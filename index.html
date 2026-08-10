@@ -58,7 +58,7 @@
 
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
-      <p class="footnote">v2.1 · La Cueva</p>
+      <p class="footnote">v2.2 · La Cueva</p>
     </form>
   </div>
 
@@ -104,8 +104,8 @@
         <input id="prod-nombre" placeholder="Nombre del producto" required>
         <select id="prod-categoria"><option value="">Categoría</option></select>
         <input id="prod-unidad" placeholder="Unidad (ej. unidad, caja)">
-        <input id="prod-precio-normal" type="number" step="0.01" placeholder="Precio normal" required>
-        <input id="prod-precio-mayorista" type="number" step="0.01" placeholder="Precio mayorista" required>
+        <input id="prod-precio-normal" type="number" step="0.01" min="0.01" placeholder="Precio normal" required>
+        <input id="prod-precio-mayorista" type="number" step="0.01" min="0.01" placeholder="Precio mayorista" required>
         <button type="submit">Agregar producto</button>
       </form>
       <div id="lista-productos" class="lista"></div>
@@ -114,8 +114,8 @@
       <form id="form-compra" class="inline-form">
         <select id="compra-producto" required></select>
         <select id="compra-almacen" required></select>
-        <input id="compra-cantidad" type="number" step="0.01" placeholder="Cantidad" required>
-        <input id="compra-costo" type="number" step="0.01" placeholder="Costo unitario" required>
+        <input id="compra-cantidad" type="number" step="0.01" min="0.01" placeholder="Cantidad" required>
+        <input id="compra-costo" type="number" step="0.01" min="0.01" placeholder="Costo unitario" required>
         <button type="submit">Registrar compra</button>
       </form>
       <p class="msg" id="msg-productos"></p>
@@ -142,7 +142,7 @@
         <select id="trf-origen" required></select>
         <select id="trf-destino" required></select>
         <select id="trf-producto" required></select>
-        <input id="trf-cantidad" type="number" step="0.01" placeholder="Cantidad" required>
+        <input id="trf-cantidad" type="number" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Transferir</button>
       </form>
       <div id="lista-transferencias" class="lista"></div>
@@ -160,7 +160,7 @@
           <option value="regalo">Regalo</option>
           <option value="vencido">Vencido</option>
         </select>
-        <input id="vale-cantidad" type="number" step="0.01" placeholder="Cantidad" required>
+        <input id="vale-cantidad" type="number" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Registrar vale</button>
       </form>
       <div id="lista-vales" class="lista"></div>

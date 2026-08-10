@@ -1,7 +1,7 @@
 // Subir este número cada vez que cambie algo del "shell" propio de la app.
-const CACHE_NAME = "battlecruiser-shell-v2";
+const CACHE_NAME = "battlecruiser-shell-v3";
 
-// Archivos propios de la app: cambian con cada versión -> stale-while-revalidate.
+// Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
   "./index.html",
   "./style.css",
@@ -59,18 +59,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Shell propio: stale-while-revalidate.
+  // Shell propio (index.html/style.css/app.js/manifest.json): Sesión 14 —
+  // cambiado de "stale-while-revalidate" a "network-first". Antes, si ya había
+  // algo en caché, se devolvía ESO PRIMERO siempre y recién se actualizaba el
+  // caché en segundo plano para la PRÓXIMA carga — es decir, cada vez que se
+  // subía una versión nueva a GitHub/Cloudflare, la primera vez que se abría
+  // la app después de eso todavía se veía la versión vieja (a veces con un
+  // desfase entre archivos: un index.html nuevo con un app.js viejo, o al
+  // revés), lo que rompía botones nuevos como "Cambiar contraseña" de forma
+  // silenciosa. Ahora se intenta la red primero (con timeout corto) y solo se
+  // usa el caché si no hay conexión real — así el shell nunca queda
+  // desincronizado entre sí, y ya no hace falta tocar "Actualizar app" a mano
+  // después de cada despliegue para ver lo último.
   event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cached = await cache.match(request);
-      const networkFetch = fetch(request)
-        .then((response) => {
-          if (response && response.ok) cache.put(request, response.clone());
-          return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetchWithTimeout(request, 2500)
+      .then((response) => {
+        if (response && response.ok) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+        }
+        return response;
+      })
+      .catch(() => caches.open(CACHE_NAME).then((cache) => cache.match(request)))
   );
 });
 
