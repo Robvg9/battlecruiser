@@ -147,3 +147,13 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 .msg.error { color: var(--ember); }
 .msg.ok { color: var(--moss); }
 h3 { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--mist); text-transform: uppercase; letter-spacing: 0.04em; margin: 18px 0 8px; }
+
+/* ---- Panel de cambio de contraseña — Sesión 13 ---- */
+.pass-panel {
+  margin: 0 0 18px; background: var(--stone); border: 1px solid #24314640;
+  border-radius: 12px; padding: 16px;
+}
+.pass-panel.hidden { display: none; }
+.pass-panel h3 { margin-top: 0; }
+.pass-panel .btn-row { display: flex; gap: 8px; margin-top: 6px; }
+.pass-panel .btn-row button { flex: 1; margin-top: 0; width: auto; }
