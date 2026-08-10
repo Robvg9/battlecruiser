@@ -58,7 +58,7 @@
 
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
-      <p class="footnote">v2.0 · La Cueva</p>
+      <p class="footnote">v2.1 · La Cueva</p>
     </form>
   </div>
 
@@ -67,9 +67,30 @@
       <h1>Battlecruiser</h1>
       <div class="header-right">
         <span id="user-email"></span>
+        <button id="change-pass-btn" type="button">Cambiar contraseña</button>
+        <button id="update-app-btn" type="button">Actualizar app</button>
         <button id="logout-btn" type="button">Cerrar sesión</button>
       </div>
     </header>
+
+    <div class="pass-panel hidden" id="pass-panel">
+      <h3>Cambiar contraseña</h3>
+      <form id="form-pass">
+        <div class="field">
+          <label for="pass-new">Contraseña nueva</label>
+          <input id="pass-new" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required minlength="6">
+        </div>
+        <div class="field">
+          <label for="pass-confirm">Repetir contraseña</label>
+          <input id="pass-confirm" type="password" autocomplete="new-password" placeholder="••••••••" required minlength="6">
+        </div>
+        <div class="btn-row">
+          <button type="submit">Guardar contraseña</button>
+          <button type="button" id="pass-cancel-btn">Cancelar</button>
+        </div>
+        <p class="msg" id="msg-pass"></p>
+      </form>
+    </div>
 
     <nav class="tabs" id="tabs">
       <button class="tab-btn active" data-tab="productos">Productos</button>
