@@ -60,6 +60,73 @@ logoutBtn.addEventListener("click", async () => {
   await client.auth.signOut();
 });
 
+// ---- Actualizar app: borra caché del shell y fuerza traer la última versión ----
+const updateAppBtn = document.getElementById("update-app-btn");
+updateAppBtn.addEventListener("click", async () => {
+  updateAppBtn.disabled = true;
+  updateAppBtn.textContent = "Actualizando...";
+  try {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (e) {
+    // Si algo falla igual forzamos el reload de abajo; el navegador va a pedir todo de red.
+  }
+  location.reload();
+});
+
+// ---- Cambiar contraseña (Supabase Auth, no pide la contraseña actual) ----
+const changePassBtn = document.getElementById("change-pass-btn");
+const passPanel = document.getElementById("pass-panel");
+const passCancelBtn = document.getElementById("pass-cancel-btn");
+const formPass = document.getElementById("form-pass");
+
+changePassBtn.addEventListener("click", () => {
+  passPanel.classList.toggle("hidden");
+});
+
+passCancelBtn.addEventListener("click", () => {
+  formPass.reset();
+  document.getElementById("msg-pass").textContent = "";
+  passPanel.classList.add("hidden");
+});
+
+formPass.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nueva = document.getElementById("pass-new").value;
+  const confirmar = document.getElementById("pass-confirm").value;
+  const submitBtn = formPass.querySelector("button[type='submit']");
+
+  if (nueva !== confirmar) {
+    setMsg("msg-pass", "Las contraseñas no coinciden.", false);
+    return;
+  }
+  if (nueva.length < 6) {
+    setMsg("msg-pass", "La contraseña debe tener al menos 6 caracteres.", false);
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Guardando...";
+
+  const { error } = await client.auth.updateUser({ password: nueva });
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Guardar contraseña";
+
+  if (error) {
+    setMsg("msg-pass", "No se pudo cambiar: " + error.message, false);
+    return;
+  }
+  setMsg("msg-pass", "Contraseña actualizada.", true);
+  formPass.reset();
+});
+
 if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js").catch(() => {});
