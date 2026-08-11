@@ -606,7 +606,7 @@ async function refrescarStockYSelects() {
   setLoading("lista-stock", "Cargando stock…");
   const { data: stock } = await client
     .from("stock")
-    .select("cantidad, minimo, productos(nombre), almacenes(nombre)");
+    .select("producto_id, almacen_id, cantidad, minimo, productos(nombre), almacenes(nombre)");
 
   _cache.stock = stock || [];
   renderResumen();
@@ -780,6 +780,51 @@ safeInit("form-vale", () => {
 let ventaLineas = [];
 let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
 let ventaProductosPrecios = {}; // id -> { nombre, precio_normal, precio_mayorista }
+let ventaProductosLista = []; // lista completa de productos, para el buscador
+
+// ---- Stock disponible para el carrito — Sesión 20 ----
+// Reutiliza _cache.stock, que ya carga y mantiene refrescarStockYSelects()
+// (la misma fuente que usan Resumen y la pestaña Almacenes). No se agrega
+// ninguna consulta nueva a Supabase: solo se lee lo que ya está en memoria.
+function obtenerStockDisponible(producto_id, almacen_id) {
+  const fila = _cache.stock.find((s) => s.producto_id === producto_id && s.almacen_id === almacen_id);
+  return fila ? Number(fila.cantidad) : 0;
+}
+
+// Cuánto de un producto ya está en el carrito actual (para no dejar pedir
+// más de lo que hay entre lo ya agregado + lo que se está por agregar/editar).
+function cantidadEnCarrito(producto_id, exceptoIdx) {
+  return ventaLineas.reduce((s, l, i) => {
+    if (i === exceptoIdx) return s;
+    return l.producto_id === producto_id ? s + l.cantidad : s;
+  }, 0);
+}
+
+// Actualiza el aviso "Stock disponible: X" y el máximo permitido en el campo
+// de cantidad, según el almacén y producto elegidos ahora mismo en el form.
+function actualizarStockDisponibleUI() {
+  const infoEl = document.getElementById("venta-stock-disponible");
+  const cantidadInput = document.getElementById("venta-cantidad");
+  if (!infoEl || !cantidadInput) return;
+
+  const almacen_id = document.getElementById("venta-almacen").value;
+  const producto_id = document.getElementById("venta-producto").value;
+
+  if (!almacen_id || !producto_id) {
+    infoEl.textContent = "";
+    infoEl.className = "msg";
+    cantidadInput.removeAttribute("max");
+    return;
+  }
+
+  const stockTotal = obtenerStockDisponible(producto_id, almacen_id);
+  const enCarrito = cantidadEnCarrito(producto_id, -1);
+  const disponible = Math.max(stockTotal - enCarrito, 0);
+
+  infoEl.textContent = "Stock disponible: " + money(disponible);
+  infoEl.className = "msg" + (disponible <= 0 ? " error" : "");
+  cantidadInput.setAttribute("max", disponible);
+}
 
 function renderVentaLineas() {
   const lista = document.getElementById("venta-lineas");
@@ -803,9 +848,14 @@ function renderVentaLineas() {
     div.innerHTML = `
       <span class="venta-linea-info">
         <span>${linea.nombre}</span>
-        <span class="muted">${money(linea.cantidad)} × $${money(linea.precio_unitario)}</span>
+        <span class="muted">$${money(linea.precio_unitario)} c/u</span>
       </span>
       <span class="venta-linea-precios">
+        <span class="venta-linea-cant-wrap">
+          <button type="button" class="venta-linea-btn venta-linea-menos" data-idx="${idx}" aria-label="Restar">−</button>
+          <input type="number" class="venta-linea-cant-input" data-idx="${idx}" value="${linea.cantidad}" step="0.01" min="0.01">
+          <button type="button" class="venta-linea-btn venta-linea-mas" data-idx="${idx}" aria-label="Sumar">+</button>
+        </span>
         <span class="muted">$${money(linea.subtotal)}</span>
         <button type="button" class="venta-linea-borrar" data-idx="${idx}">Quitar</button>
       </span>`;
@@ -815,9 +865,60 @@ function renderVentaLineas() {
   btnConfirmar.disabled = false;
 }
 
+// Cambia la cantidad de una línea ya agregada al carrito, validando contra
+// el stock disponible (sin contar lo que esa misma línea ya tenía apartado).
+// Si la nueva cantidad es 0 o menos, la línea se quita del carrito.
+function actualizarCantidadLinea(idx, nuevaCantidad) {
+  const linea = ventaLineas[idx];
+  if (!linea) return;
+
+  if (!(nuevaCantidad > 0)) {
+    ventaLineas.splice(idx, 1);
+    setMsg("msg-venta-linea", "", true);
+    renderVentaLineas();
+    return;
+  }
+
+  const almacen_id = document.getElementById("venta-almacen").value;
+  const stockTotal = obtenerStockDisponible(linea.producto_id, almacen_id);
+  const enOtrasLineas = cantidadEnCarrito(linea.producto_id, idx);
+  const disponible = stockTotal - enOtrasLineas;
+
+  if (nuevaCantidad > disponible) {
+    setMsg("msg-venta-linea", "No hay suficiente stock de " + linea.nombre + " (disponible: " + money(Math.max(disponible, 0)) + ").", false);
+    renderVentaLineas(); // vuelve a mostrar el valor anterior, sin aplicar el cambio
+    return;
+  }
+
+  linea.cantidad = nuevaCantidad;
+  linea.subtotal = nuevaCantidad * linea.precio_unitario;
+  setMsg("msg-venta-linea", "", true);
+  renderVentaLineas();
+}
+
+// ---- Buscador de productos — Sesión 20 ----
+// Filtra en el cliente sobre la misma lista que ya trae refrescarVentas()
+// (ventaProductosLista); no agrega ninguna consulta nueva. Reutiliza
+// fillSelect(), la misma función que arma el resto de los <select> de la app.
+safeInit("venta-producto-buscar", () => {
+  const buscarInput = document.getElementById("venta-producto-buscar");
+  const productoSelect = document.getElementById("venta-producto");
+
+  buscarInput.addEventListener("input", () => {
+    const termino = buscarInput.value.trim().toLowerCase();
+    const filtrados = termino
+      ? ventaProductosLista.filter((p) => p.nombre.toLowerCase().includes(termino))
+      : ventaProductosLista;
+    fillSelect(productoSelect, filtrados, "id", (p) => p.nombre, true);
+    actualizarStockDisponibleUI();
+  });
+});
+
 safeInit("form-venta-linea", () => {
   const form = document.getElementById("form-venta-linea");
   const almacenSelect = document.getElementById("venta-almacen");
+  const productoSelect = document.getElementById("venta-producto");
+  const cantidadInput = document.getElementById("venta-cantidad");
 
   // La venta entera pertenece a un solo almacén (el RPC recibe un único
   // almacén de cabecera): si ya hay líneas cargadas y se cambia el
@@ -829,13 +930,28 @@ safeInit("form-venta-linea", () => {
       renderVentaLineas();
       setMsg("msg-venta-linea", "Se vació la venta al cambiar de almacén (el precio depende del almacén).", true);
     }
+    actualizarStockDisponibleUI();
+  });
+
+  productoSelect.addEventListener("change", actualizarStockDisponibleUI);
+
+  // Aviso en vivo mientras se escribe la cantidad, además del bloqueo real
+  // que ocurre al enviar el formulario (no depende solo de esto).
+  cantidadInput.addEventListener("input", () => {
+    const max = cantidadInput.getAttribute("max");
+    const val = parseFloat(cantidadInput.value);
+    if (max !== null && val > parseFloat(max)) {
+      setMsg("msg-venta-linea", "Esa cantidad supera el stock disponible (" + money(parseFloat(max)) + ").", false);
+    } else {
+      setMsg("msg-venta-linea", "", true);
+    }
   });
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const almacen_id = almacenSelect.value;
-    const producto_id = document.getElementById("venta-producto").value;
-    const cantidad = parseFloat(document.getElementById("venta-cantidad").value);
+    const producto_id = productoSelect.value;
+    const cantidad = parseFloat(cantidadInput.value);
 
     if (!almacen_id) { setMsg("msg-venta-linea", "Elegí un almacén.", false); return; }
     if (!producto_id) { setMsg("msg-venta-linea", "Elegí un producto.", false); return; }
@@ -851,7 +967,18 @@ safeInit("form-venta-linea", () => {
       return;
     }
 
+    // Impedir superar el stock disponible: se compara lo que ya está en el
+    // carrito para ese producto + lo que se está por agregar, contra el
+    // stock real de ese producto en el almacén elegido.
     const existente = ventaLineas.find((l) => l.producto_id === producto_id);
+    const stockTotal = obtenerStockDisponible(producto_id, almacen_id);
+    const yaEnCarrito = existente ? existente.cantidad : 0;
+    if (yaEnCarrito + cantidad > stockTotal) {
+      const disponible = Math.max(stockTotal - yaEnCarrito, 0);
+      setMsg("msg-venta-linea", "No hay suficiente stock de " + producto.nombre + " (disponible: " + money(disponible) + ").", false);
+      return;
+    }
+
     if (existente) {
       existente.cantidad += cantidad;
       existente.subtotal = existente.cantidad * existente.precio_unitario;
@@ -863,23 +990,68 @@ safeInit("form-venta-linea", () => {
     }
 
     setMsg("msg-venta-linea", "", true);
-    document.getElementById("venta-cantidad").value = "";
-    document.getElementById("venta-producto").value = "";
+    cantidadInput.value = "";
+    productoSelect.value = "";
+    buscarInputReset();
+    actualizarStockDisponibleUI();
     renderVentaLineas();
+  });
+
+  function buscarInputReset() {
+    const buscarInput = document.getElementById("venta-producto-buscar");
+    if (buscarInput && buscarInput.value) {
+      buscarInput.value = "";
+      fillSelect(productoSelect, ventaProductosLista, "id", (p) => p.nombre, true);
+    }
+  }
+});
+
+// Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
+// carrito — evita registrar un listener por cada línea que se agrega/quita.
+safeInit("venta-lineas-interaccion", () => {
+  const contenedor = document.getElementById("venta-lineas");
+
+  contenedor.addEventListener("click", (e) => {
+    const btnQuitar = e.target.closest(".venta-linea-borrar");
+    if (btnQuitar) {
+      ventaLineas.splice(Number(btnQuitar.dataset.idx), 1);
+      setMsg("msg-venta-linea", "", true);
+      renderVentaLineas();
+      actualizarStockDisponibleUI();
+      return;
+    }
+    const btnMas = e.target.closest(".venta-linea-mas");
+    if (btnMas) {
+      const idx = Number(btnMas.dataset.idx);
+      const linea = ventaLineas[idx];
+      if (linea) actualizarCantidadLinea(idx, linea.cantidad + 1);
+      return;
+    }
+    const btnMenos = e.target.closest(".venta-linea-menos");
+    if (btnMenos) {
+      const idx = Number(btnMenos.dataset.idx);
+      const linea = ventaLineas[idx];
+      if (linea) actualizarCantidadLinea(idx, linea.cantidad - 1);
+      return;
+    }
+  });
+
+  contenedor.addEventListener("change", (e) => {
+    const input = e.target.closest(".venta-linea-cant-input");
+    if (!input) return;
+    actualizarCantidadLinea(Number(input.dataset.idx), parseFloat(input.value));
   });
 });
 
-safeInit("venta-lineas-quitar", () => {
-  document.getElementById("venta-lineas").addEventListener("click", (e) => {
-    const btn = e.target.closest(".venta-linea-borrar");
-    if (!btn) return;
-    ventaLineas.splice(Number(btn.dataset.idx), 1);
-    renderVentaLineas();
-  });
-});
+// Bandera simple para que, si alguien toca varias veces "Confirmar venta"
+// (por ejemplo con la red lenta), no se dispare más de un registrar_venta a
+// la vez con el mismo carrito.
+let enviandoVenta = false;
 
 safeInit("confirmar-venta", () => {
   document.getElementById("btn-confirmar-venta").addEventListener("click", async () => {
+    if (enviandoVenta) return;
+
     const almacen_id = document.getElementById("venta-almacen").value;
     const btn = document.getElementById("btn-confirmar-venta");
 
@@ -891,18 +1063,27 @@ safeInit("confirmar-venta", () => {
       return;
     }
 
+    enviandoVenta = true;
     btn.disabled = true;
+    const textoOriginal = btn.textContent;
+    btn.textContent = "Procesando...";
+    setMsg("msg-venta", "Procesando venta…", true);
+
     const p_lineas = ventaLineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
     const { error } = await client.rpc("registrar_venta", {
       p_almacen_id: almacen_id, p_lineas,
     });
 
+    enviandoVenta = false;
+
     if (error) {
       setMsg("msg-venta", "No se pudo registrar la venta: " + explicarError(error, "registrar venta"), false);
       btn.disabled = false;
+      btn.textContent = textoOriginal;
       return;
     }
 
+    btn.textContent = textoOriginal;
     setMsg("msg-venta", "Venta registrada, stock actualizado.", true);
     ventaLineas = [];
     renderVentaLineas(); // vuelve a deshabilitar "Confirmar venta" al quedar vacía
@@ -924,9 +1105,14 @@ async function refrescarVentas() {
     };
   });
 
+  ventaProductosLista = productos;
+  const buscarInput = document.getElementById("venta-producto-buscar");
+  if (buscarInput) buscarInput.value = "";
+
   fillSelect(document.getElementById("venta-almacen"), almacenes, "id", (a) => a.nombre, true);
   fillSelect(document.getElementById("venta-producto"), productos, "id", (p) => p.nombre, true);
   renderVentaLineas();
+  actualizarStockDisponibleUI();
   await refrescarVentasHistorial();
 }
 

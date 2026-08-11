@@ -293,6 +293,22 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 .btn-confirmar-venta:disabled { opacity: 0.6; cursor: default; }
 
+/* Carrito de venta: cantidad editable por línea (+/- y campo numérico) — Sesión 20 */
+.venta-linea-cant-wrap { display: flex; align-items: center; gap: 4px; }
+.venta-linea-btn {
+  width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--stone-2); color: var(--text); border: 1px solid var(--gold-dim);
+  border-radius: 4px; font-size: 14px; line-height: 1; cursor: pointer; margin-top: 0;
+}
+.venta-linea-btn:hover { border-color: var(--gold); color: var(--gold); }
+.venta-linea-cant-input {
+  width: 56px; padding: 4px 6px; background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 4px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  text-align: center; margin-top: 0;
+}
+.venta-linea-cant-input::-webkit-outer-spin-button,
+.venta-linea-cant-input::-webkit-inner-spin-button { margin: 0; }
+
 /* ---- Panel de cambio de contraseña ---- */
 .pass-panel {
   margin: 0 0 18px; background: var(--stone); border: 1px solid var(--gold-dim);

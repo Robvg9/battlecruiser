@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v2.6 · La Cueva</p>
+      <p class="footnote">v2.7 · La Cueva</p>
     </form>
   </div>
 
@@ -187,10 +187,12 @@
     <section id="tab-ventas" class="tab-panel">
       <form id="form-venta-linea" class="inline-form">
         <select id="venta-almacen" required><option value="">Almacén</option></select>
+        <input id="venta-producto-buscar" type="text" placeholder="Buscar producto…" autocomplete="off">
         <select id="venta-producto" required><option value="">Producto</option></select>
         <input id="venta-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad">
         <button type="submit">Agregar a la venta</button>
       </form>
+      <p class="msg" id="venta-stock-disponible"></p>
       <p class="msg" id="msg-venta-linea"></p>
 
       <div id="venta-lineas" class="lista">
