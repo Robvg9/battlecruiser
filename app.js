@@ -55,6 +55,10 @@ function showLogin() {
   loginForm.classList.remove("hidden");
   lanternWrap.classList.remove("hidden");
   appShell.classList.remove("visible");
+  // Foco directo en "Correo" al mostrar el login: con 6+ vendedores entrando y
+  // saliendo de la cuenta seguido en la misma caja, ahorra un tap cada vez.
+  const emailInput = document.getElementById("email");
+  if (emailInput) emailInput.focus();
 }
 
 // Por defecto arranca en login hasta confirmar sesión real (evita el parpadeo de ver ambas pantallas)
@@ -85,7 +89,11 @@ safeInit("login", () => {
     loginBtn.textContent = "Entrar";
 
     if (error) {
-      loginError.textContent = "Correo o contraseña incorrectos.";
+      const msg = (error.message || "").toLowerCase();
+      loginError.textContent = (!navigator.onLine || msg.includes("failed to fetch") || msg.includes("timeout"))
+        ? "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento."
+        : "Correo o contraseña incorrectos.";
+      console.error("[Battlecruiser] (login)", error);
     }
   });
 });
@@ -216,7 +224,7 @@ safeInit("cambiar-contraseña", () => {
 
     if (error) {
       console.error("[Battlecruiser] updateUser password error:", error);
-      setMsg("msg-pass", "No se pudo cambiar: " + error.message, false);
+      setMsg("msg-pass", "No se pudo cambiar: " + explicarError(error, "cambiar contraseña"), false);
       return;
     }
     console.log("[Battlecruiser] Contraseña actualizada para:", data.user && data.user.email);
@@ -230,6 +238,20 @@ if ("serviceWorker" in navigator && (location.protocol === "http:" || location.p
     navigator.serviceWorker.register("./service-worker.js").catch(() => {});
   });
 }
+
+// ---- Evitar que el scroll del mouse/trackpad cambie precios y cantidades ----
+// Bug clásico de los inputs type="number": si el cursor queda arriba de uno
+// de estos campos (precio, cantidad, costo) mientras alguien desplaza la
+// pantalla con la rueda del mouse, el navegador interpreta ese scroll como
+// "sumar/restar" al valor del campo, sin que nadie lo note. En una pantalla
+// de compras/transferencias/vales eso puede cambiar un precio o una cantidad
+// de verdad. Se desenfoca el campo apenas empieza el scroll, así el gesto
+// mueve la página como siempre y no toca el número.
+safeInit("bloqueo-scroll-numeros", () => {
+  document.querySelectorAll('input[type="number"]').forEach((input) => {
+    input.addEventListener("wheel", () => input.blur(), { passive: true });
+  });
+});
 
 safeInit("estado-conexion", () => {
   const connStatus = document.getElementById("conn-status");
@@ -260,6 +282,26 @@ function setMsg(id, text, ok) {
   const el = document.getElementById(id);
   el.textContent = text;
   el.className = "msg " + (ok ? "ok" : "error");
+}
+
+// ---- Traducir errores técnicos de red a un mensaje claro — Sesión 16 ----
+// Las Sesiones 14/15 corrigieron la CAUSA del "Failed to fetch" al cambiar la
+// contraseña, pero ese texto crudo en inglés podía seguir apareciendo tal
+// cual en CUALQUIER otra escritura (crear producto, registrar compra, crear
+// almacén, transferir, registrar vale) si la conexión fallaba justo en ese
+// momento — el mensaje técnico nunca se traducía ahí. Ahora todas las
+// pantallas pasan el error por esta función antes de mostrarlo: si es un
+// problema de red/tiempo de espera se explica en español simple, y para
+// cualquier otro error (por ejemplo uno propio de una regla del negocio) se
+// deja pasar el mensaje original, que sí suele ser útil. El error técnico
+// completo siempre queda en la consola para poder depurarlo después.
+function explicarError(error, contexto) {
+  console.error("[Battlecruiser]" + (contexto ? " (" + contexto + ")" : ""), error);
+  const msg = ((error && error.message) || "").toLowerCase();
+  if (!navigator.onLine || msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("timeout")) {
+    return "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento.";
+  }
+  return (error && error.message) || "Ocurrió un error inesperado.";
 }
 
 // ---- Pestaña Resumen — Sesión 15 (nueva) ----
@@ -418,7 +460,7 @@ safeInit("form-producto", () => {
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-productos", "No se pudo crear: " + error.message, false); return; }
+    if (error) { setMsg("msg-productos", "No se pudo crear: " + explicarError(error, "crear producto"), false); return; }
     setMsg("msg-productos", "Producto creado.", true);
     e.target.reset();
     await refrescarProductos();
@@ -446,7 +488,7 @@ safeInit("form-compra", () => {
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-productos", "No se pudo registrar la compra: " + error.message, false); return; }
+    if (error) { setMsg("msg-productos", "No se pudo registrar la compra: " + explicarError(error, "registrar compra"), false); return; }
     setMsg("msg-productos", "Compra registrada, stock actualizado.", true);
     e.target.reset();
     await refrescarStockYSelects();
@@ -516,7 +558,7 @@ safeInit("form-almacen", () => {
     const { error } = await client.from("almacenes").insert({ nombre, tipo });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-almacenes", "No se pudo crear: " + error.message, false); return; }
+    if (error) { setMsg("msg-almacenes", "No se pudo crear: " + explicarError(error, "crear almacén"), false); return; }
     setMsg("msg-almacenes", "Almacén creado.", true);
     e.target.reset();
     await refrescarAlmacenes();
@@ -577,7 +619,7 @@ safeInit("form-transferencia", () => {
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-transferencias", "No se pudo transferir: " + error.message, false); return; }
+    if (error) { setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(error, "transferencia"), false); return; }
     setMsg("msg-transferencias", "Transferencia registrada.", true);
     e.target.reset();
     await refrescarTransferencias();
@@ -634,7 +676,7 @@ safeInit("form-vale", () => {
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-vales", "No se pudo registrar: " + error.message, false); return; }
+    if (error) { setMsg("msg-vales", "No se pudo registrar: " + explicarError(error, "vale de salida"), false); return; }
     setMsg("msg-vales", "Vale de salida registrado, stock actualizado.", true);
     e.target.reset();
     await refrescarVales();
