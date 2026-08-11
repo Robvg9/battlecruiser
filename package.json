@@ -1,0 +1,7 @@
+{
+  "name": "battlecruiser",
+  "private": true,
+  "devDependencies": {
+    "wrangler": "4.120.1"
+  }
+}
