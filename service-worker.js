@@ -1,5 +1,5 @@
 // Subir este número cada vez que cambie algo del "shell" propio de la app.
-const CACHE_NAME = "battlecruiser-shell-v3";
+const CACHE_NAME = "battlecruiser-shell-v4";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
@@ -52,10 +52,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Llamadas a la API de Supabase: siempre red, con timeout corto para no
-  // dejar la pantalla colgada si hay wifi conectado pero sin internet real.
+  // Llamadas a la API de Supabase.
+  // Sesión 15 — causa real de "Failed to fetch" al cambiar la contraseña:
+  // ANTES esta regla aplicaba un timeout de apenas 1200ms a *toda* llamada a
+  // supabase.co, incluyendo las de escritura (updateUser, RPC de compras/
+  // transferencias/vales). Si la red tardaba un poco más que eso (celular con
+  // señal floja, por ejemplo), la promesa se rechazaba y el navegador le
+  // devolvía a la página un "Failed to fetch" genérico, aunque la operación
+  // en el servidor pudiera haber sido perfectamente normal de estar un poco
+  // más lenta. El timeout corto solo tiene sentido para LECTURAS (GET), donde
+  // el objetivo es no dejar la pantalla colgada y poder mostrar el aviso de
+  // "sin conexión" rápido. Las escrituras (POST/PATCH — login, cambiar
+  // contraseña, registrar compra/transferencia/vale) van directo a la red,
+  // sin ese timeout artificial.
   if (url.includes("supabase.co")) {
-    event.respondWith(fetchWithTimeout(request, 1200));
+    if (request.method === "GET") {
+      event.respondWith(fetchWithTimeout(request, 4000));
+    } else {
+      event.respondWith(fetch(request));
+    }
     return;
   }
 

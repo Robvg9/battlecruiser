@@ -97,24 +97,69 @@ safeInit("logout", () => {
 });
 
 // ---- Actualizar app: borra caché del shell y fuerza traer la última versión ----
+// Sesión 15: pedido explícito de Roberto — que este botón esté también en la
+// pantalla de login, para no tener que entrar a la cuenta solo para forzar una
+// actualización (por ejemplo si el login mismo quedó con una versión vieja
+// pegada). Un solo botón compartido, cableado a los dos lugares.
+async function actualizarApp(btn) {
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Actualizando...";
+  try {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (e) {
+    // Si algo falla igual forzamos el reload de abajo; el navegador va a pedir todo de red.
+  }
+  location.reload();
+}
+
+safeInit("actualizar-app-login", () => {
+  const btn = document.getElementById("update-app-btn-login");
+  btn.addEventListener("click", () => actualizarApp(btn));
+});
+
 safeInit("actualizar-app", () => {
   const updateAppBtn = document.getElementById("update-app-btn");
-  updateAppBtn.addEventListener("click", async () => {
-    updateAppBtn.disabled = true;
-    updateAppBtn.textContent = "Actualizando...";
-    try {
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-      if ("serviceWorker" in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-      }
-    } catch (e) {
-      // Si algo falla igual forzamos el reload de abajo; el navegador va a pedir todo de red.
+  updateAppBtn.addEventListener("click", () => actualizarApp(updateAppBtn));
+});
+
+// ---- Ojito para mostrar/ocultar contraseña — Sesión 15 ----
+// Se aplica a cualquier campo que tenga un botón .pass-toggle al lado (login
+// y las dos contraseñas del panel de "Cambiar contraseña").
+safeInit("ojito-contraseña", () => {
+  document.querySelectorAll(".pass-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.target;
+      const input = document.getElementById(targetId);
+      if (!input) return;
+      const mostrando = input.type === "text";
+      input.type = mostrando ? "password" : "text";
+      btn.setAttribute("aria-label", mostrando ? "Mostrar contraseña" : "Ocultar contraseña");
+      btn.classList.toggle("activo", !mostrando);
+    });
+  });
+});
+
+// ---- Menú "Ajustes" (Cambiar contraseña / Actualizar app) — Sesión 15 ----
+safeInit("menu-ajustes", () => {
+  const ajustesBtn = document.getElementById("ajustes-btn");
+  const ajustesMenu = document.getElementById("ajustes-menu");
+
+  ajustesBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    ajustesMenu.classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    if (!ajustesMenu.classList.contains("hidden") && !ajustesMenu.contains(e.target) && e.target !== ajustesBtn) {
+      ajustesMenu.classList.add("hidden");
     }
-    location.reload();
   });
 });
 
@@ -124,9 +169,11 @@ safeInit("cambiar-contraseña", () => {
   const passPanel = document.getElementById("pass-panel");
   const passCancelBtn = document.getElementById("pass-cancel-btn");
   const formPass = document.getElementById("form-pass");
+  const ajustesMenu = document.getElementById("ajustes-menu");
 
   changePassBtn.addEventListener("click", () => {
     passPanel.classList.toggle("hidden");
+    if (ajustesMenu) ajustesMenu.classList.add("hidden");
   });
 
   passCancelBtn.addEventListener("click", () => {
@@ -215,6 +262,70 @@ function setMsg(id, text, ok) {
   el.className = "msg " + (ok ? "ok" : "error");
 }
 
+// ---- Pestaña Resumen — Sesión 15 (nueva) ----
+// No es una tabla más: junta lo que ya se trae en las otras 4 pantallas
+// (productos, almacenes, stock, transferencias, vales) en una vista de un
+// vistazo — cantidad de productos/almacenes, qué está bajo el mínimo, y los
+// últimos movimientos de stock (transferencias + vales mezclados por fecha).
+// No agrega tablas nuevas en Supabase: todo sale de las mismas consultas que
+// ya se hacían, cacheadas acá para no duplicar llamadas a la base.
+const _cache = { productos: [], almacenes: [], stock: [], transferencias: [], vales: [] };
+
+function renderResumen() {
+  const grid = document.getElementById("resumen-grid");
+  if (!grid) return;
+
+  const bajoMinimo = _cache.stock.filter((s) => s.minimo != null && s.cantidad <= s.minimo);
+
+  grid.innerHTML = `
+    <div class="resumen-card"><div class="valor">${_cache.productos.length}</div><div class="etiqueta">Productos</div></div>
+    <div class="resumen-card"><div class="valor">${_cache.almacenes.length}</div><div class="etiqueta">Almacenes</div></div>
+    <div class="resumen-card ${bajoMinimo.length ? "alerta" : ""}"><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div></div>
+    <div class="resumen-card"><div class="valor">${_cache.transferencias.length + _cache.vales.length}</div><div class="etiqueta">Movimientos recientes</div></div>
+  `;
+
+  const alertasEl = document.getElementById("resumen-alertas-lista");
+  if (alertasEl) {
+    if (bajoMinimo.length === 0) {
+      alertasEl.innerHTML = '<p class="lista-estado">Nada bajo el mínimo por ahora.</p>';
+    } else {
+      alertasEl.innerHTML = "";
+      bajoMinimo.forEach((s) => {
+        const div = document.createElement("div");
+        div.className = "lista-item";
+        div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
+          <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
+        alertasEl.appendChild(div);
+      });
+    }
+  }
+
+  const movsEl = document.getElementById("resumen-movs-lista");
+  if (movsEl) {
+    const movs = [
+      ..._cache.transferencias.map((t) => ({
+        fecha: t.fecha, texto: `Transferencia: ${t.origen.nombre} → ${t.destino.nombre}`, estado: t.estado,
+      })),
+      ..._cache.vales.map((v) => ({
+        fecha: v.fecha, texto: `Vale (${v.tipo}): ${v.productos.nombre} · ${v.almacenes.nombre}`, estado: money(v.cantidad),
+      })),
+    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);
+
+    if (movs.length === 0) {
+      movsEl.innerHTML = '<p class="lista-estado">Todavía no hay movimientos registrados.</p>';
+    } else {
+      movsEl.innerHTML = "";
+      movs.forEach((m) => {
+        const div = document.createElement("div");
+        div.className = "lista-item";
+        div.innerHTML = `<span>${new Date(m.fecha).toLocaleDateString()}</span>
+          <span class="muted">${m.texto} · ${m.estado}</span>`;
+        movsEl.appendChild(div);
+      });
+    }
+  }
+}
+
 // ---- Navegación por tabs ----
 safeInit("tabs", () => {
   document.getElementById("tabs").addEventListener("click", (e) => {
@@ -262,6 +373,8 @@ async function refrescarProductos() {
   const [productos, categorias, almacenes] = await Promise.all([
     cargarProductos(), cargarCategorias(), cargarAlmacenes(),
   ]);
+  _cache.productos = productos;
+  renderResumen();
 
   fillSelect(document.getElementById("prod-categoria"), categorias, "id", (c) => c.nombre, true);
   fillSelect(document.getElementById("compra-producto"), productos, "id", (p) => p.nombre);
@@ -343,6 +456,8 @@ safeInit("form-compra", () => {
 async function refrescarAlmacenes() {
   setLoading("lista-almacenes", "Cargando almacenes…");
   const almacenes = await cargarAlmacenes();
+  _cache.almacenes = almacenes;
+  renderResumen();
   const lista = document.getElementById("lista-almacenes");
   if (almacenes.length === 0) {
     setEmpty("lista-almacenes", "Todavía no hay almacenes cargados.");
@@ -372,6 +487,8 @@ async function refrescarStockYSelects() {
     .from("stock")
     .select("cantidad, minimo, productos(nombre), almacenes(nombre)");
 
+  _cache.stock = stock || [];
+  renderResumen();
   const lista = document.getElementById("lista-stock");
   if (!stock || stock.length === 0) {
     setEmpty("lista-stock", "Todavía no hay stock cargado.");
@@ -415,6 +532,8 @@ async function refrescarTransferencias() {
     .order("fecha", { ascending: false })
     .limit(20);
 
+  _cache.transferencias = data || [];
+  renderResumen();
   const lista = document.getElementById("lista-transferencias");
   if (!data || data.length === 0) {
     setEmpty("lista-transferencias", "Todavía no hay transferencias registradas.");
@@ -474,6 +593,8 @@ async function refrescarVales() {
     .order("fecha", { ascending: false })
     .limit(20);
 
+  _cache.vales = data || [];
+  renderResumen();
   const lista = document.getElementById("lista-vales");
   if (!data || data.length === 0) {
     setEmpty("lista-vales", "Todavía no hay vales de salida registrados.");
