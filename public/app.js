@@ -1084,7 +1084,8 @@ safeInit("confirmar-venta", () => {
     }
 
     btn.textContent = textoOriginal;
-    setMsg("msg-venta", "Venta registrada, stock actualizado.", true);
+    setMsg("msg-venta", "✓ Venta registrada por $" + money(total) + ". Todo listo para la próxima venta.", true);
+    setMsg("msg-venta-linea", "", true);
     ventaLineas = [];
     renderVentaLineas(); // vuelve a deshabilitar "Confirmar venta" al quedar vacía
     await refrescarStockYSelects();
