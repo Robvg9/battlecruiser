@@ -270,6 +270,29 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 .msg.ok { color: var(--sage); }
 h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px; color: var(--gold); letter-spacing: 0.02em; margin: 20px 0 10px; }
 
+/* ---- Pantalla de Ventas ---- */
+.venta-linea-info { display: flex; flex-direction: column; gap: 2px; }
+.venta-linea-precios { display: flex; align-items: center; gap: 10px; }
+.venta-linea-borrar {
+  background: transparent; border: 1px solid var(--wine); color: var(--wine);
+  border-radius: 5px; padding: 6px 10px; font-size: 12px; cursor: pointer; margin-top: 0;
+}
+.venta-linea-borrar:hover { background: rgba(122,35,49,0.15); }
+.venta-total {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--stone); border: 1px solid var(--gold-dim); border-radius: 8px;
+  padding: 14px 16px; margin-bottom: 14px; font-family: 'Cormorant Garamond', serif;
+  font-size: 16px; color: var(--text);
+}
+.venta-total-valor { font-size: 24px; font-weight: 600; color: var(--gold); }
+.btn-confirmar-venta {
+  width: 100%; padding: 12px; background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #211605; border: none; border-radius: 5px; font-family: 'Inter', sans-serif;
+  font-weight: 600; font-size: 14px; letter-spacing: 0.03em; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(201,162,77,0.22);
+}
+.btn-confirmar-venta:disabled { opacity: 0.6; cursor: default; }
+
 /* ---- Panel de cambio de contraseña ---- */
 .pass-panel {
   margin: 0 0 18px; background: var(--stone); border: 1px solid var(--gold-dim);
