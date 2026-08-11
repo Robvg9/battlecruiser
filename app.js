@@ -766,6 +766,169 @@ safeInit("form-vale", () => {
   });
 });
 
+// ============================================================
+// Sesión 18 — Ventas
+// El precio se decide SOLO en el servidor (RPC registrar_venta) según el
+// tipo del almacén elegido — el cliente calcula el mismo precio nada más
+// para mostrarlo antes de confirmar, pero nunca lo envía: la función
+// vuelve a resolverlo del lado del servidor. El descuento de stock (FIFO
+// sobre lotes_compra) ocurre de forma atómica dentro del RPC, con el mismo
+// patrón que registrar_compra/registrar_transferencia/registrar_vale_salida
+// — nunca con un update directo del cliente sobre "stock".
+// ============================================================
+
+let ventaLineas = [];
+let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
+let ventaProductosPrecios = {}; // id -> { nombre, precio_normal, precio_mayorista }
+
+function renderVentaLineas() {
+  const lista = document.getElementById("venta-lineas");
+  const totalEl = document.getElementById("venta-total");
+  const btnConfirmar = document.getElementById("btn-confirmar-venta");
+  if (!lista || !totalEl || !btnConfirmar) return;
+
+  if (ventaLineas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">Todavía no agregaste productos a esta venta.</p>';
+    totalEl.textContent = "$0.00";
+    btnConfirmar.disabled = true;
+    return;
+  }
+
+  lista.innerHTML = "";
+  let total = 0;
+  ventaLineas.forEach((linea, idx) => {
+    total += linea.subtotal;
+    const div = document.createElement("div");
+    div.className = "lista-item";
+    div.innerHTML = `
+      <span class="venta-linea-info">
+        <span>${linea.nombre}</span>
+        <span class="muted">${money(linea.cantidad)} × $${money(linea.precio_unitario)}</span>
+      </span>
+      <span class="venta-linea-precios">
+        <span class="muted">$${money(linea.subtotal)}</span>
+        <button type="button" class="venta-linea-borrar" data-idx="${idx}">Quitar</button>
+      </span>`;
+    lista.appendChild(div);
+  });
+  totalEl.textContent = "$" + money(total);
+  btnConfirmar.disabled = false;
+}
+
+safeInit("form-venta-linea", () => {
+  const form = document.getElementById("form-venta-linea");
+  const almacenSelect = document.getElementById("venta-almacen");
+
+  // La venta entera pertenece a un solo almacén (el RPC recibe un único
+  // almacén de cabecera): si ya hay líneas cargadas y se cambia el
+  // almacén, se vacía el carrito para no dejar precios de un almacén
+  // distinto al que finalmente se va a confirmar.
+  almacenSelect.addEventListener("change", () => {
+    if (ventaLineas.length > 0) {
+      ventaLineas = [];
+      renderVentaLineas();
+      setMsg("msg-venta-linea", "Se vació la venta al cambiar de almacén (el precio depende del almacén).", true);
+    }
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const almacen_id = almacenSelect.value;
+    const producto_id = document.getElementById("venta-producto").value;
+    const cantidad = parseFloat(document.getElementById("venta-cantidad").value);
+
+    if (!almacen_id) { setMsg("msg-venta-linea", "Elegí un almacén.", false); return; }
+    if (!producto_id) { setMsg("msg-venta-linea", "Elegí un producto.", false); return; }
+    if (!(cantidad > 0)) { setMsg("msg-venta-linea", "La cantidad debe ser mayor a 0.", false); return; }
+
+    const tipo = ventaAlmacenesTipo[almacen_id];
+    const producto = ventaProductosPrecios[producto_id];
+    if (!producto) { setMsg("msg-venta-linea", "Producto no encontrado.", false); return; }
+
+    const precio = tipo === "mayorista" ? producto.precio_mayorista : producto.precio_normal;
+    if (precio === null || precio === undefined) {
+      setMsg("msg-venta-linea", "Este producto no tiene precio mayorista configurado.", false);
+      return;
+    }
+
+    const existente = ventaLineas.find((l) => l.producto_id === producto_id);
+    if (existente) {
+      existente.cantidad += cantidad;
+      existente.subtotal = existente.cantidad * existente.precio_unitario;
+    } else {
+      ventaLineas.push({
+        producto_id, nombre: producto.nombre, cantidad,
+        precio_unitario: precio, subtotal: cantidad * precio,
+      });
+    }
+
+    setMsg("msg-venta-linea", "", true);
+    document.getElementById("venta-cantidad").value = "";
+    document.getElementById("venta-producto").value = "";
+    renderVentaLineas();
+  });
+});
+
+safeInit("venta-lineas-quitar", () => {
+  document.getElementById("venta-lineas").addEventListener("click", (e) => {
+    const btn = e.target.closest(".venta-linea-borrar");
+    if (!btn) return;
+    ventaLineas.splice(Number(btn.dataset.idx), 1);
+    renderVentaLineas();
+  });
+});
+
+safeInit("confirmar-venta", () => {
+  document.getElementById("btn-confirmar-venta").addEventListener("click", async () => {
+    const almacen_id = document.getElementById("venta-almacen").value;
+    const btn = document.getElementById("btn-confirmar-venta");
+
+    if (!almacen_id) { setMsg("msg-venta", "Elegí un almacén.", false); return; }
+    if (ventaLineas.length === 0) { setMsg("msg-venta", "Agregá al menos un producto a la venta.", false); return; }
+
+    const total = ventaLineas.reduce((s, l) => s + l.subtotal, 0);
+    if (!window.confirm("¿Confirmar venta por $" + money(total) + "? Esto descuenta stock real.")) {
+      return;
+    }
+
+    btn.disabled = true;
+    const p_lineas = ventaLineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
+    const { error } = await client.rpc("registrar_venta", {
+      p_almacen_id: almacen_id, p_lineas,
+    });
+
+    if (error) {
+      setMsg("msg-venta", "No se pudo registrar la venta: " + explicarError(error, "registrar venta"), false);
+      btn.disabled = false;
+      return;
+    }
+
+    setMsg("msg-venta", "Venta registrada, stock actualizado.", true);
+    ventaLineas = [];
+    renderVentaLineas(); // vuelve a deshabilitar "Confirmar venta" al quedar vacía
+    await refrescarStockYSelects();
+    await refrescarVentas();
+  });
+});
+
+async function refrescarVentas() {
+  const [productos, almacenes] = await Promise.all([cargarProductos(), cargarAlmacenes()]);
+
+  ventaAlmacenesTipo = {};
+  almacenes.forEach((a) => { ventaAlmacenesTipo[a.id] = a.tipo; });
+
+  ventaProductosPrecios = {};
+  productos.forEach((p) => {
+    ventaProductosPrecios[p.id] = {
+      nombre: p.nombre, precio_normal: p.precio_normal, precio_mayorista: p.precio_mayorista,
+    };
+  });
+
+  fillSelect(document.getElementById("venta-almacen"), almacenes, "id", (a) => a.nombre, true);
+  fillSelect(document.getElementById("venta-producto"), productos, "id", (p) => p.nombre, true);
+  renderVentaLineas();
+}
+
 // Cargar todo cuando se confirma sesión real (se engancha a showApp existente)
 const _showAppOriginal = showApp;
 showApp = function (session) {
@@ -774,4 +937,5 @@ showApp = function (session) {
   safeInit("carga-inicial-almacenes", () => { refrescarAlmacenes().then(refrescarStockYSelects); });
   safeInit("carga-inicial-transferencias", () => { refrescarTransferencias(); });
   safeInit("carga-inicial-vales", () => { refrescarVales(); });
+  safeInit("carga-inicial-ventas", () => { refrescarVentas(); });
 };
