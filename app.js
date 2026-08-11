@@ -927,6 +927,36 @@ async function refrescarVentas() {
   fillSelect(document.getElementById("venta-almacen"), almacenes, "id", (a) => a.nombre, true);
   fillSelect(document.getElementById("venta-producto"), productos, "id", (p) => p.nombre, true);
   renderVentaLineas();
+  await refrescarVentasHistorial();
+}
+
+// ---- Historial de ventas — Sesión 19 ----
+// Solo lectura: la tabla "ventas" ya se llena de forma atómica dentro del RPC
+// registrar_venta (Sección 5 — nunca desde el cliente). Mismo patrón de
+// listado que refrescarTransferencias/refrescarVales: últimas 20, más nuevas
+// primero.
+async function refrescarVentasHistorial() {
+  setLoading("lista-ventas", "Cargando ventas…");
+  const { data } = await client
+    .from("ventas")
+    .select("id, fecha, total, almacenes(nombre)")
+    .order("fecha", { ascending: false })
+    .limit(20);
+
+  const lista = document.getElementById("lista-ventas");
+  if (!lista) return;
+  if (!data || data.length === 0) {
+    setEmpty("lista-ventas", "Todavía no hay ventas registradas.");
+    return;
+  }
+  lista.innerHTML = "";
+  data.forEach((v) => {
+    const div = document.createElement("div");
+    div.className = "lista-item";
+    div.innerHTML = `<span>${v.almacenes.nombre}</span>
+      <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
+    lista.appendChild(div);
+  });
 }
 
 // Cargar todo cuando se confirma sesión real (se engancha a showApp existente)
