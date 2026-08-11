@@ -520,11 +520,16 @@ safeInit("form-producto", () => {
     const categoria_id = document.getElementById("prod-categoria").value || null;
     const unidad = document.getElementById("prod-unidad").value.trim() || null;
     const precio_normal = parseFloat(document.getElementById("prod-precio-normal").value);
-    const precio_mayorista = parseFloat(document.getElementById("prod-precio-mayorista").value);
+    const precioMayoristaRaw = document.getElementById("prod-precio-mayorista").value.trim();
+    const precio_mayorista = precioMayoristaRaw === "" ? null : parseFloat(precioMayoristaRaw);
     const submitBtn = e.target.querySelector("button[type='submit']");
 
-    if (!(precio_normal > 0) || !(precio_mayorista > 0)) {
-      setMsg("msg-productos", "Los precios deben ser mayores a 0.", false);
+    if (!(precio_normal > 0)) {
+      setMsg("msg-productos", "El precio normal debe ser mayor a 0.", false);
+      return;
+    }
+    if (precio_mayorista !== null && !(precio_mayorista > 0)) {
+      setMsg("msg-productos", "El precio mayorista debe ser mayor a 0.", false);
       return;
     }
 
