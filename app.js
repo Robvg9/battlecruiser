@@ -26,6 +26,15 @@ function money(n) {
   return Number.isFinite(v) ? v.toFixed(2) : "0.00";
 }
 
+// ---- Formato de fecha fijo (día/mes/año en español) — Sesión 17 ----
+// `toLocaleDateString()` sin argumentos usa el idioma/región configurados en
+// el celular de quien esté mirando la pantalla — dos vendedoras con el
+// teléfono configurado distinto podían ver la misma fecha escrita distinto
+// (m/d/a vs d/m/a). Se fija el locale para que se vea siempre igual.
+function fechaCorta(fecha) {
+  return new Date(fecha).toLocaleDateString("es", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function setLoading(listId, texto) {
   const el = document.getElementById(listId);
   if (el) el.innerHTML = '<p class="lista-estado">' + (texto || "Cargando…") + "</p>";
@@ -138,9 +147,16 @@ safeInit("actualizar-app", () => {
   updateAppBtn.addEventListener("click", () => actualizarApp(updateAppBtn));
 });
 
-// ---- Ojito para mostrar/ocultar contraseña — Sesión 15 ----
+// ---- Ojito para mostrar/ocultar contraseña — Sesión 15, ícono real Sesión 17 ----
 // Se aplica a cualquier campo que tenga un botón .pass-toggle al lado (login
 // y las dos contraseñas del panel de "Cambiar contraseña").
+// Sesión 17: antes el botón solo agregaba la clase "activo" (sin ningún estilo
+// asociado en style.css), así que el ícono se veía exactamente igual estuviera
+// mostrando la contraseña o no — la única pista era leer los caracteres reales.
+// Ahora el ícono cambia de verdad entre "ojo abierto" y "ojo tachado".
+const OJO_ABIERTO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OJO_TACHADO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
 safeInit("ojito-contraseña", () => {
   document.querySelectorAll(".pass-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -148,9 +164,11 @@ safeInit("ojito-contraseña", () => {
       const input = document.getElementById(targetId);
       if (!input) return;
       const mostrando = input.type === "text";
-      input.type = mostrando ? "password" : "text";
-      btn.setAttribute("aria-label", mostrando ? "Mostrar contraseña" : "Ocultar contraseña");
-      btn.classList.toggle("activo", !mostrando);
+      const ahoraVisible = !mostrando;
+      input.type = ahoraVisible ? "text" : "password";
+      btn.setAttribute("aria-label", ahoraVisible ? "Ocultar contraseña" : "Mostrar contraseña");
+      btn.classList.toggle("activo", ahoraVisible);
+      btn.innerHTML = ahoraVisible ? OJO_TACHADO_SVG : OJO_ABIERTO_SVG;
     });
   });
 });
@@ -238,6 +256,24 @@ if ("serviceWorker" in navigator && (location.protocol === "http:" || location.p
     navigator.serviceWorker.register("./service-worker.js").catch(() => {});
   });
 }
+
+// ---- Tecla Escape cierra el menú "Ajustes" y el panel "Cambiar contraseña" — Sesión 17 ----
+// Antes solo se podían cerrar tocando afuera (el menú) o el botón "Cancelar"
+// (el panel). Escape es el atajo esperable para cualquiera de los dos, sobre
+// todo usando la app desde una PC con teclado.
+safeInit("escape-cierra-paneles", () => {
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const ajustesMenu = document.getElementById("ajustes-menu");
+    const passPanel = document.getElementById("pass-panel");
+    if (ajustesMenu && !ajustesMenu.classList.contains("hidden")) {
+      ajustesMenu.classList.add("hidden");
+    }
+    if (passPanel && !passPanel.classList.contains("hidden")) {
+      passPanel.classList.add("hidden");
+    }
+  });
+});
 
 // ---- Evitar que el scroll del mouse/trackpad cambie precios y cantidades ----
 // Bug clásico de los inputs type="number": si el cursor queda arriba de uno
@@ -360,7 +396,7 @@ function renderResumen() {
       movs.forEach((m) => {
         const div = document.createElement("div");
         div.className = "lista-item";
-        div.innerHTML = `<span>${new Date(m.fecha).toLocaleDateString()}</span>
+        div.innerHTML = `<span>${fechaCorta(m.fecha)}</span>
           <span class="muted">${m.texto} · ${m.estado}</span>`;
         movsEl.appendChild(div);
       });
@@ -586,7 +622,7 @@ async function refrescarTransferencias() {
     const div = document.createElement("div");
     div.className = "lista-item";
     div.innerHTML = `<span>${t.origen.nombre} → ${t.destino.nombre}</span>
-      <span class="muted">${new Date(t.fecha).toLocaleDateString()} · ${t.estado}</span>`;
+      <span class="muted">${fechaCorta(t.fecha)} · ${t.estado}</span>`;
     lista.appendChild(div);
   });
 }
@@ -646,8 +682,11 @@ async function refrescarVales() {
   data.forEach((v) => {
     const div = document.createElement("div");
     div.className = "lista-item";
+    // Sesión 17: antes esta lista no mostraba la fecha (Transferencias sí la
+    // mostraba) — para un vale de salida (merma/donación/regalo/vencido) la
+    // fecha es un dato que hace falta para llevar cuenta real.
     div.innerHTML = `<span>${v.productos.nombre} <span class="muted">· ${v.almacenes.nombre}</span></span>
-      <span class="muted">${v.tipo} · ${money(v.cantidad)}</span>`;
+      <span class="muted">${fechaCorta(v.fecha)} · ${v.tipo} · ${money(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
 }

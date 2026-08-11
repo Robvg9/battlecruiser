@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v2.4 · La Cueva</p>
+      <p class="footnote">v2.5 · La Cueva</p>
     </form>
   </div>
 
@@ -143,7 +143,15 @@
       <form id="form-producto" class="inline-form">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
         <select id="prod-categoria"><option value="">Categoría</option></select>
-        <input id="prod-unidad" placeholder="Unidad (ej. unidad, caja)">
+        <input id="prod-unidad" placeholder="Unidad (ej. unidad, caja)" list="unidades-comunes">
+        <datalist id="unidades-comunes">
+          <option value="unidad"></option>
+          <option value="caja"></option>
+          <option value="paquete"></option>
+          <option value="libra"></option>
+          <option value="kg"></option>
+          <option value="litro"></option>
+        </datalist>
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista" required>
         <button type="submit">Agregar producto</button>
