@@ -63,13 +63,35 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v2.5 · La Cueva</p>
+      <p class="footnote">v2.6 · La Cueva</p>
     </form>
   </div>
 
   <div class="app-shell" id="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <span class="sidebar-title">Secciones</span>
+        <button id="sidebar-close-btn" type="button" class="icon-btn" aria-label="Cerrar menú">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav" id="tabs">
+        <button class="tab-btn active" data-tab="resumen">Resumen</button>
+        <button class="tab-btn" data-tab="productos">Productos</button>
+        <button class="tab-btn" data-tab="almacenes">Almacenes</button>
+        <button class="tab-btn" data-tab="transferencias">Transferencias</button>
+        <button class="tab-btn" data-tab="vales">Vales de salida</button>
+      </nav>
+    </aside>
+
     <header class="app-header">
-      <h1>Battlecruiser</h1>
+      <div class="header-left">
+        <button id="sidebar-toggle-btn" type="button" class="icon-btn" aria-label="Abrir menú" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <h1>Battlecruiser</h1>
+      </div>
       <div class="header-right">
         <span id="user-email"></span>
         <div class="ajustes-wrap">
@@ -116,14 +138,6 @@
         <p class="msg" id="msg-pass"></p>
       </form>
     </div>
-
-    <nav class="tabs" id="tabs">
-      <button class="tab-btn active" data-tab="resumen">Resumen</button>
-      <button class="tab-btn" data-tab="productos">Productos</button>
-      <button class="tab-btn" data-tab="almacenes">Almacenes</button>
-      <button class="tab-btn" data-tab="transferencias">Transferencias</button>
-      <button class="tab-btn" data-tab="vales">Vales de salida</button>
-    </nav>
 
     <section id="tab-resumen" class="tab-panel visible">
       <div class="resumen-grid" id="resumen-grid">

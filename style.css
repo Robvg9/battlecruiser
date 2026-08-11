@@ -187,7 +187,6 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 }
 .ajustes-menu button:hover { background: var(--stone); color: var(--gold); }
 
-.tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; border-bottom: 1px solid #c9a24d2e; padding-bottom: 0; }
 .tab-btn {
   padding: 10px 16px; background: transparent; color: var(--mist); border: none;
   border-bottom: 2px solid transparent; font-family: 'Cormorant Garamond', serif; font-weight: 600;
@@ -195,6 +194,53 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ---- Menú lateral desplegable — reemplaza los tabs horizontales ----
+   Cerrado por defecto; se abre con el botón hamburguesa del header y se
+   cierra con el botón ✕, tocando afuera (backdrop), con Escape, o al elegir
+   una sección — así nunca queda tapando contenido por accidente. */
+.header-left { display: flex; align-items: center; gap: 12px; }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0; flex-shrink: 0;
+  background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px; cursor: pointer; margin-top: 0;
+}
+.icon-btn:hover { border-color: var(--gold); color: var(--gold); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.sidebar-backdrop {
+  position: fixed; inset: 0; background: rgba(6,14,11,0.6);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 20;
+}
+.sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+.sidebar {
+  position: fixed; top: 0; left: 0; height: 100vh; width: 240px; max-width: 78vw;
+  background: linear-gradient(180deg, var(--stone-2) 0%, var(--stone) 100%);
+  border-right: 1px solid var(--gold-dim);
+  box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  transform: translateX(-100%); transition: transform 0.22s ease;
+  z-index: 21; display: flex; flex-direction: column; padding: 16px 12px;
+  overflow-y: auto;
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 0 4px; }
+.sidebar-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 16px;
+  color: var(--gold); letter-spacing: 0.03em;
+}
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-nav .tab-btn {
+  text-align: left; padding: 11px 12px; border-bottom: none; margin-bottom: 0;
+  border-left: 2px solid transparent; border-radius: 5px;
+}
+.sidebar-nav .tab-btn:hover { background: rgba(201,162,77,0.06); }
+.sidebar-nav .tab-btn.active { border-left-color: var(--gold); background: rgba(201,162,77,0.08); }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
+  .sidebar-backdrop { transition: none; }
+}
 .tab-panel { display: none; }
 .tab-panel.visible { display: block; }
 

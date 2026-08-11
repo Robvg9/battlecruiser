@@ -1,0 +1,369 @@
+BATTLECRUISER — CEREBRO V3.0 OPTIMIZADO
+Estado maestro compacto — actualización 2026-08-11
+Proyecto: Battlecruiser | Versión de app entregada: v2.5
+Objetivo: reducir contexto innecesario para IA sin perder decisiones, reglas, estado real ni pendientes.
+
+==================================================
+0. REGLAS CRÍTICAS PARA CUALQUIER IA
+==================================================
+
+1. NO afirmar que algo está probado/hecho si Roberto no lo confirmó en uso real.
+2. Si hay código disponible en la sesión, verificar primero el código real. Este documento puede quedar desactualizado.
+3. La BITÁCORA COMPACTA conserva decisiones importantes; no inventar ni reescribir hechos.
+4. Al terminar una sesión con cambios, actualizar este documento y registrar:
+   - qué cambió,
+   - qué Roberto probó realmente,
+   - qué queda pendiente.
+5. Mantener sincronizados número de versión de app y documento cuando se entregue una versión nueva.
+6. Si cambia solo 1-3 archivos pequeños, se pueden entregar bloques de código; no hace falta ZIP salvo pedido.
+7. Al final de la sesión, dar a Roberto un resumen de 5-10 líneas.
+8. Priorizar soluciones simples, robustas y adecuadas al tamaño real del negocio.
+9. No construir funciones complejas solo porque "podrían ser útiles".
+10. Antes de declarar una función terminada, separar siempre:
+    CÓDIGO ESCRITO ≠ SUBIDO ≠ FUNCIONANDO ≠ PROBADO POR ROBERTO.
+
+==================================================
+1. PROYECTO Y ALCANCE
+==================================================
+
+Battlecruiser = POS + inventario propio para PC Windows y Android.
+Inspiración funcional: Soluciones 360, pero NO copiar visualmente ni su código.
+Proyecto hermano de CuevaCoin, separado por ahora.
+
+Tecnología confirmada:
+- PWA: un solo código para PC + Android.
+- Backend: Supabase (Postgres, Auth, RLS, Edge Functions/RPC, Realtime).
+- Hosting/despliegue: Cloudflare + GitHub.
+- Android futuro: TWA/APK.
+- Prioridad: uso básico gratuito.
+- Regla de seguridad: toda operación que mueva stock, dinero o datos sensibles debe pasar
+  por Edge Function/RPC atómica; nunca actualizar stock directamente desde el cliente.
+
+Negocio real:
+- La Cueva = punto de venta.
+- TuMejor Opción = almacén que abastece a La Cueva y mueve mercancía mayorista.
+- 1 caja activa actualmente.
+- 6+ vendedores/dependientes.
+- Posibles nuevos puntos en el futuro.
+- Arquitectura preparada para multi-almacén.
+
+Prioridades reales:
+- Multi-almacén.
+- Transferencias entre almacenes.
+- Vales de salida.
+- FIFO.
+- Productos/almacenes/stock.
+- Ventas.
+- Reportes.
+
+No prioritario por ahora:
+- Impresión térmica.
+- Migración histórica de Soluciones 360.
+- Complejidad innecesaria para múltiples cajas/antifraude bancario/testing formal.
+
+==================================================
+2. MODELO DE DATOS CERRADO
+==================================================
+
+Categoría:
+- nombre.
+
+Producto:
+- nombre.
+- categoría.
+- unidad/presentación.
+- precio normal.
+- precio mayorista.
+- estado.
+- sin código de barras; búsqueda por nombre.
+- IMPORTANTE: el precio mayorista debe poder quedar vacío/null si un producto no se vende
+  al por mayor.
+
+Almacén:
+- nombre.
+- tipo:
+  - "venta" → aplica precio normal.
+  - "mayorista"/"almacén-mayorista" → aplica precio mayorista.
+- El tipo determina automáticamente el precio; no se selecciona manualmente en cada venta.
+
+Stock:
+- producto + almacén.
+- cantidad actual.
+- stock mínimo propio de esa combinación.
+
+Lote de compra:
+- producto, almacén, cantidad, costo unitario, fecha.
+- FIFO: se consume primero el lote más viejo.
+
+Transferencia:
+- almacén origen.
+- almacén destino.
+- productos/cantidades.
+- fecha/estado.
+- consume FIFO en origen y crea lotes espejo en destino conservando costo unitario.
+
+Vale de salida:
+- producto, almacén, tipo (merma/donación/regalo/vencido), cantidad, fecha, estado.
+- consume FIFO y descuenta stock.
+
+Venta:
+- caja/sesión.
+- almacén.
+- líneas.
+- precio aplicado según tipo de almacén.
+- total/fecha.
+
+Usuarios:
+- usuario autenticado + rol.
+
+==================================================
+3. ROLES Y PERMISOS
+==================================================
+
+Roles con nombre personalizable.
+Permisos por sección Y acción:
+- ver
+- crear
+- editar
+- borrar
+
+Secciones previstas:
+productos, categorías, almacenes, stock, transferencias, vales_salida,
+ventas, reportes, usuarios.
+
+Existe función tiene_permiso(seccion, accion) y RLS.
+Rol inicial "Dueño" con permisos completos para Roberto.
+
+==================================================
+4. IDENTIDAD VISUAL
+==================================================
+
+Dirección vigente:
+"salón privado dentro de la cueva" — clásico, elegante, tipo casino, más caballero.
+No volver al concepto de aventura salvo pedido explícito.
+
+Paleta:
+- fondo #0c1c18
+- paneles #14302a / #1b3c34
+- dorado #c9a24d
+- burdeos #7a2331
+- éxito/salvia #8fae9c
+- texto #f2e9d8
+
+Tipografía:
+- Cormorant Garamond: títulos.
+- Inter: formularios/cuerpo.
+- IBM Plex Mono: números/montos.
+
+Firma:
+- doble filete dorado en tarjeta de acceso.
+- pequeño rombo dorado.
+- farol como firma/indicador de conexión.
+
+La estética de ilustración/atmósfera inspirada en referencias anteriores puede profundizarse
+más adelante, pero no reemplaza la dirección actual.
+
+==================================================
+5. ESTADO REAL ACTUAL — MUY IMPORTANTE
+==================================================
+
+VERSIÓN ENTREGADA: v2.5
+SERVICE WORKER: battlecruiser-shell-v6
+
+BACKEND:
+- Supabase real creado.
+- RLS configurado.
+- Roles/permisos ejecutados y confirmados.
+- Productos/almacenes/FIFO ejecutados y confirmados.
+- Transferencias ejecutadas y confirmadas.
+- Vales de salida ejecutados y confirmados.
+
+FRONT-END:
+- Login real desplegado y confirmado funcionando.
+- Productos: código entregado.
+- Almacenes: código entregado.
+- Transferencias: código entregado.
+- Vales de salida: código entregado.
+- Resumen: código entregado.
+- Ajustes: código entregado.
+- Cambiar contraseña: varias correcciones entregadas, pero falta confirmación final completa.
+- Ventas: TODAVÍA NO CONSTRUIDA.
+- Reportes: flujo pendiente.
+
+IMPORTANTE:
+Las funciones de front-end de las últimas sesiones fueron entregadas como código,
+pero varias todavía no tienen confirmación de prueba real de Roberto.
+
+Pendientes heredados que siguen sin confirmación:
+- cambiar contraseña de punta a punta.
+- "Actualizar app" desde login.
+- ojito de contraseña.
+- menú Ajustes.
+- pestaña Resumen.
+- rediseño visual.
+- mejoras de Sesión 16.
+- mejoras de Sesión 17.
+- prueba real de Productos, Almacenes, Transferencias y Vales.
+
+==================================================
+6. ÚLTIMAS PRUEBAS / NUEVOS REQUISITOS DE ROBERTO
+==================================================
+
+Actualización 2026-08-11:
+
+- El punto/prueba 1 funciona bien según Roberto.
+- El punto/prueba 2 todavía no puede probarse porque primero necesita crear un producto.
+- Para probar correctamente productos/ventas hay que permitir crear el producto necesario.
+
+NUEVO CAMBIO PEDIDO:
+- En lugar de tener el menú de unidades directamente visible, se quiere un desplegable
+  a la izquierda que permanezca cerrado normalmente.
+- Debe existir un botón para abrirlo y otro para cerrarlo.
+- La interacción debe sentirse limpia y no ocupar espacio innecesario.
+- Mantener la estética actual del sistema.
+- El precio mayorista debe ser OPCIONAL:
+  algunos productos no tendrán precio mayorista.
+- La base de datos ya fue ajustada para aceptar precio mayorista opcional según la última
+  interacción; antes de darlo por terminado, verificar código real y prueba.
+
+NO MARCAR ESTOS CAMBIOS COMO TERMINADOS SOLO POR HABERLOS ESCRITO.
+
+==================================================
+7. FUNCIONES YA IMPLEMENTADAS EN v2.5
+==================================================
+
+Sesión 13:
+- Cambiar contraseña.
+- Actualizar app.
+- Login real confirmado.
+
+Sesión 14:
+- Service Worker network-first para evitar versiones mezcladas.
+- safeInit()/aislamiento de bloques para evitar que un fallo corte todo app.js.
+- Botones bloqueados durante operaciones.
+- Validación de cantidades/precios/costos > 0.
+- Formato de 2 decimales.
+- Estados "Todavía no hay..." y "Cargando...".
+- Confirmación antes de Transferencia/Vale.
+
+Sesión 15:
+- Corrección de timeout que causaba "Failed to fetch" en escrituras.
+- Actualizar app también desde login.
+- Mostrar/ocultar contraseña.
+- Rediseño "salón privado elegante".
+- Menú Ajustes.
+- Pestaña Resumen.
+
+Sesión 16:
+- Errores de red traducidos al español.
+- inputmode decimal en campos numéricos.
+- foco automático en correo.
+- scroll no altera accidentalmente números.
+
+Sesión 17:
+- Icono real ojo abierto/tachado.
+- Fecha visible en Vales.
+- Fecha fija en español.
+- Escape cierra Ajustes/panel contraseña.
+- datalist para unidades comunes.
+
+==================================================
+8. ARQUITECTURA / DESPLIEGUE
+==================================================
+
+Archivos principales:
+- index.html
+- style.css
+- app.js
+- service-worker.js
+- manifest.json
+- wrangler.jsonc
+
+GitHub:
+- repositorio privado Robvg9/battlecruiser.
+
+Cloudflare:
+- despliegue automático desde GitHub.
+- wrangler.jsonc permanece en raíz.
+- No subir carpeta sql/ a GitHub para despliegue web.
+- Solo subir a GitHub los archivos que realmente cambiaron.
+
+Supabase:
+- SQL vive en la carpeta sql/ para ejecutar/guardar scripts.
+- Las operaciones de stock usan RPC atómica.
+
+Service Worker:
+- versión actual: battlecruiser-shell-v6.
+- shell usa network-first.
+- No volver a introducir stale-while-revalidate para el shell sin una razón fuerte,
+  porque anteriormente causó versiones mezcladas.
+
+==================================================
+9. PRÓXIMO ORDEN DE TRABAJO
+==================================================
+
+PRIORIDAD 1 — Terminar/verificar lo que ya existe:
+1. Crear un producto de prueba.
+2. Probar precio mayorista vacío/null.
+3. Probar Productos.
+4. Probar Almacenes.
+5. Probar Transferencias.
+6. Probar Vales.
+7. Probar Resumen.
+8. Probar Ajustes / actualizar app.
+9. Probar cambio de contraseña de punta a punta.
+10. Confirmar mejoras visuales y de Sesiones 16-17.
+
+PRIORIDAD 2:
+11. Implementar/ajustar menú lateral desplegable:
+    - cerrado por defecto,
+    - botón abrir,
+    - botón cerrar,
+    - no bloquear contenido,
+    - responsive PC/Android.
+
+PRIORIDAD 3:
+12. Construir pantalla de Ventas.
+13. Después construir Reportes.
+
+NO SALTAR A FUNCIONES GRANDES SI QUEDAN PRUEBAS BÁSICAS SIN CERRAR.
+
+==================================================
+10. BITÁCORA COMPACTA
+==================================================
+
+Sesión 1 — Documento + análisis de 30 capturas de Soluciones 360. Sin código.
+Sesión 2 — PWA, escala real, multi-almacén, roles/permisos y prioridades definidos.
+Sesión 3 — Modelo de datos definitivo: categorías, productos, almacenes, stock, FIFO,
+transferencias, vales, ventas y usuarios.
+Sesión 4 — Supabase real + tablas base + almacenes reales creados.
+Sesión 5 — Login real confirmado + identidad visual base + indicador de conexión.
+Sesión 6 — Bug CSS al abrir HTML directo; parche autocontenido para pruebas locales.
+Sesión 7 — Código separado + estrategia GitHub/Cloudflare Pages.
+Sesión 8 — Roles/RLS ejecutados y confirmados; Roberto quedó como Dueño.
+Sesión 9 — FIFO, compras, Productos y Almacenes implementados y backend confirmado.
+Sesión 10 — Transferencias implementadas y backend confirmado.
+Sesión 11 — Vales implementados y backend confirmado; v2.0.
+Sesión 12 — GitHub + Cloudflare automatizados; login del sitio luego confirmado.
+Sesión 13 — Cambiar contraseña + actualizar app; v2.1. Código entregado, faltaba prueba.
+Sesión 14 — Corrección de caché + protección de app.js + 6 mejoras; v2.2.
+Sesión 15 — Failed to fetch corregido + Ajustes + Resumen + rediseño + ojito; v2.3.
+Sesión 16 — 4 mejoras de calidad; v2.4.
+Sesión 17 — 5 mejoras rápidas; v2.5.
+2026-08-11 — Roberto confirma que la prueba 1 funciona. La prueba 2 espera creación de
+producto. Se pide precio mayorista opcional y menú lateral desplegable con abrir/cerrar.
+Estos últimos cambios quedan PENDIENTES DE CONFIRMACIÓN hasta probarlos.
+
+==================================================
+11. REGLA PARA LA PRÓXIMA IA
+==================================================
+
+Antes de hacer cambios:
+A) Lee primero las secciones 5, 6 y 9.
+B) Comprueba el código real si está disponible.
+C) No repitas toda la historia de sesiones 1-17.
+D) Pregunta solo si falta una decisión realmente necesaria.
+E) Si puedes resolver el siguiente paso con la información disponible, hazlo directamente.
+F) Al terminar, actualiza este documento con estado REAL, no con suposiciones.
+
+FIN — BATTLECRUISER CEREBRO V3.0 OPTIMIZADO

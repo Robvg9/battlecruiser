@@ -272,6 +272,9 @@ safeInit("escape-cierra-paneles", () => {
     if (passPanel && !passPanel.classList.contains("hidden")) {
       passPanel.classList.add("hidden");
     }
+    if (typeof window._battlecruiserCerrarMenuLateral === "function") {
+      window._battlecruiserCerrarMenuLateral();
+    }
   });
 });
 
@@ -414,6 +417,41 @@ safeInit("tabs", () => {
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("visible");
   });
+});
+
+// ---- Menú lateral desplegable — reemplaza los tabs horizontales ----
+// Pedido de Roberto: cerrado por defecto, un botón para abrirlo (hamburguesa
+// en el header) y otro para cerrarlo (✕ dentro del panel), sin tapar
+// contenido de forma permanente. Se cierra tocando el backdrop, con Escape,
+// o automáticamente al elegir una sección (así nunca hay que cerrarlo a mano
+// después de navegar).
+safeInit("menu-lateral", () => {
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  const toggleBtn = document.getElementById("sidebar-toggle-btn");
+  const closeBtn = document.getElementById("sidebar-close-btn");
+
+  function abrirMenu() {
+    sidebar.classList.add("open");
+    backdrop.classList.add("visible");
+    toggleBtn.setAttribute("aria-expanded", "true");
+  }
+  function cerrarMenu() {
+    sidebar.classList.remove("open");
+    backdrop.classList.remove("visible");
+    toggleBtn.setAttribute("aria-expanded", "false");
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    sidebar.classList.contains("open") ? cerrarMenu() : abrirMenu();
+  });
+  closeBtn.addEventListener("click", cerrarMenu);
+  backdrop.addEventListener("click", cerrarMenu);
+  sidebar.addEventListener("click", (e) => {
+    if (e.target.closest(".tab-btn")) cerrarMenu();
+  });
+
+  window._battlecruiserCerrarMenuLateral = cerrarMenu;
 });
 
 function fillSelect(select, rows, valueKey, labelFn, keepFirst) {
