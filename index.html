@@ -79,6 +79,7 @@
       <nav class="sidebar-nav" id="tabs">
         <button class="tab-btn active" data-tab="resumen">Resumen</button>
         <button class="tab-btn" data-tab="productos">Productos</button>
+        <button class="tab-btn" data-tab="ventas">Ventas</button>
         <button class="tab-btn" data-tab="almacenes">Almacenes</button>
         <button class="tab-btn" data-tab="transferencias">Transferencias</button>
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
@@ -183,6 +184,26 @@
       <p class="msg" id="msg-productos"></p>
     </section>
 
+    <section id="tab-ventas" class="tab-panel">
+      <form id="form-venta-linea" class="inline-form">
+        <select id="venta-almacen" required><option value="">Almacén</option></select>
+        <select id="venta-producto" required><option value="">Producto</option></select>
+        <input id="venta-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad">
+        <button type="submit">Agregar a la venta</button>
+      </form>
+      <p class="msg" id="msg-venta-linea"></p>
+
+      <div id="venta-lineas" class="lista">
+        <p class="lista-estado">Todavía no agregaste productos a esta venta.</p>
+      </div>
+      <div class="venta-total" id="venta-total-wrap">
+        <span>Total</span><span class="venta-total-valor" id="venta-total">$0.00</span>
+      </div>
+
+      <button type="button" id="btn-confirmar-venta" class="btn-confirmar-venta">Confirmar venta</button>
+      <p class="msg" id="msg-venta"></p>
+    </section>
+
     <section id="tab-almacenes" class="tab-panel">
       <form id="form-almacen" class="inline-form">
         <input id="alm-nombre" placeholder="Nombre del almacén" required>
@@ -233,4 +254,4 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 </body>
-                 </html>
+</html>
