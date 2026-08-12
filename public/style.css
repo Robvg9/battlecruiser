@@ -359,27 +359,37 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 
 @media (min-width: 1024px) {
-  .app-shell { max-width: 1600px; width: 96vw; text-align: left; }
+  /* Sesión 24: aunque el grid ya se activaba, .app-shell seguía viviendo
+     dentro del "body{display:flex;justify-content:center}" con un
+     width:96vw + max-width:1600px — eso deja franjas vacías a los costados
+     en vez del aprovechamiento "borde a borde" de la referencia (sidebar
+     pegado al borde real de la ventana, barra superior a todo el ancho de
+     la pantalla). Ahora ocupa el 100% del ancho disponible sin tope, y el
+     "aire" alrededor del contenido se resuelve con padding interno en
+     header/main/footer en vez de un margen exterior que achica la app. */
+  .app-shell { max-width: none; width: 100%; text-align: left; }
 
   /* Antes .sidebar era un panel fijo superpuesto (overlay) que había que
      abrir con la hamburguesa. En PC no tiene sentido esconderlo: pasa a
      ser una columna fija del grid, siempre visible, sin backdrop ni botón
      de abrir/cerrar (ambos se ocultan más abajo).
-     BUG corregido: esta regla necesita el mismo nivel de especificidad que
-     ".app-shell.visible { display:block }" (línea 152) para poder ganarle
-     — con solo ".app-shell" (menos específico) el grid nunca se activaba
+     BUG corregido en Sesión 23: esta regla necesita el mismo nivel de
+     especificidad que ".app-shell.visible { display:block }" (línea 152)
+     para poder ganarle — con solo ".app-shell" el grid nunca se activaba
      de verdad y el sidebar (ya con position:static) quedaba como una caja
      de 240px flotando arriba a la izquierda, en flujo normal de bloque. */
   .app-shell.visible {
     display: grid;
     grid-template-columns: 240px 1fr;
     grid-template-areas: "header header" "sidebar main" "footer footer";
-    column-gap: 28px;
+    column-gap: 0;
     align-items: stretch;
+    min-height: 100vh;
   }
-  .app-header { grid-area: header; margin-bottom: 14px; }
-  .main-content { grid-area: main; }
-  .app-footer { grid-area: footer; }
+  .app-header { grid-area: header; margin-bottom: 0; padding: 18px 28px; background: var(--stone); border-bottom: 1px solid var(--gold-dim); }
+  .main-content > .rule-orn { display: none; }
+  .main-content { grid-area: main; padding: 22px 28px; }
+  .app-footer { grid-area: footer; margin-top: 0; padding: 14px 28px; }
   .sidebar {
     grid-area: sidebar; position: static; transform: none; height: auto;
     max-width: none; box-shadow: none;
@@ -397,8 +407,9 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   .seccion-panel { margin-top: 0; }
 }
 
-@media (min-width: 1400px) {
-  .main-content { padding-right: 8px; }
+@media (min-width: 1600px) {
+  .main-content { padding-left: 40px; padding-right: 40px; }
+  .app-header, .app-footer { padding-left: 40px; padding-right: 40px; }
 }
 
 /* ---- Pestaña Resumen — Sesión 15 (nueva) ---- */
