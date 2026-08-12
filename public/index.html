@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v2.9 · La Cueva</p>
+      <p class="footnote">v3.0 · La Cueva</p>
     </form>
   </div>
 
@@ -106,6 +106,8 @@
         <button id="logout-btn" type="button">Cerrar sesión</button>
       </div>
     </header>
+
+    <main class="main-content">
     <div class="rule-orn">
       <svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg>
     </div>
@@ -145,13 +147,19 @@
       <div class="resumen-grid" id="resumen-grid">
         <div class="resumen-card"><div class="valor">—</div><div class="etiqueta">Productos</div></div>
       </div>
-      <div class="resumen-alertas">
-        <h3>Stock bajo mínimo</h3>
-        <div id="resumen-alertas-lista" class="lista"></div>
-      </div>
-      <div class="resumen-movs">
-        <h3>Últimos movimientos</h3>
-        <div id="resumen-movs-lista" class="lista"></div>
+      <div class="seccion-cuerpo">
+        <div class="seccion-principal">
+          <div class="resumen-movs">
+            <h3>Últimos movimientos</h3>
+            <div id="resumen-movs-lista" class="lista"></div>
+          </div>
+        </div>
+        <aside class="seccion-panel">
+          <div class="resumen-alertas">
+            <h3>Stock bajo mínimo</h3>
+            <div id="resumen-alertas-lista" class="lista"></div>
+          </div>
+        </aside>
       </div>
     </section>
 
@@ -280,6 +288,12 @@
 
       <p class="msg" id="msg-config"></p>
     </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>Salón Privado Battlecruiser</span>
+      <span class="app-footer-version">v3.0 · La Cueva</span>
+    </footer>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>

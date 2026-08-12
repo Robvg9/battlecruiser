@@ -319,24 +319,81 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .pass-panel .btn-row { display: flex; gap: 8px; margin-top: 6px; }
 .pass-panel .btn-row button { flex: 1; margin-top: 0; width: auto; }
 
-/* ---- Sesión 21: mejor aprovechamiento de espacio en tablet/PC ----
-   Antes .app-shell tenía un único max-width:760px fijo sin importar el
-   tamaño real de pantalla, así que en una PC o tablet grande el contenido
-   quedaba angosto y centrado con mucho espacio vacío a los costados. Se
-   mantiene el diseño "salón privado" intacto (mismos colores, tarjetas,
-   menú lateral) — solo se le da más ancho disponible en pantallas grandes,
-   y las listas pasan a 2 columnas cuando entran cómodas para no desperdiciar
-   ese espacio extra. El menú lateral (overlay) no se toca: sigue funcionando
-   igual en todos los tamaños, tal como lo pidió Roberto. */
-@media (min-width: 640px) {
-  .app-shell { max-width: 900px; }
-  .inline-form input, .inline-form select { flex: 1 1 200px; }
+/* ============================================================
+   Sesión 22 — Layout general: de "todo centrado en columna angosta" a
+   estructura de barra superior + menú lateral + área principal + panel
+   derecho + pie, que usa el ancho real de la pantalla en PC/tablet.
+   Antes CADA pieza (.app-shell, el login, etc.) se auto-centraba con un
+   max-width fijo bajo (380/760px) sin importar el tamaño real de la
+   ventana — por eso en PC quedaba una columna angosta con enormes
+   espacios vacíos a los costados. Ahora es el LAYOUT (grid en #app-shell)
+   el que organiza la pantalla; el contenido interno no se toca.
+   El menú lateral overlay (hamburguesa, backdrop, Escape) sigue existiendo
+   tal cual para celular/tablet — a partir de 1024px se vuelve fijo/visible
+   en vez de flotante, sin duplicar código: mismos elementos, otro CSS.
+   ============================================================ */
+.app-shell { max-width: 1000px; }
+.main-content { min-width: 0; }
+.main-content .rule-orn { margin: 10px 0 20px; }
+
+/* Pie de la app: mismo texto que ya existía en el login (.footnote),
+   ahora visible también dentro de la app en un pie fijo al fondo del shell. */
+.app-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 24px; padding-top: 14px; border-top: 1px solid #c9a24d26;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em;
+  color: var(--mist-dim);
 }
-@media (min-width: 1024px) {
-  .app-shell { max-width: 1180px; }
-  .resumen-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-  .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+
+/* Componente reutilizable "principal + panel derecho" — usado hoy en
+   Resumen (movimientos = principal, alertas de stock = panel). Pensado
+   para que otras pestañas puedan sumarse después sin CSS nuevo. */
+.seccion-cuerpo { display: block; }
+.seccion-panel { margin-top: 4px; }
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-shell { max-width: 92vw; }
+  .inline-form input, .inline-form select { flex: 1 1 200px; }
+  .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
   #venta-lineas.lista { display: flex; flex-direction: column; }
+}
+
+@media (min-width: 1024px) {
+  .app-shell { max-width: 1600px; width: 96vw; text-align: left; }
+
+  /* Antes .sidebar era un panel fijo superpuesto (overlay) que había que
+     abrir con la hamburguesa. En PC no tiene sentido esconderlo: pasa a
+     ser una columna fija del grid, siempre visible, sin backdrop ni botón
+     de abrir/cerrar (ambos se ocultan más abajo). */
+  .app-shell {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-areas: "header header" "sidebar main" "footer footer";
+    column-gap: 28px;
+    align-items: start;
+  }
+  .app-header { grid-area: header; margin-bottom: 14px; }
+  .main-content { grid-area: main; }
+  .app-footer { grid-area: footer; }
+  .sidebar {
+    grid-area: sidebar; position: static; transform: none; height: auto;
+    max-width: none; box-shadow: none; align-self: start;
+  }
+  .sidebar-backdrop, #sidebar-toggle-btn, #sidebar-close-btn { display: none; }
+
+  .resumen-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  #venta-lineas.lista { display: flex; flex-direction: column; }
+
+  /* Panel derecho: la información secundaria (Sesión 22 — Resumen) queda
+     en una columna angosta a la derecha del contenido principal en vez de
+     apilada debajo, aprovechando el ancho sobrante de la pantalla. */
+  .seccion-cuerpo { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  .seccion-panel { margin-top: 0; }
+}
+
+@media (min-width: 1400px) {
+  .main-content { padding-right: 8px; }
 }
 
 /* ---- Pestaña Resumen — Sesión 15 (nueva) ---- */
