@@ -354,7 +354,13 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 @media (min-width: 640px) and (max-width: 1023px) {
   .app-shell { max-width: 92vw; }
   .inline-form input, .inline-form select { flex: 1 1 200px; }
-  .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  /* Sesión 25: auto-fill reservaba columnas vacías cuando una sección tenía
+     pocos elementos (ej. Almacenes con 2 ítems quedaba angosta con espacio
+     muerto), mientras que una con muchos ítems (Productos) llenaba todo el
+     ancho — eso es lo que se veía como "elementos que cambian de tamaño al
+     cambiar de sección". auto-fit estira los elementos existentes para
+     ocupar siempre el ancho real disponible, sin importar cuántos haya. */
+  .lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
   #venta-lineas.lista { display: flex; flex-direction: column; }
 }
 
@@ -397,7 +403,7 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   .sidebar-backdrop, #sidebar-toggle-btn, #sidebar-close-btn { display: none; }
 
   .resumen-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-  .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  .lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
   #venta-lineas.lista { display: flex; flex-direction: column; }
 
   /* Panel derecho: la información secundaria (Sesión 22 — Resumen) queda
