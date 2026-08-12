@@ -471,6 +471,14 @@ async function cargarCategorias() {
   return data || [];
 }
 
+// Solo activas: son las únicas que deben poder elegirse al crear un producto.
+// Las inactivas siguen existiendo (para no romper productos ya cargados con
+// esa presentación) pero se ocultan de este selector.
+async function cargarPresentacionesActivas() {
+  const { data } = await client.from("presentaciones").select("id, nombre").eq("activo", true).order("nombre");
+  return data || [];
+}
+
 async function cargarAlmacenes() {
   const { data } = await client.from("almacenes").select("id, nombre, tipo").order("nombre");
   return data || [];
@@ -479,20 +487,21 @@ async function cargarAlmacenes() {
 async function cargarProductos() {
   const { data } = await client
     .from("productos")
-    .select("id, nombre, unidad, precio_normal, precio_mayorista, categorias(nombre)")
+    .select("id, nombre, unidad, precio_normal, precio_mayorista, categorias(nombre), presentaciones(nombre)")
     .order("nombre");
   return data || [];
 }
 
 async function refrescarProductos() {
   setLoading("lista-productos", "Cargando productos…");
-  const [productos, categorias, almacenes] = await Promise.all([
-    cargarProductos(), cargarCategorias(), cargarAlmacenes(),
+  const [productos, categorias, presentacionesActivas, almacenes] = await Promise.all([
+    cargarProductos(), cargarCategorias(), cargarPresentacionesActivas(), cargarAlmacenes(),
   ]);
   _cache.productos = productos;
   renderResumen();
 
   fillSelect(document.getElementById("prod-categoria"), categorias, "id", (c) => c.nombre, true);
+  fillSelect(document.getElementById("prod-presentacion"), presentacionesActivas, "id", (p) => p.nombre, true);
   fillSelect(document.getElementById("compra-producto"), productos, "id", (p) => p.nombre);
   fillSelect(document.getElementById("compra-almacen"), almacenes, "id", (a) => a.nombre);
 
@@ -504,7 +513,7 @@ async function refrescarProductos() {
     productos.forEach((p) => {
       const div = document.createElement("div");
       div.className = "lista-item";
-      div.innerHTML = `<span>${p.nombre} <span class="muted">${p.categorias ? "· " + p.categorias.nombre : ""}</span></span>
+      div.innerHTML = `<span>${p.nombre} <span class="muted">${p.categorias ? "· " + p.categorias.nombre : ""}${p.presentaciones ? " · " + p.presentaciones.nombre : ""}</span></span>
         <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)}</span>`;
       lista.appendChild(div);
     });
@@ -518,6 +527,7 @@ safeInit("form-producto", () => {
     e.preventDefault();
     const nombre = document.getElementById("prod-nombre").value.trim();
     const categoria_id = document.getElementById("prod-categoria").value || null;
+    const presentacion_id = document.getElementById("prod-presentacion").value || null;
     const unidad = document.getElementById("prod-unidad").value.trim() || null;
     const precio_normal = parseFloat(document.getElementById("prod-precio-normal").value);
     const precioMayoristaRaw = document.getElementById("prod-precio-mayorista").value.trim();
@@ -535,7 +545,7 @@ safeInit("form-producto", () => {
 
     submitBtn.disabled = true;
     const { error } = await client.from("productos").insert({
-      nombre, categoria_id, unidad, precio_normal, precio_mayorista,
+      nombre, categoria_id, presentacion_id, unidad, precio_normal, precio_mayorista,
     });
     submitBtn.disabled = false;
 
