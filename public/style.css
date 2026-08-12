@@ -35,6 +35,17 @@ body {
 }
 .center-col { display: flex; flex-direction: column; align-items: center; }
 
+/* Sesión 26 — el shell de la app (post-login) no debe re-centrarse
+   verticalmente según cuánto contenido tenga cada pestaña. Antes body
+   centraba TODO verticalmente (align-items:center); como cada sección
+   (Resumen, Productos, Ventas…) tiene distinta altura de contenido, el
+   bloque completo (sidebar+header+footer) se movía de posición al
+   cambiar de pestaña, dando la sensación de que la pantalla "se estira
+   o se encoge". La tarjeta de login sigue centrándose igual que antes;
+   solo se desactiva el centrado vertical cuando el shell de la app está
+   visible (la horizontal se conserva). */
+body:has(.app-shell.visible) { align-items: flex-start; }
+
 /* Filigrana superior — reemplaza las estalactitas por un filete dorado fino,
    más propio de un salón que de una caverna. */
 .stalactites {
@@ -387,6 +398,16 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   .app-shell.visible {
     display: grid;
     grid-template-columns: 240px 1fr;
+    /* Sesión 26 — filas explícitas: antes las 3 filas eran "auto" sin más,
+       así que el espacio sobrante hasta completar min-height:100vh se
+       repartía por igual entre header/sidebar-main/footer (comportamiento
+       por defecto de align-content en grid). Eso hacía que header y footer
+       cambiaran de tamaño/posición según cuánto contenido tuviera la
+       pestaña activa. Con "auto 1fr auto" solo la fila del medio
+       (sidebar+main) absorbe el espacio libre; header y footer quedan
+       siempre con la altura justa de su contenido, en la misma posición
+       en todas las secciones. */
+    grid-template-rows: auto 1fr auto;
     grid-template-areas: "header header" "sidebar main" "footer footer";
     column-gap: 0;
     align-items: stretch;

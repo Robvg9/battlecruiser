@@ -1,5 +1,5 @@
 // Subir este número cada vez que cambie algo del "shell" propio de la app.
-const CACHE_NAME = "battlecruiser-shell-v14";
+const CACHE_NAME = "battlecruiser-shell-v15";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
