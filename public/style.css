@@ -457,6 +457,32 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   .app-header, .app-footer { padding-left: 40px; padding-right: 40px; }
 }
 
+/* ---- Presentaciones comerciales (dentro de Productos) ---- */
+.hidden { display: none; }
+.presentaciones-panel { display: flex; flex-direction: column; gap: 20px; margin-bottom: 6px; }
+.presentaciones-panel h4 {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 14.5px;
+  color: var(--mist); letter-spacing: 0.03em; text-transform: uppercase; margin: 0 0 10px;
+}
+#pp-producto-select { width: 100%; margin-bottom: 10px; }
+.pres-acciones, .pp-acciones { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.pres-acciones button, .pp-acciones button {
+  background: var(--stone-2); color: var(--text); border: 1px solid var(--gold-dim);
+  border-radius: 5px; padding: 6px 10px; font-size: 12px; cursor: pointer; margin-top: 0; white-space: nowrap;
+}
+.pres-acciones button:hover, .pp-acciones button:hover { border-color: var(--gold); color: var(--gold); }
+.pres-editar-input, .pp-factor-input {
+  padding: 7px 9px; background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 5px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; margin-top: 0;
+}
+.pres-editar-input { flex: 1; min-width: 0; }
+.pp-factor-input { width: 90px; }
+
+@media (min-width: 1024px) {
+  .presentaciones-panel { flex-direction: row; gap: 26px; }
+  .presentaciones-catalogo, .presentaciones-producto { flex: 1; min-width: 0; }
+}
+
 /* ---- Pestaña Resumen — Sesión 15 (nueva) ---- */
 .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
 .resumen-card {

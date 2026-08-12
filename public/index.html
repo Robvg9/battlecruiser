@@ -167,7 +167,6 @@
       <form id="form-producto" class="inline-form">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
         <select id="prod-categoria"><option value="">Categoría</option></select>
-        <select id="prod-presentacion"><option value="">Presentación</option></select>
         <input id="prod-unidad" placeholder="Unidad (ej. unidad, caja)" list="unidades-comunes">
         <datalist id="unidades-comunes">
           <option value="unidad"></option>
@@ -192,6 +191,36 @@
         <button type="submit">Registrar compra</button>
       </form>
       <p class="msg" id="msg-productos"></p>
+
+      <div class="rule-orn">
+        <svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg>
+      </div>
+
+      <h3>Presentaciones comerciales</h3>
+      <div class="presentaciones-panel">
+        <div class="presentaciones-catalogo">
+          <h4>Catálogo de presentaciones</h4>
+          <form id="form-presentacion-nueva" class="inline-form hidden">
+            <input id="pres-nombre-nueva" placeholder="Nombre (ej. Caja)" required>
+            <button type="submit">Crear presentación</button>
+          </form>
+          <div id="lista-presentaciones-catalogo" class="lista"></div>
+        </div>
+
+        <div class="presentaciones-producto">
+          <h4>Presentaciones por producto</h4>
+          <select id="pp-producto-select"><option value="">Elegí un producto…</option></select>
+          <div id="pp-lista-asociaciones" class="lista">
+            <p class="lista-estado">Elegí un producto para ver sus presentaciones.</p>
+          </div>
+          <form id="form-pp-nueva" class="inline-form hidden">
+            <select id="pp-presentacion-select" required><option value="">Presentación</option></select>
+            <input id="pp-factor" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Factor (ej. 24 = 1 caja son 24 unidades base)" required>
+            <button type="submit">Agregar presentación al producto</button>
+          </form>
+        </div>
+      </div>
+      <p class="msg" id="msg-presentaciones"></p>
     </section>
 
     <section id="tab-ventas" class="tab-panel">
@@ -279,13 +308,6 @@
         <button type="submit">Agregar unidad</button>
       </form>
       <div id="lista-unidades" class="lista"></div>
-
-      <h3>Formas de presentación</h3>
-      <form id="form-presentacion" class="inline-form">
-        <input id="pre-nombre" placeholder="Nombre de la presentación" required>
-        <button type="submit">Agregar presentación</button>
-      </form>
-      <div id="lista-presentaciones" class="lista"></div>
 
       <p class="msg" id="msg-config"></p>
     </section>

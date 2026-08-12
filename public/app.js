@@ -471,14 +471,6 @@ async function cargarCategorias() {
   return data || [];
 }
 
-// Solo activas: son las únicas que deben poder elegirse al crear un producto.
-// Las inactivas siguen existiendo (para no romper productos ya cargados con
-// esa presentación) pero se ocultan de este selector.
-async function cargarPresentacionesActivas() {
-  const { data } = await client.from("presentaciones").select("id, nombre").eq("activo", true).order("nombre");
-  return data || [];
-}
-
 async function cargarAlmacenes() {
   const { data } = await client.from("almacenes").select("id, nombre, tipo").order("nombre");
   return data || [];
@@ -494,16 +486,27 @@ async function cargarProductos() {
 
 async function refrescarProductos() {
   setLoading("lista-productos", "Cargando productos…");
-  const [productos, categorias, presentacionesActivas, almacenes] = await Promise.all([
-    cargarProductos(), cargarCategorias(), cargarPresentacionesActivas(), cargarAlmacenes(),
+  const [productos, categorias, almacenes] = await Promise.all([
+    cargarProductos(), cargarCategorias(), cargarAlmacenes(),
   ]);
   _cache.productos = productos;
   renderResumen();
 
   fillSelect(document.getElementById("prod-categoria"), categorias, "id", (c) => c.nombre, true);
-  fillSelect(document.getElementById("prod-presentacion"), presentacionesActivas, "id", (p) => p.nombre, true);
   fillSelect(document.getElementById("compra-producto"), productos, "id", (p) => p.nombre);
   fillSelect(document.getElementById("compra-almacen"), almacenes, "id", (a) => a.nombre);
+
+  // Selector de "Presentaciones por producto": se refresca junto con la
+  // lista de productos para que siempre esté al día, preservando la
+  // selección actual si el producto elegido sigue existiendo.
+  const ppProductoSelect = document.getElementById("pp-producto-select");
+  if (ppProductoSelect) {
+    const seleccionPPActual = ppProductoSelect.value;
+    fillSelect(ppProductoSelect, productos, "id", (p) => p.nombre, true);
+    if (seleccionPPActual && productos.some((p) => p.id === seleccionPPActual)) {
+      ppProductoSelect.value = seleccionPPActual;
+    }
+  }
 
   const lista = document.getElementById("lista-productos");
   if (productos.length === 0) {
@@ -527,7 +530,6 @@ safeInit("form-producto", () => {
     e.preventDefault();
     const nombre = document.getElementById("prod-nombre").value.trim();
     const categoria_id = document.getElementById("prod-categoria").value || null;
-    const presentacion_id = document.getElementById("prod-presentacion").value || null;
     const unidad = document.getElementById("prod-unidad").value.trim() || null;
     const precio_normal = parseFloat(document.getElementById("prod-precio-normal").value);
     const precioMayoristaRaw = document.getElementById("prod-precio-mayorista").value.trim();
@@ -545,7 +547,7 @@ safeInit("form-producto", () => {
 
     submitBtn.disabled = true;
     const { error } = await client.from("productos").insert({
-      nombre, categoria_id, presentacion_id, unidad, precio_normal, precio_mayorista,
+      nombre, categoria_id, unidad, precio_normal, precio_mayorista,
     });
     submitBtn.disabled = false;
 
@@ -583,6 +585,318 @@ safeInit("form-compra", () => {
     await refrescarStockYSelects();
   });
 });
+
+// ============================================================
+// Presentaciones comerciales — dentro de Productos. Un producto puede
+// tener varias presentaciones (unidad, paquete, caja…), cada una con su
+// propio factor de conversión a unidades base
+// (producto_presentaciones.factor). La columna legacy
+// productos.presentacion_id NO se toca acá: es solo para productos viejos
+// que ya la tenían cargada antes de este modelo; el formulario de crear
+// producto ya no la usa.
+//
+// El backend (RLS + tiene_permiso + obtener_conversion_presentacion) es
+// quien realmente protege estas operaciones — acá solo se refleja el
+// resultado de tiene_permiso('presentaciones', <accion>) para mostrar u
+// ocultar botones, nunca como sustituto de esa protección real.
+// ============================================================
+
+let _permisosPresentaciones = { ver: true, crear: false, editar: false, borrar: false };
+let _presentacionesCache = [];
+let _asociacionesProductoCache = [];
+let _productoPresentacionesActual = null;
+
+function formatFactor(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? String(v) : String(n);
+}
+
+async function cargarPermisosPresentaciones() {
+  const acciones = ["ver", "crear", "editar", "borrar"];
+  const resultados = await Promise.all(
+    acciones.map((accion) => client.rpc("tiene_permiso", { p_seccion: "presentaciones", p_accion: accion }))
+  );
+  const permisos = {};
+  acciones.forEach((accion, i) => { permisos[accion] = resultados[i].data === true; });
+  return permisos;
+}
+
+async function cargarPresentacionesTodas() {
+  const { data } = await client.from("presentaciones").select("id, nombre, activo").order("nombre");
+  return data || [];
+}
+
+async function cargarAsociacionesProducto(producto_id) {
+  const { data } = await client
+    .from("producto_presentaciones")
+    .select("id, factor, activo, presentacion_id, presentaciones(nombre)")
+    .eq("producto_id", producto_id)
+    .order("created_at");
+  return data || [];
+}
+
+function renderCatalogoPresentaciones() {
+  if (_presentacionesCache.length === 0) {
+    setEmpty("lista-presentaciones-catalogo", "Todavía no hay presentaciones creadas.");
+    return;
+  }
+  const cont = document.getElementById("lista-presentaciones-catalogo");
+  cont.innerHTML = "";
+  _presentacionesCache.forEach((p) => {
+    const div = document.createElement("div");
+    div.className = "lista-item";
+    div.innerHTML = `
+      <span>${p.nombre}${p.activo ? "" : ' <span class="muted">· Inactiva</span>'}</span>
+      <span class="pres-acciones">
+        ${_permisosPresentaciones.editar ? `<button type="button" class="pres-editar-btn" data-id="${p.id}">Editar</button>` : ""}
+        ${_permisosPresentaciones.borrar ? `<button type="button" class="pres-toggle-btn" data-id="${p.id}" data-activo="${p.activo}">${p.activo ? "Desactivar" : "Activar"}</button>` : ""}
+      </span>`;
+    cont.appendChild(div);
+  });
+}
+
+async function refrescarPresentacionesCatalogo() {
+  setLoading("lista-presentaciones-catalogo", "Cargando…");
+  _presentacionesCache = await cargarPresentacionesTodas();
+  renderCatalogoPresentaciones();
+  actualizarSelectPresentacionesDisponibles();
+}
+
+function actualizarSelectPresentacionesDisponibles() {
+  const select = document.getElementById("pp-presentacion-select");
+  if (!select) return;
+  // Solo presentaciones activas y que el producto elegido todavía no tenga
+  // asociadas de forma activa (evita el error de asociación duplicada antes
+  // de intentarlo; el backend igual lo impide si algo se escapa acá).
+  const enUsoActivo = new Set(_asociacionesProductoCache.filter((pp) => pp.activo).map((pp) => pp.presentacion_id));
+  const disponibles = _presentacionesCache.filter((p) => p.activo && !enUsoActivo.has(p.id));
+  fillSelect(select, disponibles, "id", (p) => p.nombre, true);
+}
+
+function renderAsociacionesProducto() {
+  const cont = document.getElementById("pp-lista-asociaciones");
+  if (_asociacionesProductoCache.length === 0) {
+    setEmpty("pp-lista-asociaciones", "Este producto todavía no tiene presentaciones asociadas.");
+    return;
+  }
+  cont.innerHTML = "";
+  _asociacionesProductoCache.forEach((pp) => {
+    const div = document.createElement("div");
+    div.className = "lista-item";
+    div.innerHTML = `
+      <span>${pp.presentaciones.nombre} <span class="muted">× ${formatFactor(pp.factor)}</span>${pp.activo ? "" : ' <span class="muted">· Inactiva</span>'}</span>
+      <span class="pp-acciones">
+        ${_permisosPresentaciones.editar ? `<button type="button" class="pp-editar-btn" data-id="${pp.id}" data-factor="${pp.factor}">Editar factor</button>` : ""}
+        ${_permisosPresentaciones.borrar ? `<button type="button" class="pp-toggle-btn" data-id="${pp.id}" data-activo="${pp.activo}">${pp.activo ? "Desactivar" : "Activar"}</button>` : ""}
+      </span>`;
+    cont.appendChild(div);
+  });
+}
+
+async function refrescarAsociacionesProducto(producto_id) {
+  setLoading("pp-lista-asociaciones", "Cargando…");
+  _asociacionesProductoCache = await cargarAsociacionesProducto(producto_id);
+  renderAsociacionesProducto();
+  actualizarSelectPresentacionesDisponibles();
+}
+
+safeInit("presentaciones-catalogo", () => {
+  const form = document.getElementById("form-presentacion-nueva");
+  const input = document.getElementById("pres-nombre-nueva");
+  const lista = document.getElementById("lista-presentaciones-catalogo");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nombre = input.value.trim();
+    if (!nombre) return;
+    const submitBtn = form.querySelector("button[type='submit']");
+    submitBtn.disabled = true;
+    const { error } = await client.from("presentaciones").insert({ nombre });
+    submitBtn.disabled = false;
+    if (error) {
+      const msg = error.code === "23505" ? "Ya existe una presentación con ese nombre." : explicarError(error, "crear presentación");
+      setMsg("msg-presentaciones", "No se pudo crear: " + msg, false);
+      return;
+    }
+    setMsg("msg-presentaciones", "Presentación creada.", true);
+    form.reset();
+    await refrescarPresentacionesCatalogo();
+  });
+
+  lista.addEventListener("click", async (e) => {
+    const editarBtn = e.target.closest(".pres-editar-btn");
+    const toggleBtn = e.target.closest(".pres-toggle-btn");
+    const guardarBtn = e.target.closest(".pres-guardar-btn");
+    const cancelarBtn = e.target.closest(".pres-cancelar-btn");
+
+    if (editarBtn) {
+      const id = editarBtn.dataset.id;
+      const p = _presentacionesCache.find((x) => x.id === id);
+      if (!p) return;
+      const div = editarBtn.closest(".lista-item");
+      div.innerHTML = `
+        <input type="text" class="pres-editar-input" value="${p.nombre.replace(/"/g, "&quot;")}">
+        <span class="pres-acciones">
+          <button type="button" class="pres-guardar-btn" data-id="${id}">Guardar</button>
+          <button type="button" class="pres-cancelar-btn">Cancelar</button>
+        </span>`;
+      div.querySelector(".pres-editar-input").focus();
+      return;
+    }
+
+    if (cancelarBtn) { renderCatalogoPresentaciones(); return; }
+
+    if (guardarBtn) {
+      const id = guardarBtn.dataset.id;
+      const div = guardarBtn.closest(".lista-item");
+      const nuevoNombre = div.querySelector(".pres-editar-input").value.trim();
+      if (!nuevoNombre) { setMsg("msg-presentaciones", "El nombre no puede quedar vacío.", false); return; }
+      guardarBtn.disabled = true;
+      const { error } = await client.from("presentaciones").update({ nombre: nuevoNombre }).eq("id", id);
+      guardarBtn.disabled = false;
+      if (error) {
+        const msg = error.code === "23505" ? "Ya existe una presentación con ese nombre." : explicarError(error, "editar presentación");
+        setMsg("msg-presentaciones", "No se pudo guardar: " + msg, false);
+        return;
+      }
+      setMsg("msg-presentaciones", "Presentación actualizada.", true);
+      await refrescarPresentacionesCatalogo();
+      return;
+    }
+
+    if (toggleBtn) {
+      const id = toggleBtn.dataset.id;
+      const activoActual = toggleBtn.dataset.activo === "true";
+      toggleBtn.disabled = true;
+      const { error } = await client.from("presentaciones").update({ activo: !activoActual }).eq("id", id);
+      toggleBtn.disabled = false;
+      if (error) {
+        setMsg("msg-presentaciones", "No se pudo actualizar: " + explicarError(error, "cambiar estado de presentación"), false);
+        return;
+      }
+      await refrescarPresentacionesCatalogo();
+      // El nombre/estado de una presentación pudo cambiar: si hay un
+      // producto elegido, sus asociaciones se vuelven a pintar con datos al día.
+      if (_productoPresentacionesActual) await refrescarAsociacionesProducto(_productoPresentacionesActual);
+    }
+  });
+});
+
+safeInit("presentaciones-por-producto", () => {
+  const productoSelect = document.getElementById("pp-producto-select");
+  const formNueva = document.getElementById("form-pp-nueva");
+  const listaAsoc = document.getElementById("pp-lista-asociaciones");
+
+  productoSelect.addEventListener("change", async () => {
+    const producto_id = productoSelect.value;
+    _productoPresentacionesActual = producto_id || null;
+    if (!producto_id) {
+      _asociacionesProductoCache = [];
+      setEmpty("pp-lista-asociaciones", "Elegí un producto para ver sus presentaciones.");
+      formNueva.classList.add("hidden");
+      return;
+    }
+    formNueva.classList.toggle("hidden", !_permisosPresentaciones.crear);
+    await refrescarAsociacionesProducto(producto_id);
+  });
+
+  formNueva.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const producto_id = productoSelect.value;
+    const presentacion_id = document.getElementById("pp-presentacion-select").value;
+    const factor = parseFloat(document.getElementById("pp-factor").value);
+
+    if (!producto_id || !presentacion_id) { setMsg("msg-presentaciones", "Elegí un producto y una presentación.", false); return; }
+    if (!(factor > 0)) { setMsg("msg-presentaciones", "El factor debe ser mayor a 0.", false); return; }
+
+    const submitBtn = formNueva.querySelector("button[type='submit']");
+    submitBtn.disabled = true;
+    const { error } = await client.from("producto_presentaciones").insert({ producto_id, presentacion_id, factor });
+    submitBtn.disabled = false;
+
+    if (error) {
+      const msg = error.code === "23505" ? "Ese producto ya tiene esa presentación activa." : explicarError(error, "asociar presentación");
+      setMsg("msg-presentaciones", "No se pudo agregar: " + msg, false);
+      return;
+    }
+    setMsg("msg-presentaciones", "Presentación agregada al producto.", true);
+    formNueva.reset();
+    await refrescarAsociacionesProducto(producto_id);
+  });
+
+  listaAsoc.addEventListener("click", async (e) => {
+    const editarBtn = e.target.closest(".pp-editar-btn");
+    const toggleBtn = e.target.closest(".pp-toggle-btn");
+    const guardarBtn = e.target.closest(".pp-guardar-btn");
+    const cancelarBtn = e.target.closest(".pp-cancelar-btn");
+
+    if (editarBtn) {
+      const id = editarBtn.dataset.id;
+      const pp = _asociacionesProductoCache.find((x) => x.id === id);
+      if (!pp) return;
+      const div = editarBtn.closest(".lista-item");
+      div.innerHTML = `
+        <span>${pp.presentaciones.nombre} ×</span>
+        <span class="pp-acciones">
+          <input type="number" step="0.0001" min="0.0001" class="pp-factor-input" value="${pp.factor}">
+          <button type="button" class="pp-guardar-btn" data-id="${id}">Guardar</button>
+          <button type="button" class="pp-cancelar-btn">Cancelar</button>
+        </span>`;
+      div.querySelector(".pp-factor-input").focus();
+      return;
+    }
+
+    if (cancelarBtn) { renderAsociacionesProducto(); return; }
+
+    if (guardarBtn) {
+      const id = guardarBtn.dataset.id;
+      const div = guardarBtn.closest(".lista-item");
+      const nuevoFactor = parseFloat(div.querySelector(".pp-factor-input").value);
+      if (!(nuevoFactor > 0)) { setMsg("msg-presentaciones", "El factor debe ser mayor a 0.", false); return; }
+      guardarBtn.disabled = true;
+      const { error } = await client.from("producto_presentaciones").update({ factor: nuevoFactor }).eq("id", id);
+      guardarBtn.disabled = false;
+      if (error) { setMsg("msg-presentaciones", "No se pudo guardar: " + explicarError(error, "editar factor"), false); return; }
+      setMsg("msg-presentaciones", "Factor actualizado.", true);
+      await refrescarAsociacionesProducto(_productoPresentacionesActual);
+      return;
+    }
+
+    if (toggleBtn) {
+      const id = toggleBtn.dataset.id;
+      const activoActual = toggleBtn.dataset.activo === "true";
+      toggleBtn.disabled = true;
+      const { error } = await client.from("producto_presentaciones").update({ activo: !activoActual }).eq("id", id);
+      toggleBtn.disabled = false;
+      if (error) {
+        const msg = error.code === "23505" ? "Ese producto ya tiene esa presentación activa." : explicarError(error, "cambiar estado");
+        setMsg("msg-presentaciones", "No se pudo actualizar: " + msg, false);
+        return;
+      }
+      await refrescarAsociacionesProducto(_productoPresentacionesActual);
+    }
+  });
+});
+
+// Carga inicial: permisos primero (determinan qué botones/formularios se
+// muestran), después el catálogo. La lista de productos para
+// "pp-producto-select" la llena refrescarProductos() por su cuenta.
+async function inicializarPresentaciones() {
+  _permisosPresentaciones = await cargarPermisosPresentaciones();
+
+  const panel = document.querySelector(".presentaciones-panel");
+  if (!_permisosPresentaciones.ver) {
+    if (panel) panel.classList.add("hidden");
+    setMsg("msg-presentaciones", "No tenés permiso para ver presentaciones.", false);
+    return;
+  }
+  if (panel) panel.classList.remove("hidden");
+
+  const formCrear = document.getElementById("form-presentacion-nueva");
+  if (formCrear) formCrear.classList.toggle("hidden", !_permisosPresentaciones.crear);
+
+  await refrescarPresentacionesCatalogo();
+}
 
 async function refrescarAlmacenes() {
   setLoading("lista-almacenes", "Cargando almacenes…");
@@ -1230,7 +1544,6 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
 
 initCatalogoSimple({ tabla: "categorias", formId: "form-categoria", inputId: "cat-nombre", listaId: "lista-categorias", singular: "categoría" });
 initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nombre", listaId: "lista-unidades", singular: "unidad" });
-initCatalogoSimple({ tabla: "presentaciones", formId: "form-presentacion", inputId: "pre-nombre", listaId: "lista-presentaciones", singular: "presentación" });
 
 // Cargar todo cuando se confirma sesión real (se engancha a showApp existente)
 const _showAppOriginal = showApp;
@@ -1242,9 +1555,10 @@ showApp = function (session) {
   safeInit("carga-inicial-vales", () => { refrescarVales(); });
   safeInit("carga-inicial-ventas", () => { refrescarVentas(); });
   safeInit("carga-inicial-config", () => {
-    ["categorias", "unidades", "presentaciones"].forEach((tabla) => {
+    ["categorias", "unidades"].forEach((tabla) => {
       const refrescar = window["_refrescarCatalogo_" + tabla];
       if (refrescar) refrescar();
     });
   });
+  safeInit("carga-inicial-presentaciones", () => { inicializarPresentaciones(); });
 };
