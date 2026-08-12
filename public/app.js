@@ -496,6 +496,14 @@ async function refrescarProductos() {
   fillSelect(document.getElementById("compra-producto"), productos, "id", (p) => p.nombre);
   fillSelect(document.getElementById("compra-almacen"), almacenes, "id", (a) => a.nombre);
 
+  // El selector de producto de "Registrar compra" no conserva un valor en
+  // blanco (fillSelect sin keepFirst), así que tras cada refresco queda
+  // apuntando a algún producto real — el selector de presentación se
+  // vuelve a sincronizar con ese producto para no dejar seleccionada una
+  // presentación que ya no le corresponde (Sesión 28).
+  const compraProductoSelect = document.getElementById("compra-producto");
+  if (compraProductoSelect) actualizarSelectorCompraPresentacion(compraProductoSelect.value);
+
   // Selector de "Presentaciones por producto": se refresca junto con la
   // lista de productos para que siempre esté al día, preservando la
   // selección actual si el producto elegido sigue existiendo.
@@ -558,17 +566,139 @@ safeInit("form-producto", () => {
   });
 });
 
+// ---- Presentación en "Registrar compra" — Sesión 28 ----
+// Reutiliza cargarAsociacionesProducto() (ya existente, sección de
+// Presentaciones comerciales) para el selector de "Registrar compra" en
+// vez de duplicar la consulta. Cache propio (_compraAsociacionesCache)
+// separado de _asociacionesProductoCache porque son dos <select> de
+// producto independientes (el de compra y el del panel de Presentaciones
+// por producto) que no deben pisarse entre sí.
+//
+// Modo legacy (opción "Sin presentación / Unidad base", value=""):
+// p_presentacion_id = null, p_cantidad_presentacion = null, "Cantidad"
+// sigue significando unidades base — comportamiento idéntico al de antes.
+//
+// Modo presentación: "Cantidad" pasa a significar cantidad de
+// presentaciones (entero ≥ 1); el factor de conversión (1 Caja = 24
+// unidades, etc.) nunca lo escribe el usuario, sale de
+// producto_presentaciones.factor ya cargado. El cálculo de equivalencia
+// en unidades base que se muestra en el resumen es solo visual — la
+// autoridad real de inventario sigue siendo el backend
+// (obtener_conversion_presentacion dentro de registrar_compra).
+let _compraAsociacionesCache = [];
+
+async function actualizarSelectorCompraPresentacion(producto_id) {
+  const select = document.getElementById("compra-presentacion");
+  if (!select) return;
+
+  if (!producto_id) {
+    _compraAsociacionesCache = [];
+    fillSelect(select, [], "presentacion_id", () => "", true);
+    actualizarModoCompra();
+    return;
+  }
+
+  const asociaciones = await cargarAsociacionesProducto(producto_id);
+  _compraAsociacionesCache = asociaciones.filter((pp) => pp.activo);
+  fillSelect(
+    select, _compraAsociacionesCache, "presentacion_id",
+    (pp) => `${pp.presentaciones.nombre} × ${formatFactor(pp.factor)}`, true
+  );
+  actualizarModoCompra();
+}
+
+function presentacionCompraActual() {
+  const select = document.getElementById("compra-presentacion");
+  if (!select || !select.value) return null;
+  return _compraAsociacionesCache.find((pp) => pp.presentacion_id === select.value) || null;
+}
+
+// Cambia placeholders/validación de "Cantidad" y "Costo" según el modo, y
+// refresca el resumen visual. No toca ningún dato de inventario: solo UX.
+function actualizarModoCompra() {
+  const cantidadInput = document.getElementById("compra-cantidad");
+  const costoInput = document.getElementById("compra-costo");
+  if (!cantidadInput || !costoInput) return;
+
+  const pp = presentacionCompraActual();
+  if (pp) {
+    cantidadInput.placeholder = "Cantidad de " + pp.presentaciones.nombre.toLowerCase();
+    cantidadInput.step = "1";
+    cantidadInput.min = "1";
+  } else {
+    cantidadInput.placeholder = "Cantidad de unidades base";
+    cantidadInput.step = "0.01";
+    cantidadInput.min = "0.01";
+  }
+  costoInput.placeholder = pp ? "Costo por " + pp.presentaciones.nombre.toLowerCase() : "Costo unitario";
+
+  actualizarResumenCompra();
+}
+
+function actualizarResumenCompra() {
+  const resumen = document.getElementById("compra-resumen");
+  if (!resumen) return;
+
+  const pp = presentacionCompraActual();
+  if (!pp) {
+    resumen.classList.add("hidden");
+    return;
+  }
+
+  const cantidad = parseFloat(document.getElementById("compra-cantidad").value);
+  const costo = parseFloat(document.getElementById("compra-costo").value);
+  const cantidadValida = Number.isInteger(cantidad) && cantidad > 0;
+  const costoValido = costo > 0;
+
+  document.getElementById("compra-resumen-cantidad").textContent = cantidadValida
+    ? cantidad + " × " + pp.presentaciones.nombre + " (1 " + pp.presentaciones.nombre + " = " + formatFactor(pp.factor) + " unidades)"
+    : "—";
+  document.getElementById("compra-resumen-equivalente").textContent = cantidadValida
+    ? money(cantidad * pp.factor) + " unidades base"
+    : "—";
+  document.getElementById("compra-resumen-costo").textContent = costoValido
+    ? "$" + money(costo) + " por " + pp.presentaciones.nombre
+    : "—";
+  document.getElementById("compra-resumen-total").textContent = cantidadValida && costoValido
+    ? "$" + money(cantidad * costo)
+    : "—";
+
+  resumen.classList.remove("hidden");
+}
+
 safeInit("form-compra", () => {
+  const productoSelect = document.getElementById("compra-producto");
+  const presentacionSelect = document.getElementById("compra-presentacion");
+  const cantidadInput = document.getElementById("compra-cantidad");
+  const costoInput = document.getElementById("compra-costo");
+
+  productoSelect.addEventListener("change", () => {
+    actualizarSelectorCompraPresentacion(productoSelect.value);
+  });
+  presentacionSelect.addEventListener("change", actualizarModoCompra);
+  cantidadInput.addEventListener("input", actualizarResumenCompra);
+  costoInput.addEventListener("input", actualizarResumenCompra);
+
   document.getElementById("form-compra").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const producto_id = document.getElementById("compra-producto").value;
+    const producto_id = productoSelect.value;
     const almacen_id = document.getElementById("compra-almacen").value;
-    const cantidad = parseFloat(document.getElementById("compra-cantidad").value);
-    const costo_unitario = parseFloat(document.getElementById("compra-costo").value);
+    const cantidad = parseFloat(cantidadInput.value);
+    const costo_unitario = parseFloat(costoInput.value);
+    const pp = presentacionCompraActual();
     const submitBtn = e.target.querySelector("button[type='submit']");
 
-    if (!(cantidad > 0) || !(costo_unitario > 0)) {
-      setMsg("msg-productos", "La cantidad y el costo deben ser mayores a 0.", false);
+    if (!(costo_unitario > 0)) {
+      setMsg("msg-productos", "El costo debe ser mayor a 0.", false);
+      return;
+    }
+    if (pp) {
+      if (!Number.isInteger(cantidad) || cantidad < 1) {
+        setMsg("msg-productos", "La cantidad de " + pp.presentaciones.nombre.toLowerCase() + " debe ser un número entero mayor a 0.", false);
+        return;
+      }
+    } else if (!(cantidad > 0)) {
+      setMsg("msg-productos", "La cantidad debe ser mayor a 0.", false);
       return;
     }
 
@@ -576,12 +706,15 @@ safeInit("form-compra", () => {
     const { error } = await client.rpc("registrar_compra", {
       p_producto_id: producto_id, p_almacen_id: almacen_id,
       p_cantidad: cantidad, p_costo_unitario: costo_unitario,
+      p_presentacion_id: pp ? pp.presentacion_id : null,
+      p_cantidad_presentacion: pp ? cantidad : null,
     });
     submitBtn.disabled = false;
 
     if (error) { setMsg("msg-productos", "No se pudo registrar la compra: " + explicarError(error, "registrar compra"), false); return; }
     setMsg("msg-productos", "Compra registrada, stock actualizado.", true);
     e.target.reset();
+    document.getElementById("compra-resumen").classList.add("hidden");
     await refrescarStockYSelects();
   });
 });

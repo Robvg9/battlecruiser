@@ -186,8 +186,17 @@
       <form id="form-compra" class="inline-form">
         <select id="compra-producto" required></select>
         <select id="compra-almacen" required></select>
-        <input id="compra-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
+        <select id="compra-presentacion">
+          <option value="">Sin presentación / Unidad base</option>
+        </select>
+        <input id="compra-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad de unidades base" required>
         <input id="compra-costo" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Costo unitario" required>
+        <div id="compra-resumen" class="compra-resumen hidden">
+          <div class="compra-resumen-linea"><span>Compra</span><span id="compra-resumen-cantidad"></span></div>
+          <div class="compra-resumen-linea"><span>Equivalente</span><span id="compra-resumen-equivalente"></span></div>
+          <div class="compra-resumen-linea"><span>Costo</span><span id="compra-resumen-costo"></span></div>
+          <div class="compra-resumen-linea compra-resumen-total"><span>Total</span><span id="compra-resumen-total"></span></div>
+        </div>
         <button type="submit">Registrar compra</button>
       </form>
       <p class="msg" id="msg-productos"></p>
