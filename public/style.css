@@ -411,11 +411,29 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     grid-template-areas: "header header" "sidebar main" "footer footer";
     column-gap: 0;
     align-items: stretch;
-    min-height: 100vh;
+    /* Sesión 27 — antes era min-height:100vh, lo que dejaba crecer el grid
+       más allá de la pantalla cuando una pestaña (ej. Configuración) tenía
+       mucho contenido: la página entera se alargaba y el footer quedaba
+       fuera de la vista. Con height:100vh el shell queda fijo al alto real
+       de la pantalla; la fila del medio (1fr) tiene entonces una altura
+       definida y es .main-content quien scrollea internamente (ver abajo),
+       nunca la página completa. */
+    height: 100vh;
   }
   .app-header { grid-area: header; margin-bottom: 0; padding: 18px 28px; background: var(--stone); border-bottom: 1px solid var(--gold-dim); }
   .main-content > .rule-orn { display: none; }
-  .main-content { grid-area: main; padding: 22px 28px; }
+  .main-content {
+    grid-area: main; padding: 22px 28px;
+    /* Sesión 27 — scroll interno del área principal: min-height:0 permite
+       que este ítem del grid se achique por debajo de la altura de su
+       contenido (por defecto un ítem de grid no baja de su "min-height:auto"
+       basado en contenido, que es justo lo que hacía crecer todo el shell).
+       overflow-y:auto crea el scroll DENTRO de main cuando el contenido de
+       la pestaña activa no entra en el espacio disponible, sin mover
+       header, sidebar ni footer. */
+    min-height: 0;
+    overflow-y: auto;
+  }
   .app-footer { grid-area: footer; margin-top: 0; padding: 14px 28px; }
   .sidebar {
     grid-area: sidebar; position: static; transform: none; height: auto;
