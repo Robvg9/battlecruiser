@@ -364,20 +364,25 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   /* Antes .sidebar era un panel fijo superpuesto (overlay) que había que
      abrir con la hamburguesa. En PC no tiene sentido esconderlo: pasa a
      ser una columna fija del grid, siempre visible, sin backdrop ni botón
-     de abrir/cerrar (ambos se ocultan más abajo). */
-  .app-shell {
+     de abrir/cerrar (ambos se ocultan más abajo).
+     BUG corregido: esta regla necesita el mismo nivel de especificidad que
+     ".app-shell.visible { display:block }" (línea 152) para poder ganarle
+     — con solo ".app-shell" (menos específico) el grid nunca se activaba
+     de verdad y el sidebar (ya con position:static) quedaba como una caja
+     de 240px flotando arriba a la izquierda, en flujo normal de bloque. */
+  .app-shell.visible {
     display: grid;
     grid-template-columns: 240px 1fr;
     grid-template-areas: "header header" "sidebar main" "footer footer";
     column-gap: 28px;
-    align-items: start;
+    align-items: stretch;
   }
   .app-header { grid-area: header; margin-bottom: 14px; }
   .main-content { grid-area: main; }
   .app-footer { grid-area: footer; }
   .sidebar {
     grid-area: sidebar; position: static; transform: none; height: auto;
-    max-width: none; box-shadow: none; align-self: start;
+    max-width: none; box-shadow: none;
   }
   .sidebar-backdrop, #sidebar-toggle-btn, #sidebar-close-btn { display: none; }
 
