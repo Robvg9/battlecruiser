@@ -319,6 +319,26 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .pass-panel .btn-row { display: flex; gap: 8px; margin-top: 6px; }
 .pass-panel .btn-row button { flex: 1; margin-top: 0; width: auto; }
 
+/* ---- Sesión 21: mejor aprovechamiento de espacio en tablet/PC ----
+   Antes .app-shell tenía un único max-width:760px fijo sin importar el
+   tamaño real de pantalla, así que en una PC o tablet grande el contenido
+   quedaba angosto y centrado con mucho espacio vacío a los costados. Se
+   mantiene el diseño "salón privado" intacto (mismos colores, tarjetas,
+   menú lateral) — solo se le da más ancho disponible en pantallas grandes,
+   y las listas pasan a 2 columnas cuando entran cómodas para no desperdiciar
+   ese espacio extra. El menú lateral (overlay) no se toca: sigue funcionando
+   igual en todos los tamaños, tal como lo pidió Roberto. */
+@media (min-width: 640px) {
+  .app-shell { max-width: 900px; }
+  .inline-form input, .inline-form select { flex: 1 1 200px; }
+}
+@media (min-width: 1024px) {
+  .app-shell { max-width: 1180px; }
+  .resumen-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+  #venta-lineas.lista { display: flex; flex-direction: column; }
+}
+
 /* ---- Pestaña Resumen — Sesión 15 (nueva) ---- */
 .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
 .resumen-card {

@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v2.8 · La Cueva</p>
+      <p class="footnote">v2.9 · La Cueva</p>
     </form>
   </div>
 
@@ -83,6 +83,7 @@
         <button class="tab-btn" data-tab="almacenes">Almacenes</button>
         <button class="tab-btn" data-tab="transferencias">Transferencias</button>
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
+        <button class="tab-btn" data-tab="config">Configuración</button>
       </nav>
     </aside>
 
@@ -253,6 +254,31 @@
       </form>
       <div id="lista-vales" class="lista"></div>
       <p class="msg" id="msg-vales"></p>
+    </section>
+
+    <section id="tab-config" class="tab-panel">
+      <h3>Categorías</h3>
+      <form id="form-categoria" class="inline-form">
+        <input id="cat-nombre" placeholder="Nombre de la categoría" required>
+        <button type="submit">Agregar categoría</button>
+      </form>
+      <div id="lista-categorias" class="lista"></div>
+
+      <h3>Unidades de medida</h3>
+      <form id="form-unidad" class="inline-form">
+        <input id="uni-nombre" placeholder="Nombre de la unidad" required>
+        <button type="submit">Agregar unidad</button>
+      </form>
+      <div id="lista-unidades" class="lista"></div>
+
+      <h3>Formas de presentación</h3>
+      <form id="form-presentacion" class="inline-form">
+        <input id="pre-nombre" placeholder="Nombre de la presentación" required>
+        <button type="submit">Agregar presentación</button>
+      </form>
+      <div id="lista-presentaciones" class="lista"></div>
+
+      <p class="msg" id="msg-config"></p>
     </section>
   </div>
 

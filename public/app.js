@@ -1146,6 +1146,82 @@ async function refrescarVentasHistorial() {
   });
 }
 
+// ============================================================
+// Sesión 21 — Pestaña "Configuración": Categorías, Unidades de medida y
+// Formas de presentación. Los 3 catálogos comparten la misma regla de
+// negocio: se pueden crear valores nuevos y activar/desactivar los
+// existentes, pero NUNCA se borran físicamente (podrían estar en uso en
+// productos ya cargados). Productos y Almacenes ya tienen su propio flujo
+// con más campos y no se tocan; este es un helper genérico para no repetir
+// el mismo CRUD simple 3 veces.
+// ============================================================
+function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
+  safeInit("catalogo-" + tabla, () => {
+    const form = document.getElementById(formId);
+    const input = document.getElementById(inputId);
+    const lista = document.getElementById(listaId);
+
+    async function refrescar() {
+      setLoading(listaId, "Cargando…");
+      const { data, error } = await client.from(tabla).select("id, nombre, activo").order("nombre");
+      if (error) {
+        setMsg("msg-config", "No se pudo cargar " + tabla + ": " + explicarError(error, "cargar " + tabla), false);
+        return;
+      }
+      if (!data || data.length === 0) {
+        setEmpty(listaId, "Todavía no hay " + tabla + " cargadas.");
+        return;
+      }
+      lista.innerHTML = "";
+      data.forEach((row) => {
+        const div = document.createElement("div");
+        div.className = "lista-item";
+        div.innerHTML = `<span>${row.nombre} ${row.activo ? "" : '<span class="muted">· inactivo</span>'}</span>
+          <button type="button" class="catalogo-toggle-btn" data-id="${row.id}" data-activo="${row.activo}">${row.activo ? "Desactivar" : "Activar"}</button>`;
+        lista.appendChild(div);
+      });
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = input.value.trim();
+      const submitBtn = form.querySelector("button[type='submit']");
+      submitBtn.disabled = true;
+      const { error } = await client.from(tabla).insert({ nombre });
+      submitBtn.disabled = false;
+      if (error) {
+        const msg = error.code === "23505" ? "Ya existe un valor con ese nombre." : explicarError(error, "crear " + singular);
+        setMsg("msg-config", "No se pudo crear: " + msg, false);
+        return;
+      }
+      setMsg("msg-config", singular.charAt(0).toUpperCase() + singular.slice(1) + " creada.", true);
+      form.reset();
+      await refrescar();
+    });
+
+    lista.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".catalogo-toggle-btn");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const activoActual = btn.dataset.activo === "true";
+      btn.disabled = true;
+      const { error } = await client.from(tabla).update({ activo: !activoActual }).eq("id", id);
+      btn.disabled = false;
+      if (error) {
+        setMsg("msg-config", "No se pudo actualizar: " + explicarError(error, "actualizar " + singular), false);
+        return;
+      }
+      await refrescar();
+    });
+
+    window["_refrescarCatalogo_" + tabla] = refrescar;
+  });
+}
+
+initCatalogoSimple({ tabla: "categorias", formId: "form-categoria", inputId: "cat-nombre", listaId: "lista-categorias", singular: "categoría" });
+initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nombre", listaId: "lista-unidades", singular: "unidad" });
+initCatalogoSimple({ tabla: "presentaciones", formId: "form-presentacion", inputId: "pre-nombre", listaId: "lista-presentaciones", singular: "presentación" });
+
 // Cargar todo cuando se confirma sesión real (se engancha a showApp existente)
 const _showAppOriginal = showApp;
 showApp = function (session) {
@@ -1155,4 +1231,10 @@ showApp = function (session) {
   safeInit("carga-inicial-transferencias", () => { refrescarTransferencias(); });
   safeInit("carga-inicial-vales", () => { refrescarVales(); });
   safeInit("carga-inicial-ventas", () => { refrescarVentas(); });
+  safeInit("carga-inicial-config", () => {
+    ["categorias", "unidades", "presentaciones"].forEach((tabla) => {
+      const refrescar = window["_refrescarCatalogo_" + tabla];
+      if (refrescar) refrescar();
+    });
+  });
 };
