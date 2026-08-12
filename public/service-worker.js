@@ -1,5 +1,15 @@
 // Subir este número cada vez que cambie algo del "shell" propio de la app.
-const CACHE_NAME = "battlecruiser-shell-v17";
+// v20 — Sesión 24: bump obligatorio por el cambio en app.js del indicador
+// de conexión, que ahora combina navigator.onLine con el resultado real de
+// las consultas a Supabase (_conectividadReal / marcarConectividadReal) en
+// vez de confiar solo en navigator.onLine — cubre el caso de wifi/datos
+// "conectados" sin salida real a Internet (portal cautivo, router sin
+// Internet). También se revisó explícitamente esta sesión: CACHE_NAME,
+// instalación, activación y la estrategia de caché del shell — sin cambios
+// de comportamiento, siguen siendo correctos (network-first con fallback a
+// caché para el shell, cache-first para CDN versionado, timeout corto solo
+// en lecturas GET a Supabase, escrituras sin timeout artificial).
+const CACHE_NAME = "battlecruiser-shell-v20";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

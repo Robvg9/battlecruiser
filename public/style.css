@@ -91,6 +91,20 @@ body:has(.app-shell.visible) { align-items: flex-start; }
 .status-line.offline { color: var(--wine); }
 .status-line.offline .status-dot { background: var(--wine); box-shadow: 0 0 6px var(--wine); }
 
+/* Sesión 22 — mismo indicador, versión chica para el header del panel
+   principal (post-login): sin el margen/posicionamiento pensado para la
+   pantalla de login. */
+.status-line-app { margin-top: 0; z-index: auto; position: static; text-transform: none; }
+
+/* Sesión 22 — estado transitorio mientras se refrescan los datos justo
+   después de recuperar la conexión (ver refrescarTrasReconexion en app.js). */
+.status-line.reconectando { color: var(--gold); }
+.status-line.reconectando .status-dot {
+  background: var(--gold); box-shadow: 0 0 6px var(--gold);
+  animation: parpadeo-conexion 1s ease-in-out infinite;
+}
+@keyframes parpadeo-conexion { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
 /* Tarjeta de acceso — marco doble de filete dorado, como una carta de socio. */
 .card {
   position: relative; z-index: 2; width: 100%; max-width: 350px;
@@ -173,7 +187,11 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 }
 .app-header h1 { font-size: 22px; margin: 0; }
 .app-header .rule-orn { margin: 10px 0 20px; }
-.header-right { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--mist); position: relative; }
+/* Sesión 23: flex-wrap agregado — el indicador de conexión ahora puede
+   mostrar textos más largos ("Sin conexión — sin datos guardados"), y en
+   celulares angostos junto con el correo y los botones de Ajustes/Cerrar
+   sesión no entraba todo en una sola fila sin recortarse. */
+.header-right { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px 10px; font-size: 12.5px; color: var(--mist); position: relative; }
 .header-right button {
   padding: 7px 14px; background: var(--stone-2); color: var(--text);
   border: 1px solid var(--gold-dim); border-radius: 5px; font-family: 'Inter', sans-serif;

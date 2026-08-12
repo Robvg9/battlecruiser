@@ -292,21 +292,299 @@ safeInit("bloqueo-scroll-numeros", () => {
   });
 });
 
-safeInit("estado-conexion", () => {
-  const connStatus = document.getElementById("conn-status");
-  const connText = document.getElementById("conn-text");
-  function updateConnectionStatus() {
-    if (navigator.onLine) {
-      connStatus.classList.remove("offline");
-      connText.textContent = "Conectado";
+// ============================================================
+// Caché local de lectura (IndexedDB) — Sesión 22, refinada en Sesión 23
+// Infraestructura OFFLINE-FIRST DE LECTURA (ETAPA A completa desde esta
+// sesión). Todo lo que hace falta para poder ABRIR la app y ver datos
+// reales sin Internet: productos, categorías, unidades, almacenes, stock
+// y presentaciones (catálogo + asociaciones por producto). Se guarda cada
+// conjunto de datos completo bajo una "clave" simple en un único object
+// store — no hace falta modelar cada tabla por separado porque estos datos
+// siempre se reemplazan enteros (nunca se actualiza una fila suelta desde
+// acá, siempre el listado completo tal cual lo devuelve Supabase).
+//
+// Sesión 23: se agregó "unidades" a la lista de arriba — existía la
+// consulta cacheada de "categorias" para llenar selectores, pero el listado
+// de Categorías/Unidades del panel de Configuración usaba una consulta
+// aparte SIN caché (bug real: offline se quedaba trabado en "Cargando…"
+// para siempre). Ahora las dos pasan por el mismo withCache.
+//
+// Sesión 24: el indicador de conexión ya no depende solo de
+// navigator.onLine (ver _conectividadReal / marcarConectividadReal más
+// abajo) — cada consulta real que pasa por withCache confirma o desmiente
+// si Internet funciona de verdad, para el caso de wifi/datos "conectados"
+// pero sin salida real (portal cautivo, router sin Internet, etc.).
+//
+// A propósito, esta sesión NO incluye ninguna escritura offline (compras,
+// ventas, transferencias, vales, ni crear/editar productos, almacenes o
+// presentaciones): esa cola de sincronización de escrituras es la etapa
+// siguiente. Todas las operaciones de escritura existentes siguen
+// funcionando exactamente igual que antes, solo online.
+// ============================================================
+const IDB_NAME = "battlecruiser-cache";
+const IDB_VERSION = 1;
+const IDB_STORE = "lecturas";
+
+function idbAbrir() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) { reject(new Error("IndexedDB no disponible en este navegador")); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: "clave" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGet(clave) {
+  try {
+    const db = await idbAbrir();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(clave);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn("[Battlecruiser] No se pudo leer de IndexedDB ('" + clave + "'):", e);
+    return null;
+  }
+}
+
+async function idbSet(clave, datos) {
+  try {
+    const db = await idbAbrir();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put({ clave, datos, actualizado: new Date().toISOString() });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn("[Battlecruiser] No se pudo guardar en IndexedDB ('" + clave + "'):", e);
+  }
+}
+
+// ---- Estado de caché por clave — Sesión 23 ----
+// Antes había un solo Set booleano (_clavesDesdeCache) que solo distinguía
+// "se está mostrando desde caché" de "se está mostrando desde el servidor".
+// Eso mezclaba dos situaciones muy distintas para quien mira la pantalla
+// offline:
+//   a) esta clave NUNCA se guardó en este dispositivo (nunca se abrió esa
+//      pantalla con Internet) → no hay nada real que mostrar, y el listado
+//      vacío no significa "no hay productos", significa "no sé".
+//   b) esta clave SÍ se guardó, y lo guardado está realmente vacío (en
+//      algún momento con conexión se confirmó que no había filas) → el
+//      listado vacío es un dato real, no un problema de conexión.
+// Ahora cada clave guarda uno de 4 estados, y el resto del archivo (mensajes
+// de listas vacías, indicador de conexión, tooltip de última actualización)
+// lee de acá en vez de un simple sí/no.
+//   "servidor"        → el último dato mostrado vino del servidor recién.
+//   "sin-cache"        → sin conexión (o error de red) y nunca se guardó
+//                        nada en este dispositivo para esta clave.
+//   "cache-vacia"      → sin conexión (o error de red), hay un registro
+//                        guardado para esta clave, pero su contenido es un
+//                        array vacío (confirmado en su momento con el servidor).
+//   "cache-con-datos"  → sin conexión (o error de red), y lo guardado tiene
+//                        al menos una fila.
+const _estadoCacheClaves = {};
+
+// Claves que este dispositivo cachea para lectura offline (Etapa A). Se usa
+// para el tooltip de "última actualización" del indicador — "asociaciones:*"
+// queda afuera porque son dinámicas por producto, no una lista fija.
+const CLAVES_CACHE_PRINCIPALES = ["productos", "categorias", "unidades", "almacenes", "stock", "presentaciones"];
+
+function esErrorDeRed(error) {
+  const msg = ((error && error.message) || "").toLowerCase();
+  return !navigator.onLine || msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("timeout");
+}
+
+// ---- Conectividad real — Sesión 24 ----
+// navigator.onLine solo dice si el sistema operativo/navegador CREE tener
+// una interfaz de red activa — puede seguir en "true" con wifi conectado a
+// un router sin Internet real, datos móviles con portal cautivo, etc. El
+// indicador no puede confiar solo en eso: cada consulta real a Supabase que
+// pasa por withCache confirma o desmiente la conectividad real, y esa
+// confirmación se combina con navigator.onLine para decidir qué se muestra.
+// No se agrega ningún ping/polling nuevo — se aprovechan las consultas que
+// la app ya hace.
+let _conectividadReal = null; // null = todavía no se resolvió ninguna consulta real esta sesión
+
+function marcarConectividadReal(estado) {
+  if (_conectividadReal === estado) return;
+  _conectividadReal = estado;
+  actualizarIndicadorConexion();
+}
+
+function estaRealmenteDesconectado() {
+  return !navigator.onLine || _conectividadReal === "offline";
+}
+
+async function leerDeCache(clave) {
+  const cache = await idbGet(clave);
+  if (!cache) {
+    _estadoCacheClaves[clave] = "sin-cache";
+    actualizarIndicadorConexion();
+    return [];
+  }
+  const datos = cache.datos || [];
+  _estadoCacheClaves[clave] = datos.length > 0 ? "cache-con-datos" : "cache-vacia";
+  actualizarIndicadorConexion();
+  return datos;
+}
+
+// Mensaje de "lista vacía" que distingue el caso (a) de arriba del caso de
+// "no hay datos" normal (offline con caché confirmada vacía, u online).
+// Se usa en todas las listas que pasan por withCache — nunca en
+// transferencias/vales/ventas, que no tienen caché offline (fuera del
+// alcance de la Etapa A, ver más abajo).
+function mensajeListaVacia(clave, mensajeBase) {
+  if (_estadoCacheClaves[clave] === "sin-cache") {
+    return "Sin conexión y todavía no se guardó nada de esto en este dispositivo. Abrí esta pantalla una vez con Internet y va a quedar disponible sin conexión la próxima vez.";
+  }
+  return mensajeBase;
+}
+
+// Envuelve una consulta a Supabase con caché local de solo lectura:
+// - Con Internet: consulta al servidor, guarda el resultado en IndexedDB
+//   (para la próxima vez que falte conexión) y lo devuelve tal cual.
+// - Si la consulta falla por red, o directamente no hay Internet: cae a lo
+//   último guardado en IndexedDB para esa clave (o [] si nunca se guardó
+//   nada todavía para esa clave en este dispositivo).
+// consultaFn debe devolver la promesa cruda de Supabase (con {data, error}),
+// nunca ya resuelta — así acá se decide una sola vez si hubo que caer a caché.
+async function withCache(clave, consultaFn) {
+  if (!navigator.onLine) {
+    marcarConectividadReal("offline");
+    return leerDeCache(clave);
+  }
+
+  try {
+    const { data, error } = await consultaFn();
+    if (error) {
+      if (esErrorDeRed(error)) {
+        marcarConectividadReal("offline");
+        return leerDeCache(clave);
+      }
+      console.error("[Battlecruiser] Error cargando '" + clave + "':", error);
+      // Llegó una respuesta real del servidor (aunque sea un error de
+      // negocio, ej. un permiso denegado): eso confirma que la conexión
+      // funciona de verdad, más allá de lo que diga navigator.onLine.
+      marcarConectividadReal("online");
+      // No es un problema de conexión: se trata como respuesta real del
+      // servidor, no como estado de caché offline.
+      _estadoCacheClaves[clave] = "servidor";
+      actualizarIndicadorConexion();
+      return [];
+    }
+    marcarConectividadReal("online");
+    _estadoCacheClaves[clave] = "servidor";
+    await idbSet(clave, data || []);
+    actualizarIndicadorConexion();
+    return data || [];
+  } catch (e) {
+    // Algunos errores de red (ej. el fetch subyacente rechazado por el
+    // Service Worker) pueden llegar como excepción en vez de {error}.
+    marcarConectividadReal("offline");
+    return leerDeCache(clave);
+  }
+}
+
+// ============================================================
+// Indicador de conexión — Sesión 15 (básico), ampliado en la Sesión 22
+// para reflejar cuándo se están mostrando datos guardados (ver withCache
+// arriba) y para disparar un refresco automático de todo al reconectar.
+// Actualiza a la vez el indicador de la pantalla de login y el del panel
+// principal (agregado esta sesión en el header, ver index.html).
+// ============================================================
+// Cuenta, sobre TODAS las claves ya consultadas en esta sesión de la app,
+// cuántas están en cada uno de los 3 estados offline. Se usa para decidir
+// el texto del indicador global (no hay un solo "offline": puede ser
+// "tengo datos guardados para mostrar" o "todavía no tengo nada").
+function resumenEstadoCache() {
+  const valores = Object.values(_estadoCacheClaves);
+  return {
+    conDatos: valores.filter((v) => v === "cache-con-datos").length,
+    sinCache: valores.filter((v) => v === "sin-cache").length,
+    vacia: valores.filter((v) => v === "cache-vacia").length,
+  };
+}
+
+function actualizarIndicadorConexion(estadoForzado) {
+  const nodos = [
+    { linea: document.getElementById("conn-status"), texto: document.getElementById("conn-text") },
+    { linea: document.getElementById("conn-status-app"), texto: document.getElementById("conn-text-app") },
+  ];
+
+  let clase = "";
+  let texto = "Conectado";
+  let mostrarTooltip = false;
+  if (estadoForzado === "reconectando") {
+    clase = "reconectando";
+    texto = "Reconectando…";
+  } else if (estaRealmenteDesconectado()) {
+    clase = "offline";
+    const { conDatos, sinCache } = resumenEstadoCache();
+    if (conDatos > 0) {
+      // Al menos una pantalla tiene datos guardados reales para mostrar.
+      texto = "Sin conexión — usando caché";
+      mostrarTooltip = true;
+    } else if (sinCache > 0) {
+      // Ya se intentó cargar algo y no había nada guardado todavía (primera
+      // vez sin conexión en este dispositivo) — distinto de "no hay datos"
+      // real, así que el texto lo dice explícito.
+      texto = "Sin conexión — sin datos guardados";
     } else {
-      connStatus.classList.add("offline");
-      connText.textContent = "Sin conexión — usando caché";
+      // Todavía no se consultó nada en esta sesión (ej. recién se abrió el
+      // login sin conexión), o todo lo consultado está confirmado vacío.
+      texto = "Sin conexión";
     }
   }
-  window.addEventListener("online", updateConnectionStatus);
-  window.addEventListener("offline", updateConnectionStatus);
-  updateConnectionStatus();
+
+  nodos.forEach(({ linea, texto: textoEl }) => {
+    if (!linea) return;
+    linea.classList.remove("offline", "reconectando");
+    if (clase) linea.classList.add(clase);
+    if (textoEl) textoEl.textContent = texto;
+  });
+
+  if (mostrarTooltip) {
+    marcarTituloUltimaActualizacion(nodos);
+  } else {
+    nodos.forEach(({ linea }) => { if (linea) linea.removeAttribute("title"); });
+  }
+}
+
+// Detalle fino opcional: al pasar el mouse/tocar el indicador offline, la
+// hora de la última vez que se guardó algo en caché. Sesión 22 solo miraba
+// "productos"; Sesión 23 lo cambia para mirar TODAS las claves cacheadas
+// principales y mostrar la más reciente, porque no siempre "productos" es
+// la que se actualizó último (ej. se entró directo a la pestaña Almacenes).
+async function marcarTituloUltimaActualizacion(nodos) {
+  const registros = await Promise.all(CLAVES_CACHE_PRINCIPALES.map((c) => idbGet(c)));
+  const conFecha = registros.filter((r) => r && r.actualizado);
+  if (conFecha.length === 0) return;
+  const masReciente = conFecha.reduce((a, b) => (new Date(b.actualizado) > new Date(a.actualizado) ? b : a));
+  const hora = new Date(masReciente.actualizado).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+  const texto = "Datos guardados el " + fechaCorta(masReciente.actualizado) + " a las " + hora;
+  nodos.forEach(({ linea }) => { if (linea) linea.title = texto; });
+}
+
+safeInit("estado-conexion", () => {
+  async function alReconectar() {
+    if (appShell.classList.contains("visible")) {
+      await refrescarTrasReconexion();
+    } else {
+      actualizarIndicadorConexion();
+    }
+  }
+  window.addEventListener("online", alReconectar);
+  window.addEventListener("offline", () => marcarConectividadReal("offline"));
+  actualizarIndicadorConexion();
 });
 
 // ============================================================
@@ -466,22 +744,23 @@ function fillSelect(select, rows, valueKey, labelFn, keepFirst) {
   });
 }
 
+// Sesión 22: las 3 lecturas de abajo pasan por withCache — con Internet
+// consultan Supabase como siempre y guardan el resultado en IndexedDB; sin
+// Internet, devuelven lo último guardado (o [] si nunca se guardó nada
+// para esa clave todavía en este dispositivo).
 async function cargarCategorias() {
-  const { data } = await client.from("categorias").select("id, nombre").order("nombre");
-  return data || [];
+  return withCache("categorias", () => client.from("categorias").select("id, nombre").order("nombre"));
 }
 
 async function cargarAlmacenes() {
-  const { data } = await client.from("almacenes").select("id, nombre, tipo").order("nombre");
-  return data || [];
+  return withCache("almacenes", () => client.from("almacenes").select("id, nombre, tipo").order("nombre"));
 }
 
 async function cargarProductos() {
-  const { data } = await client
+  return withCache("productos", () => client
     .from("productos")
     .select("id, nombre, unidad, precio_normal, precio_mayorista, categorias(nombre), presentaciones(nombre)")
-    .order("nombre");
-  return data || [];
+    .order("nombre"));
 }
 
 async function refrescarProductos() {
@@ -518,7 +797,7 @@ async function refrescarProductos() {
 
   const lista = document.getElementById("lista-productos");
   if (productos.length === 0) {
-    setEmpty("lista-productos", "Todavía no hay productos cargados.");
+    setEmpty("lista-productos", mensajeListaVacia("productos", "Todavía no hay productos cargados."));
   } else {
     lista.innerHTML = "";
     productos.forEach((p) => {
@@ -744,33 +1023,44 @@ function formatFactor(n) {
   return Number.isFinite(v) ? String(v) : String(n);
 }
 
+// Sesión 22: sin conexión no tiene sentido preguntarle al servidor qué
+// puede escribir el usuario — se responde de una sin intentar la red,
+// mostrando todo en modo solo-lectura (ver, sí; crear/editar/borrar, no)
+// hasta reconectar. La cola de sincronización de escrituras (que sí
+// necesitaría saber esto de antemano, cacheado) es la etapa siguiente.
 async function cargarPermisosPresentaciones() {
+  if (!navigator.onLine) {
+    return { ver: true, crear: false, editar: false, borrar: false };
+  }
   const acciones = ["ver", "crear", "editar", "borrar"];
-  const resultados = await Promise.all(
-    acciones.map((accion) => client.rpc("tiene_permiso", { p_seccion: "presentaciones", p_accion: accion }))
-  );
-  const permisos = {};
-  acciones.forEach((accion, i) => { permisos[accion] = resultados[i].data === true; });
-  return permisos;
+  try {
+    const resultados = await Promise.all(
+      acciones.map((accion) => client.rpc("tiene_permiso", { p_seccion: "presentaciones", p_accion: accion }))
+    );
+    const permisos = {};
+    acciones.forEach((accion, i) => { permisos[accion] = resultados[i].data === true; });
+    return permisos;
+  } catch (e) {
+    console.warn("[Battlecruiser] No se pudieron cargar permisos de presentaciones:", e);
+    return { ver: true, crear: false, editar: false, borrar: false };
+  }
 }
 
 async function cargarPresentacionesTodas() {
-  const { data } = await client.from("presentaciones").select("id, nombre, activo").order("nombre");
-  return data || [];
+  return withCache("presentaciones", () => client.from("presentaciones").select("id, nombre, activo").order("nombre"));
 }
 
 async function cargarAsociacionesProducto(producto_id) {
-  const { data } = await client
+  return withCache("asociaciones:" + producto_id, () => client
     .from("producto_presentaciones")
     .select("id, factor, activo, presentacion_id, presentaciones(nombre)")
     .eq("producto_id", producto_id)
-    .order("created_at");
-  return data || [];
+    .order("created_at"));
 }
 
 function renderCatalogoPresentaciones() {
   if (_presentacionesCache.length === 0) {
-    setEmpty("lista-presentaciones-catalogo", "Todavía no hay presentaciones creadas.");
+    setEmpty("lista-presentaciones-catalogo", mensajeListaVacia("presentaciones", "Todavía no hay presentaciones creadas."));
     return;
   }
   const cont = document.getElementById("lista-presentaciones-catalogo");
@@ -809,7 +1099,8 @@ function actualizarSelectPresentacionesDisponibles() {
 function renderAsociacionesProducto() {
   const cont = document.getElementById("pp-lista-asociaciones");
   if (_asociacionesProductoCache.length === 0) {
-    setEmpty("pp-lista-asociaciones", "Este producto todavía no tiene presentaciones asociadas.");
+    const clave = "asociaciones:" + (_productoPresentacionesActual || "");
+    setEmpty("pp-lista-asociaciones", mensajeListaVacia(clave, "Este producto todavía no tiene presentaciones asociadas."));
     return;
   }
   cont.innerHTML = "";
@@ -1038,7 +1329,7 @@ async function refrescarAlmacenes() {
   renderResumen();
   const lista = document.getElementById("lista-almacenes");
   if (almacenes.length === 0) {
-    setEmpty("lista-almacenes", "Todavía no hay almacenes cargados.");
+    setEmpty("lista-almacenes", mensajeListaVacia("almacenes", "Todavía no hay almacenes cargados."));
   } else {
     lista.innerHTML = "";
     almacenes.forEach((a) => {
@@ -1061,15 +1352,15 @@ async function refrescarStockYSelects() {
   fillSelect(document.getElementById("vale-producto"), productos, "id", (p) => p.nombre);
 
   setLoading("lista-stock", "Cargando stock…");
-  const { data: stock } = await client
+  const stock = await withCache("stock", () => client
     .from("stock")
-    .select("producto_id, almacen_id, cantidad, minimo, productos(nombre), almacenes(nombre)");
+    .select("producto_id, almacen_id, cantidad, minimo, productos(nombre), almacenes(nombre)"));
 
-  _cache.stock = stock || [];
+  _cache.stock = stock;
   renderResumen();
   const lista = document.getElementById("lista-stock");
   if (!stock || stock.length === 0) {
-    setEmpty("lista-stock", "Todavía no hay stock cargado.");
+    setEmpty("lista-stock", mensajeListaVacia("stock", "Todavía no hay stock cargado."));
     return;
   }
   lista.innerHTML = "";
@@ -1618,15 +1909,22 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
     const input = document.getElementById(inputId);
     const lista = document.getElementById(listaId);
 
+    // Sesión 23 — bug real encontrado: esta lista consultaba la tabla
+    // directo con client.from(), sin pasar por withCache como el resto de
+    // las pantallas. Con Internet andaba bien, pero sin conexión el error
+    // de red no tenía ningún fallback: setLoading dejaba "Cargando…" puesto
+    // y la función cortaba en el "return" del error, así que el panel de
+    // Configuración quedaba mostrando "Cargando…" para siempre en vez de
+    // caer a los datos guardados (o al mensaje de "sin datos todavía").
+    // Ahora usa la misma clave de caché que cargarCategorias() (que ya
+    // alimentaba los selectores de Productos), así que "categorias" tiene
+    // una única caché compartida en vez de dos consultas separadas a la
+    // misma tabla con distinto comportamiento offline.
     async function refrescar() {
       setLoading(listaId, "Cargando…");
-      const { data, error } = await client.from(tabla).select("id, nombre, activo").order("nombre");
-      if (error) {
-        setMsg("msg-config", "No se pudo cargar " + tabla + ": " + explicarError(error, "cargar " + tabla), false);
-        return;
-      }
+      const data = await withCache(tabla, () => client.from(tabla).select("id, nombre, activo").order("nombre"));
       if (!data || data.length === 0) {
-        setEmpty(listaId, "Todavía no hay " + tabla + " cargadas.");
+        setEmpty(listaId, mensajeListaVacia(tabla, "Todavía no hay " + tabla + " cargadas."));
         return;
       }
       lista.innerHTML = "";
@@ -1695,3 +1993,44 @@ showApp = function (session) {
   });
   safeInit("carga-inicial-presentaciones", () => { inicializarPresentaciones(); });
 };
+
+// ============================================================
+// Refresco automático al reconectar — Sesión 22, corregido en Sesión 23
+// Dispara un refresco completo de todo lo que ya estaba cargado cuando el
+// navegador recupera la conexión, para no depender de que alguien cambie
+// de pestaña o repita una acción a mano después de haber estado offline.
+// Los datos con caché local (productos/categorías/unidades/almacenes/stock/
+// presentaciones, vía withCache más arriba — categorías y unidades desde
+// Sesión 23, antes solo productos/almacenes/stock/presentaciones) se
+// actualizan de verdad contra el servidor y reemplazan lo que había
+// guardado. El resto (transferencias, vales, ventas) ya se recargaba solo
+// al entrar a esa pestaña — acá también se refresca por prolijidad, sin
+// agregarles caché propia (fuera del alcance de la Etapa A: solo lectura
+// offline de productos/categorías/unidades/almacenes/stock/presentaciones).
+// Se llama únicamente con el panel principal ya visible (ver
+// safeInit("estado-conexion") más arriba); en la pantalla de login
+// reconectar solo actualiza el indicador.
+// ============================================================
+async function refrescarTrasReconexion() {
+  actualizarIndicadorConexion("reconectando");
+  try {
+    await refrescarStockYSelects(); // productos + categorías + almacenes + stock
+    await Promise.all([
+      refrescarTransferencias(),
+      refrescarVales(),
+      refrescarVentas(),
+    ]);
+    ["categorias", "unidades"].forEach((tabla) => {
+      const refrescar = window["_refrescarCatalogo_" + tabla];
+      if (refrescar) refrescar();
+    });
+    if (document.querySelector(".presentaciones-panel")) {
+      await inicializarPresentaciones();
+      const ppSel = document.getElementById("pp-producto-select");
+      if (ppSel && ppSel.value) await refrescarAsociacionesProducto(ppSel.value);
+    }
+  } catch (e) {
+    console.warn("[Battlecruiser] Error al refrescar tras reconexión:", e);
+  }
+  actualizarIndicadorConexion();
+}

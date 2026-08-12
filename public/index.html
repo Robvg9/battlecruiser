@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v3.6 · La Cueva</p>
+      <p class="footnote">v3.9 · La Cueva</p>
     </form>
   </div>
 
@@ -95,6 +95,12 @@
         <h1>Battlecruiser</h1>
       </div>
       <div class="header-right">
+        <!-- Sesión 22: mismo indicador de conexión de la pantalla de login,
+             ahora también acá — el modo offline/caché importa sobre todo
+             mientras se está mirando Productos/Stock adentro del panel. -->
+        <div class="status-line status-line-app" id="conn-status-app">
+          <span class="status-dot" id="conn-dot-app"></span><span id="conn-text-app">Conectado</span>
+        </div>
         <span id="user-email"></span>
         <div class="ajustes-wrap">
           <button id="ajustes-btn" type="button">Ajustes ▾</button>
@@ -324,7 +330,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v3.6 · La Cueva</span>
+      <span class="app-footer-version">v3.9 · La Cueva</span>
     </footer>
   </div>
 
