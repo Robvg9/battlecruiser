@@ -105,6 +105,22 @@ body:has(.app-shell.visible) { align-items: flex-start; }
 }
 @keyframes parpadeo-conexion { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
+/* Misión B1 — contador mínimo de la cola offline (#cola-pendientes-badge).
+   Solo un chip chico junto al indicador de conexión del panel principal;
+   el panel de sincronización real es trabajo de la próxima misión. */
+.cola-badge {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gold); border: 1px solid var(--gold);
+  border-radius: 20px; padding: 3px 9px; line-height: 1.2;
+}
+/* Misión B2 — al menos una operación en REQUIERE_ATENCION (Sección 11): se
+   pinta con el mismo tono de alerta que el resto de la app (--wine), sin
+   agregar ningún panel nuevo. */
+.cola-badge.atencion {
+  color: var(--wine); border-color: var(--wine);
+}
+
 /* Tarjeta de acceso — marco doble de filete dorado, como una carta de socio. */
 .card {
   position: relative; z-index: 2; width: 100%; max-width: 350px;

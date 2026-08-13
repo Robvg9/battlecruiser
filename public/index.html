@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v3.9 · La Cueva</p>
+      <p class="footnote">v4.0 · La Cueva</p>
     </form>
   </div>
 
@@ -101,6 +101,12 @@
         <div class="status-line status-line-app" id="conn-status-app">
           <span class="status-dot" id="conn-dot-app"></span><span id="conn-text-app">Conectado</span>
         </div>
+        <!-- Misión B1: contador mínimo de la cola offline de escrituras
+             pendientes (ver actualizarContadorColaPendiente en app.js).
+             Todavía no hay ningún formulario conectado a la cola, así que
+             por ahora se mantiene oculto siempre — queda listo para la
+             próxima misión. -->
+        <span id="cola-pendientes-badge" class="cola-badge hidden"></span>
         <span id="user-email"></span>
         <div class="ajustes-wrap">
           <button id="ajustes-btn" type="button">Ajustes ▾</button>
@@ -330,7 +336,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v3.9 · La Cueva</span>
+      <span class="app-footer-version">v4.0 · La Cueva</span>
     </footer>
   </div>
 

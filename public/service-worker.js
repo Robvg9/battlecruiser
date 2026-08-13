@@ -1,15 +1,12 @@
 // Subir este número cada vez que cambie algo del "shell" propio de la app.
-// v20 — Sesión 24: bump obligatorio por el cambio en app.js del indicador
-// de conexión, que ahora combina navigator.onLine con el resultado real de
-// las consultas a Supabase (_conectividadReal / marcarConectividadReal) en
-// vez de confiar solo en navigator.onLine — cubre el caso de wifi/datos
-// "conectados" sin salida real a Internet (portal cautivo, router sin
-// Internet). También se revisó explícitamente esta sesión: CACHE_NAME,
-// instalación, activación y la estrategia de caché del shell — sin cambios
-// de comportamiento, siguen siendo correctos (network-first con fallback a
-// caché para el shell, cache-first para CDN versionado, timeout corto solo
-// en lecturas GET a Supabase, escrituras sin timeout artificial).
-const CACHE_NAME = "battlecruiser-shell-v20";
+// v21 — Misión B2: bump por la primera versión real de escrituras offline en
+// app.js (ejecutarOperacion, sincronizarCola, conexión de compra/venta/
+// transferencia/vale a la cola offline de la Misión B1). Este service worker
+// en sí NO cambió de comportamiento: las escrituras (POST, incluidos los RPC
+// de compra/venta/transferencia/vale) ya iban directo a la red sin timeout
+// artificial (ver más abajo), que es justo lo que necesita ejecutarOperacion
+// para poder distinguir un error de red real de una respuesta del servidor.
+const CACHE_NAME = "battlecruiser-shell-v21";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

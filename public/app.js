@@ -53,17 +53,27 @@ const userEmailEl = document.getElementById("user-email");
 const logoutBtn = document.getElementById("logout-btn");
 const lanternWrap = document.getElementById("lantern-wrap");
 
+// ---- Usuario autenticado actual — Misión B1 ----
+// La cola offline necesita guardar QUIÉN creó cada operación pendiente
+// (usuario_id), sin inventar nada si por algún motivo no hay sesión real
+// todavía resuelta. Se guarda acá, en un solo lugar, en vez de leerlo cada
+// vez de client.auth.getSession() (asíncrono) desde cada función que cree
+// una operación.
+let _usuarioActualId = null;
+
 function showApp(session) {
   loginForm.classList.add("hidden");
   lanternWrap.classList.add("hidden");
   appShell.classList.add("visible");
   userEmailEl.textContent = session.user.email;
+  _usuarioActualId = session.user.id;
 }
 
 function showLogin() {
   loginForm.classList.remove("hidden");
   lanternWrap.classList.remove("hidden");
   appShell.classList.remove("visible");
+  _usuarioActualId = null;
   // Foco directo en "Correo" al mostrar el login: con 6+ vendedores entrando y
   // saliendo de la cuenta seguido en la misma caja, ahorra un tap cada vez.
   const emailInput = document.getElementById("email");
@@ -322,8 +332,16 @@ safeInit("bloqueo-scroll-numeros", () => {
 // funcionando exactamente igual que antes, solo online.
 // ============================================================
 const IDB_NAME = "battlecruiser-cache";
-const IDB_VERSION = 1;
+// Misión B1: se sube de 1 a 2 para agregar el object store nuevo de la cola
+// offline (IDB_OPS_STORE, ver más abajo). Se reutiliza la MISMA base
+// (battlecruiser-cache) — no se crea una base aparte. onupgradeneeded ya
+// revisa "si no existe" antes de crear cada store, así que abrir la base
+// con la versión nueva no toca ni borra el store existente de caché de
+// lectura (IDB_STORE / "lecturas").
+const IDB_VERSION = 2;
 const IDB_STORE = "lecturas";
+// ---- Misión B1: store de la cola offline de escrituras pendientes ----
+const IDB_OPS_STORE = "operaciones_pendientes";
 
 function idbAbrir() {
   return new Promise((resolve, reject) => {
@@ -333,6 +351,16 @@ function idbAbrir() {
       const db = req.result;
       if (!db.objectStoreNames.contains(IDB_STORE)) {
         db.createObjectStore(IDB_STORE, { keyPath: "clave" });
+      }
+      if (!db.objectStoreNames.contains(IDB_OPS_STORE)) {
+        // keyPath "id" (UUID generado con crypto.randomUUID(), ver
+        // crearOperacionPendiente). Los índices "estado" y "creado_en" son
+        // para poder consultar sin tener que traer y filtrar en JS todas
+        // las operaciones guardadas cada vez (obtenerOperacionesPorEstado
+        // y el orden FIFO de obtenerTodasLasOperaciones).
+        const opsStore = db.createObjectStore(IDB_OPS_STORE, { keyPath: "id" });
+        opsStore.createIndex("estado", "estado", { unique: false });
+        opsStore.createIndex("creado_en", "creado_en", { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -400,7 +428,15 @@ const CLAVES_CACHE_PRINCIPALES = ["productos", "categorias", "unidades", "almace
 
 function esErrorDeRed(error) {
   const msg = ((error && error.message) || "").toLowerCase();
-  return !navigator.onLine || msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("timeout");
+  return !navigator.onLine
+    || msg.includes("failed to fetch")
+    || msg.includes("fetch failed")
+    || msg.includes("networkerror")
+    || msg.includes("network request failed")
+    || msg.includes("load failed")
+    || msg.includes("timeout")
+    || msg.includes("err_internet_disconnected")
+    || msg.includes("err_network");
 }
 
 // ---- Conectividad real — Sesión 24 ----
@@ -495,6 +531,418 @@ async function withCache(clave, consultaFn) {
 }
 
 // ============================================================
+// Cola offline de escrituras (Misión B1) — SOLO infraestructura
+// ============================================================
+// Esto guarda operaciones de escritura (compras, ventas, transferencias,
+// vales, etc.) que se hicieron sin Internet, para que una misión futura
+// las pueda sincronizar contra Supabase en orden cuando vuelva la conexión.
+//
+// Esta misión NO conecta esta cola a ningún formulario todavía — compras,
+// ventas, transferencias y vales de salida siguen funcionando exactamente
+// igual que antes (solo online). Acá solo queda preparado el lugar donde
+// guardar esas operaciones y las funciones para manejarlas.
+//
+// Estados posibles de una operación (no inventar otros):
+//   PENDIENTE         → creada, todavía no se intentó sincronizar.
+//   SINCRONIZANDO     → una futura misión la está enviando a Supabase ahora.
+//   SINCRONIZADA      → se confirmó en el servidor, ya se puede limpiar.
+//   REQUIERE_ATENCION → se reintentó y falló de forma que no conviene
+//                       reintentar sola (ej. error de negocio, no de red).
+// ============================================================
+
+// Crea el objeto de una operación pendiente nueva (todavía no la guarda en
+// IndexedDB — eso lo hace guardarOperacionPendiente). "tipo" identifica qué
+// clase de operación es (ej. "venta", "compra"; lo define la misión que
+// conecte cada formulario). "payload" es lo que esa futura misión necesite
+// para reintentar la llamada real contra Supabase.
+//
+// id e idempotency_key son dos UUID independientes generadas una sola vez
+// acá: idempotency_key NUNCA se regenera al reintentar (para eso existe:
+// para que el servidor pueda reconocer un reintento de la misma operación
+// y no duplicarla), a diferencia de "id" que es solo la llave local en
+// IndexedDB.
+//
+// Si no hay usuario autenticado todavía (_usuarioActualId sigue en null),
+// se guarda tal cual: no se inventa un usuario.
+//
+// Misión B2: acepta un tercer parámetro opcional "idempotencyKeyExistente".
+// ejecutarOperacion() (más abajo) genera la idempotency_key UNA sola vez, ANTES
+// de saber si la operación va a poder ejecutarse online o si va a terminar en
+// la cola — así, si un intento online falla por red, la operación que se
+// guarda en la cola usa esa MISMA clave en vez de generar una nueva (Sección 3
+// de la misión: crítico para que un reintento después de una respuesta
+// perdida no duplique la operación en el servidor). Si no se pasa nada
+// (compatibilidad con quien llame a esta función sin pasar por
+// ejecutarOperacion), se genera una acá como antes.
+function crearOperacionPendiente(tipo, payload, idempotencyKeyExistente) {
+  const ahora = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    tipo,
+    payload,
+    usuario_id: _usuarioActualId,
+    creado_en: ahora,
+    actualizado_en: ahora,
+    estado: "PENDIENTE",
+    intentos: 0,
+    ultimo_intento: null,
+    ultimo_error: null,
+    idempotency_key: idempotencyKeyExistente || crypto.randomUUID(),
+  };
+}
+
+// Guarda (crea o reemplaza) una operación completa en la cola. No bloquea
+// la app si IndexedDB falla: avisa por consola y devuelve null en vez de
+// lanzar una excepción que corte el resto del flujo que la llamó.
+async function guardarOperacionPendiente(operacion) {
+  try {
+    const db = await idbAbrir();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readwrite");
+      tx.objectStore(IDB_OPS_STORE).put(operacion);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    actualizarContadorColaPendiente();
+    return operacion;
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudo guardar la operación pendiente en la cola offline:", e);
+    return null;
+  }
+}
+
+// Trae una operación puntual por su id, o null si no existe / si falló la
+// lectura (mismo criterio que idbGet: no lanzar, avisar y devolver vacío).
+async function obtenerOperacionPendiente(id) {
+  try {
+    const db = await idbAbrir();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      const req = tx.objectStore(IDB_OPS_STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudo leer la operación pendiente '" + id + "':", e);
+    return null;
+  }
+}
+
+// Trae TODAS las operaciones guardadas, ordenadas de la más antigua a la
+// más nueva (orden FIFO por creado_en) — así una futura misión de
+// sincronización las puede recorrer en ese mismo orden sin tener que
+// ordenar de nuevo. Devuelve [] si no hay ninguna o si algo falló.
+async function obtenerTodasLasOperaciones() {
+  try {
+    const db = await idbAbrir();
+    const datos = await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      const req = tx.objectStore(IDB_OPS_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+    return datos.sort((a, b) => (a.creado_en < b.creado_en ? -1 : a.creado_en > b.creado_en ? 1 : 0));
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudieron leer las operaciones pendientes:", e);
+    return [];
+  }
+}
+
+// Trae solo las operaciones en un estado dado (ej. "PENDIENTE"), también en
+// orden FIFO. Usa el índice "estado" del store en vez de traer todo y
+// filtrar en JS.
+async function obtenerOperacionesPorEstado(estado) {
+  try {
+    const db = await idbAbrir();
+    const datos = await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      const req = tx.objectStore(IDB_OPS_STORE).index("estado").getAll(estado);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+    return datos.sort((a, b) => (a.creado_en < b.creado_en ? -1 : a.creado_en > b.creado_en ? 1 : 0));
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudieron leer las operaciones en estado '" + estado + "':", e);
+    return [];
+  }
+}
+
+// Actualiza una operación existente (ej. cambiar estado, sumar un intento,
+// guardar el último error). "cambios" es un objeto con solo los campos que
+// cambian — se mezcla con la operación guardada, nunca la reemplaza entera,
+// así quien llama no tiene que repetir todos los campos que no cambiaron.
+// actualizado_en se pisa siempre acá mismo, no hace falta pasarlo.
+// idempotency_key NUNCA se debe pasar en "cambios" desde quien reintenta
+// una sincronización — si igual llegara, se ignora a propósito para que no
+// se pueda regenerar por error.
+async function actualizarOperacionPendiente(id, cambios) {
+  try {
+    const existente = await obtenerOperacionPendiente(id);
+    if (!existente) {
+      console.warn("[Battlecruiser] No se encontró la operación pendiente '" + id + "' para actualizar.");
+      return null;
+    }
+    const actualizada = Object.assign({}, existente, cambios, {
+      id: existente.id,
+      idempotency_key: existente.idempotency_key,
+      actualizado_en: new Date().toISOString(),
+    });
+    return await guardarOperacionPendiente(actualizada);
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudo actualizar la operación pendiente '" + id + "':", e);
+    return null;
+  }
+}
+
+// Elimina una operación de la cola (ej. una vez confirmada SINCRONIZADA y
+// ya no hace falta conservarla). No lanza si falla, solo avisa.
+async function eliminarOperacionPendiente(id) {
+  try {
+    const db = await idbAbrir();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readwrite");
+      tx.objectStore(IDB_OPS_STORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    actualizarContadorColaPendiente();
+    return true;
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudo eliminar la operación pendiente '" + id + "':", e);
+    return false;
+  }
+}
+
+// ---- UI mínima (punto 17/18 de la Misión B2): solo el contador que ya
+// existía (Misión B1), ahora conectado a datos reales. Distingue
+// "pendientes/sincronizando" (🔄, normal) de "requiere atención" (⚠, se
+// pinta distinto vía la clase .atencion en style.css) — nunca se agrega un
+// dashboard nuevo, solo se llena el chip que ya estaba en el HTML.
+async function actualizarContadorColaPendiente() {
+  const el = document.getElementById("cola-pendientes-badge");
+  if (!el) return;
+  try {
+    const todas = await obtenerTodasLasOperaciones();
+    const pendientes = todas.filter((op) => op.estado === "PENDIENTE" || op.estado === "SINCRONIZANDO");
+    const atencion = todas.filter((op) => op.estado === "REQUIERE_ATENCION");
+    if (pendientes.length === 0 && atencion.length === 0) {
+      el.classList.add("hidden");
+      el.classList.remove("atencion");
+      el.textContent = "";
+      return;
+    }
+    const partes = [];
+    if (pendientes.length > 0) {
+      partes.push("🔄 " + pendientes.length + (pendientes.length === 1 ? " pendiente" : " pendientes"));
+    }
+    if (atencion.length > 0) {
+      partes.push("⚠ " + atencion.length + (atencion.length === 1 ? " requiere atención" : " requieren atención"));
+    }
+    el.textContent = partes.join(" · ");
+    el.classList.toggle("atencion", atencion.length > 0);
+    el.classList.remove("hidden");
+  } catch (e) {
+    console.warn("[Battlecruiser] No se pudo actualizar el contador de la cola pendiente:", e);
+  }
+}
+
+// ============================================================
+// Proyección local de stock (Misión B2, Sección 16) — SIMPLE
+// ============================================================
+// Suma el efecto de las operaciones todavía no confirmadas (PENDIENTE o
+// SINCRONIZANDO) sobre el stock real ya cacheado, solo para que se pueda
+// seguir vendiendo/trabajando con una cifra aproximada mientras no hay
+// Internet. NUNCA modifica el stock real ni la caché real de solo lectura
+// (_cache.stock / IndexedDB "stock", ver withCache más arriba) — es un
+// ajuste que se calcula al vuelo cada vez que hace falta mostrar un número.
+// Las operaciones SINCRONIZADA (se borran de la cola) y REQUIERE_ATENCION
+// (quedan pero fuera de este filtro) no afectan la proyección: en ambos
+// casos la Sección 16 pide refrescar el stock real y sacarlas de acá.
+let _operacionesPendientesCache = [];
+
+async function refrescarOperacionesPendientesCache() {
+  const todas = await obtenerTodasLasOperaciones();
+  _operacionesPendientesCache = todas.filter((op) => op.estado === "PENDIENTE" || op.estado === "SINCRONIZANDO");
+}
+
+// Cuánto sumar/restar al stock real de un producto en un almacén según las
+// operaciones todavía no confirmadas: compra suma en su almacén, venta/vale
+// restan en el suyo, transferencia resta en el origen y suma en el destino.
+function ajustePendiente(producto_id, almacen_id) {
+  let ajuste = 0;
+  _operacionesPendientesCache.forEach((op) => {
+    const p = op.payload || {};
+    if (op.tipo === "compra" && p.p_producto_id === producto_id && p.p_almacen_id === almacen_id) {
+      ajuste += Number(p.p_cantidad) || 0;
+    } else if (op.tipo === "vale" && p.p_producto_id === producto_id && p.p_almacen_id === almacen_id) {
+      ajuste -= Number(p.p_cantidad) || 0;
+    } else if (op.tipo === "venta" && p.p_almacen_id === almacen_id) {
+      (p.p_lineas || []).forEach((l) => {
+        if (l.producto_id === producto_id) ajuste -= Number(l.cantidad) || 0;
+      });
+    } else if (op.tipo === "transferencia") {
+      (p.p_lineas || []).forEach((l) => {
+        if (l.producto_id !== producto_id) return;
+        if (p.p_origen_id === almacen_id) ajuste -= Number(l.cantidad) || 0;
+        if (p.p_destino_id === almacen_id) ajuste += Number(l.cantidad) || 0;
+      });
+    }
+  });
+  return ajuste;
+}
+
+// ============================================================
+// Punto central de ejecución de operaciones de escritura — Misión B2
+// ============================================================
+// Usado por los 4 formularios (compra/venta/transferencia/vale) en vez de
+// que cada uno duplique su propia lógica de "intentar online, caer a la
+// cola si falla" (Sección 2 de la misión). "payload" son EXACTAMENTE los
+// parámetros del RPC correspondiente (Sección 1 — firmas reales, sin
+// p_idempotency_key todavía: esa se agrega acá).
+//
+// La idempotency_key se genera UNA sola vez, al principio, antes de saber
+// si va a poder intentarse online — así, si el intento online falla por
+// red, la operación que se guarda en la cola usa esa MISMA clave
+// (Secciones 3 y 13: crítico para que un reintento tras una respuesta
+// perdida no duplique la operación ya procesada en el servidor). Nunca se
+// regenera al reintentar.
+//
+// Devuelve siempre uno de estos 3 resultados:
+//   { ok: true,  offline: false, data }      → el RPC se ejecutó ahora mismo.
+//   { ok: true,  offline: true,  operacion }  → quedó guardada en la cola.
+//   { ok: false, error }                      → error de negocio real del
+//                                                backend (nunca se guarda en
+//                                                la cola ni se reintenta sola).
+const RPC_POR_TIPO = {
+  compra: "registrar_compra",
+  venta: "registrar_venta",
+  transferencia: "registrar_transferencia",
+  vale: "registrar_vale_salida",
+};
+
+async function ejecutarOperacion(tipo, payload) {
+  const idempotency_key = crypto.randomUUID();
+  const rpcNombre = RPC_POR_TIPO[tipo];
+
+  async function encolar() {
+    const operacion = await guardarOperacionPendiente(
+      crearOperacionPendiente(tipo, payload, idempotency_key)
+    );
+    await refrescarOperacionesPendientesCache();
+    return { ok: true, offline: true, operacion };
+  }
+
+  // Sección 5: sin Internet, directo a la cola — nunca se intenta el RPC.
+  if (!navigator.onLine) {
+    return encolar();
+  }
+
+  // Sección 4/6: con Internet (aparente) se intenta el RPC real.
+  try {
+    const { data, error } = await client.rpc(
+      rpcNombre,
+      Object.assign({}, payload, { p_idempotency_key: idempotency_key })
+    );
+
+    if (!error) {
+      return { ok: true, offline: false, data };
+    }
+
+    if (esErrorDeRed(error)) {
+      // Sección 6: falló por red (timeout, "Failed to fetch", etc.), no por
+      // una regla de negocio — se guarda en la cola con la misma clave.
+      return encolar();
+    }
+
+    // Sección 7: error de negocio real (stock insuficiente, sin permiso,
+    // producto/almacén/presentación inexistente o inactiva, cantidad o
+    // configuración inválida, etc.) — se muestra normal, NUNCA a la cola.
+    return { ok: false, error };
+  } catch (e) {
+    // Algunas fallas de red llegan como excepción (fetch rechazado por el
+    // Service Worker, "Failed to fetch" como TypeError) en vez de {error}.
+    return encolar();
+  }
+}
+
+// ============================================================
+// Sincronización de la cola offline — Misión B2, Secciones 8 a 13
+// ============================================================
+let _sincronizando = false;
+
+async function sincronizarCola() {
+  // Sección 8/12: protección contra dos sincronizaciones simultáneas.
+  if (_sincronizando) return;
+  _sincronizando = true;
+  actualizarIndicadorConexion("sincronizando");
+  try {
+    // Sección 8: FIFO por creado_en ASC (obtenerOperacionesPorEstado ya
+    // ordena así), una operación a la vez, nunca todas en simultáneo.
+    const operaciones = await obtenerOperacionesPorEstado("PENDIENTE");
+
+    for (const op of operaciones) {
+      if (!navigator.onLine) break; // se perdió la conexión a mitad de la cola
+
+      // Sección 9: al empezar cada intento.
+      await actualizarOperacionPendiente(op.id, {
+        estado: "SINCRONIZANDO",
+        intentos: (op.intentos || 0) + 1,
+        ultimo_intento: new Date().toISOString(),
+      });
+
+      let error = null;
+      try {
+        const respuesta = await client.rpc(
+          RPC_POR_TIPO[op.tipo],
+          Object.assign({}, op.payload, { p_idempotency_key: op.idempotency_key })
+        );
+        error = respuesta.error;
+      } catch (e) {
+        error = e;
+      }
+
+      if (!error) {
+        // Sección 9: éxito → SINCRONIZADA, ya se puede limpiar de la cola.
+        await actualizarOperacionPendiente(op.id, { estado: "SINCRONIZADA" });
+        await eliminarOperacionPendiente(op.id);
+        await refrescarOperacionesPendientesCache();
+        continue;
+      }
+
+      if (esErrorDeRed(error)) {
+        // Sección 10: vuelve a PENDIENTE, se detiene y espera a que vuelva
+        // Internet — no sigue reintentando ahora mismo.
+        await actualizarOperacionPendiente(op.id, {
+          estado: "PENDIENTE",
+          ultimo_error: error.message || String(error),
+        });
+        await refrescarOperacionesPendientesCache();
+        break;
+      }
+
+      // Sección 11: error de negocio real durante la sincronización → queda
+      // para revisar a mano, pero la cola sigue con las siguientes.
+      await actualizarOperacionPendiente(op.id, {
+        estado: "REQUIERE_ATENCION",
+        ultimo_error: error.message || String(error),
+      });
+      await refrescarOperacionesPendientesCache();
+    }
+  } finally {
+    _sincronizando = false;
+    await actualizarContadorColaPendiente();
+    // Sección 16: tras cada operación resuelta (sincronizada o con
+    // conflicto) hay que refrescar el stock real y sacarla de la
+    // proyección — ya se hace por operación arriba (refrescarOperacionesPendientesCache);
+    // acá además se refresca el stock real mostrado si el panel está visible.
+    if (appShell.classList.contains("visible")) {
+      await refrescarStockYSelects();
+    }
+    actualizarIndicadorConexion();
+  }
+}
+
+// ============================================================
 // Indicador de conexión — Sesión 15 (básico), ampliado en la Sesión 22
 // para reflejar cuándo se están mostrando datos guardados (ver withCache
 // arriba) y para disparar un refresco automático de todo al reconectar.
@@ -521,27 +969,31 @@ function actualizarIndicadorConexion(estadoForzado) {
   ];
 
   let clase = "";
-  let texto = "Conectado";
+  let texto = "🟢 Conectado";
   let mostrarTooltip = false;
-  if (estadoForzado === "reconectando") {
+  if (estadoForzado === "sincronizando") {
+    // Misión B2: sincronizando la cola de escrituras pendientes con el RPC.
     clase = "reconectando";
-    texto = "Reconectando…";
+    texto = "🔄 Sincronizando…";
+  } else if (estadoForzado === "reconectando") {
+    clase = "reconectando";
+    texto = "🔄 Reconectando…";
   } else if (estaRealmenteDesconectado()) {
     clase = "offline";
     const { conDatos, sinCache } = resumenEstadoCache();
     if (conDatos > 0) {
       // Al menos una pantalla tiene datos guardados reales para mostrar.
-      texto = "Sin conexión — usando caché";
+      texto = "🔴 Sin conexión — usando caché";
       mostrarTooltip = true;
     } else if (sinCache > 0) {
       // Ya se intentó cargar algo y no había nada guardado todavía (primera
       // vez sin conexión en este dispositivo) — distinto de "no hay datos"
       // real, así que el texto lo dice explícito.
-      texto = "Sin conexión — sin datos guardados";
+      texto = "🔴 Sin conexión — sin datos guardados";
     } else {
       // Todavía no se consultó nada en esta sesión (ej. recién se abrió el
       // login sin conexión), o todo lo consultado está confirmado vacío.
-      texto = "Sin conexión";
+      texto = "🔴 Sin conexión";
     }
   }
 
@@ -575,7 +1027,13 @@ async function marcarTituloUltimaActualizacion(nodos) {
 }
 
 safeInit("estado-conexion", () => {
+  // Misión B2, Sección 12: al reconectar, primero sincronizar la cola de
+  // escrituras pendientes (sincronizarCola ya se protege sola contra una
+  // segunda sincronización simultánea) y DESPUÉS el refresco general que ya
+  // existía (Sección 22 original) — se mantiene igual que antes, sin
+  // condicionarlo a que haya habido algo para sincronizar.
   async function alReconectar() {
+    await sincronizarCola();
     if (appShell.classList.contains("visible")) {
       await refrescarTrasReconexion();
     } else {
@@ -982,7 +1440,7 @@ safeInit("form-compra", () => {
     }
 
     submitBtn.disabled = true;
-    const { error } = await client.rpc("registrar_compra", {
+    const resultado = await ejecutarOperacion("compra", {
       p_producto_id: producto_id, p_almacen_id: almacen_id,
       p_cantidad: cantidad, p_costo_unitario: costo_unitario,
       p_presentacion_id: pp ? pp.presentacion_id : null,
@@ -990,10 +1448,17 @@ safeInit("form-compra", () => {
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-productos", "No se pudo registrar la compra: " + explicarError(error, "registrar compra"), false); return; }
-    setMsg("msg-productos", "Compra registrada, stock actualizado.", true);
+    if (!resultado.ok) {
+      setMsg("msg-productos", "No se pudo registrar la compra: " + explicarError(resultado.error, "registrar compra"), false);
+      return;
+    }
     e.target.reset();
     document.getElementById("compra-resumen").classList.add("hidden");
+    if (resultado.offline) {
+      setMsg("msg-productos", "✓ Guardada localmente — se sincronizará al recuperar conexión.", true);
+      return;
+    }
+    setMsg("msg-productos", "Compra registrada, stock actualizado.", true);
     await refrescarStockYSelects();
   });
 });
@@ -1440,15 +1905,22 @@ safeInit("form-transferencia", () => {
     }
 
     submitBtn.disabled = true;
-    const { error } = await client.rpc("registrar_transferencia", {
+    const resultado = await ejecutarOperacion("transferencia", {
       p_origen_id: origen, p_destino_id: destino,
       p_lineas: [{ producto_id, cantidad }],
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(error, "transferencia"), false); return; }
-    setMsg("msg-transferencias", "Transferencia registrada.", true);
+    if (!resultado.ok) {
+      setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(resultado.error, "transferencia"), false);
+      return;
+    }
     e.target.reset();
+    if (resultado.offline) {
+      setMsg("msg-transferencias", "✓ Guardada localmente — se sincronizará al recuperar conexión.", true);
+      return;
+    }
+    setMsg("msg-transferencias", "Transferencia registrada.", true);
     await refrescarTransferencias();
     await refrescarStockYSelects();
   });
@@ -1500,15 +1972,22 @@ safeInit("form-vale", () => {
     }
 
     submitBtn.disabled = true;
-    const { error } = await client.rpc("registrar_vale_salida", {
+    const resultado = await ejecutarOperacion("vale", {
       p_producto_id: producto_id, p_almacen_id: almacen_id,
       p_tipo: tipo, p_cantidad: cantidad,
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-vales", "No se pudo registrar: " + explicarError(error, "vale de salida"), false); return; }
-    setMsg("msg-vales", "Vale de salida registrado, stock actualizado.", true);
+    if (!resultado.ok) {
+      setMsg("msg-vales", "No se pudo registrar: " + explicarError(resultado.error, "vale de salida"), false);
+      return;
+    }
     e.target.reset();
+    if (resultado.offline) {
+      setMsg("msg-vales", "✓ Guardada localmente — se sincronizará al recuperar conexión.", true);
+      return;
+    }
+    setMsg("msg-vales", "Vale de salida registrado, stock actualizado.", true);
     await refrescarVales();
     await refrescarStockYSelects();
   });
@@ -1534,9 +2013,16 @@ let ventaProductosLista = []; // lista completa de productos, para el buscador
 // Reutiliza _cache.stock, que ya carga y mantiene refrescarStockYSelects()
 // (la misma fuente que usan Resumen y la pestaña Almacenes). No se agrega
 // ninguna consulta nueva a Supabase: solo se lee lo que ya está en memoria.
+// Misión B2, Sección 16: el número real cacheado ajustado por el efecto de
+// las operaciones todavía no confirmadas (ver ajustePendiente más arriba) —
+// nunca negativo. El backend sigue siendo la autoridad real; esto es solo
+// para que la venta pueda seguir funcionando de forma aproximada sin
+// Internet, igual que antes cuando no hay ninguna operación pendiente
+// (ajustePendiente devuelve 0 y el resultado es idéntico al de antes).
 function obtenerStockDisponible(producto_id, almacen_id) {
   const fila = _cache.stock.find((s) => s.producto_id === producto_id && s.almacen_id === almacen_id);
-  return fila ? Number(fila.cantidad) : 0;
+  const real = fila ? Number(fila.cantidad) : 0;
+  return Math.max(real + ajustePendiente(producto_id, almacen_id), 0);
 }
 
 // Cuánto de un producto ya está en el carrito actual (para no dejar pedir
@@ -1565,11 +2051,12 @@ function actualizarStockDisponibleUI() {
     return;
   }
 
-  const stockTotal = obtenerStockDisponible(producto_id, almacen_id);
+  const stockTotal = obtenerStockDisponible(producto_id, almacen_id); // ya incluye ajuste por pendientes
   const enCarrito = cantidadEnCarrito(producto_id, -1);
   const disponible = Math.max(stockTotal - enCarrito, 0);
+  const tienePendientes = ajustePendiente(producto_id, almacen_id) !== 0;
 
-  infoEl.textContent = "Stock disponible: " + money(disponible);
+  infoEl.textContent = "Stock disponible: " + money(disponible) + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
   infoEl.className = "msg" + (disponible <= 0 ? " error" : "");
   cantidadInput.setAttribute("max", disponible);
 }
@@ -1818,24 +2305,31 @@ safeInit("confirmar-venta", () => {
     setMsg("msg-venta", "Procesando venta…", true);
 
     const p_lineas = ventaLineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
-    const { error } = await client.rpc("registrar_venta", {
+    const resultado = await ejecutarOperacion("venta", {
       p_almacen_id: almacen_id, p_lineas,
     });
 
     enviandoVenta = false;
 
-    if (error) {
-      setMsg("msg-venta", "No se pudo registrar la venta: " + explicarError(error, "registrar venta"), false);
+    if (!resultado.ok) {
+      setMsg("msg-venta", "No se pudo registrar la venta: " + explicarError(resultado.error, "registrar venta"), false);
       btn.disabled = false;
       btn.textContent = textoOriginal;
       return;
     }
 
     btn.textContent = textoOriginal;
-    setMsg("msg-venta", "✓ Venta registrada por $" + money(total) + ". Todo listo para la próxima venta.", true);
     setMsg("msg-venta-linea", "", true);
     ventaLineas = [];
     renderVentaLineas(); // vuelve a deshabilitar "Confirmar venta" al quedar vacía
+
+    if (resultado.offline) {
+      setMsg("msg-venta", "✓ Venta guardada localmente por $" + money(total) + " — se sincronizará al recuperar conexión.", true);
+      actualizarStockDisponibleUI(); // refleja la proyección local (Sección 16) ya con esta venta descontada
+      return;
+    }
+
+    setMsg("msg-venta", "✓ Venta registrada por $" + money(total) + ". Todo listo para la próxima venta.", true);
     await refrescarStockYSelects();
     await refrescarVentas();
   });
@@ -1992,6 +2486,18 @@ showApp = function (session) {
     });
   });
   safeInit("carga-inicial-presentaciones", () => { inicializarPresentaciones(); });
+  // Misión B1/B2: contador de la cola offline + caché de operaciones
+  // pendientes para la proyección local de stock (Sección 16) — así queda
+  // mostrando el estado real desde el primer momento, no solo después de la
+  // primera escritura de esta sesión. Si ya hay operaciones PENDIENTE de una
+  // sesión anterior (se cerró la app sin haber recuperado Internet) y ahora
+  // sí hay conexión, se dispara la sincronización directamente al entrar en
+  // vez de esperar a un evento "online" que quizás no vuelva a ocurrir.
+  safeInit("carga-inicial-cola-pendiente", () => { actualizarContadorColaPendiente(); });
+  safeInit("carga-inicial-operaciones-pendientes-cache", () => { refrescarOperacionesPendientesCache(); });
+  safeInit("sincronizar-cola-inicial", () => {
+    if (navigator.onLine) sincronizarCola();
+  });
 };
 
 // ============================================================
