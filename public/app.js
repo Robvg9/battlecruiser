@@ -343,8 +343,22 @@ const IDB_STORE = "lecturas";
 // ---- Misión B1: store de la cola offline de escrituras pendientes ----
 const IDB_OPS_STORE = "operaciones_pendientes";
 
+// ---- Misión B2.2-A: conexión IndexedDB memoizada ----
+// ANTES: cada llamada a idbAbrir() hacía un indexedDB.open() nuevo — abrir
+// una conexión no es gratis (ida y vuelta al proceso de storage del
+// navegador), y guardar UNA sola operación offline terminaba abriendo la
+// base 3 veces (guardarOperacionPendiente, actualizarContadorColaPendiente,
+// refrescarOperacionesPendientesCache). En ventas consecutivas eso se
+// notaba como demora al guardar.
+// AHORA: se abre una sola vez por sesión y se reutiliza el mismo handle.
+// Nada del resto del contrato de idbAbrir() cambia (misma base, mismo
+// onupgradeneeded, mismo comportamiento si IndexedDB no está disponible) —
+// solo se cachea la promesa para no repetir el open().
+let _idbConexion = null;
+
 function idbAbrir() {
-  return new Promise((resolve, reject) => {
+  if (_idbConexion) return _idbConexion;
+  _idbConexion = new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) { reject(new Error("IndexedDB no disponible en este navegador")); return; }
     const req = indexedDB.open(IDB_NAME, IDB_VERSION);
     req.onupgradeneeded = () => {
@@ -363,9 +377,24 @@ function idbAbrir() {
         opsStore.createIndex("creado_en", "creado_en", { unique: false });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Si otra pestaña/ventana necesita subir la versión de la base, esta
+      // conexión se cierra sola — hay que soltar la caché para que la
+      // próxima llamada abra una conexión nueva en vez de quedarse con un
+      // handle cerrado e inservible.
+      db.onversionchange = () => {
+        db.close();
+        _idbConexion = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      _idbConexion = null; // no cachear un intento fallido: reintentar la próxima vez
+      reject(req.error);
+    };
   });
+  return _idbConexion;
 }
 
 async function idbGet(clave) {
@@ -718,28 +747,46 @@ async function eliminarOperacionPendiente(id) {
 // "pendientes/sincronizando" (🔄, normal) de "requiere atención" (⚠, se
 // pinta distinto vía la clase .atencion en style.css) — nunca se agrega un
 // dashboard nuevo, solo se llena el chip que ya estaba en el HTML.
+// Misión B2.2-A: antes traía TODAS las operaciones guardadas (getAll sin
+// filtro), las deserializaba enteras y las contaba con .filter() en JS —
+// para un badge que solo necesita 3 números, eso era leer y ordenar de más.
+// Ahora usa .count() sobre el índice "estado" (ya existía, ver idbAbrir):
+// IndexedDB puede contar coincidencias de un índice sin traer los datos
+// completos de cada operación. Mismo resultado visible, mucho menos trabajo.
 async function actualizarContadorColaPendiente() {
   const el = document.getElementById("cola-pendientes-badge");
   if (!el) return;
   try {
-    const todas = await obtenerTodasLasOperaciones();
-    const pendientes = todas.filter((op) => op.estado === "PENDIENTE" || op.estado === "SINCRONIZANDO");
-    const atencion = todas.filter((op) => op.estado === "REQUIERE_ATENCION");
-    if (pendientes.length === 0 && atencion.length === 0) {
+    const db = await idbAbrir();
+    const { pendientes, atencion } = await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      const idx = tx.objectStore(IDB_OPS_STORE).index("estado");
+      const reqPendiente = idx.count("PENDIENTE");
+      const reqSincronizando = idx.count("SINCRONIZANDO");
+      const reqAtencion = idx.count("REQUIERE_ATENCION");
+      tx.oncomplete = () => {
+        resolve({
+          pendientes: reqPendiente.result + reqSincronizando.result,
+          atencion: reqAtencion.result,
+        });
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+    if (pendientes === 0 && atencion === 0) {
       el.classList.add("hidden");
       el.classList.remove("atencion");
       el.textContent = "";
       return;
     }
     const partes = [];
-    if (pendientes.length > 0) {
-      partes.push("🔄 " + pendientes.length + (pendientes.length === 1 ? " pendiente" : " pendientes"));
+    if (pendientes > 0) {
+      partes.push("🔄 " + pendientes + (pendientes === 1 ? " pendiente" : " pendientes"));
     }
-    if (atencion.length > 0) {
-      partes.push("⚠ " + atencion.length + (atencion.length === 1 ? " requiere atención" : " requieren atención"));
+    if (atencion > 0) {
+      partes.push("⚠ " + atencion + (atencion === 1 ? " requiere atención" : " requieren atención"));
     }
     el.textContent = partes.join(" · ");
-    el.classList.toggle("atencion", atencion.length > 0);
+    el.classList.toggle("atencion", atencion > 0);
     el.classList.remove("hidden");
   } catch (e) {
     console.warn("[Battlecruiser] No se pudo actualizar el contador de la cola pendiente:", e);
@@ -760,9 +807,31 @@ async function actualizarContadorColaPendiente() {
 // casos la Sección 16 pide refrescar el stock real y sacarlas de acá.
 let _operacionesPendientesCache = [];
 
+// Misión B2.2-A: antes traía TODAS las operaciones de la cola (incluidas
+// SINCRONIZADA/REQUIERE_ATENCION, que esta proyección ni usa) y las
+// ordenaba enteras en JS, solo para quedarse con dos estados. Ahora pide
+// directamente esos dos estados al índice "estado" (una sola transacción,
+// dos getAll indexados) y solo ordena ese subconjunto — normalmente mucho
+// más chico que la cola completa.
 async function refrescarOperacionesPendientesCache() {
-  const todas = await obtenerTodasLasOperaciones();
-  _operacionesPendientesCache = todas.filter((op) => op.estado === "PENDIENTE" || op.estado === "SINCRONIZANDO");
+  try {
+    const db = await idbAbrir();
+    const combinadas = await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      const idx = tx.objectStore(IDB_OPS_STORE).index("estado");
+      const reqPendiente = idx.getAll("PENDIENTE");
+      const reqSincronizando = idx.getAll("SINCRONIZANDO");
+      tx.oncomplete = () => {
+        resolve((reqPendiente.result || []).concat(reqSincronizando.result || []));
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+    combinadas.sort((a, b) => (a.creado_en < b.creado_en ? -1 : a.creado_en > b.creado_en ? 1 : 0));
+    _operacionesPendientesCache = combinadas;
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudieron leer las operaciones pendientes:", e);
+    _operacionesPendientesCache = [];
+  }
 }
 
 // Cuánto sumar/restar al stock real de un producto en un almacén según las
