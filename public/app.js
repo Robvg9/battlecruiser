@@ -914,6 +914,9 @@ const RPC_POR_TIPO = {
   venta: "registrar_venta",
   transferencia: "registrar_transferencia",
   vale: "registrar_vale_salida",
+  // Misión B2.2-B.2: creación de productos entra a la misma cola/RPC central
+  // que compra/venta/transferencia/vale, en vez de un INSERT directo aparte.
+  producto: "crear_producto",
 };
 
 async function ejecutarOperacion(tipo, payload) {
@@ -1422,15 +1425,37 @@ safeInit("form-producto", () => {
       return;
     }
 
+    // Misión B2.2-B.2: ya no hay INSERT directo a public.productos — pasa
+    // por la misma cola offline central que compra/venta/transferencia/vale
+    // (ejecutarOperacion), usando el RPC crear_producto (ver RPC_POR_TIPO).
+    // El payload son EXACTAMENTE los parámetros de crear_producto, sin
+    // p_idempotency_key (eso lo agrega ejecutarOperacion/sincronizarCola).
     submitBtn.disabled = true;
-    const { error } = await client.from("productos").insert({
-      nombre, categoria_id, unidad, precio_normal, precio_mayorista,
+    const resultado = await ejecutarOperacion("producto", {
+      p_nombre: nombre,
+      p_categoria_id: categoria_id,
+      p_unidad: unidad,
+      p_precio_normal: precio_normal,
+      p_precio_mayorista: precio_mayorista,
     });
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-productos", "No se pudo crear: " + explicarError(error, "crear producto"), false); return; }
-    setMsg("msg-productos", "Producto creado.", true);
+    if (!resultado.ok) {
+      setMsg("msg-productos", "No se pudo crear: " + explicarError(resultado.error, "crear producto"), false);
+      return;
+    }
     e.target.reset();
+    if (resultado.offline) {
+      // Sección "IMPORTANTE SOBRE UX" de la misión: respuesta inmediata de
+      // que quedó pendiente, sin inventar un producto definitivo en
+      // Supabase ni un UUID definitivo. No se agrega ninguna proyección
+      // local de "productos" (a diferencia de la proyección de stock ya
+      // existente en ajustePendiente/_operacionesPendientesCache): eso
+      // pertenece a B2.2-B.3, fuera de alcance acá.
+      setMsg("msg-productos", "✓ Guardado localmente — se sincronizará al recuperar conexión.", true);
+      return;
+    }
+    setMsg("msg-productos", "Producto creado.", true);
     await refrescarProductos();
   });
 });
