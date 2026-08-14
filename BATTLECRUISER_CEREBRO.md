@@ -16,6 +16,51 @@ El nombre BattleCruiser puede cambiar en el futuro.
 - Si algo no funciona, comunicarlo brevemente y volver a intentarlo.
 - No inventar resultados de pruebas.
 
+## DOCTRINA DE TRABAJO — OBLIGATORIA
+BattleCruiser es una misión continua de ingeniería. El objetivo de cada sesión es **hacer realidad la visión de BattleCruiser sin romper ni duplicar lo que ya existe**.
+
+### Rol del analista/arquitecto
+El analista debe actuar como responsable de continuidad, arquitectura y auditoría. Antes de proponer una implementación debe:
+1. Leer el Cerebro.
+2. Revisar GitHub real.
+3. Revisar Supabase real cuando la misión afecte backend, datos, RPC, RLS o esquema.
+4. Identificar cómo funciona realmente el sistema actual.
+5. Comparar la propuesta con la arquitectura existente.
+6. Detectar reutilización posible antes de crear sistemas nuevos.
+7. Detectar contradicciones entre requisitos y código real.
+8. Diseñar la misión mínima y segura para el ejecutor.
+9. Verificar después que lo implementado realmente existe.
+
+**No asumir que algo existe porque aparezca mencionado en el Cerebro. GitHub/Supabase representan el estado técnico real.**
+
+### Rol de Claude
+Claude es el ejecutor de misiones concretas. Debe implementar lo que se le indique, revisar el código real necesario para hacerlo correctamente y reportar resultados. No debe recibir el Cerebro completo como sustituto de una misión técnica ni tomar decisiones arquitectónicas grandes por su cuenta.
+
+Si Claude encuentra una contradicción real, debe detenerse y señalarla antes de aplicar cambios destructivos o arquitectónicos.
+
+### Regla anti-duplicación
+**Antes de crear una tabla, cola, caché, helper, mecanismo de idempotencia, RPC, servicio o arquitectura nueva, comprobar si ya existe un mecanismo equivalente y reutilizarlo.**
+
+No crear una segunda arquitectura para resolver un problema que la arquitectura existente ya resuelve.
+
+Ejemplos:
+- Una sola cola offline.
+- Un solo mecanismo central de idempotencia.
+- Una sola fuente real para reglas críticas del backend.
+- No crear tablas de idempotencia dedicadas por operación si existe una tabla central reutilizable.
+- No duplicar cachés ni proyecciones sin justificación arquitectónica.
+
+### Regla de precedencia
+Cuando exista una contradicción:
+1. La seguridad e integridad del sistema tienen prioridad.
+2. La arquitectura real existente tiene prioridad sobre una suposición.
+3. El código/esquema real tiene prioridad sobre una descripción antigua.
+4. El Cerebro se actualiza después de descubrir una decisión técnica real para que futuras sesiones no repitan el análisis.
+5. Nunca resolver una contradicción inventando una tercera arquitectura sin analizar primero las dos existentes.
+
+### Regla de honestidad
+Nunca decir “implementado”, “probado” o “verificado” si no se comprobó realmente. Si una herramienta bloquea una operación, decirlo y buscar la vía correcta. No trasladar innecesariamente trabajo técnico al usuario.
+
 ## CONTEXTO DEL NEGOCIO
 El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inventario, dinero, entradas, reinversiones, gastos, turnos y responsabilidades.
 
@@ -37,6 +82,22 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - B2.1 corrigió la proyección con presentaciones cuando el factor confiable está disponible en caché.
 - Si falta el factor offline, no se inventa una cifra de stock.
 - B2.1 no modificó Supabase/RPC/RLS.
+
+## IDEMPOTENCIA — ARQUITECTURA REAL
+BattleCruiser ya posee un mecanismo centralizado de idempotencia compartido por las operaciones existentes.
+
+Componentes reales confirmados:
+- `private.operaciones_idempotencia`.
+- `private.reclamar_idempotencia(key, usuario, tipo_operacion, payload)`.
+- `idempotency_key` como clave primaria.
+- `usuario_id`.
+- `tipo_operacion`.
+- `payload_hash`.
+- `resultado_id`.
+
+El patrón existente usa `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` y posteriormente recupera el registro. También valida que una clave no sea reutilizada por otro usuario, otro tipo de operación o un payload diferente. Los RPC existentes registran `resultado_id` al completar la operación.
+
+**Regla:** todo nuevo RPC que necesite idempotencia debe integrarse con este mecanismo central. No crear tablas de idempotencia paralelas por operación salvo una decisión arquitectónica explícita y documentada.
 
 ## PRESENTACIONES COMERCIALES
 Los productos pueden tener presentaciones diferenciadas activables/desactivables.
@@ -231,22 +292,84 @@ Errores de negocio: stock insuficiente, producto/almacén/presentación inexiste
 
 Una operación pendiente conserva la misma idempotency_key. Una sincronizada no se ejecuta otra vez. Doble evento online no debe provocar sincronizaciones simultáneas. La cola debe sobrevivir cierre/reapertura. SINCRONIZANDO debe recuperarse de forma segura.
 
-## B2.2 — MISIÓN ACTUAL DIVIDIDA
+## B2.2 — ESTADO Y MISIONES
 
-### B2.2-A — VELOCIDAD OFFLINE
-Objetivo único: que venta/compra/transferencia/vale offline se guarde localmente rápido y no frene el flujo de venta.
+### B2.2-A — VELOCIDAD OFFLINE — CERRADA
+Problema: guardar una operación offline era lento por múltiples aperturas/lecturas de IndexedDB.
 
-Revisar IndexedDB, guardarOperacionPendiente(), encolar(), refrescos, lecturas completas, transacciones repetidas y trabajo innecesario.
+Solución real implementada en `public/app.js`:
+- `idbAbrir()` memoiza la conexión.
+- Maneja `onversionchange`.
+- `actualizarContadorColaPendiente()` usa el índice `estado` + `count()`.
+- `refrescarOperacionesPendientesCache()` usa índices directamente.
+- No se creó otra cola.
+- No se creó otra caché.
+- No se modificó `ejecutarOperacion()`.
+- `idempotency_key` se conserva.
+- FIFO se conserva.
+- Estados se conservan.
 
-No tocar productos offline, Pendientes, Supabase/RPC/RLS ni Service Worker.
+Validación con fake-indexeddb: 5 operaciones pasaron de 15 aperturas de IndexedDB a 1 apertura. No había Playwright/Chromium disponible, por lo que la prueba real de navegador quedó pendiente.
 
-### B2.2-B — PRODUCTOS OFFLINE
-Crear productos offline usando la cola existente si es seguro. Si requiere backend, detenerse y preguntar.
+Después se revisó `public/app.js` desde GitHub y se confirmó la implementación. B2.2-A está CERRADA.
+
+### B2.2-B — PRODUCTOS OFFLINE — EN CURSO
+Objetivo: permitir crear productos sin Internet y sincronizarlos posteriormente usando la cola existente.
+
+#### B2.2-B.1 — BACKEND — DECISIÓN ARQUITECTÓNICA
+La auditoría de Supabase reveló una regla importante que queda registrada permanentemente:
+
+**No crear una tabla de idempotencia específica para productos.**
+
+Los RPC existentes `registrar_compra`, `registrar_venta`, `registrar_transferencia` y `registrar_vale_salida` utilizan el mecanismo central:
+- `private.operaciones_idempotencia`;
+- `private.reclamar_idempotencia(...)`;
+- `idempotency_key`;
+- `usuario_id`;
+- `tipo_operacion`;
+- `payload_hash`;
+- `resultado_id`.
+
+`crear_producto` debe reutilizar exactamente este mecanismo central, con un `tipo_operacion` propio como `crear_producto`. No se debe introducir `public.operaciones_productos_idempotencia` ni ningún segundo mecanismo equivalente.
+
+La tabla `public.productos` actualmente contiene:
+- `id uuid NOT NULL DEFAULT gen_random_uuid()`;
+- `nombre text NOT NULL`;
+- `categoria_id uuid NULL`;
+- `unidad text NULL`;
+- `precio_normal numeric NOT NULL DEFAULT 0`;
+- `precio_mayorista numeric NULL DEFAULT 0`;
+- `activo boolean NOT NULL DEFAULT true`;
+- `created_at timestamptz NOT NULL DEFAULT now()`;
+- `presentacion_id uuid NULL`.
+
+FK actuales: `categoria_id → categorias(id)` y `presentacion_id → presentaciones(id)`.
+
+Misión B2.2-B.1: crear un RPC idempotente para productos siguiendo el mismo patrón central de los cuatro RPC existentes, sin modificar los RPC existentes, sin crear una segunda cola y sin modificar frontend todavía. Claude ya fue instruido para implementar esta opción reutilizando `private.operaciones_idempotencia` + `private.reclamar_idempotencia`.
+
+### B2.2-B.2 — FRONTEND — PENDIENTE
+Después de verificar que B2.2-B.1 existe realmente en Supabase y que la idempotencia fue probada, conectar el formulario actual de creación de productos de `public/app.js` con `ejecutarOperacion()` y la cola existente.
+
+Antes de implementar, revisar el flujo actual real del formulario y adaptar el payload al RPC nuevo. No duplicar lógica de cola.
+
+### B2.2-B.3 — UX / PROYECCIÓN — PENDIENTE
+Después de B2.2-B.2, definir cómo mostrar productos recién creados que estén pendientes de sincronización y cómo reconciliarlos con el producto real al sincronizar.
+
+No inventar IDs definitivos ni sustituir la fuente real del backend sin una estrategia explícita de reconciliación.
 
 ### B2.2-C — PENDIENTES
 Convertir el botón/contador Pendientes en panel interactivo con operación, producto, cantidad, presentación, fecha, estado, error/motivo y requiere atención.
 
-La sesión anterior intentó `EJECUTORES_POR_TIPO`, `insertarProductoIdempotente()` y cambios relacionados, pero esos cambios **no llegaron a GitHub**. No asumir que existen; comprobar el código actual antes de reutilizar la idea.
+## LECCIONES ARQUITECTÓNICAS
+- Auditar primero, programar después.
+- Si una arquitectura existente resuelve el problema, reutilizarla.
+- No crear tablas, colas, cachés o RPC duplicados por comodidad.
+- La idempotencia es una propiedad transversal del sistema, no una característica aislada de cada módulo.
+- El backend/RPC es la fuente de verdad para reglas críticas.
+- Las proyecciones offline son temporales y nunca deben convertirse silenciosamente en verdad del sistema.
+- Una misión pequeña y verificable es preferible a una gran modificación difícil de auditar.
+- El analista debe anticipar contradicciones que puedan detectarse mediante auditoría; no trasladar ese trabajo al ejecutor después de haber diseñado una especificación incorrecta.
+- Cuando una decisión técnica real contradice una especificación anterior, actualizar este Cerebro para que el próximo agente no repita el error.
 
 ## APP INSTALABLE
 La visión futura incluye una aplicación instalable para teléfono en lugar de depender de abrir el navegador. Debe evolucionar desde la PWA sin romper la arquitectura actual.
@@ -254,9 +377,11 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 ## ROADMAP
 **Implementado/conocido:** base POS/inventario, Offline-First B1/B2, cola persistente, idempotencia, proyección local, presentaciones en lógica correspondiente, recuperación de SINCRONIZANDO.
 
-**Actual:** B2.2-A velocidad offline.
+**Cerrado:** B2.2-A velocidad offline.
 
-**Siguiente:** B2.2-B productos offline; B2.2-C Pendientes.
+**Actual:** B2.2-B productos offline; B2.2-B.1 backend en implementación/verificación.
+
+**Siguiente:** B2.2-B.2 frontend; B2.2-B.3 UX/proyección; B2.2-C Pendientes.
 
 **Futuro:** cuadre de turnos; entrega/recepción; auditoría físico/sistema; gastos/reinversiones/bajas con aprobación; entradas internas aceptadas/rechazadas; responsabilidades y alarmas; expedientes/niveles/recompensas; Centro de Mando/comunicación; métodos de pago adicionales; app instalable.
 
