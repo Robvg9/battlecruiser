@@ -83,6 +83,7 @@
         <button class="tab-btn" data-tab="almacenes">Almacenes</button>
         <button class="tab-btn" data-tab="transferencias">Transferencias</button>
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
+        <button class="tab-btn" data-tab="pendientes">Pendientes <span id="pendientes-tab-badge" class="pendientes-tab-badge hidden"></span></button>
         <button class="tab-btn" data-tab="config">Configuración</button>
       </nav>
     </aside>
@@ -313,6 +314,15 @@
       </form>
       <div id="lista-vales" class="lista"></div>
       <p class="msg" id="msg-vales"></p>
+    </section>
+
+    <section id="tab-pendientes" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Operaciones pendientes</h3>
+        <button type="button" id="pendientes-refrescar-btn" class="pendientes-refrescar-btn">Reintentar sincronización</button>
+      </div>
+      <div id="lista-pendientes" class="lista"></div>
+      <p class="msg" id="msg-pendientes"></p>
     </section>
 
     <section id="tab-config" class="tab-panel">
