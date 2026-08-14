@@ -1,0 +1,540 @@
+/* ============================================================
+   BATTLECRUISER — Sesión 15: dirección visual "salón privado"
+   Paleta: fieltro de mesa de casino clásico (verde profundo +
+   dorado + burdeos) en vez del tono cueva/aventura anterior.
+   Firma visual: marco doble de filete dorado en la tarjeta de
+   acceso + un rombo tallado como remate del título, evocando
+   una ficha o una carta de socio de un salón de juego elegante,
+   sin caer en clichés de casino de neón.
+   ============================================================ */
+:root {
+  --void: #0c1c18;      /* fondo — verde casi negro */
+  --stone: #14302a;     /* paneles */
+  --stone-2: #1b3c34;   /* paneles / hover */
+  --gold: #c9a24d;      /* acento primario — dorado */
+  --gold-bright: #e8c877;
+  --gold-dim: #8a7038;
+  --wine: #7a2331;      /* error / acento secundario — burdeos */
+  --sage: #8fae9c;      /* éxito */
+  --text: #f2e9d8;      /* texto principal — pergamino cálido */
+  --mist: #b9ab8e;      /* texto secundario */
+  --mist-dim: #6e6450;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at top, #12291f 0%, var(--void) 62%);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  position: relative;
+}
+.center-col { display: flex; flex-direction: column; align-items: center; }
+
+/* Sesión 26 — el shell de la app (post-login) no debe re-centrarse
+   verticalmente según cuánto contenido tenga cada pestaña. Antes body
+   centraba TODO verticalmente (align-items:center); como cada sección
+   (Resumen, Productos, Ventas…) tiene distinta altura de contenido, el
+   bloque completo (sidebar+header+footer) se movía de posición al
+   cambiar de pestaña, dando la sensación de que la pantalla "se estira
+   o se encoge". La tarjeta de login sigue centrándose igual que antes;
+   solo se desactiva el centrado vertical cuando el shell de la app está
+   visible (la horizontal se conserva). */
+body:has(.app-shell.visible) { align-items: flex-start; }
+
+/* Filigrana superior — reemplaza las estalactitas por un filete dorado fino,
+   más propio de un salón que de una caverna. */
+.stalactites {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  pointer-events: none; z-index: 1;
+  background: linear-gradient(90deg, transparent, var(--gold-dim) 20%, var(--gold) 50%, var(--gold-dim) 80%, transparent);
+  opacity: 0.55;
+}
+.stalactites svg { display: none; }
+
+.motes { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+.mote {
+  position: absolute; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--gold); opacity: 0; animation: drift 9s ease-in-out infinite;
+}
+@keyframes drift {
+  0%   { opacity: 0; transform: translateY(0); }
+  15%  { opacity: 0.5; }
+  85%  { opacity: 0.28; }
+  100% { opacity: 0; transform: translateY(-90px); }
+}
+.lantern-wrap {
+  position: relative; display: flex; flex-direction: column;
+  align-items: center; margin-bottom: 6px; z-index: 2;
+}
+.lantern-glow {
+  position: absolute; top: -6px; width: 180px; height: 180px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,162,77,0.30) 0%, rgba(201,162,77,0.07) 45%, transparent 70%);
+  animation: pulse 4.5s ease-in-out infinite; filter: blur(2px);
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.08); }
+}
+.lantern-icon { position: relative; z-index: 2; width: 34px; height: 34px; display: block; }
+.status-line {
+  position: relative; z-index: 2; margin-top: 10px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--sage);
+  display: flex; align-items: center; gap: 6px;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sage); box-shadow: 0 0 6px var(--sage); }
+.status-line.offline { color: var(--wine); }
+.status-line.offline .status-dot { background: var(--wine); box-shadow: 0 0 6px var(--wine); }
+
+/* Sesión 22 — mismo indicador, versión chica para el header del panel
+   principal (post-login): sin el margen/posicionamiento pensado para la
+   pantalla de login. */
+.status-line-app { margin-top: 0; z-index: auto; position: static; text-transform: none; }
+
+/* Sesión 22 — estado transitorio mientras se refrescan los datos justo
+   después de recuperar la conexión (ver refrescarTrasReconexion en app.js). */
+.status-line.reconectando { color: var(--gold); }
+.status-line.reconectando .status-dot {
+  background: var(--gold); box-shadow: 0 0 6px var(--gold);
+  animation: parpadeo-conexion 1s ease-in-out infinite;
+}
+@keyframes parpadeo-conexion { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* Misión B1 — contador mínimo de la cola offline (#cola-pendientes-badge).
+   Solo un chip chico junto al indicador de conexión del panel principal;
+   el panel de sincronización real es trabajo de la próxima misión. */
+.cola-badge {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gold); border: 1px solid var(--gold);
+  border-radius: 20px; padding: 3px 9px; line-height: 1.2;
+}
+/* Misión B2 — al menos una operación en REQUIERE_ATENCION (Sección 11): se
+   pinta con el mismo tono de alerta que el resto de la app (--wine), sin
+   agregar ningún panel nuevo. */
+.cola-badge.atencion {
+  color: var(--wine); border-color: var(--wine);
+}
+
+/* Tarjeta de acceso — marco doble de filete dorado, como una carta de socio. */
+.card {
+  position: relative; z-index: 2; width: 100%; max-width: 350px;
+  background: linear-gradient(180deg, var(--stone-2) 0%, var(--stone) 100%);
+  border: 1px solid var(--gold-dim); border-radius: 4px;
+  padding: 32px 32px 26px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(201,162,77,0.18), inset 0 0 0 5px var(--void);
+  text-align: center;
+}
+h1 {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 32px;
+  margin: 0 0 8px; letter-spacing: 0.03em; color: var(--text);
+}
+.rule-orn {
+  width: 100%; display: flex; align-items: center; justify-content: center;
+  gap: 10px; margin: 0 0 22px; color: var(--gold-dim);
+}
+.rule-orn::before, .rule-orn::after {
+  content: ""; height: 1px; flex: 1; background: linear-gradient(90deg, transparent, var(--gold-dim));
+}
+.rule-orn::after { background: linear-gradient(90deg, var(--gold-dim), transparent); }
+.rule-orn svg { flex-shrink: 0; }
+.subtitle { margin: 0 0 26px; font-size: 12px; color: var(--mist); font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; }
+.field { text-align: left; margin-bottom: 16px; }
+label { display: block; font-size: 11px; color: var(--mist); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+input {
+  width: 100%; padding: 11px 13px; background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 5px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input::placeholder { color: var(--mist-dim); }
+input:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(201,162,77,0.14); }
+input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Campo de contraseña con ojito para mostrar/ocultar — Sesión 15 */
+.field-pass { position: relative; }
+.field-pass input { padding-right: 42px; }
+.pass-toggle {
+  position: absolute; right: 6px; top: 30px; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; cursor: pointer; padding: 0;
+  color: var(--mist); margin-top: 0 !important;
+}
+.pass-toggle:hover { color: var(--gold); }
+.pass-toggle svg { width: 18px; height: 18px; }
+
+button[type="submit"] {
+  width: 100%; margin-top: 6px; padding: 12px;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #211605; border: none;
+  border-radius: 5px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13.5px;
+  letter-spacing: 0.03em; cursor: pointer; box-shadow: 0 6px 18px rgba(201,162,77,0.22);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+button[type="submit"]:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(201,162,77,0.32); }
+button[type="submit"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none; }
+.error { margin-top: 14px; color: var(--wine); font-size: 13px; min-height: 16px; }
+.footnote { margin-top: 18px; font-size: 10.5px; color: var(--mist-dim); font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.06em; }
+
+/* Botón secundario discreto en la pantalla de login (Actualizar app) */
+.login-utility {
+  margin-top: 16px; background: transparent; border: none; color: var(--mist-dim);
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em;
+  cursor: pointer; text-transform: uppercase; padding: 6px;
+}
+.login-utility:hover { color: var(--gold); }
+.login-utility:disabled { opacity: 0.6; cursor: default; }
+
+.app-shell { display: none; width: 100%; max-width: 380px; text-align: center; z-index: 2; }
+.app-shell.visible { display: block; }
+.card.hidden { display: none; }
+.lantern-wrap.hidden { display: none; }
+@media (prefers-reduced-motion: reduce) { .lantern-glow, .mote { animation: none; opacity: 0.5; } }
+
+/* ---- Panel principal (post-login) — salón, no cueva ---- */
+.app-shell { max-width: 760px; text-align: left; }
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px; flex-wrap: wrap; gap: 10px;
+}
+.app-header h1 { font-size: 22px; margin: 0; }
+.app-header .rule-orn { margin: 10px 0 20px; }
+/* Sesión 23: flex-wrap agregado — el indicador de conexión ahora puede
+   mostrar textos más largos ("Sin conexión — sin datos guardados"), y en
+   celulares angostos junto con el correo y los botones de Ajustes/Cerrar
+   sesión no entraba todo en una sola fila sin recortarse. */
+.header-right { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px 10px; font-size: 12.5px; color: var(--mist); position: relative; }
+.header-right button {
+  padding: 7px 14px; background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px; font-family: 'Inter', sans-serif;
+  font-size: 12.5px; cursor: pointer; margin-top: 0; letter-spacing: 0.02em;
+}
+.header-right button:hover { border-color: var(--gold); }
+
+/* Menú desplegable "Ajustes" — agrupa Cambiar contraseña + Actualizar app,
+   Sesión 15: antes eran dos botones sueltos en el header; ahora es un menú
+   con más opciones, en línea con el pedido de "más menús con opciones". */
+.ajustes-wrap { position: relative; }
+.ajustes-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; min-width: 210px;
+  background: var(--stone-2); border: 1px solid var(--gold-dim); border-radius: 8px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.5); padding: 6px; z-index: 10;
+}
+.ajustes-menu.hidden { display: none; }
+.ajustes-menu button {
+  width: 100%; text-align: left; background: transparent; border: none;
+  color: var(--text); padding: 10px 12px; border-radius: 5px; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 13px; margin-top: 0;
+}
+.ajustes-menu button:hover { background: var(--stone); color: var(--gold); }
+
+.tab-btn {
+  padding: 10px 16px; background: transparent; color: var(--mist); border: none;
+  border-bottom: 2px solid transparent; font-family: 'Cormorant Garamond', serif; font-weight: 600;
+  font-size: 15px; letter-spacing: 0.02em; cursor: pointer; margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ---- Menú lateral desplegable — reemplaza los tabs horizontales ----
+   Cerrado por defecto; se abre con el botón hamburguesa del header y se
+   cierra con el botón ✕, tocando afuera (backdrop), con Escape, o al elegir
+   una sección — así nunca queda tapando contenido por accidente. */
+.header-left { display: flex; align-items: center; gap: 12px; }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0; flex-shrink: 0;
+  background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px; cursor: pointer; margin-top: 0;
+}
+.icon-btn:hover { border-color: var(--gold); color: var(--gold); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.sidebar-backdrop {
+  position: fixed; inset: 0; background: rgba(6,14,11,0.6);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 20;
+}
+.sidebar-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+.sidebar {
+  position: fixed; top: 0; left: 0; height: 100vh; width: 240px; max-width: 78vw;
+  background: linear-gradient(180deg, var(--stone-2) 0%, var(--stone) 100%);
+  border-right: 1px solid var(--gold-dim);
+  box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  transform: translateX(-100%); transition: transform 0.22s ease;
+  z-index: 21; display: flex; flex-direction: column; padding: 16px 12px;
+  overflow-y: auto;
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 0 4px; }
+.sidebar-title {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 16px;
+  color: var(--gold); letter-spacing: 0.03em;
+}
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-nav .tab-btn {
+  text-align: left; padding: 11px 12px; border-bottom: none; margin-bottom: 0;
+  border-left: 2px solid transparent; border-radius: 5px;
+}
+.sidebar-nav .tab-btn:hover { background: rgba(201,162,77,0.06); }
+.sidebar-nav .tab-btn.active { border-left-color: var(--gold); background: rgba(201,162,77,0.08); }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
+  .sidebar-backdrop { transition: none; }
+}
+.tab-panel { display: none; }
+.tab-panel.visible { display: block; }
+
+.inline-form {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+  background: var(--stone); border: 1px solid #c9a24d26; border-radius: 8px; padding: 14px;
+}
+.inline-form input, .inline-form select {
+  flex: 1 1 140px; padding: 9px 11px; background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 5px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px;
+}
+.inline-form button {
+  flex: 1 1 100%; padding: 10px; background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #211605; border: none; border-radius: 5px; font-weight: 600; font-size: 13px; cursor: pointer;
+  letter-spacing: 0.02em;
+}
+.inline-form button:disabled { opacity: 0.6; cursor: default; }
+.lista { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+.lista-item {
+  display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px;
+  background: var(--stone); border: 1px solid #c9a24d20; border-radius: 6px; font-size: 13px;
+}
+.lista-item .muted { color: var(--mist); font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; }
+.lista-estado { padding: 12px; color: var(--mist); font-size: 12.5px; font-style: italic; }
+.msg { font-size: 12.5px; min-height: 16px; color: var(--mist); }
+.msg.error { color: var(--wine); }
+.msg.ok { color: var(--sage); }
+
+/* ---- Resumen visual de compra por presentación — Sesión 28 ---- */
+.compra-resumen {
+  flex: 1 1 100%; display: flex; flex-direction: column; gap: 5px;
+  background: var(--void); border: 1px solid #c9a24d33; border-radius: 5px; padding: 10px 12px;
+}
+.compra-resumen-linea { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--mist); }
+.compra-resumen-linea span:last-child { color: var(--text); font-family: 'IBM Plex Mono', monospace; text-align: right; }
+.compra-resumen-total { border-top: 1px solid #c9a24d26; padding-top: 5px; margin-top: 2px; }
+.compra-resumen-total span { color: var(--gold) !important; font-weight: 600; }
+h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px; color: var(--gold); letter-spacing: 0.02em; margin: 20px 0 10px; }
+
+/* ---- Pantalla de Ventas ---- */
+.venta-linea-info { display: flex; flex-direction: column; gap: 2px; }
+.venta-linea-precios { display: flex; align-items: center; gap: 10px; }
+.venta-linea-borrar {
+  background: transparent; border: 1px solid var(--wine); color: var(--wine);
+  border-radius: 5px; padding: 6px 10px; font-size: 12px; cursor: pointer; margin-top: 0;
+}
+.venta-linea-borrar:hover { background: rgba(122,35,49,0.15); }
+.venta-total {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--stone); border: 1px solid var(--gold-dim); border-radius: 8px;
+  padding: 14px 16px; margin-bottom: 14px; font-family: 'Cormorant Garamond', serif;
+  font-size: 16px; color: var(--text);
+}
+.venta-total-valor { font-size: 24px; font-weight: 600; color: var(--gold); }
+.btn-confirmar-venta {
+  width: 100%; padding: 12px; background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  color: #211605; border: none; border-radius: 5px; font-family: 'Inter', sans-serif;
+  font-weight: 600; font-size: 14px; letter-spacing: 0.03em; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(201,162,77,0.22);
+}
+.btn-confirmar-venta:disabled { opacity: 0.6; cursor: default; }
+
+/* Carrito de venta: cantidad editable por línea (+/- y campo numérico) — Sesión 20 */
+.venta-linea-cant-wrap { display: flex; align-items: center; gap: 4px; }
+.venta-linea-btn {
+  width: 24px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--stone-2); color: var(--text); border: 1px solid var(--gold-dim);
+  border-radius: 4px; font-size: 14px; line-height: 1; cursor: pointer; margin-top: 0;
+}
+.venta-linea-btn:hover { border-color: var(--gold); color: var(--gold); }
+.venta-linea-cant-input {
+  width: 56px; padding: 4px 6px; background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 4px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  text-align: center; margin-top: 0;
+}
+.venta-linea-cant-input::-webkit-outer-spin-button,
+.venta-linea-cant-input::-webkit-inner-spin-button { margin: 0; }
+
+/* ---- Panel de cambio de contraseña ---- */
+.pass-panel {
+  margin: 0 0 18px; background: var(--stone); border: 1px solid var(--gold-dim);
+  border-radius: 8px; padding: 16px;
+}
+.pass-panel.hidden { display: none; }
+.pass-panel h3 { margin-top: 0; }
+.pass-panel .btn-row { display: flex; gap: 8px; margin-top: 6px; }
+.pass-panel .btn-row button { flex: 1; margin-top: 0; width: auto; }
+
+/* ============================================================
+   Sesión 22 — Layout general: de "todo centrado en columna angosta" a
+   estructura de barra superior + menú lateral + área principal + panel
+   derecho + pie, que usa el ancho real de la pantalla en PC/tablet.
+   Antes CADA pieza (.app-shell, el login, etc.) se auto-centraba con un
+   max-width fijo bajo (380/760px) sin importar el tamaño real de la
+   ventana — por eso en PC quedaba una columna angosta con enormes
+   espacios vacíos a los costados. Ahora es el LAYOUT (grid en #app-shell)
+   el que organiza la pantalla; el contenido interno no se toca.
+   El menú lateral overlay (hamburguesa, backdrop, Escape) sigue existiendo
+   tal cual para celular/tablet — a partir de 1024px se vuelve fijo/visible
+   en vez de flotante, sin duplicar código: mismos elementos, otro CSS.
+   ============================================================ */
+.app-shell { max-width: 1000px; }
+.main-content { min-width: 0; }
+.main-content .rule-orn { margin: 10px 0 20px; }
+
+/* Pie de la app: mismo texto que ya existía en el login (.footnote),
+   ahora visible también dentro de la app en un pie fijo al fondo del shell. */
+.app-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 24px; padding-top: 14px; border-top: 1px solid #c9a24d26;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em;
+  color: var(--mist-dim);
+}
+
+/* Componente reutilizable "principal + panel derecho" — usado hoy en
+   Resumen (movimientos = principal, alertas de stock = panel). Pensado
+   para que otras pestañas puedan sumarse después sin CSS nuevo. */
+.seccion-cuerpo { display: block; }
+.seccion-panel { margin-top: 4px; }
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-shell { max-width: 92vw; }
+  .inline-form input, .inline-form select { flex: 1 1 200px; }
+  /* Sesión 25: auto-fill reservaba columnas vacías cuando una sección tenía
+     pocos elementos (ej. Almacenes con 2 ítems quedaba angosta con espacio
+     muerto), mientras que una con muchos ítems (Productos) llenaba todo el
+     ancho — eso es lo que se veía como "elementos que cambian de tamaño al
+     cambiar de sección". auto-fit estira los elementos existentes para
+     ocupar siempre el ancho real disponible, sin importar cuántos haya. */
+  .lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
+  #venta-lineas.lista { display: flex; flex-direction: column; }
+}
+
+@media (min-width: 1024px) {
+  /* Sesión 24: aunque el grid ya se activaba, .app-shell seguía viviendo
+     dentro del "body{display:flex;justify-content:center}" con un
+     width:96vw + max-width:1600px — eso deja franjas vacías a los costados
+     en vez del aprovechamiento "borde a borde" de la referencia (sidebar
+     pegado al borde real de la ventana, barra superior a todo el ancho de
+     la pantalla). Ahora ocupa el 100% del ancho disponible sin tope, y el
+     "aire" alrededor del contenido se resuelve con padding interno en
+     header/main/footer en vez de un margen exterior que achica la app. */
+  .app-shell { max-width: none; width: 100%; text-align: left; }
+
+  /* Antes .sidebar era un panel fijo superpuesto (overlay) que había que
+     abrir con la hamburguesa. En PC no tiene sentido esconderlo: pasa a
+     ser una columna fija del grid, siempre visible, sin backdrop ni botón
+     de abrir/cerrar (ambos se ocultan más abajo).
+     BUG corregido en Sesión 23: esta regla necesita el mismo nivel de
+     especificidad que ".app-shell.visible { display:block }" (línea 152)
+     para poder ganarle — con solo ".app-shell" el grid nunca se activaba
+     de verdad y el sidebar (ya con position:static) quedaba como una caja
+     de 240px flotando arriba a la izquierda, en flujo normal de bloque. */
+  .app-shell.visible {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    /* Sesión 26 — filas explícitas: antes las 3 filas eran "auto" sin más,
+       así que el espacio sobrante hasta completar min-height:100vh se
+       repartía por igual entre header/sidebar-main/footer (comportamiento
+       por defecto de align-content en grid). Eso hacía que header y footer
+       cambiaran de tamaño/posición según cuánto contenido tuviera la
+       pestaña activa. Con "auto 1fr auto" solo la fila del medio
+       (sidebar+main) absorbe el espacio libre; header y footer quedan
+       siempre con la altura justa de su contenido, en la misma posición
+       en todas las secciones. */
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "header header" "sidebar main" "footer footer";
+    column-gap: 0;
+    align-items: stretch;
+    /* Sesión 27 — antes era min-height:100vh, lo que dejaba crecer el grid
+       más allá de la pantalla cuando una pestaña (ej. Configuración) tenía
+       mucho contenido: la página entera se alargaba y el footer quedaba
+       fuera de la vista. Con height:100vh el shell queda fijo al alto real
+       de la pantalla; la fila del medio (1fr) tiene entonces una altura
+       definida y es .main-content quien scrollea internamente (ver abajo),
+       nunca la página completa. */
+    height: 100vh;
+  }
+  .app-header { grid-area: header; margin-bottom: 0; padding: 18px 28px; background: var(--stone); border-bottom: 1px solid var(--gold-dim); }
+  .main-content > .rule-orn { display: none; }
+  .main-content {
+    grid-area: main; padding: 22px 28px;
+    /* Sesión 27 — scroll interno del área principal: min-height:0 permite
+       que este ítem del grid se achique por debajo de la altura de su
+       contenido (por defecto un ítem de grid no baja de su "min-height:auto"
+       basado en contenido, que es justo lo que hacía crecer todo el shell).
+       overflow-y:auto crea el scroll DENTRO de main cuando el contenido de
+       la pestaña activa no entra en el espacio disponible, sin mover
+       header, sidebar ni footer. */
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .app-footer { grid-area: footer; margin-top: 0; padding: 14px 28px; }
+  .sidebar {
+    grid-area: sidebar; position: static; transform: none; height: auto;
+    max-width: none; box-shadow: none;
+  }
+  .sidebar-backdrop, #sidebar-toggle-btn, #sidebar-close-btn { display: none; }
+
+  .resumen-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; }
+  #venta-lineas.lista { display: flex; flex-direction: column; }
+
+  /* Panel derecho: la información secundaria (Sesión 22 — Resumen) queda
+     en una columna angosta a la derecha del contenido principal en vez de
+     apilada debajo, aprovechando el ancho sobrante de la pantalla. */
+  .seccion-cuerpo { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  .seccion-panel { margin-top: 0; }
+}
+
+@media (min-width: 1600px) {
+  .main-content { padding-left: 40px; padding-right: 40px; }
+  .app-header, .app-footer { padding-left: 40px; padding-right: 40px; }
+}
+
+/* ---- Presentaciones comerciales (dentro de Productos) ---- */
+.hidden { display: none; }
+.presentaciones-panel { display: flex; flex-direction: column; gap: 20px; margin-bottom: 6px; }
+.presentaciones-panel h4 {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 14.5px;
+  color: var(--mist); letter-spacing: 0.03em; text-transform: uppercase; margin: 0 0 10px;
+}
+#pp-producto-select { width: 100%; margin-bottom: 10px; }
+.pres-acciones, .pp-acciones { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.pres-acciones button, .pp-acciones button {
+  background: var(--stone-2); color: var(--text); border: 1px solid var(--gold-dim);
+  border-radius: 5px; padding: 6px 10px; font-size: 12px; cursor: pointer; margin-top: 0; white-space: nowrap;
+}
+.pres-acciones button:hover, .pp-acciones button:hover { border-color: var(--gold); color: var(--gold); }
+.pres-editar-input, .pp-factor-input {
+  padding: 7px 9px; background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 5px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; margin-top: 0;
+}
+.pres-editar-input { flex: 1; min-width: 0; }
+.pp-factor-input { width: 90px; }
+
+@media (min-width: 1024px) {
+  .presentaciones-panel { flex-direction: row; gap: 26px; }
+  .presentaciones-catalogo, .presentaciones-producto { flex: 1; min-width: 0; }
+}
+
+/* ---- Pestaña Resumen — Sesión 15 (nueva) ---- */
+.resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
+.resumen-card {
+  background: var(--stone); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 16px;
+  text-align: center;
+}
+.resumen-card .valor { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 600; color: var(--gold); line-height: 1.1; }
+.resumen-card .etiqueta { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--mist); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
+.resumen-card.alerta .valor { color: var(--wine); }
+.resumen-alertas { margin-bottom: 22px; }
+.resumen-movs .lista-item span:first-child { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--mist); min-width: 80px; }

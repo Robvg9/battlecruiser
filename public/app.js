@@ -768,12 +768,39 @@ async function refrescarOperacionesPendientesCache() {
 // Cuánto sumar/restar al stock real de un producto en un almacén según las
 // operaciones todavía no confirmadas: compra suma en su almacén, venta/vale
 // restan en el suyo, transferencia resta en el origen y suma en el destino.
+//
+// Misión B2.1, Partes 1/2/14 — CORRECCIÓN: una compra pendiente puede estar
+// en unidades de PRESENTACIÓN (p_presentacion_id + p_cantidad_presentacion,
+// ver form-compra) en vez de unidades base — antes esta función sumaba
+// siempre p_cantidad tal cual, que en modo presentación es la cantidad de
+// CAJAS/PAQUETES, no de unidades base (ej. 3 cajas sumaba "3" en vez de "72").
+// Ahora, si la operación usa presentación, se multiplica por el factor SOLO
+// si ese factor ya se conoce de forma confiable (factorPresentacionConocido,
+// ver arriba); el factor nunca se inventa. Venta/vale/transferencia siguen
+// siendo siempre en unidades base (no tienen modo presentación en el código
+// actual — Parte 3 de la misión), así que no cambian.
+//
+// Devuelve { ajuste, noCalculable }: si CUALQUIER operación pendiente
+// relevante para este producto/almacén no se puede reflejar (factor
+// desconocido), noCalculable queda en true y "ajuste" NO debe mostrarse como
+// si fuera la cifra completa (ver obtenerStockDisponible /
+// actualizarStockDisponibleUI más abajo).
 function ajustePendiente(producto_id, almacen_id) {
   let ajuste = 0;
+  let noCalculable = false;
   _operacionesPendientesCache.forEach((op) => {
     const p = op.payload || {};
     if (op.tipo === "compra" && p.p_producto_id === producto_id && p.p_almacen_id === almacen_id) {
-      ajuste += Number(p.p_cantidad) || 0;
+      if (p.p_presentacion_id) {
+        const factor = factorPresentacionConocido(producto_id, p.p_presentacion_id);
+        if (factor === null) {
+          noCalculable = true;
+        } else {
+          ajuste += (Number(p.p_cantidad_presentacion) || 0) * factor;
+        }
+      } else {
+        ajuste += Number(p.p_cantidad) || 0;
+      }
     } else if (op.tipo === "vale" && p.p_producto_id === producto_id && p.p_almacen_id === almacen_id) {
       ajuste -= Number(p.p_cantidad) || 0;
     } else if (op.tipo === "venta" && p.p_almacen_id === almacen_id) {
@@ -788,7 +815,7 @@ function ajustePendiente(producto_id, almacen_id) {
       });
     }
   });
-  return ajuste;
+  return { ajuste, noCalculable };
 }
 
 // ============================================================
@@ -862,6 +889,42 @@ async function ejecutarOperacion(tipo, payload) {
     // Algunas fallas de red llegan como excepción (fetch rechazado por el
     // Service Worker, "Failed to fetch" como TypeError) en vez de {error}.
     return encolar();
+  }
+}
+
+// ============================================================
+// Recuperación de operaciones atrapadas en SINCRONIZANDO — Misión B2.1,
+// Parte 10.
+// ============================================================
+// Riesgo real: si la app se cierra/recarga/pierde conexión justo mientras una
+// operación está marcada SINCRONIZANDO (ver sincronizarCola más abajo, que la
+// marca así ANTES de llamar al RPC), esa operación queda atrapada para
+// siempre — sincronizarCola() solo vuelve a leer las que están en
+// "PENDIENTE" (FIFO, Sección 8), así que "SINCRONIZANDO" nunca se reintenta
+// sola en la siguiente sesión.
+//
+// Es seguro bajarla a PENDIENTE al iniciar la app porque su idempotency_key
+// NUNCA se regenera (actualizarOperacionPendiente la conserva siempre, ver
+// Parte 5/6 de la misión): si el intento anterior en realidad sí había
+// llegado a procesarse en el servidor y solo se perdió la respuesta, el
+// reintento usa la MISMA clave y el backend puede reconocerlo como la misma
+// operación lógica en vez de duplicarla (contrato ya existente vía
+// p_idempotency_key en cada RPC). Se debe ejecutar ANTES de la primera
+// llamada a sincronizarCola() de esta sesión.
+async function recuperarOperacionesAtrapadas() {
+  try {
+    const atrapadas = await obtenerOperacionesPorEstado("SINCRONIZANDO");
+    for (const op of atrapadas) {
+      await actualizarOperacionPendiente(op.id, {
+        estado: "PENDIENTE",
+        ultimo_error: "Reintentada al iniciar la app: quedó a medias en una sincronización de una sesión anterior.",
+      });
+    }
+    if (atrapadas.length > 0) {
+      console.warn("[Battlecruiser] " + atrapadas.length + " operación(es) recuperada(s) de SINCRONIZANDO a PENDIENTE al iniciar.");
+    }
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudo revisar operaciones atrapadas en SINCRONIZANDO:", e);
   }
 }
 
@@ -1515,12 +1578,51 @@ async function cargarPresentacionesTodas() {
   return withCache("presentaciones", () => client.from("presentaciones").select("id, nombre, activo").order("nombre"));
 }
 
+// ---- Factor de presentación conocido, para la proyección local — Misión
+// B2.1, Partes 1/2/14 ----
+// Espejo síncrono en memoria de los factores ya vistos en
+// producto_presentaciones, alimentado únicamente por cargarAsociacionesProducto
+// de acá abajo (que ya pasa por withCache — la misma caché offline existente
+// de asociaciones por producto; esto NO es una caché nueva, solo un acceso
+// rápido y síncrono a datos que esa consulta ya trajo). La proyección local de
+// stock (ajustePendiente, más abajo) necesita el factor de forma síncrona para
+// no volver asíncrona toda la cadena de obtenerStockDisponible /
+// actualizarStockDisponibleUI.
+//
+// Si una compra pendiente usa una presentación cuyo factor NUNCA se cargó en
+// este dispositivo (ej. otra pestaña/dispositivo la creó, o se recargó la app
+// sin volver a abrir el selector de esa presentación), acá simplemente no va a
+// estar — y ajustePendiente debe marcar la proyección como NO CALCULABLE en
+// vez de inventar un factor (Parte 2 de la misión).
+const _factoresConocidos = {}; // "producto_id::presentacion_id" -> factor
+
+function _claveFactor(producto_id, presentacion_id) {
+  return producto_id + "::" + presentacion_id;
+}
+
+function _registrarFactoresConocidos(producto_id, asociaciones) {
+  (asociaciones || []).forEach((pp) => {
+    if (pp && pp.presentacion_id && pp.factor != null && Number.isFinite(Number(pp.factor))) {
+      _factoresConocidos[_claveFactor(producto_id, pp.presentacion_id)] = Number(pp.factor);
+    }
+  });
+}
+
+// Devuelve el factor si ya se conoce de forma confiable, o null si no hay
+// información suficiente en la caché actual (nunca inventa un valor).
+function factorPresentacionConocido(producto_id, presentacion_id) {
+  const v = _factoresConocidos[_claveFactor(producto_id, presentacion_id)];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
 async function cargarAsociacionesProducto(producto_id) {
-  return withCache("asociaciones:" + producto_id, () => client
+  const asociaciones = await withCache("asociaciones:" + producto_id, () => client
     .from("producto_presentaciones")
     .select("id, factor, activo, presentacion_id, presentaciones(nombre)")
     .eq("producto_id", producto_id)
     .order("created_at"));
+  _registrarFactoresConocidos(producto_id, asociaciones);
+  return asociaciones;
 }
 
 function renderCatalogoPresentaciones() {
@@ -2019,10 +2121,16 @@ let ventaProductosLista = []; // lista completa de productos, para el buscador
 // para que la venta pueda seguir funcionando de forma aproximada sin
 // Internet, igual que antes cuando no hay ninguna operación pendiente
 // (ajustePendiente devuelve 0 y el resultado es idéntico al de antes).
+// Misión B2.1: devuelve { valor, ajuste, noCalculable } en vez de un número
+// suelto — ver ajustePendiente. "valor" sigue siendo la mejor aproximación
+// posible (stock real + lo que SÍ se pudo calcular); "noCalculable" avisa que
+// falta información para que la cifra sea exacta, sin bloquear la venta (el
+// backend sigue siendo la autoridad real al sincronizar).
 function obtenerStockDisponible(producto_id, almacen_id) {
   const fila = _cache.stock.find((s) => s.producto_id === producto_id && s.almacen_id === almacen_id);
   const real = fila ? Number(fila.cantidad) : 0;
-  return Math.max(real + ajustePendiente(producto_id, almacen_id), 0);
+  const { ajuste, noCalculable } = ajustePendiente(producto_id, almacen_id);
+  return { valor: Math.max(real + ajuste, 0), ajuste, noCalculable };
 }
 
 // Cuánto de un producto ya está en el carrito actual (para no dejar pedir
@@ -2051,11 +2159,23 @@ function actualizarStockDisponibleUI() {
     return;
   }
 
-  const stockTotal = obtenerStockDisponible(producto_id, almacen_id); // ya incluye ajuste por pendientes
+  const { valor: stockTotal, ajuste, noCalculable } = obtenerStockDisponible(producto_id, almacen_id); // ya incluye ajuste por pendientes
   const enCarrito = cantidadEnCarrito(producto_id, -1);
   const disponible = Math.max(stockTotal - enCarrito, 0);
-  const tienePendientes = ajustePendiente(producto_id, almacen_id) !== 0;
 
+  if (noCalculable) {
+    // Misión B2.1, Partes 2/14: hay una compra pendiente con presentación
+    // cuyo factor no está disponible en la caché local — no se inventa un
+    // número. Se muestra lo que sí se sabe (stock real + lo demás que sí se
+    // pudo calcular) y se avisa que puede quedar corto, sin bloquear la
+    // venta (max sin fijar) porque el backend es la autoridad real.
+    infoEl.textContent = "Stock disponible: " + money(disponible) + " (proyección no calculable — hay una compra pendiente con presentación sin confirmar en este dispositivo)";
+    infoEl.className = "msg";
+    cantidadInput.removeAttribute("max");
+    return;
+  }
+
+  const tienePendientes = ajuste !== 0;
   infoEl.textContent = "Stock disponible: " + money(disponible) + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
   infoEl.className = "msg" + (disponible <= 0 ? " error" : "");
   cantidadInput.setAttribute("max", disponible);
@@ -2115,7 +2235,7 @@ function actualizarCantidadLinea(idx, nuevaCantidad) {
   }
 
   const almacen_id = document.getElementById("venta-almacen").value;
-  const stockTotal = obtenerStockDisponible(linea.producto_id, almacen_id);
+  const { valor: stockTotal } = obtenerStockDisponible(linea.producto_id, almacen_id);
   const enOtrasLineas = cantidadEnCarrito(linea.producto_id, idx);
   const disponible = stockTotal - enOtrasLineas;
 
@@ -2206,7 +2326,7 @@ safeInit("form-venta-linea", () => {
     // carrito para ese producto + lo que se está por agregar, contra el
     // stock real de ese producto en el almacén elegido.
     const existente = ventaLineas.find((l) => l.producto_id === producto_id);
-    const stockTotal = obtenerStockDisponible(producto_id, almacen_id);
+    const { valor: stockTotal } = obtenerStockDisponible(producto_id, almacen_id);
     const yaEnCarrito = existente ? existente.cantidad : 0;
     if (yaEnCarrito + cantidad > stockTotal) {
       const disponible = Math.max(stockTotal - yaEnCarrito, 0);
@@ -2493,10 +2613,18 @@ showApp = function (session) {
   // sesión anterior (se cerró la app sin haber recuperado Internet) y ahora
   // sí hay conexión, se dispara la sincronización directamente al entrar en
   // vez de esperar a un evento "online" que quizás no vuelva a ocurrir.
-  safeInit("carga-inicial-cola-pendiente", () => { actualizarContadorColaPendiente(); });
-  safeInit("carga-inicial-operaciones-pendientes-cache", () => { refrescarOperacionesPendientesCache(); });
-  safeInit("sincronizar-cola-inicial", () => {
-    if (navigator.onLine) sincronizarCola();
+  // Misión B2.1, Parte 10: la recuperación de SINCRONIZANDO→PENDIENTE debe
+  // terminar ANTES de que sincronizarCola() lea la cola, o una operación
+  // atrapada de una sesión anterior seguiría sin encontrarse (sincronizarCola
+  // solo busca "PENDIENTE"). Por eso va todo en una sola cadena async
+  // ordenada en vez de varios safeInit sueltos que no se esperan entre sí.
+  safeInit("cola-offline-arranque", () => {
+    (async () => {
+      await recuperarOperacionesAtrapadas();
+      await actualizarContadorColaPendiente();
+      await refrescarOperacionesPendientesCache();
+      if (navigator.onLine) await sincronizarCola();
+    })();
   });
 };
 

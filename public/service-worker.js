@@ -6,7 +6,13 @@
 // de compra/venta/transferencia/vale) ya iban directo a la red sin timeout
 // artificial (ver más abajo), que es justo lo que necesita ejecutarOperacion
 // para poder distinguir un error de red real de una respuesta del servidor.
-const CACHE_NAME = "battlecruiser-shell-v21";
+// v22 — Misión B2.1: bump porque app.js cambió comportamiento real (fix de la
+// proyección local con presentaciones, recuperación de operaciones atrapadas
+// en SINCRONIZANDO). Este service worker en sí tampoco cambió de
+// comportamiento en esta misión — el bump es solo para que los dispositivos
+// ya instalados bajen el app.js nuevo en vez de seguir serviendo el viejo
+// desde caché.
+const CACHE_NAME = "battlecruiser-shell-v22";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
