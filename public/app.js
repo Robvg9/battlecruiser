@@ -1209,8 +1209,9 @@ async function reintentarOperacionPendiente(id, btn) {
     cerrarDetalleOperacion();
     await refrescarPanelPendientes();
     // Delegar al flujo de sincronizacion existente (respeta _sincronizando).
+    // El finally de sincronizarCola ya refresca el panel; no hace falta
+    // una llamada explicita extra aca (seria duplicada).
     await sincronizarCola();
-    await refrescarPanelPendientes();
     setMsg("msg-pendientes", "Operaci\u00f3n reintentada.", true);
   } catch (e) {
     setMsg("msg-pendientes", "No se pudo completar el reintento.", false);
@@ -1249,7 +1250,9 @@ async function eliminarOperacionPendienteConfirmada(id, btn) {
   }
   cerrarDetalleOperacion();
   await actualizarContadorColaPendiente();
-  await refrescarPanelPendientes();
+  // refrescarPanelPendientes() no se llama explicito aca:
+  // actualizarContadorColaPendiente ya refresca el panel si esta
+  // visible; si no lo esta, el hook del tab lo refresca al abrirse.
   setMsg("msg-pendientes", "Operaci\u00f3n eliminada.", true);
 }
 
@@ -1538,12 +1541,120 @@ async function recuperarOperacionesAtrapadas() {
 // ============================================================
 // Sincronización de la cola offline — Misión B2, Secciones 8 a 13
 // ============================================================
+// ============================================================
+// B2.2-D — Cierre Offline-First: reconciliacion por tipo.
+// Reutiliza EXCLUSIVAMENTE las funciones de refresco ya existentes
+// (refrescarProductos, refrescarStockYSelects, refrescarTransferencias,
+// refrescarVales, refrescarVentas) y _cache / withCache / refrescarPanel
+// Pendientes. NO crea otra caché ni otro sistema de sincronizacion.
+//
+// REVISION DE COSTE: antes se llamaba a refrescarStockYSelects() (que internamente
+// hace refrescarProductos = 3 consultas + 1 de stock = 4 consultas) y a los
+// refrescos de historial UNA VEZ POR OPERACION dentro del bucle de
+// sincronizarCola. Con N operaciones eso eran N*4..5 consultas a Supabase,
+// mas el refresco global del finally (otras 4). La proyeccion local ya se
+// actualiza por operacion via refrescarOperacionesPendientesCache (saca la op
+// al marcarla REQUIERE_ATENCION o eliminarla), asi que no hace falta refrescar
+// los datos reales del backend despues de CADA operacion: basta con hacerlo
+// una sola vez al final, consolidando segun los tipos que se resolvieron.
+//
+// Modelo marcar-y-consolidar (sin nueva caché, sin nueva arquitectura):
+//   - marcarRefrescoPendiente(categoria): anota en un Set qué categorias de
+//     refresco hacen falta segun el tipo/resultado de cada operacion resuelta.
+//   - consolidarRefrescosPendientes(): ejecuta una sola vez cada refresco
+//     necesario al final de la sincronizacion, respetando dependencias.
+// Comportamiento funcional identico al anterior (los mismos datos se
+// refrescan); solo cambia cuantas veces: de N+1 a 1.
+// ============================================================
+
+// Set de categorias de refresco pendientes de consolidar al final de la
+// sincronizacion. Se resetea al empezar sincronizarCola. No es una caché de
+// datos: es solo una marca de "que hay que refrescar". Se vacia al consolidar.
+// Categorias posibles: "stock" (productos+almacenes+stock via
+// refrescarStockYSelects), "productos" (solo refrescarProductos, cuando la
+// unica operacion exitosa fue crear producto y no mueve stock), y los
+// historiales "transferencias", "vales", "ventas".
+let _refrescosPendientes = null;
+
+function marcarRefrescoPendiente(categoria) {
+  if (!_refrescosPendientes) return; // sin sincronizacion en curso: ignorar
+  _refrescosPendientes.add(categoria);
+}
+
+// Anota que refrescos hacen falta segun el tipo/resultado de la operacion
+// resuelta. NO ejecuta ningun refresco (eso lo hace consolidar al final).
+// resultado: "exito" | "negocio". No se llama para error de red (la op vuelve
+// a PENDIENTE y mantiene su proyeccion).
+function reconciliarTrasOperacion(tipo, resultado) {
+  switch (tipo) {
+    case "producto":
+      // Producto nuevo: tras exito hay que traer los productos reales. No
+      // mueve stock por si mismo. Tras error de negocio no hay producto real.
+      if (resultado === "exito") marcarRefrescoPendiente("productos");
+      break;
+    case "compra":
+      // Compra = entrada de stock. (refrescarStockYSelects cubre productos
+      // + almacenes + stock, asi que "stock" incluye "productos".)
+      marcarRefrescoPendiente("stock");
+      break;
+    case "venta":
+      marcarRefrescoPendiente("stock");
+      marcarRefrescoPendiente("ventas");
+      break;
+    case "transferencia":
+      marcarRefrescoPendiente("stock");
+      marcarRefrescoPendiente("transferencias");
+      break;
+    case "vale":
+      marcarRefrescoPendiente("stock");
+      marcarRefrescoPendiente("vales");
+      break;
+    default:
+      marcarRefrescoPendiente("stock");
+  }
+}
+
+// Ejecuta una sola vez cada refresco marcado, al final de la sincronizacion.
+// "stock" (refrescarStockYSelects) ya cubre productos+almacenes+stock; si esta
+// marcado, "productos" queda cubierto y no se llama aparte (evita duplicar
+// las 3 consultas de refrescarProductos). Los historiales van despues.
+async function consolidarRefrescosPendientes() {
+  if (!_refrescosPendientes) return;
+  const cats = _refrescosPendientes;
+  _refrescosPendientes = null; // liberar antes de ejecutar por si una llamada
+  // anidada vuelve a sincronizar (no deberia, pero por seguridad).
+  if (!appShell || !appShell.classList.contains("visible")) return;
+  try {
+    if (cats.has("stock")) {
+      // refrescarStockYSelects trae productos + almacenes + stock (cubriendo
+      // tambien la categoria "productos" si estuviera marcada).
+      await refrescarStockYSelects();
+    } else if (cats.has("productos")) {
+      // Solo productos (ej. operacion de crear producto exitosa, sin stock).
+      await refrescarProductos();
+    }
+    // Historiales: uno por categoria marcada (cada uno es 1 consulta).
+    if (cats.has("transferencias")) await refrescarTransferencias();
+    if (cats.has("vales")) await refrescarVales();
+    if (cats.has("ventas")) await refrescarVentas();
+  } catch (e) {
+    // Una reconciliacion fallida no debe romper el estado: ya se logueo el
+    // warning; la UI mostrara lo ultimo que tenga en _cache.
+    console.warn("[Battlecruiser] Consolidacion de refrescos fallo:", e);
+  }
+}
+
 let _sincronizando = false;
 
 async function sincronizarCola() {
   // Sección 8/12: protección contra dos sincronizaciones simultáneas.
   if (_sincronizando) return;
   _sincronizando = true;
+  // B2.2-D: resetear el set de refrescos pendientes para esta
+  // sincronizacion. reconciliarTrasOperacion (llamada por op) solo
+  // marca categorias; consolidarRefrescosPendientes (en el finally)
+  // las ejecuta una sola vez al final.
+  _refrescosPendientes = new Set();
   actualizarIndicadorConexion("sincronizando");
   try {
     // Sección 8: FIFO por creado_en ASC (obtenerOperacionesPorEstado ya
@@ -1576,6 +1687,13 @@ async function sincronizarCola() {
         await actualizarOperacionPendiente(op.id, { estado: "SINCRONIZADA" });
         await eliminarOperacionPendiente(op.id);
         await refrescarOperacionesPendientesCache();
+        // B2.2-D: reconciliacion por tipo tras exito. Trae los datos
+        // reales afectados desde Supabase, actualiza _cache y refresca
+        // la UI correspondiente (stock, historial, productos segun tipo).
+        // La op ya salio de la proyeccion (refrescarOperacionesPendientesCache);
+        // aca se trae la verdad del backend para que la UI no quede con la
+        // proyeccion temporal como definitiva.
+        await reconciliarTrasOperacion(op.tipo, "exito");
         continue;
       }
 
@@ -1597,23 +1715,22 @@ async function sincronizarCola() {
         ultimo_error: error.message || String(error),
       });
       await refrescarOperacionesPendientesCache();
+      // B2.2-D: la op salio de la proyeccion (queda REQUIERE_ATENCION,
+      // fuera del filtro PENDIENTE+SINCRONIZANDO). Se refresca el stock
+      // real y los historiales afectados para mostrar la verdad del backend
+      // y el conflicto en el panel Pendientes.
+      await reconciliarTrasOperacion(op.tipo, "negocio");
     }
   } finally {
     _sincronizando = false;
     await actualizarContadorColaPendiente();
-    // Mision B2.2-B.3.1: el panel refleja cambios de estado (ej.
-    // PENDIENTE -> REQUIERE_ATENCION) aunque el total del contador no
-    // cambie. actualizarContadorColaPendiente ya refresca el panel si
-    // esta visible; esta llamada explicita lo garantiza siempre tras
-    // una sincronizacion, con la misma lectura getAll del panel.
-    await refrescarPanelPendientes();
-    // Sección 16: tras cada operación resuelta (sincronizada o con
-    // conflicto) hay que refrescar el stock real y sacarla de la
-    // proyección — ya se hace por operación arriba (refrescarOperacionesPendientesCache);
-    // acá además se refresca el stock real mostrado si el panel está visible.
-    if (appShell.classList.contains("visible")) {
-      await refrescarStockYSelects();
-    }
+    // B2.2-D (revision de coste): consolidar los refrescos marcados
+    // durante el bucle en una sola pasada al final, en vez del
+    // refresco global por operacion + el global del finally. La
+    // proyeccion local ya se actualizo por operacion arriba
+    // (refrescarOperacionesPendientesCache); aca se trae la verdad
+    // del backend una sola vez segun los tipos resueltos.
+    await consolidarRefrescosPendientes();
     actualizarIndicadorConexion();
   }
 }
@@ -3268,7 +3385,10 @@ showApp = function (session) {
       await recuperarOperacionesAtrapadas();
       await actualizarContadorColaPendiente();
       await refrescarOperacionesPendientesCache();
-      await refrescarPanelPendientes();
+      // refrescarPanelPendientes() no se llama aca: va despues de
+      // actualizarContadorColaPendiente (que ya refresca el panel si
+      // esta visible) y antes de sincronizarCola (cuyo finally tambien
+      // refresca). El hook del tab lo refresca al abrir Pendientes.
       if (navigator.onLine) await sincronizarCola();
     })();
   });
@@ -3312,5 +3432,10 @@ async function refrescarTrasReconexion() {
   } catch (e) {
     console.warn("[Battlecruiser] Error al refrescar tras reconexión:", e);
   }
+  // B2.2-D: garantizar que el panel Pendientes quede consistente con
+  // IndexedDB tras reconectar (sincronizarCola ya lo refresca en su
+  // finally, pero alReconectar llama a esta funcion despues; refresco
+  // explicito por si la sincronizacion dejo estado intermedio).
+  await refrescarPanelPendientes();
   actualizarIndicadorConexion();
 }
