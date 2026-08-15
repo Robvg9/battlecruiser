@@ -12,7 +12,13 @@
 // comportamiento en esta misión — el bump es solo para que los dispositivos
 // ya instalados bajen el app.js nuevo en vez de seguir serviendo el viejo
 // desde caché.
-const CACHE_NAME = "battlecruiser-shell-v22";
+// v23 — Mision B2.3: bump por el Centro de Control Operacional en
+// app.js/index.html/style.css (capa de lectura/accion sobre la cola
+// Offline-First existente, sin segunda cola/caché/sincronizador). Este
+// service worker en sí no cambió de comportamiento — el bump es para que
+// los dispositivos ya instalados bajen el app.js/index.html/style.css
+// nuevos en vez de seguir sirviendo los viejos desde caché.
+const CACHE_NAME = "battlecruiser-shell-v23";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

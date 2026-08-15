@@ -981,6 +981,10 @@ async function refrescarPanelPendientes() {
       badgeTab.classList.remove("hidden");
     }
   }
+  // B2.3: el Centro de Control refleja el mismo estado de la cola.
+  // No crea una segunda fuente: lee la misma cola (ya leida arriba) y
+  // deriva el estado operacional. Sin await para no acoplar al panel.
+  if (typeof refrescarCentroControl === "function") refrescarCentroControl();
 }
 
 // ============================================================
@@ -1879,7 +1883,421 @@ function explicarError(error, contexto) {
 // últimos movimientos de stock (transferencias + vales mezclados por fecha).
 // No agrega tablas nuevas en Supabase: todo sale de las mismas consultas que
 // ya se hacían, cacheadas acá para no duplicar llamadas a la base.
-const _cache = { productos: [], almacenes: [], stock: [], transferencias: [], vales: [] };
+const _cache = { productos: [], almacenes: [], stock: [], transferencias: [], vales: [], ventas: [] };
+
+// ============================================================
+// B2.3 — CENTRO DE CONTROL OPERACIONAL
+// ============================================================
+// Capa de lectura/acción sobre la infraestructura Offline-First ya
+// existente. NO crea una segunda cola, ni un store IndexedDB nuevo, ni una
+// caché nueva, ni un sistema de sincronización paralelo, ni permisos
+// paralelos, ni RPC duplicados. Todo el estado se deriva de:
+//   - operaciones_pendientes (IndexedDB, vía obtenerOperacionesVisiblesPanel);
+//   - _cache (productos/almacenes/stock/transferencias/vales/ventas);
+//   - _conectividadReal / navigator.onLine / _estadoCacheClaves;
+//   - _sincronizando (mutex de sincronización único).
+// Las acciones reutilizan reintentarOperacionPendiente(),
+// eliminarOperacionPendienteConfirmada(), mostrarDetalleOperacion(),
+// sincronizarCola() y la navegación por tabs ya existente.
+//
+// Regla fundamental (B2.3-A): el estado mostrado deriva de datos reales.
+// Nunca "Operativo" si hay REQUIERE_ATENCION. Nunca "Sincronizado" si hay
+// pendientes. Conectividad y sincronización son estados distintos.
+// ============================================================
+
+// B2.3-G: novedades vistas (Set en memoria, NO persistente). "Visto" ≠
+// "resuelto": marcar visto solo quita el realce visual de "nuevo" (punto
+// rojo), nunca borra el dato ni cambia el estado real de la operación.
+// Al recargar la app el Set arranca vacío: las novedades vuelven a
+// resaltarse hasta que el usuario las mire otra vez — exactamente lo que
+// pide B2.3-G ("desaparecer visualmente sin borrar el dato original").
+let _novedadesVistas = new Set();
+
+// B2.3-H: jerarquía visual única. Cada asunto del Centro de Atención
+// recibe una prioridad derivada de su estado real, no inventada.
+//   critico  → REQUIERE_ATENCION (problema que requiere acción).
+//   atencion → PENDIENTE o SINCRONIZANDO (seguimiento, no error).
+//   normal   → actividad correcta / sincronización completada.
+function prioridadAsunto(estado) {
+  switch (estado) {
+    case "REQUIERE_ATENCION": return "critico";
+    case "PENDIENTE":
+    case "SINCRONIZANDO": return "atencion";
+    default: return "normal";
+  }
+}
+
+// B2.3-A: estado operacional global derivado de datos reales. Devuelve
+// { nivel, texto, detalle }. Reglas: conexión y sincronización son
+// estados distintos. Nunca verde si hay pendientes o atención.
+function calcularEstadoOperacional(ops, sincronizando) {
+  const pendiente = ops.filter((o) => o.estado === "PENDIENTE").length;
+  const sincronizandoOps = ops.filter((o) => o.estado === "SINCRONIZANDO").length;
+  const atencion = ops.filter((o) => o.estado === "REQUIERE_ATENCION").length;
+  const offline = estaRealmenteDesconectado();
+
+  if (atencion > 0) {
+    return {
+      nivel: "critico",
+      texto: "Requiere atención",
+      detalle: atencion + (atencion === 1 ? " operación requiere atención." : " operaciones requieren atención."),
+    };
+  }
+
+  if (sincronizando || sincronizandoOps > 0) {
+    return {
+      nivel: "atencion",
+      texto: "Sincronizando…",
+      detalle: "Enviando operaciones pendientes al servidor.",
+    };
+  }
+
+  if (pendiente > 0) {
+    return {
+      nivel: "atencion",
+      texto: offline ? "Pendientes (sin conexión)" : "Operaciones pendientes",
+      detalle: pendiente + (pendiente === 1 ? " operación pendiente de sincronizar." : " operaciones pendientes de sincronizar."),
+    };
+  }
+
+  if (offline) {
+    return {
+      nivel: "normal",
+      texto: "Sin conexión — al día",
+      detalle: "Trabajando localmente. Sin operaciones pendientes.",
+    };
+  }
+
+  return {
+    nivel: "normal",
+    texto: "Operativo",
+    detalle: "Todo sincronizado.",
+  };
+}
+
+// B2.3-B: construye la lista de asuntos que requieren atención/acción,
+// ordenada por prioridad (critico primero). Cada asunto envuelve una
+// operación de la cola real y lleva su prioridad y si fue vista o no.
+// Reutiliza obtenerOperacionesVisiblesPanel() (única fuente de la cola).
+function construirAsuntosAtencion(ops) {
+  return ops
+    .map((op) => ({
+      op,
+      prioridad: prioridadAsunto(op.estado),
+      visto: _novedadesVistas.has(op.id),
+    }))
+    .sort((a, b) => {
+      const orden = { critico: 0, atencion: 1, normal: 2 };
+      const d = (orden[a.prioridad] != null ? orden[a.prioridad] : 3) - (orden[b.prioridad] != null ? orden[b.prioridad] : 3);
+      if (d !== 0) return d;
+      // dentro de la misma prioridad, FIFO (más antigua primero)
+      return (a.op.creado_en < b.op.creado_en ? -1 : a.op.creado_en > b.op.creado_en ? 1 : 0);
+    });
+}
+
+// B2.3-L: actividad reciente compacta. Reutiliza _cache
+// (transferencias + vales + ventas), NO hace consultas nuevas. Cada
+// actividad indica tipo, hora y resultado. No crea una segunda auditoría.
+function construirActividadReciente() {
+  const movs = [];
+  (_cache.transferencias || []).forEach((t) => {
+    movs.push({
+      icono: "↔",
+      texto: "Transferencia: " + (t.origen && t.origen.nombre ? t.origen.nombre : "?") + " → " + (t.destino && t.destino.nombre ? t.destino.nombre : "?"),
+      fecha: t.fecha,
+      resultado: t.estado || "",
+    });
+  });
+  (_cache.vales || []).forEach((v) => {
+    movs.push({
+      icono: "📋",
+      texto: "Vale (" + (v.tipo || "?") + "): " + (v.productos && v.productos.nombre ? v.productos.nombre : "?") + " · " + (v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"),
+      fecha: v.fecha,
+      resultado: money(v.cantidad) + " u",
+    });
+  });
+  (_cache.ventas || []).forEach((v) => {
+    movs.push({
+      icono: "🛒",
+      texto: "Venta: " + (v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"),
+      fecha: v.fecha,
+      resultado: "$" + money(v.total),
+    });
+  });
+  return movs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);
+}
+
+// B2.3-K: stock bajo reutilizando _cache.stock. La proyección usa
+// ajustePendiente() (autoridad existente). El Centro de Control solo
+// presenta; NO recalcula stock independientemente.
+function construirStockBajo() {
+  return (_cache.stock || []).filter((s) => s.minimo != null && s.cantidad <= s.minimo);
+}
+
+function proyeccionStock(producto_id, almacen_id, stockReal) {
+  const { ajuste, noCalculable } = ajustePendiente(producto_id, almacen_id);
+  return {
+    stockReal: Number(stockReal) || 0,
+    ajuste,
+    proyeccion: (Number(stockReal) || 0) + ajuste,
+    noCalculable,
+  };
+}
+
+// ---- Render del Centro de Control ----
+// B2.3-E/B2.3-F: vive en la pestaña "Resumen" (pantalla inicial
+// post-login), reutilizando el panel que ya existía, ampliado. No hay
+// roles reales en el proyecto todavía (no existe user_metadata.role ni un
+// RPC de roles): la vista es la misma para todo usuario autenticado y NO
+// se inventa una distinción admin/trabajador que el backend no respalda.
+// Ver documentación de limitaciones al final del archivo.
+
+function renderEstadoNegocio(estado) {
+  const el = document.getElementById("cc-estado");
+  if (!el) return;
+  el.className = "cc-estado cc-estado-" + estado.nivel;
+  el.innerHTML =
+    '<div class="cc-estado-cabecera">' +
+      '<span class="cc-estado-titulo">' + escHtml(estado.texto) + "</span>" +
+      '<span class="cc-estado-detalle">' + escHtml(estado.detalle) + "</span>" +
+    "</div>";
+}
+
+function renderRequiereAtencion(asuntos) {
+  const el = document.getElementById("cc-atencion");
+  if (!el) return;
+  const criticos = asuntos.filter((a) => a.prioridad === "critico");
+  if (criticos.length === 0) {
+    el.innerHTML = '<p class="lista-estado">Nada requiere atención ahora mismo.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  criticos.forEach((a) => {
+    const op = a.op;
+    const tipo = ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operación";
+    const fecha = op.creado_en
+      ? new Date(op.creado_en).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : "—";
+    const errorTxt = op.ultimo_error ? escHtml(String(op.ultimo_error)) : "Error de negocio.";
+    const div = document.createElement("div");
+    div.className = "cc-asunto cc-prioridad-critico" + (a.visto ? " visto" : "");
+    div.dataset.id = op.id;
+    div.innerHTML =
+      '<span class="cc-asunto-principal">' +
+        '<span class="cc-asunto-tipo">' + escHtml(tipo) + "</span>" +
+        '<span class="muted cc-asunto-resumen">' + escHtml(resumenOperacionPendiente(op)) + "</span>" +
+        '<span class="cc-asunto-motivo">' + errorTxt + "</span>" +
+      "</span>" +
+      '<span class="cc-asunto-lateral">' +
+        '<span class="muted cc-asunto-meta">' + fecha + "</span>" +
+        '<span class="cc-asunto-acciones">' +
+          '<button type="button" class="cc-accion cc-ver-btn" data-id="' + escHtml(op.id) + '">Ver detalle</button>' +
+          '<button type="button" class="cc-accion cc-reintentar-btn" data-id="' + escHtml(op.id) + '">Reintentar</button>' +
+          '<button type="button" class="cc-accion cc-eliminar-btn" data-id="' + escHtml(op.id) + '">Eliminar</button>' +
+        "</span>" +
+      "</span>";
+    el.appendChild(div);
+    // B2.3-G: marcar visto al renderizarlo visible. El realce "nuevo"
+    // desaparece porque el usuario ya está mirando la lista. No se borra
+    // el dato ni se resuelve el problema.
+    _novedadesVistas.add(op.id);
+  });
+}
+
+function renderPendientesCompacto(asuntos) {
+  const el = document.getElementById("cc-pendientes");
+  if (!el) return;
+  const pendientes = asuntos.filter((a) => a.prioridad === "atencion");
+  const total = pendientes.length;
+  if (total === 0) {
+    el.innerHTML = '<p class="lista-estado">Sin operaciones pendientes.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  const resumen = document.createElement("div");
+  resumen.className = "cc-pendientes-resumen";
+  resumen.innerHTML =
+    '<span class="cc-pendientes-numero">' + total + "</span>" +
+    "<span>" + (total === 1 ? "operación pendiente" : "operaciones pendientes") + "</span>" +
+    '<button type="button" class="cc-accion cc-ir-pendientes-btn">Ver en Pendientes</button>';
+  el.appendChild(resumen);
+
+  const lista = document.createElement("div");
+  lista.className = "cc-pendientes-lista";
+  pendientes.slice(0, 4).forEach((a) => {
+    const op = a.op;
+    const tipo = ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operación";
+    const div = document.createElement("div");
+    div.className = "cc-asunto cc-prioridad-atencion" + (a.visto ? " visto" : "");
+    div.dataset.id = op.id;
+    div.innerHTML =
+      '<span class="cc-asunto-principal">' +
+        '<span class="cc-asunto-tipo">' + escHtml(tipo) + "</span>" +
+        '<span class="muted cc-asunto-resumen">' + escHtml(resumenOperacionPendiente(op)) + "</span>" +
+      "</span>" +
+      '<span class="cc-asunto-lateral">' +
+        '<span class="cc-asunto-estado">' + escHtml(etiquetaEstadoPanel(op.estado)) + "</span>" +
+      "</span>";
+    lista.appendChild(div);
+    _novedadesVistas.add(op.id);
+  });
+  el.appendChild(lista);
+}
+
+function renderActividadReciente() {
+  const el = document.getElementById("cc-actividad");
+  if (!el) return;
+  const movs = construirActividadReciente();
+  if (movs.length === 0) {
+    el.innerHTML = '<p class="lista-estado">Todavía no hay actividad registrada.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  movs.forEach((m) => {
+    const div = document.createElement("div");
+    div.className = "cc-actividad-item cc-prioridad-normal";
+    const fechaTxt = m.fecha ? new Date(m.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    div.innerHTML =
+      '<span class="cc-actividad-icono">' + escHtml(m.icono) + "</span>" +
+      '<span class="cc-actividad-texto">' + escHtml(m.texto) + "</span>" +
+      '<span class="cc-actividad-meta">' +
+        '<span class="muted">' + escHtml(fechaTxt) + "</span>" +
+        '<span class="cc-actividad-resultado">' + escHtml(m.resultado) + "</span>" +
+      "</span>";
+    el.appendChild(div);
+  });
+}
+
+function renderInventarioControl() {
+  const el = document.getElementById("cc-inventario");
+  if (!el) return;
+  const bajo = construirStockBajo();
+  if (bajo.length === 0) {
+    el.innerHTML = '<p class="lista-estado">Nada bajo el mínimo por ahora.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  bajo.slice(0, 5).forEach((s) => {
+    const prodId = s.producto_id;
+    const almId = s.almacen_id;
+    const div = document.createElement("div");
+    div.className = "cc-stock-item";
+    // B2.3-K: proyección local reutilizando ajustePendiente (autoridad
+    // existente). No recalcula stock independientemente.
+    const proj = proyeccionStock(prodId, almId, s.cantidad);
+    const ajusteTxt = proj.noCalculable
+      ? '<span class="muted">proyección no calculable</span>'
+      : (proj.ajuste === 0
+          ? ""
+          : '<span class="cc-stock-ajuste">' + (proj.ajuste > 0 ? "+" : "") + money(proj.ajuste) + " pend.</span>");
+    div.innerHTML =
+      '<span class="cc-stock-principal">' +
+        '<span class="cc-stock-nombre">' + escHtml(s.productos && s.productos.nombre ? s.productos.nombre : "?") +
+          ' <span class="muted">· ' + escHtml(s.almacenes && s.almacenes.nombre ? s.almacenes.nombre : "?") + "</span></span>" +
+        '<span class="cc-stock-proyeccion">' +
+          '<span class="cc-stock-real">' + money(s.cantidad) + "</span>" +
+          ajusteTxt +
+          (proj.noCalculable ? "" : '<span class="cc-stock-proj">Proy: ' + money(proj.proyeccion) + "</span>") +
+        "</span>" +
+      "</span>";
+    el.appendChild(div);
+  });
+  // B2.3-P: botón para ir a Inventario (almacenes). Evita botón muerto.
+  const ir = document.createElement("button");
+  ir.type = "button";
+  ir.className = "cc-accion cc-ir-inventario-btn";
+  ir.textContent = "Ver inventario";
+  el.appendChild(ir);
+}
+
+// Orquestador único del Centro de Control. Lee la cola una sola vez
+// (obtenerOperacionesVisiblesPanel, transacción IndexedDB única), deriva
+// todo el estado y pinta. NO hace consultas Supabase extra: reutiliza lo
+// que _cache ya tiene cargado. Se llama desde refrescarPanelPendientes y
+// desde los hooks existentes cuando cambia el estado de la cola.
+async function refrescarCentroControl() {
+  if (!appShell || !appShell.classList.contains("visible")) return;
+  const ops = await obtenerOperacionesVisiblesPanel();
+  const estado = calcularEstadoOperacional(ops, _sincronizando);
+  const asuntos = construirAsuntosAtencion(ops);
+  renderEstadoNegocio(estado);
+  renderRequiereAtencion(asuntos);
+  renderPendientesCompacto(asuntos);
+  renderInventarioControl();
+  renderActividadReciente();
+  refrescarBadgeCentroControl(asuntos);
+}
+
+// B2.3-G: badge de novedades en la pestaña "Resumen". Punto rojo cuando
+// hay asuntos críticos (REQUIERE_ATENCION) no vistos. Reutiliza el mismo
+// patrón que el badge de Pendientes (.pendientes-tab-badge).
+function refrescarBadgeCentroControl(asuntos) {
+  const badge = document.getElementById("resumen-tab-badge");
+  if (!badge) return;
+  const criticosNoVistos = asuntos.filter((a) => a.prioridad === "critico" && !a.visto).length;
+  if (criticosNoVistos === 0) {
+    badge.classList.add("hidden");
+    badge.classList.remove("atencion");
+    badge.textContent = "";
+  } else {
+    badge.textContent = String(criticosNoVistos);
+    badge.classList.add("atencion");
+    badge.classList.remove("hidden");
+  }
+}
+
+// B2.3-C/P: acciones contextuales y navegación. Reutilizan las funciones
+// existentes y la navegación por tabs. Un solo listener delegado (no uno
+// por botón, los items se recrean en cada refresco). Evita botones muertos.
+safeInit("centro-control-acciones", () => {
+  const cont = document.getElementById("tab-resumen");
+  if (!cont) return;
+  cont.addEventListener("click", async (e) => {
+    const ver = e.target.closest(".cc-ver-btn");
+    if (ver) {
+      e.stopPropagation();
+      const op = await obtenerOperacionPendiente(ver.dataset.id);
+      if (op) mostrarDetalleOperacion(op);
+      else await refrescarCentroControl();
+      return;
+    }
+    const reintentar = e.target.closest(".cc-reintentar-btn");
+    if (reintentar) {
+      e.stopPropagation();
+      await reintentarOperacionPendiente(reintentar.dataset.id, reintentar);
+      await refrescarCentroControl();
+      return;
+    }
+    const eliminar = e.target.closest(".cc-eliminar-btn");
+    if (eliminar) {
+      e.stopPropagation();
+      await eliminarOperacionPendienteConfirmada(eliminar.dataset.id, eliminar);
+      await refrescarCentroControl();
+      return;
+    }
+    const irPendientes = e.target.closest(".cc-ir-pendientes-btn");
+    if (irPendientes) {
+      e.stopPropagation();
+      const btnTab = document.querySelector('.tab-btn[data-tab="pendientes"]');
+      if (btnTab) btnTab.click();
+      return;
+    }
+    const irInventario = e.target.closest(".cc-ir-inventario-btn");
+    if (irInventario) {
+      e.stopPropagation();
+      const btnTab = document.querySelector('.tab-btn[data-tab="almacenes"]');
+      if (btnTab) btnTab.click();
+      return;
+    }
+    // Click en un item de atención/pendiente (no en un botón): detalle.
+    const item = e.target.closest(".cc-asunto");
+    if (item && item.dataset.id) {
+      const op = await obtenerOperacionPendiente(item.dataset.id);
+      if (op) mostrarDetalleOperacion(op);
+    }
+  });
+});
+
 
 function renderResumen() {
   const grid = document.getElementById("resumen-grid");
@@ -1934,6 +2352,10 @@ function renderResumen() {
       });
     }
   }
+  // B2.3: el Centro de Control reutiliza _cache (mismo objeto) para su
+  // actividad reciente e inventario. Cuando _cache cambia, refrescar el
+  // Centro tambien. No hace consultas nuevas: solo pinta desde _cache.
+  if (typeof refrescarCentroControl === "function") refrescarCentroControl();
 }
 
 // ---- Navegación por tabs ----
@@ -1950,10 +2372,15 @@ safeInit("tabs", () => {
     // lectura, solo cuando hace falta).
     if (btn.dataset.tab === "pendientes") {
       refrescarPanelPendientes();
-    } else {
+    } else if (btn.dataset.tab === "resumen") {
+      // B2.3: al entrar al Centro de Control (pestaña Resumen),
+      // refrescar el estado operacional derivado de la cola real.
+      if (typeof refrescarCentroControl === "function") refrescarCentroControl();
+    }
+    if (btn.dataset.tab !== "pendientes" && typeof cerrarDetalleOperacion === "function") {
       // Al salir de la pestana Pendientes, cerrar el detalle si estaba
       // abierto para que no quede visible encima de otra seccion.
-      if (typeof cerrarDetalleOperacion === "function") cerrarDetalleOperacion();
+      cerrarDetalleOperacion();
     }
   });
 });
@@ -3254,6 +3681,12 @@ async function refrescarVentasHistorial() {
     .order("fecha", { ascending: false })
     .limit(20);
 
+  // B2.3: guardar en _cache.ventas (unica cache del proyecto) para que el
+  // Centro de Control muestre ventas en la actividad reciente. No es una
+  // segunda cache: _cache ya existia con transferencias/vales; ventas solo
+  // no se guardaba aca porque el Resumen viejo no las usaba.
+  _cache.ventas = data || [];
+  renderResumen();
   const lista = document.getElementById("lista-ventas");
   if (!lista) return;
   if (!data || data.length === 0) {
@@ -3389,6 +3822,9 @@ showApp = function (session) {
       // actualizarContadorColaPendiente (que ya refresca el panel si
       // esta visible) y antes de sincronizarCola (cuyo finally tambien
       // refresca). El hook del tab lo refresca al abrir Pendientes.
+      // B2.3: pintar el Centro de Control con el estado real de la
+      // cola al iniciar (la pestaña Resumen es la pantalla inicial).
+      if (typeof refrescarCentroControl === "function") refrescarCentroControl();
       if (navigator.onLine) await sincronizarCola();
     })();
   });

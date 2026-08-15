@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v4.1 · La Cueva</p>
+      <p class="footnote">v4.2 · La Cueva</p>
     </form>
   </div>
 
@@ -77,7 +77,7 @@
         </button>
       </div>
       <nav class="sidebar-nav" id="tabs">
-        <button class="tab-btn active" data-tab="resumen">Resumen</button>
+        <button class="tab-btn active" data-tab="resumen">Centro de Control <span id="resumen-tab-badge" class="pendientes-tab-badge hidden"></span></button>
         <button class="tab-btn" data-tab="productos">Productos</button>
         <button class="tab-btn" data-tab="ventas">Ventas</button>
         <button class="tab-btn" data-tab="almacenes">Almacenes</button>
@@ -157,6 +157,40 @@
     </div>
 
     <section id="tab-resumen" class="tab-panel visible">
+      <!-- B2.3: Centro de Control Operacional. Capa de lectura/accion
+           sobre la infraestructura Offline-First existente. NO es una
+           segunda cola/caché/sincronizador. -->
+      <div class="cc-grid">
+        <div class="cc-col-ppal">
+          <div class="cc-estado" id="cc-estado"></div>
+
+          <div class="cc-bloque">
+            <h3>Requiere atención</h3>
+            <div id="cc-atencion" class="lista"></div>
+          </div>
+
+          <div class="cc-bloque">
+            <h3>Operaciones pendientes</h3>
+            <div id="cc-pendientes" class="lista"></div>
+          </div>
+        </div>
+
+        <aside class="cc-col-lateral">
+          <div class="cc-bloque">
+            <h3>Inventario</h3>
+            <div id="cc-inventario" class="lista"></div>
+          </div>
+          <div class="cc-bloque">
+            <h3>Actividad reciente</h3>
+            <div id="cc-actividad" class="lista"></div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="rule-orn">
+        <svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg>
+      </div>
+
       <div class="resumen-grid" id="resumen-grid">
         <div class="resumen-card"><div class="valor">—</div><div class="etiqueta">Productos</div></div>
       </div>
@@ -347,7 +381,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v4.1 · La Cueva</span>
+      <span class="app-footer-version">v4.2 · La Cueva</span>
     </footer>
   </div>
 

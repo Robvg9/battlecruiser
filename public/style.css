@@ -693,3 +693,131 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .pendiente-detalle .pendiente-eliminar-btn:hover {
   background: rgba(122,35,49,0.15); color: var(--wine);
 }
+
+/* ============================================================
+   B2.3 — Centro de Control Operacional
+   Mismo lenguaje visual del salón (paleta oro/burdeos/salvia). Reutiliza
+   .lista / .lista-item / .muted / .msg / .hidden ya existentes. Sin
+   gráficos inútiles, sin neón: jerarquía visual por color de borde.
+   ============================================================ */
+
+/* Layout: en móvil apilado; en escritorio dos columnas (principal +
+   lateral), igual que .seccion-cuerpo ya existente. */
+.cc-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 8px; }
+.cc-col-ppal, .cc-col-lateral { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cc-bloque { display: flex; flex-direction: column; gap: 6px; }
+.cc-bloque h3 { margin: 0 0 2px; }
+
+/* Estado del negocio (B2.3-A): tarjeta de cabecera con color derivado
+   del estado real. critico=burdeos, atencion=oro, normal=salvia. */
+.cc-estado {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 18px; border-radius: 8px;
+  background: linear-gradient(180deg, var(--stone-2) 0%, var(--stone) 100%);
+  border: 1px solid var(--gold-dim);
+  border-left-width: 4px;
+}
+.cc-estado-cabecera { display: flex; flex-direction: column; gap: 3px; }
+.cc-estado-titulo {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600;
+  font-size: 20px; color: var(--gold); letter-spacing: 0.02em;
+}
+.cc-estado-detalle {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11.5px;
+  color: var(--mist); letter-spacing: 0.02em;
+}
+.cc-estado-critico { border-left-color: var(--wine); }
+.cc-estado-critico .cc-estado-titulo { color: var(--wine); }
+.cc-estado-atencion { border-left-color: var(--gold); }
+.cc-estado-atencion .cc-estado-titulo { color: var(--gold-bright); }
+.cc-estado-normal { border-left-color: var(--sage); }
+.cc-estado-normal .cc-estado-titulo { color: var(--sage); }
+
+/* Asuntos del Centro de Atención (B2.3-B/C). Reutiliza .lista-item con
+   maquetación flexible. Prioridad por borde lateral (oro=atención,
+   burdeos=crítico), igual que .pendiente-item ya existente. */
+.cc-asunto {
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  cursor: pointer; border-left-width: 3px;
+}
+.cc-asunto.visto { opacity: 0.82; }
+.cc-asunto-principal { display: flex; flex-direction: column; gap: 2px; }
+.cc-asunto-tipo { color: var(--text); font-size: 13px; }
+.cc-asunto-resumen { font-size: 11.5px; }
+.cc-asunto-motivo { font-size: 11px; color: var(--wine); word-break: break-word; white-space: normal; }
+.cc-asunto-lateral {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.cc-asunto-meta { font-size: 11px; }
+.cc-asunto-estado {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em;
+}
+.cc-asunto-acciones { display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px; }
+.cc-prioridad-critico { border-left-color: var(--wine); }
+.cc-prioridad-atencion { border-left-color: var(--gold-dim); }
+.cc-prioridad-normal { border-left-color: #c9a24d20; }
+
+/* Acciones contextuales (B2.3-C): mismo look que .pendiente-accion-rapida. */
+.cc-accion {
+  background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px;
+  padding: 5px 10px; font-size: 11px; cursor: pointer; white-space: nowrap;
+  font-family: 'Inter', sans-serif; letter-spacing: 0.02em;
+}
+.cc-accion:hover { border-color: var(--gold); color: var(--gold); }
+.cc-accion:disabled { opacity: 0.6; cursor: default; }
+.cc-reintentar-btn { border-color: var(--gold-dim); }
+.cc-eliminar-btn { border-color: var(--wine); color: var(--wine); }
+.cc-eliminar-btn:hover { background: rgba(122,35,49,0.15); border-color: var(--wine); color: var(--wine); }
+.cc-ir-pendientes-btn, .cc-ir-inventario-btn { margin-top: 8px; }
+
+/* Resumen compacto de pendientes (B2.3-J). */
+.cc-pendientes-resumen {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--void); border: 1px solid #c9a24d33; border-radius: 6px;
+  font-size: 12.5px; color: var(--text);
+}
+.cc-pendientes-numero {
+  font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600;
+  color: var(--gold); line-height: 1;
+}
+.cc-pendientes-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+/* Inventario con proyección local (B2.3-K). */
+.cc-stock-item {
+  display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px;
+  background: var(--stone); border: 1px solid #c9a24d20; border-radius: 6px;
+  font-size: 13px;
+}
+.cc-stock-principal { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cc-stock-nombre { color: var(--text); }
+.cc-stock-proyeccion {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.cc-stock-real { color: var(--wine); font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; }
+.cc-stock-ajuste {
+  color: var(--gold); font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  border: 1px solid var(--gold-dim); border-radius: 4px; padding: 1px 6px;
+}
+.cc-stock-proj { color: var(--mist); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+/* Actividad reciente (B2.3-L). */
+.cc-actividad-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  background: var(--stone); border: 1px solid #c9a24d20; border-radius: 6px;
+  border-left: 3px solid #c9a24d20; font-size: 12.5px;
+}
+.cc-actividad-icono { font-size: 14px; color: var(--gold); flex-shrink: 0; }
+.cc-actividad-texto { color: var(--text); flex: 1; min-width: 0; word-break: break-word; }
+.cc-actividad-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.cc-actividad-meta .muted { font-size: 10.5px; }
+.cc-actividad-resultado {
+  color: var(--sage); font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+}
+
+/* Responsive: en escritorio dos columnas como .seccion-cuerpo. */
+@media (min-width: 760px) {
+  .cc-grid { grid-template-columns: 1fr 320px; align-items: start; }
+}
