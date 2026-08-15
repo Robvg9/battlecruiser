@@ -904,9 +904,9 @@ async function obtenerOperacionesVisiblesPanel() {
 // Texto corto para el estado (coincide con los estados reales de la cola).
 function etiquetaEstadoPanel(estado) {
   switch (estado) {
-    case "PENDIENTE": return "🔄 Pendiente";
+    case "PENDIENTE": return "🟡 Pendiente de sincronización";
     case "SINCRONIZANDO": return "🔄 Sincronizando…";
-    case "REQUIERE_ATENCION": return "⚠ Requiere atención";
+    case "REQUIERE_ATENCION": return "🔴 Requiere atención";
     default: return estado || "?";
   }
 }
@@ -922,6 +922,8 @@ function renderizarPanelPendientes(operaciones) {
   operaciones.forEach((op) => {
     const div = document.createElement("div");
     div.className = "lista-item pendiente-item estado-" + (op.estado || "").toLowerCase();
+    // data-id para delegar el click y abrir el detalle.
+    div.dataset.id = op.id;
     const tipo = ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operación";
     const estado = etiquetaEstadoPanel(op.estado);
     const fecha = op.creado_en ? fechaCorta(op.creado_en) : "";
@@ -930,6 +932,16 @@ function renderizarPanelPendientes(operaciones) {
     const errorTxt = op.ultimo_error
       ? '<span class="pendiente-error muted">' + String(op.ultimo_error).replace(/</g, "&lt;") + "</span>"
       : "";
+    // Acciones rapidas SOLO para REQUIERE_ATENCION (regla 3/4).
+    // Para PENDIENTE/SINCRONIZANDO no se exponen (regla 6/7).
+    let accionesHtml = "";
+    if (op.estado === "REQUIERE_ATENCION") {
+      accionesHtml =
+        '<span class="pendiente-acciones">' +
+          '<button type="button" class="pendiente-accion-rapida pendiente-reintentar-btn" data-id="' + escHtml(op.id) + '" title="Reintentar">Reintentar</button>' +
+          '<button type="button" class="pendiente-accion-rapida pendiente-eliminar-btn" data-id="' + escHtml(op.id) + '" title="Eliminar operación">Eliminar</button>' +
+        "</span>";
+    }
     div.innerHTML =
       '<span class="pendiente-principal">' +
         '<span class="pendiente-tipo">' + tipo + "</span>" +
@@ -939,6 +951,7 @@ function renderizarPanelPendientes(operaciones) {
       '<span class="pendiente-lateral">' +
         '<span class="pendiente-estado">' + estado + "</span>" +
         '<span class="muted pendiente-meta">' + fecha + intentosTxt + "</span>" +
+        (accionesHtml) +
       "</span>";
     lista.appendChild(div);
   });
@@ -970,6 +983,276 @@ async function refrescarPanelPendientes() {
   }
 }
 
+// ============================================================
+// B2.2-B.3.2 - Gestion y recuperacion de operaciones pendientes.
+// Convierte el panel de B2.2-B.3.1 en una herramienta real de control:
+// ver detalle de una operacion, reintentar REQUIERE_ATENCION->PENDIENTE
+// reutilizando el MISMO registro (misma idempotency_key) y eliminar una
+// operacion que ya no debe ejecutarse. Sigue sin crear nada paralelo:
+// reutiliza _cache, actualizarOperacionPendiente(),
+// eliminarOperacionPendiente(), sincronizarCola(),
+// actualizarContadorColaPendiente() y refrescarPanelPendientes().
+// ============================================================
+
+// Resuelve un id de producto a su nombre legible usando _cache.productos
+// (la misma cache de lectura que ya alimenta Productos/Resumen/Ventas).
+// Si no esta en cache, no inventa: devuelve el id tal cual (acortado para
+// que quepa en pantalla) para que la operacion igual sea identificable.
+function resolverNombreProducto(id) {
+  if (!id) return "\u2014";
+  const p = _cache.productos.find((x) => x.id === id);
+  if (p && p.nombre) return p.nombre;
+  return id.length > 12 ? id.slice(0, 12) + "\u2026" : id;
+}
+
+// Resuelve un id de almacen a su nombre legible usando _cache.almacenes.
+function resolverNombreAlmacen(id) {
+  if (!id) return "\u2014";
+  const a = _cache.almacenes.find((x) => x.id === id);
+  if (a && a.nombre) return a.nombre;
+  return id.length > 12 ? id.slice(0, 12) + "\u2026" : id;
+}
+
+// Acorta cualquier id (categoria, presentacion, idempotency_key) para que
+// quepa en pantalla. Para IDs que no se resuelven a nombre (categoria,
+// presentacion) se muestra el id acortado, nunca un nombre inventado.
+function idCorto(id) {
+  if (!id) return "\u2014";
+  const s = String(id);
+  return s.length > 12 ? s.slice(0, 12) + "\u2026" : s;
+}
+
+// Escapa texto para insertarlo seguro en innerHTML.
+function escHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Construye el HTML del detalle de una operacion, segun su tipo y su
+// payload REAL (los mismos p_* que los RPC existentes). No inventa campos:
+// si un dato no esta en el payload, no se muestra. Los IDs de producto/
+// almacen se resuelven a nombre via _cache; si no hay match, se muestra el
+// id acortado para que la operacion igual sea identificable (regla 11).
+function detalleOperacionPendiente(op) {
+  const p = (op && op.payload) || {};
+  const tipo = ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operaci\u00f3n";
+  const estado = etiquetaEstadoPanel(op.estado);
+  const fechaHora = op.creado_en
+    ? new Date(op.creado_en).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "\u2014";
+  const intentos = Number(op.intentos) || 0;
+  const ultimoIntento = op.ultimo_intento
+    ? new Date(op.ultimo_intento).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : "\u2014";
+
+  function fila(etiqueta, valor) {
+    return '<div class="detalle-fila"><span class="detalle-etiqueta">' + escHtml(etiqueta) + '</span><span class="detalle-valor">' + escHtml(valor) + '</span></div>';
+  }
+
+  let cuerpo = "";
+  switch (op && op.tipo) {
+    case "producto":
+      cuerpo += fila("Nombre", p.p_nombre || "\u2014");
+      cuerpo += fila("Categor\u00eda", p.p_categoria_id ? idCorto(p.p_categoria_id) : "\u2014");
+      cuerpo += fila("Unidad", p.p_unidad || "\u2014");
+      cuerpo += fila("Precio normal", Number.isFinite(Number(p.p_precio_normal)) ? "$" + money(p.p_precio_normal) : "\u2014");
+      cuerpo += fila("Precio mayorista", (p.p_precio_mayorista == null || p.p_precio_mayorista === "") ? "\u2014" : "$" + money(p.p_precio_mayorista));
+      break;
+    case "compra":
+      cuerpo += fila("Producto", resolverNombreProducto(p.p_producto_id));
+      cuerpo += fila("Almac\u00e9n", resolverNombreAlmacen(p.p_almacen_id));
+      if (p.p_presentacion_id) {
+        cuerpo += fila("Presentaci\u00f3n (id)", idCorto(p.p_presentacion_id));
+        cuerpo += fila("Cantidad de presentaciones", Number(p.p_cantidad_presentacion) || 0);
+      } else {
+        cuerpo += fila("Cantidad (unidades base)", Number(p.p_cantidad) || 0);
+      }
+      cuerpo += fila("Costo unitario", Number.isFinite(Number(p.p_costo_unitario)) ? "$" + money(p.p_costo_unitario) : "\u2014");
+      break;
+    case "venta": {
+      const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
+      cuerpo += fila("Almac\u00e9n", resolverNombreAlmacen(p.p_almacen_id));
+      cuerpo += fila("L\u00edneas", lineas.length);
+      lineas.forEach((l, i) => {
+        cuerpo += fila("  " + (i + 1) + ". " + resolverNombreProducto(l.producto_id), (Number(l.cantidad) || 0) + " unidades");
+      });
+      break;
+    }
+    case "transferencia": {
+      const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
+      cuerpo += fila("Origen", resolverNombreAlmacen(p.p_origen_id));
+      cuerpo += fila("Destino", resolverNombreAlmacen(p.p_destino_id));
+      cuerpo += fila("L\u00edneas", lineas.length);
+      lineas.forEach((l, i) => {
+        cuerpo += fila("  " + (i + 1) + ". " + resolverNombreProducto(l.producto_id), (Number(l.cantidad) || 0) + " unidades");
+      });
+      break;
+    }
+    case "vale":
+      cuerpo += fila("Tipo", p.p_tipo || "\u2014");
+      cuerpo += fila("Producto", resolverNombreProducto(p.p_producto_id));
+      cuerpo += fila("Almac\u00e9n", resolverNombreAlmacen(p.p_almacen_id));
+      cuerpo += fila("Cantidad", Number(p.p_cantidad) || 0);
+      break;
+    default:
+      cuerpo += fila("Tipo", op.tipo || "\u2014");
+  }
+
+  // Motivo de atencion: el ultimo_error cuando la operacion esta en
+  // REQUIERE_ATENCION. Se muestra siempre que exista.
+  let motivoHtml = "";
+  if (op.ultimo_error) {
+    motivoHtml = '<div class="detalle-motivo"><span class="detalle-etiqueta">Motivo de atenci\u00f3n</span><span class="detalle-valor detalle-error-texto">' + escHtml(op.ultimo_error) + '</span></div>';
+  }
+
+  // Acciones: Reintentar y Eliminar SOLO para REQUIERE_ATENCION (regla 3/4).
+  // SINCRONIZANDO no permite generar un intento paralelo (respeta
+  // _sincronizando). El data-id permite delegar el click en un listener.
+  let accionesHtml = "";
+  if (op.estado === "REQUIERE_ATENCION") {
+    accionesHtml =
+      '<div class="detalle-acciones">' +
+        '<button type="button" class="pendiente-accion-btn pendiente-reintentar-btn" data-id="' + escHtml(op.id) + '">Reintentar</button>' +
+        '<button type="button" class="pendiente-accion-btn pendiente-eliminar-btn" data-id="' + escHtml(op.id) + '">Eliminar operaci\u00f3n</button>' +
+      '</div>';
+  }
+
+  // idempotency_key: identificador breve (no es secreto; es la clave que el
+  // backend usa para reconocer reintentos). Se acorta para que quepa. No se
+  // crea nada nuevo: es el campo ya existente del registro.
+  const idempCorta = op.idempotency_key ? idCorto(op.idempotency_key) : "\u2014";
+
+  return (
+    '<div class="detalle-cabecera">' +
+      '<span class="detalle-tipo">' + escHtml(tipo) + '</span>' +
+      '<span class="detalle-estado estado-' + (op.estado || "").toLowerCase() + '">' + estado + '</span>' +
+      '<button type="button" class="detalle-cerrar-btn" id="pendiente-detalle-cerrar" aria-label="Cerrar detalle">&times;</button>' +
+    '</div>' +
+    '<div class="detalle-cuerpo">' +
+      fila("Estado", estado) +
+      fila("Fecha/hora", fechaHora) +
+      fila("Intentos", intentos) +
+      fila("\u00daltimo intento", ultimoIntento) +
+      cuerpo +
+      fila("idempotency_key", idempCorta) +
+    '</div>' +
+    (motivoHtml) +
+    (accionesHtml)
+  );
+}
+
+// Muestra el detalle de una operacion en #pendiente-detalle.
+function mostrarDetalleOperacion(op) {
+  const cont = document.getElementById("pendiente-detalle");
+  if (!cont) return;
+  cont.innerHTML = detalleOperacionPendiente(op);
+  cont.classList.remove("hidden");
+  const cerrar = document.getElementById("pendiente-detalle-cerrar");
+  if (cerrar) cerrar.addEventListener("click", cerrarDetalleOperacion);
+}
+
+function cerrarDetalleOperacion() {
+  const cont = document.getElementById("pendiente-detalle");
+  if (cont) {
+    cont.classList.add("hidden");
+    cont.innerHTML = "";
+  }
+}
+
+// Reintentar una operacion en REQUIERE_ATENCION: la baja a PENDIENTE usando
+// actualizarOperacionPendiente() (que CONSERVA idempotency_key por contrato
+// existente) y luego dispara el flujo normal de sincronizacion. NO crea un
+// nuevo registro, NO regenera la clave, NO llama al RPC directamente: vuelve
+// al flujo existente (REQUIERE_ATENCION -> PENDIENTE -> SINCRONIZANDO -> RPC).
+// Mismo patron que recuperarOperacionesAtrapadas (SINCRONIZANDO->PENDIENTE).
+let _reintentandoPanel = false; // anti doble accion rapida sobre el mismo boton
+async function reintentarOperacionPendiente(id, btn) {
+  if (_reintentandoPanel || _sincronizando) {
+    setMsg("msg-pendientes", "Ya hay una sincronizaci\u00f3n en curso. Esper\u00e1 un momento.", false);
+    return;
+  }
+  const op = await obtenerOperacionPendiente(id);
+  if (!op) {
+    setMsg("msg-pendientes", "La operaci\u00f3n ya no existe.", false);
+    await refrescarPanelPendientes();
+    return;
+  }
+  if (op.estado !== "REQUIERE_ATENCION") {
+    setMsg("msg-pendientes", "Esta operaci\u00f3n no requiere reintento manual ahora mismo.", false);
+    return;
+  }
+  if (!navigator.onLine) {
+    setMsg("msg-pendientes", "Sin conexi\u00f3n ahora mismo. Se sincronizar\u00e1 solo al recuperar Internet.", false);
+    return;
+  }
+  _reintentandoPanel = true;
+  if (btn) { btn.disabled = true; }
+  try {
+    const actualizada = await actualizarOperacionPendiente(id, {
+      estado: "PENDIENTE",
+      // B2.2-B.3.2 (revision): NO se pasa ultimo_error. El contrato de
+      // actualizarOperacionPendiente (Object.assign + conservar idempotency_key)
+      // deja intacto el ultimo_error existente, que es el error real que
+      // provoco REQUIERE_ATENCION (ej. "stock insuficiente"). Pisarlo con un
+      // texto generico perdia la informacion del motivo original. El
+      // ultimo_error solo lo setea el sistema ante un fallo real (red/negocio),
+      // nunca el reintento manual. No se toca idempotency_key.
+    });
+    if (!actualizada) {
+      setMsg("msg-pendientes", "No se pudo reintentar la operaci\u00f3n.", false);
+      return;
+    }
+    cerrarDetalleOperacion();
+    await refrescarPanelPendientes();
+    // Delegar al flujo de sincronizacion existente (respeta _sincronizando).
+    await sincronizarCola();
+    await refrescarPanelPendientes();
+    setMsg("msg-pendientes", "Operaci\u00f3n reintentada.", true);
+  } catch (e) {
+    setMsg("msg-pendientes", "No se pudo completar el reintento.", false);
+  } finally {
+    _reintentandoPanel = false;
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+// Eliminar una operacion en REQUIERE_ATENCION: confirmacion real y luego
+// eliminarOperacionPendiente(). NO llama RPC, NO crea otra operacion, NO
+// toca Supabase. Actualiza panel y contador (eliminarOperacionPendiente ya
+// llama a actualizarContadorColaPendiente, y refrescarPanelPendientes al
+// final deja todo sincronizado).
+async function eliminarOperacionPendienteConfirmada(id, btn) {
+  const op = await obtenerOperacionPendiente(id);
+  if (!op) {
+    setMsg("msg-pendientes", "La operaci\u00f3n ya no existe.", false);
+    await refrescarPanelPendientes();
+    return;
+  }
+  if (op.estado === "SINCRONIZANDO") {
+    // Proteccion: no eliminar mientras se esta sincronizando (regla 10).
+    setMsg("msg-pendientes", "La operaci\u00f3n se est\u00e1 sincronizando ahora mismo. Esper\u00e1 a que termine.", false);
+    return;
+  }
+  if (!window.confirm("\u00bfEliminar esta operaci\u00f3n pendiente?\nEsta acci\u00f3n impedir\u00e1 que vuelva a intentarse autom\u00e1ticamente.")) {
+    return;
+  }
+  if (btn) btn.disabled = true;
+  const ok = await eliminarOperacionPendiente(id);
+  if (!ok) {
+    setMsg("msg-pendientes", "No se pudo eliminar la operaci\u00f3n.", false);
+    if (btn) btn.disabled = false;
+    return;
+  }
+  cerrarDetalleOperacion();
+  await actualizarContadorColaPendiente();
+  await refrescarPanelPendientes();
+  setMsg("msg-pendientes", "Operaci\u00f3n eliminada.", true);
+}
+
 // Botón "Reintentar sincronización": reutiliza directamente sincronizarCola()
 // (que ya se protege sola contra llamadas simultáneas con _sincronizando y
 // recorre la cola en FIFO). No crea ningún reintento paralelo propio.
@@ -995,6 +1278,54 @@ safeInit("panel-pendientes", () => {
       btn.textContent = textoOriginal;
     }
   });
+
+  // B2.2-B.3.2: listeners delegados en la lista del panel. Un solo
+  // listener por contenedor, no uno por item (los items se recrean en
+  // cada refrescarPanelPendientes). data-id identifica la operacion.
+  const listaPendientes = document.getElementById("lista-pendientes");
+  if (listaPendientes) {
+    listaPendientes.addEventListener("click", async (e) => {
+      // Click en un boton de accion: Reintentar / Eliminar.
+      const btnReintentar = e.target.closest(".pendiente-reintentar-btn");
+      if (btnReintentar) {
+        e.stopPropagation();
+        await reintentarOperacionPendiente(btnReintentar.dataset.id, btnReintentar);
+        return;
+      }
+      const btnEliminar = e.target.closest(".pendiente-eliminar-btn");
+      if (btnEliminar) {
+        e.stopPropagation();
+        await eliminarOperacionPendienteConfirmada(btnEliminar.dataset.id, btnEliminar);
+        return;
+      }
+      // Click en el item (no en un boton): abrir el detalle.
+      const item = e.target.closest(".pendiente-item");
+      if (item && item.dataset.id) {
+        const op = await obtenerOperacionPendiente(item.dataset.id);
+        if (op) mostrarDetalleOperacion(op);
+        else { setMsg("msg-pendientes", "La operaci\u00f3n ya no existe.", false); await refrescarPanelPendientes(); }
+      }
+    });
+  }
+
+  // B2.2-B.3.2: listener delegado para el detalle (Reintentar/Eliminar del
+  // detalle y el boton de cerrar). El detalle se reescribe en cada apertura,
+  // asi que delegar evita rebindear.
+  const detalle = document.getElementById("pendiente-detalle");
+  if (detalle) {
+    detalle.addEventListener("click", async (e) => {
+      const btnReintentar = e.target.closest(".pendiente-reintentar-btn");
+      if (btnReintentar) {
+        await reintentarOperacionPendiente(btnReintentar.dataset.id, btnReintentar);
+        return;
+      }
+      const btnEliminar = e.target.closest(".pendiente-eliminar-btn");
+      if (btnEliminar) {
+        await eliminarOperacionPendienteConfirmada(btnEliminar.dataset.id, btnEliminar);
+        return;
+      }
+    });
+  }
 });
 
 // ============================================================
@@ -1500,7 +1831,13 @@ safeInit("tabs", () => {
     // Mision B2.2-B.3.1: al entrar a la pestaña Pendientes, refrescar
     // el panel para mostrar el estado actual de la cola (una sola
     // lectura, solo cuando hace falta).
-    if (btn.dataset.tab === "pendientes") refrescarPanelPendientes();
+    if (btn.dataset.tab === "pendientes") {
+      refrescarPanelPendientes();
+    } else {
+      // Al salir de la pestana Pendientes, cerrar el detalle si estaba
+      // abierto para que no quede visible encima de otra seccion.
+      if (typeof cerrarDetalleOperacion === "function") cerrarDetalleOperacion();
+    }
   });
 });
 
