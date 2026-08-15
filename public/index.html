@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v4.4 · La Cueva</p>
+      <p class="footnote">v4.5 · La Cueva</p>
     </form>
   </div>
 
@@ -84,6 +84,7 @@
         <button class="tab-btn" data-tab="transferencias">Transferencias</button>
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
         <button class="tab-btn" data-tab="pendientes">Pendientes <span id="pendientes-tab-badge" class="pendientes-tab-badge hidden"></span></button>
+        <button class="tab-btn" data-tab="reportes">Reportes</button>
         <button class="tab-btn" data-tab="mando">Centro de Mando</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
@@ -362,6 +363,45 @@
       <p class="msg" id="msg-pendientes"></p>
     </section>
 
+    <section id="tab-reportes" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Reportes</h3>
+        <span id="reportes-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Análisis operativo del negocio. Datos reales de Supabase.</p>
+
+      <!-- Filtros globales -->
+      <div class="mando-filtros" id="reportes-filtros">
+        <label>Desde<input type="date" id="rep-filtro-desde"></label>
+        <label>Hasta<input type="date" id="rep-filtro-hasta"></label>
+        <select id="rep-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="rep-aplicar-btn" class="cc-accion">Aplicar filtros</button>
+        <button type="button" id="rep-limpiar-btn" class="cc-accion">Limpiar filtros</button>
+      </div>
+
+      <!-- Resumen ejecutivo -->
+      <div class="cc-bloque">
+        <h3>Resumen ejecutivo</h3>
+        <div id="rep-resumen" class="rep-grid"></div>
+      </div>
+
+      <!-- Sub-reportes -->
+      <div class="cc-bloque">
+        <h3>Reportes detallados</h3>
+        <div class="rep-tabs">
+          <button type="button" class="rep-tab-btn active" data-rep="ventas">Ventas</button>
+          <button type="button" class="rep-tab-btn" data-rep="transferencias">Transferencias</button>
+          <button type="button" class="rep-tab-btn" data-rep="vales">Vales</button>
+          <button type="button" class="rep-tab-btn" data-rep="stock">Stock</button>
+          <button type="button" class="rep-tab-btn" data-rep="movimiento">Movimiento</button>
+        </div>
+        <div id="rep-detalle" class="lista"></div>
+        <div class="mando-paginacion" id="rep-paginacion"></div>
+      </div>
+
+      <p class="msg" id="msg-reportes"></p>
+    </section>
+
     <section id="tab-mando" class="tab-panel">
       <div class="pendientes-header">
         <h3>Centro de Mando</h3>
@@ -426,7 +466,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v4.4 · La Cueva</span>
+      <span class="app-footer-version">v4.5 · La Cueva</span>
     </footer>
   </div>
 

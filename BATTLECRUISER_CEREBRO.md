@@ -91,8 +91,9 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - B2.3 — Centro de Control Operacional implementado (capa de lectura/acción sobre la cola Offline-First existente; 0 stores/colas/cachés/RPC nuevos).
 - B3 — Sistema operacional de usuarios, roles, permisos y control implementado. Reutiliza la arquitectura real de Supabase (usuarios/roles/permisos/tiene_permiso/RLS).
 - B4 — Centro de Mando + auditoría + trazabilidad operativa implementado. Reutiliza operaciones_pendientes/_cache/_usuarioActual/tiene_permiso. SQL de auditoría versionado (pendiente de aplicar).
-- App v4.4, Service Worker shell-v25.
-- Validación automatizada: **42/42 PASS** (16 B2.3 + 14 B3 + 12 B4).
+- B5 — Reportes y análisis operativo implementado. Reutiliza tablas existentes + tiene_permiso('reportes','ver'). SQL de reportes versionado (pendiente de aplicar).
+- App v4.5, Service Worker shell-v26.
+- Validación automatizada: **53/53 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -613,6 +614,38 @@ B4 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de auditoría 
 - Mientras tanto, la auditoría no se registra ni muestra (el frontend avisa que falta el SQL). El resto del Centro de Mando (estado, alertas, actividad) sí funciona sin el SQL.
 - Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
 
+## B5 — REPORTES Y ANÁLISIS OPERATIVO — IMPLEMENTADO
+
+### Estado
+B5 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de reportes está versionado en `supabase/b5-reportes.sql` pero **NO aplicado en Supabase** (pendiente de que Roberto lo ejecute en el SQL Editor). El frontend degrada con mensajes claros si las RPCs aún no existen.
+
+### Auditoría real confirmada
+- `ventas`, `ventas_lineas`, `transferencias`, `transferencias_lineas`, `vales_salida`, `stock`, `productos`, `almacenes`, `categorias` existen.
+- **NO existe** tabla `compras`, `lotes`, ni `movimientos_stock`. Las compras se reflejan en stock pero no hay historial persistente. El reporte de movimiento de inventario reconstruye a partir de ventas/transferencias/vales; las compras NO se incluyen (falta tabla).
+- **NO existe costo histórico por lote** → el margen/rentabilidad NO se calcula. Se documenta y no se inventa.
+
+### Implementado
+- Pestaña "Reportes" (permiso `reportes.ver`) con: filtros globales (fecha/almacén), resumen ejecutivo, y sub-reportes (ventas, transferencias, vales, stock, movimiento de inventario) con paginación y exportación CSV.
+- 6 RPC nuevos (todos SECURITY DEFINER, search_path fijo, protegidos con tiene_permiso('reportes','ver')): reporte_resumen_ejecutivo, reporte_ventas, reporte_transferencias, reporte_vales, reporte_stock, reporte_movimiento_inventario.
+- Agregaciones SQL (no trae miles de filas); paginación en los detallados.
+- Offline: no inventa datos; muestra "sin conexión". Reconexión refresca.
+
+### Arquitectura (reutilización, 0 duplicados)
+- Permisos: _usuarioActual/_permisosEfectivos/tienePermiso (B3).
+- Filtros usan _cache.almacenes (sin consulta nueva).
+- Stores nuevos: 0. Colas nuevas: 0. Cachés nuevas: 0. Sincronizadores nuevos: 0.
+
+### Seguridad
+- Cada RPC devuelve únicamente los datos necesarios. No hay RPC genérico que devuelva toda la base.
+- Todas protegidas con tiene_permiso('reportes','ver'). El cliente no puede bypassar el permiso.
+- Exportación CSV respeta filtros y permisos (solo datos ya visibles).
+
+### Limitaciones
+- El SQL de B5 NO está aplicado en Supabase. Roberto debe ejecutar `supabase/b5-reportes.sql`.
+- Reporte de compras: NO disponible (no existe tabla histórica de compras).
+- Margen/rentabilidad: NO disponible (no existe costo FIFO histórico por lote).
+- Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
+
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
 - Si una arquitectura existente resuelve el problema, reutilizarla.
@@ -632,9 +665,9 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 
 **Cerrado:** B2.2-A velocidad offline; B2.2-B.3.1 panel de pendientes; B2.2-B.3.2 gestión/recuperación; B2.2-D cierre Offline-First.
 
-**Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control; B4 — Centro de Mando + auditoría + trazabilidad (frontend completo; SQL de auditoría pendiente de aplicar en Supabase).
+**Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control; B4 — Centro de Mando + auditoría + trazabilidad; B5 — Reportes y análisis operativo (frontend completo; SQL de B3/B4/B5 pendiente de aplicar en Supabase).
 
-**Actual:** proyecto consolidado en `main` (v4.4).
+**Actual:** proyecto consolidado en `main` (v4.5).
 
 **Siguiente bloque general:** módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación).
 

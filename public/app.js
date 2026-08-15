@@ -2419,6 +2419,9 @@ safeInit("tabs", () => {
       // B2.3: al entrar al Centro de Control (pestaña Resumen),
       // refrescar el estado operacional derivado de la cola real.
       if (typeof refrescarCentroControl === "function") refrescarCentroControl();
+    } else if (btn.dataset.tab === "reportes") {
+      // B5: al entrar a Reportes, cargar resumen y detalle.
+      if (typeof refrescarReportes === "function") refrescarReportes();
     } else if (btn.dataset.tab === "mando") {
       // B4: al entrar al Centro de Mando, refrescar estado/alertas/auditoría.
       if (typeof refrescarCentroMando === "function") refrescarCentroMando();
@@ -3989,6 +3992,7 @@ var TAB_A_SECCION = {
   config: "config",
   usuarios: "usuarios",
   mando: "auditoria", // B4: Centro de Mando requiere permiso auditoria.ver
+  reportes: "reportes", // B5: Reportes requiere permiso reportes.ver
 };
 
 function aplicarPermisosAInterfaz() {
@@ -4538,6 +4542,327 @@ safeInit("centro-mando-filtros", () => {
       }
     });
   }
+});
+
+
+// ============================================================
+// B5 — REPORTES Y ANÁLISIS OPERATIVO
+// ============================================================
+// Reutiliza: _usuarioActual/_permisosEfectivos/tienePermiso (B3),
+// _cache (productos/almacenes), tiene_permiso en backend. NO crea
+// otra cola/store/caché/sincronizador. Los reportes consultan datos
+// reales vía RPCs (supabase/b5-reportes.sql) protegidos con
+// tiene_permiso('reportes','ver'). Si el SQL no está aplicado, el
+// frontend degrada con mensajes claros (no inventa datos).
+// ============================================================
+
+let _repSubreporte = "ventas";
+let _repPagina = 0;
+const _REP_POR_PAG = 25;
+
+// Poblar el select de almacenes con los ya cacheados (sin consulta nueva).
+function poblarFiltrosReportes() {
+  const sel = document.getElementById("rep-filtro-almacen");
+  if (!sel) return;
+  const actual = sel.value;
+  // Reutiliza _cache.almacenes (ya cargado por refrescarAlmacenes).
+  const almacenes = (typeof _cache !== "undefined" && _cache.almacenes) ? _cache.almacenes : [];
+  sel.innerHTML = '<option value="">Todos los almacenes</option>';
+  almacenes.forEach((a) => {
+    const o = document.createElement("option");
+    o.value = a.id; o.textContent = a.nombre;
+    sel.appendChild(o);
+  });
+  if (actual) sel.value = actual;
+}
+
+function leerFiltrosReportes() {
+  const desde = document.getElementById("rep-filtro-desde");
+  const hasta = document.getElementById("rep-filtro-hasta");
+  const almacen = document.getElementById("rep-filtro-almacen");
+  return {
+    desde: desde && desde.value ? desde.value : null,
+    hasta: hasta && hasta.value ? hasta.value : null,
+    almacen: almacen && almacen.value ? almacen.value : null,
+  };
+}
+
+function limpiarFiltrosReportes() {
+  const desde = document.getElementById("rep-filtro-desde");
+  const hasta = document.getElementById("rep-filtro-hasta");
+  const almacen = document.getElementById("rep-filtro-almacen");
+  if (desde) desde.value = "";
+  if (hasta) hasta.value = "";
+  if (almacen) almacen.value = "";
+  _repPagina = 0;
+}
+
+// ---- Resumen ejecutivo ----
+async function refrescarResumenEjecutivo() {
+  const el = document.getElementById("rep-resumen");
+  if (!el) return;
+  if (!tienePermiso("reportes", "ver")) {
+    el.innerHTML = '<p class="lista-estado">No tenés permiso para ver reportes.</p>';
+    return;
+  }
+  if (!navigator.onLine) {
+    el.innerHTML = '<p class="lista-estado">⚪ Sin conexión — los reportes requieren datos de Supabase.</p>';
+    return;
+  }
+  el.innerHTML = '<p class="lista-estado">Cargando resumen…</p>';
+  const f = leerFiltrosReportes();
+  try {
+    const { data, error } = await client.rpc("reporte_resumen_ejecutivo", {
+      p_desde: f.desde, p_hasta: f.hasta, p_almacen_id: f.almacen,
+    });
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<p class="lista-estado">Falta aplicar supabase/b5-reportes.sql en Supabase.</p>';
+      } else {
+        el.innerHTML = '<p class="lista-estado">Error: ' + escHtml(msg) + "</p>";
+      }
+      return;
+    }
+    renderResumenEjecutivo(data);
+  } catch (e) {
+    el.innerHTML = '<p class="lista-estado">Error al cargar el resumen.</p>';
+    console.warn("[Battlecruiser] reporte_resumen_ejecutivo:", e);
+  }
+}
+
+function renderResumenEjecutivo(d) {
+  const el = document.getElementById("rep-resumen");
+  if (!el || !d) return;
+  function card(titulo, valor, sub) {
+    return '<div class="resumen-card"><div class="valor">' + escHtml(String(valor)) + '</div><div class="etiqueta">' + escHtml(titulo) + '</div>' + (sub ? '<div class="muted">' + escHtml(sub) + '</div>' : '') + '</div>';
+  }
+  const v = d.ventas || {}, t = d.transferencias || {}, va = d.vales || {}, inv = d.inventario || {}, comp = d.compras || {}, mar = d.margen || {};
+  el.innerHTML =
+    card("Ventas", v.cantidad || 0, "$" + money(v.ingresos || 0) + " · ticket $" + money(v.ticket_promedio || 0)) +
+    card("Unidades vendidas", v.unidades || 0) +
+    card("Transferencias", t.cantidad || 0, (t.unidades || 0) + " unidades") +
+    card("Vales", va.cantidad || 0, (va.unidades || 0) + " unidades") +
+    card("Productos en stock", inv.productos || 0, (inv.unidades || 0) + " unidades") +
+    card("Stock bajo", inv.stock_bajo || 0) +
+    card("Stock agotado", inv.stock_agotado || 0) +
+    (comp.disponible === false ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Compras</div><div class="muted">' + escHtml(comp.nota || "No disponible") + '</div></div>' : "") +
+    (mar.disponible === false ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Margen</div><div class="muted">' + escHtml(mar.nota || "No disponible") + '</div></div>' : "");
+}
+
+// ---- Sub-reportes detallados ----
+async function refrescarSubReporte() {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!tienePermiso("reportes", "ver")) {
+    el.innerHTML = '<p class="lista-estado">No tenés permiso para ver reportes.</p>';
+    return;
+  }
+  if (!navigator.onLine) {
+    el.innerHTML = '<p class="lista-estado">⚪ Sin conexión — los reportes requieren datos de Supabase.</p>';
+    return;
+  }
+  setLoading("rep-detalle", "Cargando reporte…");
+  const f = leerFiltrosReportes();
+  try {
+    let data = null;
+    let error = null;
+    if (_repSubreporte === "ventas") {
+      ({ data, error } = await client.rpc("reporte_ventas", {
+        p_desde: f.desde, p_hasta: f.hasta, p_almacen_id: f.almacen, p_producto_id: null,
+        p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
+      }));
+      if (!error) renderVentas(data);
+    } else if (_repSubreporte === "transferencias") {
+      ({ data, error } = await client.rpc("reporte_transferencias", {
+        p_desde: f.desde, p_hasta: f.hasta, p_origen_id: f.almacen, p_destino_id: null, p_estado: null,
+        p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
+      }));
+      if (!error) renderTransferencias(data);
+    } else if (_repSubreporte === "vales") {
+      ({ data, error } = await client.rpc("reporte_vales", {
+        p_desde: f.desde, p_hasta: f.hasta, p_almacen_id: f.almacen, p_tipo: null,
+        p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
+      }));
+      if (!error) renderVales(data);
+    } else if (_repSubreporte === "stock") {
+      ({ data, error } = await client.rpc("reporte_stock", {
+        p_almacen_id: f.almacen, p_categoria_id: null,
+      }));
+      if (!error) renderStockReporte(data);
+    } else if (_repSubreporte === "movimiento") {
+      ({ data, error } = await client.rpc("reporte_movimiento_inventario", {
+        p_desde: f.desde, p_hasta: f.hasta, p_producto_id: null, p_almacen_id: f.almacen,
+        p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
+      }));
+      if (!error) renderMovimiento(data);
+    }
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<p class="lista-estado">Falta aplicar supabase/b5-reportes.sql en Supabase.</p>';
+      } else {
+        el.innerHTML = '<p class="lista-estado">Error: ' + escHtml(msg) + "</p>";
+      }
+      return;
+    }
+    renderPaginacionReporte(data ? data.length : 0);
+  } catch (e) {
+    el.innerHTML = '<p class="lista-estado">Error al cargar el reporte.</p>';
+    console.warn("[Battlecruiser] reporte " + _repSubreporte + ":", e);
+  }
+}
+
+function renderVentas(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin ventas en el período.</p>'; return; }
+  el.innerHTML = "";
+  filas.forEach((v) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila";
+    const fecha = v.fecha ? new Date(v.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    let lineasHtml = "";
+    if (Array.isArray(v.lineas)) {
+      lineasHtml = v.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + (l.cantidad || 0) + " u · $" + money(l.precio_unitario || 0) + " = $" + money(l.subtotal || 0) + "</div>").join("");
+    }
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(v.almacen || "—") + '</span><span class="muted">' + fecha + ' · Total $' + money(v.total || 0) + '</span>' + lineasHtml + '</span>';
+    el.appendChild(div);
+  });
+}
+
+function renderTransferencias(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin transferencias en el período.</p>'; return; }
+  el.innerHTML = "";
+  filas.forEach((t) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila";
+    const fecha = t.fecha ? new Date(t.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    let lineasHtml = "";
+    if (Array.isArray(t.lineas)) {
+      lineasHtml = t.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + (l.cantidad || 0) + " u</div>").join("");
+    }
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(t.origen || "—") + ' → ' + escHtml(t.destino || "—") + '</span><span class="muted">' + fecha + ' · ' + escHtml(t.estado || "") + ' · ' + (t.unidades || 0) + ' u</span>' + lineasHtml + '</span>';
+    el.appendChild(div);
+  });
+}
+
+function renderVales(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin vales en el período.</p>'; return; }
+  el.innerHTML = "";
+  filas.forEach((va) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila";
+    const fecha = va.fecha ? new Date(va.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(va.tipo || "—") + '</span><span class="muted">' + escHtml(va.producto || "—") + ' · ' + escHtml(va.almacen || "—") + ' · ' + (va.cantidad || 0) + ' u · ' + fecha + '</span></span>';
+    el.appendChild(div);
+  });
+}
+
+function renderStockReporte(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin datos de stock.</p>'; return; }
+  el.innerHTML = "";
+  filas.forEach((s) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila rep-estado-" + (s.estado || "normal");
+    const icono = s.estado === "agotado" ? "🔴" : s.estado === "bajo" ? "🟡" : "🟢";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(s.producto || "—") + '</span><span class="muted">' + escHtml(s.almacen || "—") + ' · ' + escHtml(s.categoria || "") + ' · ' + (s.cantidad || 0) + ' u (mín: ' + (s.minimo != null ? s.minimo : "—") + ')</span></span>';
+    el.appendChild(div);
+  });
+}
+
+function renderMovimiento(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin movimientos en el período.</p>'; return; }
+  el.innerHTML = "";
+  filas.forEach((m) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila rep-dir-" + (m.direccion || "");
+    const fecha = m.fecha ? new Date(m.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    const icono = m.direccion === "entrada" ? "⬆️" : "⬇️";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(m.tipo || "—") + '</span><span class="muted">' + escHtml(m.producto || "—") + ' · ' + escHtml(m.almacen || "—") + ' · ' + (m.cantidad || 0) + ' u · ' + fecha + '</span></span>';
+    el.appendChild(div);
+  });
+}
+
+function renderPaginacionReporte(cargadas) {
+  const el = document.getElementById("rep-paginacion");
+  if (!el) return;
+  el.innerHTML = "";
+  if (_repPagina > 0) {
+    const ant = document.createElement("button");
+    ant.type = "button"; ant.className = "cc-accion"; ant.textContent = "← Anterior";
+    ant.addEventListener("click", () => { _repPagina--; refrescarSubReporte(); });
+    el.appendChild(ant);
+  }
+  const span = document.createElement("span");
+  span.className = "muted"; span.textContent = "Página " + (_repPagina + 1);
+  el.appendChild(span);
+  if (cargadas >= _REP_POR_PAG) {
+    const sig = document.createElement("button");
+    sig.type = "button"; sig.className = "cc-accion"; sig.textContent = "Siguiente →";
+    sig.addEventListener("click", () => { _repPagina++; refrescarSubReporte(); });
+    el.appendChild(sig);
+  }
+}
+
+// Orquestador: carga resumen + sub-reporte. Un solo refresco consolidado.
+async function refrescarReportes() {
+  if (!appShell || !appShell.classList.contains("visible")) return;
+  poblarFiltrosReportes();
+  const conn = document.getElementById("reportes-conn-info");
+  if (conn) {
+    conn.textContent = estaRealmenteDesconectado() ? "⚪ Sin conexión — datos no disponibles" : "🟢 Datos de Supabase";
+  }
+  await refrescarResumenEjecutivo();
+  await refrescarSubReporte();
+}
+
+// Exportar CSV del sub-reporte actual (respeta filtros y permisos).
+function exportarCSVReporte() {
+  if (!tienePermiso("reportes", "ver")) return;
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  const filas = el.querySelectorAll(".rep-fila");
+  if (filas.length === 0) return;
+  // Reconstruir CSV desde el texto visible (sin datos sensibles).
+  const lineas = [];
+  filas.forEach((f) => {
+    const texto = f.textContent.replace(/\s+/g, " ").trim();
+    lineas.push('"' + texto.replace(/"/g, '""') + '"');
+  });
+  const csv = lineas.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "reporte_" + _repSubreporte + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+safeInit("reportes-init", () => {
+  poblarFiltrosReportes();
+  const aplicar = document.getElementById("rep-aplicar-btn");
+  if (aplicar) aplicar.addEventListener("click", () => { _repPagina = 0; refrescarReportes(); });
+  const limpiar = document.getElementById("rep-limpiar-btn");
+  if (limpiar) limpiar.addEventListener("click", () => { limpiarFiltrosReportes(); refrescarReportes(); });
+  // Sub-reportes (tabs internos).
+  document.querySelectorAll(".rep-tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".rep-tab-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      _repSubreporte = btn.dataset.rep;
+      _repPagina = 0;
+      refrescarSubReporte();
+    });
+  });
 });
 
 

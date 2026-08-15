@@ -24,7 +24,9 @@
 // v25 — Mision B4: bump por el Centro de Mando + auditoria + trazabilidad
 // (nueva pestana Centro de Mando, registro de auditoria, filtros). El SW
 // en si no cambio de comportamiento.
-const CACHE_NAME = "battlecruiser-shell-v25";
+// v26 — Mision B5: bump por Reportes y Analisis Operativo
+// (nueva pestana Reportes con resumen, sub-reportes y filtros).
+const CACHE_NAME = "battlecruiser-shell-v26";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

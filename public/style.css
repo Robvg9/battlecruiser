@@ -854,3 +854,36 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 .mando-paginacion .muted { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
 #mando-conn-info { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+/* ============================================================
+   B5 — Reportes y Análisis Operativo
+   Mismo lenguaje visual. Reutiliza .resumen-card/.lista-item existentes.
+   ============================================================ */
+.rep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.rep-grid .resumen-card .muted { font-size: 10.5px; margin-top: 4px; }
+.rep-fila {
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  padding: 10px 12px; background: var(--stone); border: 1px solid #c9a24d20;
+  border-radius: 6px; border-left: 3px solid #c9a24d20; font-size: 13px;
+}
+.rep-fila-principal { display: flex; flex-direction: column; gap: 2px; }
+.rep-linea { padding-left: 12px; font-size: 11px; }
+.rep-estado-agotado { border-left-color: var(--wine); }
+.rep-estado-bajo { border-left-color: var(--gold); }
+.rep-estado-normal { border-left-color: var(--sage); }
+.rep-dir-entrada { border-left-color: var(--sage); }
+.rep-dir-salida { border-left-color: var(--wine); }
+.rep-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.rep-tab-btn {
+  padding: 6px 12px; background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px;
+  font-family: 'Inter', sans-serif; font-size: 12px; cursor: pointer;
+}
+.rep-tab-btn:hover { border-color: var(--gold); color: var(--gold); }
+.rep-tab-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,162,77,0.08); }
+#rep-filtro-desde, #rep-filtro-hasta {
+  padding: 7px 10px; background: var(--stone); border: 1px solid var(--gold-dim);
+  border-radius: 5px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12.5px;
+}
+#reportes-filtros label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--mist); }
+#reportes-conn-info { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
