@@ -18,7 +18,10 @@
 // service worker en sí no cambió de comportamiento — el bump es para que
 // los dispositivos ya instalados bajen el app.js/index.html/style.css
 // nuevos en vez de seguir sirviendo los viejos desde caché.
-const CACHE_NAME = "battlecruiser-shell-v23";
+// v24 — Mision B3: bump por el sistema operacional de usuarios, roles,
+// permisos y control (contexto de usuario, sidebar dinamico por permisos,
+// administracion de usuarios). El SW en si no cambio de comportamiento.
+const CACHE_NAME = "battlecruiser-shell-v24";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

@@ -821,3 +821,15 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 @media (min-width: 760px) {
   .cc-grid { grid-template-columns: 1fr 320px; align-items: start; }
 }
+
+/* ============================================================
+   B3 — Usuarios, roles, permisos y control
+   Mismo lenguaje visual (paleta oro/burdeos/salvia). Reutiliza .lista-item.
+   ============================================================ */
+.usuario-item { flex-direction: column; align-items: stretch; gap: 4px; }
+.usuario-principal { display: flex; flex-direction: column; gap: 2px; }
+.usuario-nombre { color: var(--text); font-size: 13px; }
+.usuario-inactivo { opacity: 0.7; border-left: 3px solid var(--wine); }
+.usuario-acciones { display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px; }
+.usuario-item .muted { font-size: 11px; }
+#usuario-actual-info { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }

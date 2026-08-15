@@ -60,6 +60,14 @@ const lanternWrap = document.getElementById("lantern-wrap");
 // vez de client.auth.getSession() (asíncrono) desde cada función que cree
 // una operación.
 let _usuarioActualId = null;
+// B2.3-G / B3: novedades vistas (memoria, no persistente). Declarada
+// al inicio para evitar TDZ: showLogin/showApp la referencian al arrancar.
+let _novedadesVistas = new Set();
+// B3.2: contexto centralizado del usuario actual. Declarado al inicio
+// para evitar TDZ (showApp/showLogin lo usan durante la carga inicial).
+let _usuarioActual = null;
+let _permisosEfectivos = {};
+let _cargandoUsuario = false;
 
 function showApp(session) {
   loginForm.classList.add("hidden");
@@ -67,6 +75,9 @@ function showApp(session) {
   appShell.classList.add("visible");
   userEmailEl.textContent = session.user.email;
   _usuarioActualId = session.user.id;
+  // B3: cargar el contexto completo del usuario (perfil, rol, permisos).
+  // Una sola fuente para toda la app; reutiliza los RPC de B3.
+  if (typeof cargarContextoUsuario === "function") cargarContextoUsuario();
 }
 
 function showLogin() {
@@ -74,6 +85,9 @@ function showLogin() {
   lanternWrap.classList.remove("hidden");
   appShell.classList.remove("visible");
   _usuarioActualId = null;
+  // B3.18/B3.19: limpiar TODO el contexto de usuario al salir, para que
+  // un usuario B jamás vea permisos/datos del usuario A anterior.
+  if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
   // Foco directo en "Correo" al mostrar el login: con 6+ vendedores entrando y
   // saliendo de la cuenta seguido en la misma caja, ahorra un tap cada vez.
   const emailInput = document.getElementById("email");
@@ -119,6 +133,8 @@ safeInit("login", () => {
 
 safeInit("logout", () => {
   logoutBtn.addEventListener("click", async () => {
+    // B3.19: limpiar el contexto de usuario antes de cerrar sesión.
+    if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
     await client.auth.signOut();
   });
 });
@@ -1462,6 +1478,17 @@ const RPC_POR_TIPO = {
 };
 
 async function ejecutarOperacion(tipo, payload) {
+  // B3.3: un usuario inactivo no debe operar. El backend lo impide; el
+  // frontend lo refleja devolviendo un error claro. Reutiliza
+  // usuarioPuedeOperar() (que consulta el contexto, no hace RPC nuevo).
+  if (typeof usuarioPuedeOperar === "function") {
+    const puede = await usuarioPuedeOperar();
+    if (!puede) {
+      return { ok: false, error: { message: "Tu usuario está inactivo. Contactá al administrador." } };
+    }
+  }
+  // B3.14: asegurar que la operación conserve el usuario_id correcto.
+  if (typeof sincronizarUsuarioIdParaOperaciones === "function") sincronizarUsuarioIdParaOperaciones();
   const idempotency_key = crypto.randomUUID();
   const rpcNombre = RPC_POR_TIPO[tipo];
 
@@ -1911,7 +1938,7 @@ const _cache = { productos: [], almacenes: [], stock: [], transferencias: [], va
 // Al recargar la app el Set arranca vacío: las novedades vuelven a
 // resaltarse hasta que el usuario las mire otra vez — exactamente lo que
 // pide B2.3-G ("desaparecer visualmente sin borrar el dato original").
-let _novedadesVistas = new Set();
+// _novedadesVistas se declara al inicio del archivo (B2.3-G).
 
 // B2.3-H: jerarquía visual única. Cada asunto del Centro de Atención
 // recibe una prioridad derivada de su estado real, no inventada.
@@ -2376,6 +2403,13 @@ safeInit("tabs", () => {
       // B2.3: al entrar al Centro de Control (pestaña Resumen),
       // refrescar el estado operacional derivado de la cola real.
       if (typeof refrescarCentroControl === "function") refrescarCentroControl();
+    } else if (btn.dataset.tab === "usuarios") {
+      // B3.10: al entrar a Usuarios, mostrar el contexto actual y la lista.
+      const infoEl = document.getElementById("usuario-actual-info");
+      if (infoEl && typeof _usuarioActual !== "undefined" && _usuarioActual) {
+        infoEl.textContent = "Sesión: " + (_usuarioActual.nombre || "") + (_usuarioActual.rol ? " · " + _usuarioActual.rol : "");
+      }
+      if (typeof refrescarUsuarios === "function") refrescarUsuarios();
     }
     if (btn.dataset.tab !== "pendientes" && typeof cerrarDetalleOperacion === "function") {
       // Al salir de la pestana Pendientes, cerrar el detalle si estaba
@@ -3785,6 +3819,364 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
 initCatalogoSimple({ tabla: "categorias", formId: "form-categoria", inputId: "cat-nombre", listaId: "lista-categorias", singular: "categoría" });
 initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nombre", listaId: "lista-unidades", singular: "unidad" });
 
+// ============================================================
+// B3 — SISTEMA OPERACIONAL DE USUARIOS, ROLES, PERMISOS Y CONTROL
+// ============================================================
+// Reutiliza la arquitectura real de Supabase: tablas `usuarios`, `roles`,
+// `permisos` y `public.tiene_permiso(p_seccion, p_accion)`. NO crea un
+// segundo sistema de roles/permisos. NO crea una segunda cola/caché.
+//
+// Las RPC administrativas (perfil_usuario_actual, permisos_usuario_actual,
+// listar_usuarios_admin, listar_roles_admin, permisos_por_rol,
+// asignar_rol_usuario, cambiar_estado_usuario, usuario_esta_activo) están
+// definidas en supabase/b3-roles-permisos.sql (SECURITY DEFINER, search_path
+// fijo, protegidas con tiene_permiso). El frontend las llama; si aún no se
+// aplicaron, el contexto degrada con mensajes claros (no inventa datos).
+//
+// Seguridad: la autorización REAL está en el backend (RLS + tiene_permiso
+// dentro de cada RPC). El frontend solo refleja permisos para UX; ocultar
+// un botón NO es seguridad. Un usuario que manipule el frontend no puede
+// ejecutar operaciones protegidas sin el permiso real.
+// ============================================================
+
+// ---- B3.2: contexto centralizado del usuario actual ----
+// Una sola fuente para saber quién usa la app. Evita cargarUsuario() /
+// cargarRol() / cargarPermisos() dispersos. Se carga una vez por sesión
+// y se revalida al reconectar. Offline: usa el último contexto conocido
+// para permitir navegación, pero las operaciones protegidas validan online.
+// _usuarioActual, _permisosEfectivos, _cargandoUsuario se
+// declaran al inicio del archivo (B3.2) para evitar TDZ.
+
+// B3.18: tras logout, el contexto se limpia SIEMPRE (ver limpiarContextoUsuario).
+// Los permisos NO se cachean en IndexedDB de forma persistente: viven en
+// memoria y se recargan al iniciar sesión, para que un usuario B jamás vea
+// permisos de un usuario A anterior (regla anti-contaminación).
+
+// Carga el perfil + permisos del usuario autenticado en UN solo flujo.
+// Reutiliza los RPC perfil_usuario_actual() y permisos_usuario_actual().
+// Si los RPC no existen todavía (SQL no aplicado), deja _usuarioActual con
+// lo mínimo (id/email de Auth) y _permisosEfectivos vacío: la app sigue
+// usable con el comportamiento anterior, pero la administración de usuarios
+// avisa que falta aplicar el SQL.
+async function cargarContextoUsuario() {
+  if (_cargandoUsuario) return;
+  _cargandoUsuario = true;
+  try {
+    const { data: sesion } = await client.auth.getSession();
+    if (!sesion || !sesion.session) {
+      limpiarContextoUsuario();
+      _cargandoUsuario = false;
+      return;
+    }
+    const authUser = sesion.session.user;
+    // Perfil real (nombre, activo, rol) vía RPC. Si no existe aún, fallback.
+    let perfil = null;
+    try {
+      const { data, error } = await client.rpc("perfil_usuario_actual", {});
+      if (!error && data) perfil = Array.isArray(data) ? data[0] : data;
+    } catch (e) { /* RPC inexistente: perfil queda null */ }
+
+    if (perfil) {
+      _usuarioActual = {
+        id: perfil.id || authUser.id,
+        nombre: perfil.nombre || authUser.email,
+        activo: perfil.activo !== false,
+        role_id: perfil.role_id || null,
+        rol: perfil.rol || null,
+      };
+    } else {
+      // SQL de B3 aún no aplicado: contexto mínimo desde Auth (no inventa
+      // rol/permisos). La app funciona como antes.
+      _usuarioActual = {
+        id: authUser.id,
+        nombre: authUser.email,
+        activo: true, // se asume activo si no hay forma de comprobarlo
+        role_id: null,
+        rol: null,
+      };
+    }
+
+    // Permisos efectivos vía RPC (matriz seccion->accion). Si no existe,
+    // _permisosEfectivos queda vacío y tienePermiso() degrada a true solo
+    // para no romper la app existente (la seguridad real sigue en backend).
+    _permisosEfectivos = {};
+    try {
+      const { data: perms, error } = await client.rpc("permisos_usuario_actual", {});
+      if (!error && Array.isArray(perms)) {
+        perms.forEach((p) => {
+          if (!_permisosEfectivos[p.seccion]) _permisosEfectivos[p.seccion] = {};
+          _permisosEfectivos[p.seccion][p.accion] = true;
+        });
+      }
+    } catch (e) { /* RPC inexistente */ }
+
+    aplicarPermisosAInterfaz();
+    mostrarInfoUsuarioEnHeader();
+  } catch (e) {
+    console.warn("[Battlecruiser] No se pudo cargar el contexto de usuario:", e);
+  } finally {
+    _cargandoUsuario = false;
+  }
+}
+
+// B3.18/B3.19: limpia TODO el contexto específico del usuario al logout.
+// No borra cachés globales útiles (productos/stock), solo el contexto de
+// identidad/permisos. Evita que el usuario B vea permisos del usuario A.
+function limpiarContextoUsuario() {
+  _usuarioActual = null;
+  _permisosEfectivos = {};
+  _novedadesVistas = new Set();
+  // El badge de Centro de Control se resetea para no arrastrar estado.
+  const badge = document.getElementById("resumen-tab-badge");
+  if (badge) { badge.classList.add("hidden"); badge.textContent = ""; }
+  // Reaplicar permisos: sin usuario, todo oculto salvo login.
+  aplicarPermisosAInterfaz();
+}
+
+// ---- B3.6: capa de autorización frontend ----
+// tienePermiso(seccion, accion) reutiliza la matriz de tiene_permiso del
+// backend (cargada una vez por sesión vía permisos_usuario_actual).
+// Si el SQL de B3 no está aplicado, _permisosEfectivos está vacío: en ese
+// caso devuelve true (degradación: la app funciona como antes; la seguridad
+// real sigue siendo el backend/RLS). Cuando el SQL está aplicado, refleja
+// los permisos reales del rol del usuario.
+function tienePermiso(seccion, accion) {
+  if (!_usuarioActual) return false; // sin sesión: nada
+  if (Object.keys(_permisosEfectivos).length === 0) {
+    // Degradación: SQL de B3 no aplicado todavía. No bloquear la app
+    // existente (la autorización real está en el backend). La sección de
+    // administración de usuarios avisará que falta el SQL.
+    return true;
+  }
+  const sec = _permisosEfectivos[seccion];
+  return !!(sec && sec[accion]);
+}
+
+// ¿El SQL de B3 está aplicado? (hay perfil real con rol o permisos cargados)
+function contextoB3Disponible() {
+  return !!(_usuarioActual && (_usuarioActual.rol !== null || Object.keys(_permisosEfectivos).length > 0));
+}
+
+// ---- B3.7/B3.8: aplicación de permisos a la interfaz ----
+// Mapa: tab -> seccion que requiere permiso "ver". El sidebar se oculta
+// según permisos, pero la autorización real sigue siendo el backend.
+var TAB_A_SECCION = {
+  productos: "productos",
+  ventas: "ventas",
+  almacenes: "almacenes",
+  transferencias: "transferencias",
+  vales: "vales",
+  pendientes: "pendientes",
+  config: "config",
+  usuarios: "usuarios",
+};
+
+function aplicarPermisosAInterfaz() {
+  // Sidebar: ocultar tabs sin permiso "ver". UX, no seguridad.
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    const tab = btn.dataset.tab;
+    if (!tab) return;
+    // B3: TAB_A_SECCION puede no estar asignado aún si esto se ejecuta
+    // durante la carga inicial (showApp se dispara via getSession). Tolerante.
+    const seccion = (typeof TAB_A_SECCION !== "undefined" && TAB_A_SECCION) ? TAB_A_SECCION[tab] : undefined;
+    if (!seccion) return; // resumen (Centro de Control) siempre visible
+    const permitido = tienePermiso(seccion, "ver");
+    btn.classList.toggle("hidden", !permitido);
+    btn.style.display = permitido ? "" : "none";
+  });
+
+  // Botones de creación: ocultar según "crear".
+  togglePorPermiso("form-producto", "productos", "crear");
+  togglePorPermiso("form-compra", "compras", "crear");
+  togglePorPermiso("form-venta-linea", "ventas", "crear");
+  togglePorPermiso("form-almacen", "almacenes", "crear");
+  togglePorPermiso("form-transferencia", "transferencias", "crear");
+  togglePorPermiso("form-vale", "vales", "crear");
+  togglePorPermiso("form-categoria", "config", "crear");
+  togglePorPermiso("form-unidad", "config", "crear");
+}
+
+function togglePorPermiso(elId, seccion, accion) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.toggle("hidden", !tienePermiso(seccion, accion));
+}
+
+// Muestra nombre/rol del usuario en el header (reemplaza el email crudo).
+function mostrarInfoUsuarioEnHeader() {
+  const el = document.getElementById("user-email");
+  if (!el) return;
+  if (!_usuarioActual) { el.textContent = ""; return; }
+  const nombre = _usuarioActual.nombre || "";
+  const rol = _usuarioActual.rol ? " · " + _usuarioActual.rol : "";
+  el.textContent = nombre + rol;
+}
+
+// ---- B3.3: validación de usuario activo ----
+// Un usuario inactivo no debe operar. El backend lo impide (RLS/tiene_permiso
+// validan activo); el frontend lo refleja bloqueando la creación de operaciones.
+async function usuarioPuedeOperar() {
+  if (!_usuarioActual) return false;
+  if (!contextoB3Disponible()) return true; // degradación: no podemos saber
+  return _usuarioActual.activo !== false;
+}
+
+// B3.14: al crear una operación offline, conservar usuario_id (ya hace
+// crearOperacionPendiente con _usuarioActualId). Aseguramos que
+// _usuarioActualId esté sincronizado con el contexto.
+function sincronizarUsuarioIdParaOperaciones() {
+  if (_usuarioActual && _usuarioActual.id) {
+    _usuarioActualId = _usuarioActual.id;
+  }
+}
+
+// ============================================================
+// B3.10 — Administración de usuarios
+// ============================================================
+// Reutiliza los RPC listar_usuarios_admin, listar_roles_admin,
+// permisos_por_rol, asignar_rol_usuario, cambiar_estado_usuario.
+// Toda la autorización está en el backend (tiene_permiso('usuarios',*)).
+
+let _usuariosCache = [];
+let _rolesCache = [];
+
+async function refrescarUsuarios() {
+  if (!tienePermiso("usuarios", "ver")) {
+    setEmpty("lista-usuarios", "No tenés permiso para ver usuarios.");
+    return;
+  }
+  setLoading("lista-usuarios", "Cargando usuarios…");
+  try {
+    const { data, error } = await client.rpc("listar_usuarios_admin", {});
+    if (error) {
+      // Si el RPC no existe todavía (SQL no aplicado), mensaje claro.
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        setEmpty("lista-usuarios", "Falta aplicar supabase/b3-roles-permisos.sql en Supabase (función listar_usuarios_admin).");
+      } else {
+        setEmpty("lista-usuarios", "No se pudieron cargar los usuarios: " + escHtml(msg));
+      }
+      return;
+    }
+    _usuariosCache = data || [];
+    renderizarUsuarios(_usuariosCache);
+  } catch (e) {
+    setEmpty("lista-usuarios", "Error al cargar usuarios.");
+    console.warn("[Battlecruiser] listar_usuarios_admin:", e);
+  }
+}
+
+function renderizarUsuarios(usuarios) {
+  const lista = document.getElementById("lista-usuarios");
+  if (!lista) return;
+  if (!usuarios || usuarios.length === 0) {
+    setEmpty("lista-usuarios", "Todavía no hay usuarios registrados.");
+    return;
+  }
+  lista.innerHTML = "";
+  usuarios.forEach((u) => {
+    const div = document.createElement("div");
+    div.className = "lista-item usuario-item" + (u.activo === false ? " usuario-inactivo" : "");
+    const estado = u.activo === false ? "🔴 Inactivo" : "🟢 Activo";
+    let acciones = "";
+    if (tienePermiso("usuarios", "editar")) {
+      acciones = '<span class="usuario-acciones">'
+        + '<button type="button" class="cc-accion usr-rol-btn" data-id="' + escHtml(u.id) + '" data-nombre="' + escHtml(u.nombre || "") + '">Cambiar rol</button>'
+        + '<button type="button" class="cc-accion usr-estado-btn" data-id="' + escHtml(u.id) + '" data-activo="' + (u.activo !== false ? "true" : "false") + '">' + (u.activo !== false ? "Desactivar" : "Activar") + '</button>'
+        + "</span>";
+    }
+    div.innerHTML = '<span class="usuario-principal">'
+      + '<span class="usuario-nombre">' + escHtml(u.nombre || "—") + '</span>'
+      + '<span class="muted">Rol: ' + escHtml(u.rol || "—") + ' · ' + estado + '</span>'
+      + '</span>' + acciones;
+    lista.appendChild(div);
+  });
+}
+
+async function refrescarRoles() {
+  try {
+    const { data, error } = await client.rpc("listar_roles_admin", {});
+    if (error) { _rolesCache = []; return; }
+    _rolesCache = data || [];
+  } catch (e) { _rolesCache = []; }
+}
+
+// Cambiar rol de un usuario (reutiliza asignar_rol_usuario, protegido en backend).
+async function abrirCambiarRol(usuarioId, nombreActual) {
+  if (!tienePermiso("usuarios", "editar")) return;
+  if (_rolesCache.length === 0) await refrescarRoles();
+  if (_rolesCache.length === 0) {
+    setMsg("msg-usuarios", "No se pudieron cargar los roles. ¿Está aplicado supabase/b3-roles-permisos.sql?", false);
+    return;
+  }
+  const opciones = _rolesCache.map((r) => r.nombre).join(", ");
+  const elegido = window.prompt("Cambiar rol de " + nombreActual + ".\nRoles disponibles: " + opciones + "\n\nEscribí el nombre exacto del rol:");
+  if (!elegido) return;
+  const rol = _rolesCache.find((r) => r.nombre.toLowerCase() === elegido.trim().toLowerCase());
+  if (!rol) {
+    setMsg("msg-usuarios", "Ese rol no existe.", false);
+    return;
+  }
+  const { error } = await client.rpc("asignar_rol_usuario", { p_usuario_id: usuarioId, p_role_id: rol.id });
+  if (error) {
+    setMsg("msg-usuarios", "No se pudo cambiar el rol: " + escHtml(error.message || error.code || error), false);
+    return;
+  }
+  setMsg("msg-usuarios", "Rol actualizado.", true);
+  await refrescarUsuarios();
+}
+
+// Cambiar estado activo/inactivo (reutiliza cambiar_estado_usuario).
+async function cambiarEstadoUsuario(usuarioId, activoActual) {
+  if (!tienePermiso("usuarios", "editar")) return;
+  const nuevo = activoActual !== true;
+  const { error } = await client.rpc("cambiar_estado_usuario", { p_usuario_id: usuarioId, p_activo: nuevo });
+  if (error) {
+    // B3.12: el backend rechaza desactivar al único Dueño (P0001).
+    setMsg("msg-usuarios", "No se pudo cambiar el estado: " + escHtml(error.message || error.code || error), false);
+    return;
+  }
+  setMsg("msg-usuarios", nuevo ? "Usuario activado." : "Usuario desactivado.", true);
+  await refrescarUsuarios();
+}
+
+safeInit("admin-usuarios", () => {
+  const lista = document.getElementById("lista-usuarios");
+  if (!lista) return;
+  lista.addEventListener("click", async (e) => {
+    const rolBtn = e.target.closest(".usr-rol-btn");
+    if (rolBtn) {
+      e.stopPropagation();
+      await abrirCambiarRol(rolBtn.dataset.id, rolBtn.dataset.nombre);
+      return;
+    }
+    const estBtn = e.target.closest(".usr-estado-btn");
+    if (estBtn) {
+      e.stopPropagation();
+      await cambiarEstadoUsuario(estBtn.dataset.id, estBtn.dataset.activo === "true");
+      return;
+    }
+  });
+});
+
+// B3: exports al window para inspección/tests. NO duplican lógica: solo
+// exponen referencias a las variables/funciones ya definidas, para que el
+// contexto de usuario sea consultable de forma coherente desde cualquier
+// punto (incluida la consola del navegador para depuración).
+Object.assign(window, {
+  _usuarioActual: function () { return _usuarioActual; },
+  _permisosEfectivosRef: function () { return _permisosEfectivos; },
+  cargarContextoUsuario,
+  limpiarContextoUsuario,
+  tienePermiso,
+  contextoB3Disponible,
+  usuarioPuedeOperar,
+  refrescarUsuarios,
+  abrirCambiarRol,
+  cambiarEstadoUsuario,
+});
+
+
 // Cargar todo cuando se confirma sesión real (se engancha a showApp existente)
 const _showAppOriginal = showApp;
 showApp = function (session) {
@@ -3873,5 +4265,9 @@ async function refrescarTrasReconexion() {
   // finally, pero alReconectar llama a esta funcion despues; refresco
   // explicito por si la sincronizacion dejo estado intermedio).
   await refrescarPanelPendientes();
+  // B3.13: tras reconectar, revalidar el contexto de usuario (rol/estado
+  // activo pueden haber cambiado en el backend mientras estuvimos sin
+  // conexión). Reutiliza cargarContextoUsuario (una sola fuente).
+  if (typeof cargarContextoUsuario === "function") await cargarContextoUsuario();
   actualizarIndicadorConexion();
 }

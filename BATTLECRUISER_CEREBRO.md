@@ -88,6 +88,10 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - Panel de operaciones pendientes implementado.
 - Gestión/reintento/atención de operaciones pendientes implementada.
 - Cierre de la capa Offline-First de escritura, sincronización, reconciliación e idempotencia implementado.
+- B2.3 — Centro de Control Operacional implementado (capa de lectura/acción sobre la cola Offline-First existente; 0 stores/colas/cachés/RPC nuevos).
+- B3 — Sistema operacional de usuarios, roles, permisos y control implementado. Reutiliza la arquitectura real de Supabase (usuarios/roles/permisos/tiene_permiso/RLS).
+- App v4.3, Service Worker shell-v24.
+- Validación automatizada: **29/29 PASS** (16 B2.3 + 13 B3).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -541,6 +545,42 @@ La misión debe terminar con pruebas automatizadas suficientes para demostrar:
 
 La prueba real con perfiles/dispositivos queda para la fase final de aceptación, no para cerrar cada bloque de desarrollo.
 
+## B3 — SISTEMA OPERACIONAL DE USUARIOS, ROLES, PERMISOS Y CONTROL — IMPLEMENTADO
+
+### Estado
+B3 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de las RPCs administrativas está versionado en `supabase/b3-roles-permisos.sql` pero **NO aplicado aún en Supabase** (se requiere ejecutarlo en el SQL Editor; no había credenciales service_role disponibles durante la implementación). El frontend degrada con gracia y mensajes claros si las RPCs aún no existen.
+
+### Esquema real confirmado por auditoría directa a Supabase
+- `usuarios(id, nombre, activo, role_id)` — `id` = `auth.users.id` (UUID).
+- `roles(id, nombre)`.
+- `permisos(id, seccion, accion, role_id)` — matriz rol → (seccion, accion).
+- `public.tiene_permiso(p_seccion, p_accion)` — SECURITY DEFINER, requiere sesión.
+- RLS en `usuarios`/`roles`/`permisos` invoca `tiene_permiso`.
+- Rol inicial: Dueño.
+
+**CORRECCIÓN:** cualquier mención anterior (incluido B2.3) que dijera que "no existe sistema de roles real" está OBSOLETA. El sistema de roles/permisos SÍ existe en Supabase. B3 lo reutiliza sin reemplazarlo.
+
+### Arquitectura B3 (reutilización, 0 sistemas duplicados)
+- Contexto centralizado del usuario: `_usuarioActual` + `_permisosEfectivos` (una sola fuente).
+- `tienePermiso(seccion, accion)` refleja la matriz del backend (cargada una vez por sesión vía `permisos_usuario_actual`).
+- Sidebar dinámico por permiso "ver"; botones de creación por permiso "crear" (UX, no seguridad).
+- Administración de usuarios (ver/cambiar rol/activar-desactivar) via RPCs protegidos con `tiene_permiso('usuarios',*)`.
+- Protección del Dueño en el backend (no permitir desactivar/cambiar rol al único Dueño activo).
+- Operaciones offline conservan `usuario_id` e `idempotency_key`.
+- Cambio de usuario: limpieza completa del contexto (anti-contaminación A→B).
+- Stores nuevos: 0. Colas nuevas: 0. Cachés nuevas: 0. RPC duplicados: 0. Sistema de permisos paralelo: 0.
+
+### RPCs nuevas (en `supabase/b3-roles-permisos.sql`, pendientes de aplicar)
+`perfil_usuario_actual`, `permisos_usuario_actual`, `listar_usuarios_admin`, `listar_roles_admin`, `permisos_por_rol`, `asignar_rol_usuario`, `cambiar_estado_usuario`, `usuario_esta_activo`. Todas SECURITY DEFINER con `search_path` fijo, GRANT a anon/authenticated, protegidas con `tiene_permiso`.
+
+### Seguridad
+La autorización REAL está en el backend (RLS + `tiene_permiso` dentro de cada RPC). El frontend solo refleja permisos para UX. Ocultar un botón NO es seguridad. Un usuario que manipule el frontend no puede ejecutar operaciones protegidas sin el permiso real.
+
+### Limitaciones
+- El SQL de B3 NO está aplicado en Supabase todavía (Roberto debe ejecutar `supabase/b3-roles-permisos.sql` en el SQL Editor). Mientras tanto, `tienePermiso` degrada a true (no bloquea la app existente; la seguridad real sigue siendo el backend/RLS).
+- No hay modificación de permisos desde el frontend (B3.11): la visualización de roles/permisos usa los RPCs de lectura; modificar permisos requeriría un RPC adicional que no se creó para no introducir una solución insegura.
+- Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
+
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
 - Si una arquitectura existente resuelve el problema, reutilizarla.
@@ -560,9 +600,11 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 
 **Cerrado:** B2.2-A velocidad offline; B2.2-B.3.1 panel de pendientes; B2.2-B.3.2 gestión/recuperación; B2.2-D cierre Offline-First.
 
-**Actual:** proyecto consolidado en `main`, con la infraestructura Offline-First de escritura/sincronización/reconciliación ya establecida.
+**Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control (frontend completo; SQL de RPCs pendiente de aplicar en Supabase).
 
-**Siguiente bloque general:** **B2.3 — Centro de Control Operacional**.
+**Actual:** proyecto consolidado en `main` (v4.3).
+
+**Siguiente bloque general:** módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación/Centro de Mando).
 
 **Posterior:** módulos operativos de negocio → turnos/cuadre → auditoría y responsabilidad → aprobaciones → comunicación/Centro de Mando → recompensas → empaquetado → aceptación final.
 

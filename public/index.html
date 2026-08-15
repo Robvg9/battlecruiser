@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v4.2 · La Cueva</p>
+      <p class="footnote">v4.3 · La Cueva</p>
     </form>
   </div>
 
@@ -84,6 +84,7 @@
         <button class="tab-btn" data-tab="transferencias">Transferencias</button>
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
         <button class="tab-btn" data-tab="pendientes">Pendientes <span id="pendientes-tab-badge" class="pendientes-tab-badge hidden"></span></button>
+        <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
       </nav>
     </aside>
@@ -360,6 +361,15 @@
       <p class="msg" id="msg-pendientes"></p>
     </section>
 
+    <section id="tab-usuarios" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Usuarios</h3>
+        <span id="usuario-actual-info" class="muted"></span>
+      </div>
+      <p class="msg" id="msg-usuarios"></p>
+      <div id="lista-usuarios" class="lista"></div>
+    </section>
+
     <section id="tab-config" class="tab-panel">
       <h3>Categorías</h3>
       <form id="form-categoria" class="inline-form">
@@ -381,7 +391,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v4.2 · La Cueva</span>
+      <span class="app-footer-version">v4.3 · La Cueva</span>
     </footer>
   </div>
 
