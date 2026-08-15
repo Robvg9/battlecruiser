@@ -1209,8 +1209,9 @@ async function reintentarOperacionPendiente(id, btn) {
     cerrarDetalleOperacion();
     await refrescarPanelPendientes();
     // Delegar al flujo de sincronizacion existente (respeta _sincronizando).
+    // El finally de sincronizarCola ya refresca el panel; no hace falta
+    // una llamada explicita extra aca (seria duplicada).
     await sincronizarCola();
-    await refrescarPanelPendientes();
     setMsg("msg-pendientes", "Operaci\u00f3n reintentada.", true);
   } catch (e) {
     setMsg("msg-pendientes", "No se pudo completar el reintento.", false);
@@ -1249,7 +1250,9 @@ async function eliminarOperacionPendienteConfirmada(id, btn) {
   }
   cerrarDetalleOperacion();
   await actualizarContadorColaPendiente();
-  await refrescarPanelPendientes();
+  // refrescarPanelPendientes() no se llama explicito aca:
+  // actualizarContadorColaPendiente ya refresca el panel si esta
+  // visible; si no lo esta, el hook del tab lo refresca al abrirse.
   setMsg("msg-pendientes", "Operaci\u00f3n eliminada.", true);
 }
 
@@ -1721,12 +1724,6 @@ async function sincronizarCola() {
   } finally {
     _sincronizando = false;
     await actualizarContadorColaPendiente();
-    // Mision B2.2-B.3.1: el panel refleja cambios de estado (ej.
-    // PENDIENTE -> REQUIERE_ATENCION) aunque el total del contador no
-    // cambie. actualizarContadorColaPendiente ya refresca el panel si
-    // esta visible; esta llamada explicita lo garantiza siempre tras
-    // una sincronizacion, con la misma lectura getAll del panel.
-    await refrescarPanelPendientes();
     // B2.2-D (revision de coste): consolidar los refrescos marcados
     // durante el bucle en una sola pasada al final, en vez del
     // refresco global por operacion + el global del finally. La
@@ -3388,7 +3385,10 @@ showApp = function (session) {
       await recuperarOperacionesAtrapadas();
       await actualizarContadorColaPendiente();
       await refrescarOperacionesPendientesCache();
-      await refrescarPanelPendientes();
+      // refrescarPanelPendientes() no se llama aca: va despues de
+      // actualizarContadorColaPendiente (que ya refresca el panel si
+      // esta visible) y antes de sincronizarCola (cuyo finally tambien
+      // refresca). El hook del tab lo refresca al abrir Pendientes.
       if (navigator.onLine) await sincronizarCola();
     })();
   });
