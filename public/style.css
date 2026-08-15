@@ -596,3 +596,100 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   font-weight: 600; line-height: 1;
 }
 .pendientes-tab-badge.atencion { background: var(--wine); color: var(--text); }
+
+/* ============================================================
+   B2.2-B.3.2 - Gestion y recuperacion: detalle + acciones
+   Mismo lenguaje visual del panel (paleta oro/burdeos), reutilizando
+   .lista-item / .muted / .hidden ya existentes.
+   ============================================================ */
+
+/* Item del panel: cursor pointer para indicar que abre el detalle, y
+   separacion de las acciones rapidas dentro del lateral. */
+.pendiente-item { cursor: pointer; }
+.pendiente-acciones {
+  display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px;
+}
+.pendiente-accion-rapida {
+  background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px;
+  padding: 5px 10px; font-size: 11px; cursor: pointer; margin-top: 0;
+  white-space: nowrap;
+}
+.pendiente-accion-rapida:hover { border-color: var(--gold); color: var(--gold); }
+.pendiente-accion-rapida:disabled { opacity: 0.6; cursor: default; }
+.pendiente-reintentar-btn { border-color: var(--gold-dim); }
+.pendiente-eliminar-btn { border-color: var(--wine); color: var(--wine); }
+.pendiente-eliminar-btn:hover { background: rgba(122,35,49,0.15); border-color: var(--wine); color: var(--wine); }
+
+/* Estado de color por borde (solo el borde lateral izquierdo para diferenciar
+   sin romper el estilo de .lista-item). */
+.pendiente-item.estado-pendiente { border-left: 3px solid var(--gold-dim); }
+.pendiente-item.estado-sincronizando { border-left: 3px solid var(--gold); }
+.pendiente-item.estado-requiere_atencion { border-left: 3px solid var(--wine); }
+/* Sigue el borde wine de B3.1 para requiere_atencion; se mantiene. */
+
+/* ---- Detalle de operacion (#pendiente-detalle) ---- */
+.pendiente-detalle {
+  margin-top: 12px; background: var(--stone);
+  border: 1px solid var(--gold-dim); border-radius: 8px; padding: 16px;
+}
+.pendiente-detalle.hidden { display: none; }
+.detalle-cabecera {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid #c9a24d26;
+}
+.detalle-tipo {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600;
+  font-size: 16px; color: var(--gold); letter-spacing: 0.02em; flex: 1;
+}
+.detalle-estado {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.04em; padding: 3px 8px; border-radius: 4px;
+  background: var(--stone-2);
+}
+.detalle-estado.estado-requiere_atencion { color: var(--wine); border: 1px solid var(--wine); }
+.detalle-estado.estado-pendiente,
+.detalle-estado.estado-sincronizando { color: var(--gold); border: 1px solid var(--gold-dim); }
+.detalle-cerrar-btn {
+  background: transparent; border: none; color: var(--mist);
+  font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; margin-top: 0;
+}
+.detalle-cerrar-btn:hover { color: var(--gold); }
+.detalle-cuerpo { display: flex; flex-direction: column; gap: 4px; }
+.detalle-fila {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12.5px; padding: 3px 0;
+}
+.detalle-etiqueta {
+  color: var(--mist); font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  flex-shrink: 0; min-width: 130px;
+}
+.detalle-valor {
+  color: var(--text); font-size: 12.5px; text-align: right;
+  word-break: break-word;
+}
+.detalle-motivo {
+  margin-top: 12px; padding: 10px 12px; background: var(--void);
+  border: 1px solid var(--wine); border-radius: 5px;
+}
+.detalle-motivo .detalle-etiqueta { color: var(--wine); }
+.detalle-error-texto { color: var(--wine) !important; }
+.detalle-acciones {
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+}
+.pendiente-accion-btn {
+  padding: 8px 14px; background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px;
+  font-family: 'Inter', sans-serif; font-size: 12.5px; cursor: pointer;
+  letter-spacing: 0.02em; margin-top: 0;
+}
+.pendiente-accion-btn:hover { border-color: var(--gold); color: var(--gold); }
+.pendiente-accion-btn:disabled { opacity: 0.6; cursor: default; }
+/* Boton Eliminar del detalle con tono burdeos para distinguir accion destructiva. */
+.pendiente-detalle .pendiente-eliminar-btn {
+  border-color: var(--wine); color: var(--wine);
+}
+.pendiente-detalle .pendiente-eliminar-btn:hover {
+  background: rgba(122,35,49,0.15); color: var(--wine);
+}
