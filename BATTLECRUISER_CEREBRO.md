@@ -90,8 +90,9 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - Cierre de la capa Offline-First de escritura, sincronización, reconciliación e idempotencia implementado.
 - B2.3 — Centro de Control Operacional implementado (capa de lectura/acción sobre la cola Offline-First existente; 0 stores/colas/cachés/RPC nuevos).
 - B3 — Sistema operacional de usuarios, roles, permisos y control implementado. Reutiliza la arquitectura real de Supabase (usuarios/roles/permisos/tiene_permiso/RLS).
-- App v4.3, Service Worker shell-v24.
-- Validación automatizada: **29/29 PASS** (16 B2.3 + 13 B3).
+- B4 — Centro de Mando + auditoría + trazabilidad operativa implementado. Reutiliza operaciones_pendientes/_cache/_usuarioActual/tiene_permiso. SQL de auditoría versionado (pendiente de aplicar).
+- App v4.4, Service Worker shell-v25.
+- Validación automatizada: **42/42 PASS** (16 B2.3 + 14 B3 + 12 B4).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -581,6 +582,37 @@ La autorización REAL está en el backend (RLS + `tiene_permiso` dentro de cada 
 - No hay modificación de permisos desde el frontend (B3.11): la visualización de roles/permisos usa los RPCs de lectura; modificar permisos requeriría un RPC adicional que no se creó para no introducir una solución insegura.
 - Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
 
+## B4 — CENTRO DE MANDO + AUDITORÍA + TRAZABILIDAD OPERATIVA — IMPLEMENTADO
+
+### Estado
+B4 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de auditoría está versionado en `supabase/b4-auditoria-trazabilidad.sql` pero **NO aplicado en Supabase** (pendiente de que Roberto lo ejecute en el SQL Editor). El frontend degrada con mensajes claros si las RPCs aún no existen.
+
+### Auditoría real confirmada
+- Las tablas ventas/transferencias/vales_salida **NO tienen** columna usuario_id ni idempotency_key (verificado por introspección directa).
+- No existía tabla de auditoría/historial.
+- Única trazabilidad existente: operaciones_pendientes (IndexedDB, se elimina al sync) y private.operaciones_idempotencia.
+
+### Solución implementada
+- Nueva tabla `auditoria_operaciones` + RPC `registrar_auditoria` y `listar_auditoria_admin` (SQL versionado, SECURITY DEFINER, protegidos con tiene_permiso).
+- Registro de auditoría desde: ejecutarOperacion (exito/rechazo), sincronizarCola (sync exitosa / requiere_atencion), acciones administrativas B3 (cambiar rol/estado).
+- Pestaña "Centro de Mando" (permiso auditoria.ver) con: estado general, alertas reales, actividad reciente, auditoría con filtros y paginación.
+
+### Arquitectura (reutilización, 0 duplicados)
+- Estado/alertas derivan de obtenerOperacionesVisiblesPanel + _cache + _sincronizando (B2/B3).
+- Actividad reciente reutiliza construirActividadReciente (B2.3).
+- Permisos reutilizan _usuarioActual/_permisosEfectivos/tienePermiso (B3).
+- Stores nuevos: 0. Colas nuevas: 0. Cachés nuevas: 0. Sincronizadores nuevos: 0.
+
+### Seguridad
+- La auditoría se escribe vía RPC (SECURITY DEFINER) tomando usuario_id de auth.uid(), no del cliente (no se falsifica el autor).
+- listar_auditoria_admin protegida con tiene_permiso('auditoria','ver'). La tabla tiene RLS + REVOKE a anon (no SELECT directo).
+- No se almacenan secretos. payload_resumen solo lleva lo necesario.
+
+### Limitaciones
+- El SQL de B4 NO está aplicado en Supabase todavía. Roberto debe ejecutar `supabase/b4-auditoria-trazabilidad.sql`.
+- Mientras tanto, la auditoría no se registra ni muestra (el frontend avisa que falta el SQL). El resto del Centro de Mando (estado, alertas, actividad) sí funciona sin el SQL.
+- Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
+
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
 - Si una arquitectura existente resuelve el problema, reutilizarla.
@@ -600,11 +632,11 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 
 **Cerrado:** B2.2-A velocidad offline; B2.2-B.3.1 panel de pendientes; B2.2-B.3.2 gestión/recuperación; B2.2-D cierre Offline-First.
 
-**Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control (frontend completo; SQL de RPCs pendiente de aplicar en Supabase).
+**Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control; B4 — Centro de Mando + auditoría + trazabilidad (frontend completo; SQL de auditoría pendiente de aplicar en Supabase).
 
-**Actual:** proyecto consolidado en `main` (v4.3).
+**Actual:** proyecto consolidado en `main` (v4.4).
 
-**Siguiente bloque general:** módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación/Centro de Mando).
+**Siguiente bloque general:** módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación).
 
 **Posterior:** módulos operativos de negocio → turnos/cuadre → auditoría y responsabilidad → aprobaciones → comunicación/Centro de Mando → recompensas → empaquetado → aceptación final.
 

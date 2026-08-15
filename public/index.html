@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v4.3 · La Cueva</p>
+      <p class="footnote">v4.4 · La Cueva</p>
     </form>
   </div>
 
@@ -84,6 +84,7 @@
         <button class="tab-btn" data-tab="transferencias">Transferencias</button>
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
         <button class="tab-btn" data-tab="pendientes">Pendientes <span id="pendientes-tab-badge" class="pendientes-tab-badge hidden"></span></button>
+        <button class="tab-btn" data-tab="mando">Centro de Mando</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
       </nav>
@@ -361,6 +362,40 @@
       <p class="msg" id="msg-pendientes"></p>
     </section>
 
+    <section id="tab-mando" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Centro de Mando</h3>
+        <span id="mando-conn-info" class="muted"></span>
+      </div>
+
+      <!-- A) Estado general -->
+      <div class="cc-estado" id="mando-estado"></div>
+
+      <!-- B) Alertas -->
+      <div class="cc-bloque">
+        <h3>Alertas</h3>
+        <div id="mando-alertas" class="lista"></div>
+      </div>
+
+      <!-- C) Actividad reciente -->
+      <div class="cc-bloque">
+        <h3>Actividad reciente</h3>
+        <div id="mando-actividad" class="lista"></div>
+      </div>
+
+      <!-- D) Auditoría administrativa -->
+      <div class="cc-bloque">
+        <h3>Auditoría</h3>
+        <div class="mando-filtros" id="mando-filtros">
+          <select id="filtro-aud-tipo"><option value="">Todos los tipos</option></select>
+          <select id="filtro-aud-estado"><option value="">Todos los estados</option></select>
+          <button type="button" id="aud-limpiar-btn" class="cc-accion">Limpiar filtros</button>
+        </div>
+        <div id="mando-auditoria" class="lista"></div>
+        <div class="mando-paginacion" id="mando-paginacion"></div>
+      </div>
+    </section>
+
     <section id="tab-usuarios" class="tab-panel">
       <div class="pendientes-header">
         <h3>Usuarios</h3>
@@ -391,7 +426,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v4.3 · La Cueva</span>
+      <span class="app-footer-version">v4.4 · La Cueva</span>
     </footer>
   </div>
 

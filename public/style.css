@@ -833,3 +833,24 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .usuario-acciones { display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px; }
 .usuario-item .muted { font-size: 11px; }
 #usuario-actual-info { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+/* ============================================================
+   B4 — Centro de Mando + Auditoría
+   Mismo lenguaje visual. Reutiliza .cc-* existente de B2.3.
+   ============================================================ */
+.mando-filtros {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-bottom: 10px; padding: 10px 12px;
+  background: var(--void); border: 1px solid #c9a24d33; border-radius: 6px;
+}
+.mando-filtros select {
+  flex: 1 1 140px; padding: 7px 10px; background: var(--stone);
+  border: 1px solid var(--gold-dim); border-radius: 5px; color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 12.5px;
+}
+.mando-paginacion {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  margin-top: 10px; flex-wrap: wrap;
+}
+.mando-paginacion .muted { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+#mando-conn-info { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }

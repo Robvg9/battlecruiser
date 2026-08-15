@@ -21,7 +21,10 @@
 // v24 — Mision B3: bump por el sistema operacional de usuarios, roles,
 // permisos y control (contexto de usuario, sidebar dinamico por permisos,
 // administracion de usuarios). El SW en si no cambio de comportamiento.
-const CACHE_NAME = "battlecruiser-shell-v24";
+// v25 — Mision B4: bump por el Centro de Mando + auditoria + trazabilidad
+// (nueva pestana Centro de Mando, registro de auditoria, filtros). El SW
+// en si no cambio de comportamiento.
+const CACHE_NAME = "battlecruiser-shell-v25";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
