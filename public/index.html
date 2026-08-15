@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v4.5 · La Cueva</p>
+      <p class="footnote">v6.0 · La Cueva</p>
     </form>
   </div>
 
@@ -85,6 +85,8 @@
         <button class="tab-btn" data-tab="vales">Vales de salida</button>
         <button class="tab-btn" data-tab="pendientes">Pendientes <span id="pendientes-tab-badge" class="pendientes-tab-badge hidden"></span></button>
         <button class="tab-btn" data-tab="reportes">Reportes</button>
+        <button class="tab-btn" data-tab="inventario">Inventario</button>
+        <button class="tab-btn" data-tab="movimientos">Movimientos</button>
         <button class="tab-btn" data-tab="mando">Centro de Mando</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
@@ -363,6 +365,53 @@
       <p class="msg" id="msg-pendientes"></p>
     </section>
 
+    <section id="tab-inventario" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Inventario</h3>
+        <span id="inv-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Existencia, mínimo, estado, costo promedio y valoración de inventario.</p>
+      <div class="mando-filtros">
+        <select id="inv-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="inv-refrescar-btn" class="cc-accion">Refrescar</button>
+      </div>
+      <div class="cc-bloque">
+        <h3>Valoración de inventario</h3>
+        <div id="inv-resumen" class="rep-grid"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Detalle por producto</h3>
+        <div id="inv-detalle" class="lista"></div>
+      </div>
+      <p class="msg" id="msg-inventario"></p>
+    </section>
+
+    <section id="tab-movimientos" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Movimientos de inventario</h3>
+        <span id="mov-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Trazabilidad: ¿qué entró, qué salió, quién, cuándo, a qué costo?</p>
+      <div class="mando-filtros">
+        <label>Desde<input type="date" id="mov-filtro-desde"></label>
+        <label>Hasta<input type="date" id="mov-filtro-hasta"></label>
+        <select id="mov-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <select id="mov-filtro-tipo">
+          <option value="">Todos los tipos</option>
+          <option value="COMPRA">Compra</option>
+          <option value="VENTA">Venta</option>
+          <option value="TRANSFERENCIA_SALIDA">Transf. salida</option>
+          <option value="TRANSFERENCIA_ENTRADA">Transf. entrada</option>
+          <option value="VALE_SALIDA">Vale</option>
+          <option value="AJUSTE">Ajuste</option>
+        </select>
+        <button type="button" id="mov-refrescar-btn" class="cc-accion">Aplicar</button>
+      </div>
+      <div id="mov-detalle" class="lista"></div>
+      <div class="mando-paginacion" id="mov-paginacion"></div>
+      <p class="msg" id="msg-movimientos"></p>
+    </section>
+
     <section id="tab-reportes" class="tab-panel">
       <div class="pendientes-header">
         <h3>Reportes</h3>
@@ -390,6 +439,8 @@
         <h3>Reportes detallados</h3>
         <div class="rep-tabs">
           <button type="button" class="rep-tab-btn active" data-rep="ventas">Ventas</button>
+          <button type="button" class="rep-tab-btn" data-rep="compras">Compras</button>
+          <button type="button" class="rep-tab-btn" data-rep="rentabilidad">Rentabilidad</button>
           <button type="button" class="rep-tab-btn" data-rep="transferencias">Transferencias</button>
           <button type="button" class="rep-tab-btn" data-rep="vales">Vales</button>
           <button type="button" class="rep-tab-btn" data-rep="stock">Stock</button>
@@ -466,7 +517,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v4.5 · La Cueva</span>
+      <span class="app-footer-version">v6.0 · La Cueva</span>
     </footer>
   </div>
 

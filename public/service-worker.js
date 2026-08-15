@@ -26,7 +26,11 @@
 // en si no cambio de comportamiento.
 // v26 — Mision B5: bump por Reportes y Analisis Operativo
 // (nueva pestana Reportes con resumen, sub-reportes y filtros).
-const CACHE_NAME = "battlecruiser-shell-v26";
+// v27 — Mision B6: bump por Nucleo Operativo + Inventario Inteligente
+// (lotes/FIFO/costos/movimientos/compras/rentabilidad, nuevas pestanas
+// Inventario y Movimientos, sub-reportes de compras/rentabilidad, columnas
+// de costo en ventas_lineas, indicadores de inventario en Centro de Mando).
+const CACHE_NAME = "battlecruiser-shell-v27";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

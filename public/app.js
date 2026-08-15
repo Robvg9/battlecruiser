@@ -2422,6 +2422,12 @@ safeInit("tabs", () => {
     } else if (btn.dataset.tab === "reportes") {
       // B5: al entrar a Reportes, cargar resumen y detalle.
       if (typeof refrescarReportes === "function") refrescarReportes();
+    } else if (btn.dataset.tab === "inventario") {
+      // B6: al entrar a Inventario, cargar el inventario enriquecido.
+      if (typeof refrescarInventario === "function") refrescarInventario();
+    } else if (btn.dataset.tab === "movimientos") {
+      // B6: al entrar a Movimientos, cargar la trazabilidad.
+      if (typeof refrescarMovimientos === "function") refrescarMovimientos();
     } else if (btn.dataset.tab === "mando") {
       // B4: al entrar al Centro de Mando, refrescar estado/alertas/auditoría.
       if (typeof refrescarCentroMando === "function") refrescarCentroMando();
@@ -3993,6 +3999,8 @@ var TAB_A_SECCION = {
   usuarios: "usuarios",
   mando: "auditoria", // B4: Centro de Mando requiere permiso auditoria.ver
   reportes: "reportes", // B5: Reportes requiere permiso reportes.ver
+  inventario: "reportes", // B6: Inventario requiere permiso reportes.ver
+  movimientos: "reportes", // B6: Movimientos requiere permiso reportes.ver
 };
 
 function aplicarPermisosAInterfaz() {
@@ -4334,7 +4342,10 @@ function construirAlertasMando(ops) {
 function renderAlertasMando(ops) {
   const el = document.getElementById("mando-alertas");
   if (!el) return;
-  const alertas = construirAlertasMando(ops);
+  // B6: integrar alertas de inventario (agotados/bajo) además de las de operaciones.
+  const alertas = (typeof construirAlertasMandoCompleto === "function")
+    ? construirAlertasMandoCompleto(ops)
+    : construirAlertasMando(ops);
   if (alertas.length === 0) {
     el.innerHTML = '<p class="lista-estado">Sin alertas. Todo en orden.</p>';
     return;
@@ -4696,6 +4707,18 @@ async function refrescarSubReporte() {
         p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
       }));
       if (!error) renderMovimiento(data);
+    } else if (_repSubreporte === "compras") {
+      ({ data, error } = await client.rpc("historial_compras", {
+        p_desde: f.desde, p_hasta: f.hasta, p_almacen_id: f.almacen,
+        p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
+      }));
+      if (!error) renderCompras(data);
+    } else if (_repSubreporte === "rentabilidad") {
+      ({ data, error } = await client.rpc("rentabilidad_ventas", {
+        p_desde: f.desde, p_hasta: f.hasta, p_almacen_id: f.almacen,
+        p_limite: _REP_POR_PAG, p_offset: _repPagina * _REP_POR_PAG,
+      }));
+      if (!error) renderRentabilidad(data);
     }
     if (error) {
       const msg = String(error.message || error.code || error);
@@ -4790,6 +4813,46 @@ function renderMovimiento(filas) {
     div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(m.tipo || "—") + '</span><span class="muted">' + escHtml(m.producto || "—") + ' · ' + escHtml(m.almacen || "—") + ' · ' + (m.cantidad || 0) + ' u · ' + fecha + '</span></span>';
     el.appendChild(div);
   });
+}
+
+function renderCompras(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin compras en el período.</p>'; return; }
+  el.innerHTML = "";
+  filas.forEach((c) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila";
+    const fecha = c.fecha ? new Date(c.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(c.almacen || "—") + '</span><span class="muted">' + fecha + ' · ' + escHtml(c.proveedor || "Sin proveedor") + ' · ' + escHtml(c.usuario || "—") + ' · Total $' + money(c.total || 0) + '</span></span>';
+    el.appendChild(div);
+  });
+}
+
+function renderRentabilidad(filas) {
+  const el = document.getElementById("rep-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin datos de rentabilidad.</p>'; return; }
+  let totalIng = 0, totalCmv = 0;
+  el.innerHTML = "";
+  filas.forEach((r) => {
+    totalIng += Number(r.ingresos || 0);
+    totalCmv += Number(r.cmv || 0);
+    const div = document.createElement("div");
+    div.className = "rep-fila";
+    const fecha = r.fecha ? new Date(r.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    const gan = Number(r.ganancia_bruta || 0);
+    const margen = Number(r.margen_porcentaje || 0);
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(r.almacen || "—") + '</span><span class="muted">' + fecha + ' · Ing $' + money(r.ingresos || 0) + ' · CMV $' + money(r.cmv || 0) + ' · <b>Gan $' + money(gan) + '</b> (' + money(margen) + '%)</span></span>';
+    el.appendChild(div);
+  });
+  // Totales al pie.
+  const tot = document.createElement("div");
+  tot.className = "rep-fila rep-totales";
+  const totGan = totalIng - totalCmv;
+  const totMargen = totalIng > 0 ? (totGan / totalIng * 100) : 0;
+  tot.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">TOTALES</span><span class="muted">Ing $' + money(totalIng) + ' · CMV $' + money(totalCmv) + ' · <b>Gan $' + money(totGan) + '</b> (' + money(totMargen) + '%)</span></span>';
+  el.appendChild(tot);
 }
 
 function renderPaginacionReporte(cargadas) {
@@ -4964,3 +5027,260 @@ async function refrescarTrasReconexion() {
   if (typeof refrescarCentroMando === "function") refrescarCentroMando();
   actualizarIndicadorConexion();
 }
+
+
+// ============================================================
+// B6 — NÚCLEO OPERATIVO + INVENTARIO INTELIGENTE
+// ============================================================
+// Reutiliza TODO: _cache/_usuarioActual/_permisosEfectivos/tienePermiso
+// (B3), operaciones_pendientes + ejecutarOperacion + sincronizarCola
+// (B2), _sincronizando (mutex único), registrarAuditoria (B4).
+// NO crea otra cola, caché, sincronizador ni sistema de permisos.
+// Los RPC de B6 (registrar_compra/venta/transferencia/vale, inventario,
+// movimientos, rentabilidad, historial_compras) están en
+// supabase/b6-nucleo-operativo.sql. Si no están aplicados, el frontend
+// degrada con mensajes claros (no inventa datos).
+// ============================================================
+
+// ---- B6: pestaña Inventario (enriquecido) ----
+// Usa inventario_enriquecido (RPC B6) que devuelve existencia, mínimo,
+// estado, costo promedio ponderado y valoración. Si el RPC no existe,
+// avisa que falta aplicar el SQL. No inventa costos.
+async function refrescarInventario() {
+  const el = document.getElementById("inv-detalle");
+  const resumen = document.getElementById("inv-resumen");
+  const conn = document.getElementById("inv-conn-info");
+  if (!el || !appShell || !appShell.classList.contains("visible")) return;
+  if (!tienePermiso("reportes", "ver")) {
+    el.innerHTML = '<p class="lista-estado">No tenés permiso para ver inventario.</p>';
+    if (resumen) resumen.innerHTML = "";
+    return;
+  }
+  if (!navigator.onLine) {
+    if (conn) conn.textContent = "\u26aa Sin conexión — datos no disponibles";
+    el.innerHTML = '<p class="lista-estado">\u26aa Sin conexión — el inventario enriquecido requiere datos de Supabase.</p>';
+    if (resumen) resumen.innerHTML = '<p class="muted">Sin conexión.</p>';
+    return;
+  }
+  if (conn) conn.textContent = "\ud83d\udfe2 Datos de Supabase";
+  setLoading("inv-detalle", "Cargando inventario…");
+  if (resumen) resumen.innerHTML = "";
+  // Poblar el select de almacenes con _cache (sin consulta nueva).
+  const sel = document.getElementById("inv-filtro-almacen");
+  if (sel) {
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">Todos los almacenes</option>';
+    (_cache.almacenes || []).forEach((a) => {
+      const o = document.createElement("option");
+      o.value = a.id; o.textContent = a.nombre;
+      sel.appendChild(o);
+    });
+    if (actual) sel.value = actual;
+  }
+  const almacen = sel ? (sel.value || null) : null;
+  try {
+    const { data, error } = await client.rpc("inventario_enriquecido", { p_almacen_id: almacen });
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<p class="lista-estado">Falta aplicar supabase/b6-nucleo-operativo.sql en Supabase (función inventario_enriquecido).</p>';
+      } else {
+        el.innerHTML = '<p class="lista-estado">Error: ' + escHtml(msg) + "</p>";
+      }
+      return;
+    }
+    renderInventario(data || []);
+  } catch (e) {
+    el.innerHTML = '<p class="lista-estado">Error al cargar el inventario.</p>';
+    console.warn("[Battlecruiser] inventario_enriquecido:", e);
+  }
+}
+
+function renderInventario(filas) {
+  const el = document.getElementById("inv-detalle");
+  const resumen = document.getElementById("inv-resumen");
+  if (!el) return;
+  if (!filas || filas.length === 0) {
+    el.innerHTML = '<p class="lista-estado">Sin datos de inventario.</p>';
+    if (resumen) resumen.innerHTML = "";
+    return;
+  }
+  let totalValor = 0, totalUnidades = 0, agotados = 0, bajos = 0;
+  el.innerHTML = "";
+  filas.forEach((s) => {
+    const valor = Number(s.valor_inventario || 0);
+    totalValor += valor;
+    totalUnidades += Number(s.cantidad || 0);
+    if (s.estado === "agotado") agotados++;
+    else if (s.estado === "bajo") bajos++;
+    const div = document.createElement("div");
+    div.className = "rep-fila rep-estado-" + (s.estado || "normal");
+    const icono = s.estado === "agotado" ? "\ud83d\udd34" : s.estado === "bajo" ? "\ud83d\udfe1" : "\ud83d\udfe2";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom $' + money(s.costo_promedio || 0) + " \u00b7 valor $" + money(valor) + "</span></span>";
+    el.appendChild(div);
+  });
+  if (resumen) {
+    function card(t, v, sub) {
+      return '<div class="resumen-card"><div class="valor">' + escHtml(String(v)) + '</div><div class="etiqueta">' + escHtml(t) + "</div>" + (sub ? '<div class="muted">' + escHtml(sub) + "</div>" : "") + "</div>";
+    }
+    resumen.innerHTML =
+      card("Valor inventario", "$" + money(totalValor)) +
+      card("Unidades", totalUnidades) +
+      card("Agotados", agotados, "\ud83d\udd34") +
+      card("Stock bajo", bajos, "\ud83d\udfe1");
+  }
+}
+
+// ---- B6: pestaña Movimientos ----
+// Usa movimientos_producto (RPC B6). Fuente única de trazabilidad.
+let _movPagina = 0;
+const _MOV_POR_PAG = 50;
+
+async function refrescarMovimientos() {
+  const el = document.getElementById("mov-detalle");
+  const conn = document.getElementById("mov-conn-info");
+  if (!el || !appShell || !appShell.classList.contains("visible")) return;
+  if (!tienePermiso("reportes", "ver")) {
+    el.innerHTML = '<p class="lista-estado">No tenés permiso para ver movimientos.</p>';
+    return;
+  }
+  if (!navigator.onLine) {
+    if (conn) conn.textContent = "\u26aa Sin conexión — datos no disponibles";
+    el.innerHTML = '<p class="lista-estado">\u26aa Sin conexión — los movimientos requieren datos de Supabase.</p>';
+    return;
+  }
+  if (conn) conn.textContent = "\ud83d\udfe2 Datos de Supabase";
+  setLoading("mov-detalle", "Cargando movimientos…");
+  const sel = document.getElementById("mov-filtro-almacen");
+  if (sel) {
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">Todos los almacenes</option>';
+    (_cache.almacenes || []).forEach((a) => {
+      const o = document.createElement("option");
+      o.value = a.id; o.textContent = a.nombre;
+      sel.appendChild(o);
+    });
+    if (actual) sel.value = actual;
+  }
+  const desde = document.getElementById("mov-filtro-desde");
+  const hasta = document.getElementById("mov-filtro-hasta");
+  const tipo = document.getElementById("mov-filtro-tipo");
+  const f = {
+    desde: desde && desde.value ? desde.value : null,
+    hasta: hasta && hasta.value ? hasta.value : null,
+    almacen: sel ? (sel.value || null) : null,
+    tipo: tipo ? (tipo.value || null) : null,
+  };
+  try {
+    const { data, error } = await client.rpc("movimientos_producto", {
+      p_producto_id: null, p_almacen_id: f.almacen,
+      p_desde: f.desde, p_hasta: f.hasta, p_tipo: f.tipo,
+      p_limite: _MOV_POR_PAG, p_offset: _movPagina * _MOV_POR_PAG,
+    });
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<p class="lista-estado">Falta aplicar supabase/b6-nucleo-operativo.sql en Supabase (función movimientos_producto).</p>';
+      } else {
+        el.innerHTML = '<p class="lista-estado">Error: ' + escHtml(msg) + "</p>";
+      }
+      return;
+    }
+    renderMovimientos(data || []);
+  } catch (e) {
+    el.innerHTML = '<p class="lista-estado">Error al cargar movimientos.</p>';
+    console.warn("[Battlecruiser] movimientos_producto:", e);
+  }
+}
+
+function renderMovimientos(filas) {
+  const el = document.getElementById("mov-detalle");
+  if (!el) return;
+  if (!filas || filas.length === 0) {
+    el.innerHTML = '<p class="lista-estado">Sin movimientos en el per\u00edodo.</p>';
+    return;
+  }
+  el.innerHTML = "";
+  filas.forEach((m) => {
+    const div = document.createElement("div");
+    div.className = "rep-fila";
+    const fecha = m.fecha ? new Date(m.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "\u2014";
+    const entrada = Number(m.cantidad) > 0;
+    const icono = entrada ? "\u2b06\ufe0f" : "\u2b07\ufe0f";
+    const costo = m.costo_unitario != null ? " \u00b7 $" + money(m.costo_unitario) + " c/u" : "";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(m.tipo || "\u2014") + '</span><span class="muted">' + escHtml(m.producto || "\u2014") + " \u00b7 " + escHtml(m.almacen || "\u2014") + " \u00b7 " + (m.cantidad || 0) + " u" + costo + " \u00b7 " + escHtml(m.usuario || "\u2014") + " \u00b7 " + fecha + "</span></span>";
+    el.appendChild(div);
+  });
+  // Paginación simple.
+  const pag = document.getElementById("mov-paginacion");
+  if (pag) {
+    pag.innerHTML = "";
+    if (_movPagina > 0) {
+      const ant = document.createElement("button");
+      ant.type = "button"; ant.className = "cc-accion"; ant.textContent = "\u2190 Anterior";
+      ant.addEventListener("click", () => { _movPagina--; refrescarMovimientos(); });
+      pag.appendChild(ant);
+    }
+    const span = document.createElement("span");
+    span.className = "muted"; span.textContent = "P\u00e1gina " + (_movPagina + 1);
+    pag.appendChild(span);
+    if (filas.length >= _MOV_POR_PAG) {
+      const sig = document.createElement("button");
+      sig.type = "button"; sig.className = "cc-accion"; sig.textContent = "Siguiente \u2192";
+      sig.addEventListener("click", () => { _movPagina++; refrescarMovimientos(); });
+      pag.appendChild(sig);
+    }
+  }
+}
+
+// ---- B6: indicadores de inventario en el Centro de Mando ----
+// Añade productos agotados y stock bajo al panel de alertas del Centro de
+// Mando, reutilizando _cache.stock (sin consulta nueva). No inventa datos.
+function construirAlertasInventarioB6() {
+  const alertas = [];
+  (_cache.stock || []).forEach((s) => {
+    const cant = Number(s.cantidad);
+    if (s.minimo != null && cant <= Number(s.minimo) && cant > 0) {
+      const prod = (_cache.productos || []).find((p) => p.id === s.producto_id);
+      const alm = (_cache.almacenes || []).find((a) => a.id === s.almacen_id);
+      alertas.push({
+        nivel: "atencion",
+        tipo: "Stock bajo",
+        texto: escHtml((prod && prod.nombre) || "Producto") + " \u00b7 " + escHtml((alm && alm.nombre) || "\u2014") + " \u00b7 " + cant + " u (m\u00edn " + s.minimo + ")",
+        op: null,
+      });
+    } else if (cant <= 0) {
+      const prod = (_cache.productos || []).find((p) => p.id === s.producto_id);
+      const alm = (_cache.almacenes || []).find((a) => a.id === s.almacen_id);
+      alertas.push({
+        nivel: "critico",
+        tipo: "Producto agotado",
+        texto: escHtml((prod && prod.nombre) || "Producto") + " \u00b7 " + escHtml((alm && alm.nombre) || "\u2014"),
+        op: null,
+      });
+    }
+  });
+  return alertas;
+}
+
+// Hook: integrar las alertas de inventario B6 en el Centro de Mando.
+// Se llama desde refrescarCentroMando (B4). Las alertas de inventario
+// se mezclan con las de operaciones existentes, priorizadas igual.
+function construirAlertasMandoCompleto(ops) {
+  const ops_alertas = (typeof construirAlertasMando === "function") ? construirAlertasMando(ops) : [];
+  const inv_alertas = construirAlertasInventarioB6();
+  return ops_alertas.concat(inv_alertas).sort((a, b) => {
+    const orden = { critico: 0, atencion: 1, normal: 2 };
+    return (orden[a.nivel] != null ? orden[a.nivel] : 3) - (orden[b.nivel] != null ? orden[b.nivel] : 3);
+  });
+}
+
+// Inicialización de las pestañas Inventario y Movimientos.
+safeInit("b6-inventario", () => {
+  const refrescar = document.getElementById("inv-refrescar-btn");
+  if (refrescar) refrescar.addEventListener("click", () => refrescarInventario());
+});
+safeInit("b6-movimientos", () => {
+  const refrescar = document.getElementById("mov-refrescar-btn");
+  if (refrescar) refrescar.addEventListener("click", () => { _movPagina = 0; refrescarMovimientos(); });
+});

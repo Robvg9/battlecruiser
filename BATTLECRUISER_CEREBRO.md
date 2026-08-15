@@ -92,8 +92,9 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - B3 — Sistema operacional de usuarios, roles, permisos y control implementado. Reutiliza la arquitectura real de Supabase (usuarios/roles/permisos/tiene_permiso/RLS).
 - B4 — Centro de Mando + auditoría + trazabilidad operativa implementado. Reutiliza operaciones_pendientes/_cache/_usuarioActual/tiene_permiso. SQL de auditoría versionado (pendiente de aplicar).
 - B5 — Reportes y análisis operativo implementado. Reutiliza tablas existentes + tiene_permiso('reportes','ver'). SQL de reportes versionado (pendiente de aplicar).
-- App v4.5, Service Worker shell-v26.
-- Validación automatizada: **53/53 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5).
+- B6 — Núcleo operativo + inventario inteligente IMPLEMENTADO. Reutiliza lotes_compra (SÍ EXISTE, ver auditoría), tiene_permiso, operaciones_idempotencia, operaciones_pendientes, _cache. Crea compras + movimientos_stock (no existían). RPC registrar_compra/venta/transferencia/vale con FIFO, costo real, atomicidad. SQL versionado (pendiente de aplicar).
+- App v6.0, Service Worker shell-v27.
+- Validación automatizada: **80/80 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -619,10 +620,12 @@ B4 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de auditoría 
 ### Estado
 B5 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de reportes está versionado en `supabase/b5-reportes.sql` pero **NO aplicado en Supabase** (pendiente de que Roberto lo ejecute en el SQL Editor). El frontend degrada con mensajes claros si las RPCs aún no existen.
 
-### Auditoría real confirmada
-- `ventas`, `ventas_lineas`, `transferencias`, `transferencias_lineas`, `vales_salida`, `stock`, `productos`, `almacenes`, `categorias` existen.
-- **NO existe** tabla `compras`, `lotes`, ni `movimientos_stock`. Las compras se reflejan en stock pero no hay historial persistente. El reporte de movimiento de inventario reconstruye a partir de ventas/transferencias/vales; las compras NO se incluyen (falta tabla).
-- **NO existe costo histórico por lote** → el margen/rentabilidad NO se calcula. Se documenta y no se inventa.
+### Auditoría real confirmada (corregida en B6 con introspección en vivo)
+- `ventas`, `ventas_lineas`, `transferencias`, `transferencias_lineas`, `vales_salida`, `stock`, `productos`, `almacenes`, `categorias`, **`lotes_compra`** existen (todas con RLS; responden 401 sin sesión, no 404).
+- `lotes_compra` SÍ EXISTE con columnas: `id, producto_id, almacen_id, cantidad_restante, costo_unitario, fecha_compra, cantidad_inicial` (B6 agrega `operacion_id, idempotency_key, origen, activo`).
+- **NO existen** (404 real): `compras`, `compras_lineas`, `movimientos_stock`, `movimientos`, `auditoria_operaciones`. B6 crea `compras` y `movimientos_stock`.
+- Al momento de B5, los RPC de operaciones (`registrar_compra`, `registrar_venta`, `registrar_transferencia`, `registrar_vale_salida`, `crear_producto`) y los de reportes **NO existían** en Supabase. B6 los crea. El reporte de movimiento reconstruía desde ventas/transferencias/vales porque no había tabla histórica ni RPC.
+- **CORRECCIÓN**: la afirmación anterior de B5 de que "no existe lotes_compra" era INCORRECTA. La auditoría en vivo de B6 lo confirmó.
 
 ### Implementado
 - Pestaña "Reportes" (permiso `reportes.ver`) con: filtros globales (fecha/almacén), resumen ejecutivo, y sub-reportes (ventas, transferencias, vales, stock, movimiento de inventario) con paginación y exportación CSV.
@@ -646,6 +649,79 @@ B5 está IMPLEMENTADO en el frontend de extremo a extremo. El SQL de reportes es
 - Margen/rentabilidad: NO disponible (no existe costo FIFO histórico por lote).
 - Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
 
+## B6 — NÚCLEO OPERATIVO + INVENTARIO INTELIGENTE — IMPLEMENTADO
+
+### Estado
+B6 está IMPLEMENTADO en el frontend y el SQL está versionado en `supabase/b6-nucleo-operativo.sql`. **NO aplicado aún en Supabase** (pendiente de que Roberto lo ejecute en el SQL Editor). El frontend degrada con mensajes claros si los RPC aún no existen (no inventa datos).
+
+### Auditoría REAL en vivo contra Supabase (2026-08-15, vía API REST con anon key)
+Hallazgos que **corrigen** afirmaciones anteriores del Cerebro:
+
+**Tablas que EXISTEN** (401 RLS, no 404):
+- `lotes_compra(id, producto_id, almacen_id, cantidad_restante, costo_unitario, fecha_compra, cantidad_inicial)` — **SÍ EXISTE**. El Cerebro B5 decía que NO: estaba equivocado.
+- `stock(id, producto_id, almacen_id, cantidad, minimo, updated_at)`
+- `productos(id, nombre, categoria_id, unidad, precio_normal, precio_mayorista, presentacion_id, activo)`
+- `almacenes(id, nombre, tipo)`
+- `ventas(id, almacen_id, fecha, total)` — sin usuario_id/idempotency_key
+- `ventas_lineas(id, venta_id, producto_id, cantidad, precio_unitario)` — sin costo_unitario/costo_total
+- `transferencias(id, almacen_origen_id, almacen_destino_id, fecha, estado)` — sin usuario_id/idempotency_key
+- `transferencias_lineas(id, transferencia_id, producto_id, cantidad)`
+- `vales_salida(id, producto_id, almacen_id, fecha, tipo, cantidad)` — sin usuario_id/motivo
+- `usuarios`, `roles`, `permisos`, `categorias`, `presentaciones`, `producto_presentaciones`.
+
+**Tablas que NO existen** (404 real): `compras`, `compras_lineas`, `movimientos_stock`, `movimientos`, `auditoria_operaciones`.
+
+**RPC que EXISTEN**: `tiene_permiso`, `perfil_usuario_actual`, `permisos_usuario_actual`, `usuario_esta_activo`, `listar_usuarios_admin`, `listar_roles_admin`.
+
+**RPC que NO existían** (B6 los crea): `registrar_compra`, `registrar_venta`, `registrar_transferencia`, `registrar_vale_salida`, `crear_producto`, `inventario_enriquecido`, `movimientos_producto`, `rentabilidad_ventas`, `historial_compras`, más los helpers internos `_validar_usuario_operacion`, `_registrar_movimiento`, `_resolver_presentacion`, `_consumir_fifo`.
+
+**IMPORTANTE**: el SQL de B3, B4 y B5 **NO está aplicado** en Supabase (solo algunas RPC de B3 existen). Los RPC de operaciones (registrar_compra, etc.) tampoco existían hasta B6. Roberto debe aplicar los SQL de B3, B4, B5 y B6.
+
+### Qué se implementó
+1. **lotes_compra mejorada**: se agregaron columnas de trazabilidad (`operacion_id, idempotency_key, origen, activo`) + índice FIFO. NO se duplica la tabla.
+2. **Tabla `compras`** (nueva): encabezado histórico de entrada (almacén, proveedor, fecha, usuario, total, idempotency_key). Antes no existía.
+3. **Tabla `movimientos_stock`** (nueva): fuente Única de trazabilidad de inventario (tipo, producto, almacén, cantidad, costo_unitario, costo_total, operacion_id, lote_id, usuario, idempotency_key). Antes no existía.
+4. **RPC `registrar_compra`**: atómico (lote + stock + movimiento + encabezado), valida producto/almacén/costo, resuelve presentación en backend.
+5. **RPC `registrar_venta`**: FIFO real, costo de mercancía vendida (CMV), ganancia bruta y margen. Agrega columnas `costo_unitario`, `costo_total` a `ventas_lineas`.
+6. **RPC `registrar_transferencia`**: consume FIFO en origen, crea lotes en destino con el MISMO costo (no recalcula), atómica.
+7. **RPC `registrar_vale_salida`**: FIFO, valida tipo/cantidad, agrega columna `motivo` a `vales_salida`.
+8. **RPC `crear_producto`**: reutiliza idempotencia central.
+9. **Helper `_consumir_fifo`**: FOR UPDATE, lote más antiguo primero, nunca negativo, falla si stock insuficiente (revertible).
+10. **RPC de lectura**: `inventario_enriquecido` (costo promedio + valoración), `movimientos_producto` (trazabilidad), `rentabilidad_ventas` (ganancia/margen), `historial_compras`.
+11. **Frontend**: nuevas pestañas Inventario y Movimientos; sub-reportes de Compras y Rentabilidad en Reportes; alertas de inventario (agotados/bajo) integradas en el Centro de Mando (B4); permisos `reportes.ver` en las nuevas pestañas.
+
+### Arquitectura (reutilización, 0 duplicados)
+- `lotes_compra` = único sistema FIFO (reutilizado, no duplicado).
+- `operaciones_idempotencia` + `reclamar_idempotencia` = única idempotencia.
+- `tiene_permiso` + `usuario_esta_activo` = única autorización.
+- `operaciones_pendientes` + `ejecutarOperacion` + `sincronizarCola` + `_sincronizando` + `RPC_POR_TIPO` = única cola offline.
+- `registrarAuditoria` (B4) = única auditoría.
+- `_cache` = única caché.
+- `movimientos_stock` = única trazabilidad de inventario (antes no existía; no duplica nada).
+- Stores nuevos: 0. Colas nuevas: 0. Cachés nuevas: 0. Sincronizadores nuevos: 0. Sistema FIFO paralelo: 0.
+
+### Seguridad
+- Todos los RPC: SECURITY DEFINER, `search_path = public, pg_temp`, validan `auth.uid()`, `usuario_esta_activo()` y `tiene_permiso`.
+- FIFO con `FOR UPDATE` (bloqueo en concurrencia).
+- Atomicidad: toda la operación (lote + stock + movimiento + encabezado) en una transacción; si algo falla, `RAISE EXCEPTION` revierte todo.
+- El factor de presentación se resuelve en el backend (`_resolver_presentacion`), no del cliente.
+- RLS + REVOKE a anon en `compras` y `movimientos_stock` (solo RPC acceden).
+- No se usa `service_role` en el frontend.
+
+### Limitaciones reales
+- El SQL de B6 (y B3/B4/B5) **NO está aplicado** en Supabase. Roberto debe ejecutar `supabase/b6-nucleo-operativo.sql` (y los anteriores) en el SQL Editor. Mientras tanto, el frontend avisa que faltan los RPC (no inventa datos).
+- Las pruebas automatizadas de B6 validan la lógica de negocio (FIFO, costos, margen) con un mock que refleja la semóntica de los RPC. La validación SQL real contra Supabase requiere que el SQL esté aplicado (no disponible en el sandbox).
+- No se pudo aplicar el SQL en vivo (sin conector Supabase service_role ni acceso al SQL Editor desde el sandbox).
+- Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
+
+### Pruebas
+- `test/b6-nucleo-operativo.test.js`: 27 casos (compra, lote, FIFO, venta 1/varios lotes, transferencia FIFO, vale FIFO, costo histórico, ganancia, margen, stock insuficiente, permisos, usuario inactivo, idempotencia, doble sincronización, error de red, reintento, offline, reconciliación, auditoría, compatibilidad B3/B4/B5, 0 duplicados).
+- Suite global: **80/80 PASS** (B2.3 + B3 + B4 + B5 + B6).
+- `node --check public/app.js`: OK.
+
+### Versión
+- App v6.0. Service Worker shell-v27. Cache-busting vía bump del SW.
+
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
 - Si una arquitectura existente resuelve el problema, reutilizarla.
@@ -667,9 +743,9 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 
 **Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control; B4 — Centro de Mando + auditoría + trazabilidad; B5 — Reportes y análisis operativo (frontend completo; SQL de B3/B4/B5 pendiente de aplicar en Supabase).
 
-**Actual:** proyecto consolidado en `main` (v4.5).
+**Actual:** proyecto consolidado en `main` (v6.0). B6 — Núcleo operativo + inventario inteligente IMPLEMENTADO (frontend + SQL versionado, pendiente de aplicar en Supabase).
 
-**Siguiente bloque general:** módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación).
+**Siguiente bloque general:** aplicar los SQL de B3/B4/B5/B6 en Supabase y luego módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación).
 
 **Posterior:** módulos operativos de negocio → turnos/cuadre → auditoría y responsabilidad → aprobaciones → comunicación/Centro de Mando → recompensas → empaquetado → aceptación final.
 

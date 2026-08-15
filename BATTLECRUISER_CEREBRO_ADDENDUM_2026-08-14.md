@@ -3,12 +3,19 @@
 
 Este documento complementa `BATTLECRUISER_CEREBRO.md` con hallazgos recientes verificados sobre el estado técnico del repositorio. No sustituye al Cerebro maestro.
 
-## ESTADO REAL CONFIRMADO
+## ESTADO REAL CONFIRMADO (actualizado B6 — 2026-08-15)
 
 - Repo: `Robvg9/battlecruiser`.
 - Rama de trabajo actual: `main`.
-- App: v4.1.
-- Service Worker: shell-v22.
+- App: v6.0.
+- Service Worker: shell-v27.
+
+### CORRECCIÓN CRÍTICA de B6 (auditoría en vivo contra Supabase)
+- `lotes_compra` **SÍ EXISTE** (columnas: id, producto_id, almacen_id, cantidad_restante, costo_unitario, fecha_compra, cantidad_inicial). Este addendum y el Cerebro B5 decían que NO existía: estaban equivocados.
+- NO existen (404 real): `compras`, `compras_lineas`, `movimientos_stock`, `movimientos`, `auditoria_operaciones`.
+- Los RPC `registrar_compra`, `registrar_venta`, `registrar_transferencia`, `registrar_vale_salida`, `crear_producto`, `registrar_auditoria`, `listar_auditoria_admin`, `reporte_*`, `asignar_rol_usuario`, `cambiar_estado_usuario`, `permisos_por_rol` **NO existían** en Supabase antes de B6. El SQL de B3/B4/B5 estaba versionado pero no aplicado.
+- RPC que SÍ existían: `tiene_permiso`, `perfil_usuario_actual`, `permisos_usuario_actual`, `usuario_esta_activo`, `listar_usuarios_admin`, `listar_roles_admin`.
+- B6 crea los RPC faltantes + las tablas `compras` y `movimientos_stock` en `supabase/b6-nucleo-operativo.sql`. Roberto debe aplicar ese SQL (y los de B3/B4/B5) en el SQL Editor.
 - Arquitectura: frontend vanilla HTML/CSS/JS + Supabase + IndexedDB + Service Worker.
 - Archivos principales: `public/app.js`, `public/index.html`, `public/style.css`, `public/service-worker.js`.
 - `public/` es el directorio de assets servido por Cloudflare/Wrangler.
