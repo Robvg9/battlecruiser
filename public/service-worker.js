@@ -30,7 +30,10 @@
 // (lotes/FIFO/costos/movimientos/compras/rentabilidad, nuevas pestanas
 // Inventario y Movimientos, sub-reportes de compras/rentabilidad, columnas
 // de costo en ventas_lineas, indicadores de inventario en Centro de Mando).
-const CACHE_NAME = "battlecruiser-shell-v27";
+// v28 — Mision B7: bump por Operacion Humana (turnos, cuadres,
+// responsabilidades, incidencias, aprobaciones; nuevas pestanas Turnos y
+// Operacion; integracion en Centro de Mando).
+const CACHE_NAME = "battlecruiser-shell-v28";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v6.0 · La Cueva</p>
+      <p class="footnote">v7.0 · La Cueva</p>
     </form>
   </div>
 
@@ -87,6 +87,8 @@
         <button class="tab-btn" data-tab="reportes">Reportes</button>
         <button class="tab-btn" data-tab="inventario">Inventario</button>
         <button class="tab-btn" data-tab="movimientos">Movimientos</button>
+        <button class="tab-btn" data-tab="turnos">Turnos</button>
+        <button class="tab-btn" data-tab="operacion">Operación</button>
         <button class="tab-btn" data-tab="mando">Centro de Mando</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
@@ -453,6 +455,103 @@
       <p class="msg" id="msg-reportes"></p>
     </section>
 
+    <section id="tab-turnos" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Turnos</h3>
+        <span id="turnos-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">¿Quién está trabajando? ¿En qué turno? ¿Qué hizo?</p>
+
+      <!-- Acciones de turno -->
+      <div class="cc-bloque">
+        <div id="turno-actual" class="turno-actual-card"></div>
+        <div class="btn-row" id="turno-acciones">
+          <button type="button" id="btn-abrir-turno" class="cc-accion">Abrir turno</button>
+          <button type="button" id="btn-cerrar-turno" class="cc-accion hidden">Cerrar turno</button>
+        </div>
+        <p class="msg" id="msg-turno"></p>
+      </div>
+
+      <!-- Filtros -->
+      <div class="mando-filtros" id="turnos-filtros">
+        <select id="turno-filtro-estado">
+          <option value="">Todos los estados</option>
+          <option value="ABIERTO">Abierto</option>
+          <option value="CERRADO">Cerrado</option>
+          <option value="PROGRAMADO">Programado</option>
+          <option value="CANCELADO">Cancelado</option>
+        </select>
+        <select id="turno-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="turnos-refrescar-btn" class="cc-accion">Refrescar</button>
+      </div>
+
+      <div class="cc-bloque">
+        <h3>Historial de turnos</h3>
+        <div id="lista-turnos" class="lista"></div>
+        <div class="mando-paginacion" id="turnos-paginacion"></div>
+      </div>
+
+      <div class="cc-bloque">
+        <h3>Cuadres</h3>
+        <div id="lista-cuadres" class="lista"></div>
+        <p class="msg" id="msg-cuadre"></p>
+      </div>
+    </section>
+
+    <section id="tab-operacion" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Operación</h3>
+        <span id="operacion-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Responsabilidades, incidencias y aprobaciones.</p>
+
+      <!-- Crear responsabilidad -->
+      <div class="cc-bloque">
+        <h3>Nueva responsabilidad</h3>
+        <form id="form-responsabilidad" class="inline-form">
+          <input id="resp-titulo" placeholder="Título de la tarea" required>
+          <input id="resp-desc" placeholder="Descripción (opcional)">
+          <select id="resp-prioridad">
+            <option value="normal">Normal</option>
+            <option value="alta">Alta</option>
+            <option value="baja">Baja</option>
+          </select>
+          <button type="submit">Crear</button>
+        </form>
+        <p class="msg" id="msg-resp-crear"></p>
+      </div>
+
+      <!-- Responsabilidades -->
+      <div class="cc-bloque">
+        <h3>Responsabilidades</h3>
+        <select id="resp-filtro-estado">
+          <option value="">Todos los estados</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="EN_PROGRESO">En progreso</option>
+          <option value="COMPLETADA">Completada</option>
+        </select>
+        <div id="lista-responsabilidades" class="lista"></div>
+      </div>
+
+      <!-- Incidencias -->
+      <div class="cc-bloque">
+        <h3>Incidencias</h3>
+        <form id="form-incidencia" class="inline-form">
+          <select id="inc-tipo">
+            <option value="faltante">Faltante</option>
+            <option value="sobrante">Sobrante</option>
+            <option value="dano">Daño</option>
+            <option value="error_operativo">Error operativo</option>
+            <option value="otro">Otro</option>
+          </select>
+          <input id="inc-desc" placeholder="Descripción de la incidencia" required>
+          <button type="submit">Reportar</button>
+        </form>
+        <p class="msg" id="msg-inc-crear"></p>
+        <div id="lista-incidencias" class="lista"></div>
+      </div>
+    </section>
+
     <section id="tab-mando" class="tab-panel">
       <div class="pendientes-header">
         <h3>Centro de Mando</h3>
@@ -517,7 +616,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v6.0 · La Cueva</span>
+      <span class="app-footer-version">v7.0 · La Cueva</span>
     </footer>
   </div>
 

@@ -93,8 +93,9 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - B4 — Centro de Mando + auditoría + trazabilidad operativa implementado. Reutiliza operaciones_pendientes/_cache/_usuarioActual/tiene_permiso. SQL de auditoría versionado (pendiente de aplicar).
 - B5 — Reportes y análisis operativo implementado. Reutiliza tablas existentes + tiene_permiso('reportes','ver'). SQL de reportes versionado (pendiente de aplicar).
 - B6 — Núcleo operativo + inventario inteligente IMPLEMENTADO. Reutiliza lotes_compra (SÍ EXISTE, ver auditoría), tiene_permiso, operaciones_idempotencia, operaciones_pendientes, _cache. Crea compras + movimientos_stock (no existían). RPC registrar_compra/venta/transferencia/vale con FIFO, costo real, atomicidad. SQL versionado (pendiente de aplicar).
-- App v6.0, Service Worker shell-v27.
-- Validación automatizada: **80/80 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6).
+- B7 — Operación humana IMPLEMENTADO. Turnos, cuadres, responsabilidades e incidencias. Reutiliza _validar_usuario_operacion (B6), tiene_permiso, registrar_auditoria (B4), operaciones_pendientes + ejecutarOperacion (B2). Crea tablas turnos/cuadres/responsabilidades/incidencias + RPC seguros (abrir_turno, cerrar_turno, registrar_cuadre, revisar_cuadre, crear_responsabilidad, crear_incidencia, etc.). SQL versionado (pendiente de aplicar).
+- App v7.0, Service Worker shell-v28.
+- Validación automatizada: **107/107 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6 + 27 B7).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -720,7 +721,60 @@ Hallazgos que **corrigen** afirmaciones anteriores del Cerebro:
 - `node --check public/app.js`: OK.
 
 ### Versión
-- App v6.0. Service Worker shell-v27. Cache-busting vía bump del SW.
+- App v7.0. Service Worker shell-v28. Cache-busting vía bump del SW.
+
+## B7 — OPERACIÓN HUMANA: TURNOS + CUADRES + RESPONSABILIDADES + INCIDENCIAS — IMPLEMENTADO
+
+### Estado
+B7 está IMPLEMENTADO en el frontend y el SQL está versionado en `supabase/b7-operacion-humana.sql`. **NO aplicado aún en Supabase** (pendiente de que Roberto lo ejecute en el SQL Editor). El frontend degrada con mensajes claros si los RPC aún no existen (no inventa datos).
+
+### Auditoría REAL en vivo contra Supabase (2026-08-15)
+Confirmado que NO existen: `turnos`, `cuadres`, `responsabilidades`, `incidencias` (todas 404). B7 las crea. Los RPC de B7 tampoco existían; B7 los crea en SQL. Los RPC de B3 que sí existen (perfil/permisos/usuario/listar) se reutilizan.
+
+### Qué se implementó
+1. **Tabla `turnos`** (nueva): período de trabajo de un usuario en un almacén. Estados PROGRAMADO/ABIERTO/CERRADO/CANCELADO. Registra apertura/cierre reales, observación, usuario creador.
+2. **Tabla `cuadres`** (nueva): conciliación económica de un turno. Dinero esperado (calculado de ventas reales, no introducido por el trabajador), dinero declarado, diferencia, estado. Estados PENDIENTE/EN_REVISION/CUADRADO/CON_DIFERENCIA/APROBADO/RECHAZADO.
+3. **Tabla `responsabilidades`** (nueva): tareas operativas por usuario o turno. Estados PENDIENTE/EN_PROGRESO/COMPLETADA/CANCELADA. Prioridad, fecha límite, creador.
+4. **Tabla `incidencias`** (nueva): excepciones operativas (faltante, sobrante, daño, error). Estados ABIERTA/EN_REVISION/RESUELTA/CERRADA. Se crean automáticamente cuando un cuadre tiene diferencia.
+5. **RPC `abrir_turno`**: valida usuario activo, permiso, doble apertura (idempotente). Registra auditoría.
+6. **RPC `cerrar_turno`**: valida propiedad o permiso admin, estado ABIERTO, registra cierre real. Crea cuadre PENDIENTE automáticamente. Detecta responsabilidades pendientes (no bloquea, alerta).
+7. **RPC `calcular_dinero_esperado_turno`** (interno): calcula el dinero esperado de las ventas reales del usuario en el período del turno. DOCUMENTACIÓN: entran las ventas del período; NO entran compras/transferencias/vales (son inventario, no caja).
+8. **RPC `registrar_cuadre`**: el trabajador declara el dinero. Calcula diferencia. Si hay diferencia → estado CON_DIFERENCIA + crea incidencia automáticamente. No permite editar cuadre cerrado/aprobado.
+9. **RPC `revisar_cuadre`**: el admin aprueba/rechaza/devuelve. No permite que el trabajador apruebe su propio cuadre (validación real en backend). Registra estado anterior y nuevo + comentario.
+10. **RPC `crear_responsabilidad`**, **`actualizar_responsabilidad`**: gestión de tareas. Valida propiedad o permiso admin.
+11. **RPC `crear_incidencia`**, **`resolver_incidencia`**: cualquier usuario reporta; admin resuelve.
+12. **RPC de lectura**: `listar_turnos`, `listar_cuadres`, `listar_responsabilidades`, `listar_incidencias`, `turno_actual_usuario`. El trabajador ve los suyos; el admin ve todos (permiso `turnos.editar_any`).
+13. **Frontend**: pestañas Turnos (abrir/cerrar, historial, cuadres con declarar/revisar) y Operación (responsabilidades + incidencias). Integración de alertas en el Centro de Mando (turnos abiertos, cuadres pendientes/con diferencia, responsabilidades pendientes, incidencias abiertas). Refresco del turno actual al iniciar y reconectar.
+
+### Arquitectura (reutilización, 0 duplicados)
+- `_validar_usuario_operacion` (B6) = validación central de usuario/permiso/activo.
+- `registrar_auditoria` (B4) = única auditoría persistente (todos los RPC de B7 la llaman).
+- `operaciones_pendientes` + `ejecutarOperacion` + `sincronizarCola` + `_sincronizando` + `RPC_POR_TIPO` (B2) = única cola offline. Los tipos de B7 (`turno`, `turno_cerrar`, `cuadre`, `cuadre_revisar`, `responsabilidad`, `responsabilidad_actualizar`, `incidencia`, `incidencia_resolver`) se añadieron al MISMO `RPC_POR_TIPO`.
+- `tienePermiso` (B3) = autorización frontend. Permisos `turnos.ver`, `turnos.crear`, `turnos.editar`, `turnos.editar_any`.
+- `_cache` (B2/B6) = única caché (almacenes reutilizados para selects).
+- Las operaciones de B7 no mueven stock (no afectan `ajustePendiente` ni FIFO).
+- Stores nuevos: 0. Colas nuevas: 0. Cachés nuevas: 0. Sincronizadores nuevos: 0.
+
+### Seguridad
+- Todos los RPC: SECURITY DEFINER, `search_path = public, pg_temp`, validan `auth.uid()`, `usuario_esta_activo()` y `tiene_permiso` (vía `_validar_usuario_operacion`).
+- El trabajador no puede aprobar su propio cuadre (validación real en backend, no solo ocultar botón).
+- El dinero esperado se calcula de ventas reales (no lo introduce el trabajador).
+- Diferencias generan incidencias automáticamente (no se ocultan).
+- RLS + REVOKE a anon en todas las tablas nuevas.
+
+### Limitaciones reales
+- El SQL de B7 (y B3/B4/B5/B6) **NO está aplicado** en Supabase. Roberto debe ejecutar los SQL en orden. Mientras tanto, el frontend avisa que faltan los RPC.
+- Las pruebas automatizadas de B7 validan la lógica con un mock que refleja la semántica de los RPC. La validación SQL real requiere aplicar el SQL.
+- `ventas` no tiene `usuario_id` (verificado en auditoría B6); el dinero esperado se calcula por almacén + período del turno. Si se quisiera por usuario, habría que agregar `usuario_id` a `ventas` (no se hace en B7 para no romper el esquema existente).
+- Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
+
+### Pruebas
+- `test/b7-operacion-humana.test.js`: 27 casos (turnos, doble apertura, cierre, cuadres exacto/faltante/sobrante, aprobar/rechazar, no editar cerrado, responsabilidades, incidencias, permisos, usuario inactivo, idempotencia, offline, auditoría, compatibilidad B3/B6, 0 duplicados).
+- Suite global: **107/107 PASS** (B2.3 + B3 + B4 + B5 + B6 + B7).
+- `node --check public/app.js`: OK.
+
+### Versión
+- App v7.0. Service Worker shell-v28. Cache-busting vía bump del SW.
 
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
@@ -743,9 +797,9 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 
 **Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control; B4 — Centro de Mando + auditoría + trazabilidad; B5 — Reportes y análisis operativo (frontend completo; SQL de B3/B4/B5 pendiente de aplicar en Supabase).
 
-**Actual:** proyecto consolidado en `main` (v6.0). B6 — Núcleo operativo + inventario inteligente IMPLEMENTADO (frontend + SQL versionado, pendiente de aplicar en Supabase).
+**Actual:** proyecto consolidado en `main` (v7.0). B7 — Operación humana (turnos, cuadres, responsabilidades, incidencias) IMPLEMENTADO (frontend + SQL versionado, pendiente de aplicar en Supabase).
 
-**Siguiente bloque general:** aplicar los SQL de B3/B4/B5/B6 en Supabase y luego módulos operativos de negocio (turnos/cuadre, auditoría físico vs sistema, aprobaciones, comunicación).
+**Siguiente bloque general:** aplicar los SQL de B3/B4/B5/B6/B7 en Supabase, luego pruebas reales multi-usuario/dispositivo, y módulos pendientes (comunicación/Centro de Mando, recompensas, empaquetado como app instalable).
 
 **Posterior:** módulos operativos de negocio → turnos/cuadre → auditoría y responsabilidad → aprobaciones → comunicación/Centro de Mando → recompensas → empaquetado → aceptación final.
 
