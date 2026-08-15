@@ -9,12 +9,13 @@ El nombre BattleCruiser puede cambiar en el futuro.
 - Revisar el Cerebro y el estado actual de GitHub antes de continuar trabajos importantes.
 - Claude no tiene memoria entre cuentas/sesiones nuevas: debe recibir el contexto mínimo y los archivos de trabajo necesarios.
 - Si Claude dice que hizo algo, verificar GitHub antes de considerarlo implementado.
-- Flujo: **Cerebro → GitHub → auditoría → decisión → misión pequeña para Claude → GitHub → verificación.**
-- Dividir misiones grandes para evitar sesiones demasiado pesadas.
+- Flujo: **Cerebro → GitHub → auditoría → decisión → misión → GitHub → verificación.**
+- Evitar dividir artificialmente el proyecto en microtareas: las misiones deben representar bloques funcionales completos y verificables.
 - No pedir al usuario archivos que puedan revisarse directamente desde GitHub.
 - Antes de implementar funciones nuevas importantes, explicar qué hacen, qué datos usan y las decisiones/riesgos; preguntar antes de cambios arquitectónicos.
 - Si algo no funciona, comunicarlo brevemente y volver a intentarlo.
 - No inventar resultados de pruebas.
+- Las pruebas de usuario real se realizarán **al final de la fase de implementación**, una vez terminados los bloques funcionales previstos y los problemas técnicos que surjan durante el desarrollo.
 
 ## DOCTRINA DE TRABAJO — OBLIGATORIA
 BattleCruiser es una misión continua de ingeniería. El objetivo de cada sesión es **hacer realidad la visión de BattleCruiser sin romper ni duplicar lo que ya existe**.
@@ -66,22 +67,28 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 
 **Movimiento interno ≠ compra externa.** Una transferencia entre nuestros almacenes/puntos es un movimiento interno; una compra que viene de fuera e incorpora mercancía al inventario es una compra/reinversión externa.
 
-## ESTADO TÉCNICO CONOCIDO
-- APP v4.1.
-- Service Worker shell-v22.
-- B1/B2/B2.1 implementados.
-- IndexedDB + cola persistente.
-- `ejecutarOperacion()` y `sincronizarCola()`.
-- FIFO.
+## ESTADO TÉCNICO CONSOLIDADO — 2026-08-15
+- Rama principal de desarrollo: `main`.
+- `main` consolidó B2.2-B.3.1, B2.2-B.3.2 y B2.2-D.
+- SHA consolidado registrado: `3af997c8a52aa377e6cf04469a54fd766982b44e`.
+- Las tres implementaciones fueron integradas sin conflictos en `main` y posteriormente verificadas.
+- Validación automatizada reportada: **115/115 PASS, 0 FAIL**.
+- `node --check public/app.js`: OK.
+- Arquitectura IndexedDB: únicamente stores `lecturas` y `operaciones_pendientes`.
+- Una única cola offline persistente.
+- Un único `_sincronizando` para impedir sincronizaciones concurrentes.
+- Un único `RPC_POR_TIPO` para enrutar operaciones.
+- Una única `_cache` para los datos cacheados existentes.
 - `idempotency_key` estable por operación lógica.
 - Estados PENDIENTE / SINCRONIZANDO / SINCRONIZADA / REQUIERE_ATENCION.
 - Reconexión automática.
 - Proyección local de stock.
 - Recuperación de operaciones atrapadas en SINCRONIZANDO.
 - Compra, venta, transferencia y vale conectados a la cola.
-- B2.1 corrigió la proyección con presentaciones cuando el factor confiable está disponible en caché.
-- Si falta el factor offline, no se inventa una cifra de stock.
-- B2.1 no modificó Supabase/RPC/RLS.
+- Panel de operaciones pendientes implementado.
+- Gestión/reintento/atención de operaciones pendientes implementada.
+- Cierre de la capa Offline-First de escritura, sincronización, reconciliación e idempotencia implementado.
+- La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
 BattleCruiser ya posee un mecanismo centralizado de idempotencia compartido por las operaciones existentes.
@@ -309,17 +316,17 @@ Solución real implementada en `public/app.js`:
 - FIFO se conserva.
 - Estados se conservan.
 
-Validación con fake-indexeddb: 5 operaciones pasaron de 15 aperturas de IndexedDB a 1 apertura. No había Playwright/Chromium disponible, por lo que la prueba real de navegador quedó pendiente.
+Validación con fake-indexeddb: 5 operaciones pasaron de 15 aperturas de IndexedDB a 1 apertura. No había Playwright/Chromium disponible, por lo que la prueba real de navegador quedó pendiente para la fase final de pruebas.
 
-Después se revisó `public/app.js` desde GitHub y se confirmó la implementación. B2.2-A está CERRADA.
+B2.2-A está CERRADA.
 
-### B2.2-B — PRODUCTOS OFFLINE — EN CURSO
-Objetivo: permitir crear productos sin Internet y sincronizarlos posteriormente usando la cola existente.
+### B2.2-B — PRODUCTOS OFFLINE — BLOQUE REDEFINIDO
+Objetivo original: permitir crear productos sin Internet y sincronizarlos posteriormente usando la cola existente.
+
+La arquitectura Offline-First transversal ya quedó consolidada con B2.2-B.3.1, B2.2-B.3.2 y B2.2-D. Por tanto, los futuros módulos offline deben reutilizar directamente esa infraestructura en lugar de crear otra cola, otra caché o otro mecanismo de sincronización.
 
 #### B2.2-B.1 — BACKEND — DECISIÓN ARQUITECTÓNICA
-La auditoría de Supabase reveló una regla importante que queda registrada permanentemente:
-
-**No crear una tabla de idempotencia específica para productos.**
+No crear una tabla de idempotencia específica para productos.
 
 Los RPC existentes `registrar_compra`, `registrar_venta`, `registrar_transferencia` y `registrar_vale_salida` utilizan el mecanismo central:
 - `private.operaciones_idempotencia`;
@@ -330,35 +337,209 @@ Los RPC existentes `registrar_compra`, `registrar_venta`, `registrar_transferenc
 - `payload_hash`;
 - `resultado_id`.
 
-`crear_producto` debe reutilizar exactamente este mecanismo central, con un `tipo_operacion` propio como `crear_producto`. No se debe introducir `public.operaciones_productos_idempotencia` ni ningún segundo mecanismo equivalente.
+`crear_producto`, si se implementa como operación offline, debe reutilizar exactamente este mecanismo central, con un `tipo_operacion` propio como `crear_producto`. No introducir `public.operaciones_productos_idempotencia` ni ningún segundo mecanismo equivalente.
 
-La tabla `public.productos` actualmente contiene:
-- `id uuid NOT NULL DEFAULT gen_random_uuid()`;
-- `nombre text NOT NULL`;
-- `categoria_id uuid NULL`;
-- `unidad text NULL`;
-- `precio_normal numeric NOT NULL DEFAULT 0`;
-- `precio_mayorista numeric NULL DEFAULT 0`;
-- `activo boolean NOT NULL DEFAULT true`;
-- `created_at timestamptz NOT NULL DEFAULT now()`;
-- `presentacion_id uuid NULL`.
+#### B2.2-B.2 — FRONTEND
+Conectar el formulario real de creación de productos con `ejecutarOperacion()` y la cola existente cuando el RPC/backend correspondiente esté confirmado y probado.
 
-FK actuales: `categoria_id → categorias(id)` y `presentacion_id → presentaciones(id)`.
+No duplicar lógica de cola ni inventar IDs definitivos offline.
 
-Misión B2.2-B.1: crear un RPC idempotente para productos siguiendo el mismo patrón central de los cuatro RPC existentes, sin modificar los RPC existentes, sin crear una segunda cola y sin modificar frontend todavía. Claude ya fue instruido para implementar esta opción reutilizando `private.operaciones_idempotencia` + `private.reclamar_idempotencia`.
+#### B2.2-B.3 — UX / PROYECCIÓN
+Mostrar claramente productos/operaciones pendientes sin convertir una proyección local en fuente de verdad. La reconciliación debe utilizar el resultado real del backend al sincronizar.
 
-### B2.2-B.2 — FRONTEND — PENDIENTE
-Después de verificar que B2.2-B.1 existe realmente en Supabase y que la idempotencia fue probada, conectar el formulario actual de creación de productos de `public/app.js` con `ejecutarOperacion()` y la cola existente.
+### B2.2-B.3.1 — PANEL DE OPERACIONES PENDIENTES — CERRADA
+Implementado y consolidado en `main`.
 
-Antes de implementar, revisar el flujo actual real del formulario y adaptar el payload al RPC nuevo. No duplicar lógica de cola.
+Incluye:
+- pestaña/panel de Pendientes;
+- operación/tipo;
+- producto y datos relevantes disponibles;
+- cantidad/presentación cuando forman parte del payload;
+- fecha;
+- estado;
+- error/motivo;
+- indicación de requiere atención;
+- contador coherente con la cola real;
+- reutilización directa de `operaciones_pendientes`.
 
-### B2.2-B.3 — UX / PROYECCIÓN — PENDIENTE
-Después de B2.2-B.2, definir cómo mostrar productos recién creados que estén pendientes de sincronización y cómo reconciliarlos con el producto real al sincronizar.
+No se creó un segundo store ni una segunda cola.
 
-No inventar IDs definitivos ni sustituir la fuente real del backend sin una estrategia explícita de reconciliación.
+### B2.2-B.3.2 — GESTIÓN Y RECUPERACIÓN — CERRADA
+Implementado y consolidado en `main`.
 
-### B2.2-C — PENDIENTES
-Convertir el botón/contador Pendientes en panel interactivo con operación, producto, cantidad, presentación, fecha, estado, error/motivo y requiere atención.
+Incluye la gestión de operaciones pendientes, reintentos controlados, atención de errores de negocio y recuperación sin modificar la `idempotency_key` ni duplicar operaciones.
+
+### B2.2-D — CIERRE OFFLINE-FIRST — CERRADA
+Implementado y consolidado en `main`.
+
+Queda cubierta la cadena:
+**operación local → cola persistente → estado → sincronización → idempotencia → eliminación/reconciliación → refresco → recuperación ante reconexión**.
+
+Se verificaron casos de cola mixta, error de red con recuperación, errores de negocio, doble sincronización, preservación literal de `idempotency_key` y fallo de refresco sin reejecución de la operación.
+
+Resultado reportado de la batería consolidada: **115 PASS / 0 FAIL**.
+
+## ESTADO ACTUAL DEL MAPA
+### Ya construido
+1. Base POS/inventario.
+2. Presentaciones comerciales.
+3. Cache/lecturas offline.
+4. Cola Offline-First persistente.
+5. FIFO y estados de operación.
+6. Idempotencia central.
+7. Proyección local de stock.
+8. Reconexión y recuperación.
+9. Panel de Pendientes.
+10. Gestión y recuperación de pendientes.
+11. Reconciliación y cierre de la capa Offline-First.
+12. Consolidación de todo lo anterior en `main`.
+
+### En desarrollo inmediato
+El siguiente bloque general es **B2.3 — CENTRO DE CONTROL OPERACIONAL**, cuyo objetivo es pasar de una infraestructura Offline-First ya sólida a una capa visible de control operativo que permita al sistema mostrar qué está ocurriendo, qué requiere atención y qué debe hacer cada persona, sin crear una segunda arquitectura.
+
+### Después de B2.3
+1. Operaciones de productos y demás módulos pendientes que necesiten integrarse a la infraestructura existente.
+2. Turnos, entrega/recepción y cuadre.
+3. Auditoría físico vs sistema y atribución de diferencias.
+4. Gastos, reinversiones y bajas con aprobación.
+5. Entradas/movimientos internos con aceptación/rechazo.
+6. Responsabilidades, alarmas y verificación.
+7. Expedientes, niveles y recompensas.
+8. Centro de Mando/comunicación.
+9. Métodos de pago adicionales.
+10. App instalable.
+11. Pruebas integrales de usuario real y aceptación final.
+
+## B2.3 — CENTRO DE CONTROL OPERACIONAL — PRÓXIMO BLOQUE GENERAL
+
+### Objetivo 100%
+Construir la primera capa real de **control operativo visible** sobre la infraestructura existente. El Admin y los usuarios deben poder entender el estado del negocio y actuar sobre aquello que requiere atención, sin depender de revisar manualmente tablas, colas o registros técnicos.
+
+B2.3 no debe rehacer Offline-First. Debe consumir y extender los mecanismos ya consolidados.
+
+### B2.3-A — ESTADO OPERACIONAL GLOBAL
+Crear una representación clara del estado actual de la operación:
+- conexión online/offline;
+- operaciones pendientes;
+- operaciones que requieren atención;
+- sincronizaciones en curso;
+- datos locales que requieren reconciliación;
+- alertas importantes;
+- responsabilidades pendientes;
+- solicitudes pendientes de decisión cuando ya existan.
+
+Debe existir una jerarquía visual que diferencie información normal de problemas que requieren acción.
+
+### B2.3-B — CENTRO DE ATENCIÓN
+Convertir la información dispersa en una lista priorizada de asuntos que requieren acción.
+
+Cada asunto debe poder indicar, cuando aplique:
+- qué ocurrió;
+- cuándo ocurrió;
+- quién está relacionado;
+- qué operación o entidad está afectada;
+- estado actual;
+- motivo/error;
+- qué acción puede realizarse;
+- quién tiene autoridad para realizarla.
+
+No crear una nueva cola técnica. Es una capa de presentación/control sobre fuentes existentes.
+
+### B2.3-C — ACCIONES CONTEXTUALES
+Cada asunto debe llevar a la acción correcta sin obligar al usuario a navegar manualmente por múltiples secciones.
+
+Ejemplos conceptuales:
+- reintentar una operación recuperable;
+- revisar una operación que requiere atención;
+- abrir el producto afectado;
+- revisar una solicitud;
+- ver una incidencia;
+- abrir la información necesaria para decidir.
+
+Las acciones deben respetar roles/permisos y no deben ejecutar operaciones privilegiadas por simple navegación.
+
+### B2.3-D — VISIBILIDAD DEL ADMIN
+La vista Admin debe comenzar a comportarse como un verdadero centro de mando:
+- resumen de lo importante;
+- problemas primero;
+- operaciones pendientes;
+- incidencias;
+- solicitudes;
+- responsabilidades críticas;
+- actividad relevante;
+- señales de riesgo.
+
+No convertir el dashboard en una colección de números decorativos. Cada indicador debe responder a una pregunta operativa o llevar a una acción.
+
+### B2.3-E — VISIBILIDAD DEL USUARIO OPERATIVO
+La vista de dependienta/usuario debe mostrar únicamente lo necesario para ejecutar su trabajo:
+- tareas/responsabilidades pendientes cuando existan;
+- operaciones pendientes propias o visibles según permisos;
+- errores que debe corregir;
+- solicitudes que debe completar;
+- estado de turno cuando el módulo esté disponible.
+
+La información debe estar filtrada por permisos y contexto.
+
+### B2.3-F — NOTIFICACIONES Y NOVEDADES
+Establecer un patrón coherente para novedades:
+- contador/punto rojo;
+- mensajes importantes;
+- operaciones que requieren atención;
+- solicitudes nuevas;
+- cambios de estado relevantes.
+
+Evitar notificaciones duplicadas o persistentes sin motivo.
+
+### B2.3-G — ARQUITECTURA Y REUTILIZACIÓN
+B2.3 debe reutilizar:
+- IndexedDB existente;
+- `operaciones_pendientes`;
+- `_cache` existente;
+- `ejecutarOperacion()`;
+- `sincronizarCola()`;
+- mecanismos existentes de permisos/autenticación;
+- RPC existentes cuando una acción requiera backend.
+
+No crear:
+- segunda cola offline;
+- segundo sistema de idempotencia;
+- caché paralela sin justificación;
+- store de UI que duplique la fuente real;
+- RPC duplicados para operaciones ya existentes.
+
+### B2.3-H — INTEGRIDAD Y ESTADOS
+Todos los estados mostrados al usuario deben corresponder con el estado real disponible.
+
+Especialmente:
+- PENDIENTE no debe aparecer como completada;
+- SINCRONIZANDO no debe interpretarse como completada;
+- REQUIERE_ATENCION no debe reintentarse infinitamente;
+- una operación sincronizada no debe reaparecer como pendiente;
+- un error de refresco no debe volver a ejecutar una operación de negocio ya completada.
+
+### B2.3-I — RESPONSIVE / EXPERIENCIA
+El Centro de Control debe funcionar en teléfono y PC, respetando el diseño existente.
+
+Debe priorizar:
+- lectura rápida;
+- jerarquía visual;
+- acciones claras;
+- estados comprensibles;
+- ausencia de scroll horizontal innecesario;
+- consistencia con el sistema actual.
+
+### B2.3-J — PRUEBAS TÉCNICAS
+La misión debe terminar con pruebas automatizadas suficientes para demostrar:
+- que los estados se representan correctamente;
+- que las acciones no duplican operaciones;
+- que la idempotencia permanece intacta;
+- que los permisos se respetan;
+- que no se crean stores/colas/cachés paralelos innecesarios;
+- que la UI puede reconstruirse desde el estado real;
+- que errores de red/negocio no producen estados falsos.
+
+La prueba real con perfiles/dispositivos queda para la fase final de aceptación, no para cerrar cada bloque de desarrollo.
 
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
@@ -367,7 +548,7 @@ Convertir el botón/contador Pendientes en panel interactivo con operación, pro
 - La idempotencia es una propiedad transversal del sistema, no una característica aislada de cada módulo.
 - El backend/RPC es la fuente de verdad para reglas críticas.
 - Las proyecciones offline son temporales y nunca deben convertirse silenciosamente en verdad del sistema.
-- Una misión pequeña y verificable es preferible a una gran modificación difícil de auditar.
+- Las misiones deben ser bloques funcionales completos, no una fragmentación artificial en microtareas.
 - El analista debe anticipar contradicciones que puedan detectarse mediante auditoría; no trasladar ese trabajo al ejecutor después de haber diseñado una especificación incorrecta.
 - Cuando una decisión técnica real contradice una especificación anterior, actualizar este Cerebro para que el próximo agente no repita el error.
 
@@ -377,13 +558,13 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 ## ROADMAP
 **Implementado/conocido:** base POS/inventario, Offline-First B1/B2, cola persistente, idempotencia, proyección local, presentaciones en lógica correspondiente, recuperación de SINCRONIZANDO.
 
-**Cerrado:** B2.2-A velocidad offline.
+**Cerrado:** B2.2-A velocidad offline; B2.2-B.3.1 panel de pendientes; B2.2-B.3.2 gestión/recuperación; B2.2-D cierre Offline-First.
 
-**Actual:** B2.2-B productos offline; B2.2-B.1 backend en implementación/verificación.
+**Actual:** proyecto consolidado en `main`, con la infraestructura Offline-First de escritura/sincronización/reconciliación ya establecida.
 
-**Siguiente:** B2.2-B.2 frontend; B2.2-B.3 UX/proyección; B2.2-C Pendientes.
+**Siguiente bloque general:** **B2.3 — Centro de Control Operacional**.
 
-**Futuro:** cuadre de turnos; entrega/recepción; auditoría físico/sistema; gastos/reinversiones/bajas con aprobación; entradas internas aceptadas/rechazadas; responsabilidades y alarmas; expedientes/niveles/recompensas; Centro de Mando/comunicación; métodos de pago adicionales; app instalable.
+**Posterior:** módulos operativos de negocio → turnos/cuadre → auditoría y responsabilidad → aprobaciones → comunicación/Centro de Mando → recompensas → empaquetado → aceptación final.
 
 ## DECISIONES A DEFINIR ANTES DE PROGRAMAR
 - Fórmula exacta del cuadre final.
@@ -396,6 +577,8 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 - Auditoría completa de entradas/rechazos.
 - Métodos de pago adicionales.
 - Empaquetado como app instalable.
+
+Estas decisiones no bloquean B2.3 mientras el bloque se limite a control/visibilidad sobre estados y datos ya existentes.
 
 ## PRINCIPIO CENTRAL
 **BattleCruiser debe registrar qué ocurrió, quién fue responsable, quién recibió, quién aprobó, qué esperaba el sistema, qué ocurrió físicamente y cómo se resolvió cada diferencia.**
