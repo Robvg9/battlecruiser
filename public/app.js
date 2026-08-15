@@ -4015,9 +4015,27 @@ function mostrarInfoUsuarioEnHeader() {
 // ---- B3.3: validación de usuario activo ----
 // Un usuario inactivo no debe operar. El backend lo impide (RLS/tiene_permiso
 // validan activo); el frontend lo refleja bloqueando la creación de operaciones.
+// REVISIÓN (cierre B3): además del contexto en memoria, cuando hay conexión
+// consultamos usuario_esta_activo() para bloqueo REAL (no solo ocultar botones).
+// Así, si el estado activo cambió en el backend mientras la sesión estaba
+// abierta, la próxima operación online lo detecta. Offline: usamos el último
+// contexto conocido (la operación se encola y el backend la validará al sync).
 async function usuarioPuedeOperar() {
   if (!_usuarioActual) return false;
   if (!contextoB3Disponible()) return true; // degradación: no podemos saber
+  // Offline: el contexto en memoria es lo único disponible; el backend
+  // validará activo al sincronizar la operación (RLS/tiene_permiso).
+  if (!navigator.onLine) return _usuarioActual.activo !== false;
+  // Online: validar contra el backend para bloqueo real y fresco.
+  try {
+    const { data, error } = await client.rpc("usuario_esta_activo", {});
+    if (!error) {
+      // Actualizar el contexto en memoria con el valor fresco del backend.
+      _usuarioActual.activo = data === true;
+      return data === true;
+    }
+    // Si el RPC aún no existe (SQL no aplicado), caer al contexto.
+  } catch (e) { /* RPC inexistente: usar contexto */ }
   return _usuarioActual.activo !== false;
 }
 

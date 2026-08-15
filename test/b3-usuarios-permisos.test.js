@@ -48,6 +48,8 @@ function mockCliente({ perfil, permisos, usuarios, roles } = {}) {
       if (nombre === "permisos_usuario_actual") return { data: permisos || [], error: null };
       if (nombre === "listar_usuarios_admin") return { data: usuarios || [], error: null };
       if (nombre === "listar_roles_admin") return { data: roles || [], error: null };
+      // usuario_esta_activo: devuelve el estado activo del perfil del mock.
+      if (nombre === "usuario_esta_activo") return { data: perfil ? !!perfil[0].activo : null, error: null };
       if (nombre === "asignar_rol_usuario" || nombre === "cambiar_estado_usuario") return { data: null, error: null };
       return { data: null, error: { message: "Could not find the function" } };
     },
@@ -297,4 +299,27 @@ test("B3.2 Degradación: si el SQL de B3 no está aplicado, la app sigue usable"
   assert.strictEqual(window.contextoB3Disponible(), false, "B3 no disponible sin SQL");
   // tienePermiso degrada a true (no bloquea la app existente; seguridad real en backend).
   assert.strictEqual(window.tienePermiso("productos", "ver"), true, "degradación: no bloquea");
+});
+
+test("B3.3 (cierre): usuario inactivo bloqueado via usuario_esta_activo online (bloqueo real)", async () => {
+  // El mock devuelve perfil con activo=false y usuario_esta_activo devuelve false.
+  const { window, client } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Inactivo", activo: false, role_id: "r1", rol: "Dependiente" }],
+    permisos: [{ seccion: "productos", accion: "ver" }],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  // Sobreescribir rpc para que usuario_esta_activo devuelva false explícitamente.
+  client.rpc = async (nombre) => {
+    if (nombre === "usuario_esta_activo") return { data: false, error: null };
+    if (nombre === "perfil_usuario_actual") return { data: [{ id: "u-test", nombre: "Inactivo", activo: false, role_id: "r1", rol: "Dependiente" }], error: null };
+    if (nombre === "permisos_usuario_actual") return { data: [{ seccion: "productos", accion: "ver" }], error: null };
+    return { data: null, error: null };
+  };
+  const puede = await window.usuarioPuedeOperar();
+  assert.strictEqual(puede, false, "bloqueo real online via usuario_esta_activo");
+  // Y ejecutarOperacion debe rechazar.
+  const res = await window.ejecutarOperacion("venta", { p_almacen_id: "a1", p_lineas: [] });
+  assert.strictEqual(res.ok, false, "operación rechazada para usuario inactivo");
+  assert.ok(/inactivo/i.test(res.error.message), "mensaje claro de inactivo");
 });
