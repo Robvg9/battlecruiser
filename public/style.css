@@ -538,3 +538,61 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .resumen-card.alerta .valor { color: var(--wine); }
 .resumen-alertas { margin-bottom: 22px; }
 .resumen-movs .lista-item span:first-child { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--mist); min-width: 80px; }
+
+/* ============================================================
+   Mision B2.2-B.3.1 - Panel "Operaciones pendientes"
+   Reutiliza .lista / .lista-item / .muted / .msg / .hidden ya
+   existentes. Solo anade lo minimo especifico del panel y del
+   badge chico de la pestana, con la misma paleta del salon.
+   ============================================================ */
+.pendientes-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.pendientes-header h3 { margin: 0; }
+.pendientes-refrescar-btn {
+  padding: 7px 14px; background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 5px;
+  font-family: 'Inter', sans-serif; font-size: 12.5px; cursor: pointer;
+  letter-spacing: 0.02em; margin-top: 0;
+}
+.pendientes-refrescar-btn:hover { border-color: var(--gold); color: var(--gold); }
+.pendientes-refrescar-btn:disabled { opacity: 0.6; cursor: default; }
+
+.pendiente-item {
+  flex-direction: column; align-items: stretch; gap: 4px;
+}
+.pendiente-principal {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pendiente-tipo { color: var(--text); font-size: 13px; }
+.pendiente-resumen { font-size: 11.5px; }
+.pendiente-error {
+  font-size: 11px; color: var(--wine) !important;
+  word-break: break-word; white-space: normal;
+}
+.pendiente-lateral {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.pendiente-estado {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.pendiente-item.estado-pendiente .pendiente-estado,
+.pendiente-item.estado-sincronizando .pendiente-estado { color: var(--gold); }
+.pendiente-item.estado-requiere_atencion .pendiente-estado,
+.pendiente-item.estado-requiere_atencion { border-color: var(--wine); }
+.pendiente-meta { font-size: 11px; }
+
+/* Badge chico en la pestana del menu lateral: mismo look que el
+   #cola-pendientes-badge del header pero mas compacto (un numero
+   dentro de la pestana). Reutiliza .hidden y .atencion. */
+.pendientes-tab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 5px; margin-left: 6px;
+  border-radius: 10px; background: var(--gold); color: #211605;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  font-weight: 600; line-height: 1;
+}
+.pendientes-tab-badge.atencion { background: var(--wine); color: var(--text); }

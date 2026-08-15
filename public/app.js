@@ -788,10 +788,214 @@ async function actualizarContadorColaPendiente() {
     el.textContent = partes.join(" · ");
     el.classList.toggle("atencion", atencion > 0);
     el.classList.remove("hidden");
+    // Mision B2.2-B.3.1: si el panel de pendientes esta visible,
+    // refrescarlo a la vez que el contador. El panel hace su propia
+    // lectura getAll (necesita los registros completos para pintarlos,
+    // no solo los count() de aca); sin await para no bloquear al
+    // contador ni disparar una segunda sincronizacion.
+    var tabPendientes = document.getElementById("tab-pendientes");
+    if (tabPendientes && tabPendientes.classList.contains("visible")) {
+      refrescarPanelPendientes();
+    }
   } catch (e) {
     console.warn("[Battlecruiser] No se pudo actualizar el contador de la cola pendiente:", e);
   }
 }
+
+// ============================================================
+// Panel "Operaciones pendientes" (Misión B2.2-B.3.1) — SOLO UI
+// ============================================================
+// Muestra el detalle de las operaciones todavía no eliminadas de la cola
+// (PENDIENTE, SINCRONIZANDO, REQUIERE_ATENCION) reutilizando EXACTAMENTE la
+// misma infraestructura offline existente:
+//   - mismo store IndexedDB (IDB_OPS_STORE / "operaciones_pendientes");
+//   - mismos índices "estado" y "creado_en";
+//   - obtenerOperacionesPorEstado() / guardarOperacionPendiente() /
+//     actualizarOperacionPendiente() / eliminarOperacionPendiente() /
+//     sincronizarCola() / actualizarContadorColaPendiente().
+// NO crea una segunda cola, ni un store nuevo, ni una caché nueva, ni un
+// mecanismo de sincronización propio. Toca la lógica de sincronización
+// únicamente para pedirle que refresque el panel al terminar (junto al
+// contador que ya refrescaba).
+//
+// Eficiencia de lectura: una sola transacción IndexedDB con tres getAll
+// indexados (mismo patrón que actualizarContadorColaPendiente ya usaba con
+// count()). No se usa obtenerTodasLasOperaciones() acá (trae también
+// SINCRONIZADA, que ya se elimina y no debe aparecer como pendiente) ni
+// refrescarOperacionesPendientesCache() (trae solo PENDIENTE+SINCRONIZANDO
+// para la proyección de stock y excluye REQUIERE_ATENCION a propósito).
+// ============================================================
+
+// Etiquetas legibles de tipo de operación. Los tipos son los mismos que ya
+// define RPC_POR_TIPO (compra/venta/transferencia/vale/producto).
+const ETIQUETA_TIPO_OP = {
+  compra: "Compra",
+  venta: "Venta",
+  transferencia: "Transferencia",
+  vale: "Vale de salida",
+  producto: "Creación de producto",
+};
+
+// Resumen legible de una operación, armado a partir de su payload (los
+// mismos p_* que los RPC existentes). Nunca inventa datos: si un campo no
+// está en el payload, no se muestra. Es solo texto para que una persona
+// reconozca qué operación es; la autoridad real sigue siendo el backend.
+function resumenOperacionPendiente(op) {
+  const p = (op && op.payload) || {};
+  switch (op && op.tipo) {
+    case "compra": {
+      const cant = p.p_presentacion_id
+        ? (Number(p.p_cantidad_presentacion) || 0) + " presentación(es)"
+        : (Number(p.p_cantidad) || 0) + " unidades";
+      const costo = Number(p.p_costo_unitario);
+      return "Entrada de stock · " + cant + (Number.isFinite(costo) ? " · $" + money(costo) + " c/u" : "");
+    }
+    case "venta": {
+      const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
+      const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
+      return lineas.length + " línea(s) · " + totalUnidades + " unidades";
+    }
+    case "transferencia": {
+      const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
+      const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
+      return lineas.length + " línea(s) · " + totalUnidades + " unidades";
+    }
+    case "vale": {
+      return (p.p_tipo || "vale") + " · " + (Number(p.p_cantidad) || 0) + " unidades";
+    }
+    case "producto": {
+      return "Nuevo producto" + (p.p_nombre ? ": " + p.p_nombre : "");
+    }
+    default:
+      return op && op.tipo ? op.tipo : "Operación";
+  }
+}
+
+// Una sola transacción IndexedDB, tres getAll indexados (los únicos estados
+// que deben aparecer como pendientes: SINCRONIZADA se elimina al sincronizar
+// y no debe mostrarse). Orden FIFO por creado_en, igual que el resto de la cola.
+// Devuelve [] si IndexedDB no está disponible o algo falla (mismo criterio
+// que obtenerOperacionesPorEstado: no lanzar, avisar y devolver vacío).
+async function obtenerOperacionesVisiblesPanel() {
+  try {
+    const db = await idbAbrir();
+    const combinadas = await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      const idx = tx.objectStore(IDB_OPS_STORE).index("estado");
+      const reqPendiente = idx.getAll("PENDIENTE");
+      const reqSincronizando = idx.getAll("SINCRONIZANDO");
+      const reqAtencion = idx.getAll("REQUIERE_ATENCION");
+      tx.oncomplete = () => {
+        resolve(
+          (reqPendiente.result || [])
+            .concat(reqSincronizando.result || [])
+            .concat(reqAtencion.result || [])
+        );
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+    return combinadas.sort((a, b) => (a.creado_en < b.creado_en ? -1 : a.creado_en > b.creado_en ? 1 : 0));
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudieron leer las operaciones visibles del panel:", e);
+    return [];
+  }
+}
+
+// Texto corto para el estado (coincide con los estados reales de la cola).
+function etiquetaEstadoPanel(estado) {
+  switch (estado) {
+    case "PENDIENTE": return "🔄 Pendiente";
+    case "SINCRONIZANDO": return "🔄 Sincronizando…";
+    case "REQUIERE_ATENCION": return "⚠ Requiere atención";
+    default: return estado || "?";
+  }
+}
+
+function renderizarPanelPendientes(operaciones) {
+  const lista = document.getElementById("lista-pendientes");
+  if (!lista) return;
+  if (!operaciones || operaciones.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">No hay operaciones pendientes. Todo sincronizado.</p>';
+    return;
+  }
+  lista.innerHTML = "";
+  operaciones.forEach((op) => {
+    const div = document.createElement("div");
+    div.className = "lista-item pendiente-item estado-" + (op.estado || "").toLowerCase();
+    const tipo = ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operación";
+    const estado = etiquetaEstadoPanel(op.estado);
+    const fecha = op.creado_en ? fechaCorta(op.creado_en) : "";
+    const intentos = Number(op.intentos) || 0;
+    const intentosTxt = intentos > 0 ? " · " + intentos + (intentos === 1 ? " intento" : " intentos") : "";
+    const errorTxt = op.ultimo_error
+      ? '<span class="pendiente-error muted">' + String(op.ultimo_error).replace(/</g, "&lt;") + "</span>"
+      : "";
+    div.innerHTML =
+      '<span class="pendiente-principal">' +
+        '<span class="pendiente-tipo">' + tipo + "</span>" +
+        '<span class="muted pendiente-resumen">' + resumenOperacionPendiente(op) + "</span>" +
+        (errorTxt) +
+      "</span>" +
+      '<span class="pendiente-lateral">' +
+        '<span class="pendiente-estado">' + estado + "</span>" +
+        '<span class="muted pendiente-meta">' + fecha + intentosTxt + "</span>" +
+      "</span>";
+    lista.appendChild(div);
+  });
+}
+
+// Orquesta: lee la cola (una sola transacción), pinta el panel y actualiza el
+// badge de la pestaña. No hace lecturas extra: el #cola-pendientes-badge del
+// header sigue siendo la única fuente del contador (lo actualiza
+// actualizarContadorColaPendiente por su cuenta); acá solo se refleja ese
+// conteo en el badge chico de la pestaña para que se sepa si entrar.
+async function refrescarPanelPendientes() {
+  const operaciones = await obtenerOperacionesVisiblesPanel();
+  renderizarPanelPendientes(operaciones);
+
+  const badgeTab = document.getElementById("pendientes-tab-badge");
+  if (badgeTab) {
+    const pendientes = operaciones.filter((o) => o.estado === "PENDIENTE" || o.estado === "SINCRONIZANDO").length;
+    const atencion = operaciones.filter((o) => o.estado === "REQUIERE_ATENCION").length;
+    const total = pendientes + atencion;
+    if (total === 0) {
+      badgeTab.classList.add("hidden");
+      badgeTab.classList.remove("atencion");
+      badgeTab.textContent = "";
+    } else {
+      badgeTab.textContent = String(total);
+      badgeTab.classList.toggle("atencion", atencion > 0);
+      badgeTab.classList.remove("hidden");
+    }
+  }
+}
+
+// Botón "Reintentar sincronización": reutiliza directamente sincronizarCola()
+// (que ya se protege sola contra llamadas simultáneas con _sincronizando y
+// recorre la cola en FIFO). No crea ningún reintento paralelo propio.
+safeInit("panel-pendientes", () => {
+  const btn = document.getElementById("pendientes-refrescar-btn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    if (!navigator.onLine) {
+      setMsg("msg-pendientes", "Sin conexión ahora mismo. Se sincronizará solo al recuperar Internet.", false);
+      return;
+    }
+    btn.disabled = true;
+    const textoOriginal = btn.textContent;
+    btn.textContent = "Sincronizando…";
+    try {
+      await sincronizarCola();
+      await refrescarPanelPendientes();
+      setMsg("msg-pendientes", "Sincronización completada.", true);
+    } catch (e) {
+      setMsg("msg-pendientes", "No se pudo completar la sincronización.", false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
+  });
+});
 
 // ============================================================
 // Proyección local de stock (Misión B2, Sección 16) — SIMPLE
@@ -1066,6 +1270,12 @@ async function sincronizarCola() {
   } finally {
     _sincronizando = false;
     await actualizarContadorColaPendiente();
+    // Mision B2.2-B.3.1: el panel refleja cambios de estado (ej.
+    // PENDIENTE -> REQUIERE_ATENCION) aunque el total del contador no
+    // cambie. actualizarContadorColaPendiente ya refresca el panel si
+    // esta visible; esta llamada explicita lo garantiza siempre tras
+    // una sincronizacion, con la misma lectura getAll del panel.
+    await refrescarPanelPendientes();
     // Sección 16: tras cada operación resuelta (sincronizada o con
     // conflicto) hay que refrescar el stock real y sacarla de la
     // proyección — ya se hace por operación arriba (refrescarOperacionesPendientesCache);
@@ -1287,6 +1497,10 @@ safeInit("tabs", () => {
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("visible"));
     btn.classList.add("active");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("visible");
+    // Mision B2.2-B.3.1: al entrar a la pestaña Pendientes, refrescar
+    // el panel para mostrar el estado actual de la cola (una sola
+    // lectura, solo cuando hace falta).
+    if (btn.dataset.tab === "pendientes") refrescarPanelPendientes();
   });
 });
 
@@ -2717,6 +2931,7 @@ showApp = function (session) {
       await recuperarOperacionesAtrapadas();
       await actualizarContadorColaPendiente();
       await refrescarOperacionesPendientesCache();
+      await refrescarPanelPendientes();
       if (navigator.onLine) await sincronizarCola();
     })();
   });
