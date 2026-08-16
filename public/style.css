@@ -881,6 +881,11 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 .rep-tab-btn:hover { border-color: var(--gold); color: var(--gold); }
 .rep-tab-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,162,77,0.08); }
+/* R4: filtro por estado del inventario (mismo patron visual que rep-tab-btn) */
+.inv-filtro-estado { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.inv-estado-btn { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; background: transparent; border: 1px solid var(--gold-dim); color: var(--mist); padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+.inv-estado-btn:hover { border-color: var(--gold); color: var(--gold); }
+.inv-estado-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,162,77,0.08); }
 #rep-filtro-desde, #rep-filtro-hasta {
   padding: 7px 10px; background: var(--stone); border: 1px solid var(--gold-dim);
   border-radius: 5px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12.5px;

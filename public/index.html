@@ -378,6 +378,14 @@
         <select id="inv-filtro-almacen"><option value="">Todos los almacenes</option></select>
         <button type="button" id="inv-refrescar-btn" class="cc-accion">Refrescar</button>
       </div>
+      <!-- R4: filtro por estado operativo del inventario. Filtra los datos ya
+           cargados en memoria, sin consultas nuevas. -->
+      <div class="inv-filtro-estado" id="inv-filtro-estado" role="group" aria-label="Filtrar por estado">
+        <button type="button" class="inv-estado-btn active" data-estado="todos">Todos</button>
+        <button type="button" class="inv-estado-btn" data-estado="bajo">Bajo mínimo</button>
+        <button type="button" class="inv-estado-btn" data-estado="agotado">Agotados</button>
+        <button type="button" class="inv-estado-btn" data-estado="normal">Normales</button>
+      </div>
       <div class="cc-bloque">
         <h3>Valoración de inventario</h3>
         <div id="inv-resumen" class="rep-grid"></div>

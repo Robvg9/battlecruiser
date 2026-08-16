@@ -573,3 +573,166 @@ test("B6.27: una sola fuente de verdad — RPC_POR_TIPO enruta todas las operaci
   assert.strictEqual(window.RPC_POR_TIPO_B6, undefined, "no hay segundo RPC_POR_TIPO");
   assert.strictEqual(window._rpcInventario, undefined, "no hay enrutador de inventario paralelo");
 });
+
+
+// ============================================================
+// R4 — Filtro por estado operativo del inventario
+// ============================================================
+
+// Helper: inventario con un producto de cada estado operativo.
+function inventarioMixto() {
+  const estado = crearEstadoInventarioMock();
+  estado.stock["p1::a1"] = { cantidad: 0, minimo: 5 };   // agotado
+  estado.stock["p2::a1"] = { cantidad: 2, minimo: 10 };  // bajo
+  estado.stock["p3::a1"] = { cantidad: 50, minimo: 10 }; // normal
+  estado.stock["p4::a1"] = { cantidad: 0, minimo: null };// agotado (sin minimo)
+  // Lotes para que valor_inventario/costo_promedio no sean undefined.
+  estado.compra("p1", "a1", 5, 10);
+  estado.compra("p2", "a1", 10, 8);
+  estado.compra("p3", "a1", 50, 4);
+  estado.compra("p4", "a1", 3, 6);
+  // Poner stock final correcto tras las compras (la compra suma, pero
+  // queremos estados especificos; ajustamos cantidad directamente).
+  estado.stock["p1::a1"].cantidad = 0;
+  estado.stock["p2::a1"].cantidad = 2;
+  estado.stock["p3::a1"].cantidad = 50;
+  estado.stock["p4::a1"].cantidad = 0;
+  return estado;
+}
+
+async function cargarInventario(window) {
+  const tab = window.document.querySelector('.tab-btn[data-tab="inventario"]');
+  if (tab) tab.click();
+  await esperar(30);
+  await window.refrescarInventario();
+  await esperar(30);
+}
+
+test("R4: filtro Todos muestra todos los productos", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p1"), "muestra agotado");
+  assert.ok(detalle.innerHTML.includes("Prod-p2"), "muestra bajo");
+  assert.ok(detalle.innerHTML.includes("Prod-p3"), "muestra normal");
+  assert.ok(detalle.innerHTML.includes("Prod-p4"), "muestra agotado sin minimo");
+});
+
+test("R4: filtro Bajo mínimo muestra solamente productos bajo mínimo", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  document.querySelector('.inv-estado-btn[data-estado="bajo"]').click();
+  await esperar(20);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p2"), "muestra el bajo mínimo");
+  assert.ok(!detalle.innerHTML.includes("Prod-p1"), "no muestra agotado");
+  assert.ok(!detalle.innerHTML.includes("Prod-p3"), "no muestra normal");
+  assert.ok(!detalle.innerHTML.includes("Prod-p4"), "no muestra agotado sin minimo");
+});
+
+test("R4: filtro Agotados muestra solamente agotados", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  document.querySelector('.inv-estado-btn[data-estado="agotado"]').click();
+  await esperar(20);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p1"), "muestra agotado con minimo");
+  assert.ok(detalle.innerHTML.includes("Prod-p4"), "muestra agotado sin minimo");
+  assert.ok(!detalle.innerHTML.includes("Prod-p2"), "no muestra bajo");
+  assert.ok(!detalle.innerHTML.includes("Prod-p3"), "no muestra normal");
+});
+
+test("R4: filtro Normales muestra solamente normales", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  document.querySelector('.inv-estado-btn[data-estado="normal"]').click();
+  await esperar(20);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p3"), "muestra normal");
+  assert.ok(!detalle.innerHTML.includes("Prod-p1"), "no muestra agotado");
+  assert.ok(!detalle.innerHTML.includes("Prod-p2"), "no muestra bajo");
+  assert.ok(!detalle.innerHTML.includes("Prod-p4"), "no muestra agotado sin minimo");
+});
+
+test("R4: cambio de filtro actualiza inmediatamente la vista", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  const detalle = document.getElementById("inv-detalle");
+  // Inicialmente Todos: 4 productos.
+  assert.ok(detalle.innerHTML.includes("Prod-p1") && detalle.innerHTML.includes("Prod-p3"));
+  // Cambiar a Agotados: solo 2.
+  document.querySelector('.inv-estado-btn[data-estado="agotado"]').click();
+  await esperar(20);
+  assert.ok(detalle.innerHTML.includes("Prod-p1") && detalle.innerHTML.includes("Prod-p4"));
+  assert.ok(!detalle.innerHTML.includes("Prod-p3"), "normal ya no visible");
+  // Cambiar a Normales: solo 1.
+  document.querySelector('.inv-estado-btn[data-estado="normal"]').click();
+  await esperar(20);
+  assert.ok(detalle.innerHTML.includes("Prod-p3"));
+  assert.ok(!detalle.innerHTML.includes("Prod-p1"), "agotado ya no visible");
+});
+
+test("R4: estado sin resultados se muestra correctamente", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  // No hay productos normales... si los hay. Forcemos un estado sin bajo:
+  // usar un inventario solo con normales y filtrar por bajo.
+  const estadoSoloNormales = crearEstadoInventarioMock();
+  estadoSoloNormales.stock["p9::a1"] = { cantidad: 100, minimo: 10 };
+  estadoSoloNormales.compra("p9", "a1", 100, 4);
+  estadoSoloNormales.stock["p9::a1"].cantidad = 100;
+  const w2 = montarEntorno(Object.assign(perfil(), { estado: estadoSoloNormales }));
+  marcarOnline(w2.window);
+  await esperar(80);
+  const tab = w2.window.document.querySelector('.tab-btn[data-tab="inventario"]');
+  if (tab) tab.click();
+  await esperar(30);
+  await w2.window.refrescarInventario();
+  await esperar(30);
+  w2.window.document.querySelector('.inv-estado-btn[data-estado="bajo"]').click();
+  await esperar(20);
+  const detalle = w2.document.getElementById("inv-detalle");
+  assert.ok(/No hay productos bajo m\u00ednimo con el filtro actual/.test(detalle.innerHTML), "estado sin resultados");
+});
+
+test("R4: volver a Todos restaura la lista completa", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  // Filtrar agotados, luego volver a Todos.
+  document.querySelector('.inv-estado-btn[data-estado="agotado"]').click();
+  await esperar(20);
+  document.querySelector('.inv-estado-btn[data-estado="todos"]').click();
+  await esperar(20);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p1") && detalle.innerHTML.includes("Prod-p2") && detalle.innerHTML.includes("Prod-p3") && detalle.innerHTML.includes("Prod-p4"), "lista completa restaurada");
+});
+
+test("R4: no regresión — resumen de valoración sigue sobre todas las filas", async () => {
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado: inventarioMixto() }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  const resumen = document.getElementById("inv-resumen");
+  const antes = resumen.innerHTML;
+  // Filtrar agotados: el resumen no debe cambiar (se calcula sobre todas las filas).
+  document.querySelector('.inv-estado-btn[data-estado="agotado"]').click();
+  await esperar(20);
+  const despues = resumen.innerHTML;
+  assert.strictEqual(antes, despues, "el resumen no cambia al filtrar (totales estables)");
+  // Debe mostrar Agotados: 2 (p1 y p4).
+  assert.ok(/2/.test(resumen.innerHTML), "conteo de agotados correcto en resumen");
+});

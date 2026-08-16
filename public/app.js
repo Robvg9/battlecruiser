@@ -5099,6 +5099,13 @@ async function refrescarTrasReconexion() {
 // degrada con mensajes claros (no inventa datos).
 // ============================================================
 
+// R4: filtro por estado operativo del inventario. Las filas cargadas
+// viven en memoria (no es una segunda cache global: es estado local de
+// la pestana, mismo patron que _movPagina/_repPagina). El filtro trabaja
+// sobre los datos ya cargados: no hace consultas nuevas.
+let _invFiltroEstado = "todos"; // todos | bajo | agotado | normal
+let _invFilas = []; // filas del ultimo inventario cargado (en memoria)
+
 // ---- B6: pestaña Inventario (enriquecido) ----
 // Usa inventario_enriquecido (RPC B6) que devuelve existencia, mínimo,
 // estado, costo promedio ponderado y valoración. Si el RPC no existe,
@@ -5146,8 +5153,10 @@ async function refrescarInventario() {
       }
       return;
     }
-    renderInventario(data || []);
+    _invFilas = data || [];
+    renderInventario(_invFilas);
   } catch (e) {
+    _invFilas = [];
     el.innerHTML = '<p class="lista-estado">Error al cargar el inventario.</p>';
     console.warn("[Battlecruiser] inventario_enriquecido:", e);
   }
@@ -5162,20 +5171,38 @@ function renderInventario(filas) {
     if (resumen) resumen.innerHTML = "";
     return;
   }
+  // Totales/valoracion sobre TODAS las filas (estables, no dependen del filtro).
   let totalValor = 0, totalUnidades = 0, agotados = 0, bajos = 0;
-  el.innerHTML = "";
   filas.forEach((s) => {
-    const valor = Number(s.valor_inventario || 0);
-    totalValor += valor;
+    totalValor += Number(s.valor_inventario || 0);
     totalUnidades += Number(s.cantidad || 0);
     if (s.estado === "agotado") agotados++;
     else if (s.estado === "bajo") bajos++;
-    const div = document.createElement("div");
-    div.className = "rep-fila rep-estado-" + (s.estado || "normal");
-    const icono = s.estado === "agotado" ? "\ud83d\udd34" : s.estado === "bajo" ? "\ud83d\udfe1" : "\ud83d\udfe2";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom $' + money(s.costo_promedio || 0) + " \u00b7 valor $" + money(valor) + "</span></span>";
-    el.appendChild(div);
   });
+  // R4: filtrar por estado operativo antes de pintar la lista visible.
+  // Trabaja sobre los datos ya cargados (sin consultas nuevas).
+  const filtradas = (_invFiltroEstado === "todos")
+    ? filas
+    : filas.filter((s) => {
+        if (_invFiltroEstado === "agotado") return s.estado === "agotado";
+        if (_invFiltroEstado === "bajo") return s.estado === "bajo";
+        if (_invFiltroEstado === "normal") return s.estado !== "agotado" && s.estado !== "bajo";
+        return true;
+      });
+  el.innerHTML = "";
+  if (filtradas.length === 0) {
+    const etiqueta = { bajo: "bajo mínimo", agotado: "agotados", normal: "normales" }[_invFiltroEstado] || "";
+    el.innerHTML = '<p class="lista-estado">No hay productos ' + escHtml(etiqueta) + ' con el filtro actual.</p>';
+  } else {
+    filtradas.forEach((s) => {
+      const valor = Number(s.valor_inventario || 0);
+      const div = document.createElement("div");
+      div.className = "rep-fila rep-estado-" + (s.estado || "normal");
+      const icono = s.estado === "agotado" ? "\ud83d\udd34" : s.estado === "bajo" ? "\ud83d\udfe1" : "\ud83d\udfe2";
+      div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom $' + money(s.costo_promedio || 0) + " \u00b7 valor $" + money(valor) + "</span></span>";
+      el.appendChild(div);
+    });
+  }
   if (resumen) {
     function card(t, v, sub) {
       return '<div class="resumen-card"><div class="valor">' + escHtml(String(v)) + '</div><div class="etiqueta">' + escHtml(t) + "</div>" + (sub ? '<div class="muted">' + escHtml(sub) + "</div>" : "") + "</div>";
@@ -5336,6 +5363,23 @@ function construirAlertasMandoCompleto(ops) {
 safeInit("b6-inventario", () => {
   const refrescar = document.getElementById("inv-refrescar-btn");
   if (refrescar) refrescar.addEventListener("click", () => refrescarInventario());
+
+  // R4: filtro por estado operativo. Botones que filtran la lista ya cargada
+  // en memoria (_invFilas) sin consultas nuevas. Reutiliza renderInventario().
+  const contFiltros = document.getElementById("inv-filtro-estado");
+  if (contFiltros) {
+    contFiltros.addEventListener("click", (e) => {
+      const btn = e.target.closest(".inv-estado-btn");
+      if (!btn) return;
+      _invFiltroEstado = btn.dataset.estado || "todos";
+      // Marcar el boton activo.
+      contFiltros.querySelectorAll(".inv-estado-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      // Reutilizar las filas en memoria; si no hay, no hace nada (renderInventario
+      // ya muestra "Sin datos"). Actualiza inmediatamente la vista.
+      renderInventario(_invFilas);
+    });
+  }
 });
 safeInit("b6-movimientos", () => {
   const refrescar = document.getElementById("mov-refrescar-btn");
