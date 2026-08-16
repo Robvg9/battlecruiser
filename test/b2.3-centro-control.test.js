@@ -355,3 +355,70 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R2 — Centro de Control refleja la actividad comercial (ventas)
+// ============================================================
+
+test("R2: el Centro de Control muestra el monto de ventas recientes en el grid", async () => {
+  // ANTES: la pantalla inicial (Centro de Control) no mostraba ventas,
+  // pese a que _cache.ventas ya existía. AHORA: hay un card "Ventas recientes"
+  // con el monto total y la cantidad de ventas.
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { fecha: "2026-08-15T11:00:00Z", total: 150, almacenes: { nombre: "Caja 1" } },
+  ];
+  window.renderResumen();
+  const grid = document.getElementById("resumen-grid");
+  assert.ok(/Ventas recientes/.test(grid.innerHTML), "card de Ventas recientes presente");
+  assert.ok(grid.innerHTML.includes("$400.00"), "monto total de ventas (250+150)");
+  assert.ok(/2 venta\(s\)/.test(grid.innerHTML), "cantidad de ventas");
+});
+
+test("R2: sin ventas, el card muestra $0.00 y 0 venta(s)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [];
+  window.renderResumen();
+  const grid = document.getElementById("resumen-grid");
+  assert.ok(/Ventas recientes/.test(grid.innerHTML), "card presente");
+  assert.ok(grid.innerHTML.includes("$0.00"), "monto 0 cuando no hay ventas");
+  assert.ok(/0 venta\(s\)/.test(grid.innerHTML), "0 ventas");
+});
+
+test("R2: las ventas aparecen en Últimos movimientos del Centro de Control", async () => {
+  // ANTES: la lista de "Últimos movimientos" solo incluía transferencias y
+  // vales. AHORA: las ventas también aparecen, ordenadas por fecha.
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [{ fecha: "2026-08-15T10:00:00Z", total: 300, almacenes: { nombre: "Caja 1" } }];
+  window._cache.transferencias = [];
+  window._cache.vales = [];
+  window.renderResumen();
+  const movs = document.getElementById("resumen-movs-lista");
+  assert.ok(/Venta/.test(movs.innerHTML), "la lista de movimientos incluye la venta");
+  assert.ok(movs.innerHTML.includes("Caja 1"), "muestra el almacén de la venta");
+  assert.ok(movs.innerHTML.includes("$300.00"), "muestra el monto de la venta");
+});
+
+test("R2: ventas, transferencias y vales coexisten ordenados por fecha", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [{ fecha: "2026-08-15T12:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } }];
+  window._cache.transferencias = [{ fecha: "2026-08-15T10:00:00Z", origen: { nombre: "A" }, destino: { nombre: "B" }, estado: "completada" }];
+  window._cache.vales = [];
+  window.renderResumen();
+  const movs = document.getElementById("resumen-movs-lista");
+  // La venta (12:00) debe aparecer antes que la transferencia (10:00).
+  const ventaIdx = movs.innerHTML.indexOf("Venta:");
+  const trfIdx = movs.innerHTML.indexOf("Transferencia:");
+  assert.ok(ventaIdx !== -1 && trfIdx !== -1, "ambos tipos presentes");
+  assert.ok(ventaIdx < trfIdx, "venta más reciente aparece primero");
+});

@@ -2379,11 +2379,21 @@ function renderResumen() {
 
   const bajoMinimo = _cache.stock.filter((s) => s.minimo != null && s.cantidad <= s.minimo);
 
+  // R2: el Centro de Control (pantalla inicial) ahora refleja la actividad
+  // comercial real del negocio: ventas recientes. Reutiliza _cache.ventas
+  // (ya cargado por refrescarVentasHistorial) — no hace consultas nuevas ni
+  // agrega caché/cola nueva. Antes la pantalla principal del POS no mostraba
+  // ni el monto ni la cantidad de ventas, pese a que _cache.ventas ya existía
+  // y el Centro de Mando sí las usaba.
+  const ventasRecientes = _cache.ventas || [];
+  const totalVendido = ventasRecientes.reduce((s, v) => s + (Number(v.total) || 0), 0);
+
   grid.innerHTML = `
     <div class="resumen-card"><div class="valor">${_cache.productos.length}</div><div class="etiqueta">Productos</div></div>
     <div class="resumen-card"><div class="valor">${_cache.almacenes.length}</div><div class="etiqueta">Almacenes</div></div>
     <div class="resumen-card ${bajoMinimo.length ? "alerta" : ""}"><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div></div>
-    <div class="resumen-card"><div class="valor">${_cache.transferencias.length + _cache.vales.length}</div><div class="etiqueta">Movimientos recientes</div></div>
+    <div class="resumen-card"><div class="valor">$${money(totalVendido)}</div><div class="etiqueta">Ventas recientes</div><div class="muted">${ventasRecientes.length} venta(s)</div></div>
+    <div class="resumen-card"><div class="valor">${_cache.transferencias.length + _cache.vales.length}</div><div class="etiqueta">Otros movimientos</div></div>
   `;
 
   const alertasEl = document.getElementById("resumen-alertas-lista");
@@ -2405,6 +2415,9 @@ function renderResumen() {
   const movsEl = document.getElementById("resumen-movs-lista");
   if (movsEl) {
     const movs = [
+      ...(_cache.ventas || []).map((v) => ({
+        fecha: v.fecha, texto: `Venta: ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"}`, estado: "$" + money(v.total),
+      })),
       ..._cache.transferencias.map((t) => ({
         fecha: t.fecha, texto: `Transferencia: ${t.origen.nombre} → ${t.destino.nombre}`, estado: t.estado,
       })),
