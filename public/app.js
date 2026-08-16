@@ -3652,6 +3652,28 @@ safeInit("form-venta-linea", () => {
   }
 });
 
+// R7: listener delegado del historial de ventas. Click o Enter en una venta
+// abre su detalle con auditoria. No crea un segundo sistema de navegacion.
+safeInit("ventas-historial-detalle", () => {
+  const lista = document.getElementById("lista-ventas");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".venta-item[data-venta-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-venta-id");
+    if (id) mostrarDetalleVenta(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".venta-item[data-venta-id]")) {
+        e.preventDefault();
+        abrir(e.target);
+      }
+    }
+  });
+});
+
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
 // carrito — evita registrar un listener por cada línea que se agrega/quita.
 safeInit("venta-lineas-interaccion", () => {
@@ -3789,20 +3811,193 @@ async function refrescarVentasHistorial() {
   // no se guardaba aca porque el Resumen viejo no las usaba.
   _cache.ventas = data || [];
   renderResumen();
+  // R7: el render se delega a renderVentasHistorial() para poder re-renderizar
+  // la lista sin consultar de nuevo (p.ej. tras cerrar un detalle).
+  renderVentasHistorial();
+}
+
+// R7: render del historial de ventas. Pinta _cache.ventas como entradas
+// accionables (click/Enter abre el detalle con auditoria). No consulta nada
+// nuevo y no modifica _cache.ventas. Reutiliza el patron de las demas listas.
+function renderVentasHistorial() {
   const lista = document.getElementById("lista-ventas");
   if (!lista) return;
-  if (!data || data.length === 0) {
+  const data = _cache.ventas || [];
+  if (data.length === 0) {
     setEmpty("lista-ventas", "Todavía no hay ventas registradas.");
     return;
   }
   lista.innerHTML = "";
   data.forEach((v) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    div.innerHTML = `<span>${v.almacenes.nombre}</span>
+    // R7: cada venta es accionable. data-venta-id permite abrir el detalle
+    // real de esa venta. role/tabindex para teclado (Enter/Espacio).
+    div.className = "lista-item lista-item-accion venta-item";
+    div.setAttribute("data-venta-id", v.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
     lista.appendChild(div);
   });
+}
+
+// R7: helper de redondeo a centavos para comparar montos sin error de coma
+// flotante (149.999999 vs 150.00). Reutiliza el mismo criterio que money().
+// No es una libreria monetaria: una funcion pequena y aislada.
+function redondearCentavos(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.round((v + Number.EPSILON) * 100) / 100 : 0;
+}
+
+// R7: detalle accionable + auditoria de una venta. Reutiliza _cache.ventas
+// (unica fuente, no se modifica) para los datos base y, si hay conexion,
+// consulta las lineas reales via reporte_ventas (RPC ya existente). La
+// auditoria calcula SUMA_DE_LINEAS (suma de subtotales reales) y la compara
+// contra TOTAL_REGISTRADO con tolerancia de centavos. No modifica la venta.
+let _ventaDetalleCargandoId = null; // evita cargas solapadas del detalle
+
+function mostrarDetalleVenta(ventaId) {
+  const cont = document.getElementById("venta-detalle");
+  if (!cont) return;
+  // Buscar la venta en _cache.ventas (no consulta nueva para los datos base).
+  const venta = (_cache.ventas || []).find((v) => v.id === ventaId);
+  if (!venta) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró la venta.</p>'
+      + '<button type="button" class="cc-accion venta-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarVentaDetalle();
+    return;
+  }
+  const fechaHora = venta.fecha ? new Date(venta.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  let html = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Venta #' + (venta.id ? idCorto(venta.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn venta-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(venta.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(venta.almacenes ? venta.almacenes.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(venta.total || 0) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Líneas</span><span class="detalle-valor" id="venta-detalle-lineas"><span class="muted">Cargando…</span></span></div>'
+    + '</div>'
+    + '<div class="venta-auditoria" id="venta-detalle-auditoria"></div>';
+  cont.innerHTML = html;
+  cont.classList.remove("hidden");
+  _enlazarCerrarVentaDetalle();
+  // Cargar las lineas reales solo si hay conexion (no obligatorio para navegar).
+  if (navigator.onLine) {
+    _cargarLineasVenta(ventaId, venta.fecha, venta.total);
+  } else {
+    _renderAuditoriaVenta(null, venta.total, false);
+  }
+  cont.focus();
+}
+
+// Carga las lineas reales de una venta via reporte_ventas (RPC existente que
+// ya devuelve lineas como JSON). Filtra por fecha de la venta y luego por id.
+// No inventa datos: si no hay lineas, lo muestra. Si falla, informa.
+async function _cargarLineasVenta(ventaId, fechaVenta, totalRegistrado) {
+  if (_ventaDetalleCargandoId === ventaId) return;
+  _ventaDetalleCargandoId = ventaId;
+  const el = document.getElementById("venta-detalle-lineas");
+  if (!el) { _ventaDetalleCargandoId = null; return; }
+  try {
+    const fecha = fechaVenta ? new Date(fechaVenta).toISOString().slice(0, 10) : null;
+    const { data, error } = await client.rpc("reporte_ventas", {
+      p_desde: fecha, p_hasta: fecha, p_almacen_id: null, p_producto_id: null,
+      p_limite: 200, p_offset: 0,
+    });
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<span class="muted">Las líneas requieren aplicar supabase/b5-reportes.sql en Supabase.</span>';
+      } else {
+        el.innerHTML = '<span class="muted">No se pudieron cargar las líneas.</span>';
+      }
+      _renderAuditoriaVenta(null, totalRegistrado, true);
+      return;
+    }
+    if (_ventaDetalleCargandoId !== ventaId) return; // se cerro/cambio
+    const venta = (data || []).find((v) => v.id === ventaId);
+    const lineas = venta && Array.isArray(venta.lineas) ? venta.lineas : [];
+    if (lineas.length === 0) {
+      el.innerHTML = '<span class="muted">Sin líneas registradas para esta venta.</span>';
+    } else {
+      el.innerHTML = '<div class="venta-lineas-lista">' + lineas.map((l) =>
+        '<div class="venta-linea">'
+        + '<span class="venta-linea-producto">' + escHtml(l.producto || "—") + '</span>'
+        + '<span class="venta-linea-cant">' + (l.cantidad || 0) + ' u</span>'
+        + '<span class="venta-linea-precio">$' + money(l.precio_unitario || 0) + '</span>'
+        + '<span class="venta-linea-subtotal">$' + money(l.subtotal || 0) + '</span>'
+        + '</div>'
+      ).join("") + '</div>';
+    }
+    _renderAuditoriaVenta(lineas, totalRegistrado, true);
+  } catch (e) {
+    el.innerHTML = '<span class="muted">No se pudieron cargar las líneas.</span>';
+    _renderAuditoriaVenta(null, totalRegistrado, true);
+  } finally {
+    _ventaDetalleCargandoId = null;
+  }
+}
+
+// R7: auditoria matematica de la venta. Calcula SUMA_DE_LINEAS (suma de
+// subtotales reales) y la compara contra TOTAL_REGISTRADO con tolerancia de
+// un centavo (redondeo a 2 decimales para evitar error de coma flotante).
+// Estados visuales derivados de datos reales (no almacena nada):
+//   - TOTAL COINCIDE (verde)
+//   - DIFERENCIA DETECTADA (naranja) + monto de la diferencia
+//   - SIN LINEAS DISPONIBLES (gris)
+//   - LINEAS NO DISPONIBLES SIN CONEXION (azul)
+function _renderAuditoriaVenta(lineas, totalRegistrado, lineasCargadas) {
+  const cont = document.getElementById("venta-detalle-auditoria");
+  if (!cont) return;
+  const totalReg = redondearCentavos(totalRegistrado);
+  // Sin conexion: las lineas no estan disponibles, no es error de la venta.
+  if (!lineasCargadas) {
+    cont.innerHTML = '<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4>'
+      + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(totalReg) + '</span></div>'
+      + '<div class="venta-auditoria-estado estado-info">⚪ Líneas no disponibles sin conexión</div>';
+    return;
+  }
+  // Lineas cargadas pero vacias.
+  if (!lineas || lineas.length === 0) {
+    cont.innerHTML = '<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4>'
+      + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(totalReg) + '</span></div>'
+      + '<div class="venta-auditoria-estado estado-neutro">⚪ Sin líneas disponibles</div>';
+    return;
+  }
+  // Suma de subtotales reales.
+  const totalLineas = redondearCentavos(lineas.reduce((s, l) => s + (Number(l.subtotal) || 0), 0));
+  const diferencia = redondearCentavos(totalReg - totalLineas);
+  // Tolerancia de un centavo por redondeo.
+  const coincide = Math.abs(diferencia) < 0.01;
+  const estadoHtml = coincide
+    ? '<div class="venta-auditoria-estado estado-ok">✅ TOTAL COINCIDE</div>'
+    : '<div class="venta-auditoria-estado estado-alerta">🟠 DIFERENCIA DETECTADA</div>';
+  cont.innerHTML = '<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(totalReg) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total de productos</span><span class="detalle-valor">$' + money(totalLineas) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Diferencia</span><span class="detalle-valor">$' + money(Math.abs(diferencia)) + '</span></div>'
+    + estadoHtml;
+}
+
+function _enlazarCerrarVentaDetalle() {
+  const cont = document.getElementById("venta-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".venta-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleVenta);
+  });
+}
+
+function cerrarDetalleVenta() {
+  const cont = document.getElementById("venta-detalle");
+  if (cont) {
+    cont.classList.add("hidden");
+    cont.innerHTML = "";
+  }
+  _ventaDetalleCargandoId = null;
 }
 
 // ============================================================
