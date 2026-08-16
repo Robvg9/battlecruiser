@@ -3,14 +3,16 @@
 
 Este documento complementa `BATTLECRUISER_CEREBRO.md` con hallazgos recientes verificados sobre el estado técnico del repositorio. No sustituye al Cerebro maestro.
 
-## ESTADO REAL CONFIRMADO (actualizado B6 — 2026-08-15)
+## ESTADO REAL CONFIRMADO (actualizado R1 — 2026-08-16)
 
 - Repo: `Robvg9/battlecruiser`.
-- Rama de trabajo actual: `main`.
-- App: v8.0.
-- Service Worker: shell-v29.
-- B7 IMPLEMENTADO: turnos, cuadres, responsabilidades, incidencias. SQL en supabase/b7-operacion-humana.sql (pendiente de aplicar).
-- B8 IMPLEMENTADO: comunicación y coordinación (conversaciones, mensajes, chat contextual, soporte). SQL en supabase/b8-comunicacion.sql (pendiente de aplicar).
+- Rama base: `main`.
+- PR R1 frontend: **#4 abierto, draft, mergeable**. Base `main`; head `vibe/r1-frontend-b53-b8-catalogos-c16993`.
+- R1 tiene `150/150` tests PASS y `node --check public/app.js` OK, según la entrega del ejecutor.
+- R1 todavía NO está mergeado en `main`; por tanto, no considerarlo parte de producción hasta que sea integrado/verificado.
+- App/Service Worker y demás estados deben seguir verificándose contra el código real, no contra versiones antiguas del Cerebro.
+- B7 implementado: turnos, cuadres, responsabilidades, incidencias. SQL en `supabase/b7-operacion-humana.sql` (pendiente de aplicar según el estado documentado).
+- B8 implementado en frontend: comunicación y coordinación (conversaciones, mensajes, chat contextual, soporte). SQL en `supabase/b8-comunicacion.sql` (pendiente de aplicar según el estado documentado).
 
 ### CORRECCIÓN CRÍTICA de B6 (auditoría en vivo contra Supabase)
 - `lotes_compra` **SÍ EXISTE** (columnas: id, producto_id, almacen_id, cantidad_restante, costo_unitario, fecha_compra, cantidad_inicial). Este addendum y el Cerebro B5 decían que NO existía: estaban equivocados.
@@ -66,64 +68,87 @@ No se debe afirmar prueba de navegador real si no se ejecutó.
 
 ## B2.2-B.3 — UX DE OPERACIONES PENDIENTES
 
-Misión actual.
+CERRADA mediante PR #1 + PR #2.
 
-Se decidió dividirla en dos sesiones por tamaño:
+- B2.2-B.3.1: panel integrado para visualizar operaciones pendientes.
+- B2.2-B.3.2: detalle, reintento y eliminación controlada.
+- Reutiliza la única cola `operaciones_pendientes` y la infraestructura existente.
+- No creó segunda cola, store IndexedDB, caché ni sistema paralelo.
 
-### B2.2-B.3.1
-Crear una interfaz integrada para visualizar la cola existente:
-- PENDIENTE;
-- SINCRONIZANDO;
-- REQUIERE_ATENCION.
+## B2.2-D — RECONCILIACIÓN Y CONSISTENCIA
 
-Debe reutilizar `operaciones_pendientes` y la infraestructura existente.
-No crear otra cola, store IndexedDB, caché ni sistema paralelo.
+CERRADA mediante PR #3, mergeado.
 
-La interfaz debe mostrar tipo, estado, fecha, resumen y error cuando exista. Debe integrarse con el contador existente y actualizarse con los cambios reales de la cola.
+- Reconciliación por tipo después de éxito/error de negocio.
+- Refresco de datos reales desde backend.
+- Conservación de proyección local durante errores de red.
+- `idempotency_key`, FIFO, `_sincronizando` y cola existentes intactos.
 
-### B2.2-B.3.2
-Después de verificar B2.2-B.3.1, revisar y completar la integración/UX si es necesario. No iniciar B2.2-C ni otras funciones del roadmap hasta cerrar esta fase.
+## R1 — FRONTEND: RENTABILIDAD + B8 + PERMISOS
 
-## AUDITORÍA TÉCNICA — HALLAZGOS PARA BACKLOG
+ENTREGADA EN PR #4, todavía **NO MERGEADA**.
 
-Estos puntos fueron detectados durante una auditoría amplia del repositorio. No forman parte de la misión actual y NO deben implementarse automáticamente.
+Cambios:
+- B5.3 `renderRentabilidad`: diferencia costo real de costo no disponible y evita margen 100% falso cuando el costo no existe.
+- B8: `abrirSoporte()` y `abrirConversacionContextual()` reutilizan `ejecutarOperacion('conversacion')` e idempotencia existente.
+- Fix de helper `esperar()` faltante.
+- `tienePermiso()` ya no convierte fallo de red o usuario sin permisos en autorización falsa.
+- 10 tests nuevos; total reportado 150/150 PASS.
 
-### Seguridad / catálogo
-Existen escrituras directas desde cliente en algunas tablas de catálogo, entre ellas:
+No considerar R1 completamente cerrada hasta integrar/verificar PR #4.
+
+## BACKEND DE CATÁLOGOS — BACKLOG DIFERIDO
+
+Hallazgo de R1:
 - `presentaciones`;
 - `producto_presentaciones`;
 - `almacenes`;
 - `categorias`;
 - `unidades`.
 
-Estas operaciones no tienen actualmente el mismo tratamiento offline/idempotente que la cola principal. Debe auditarse RLS y decidir posteriormente si requieren RPC idempotentes y/o soporte offline.
+Estas escrituras directas no tienen actualmente el mismo tratamiento offline/idempotente que la cola principal.
 
-La `SUPABASE_ANON_KEY` visible en frontend no debe tratarse como secreto por sí misma; la seguridad real depende de RLS/permisos y del diseño del backend.
+### Decisión actual
+**NO es la próxima misión.**
+
+El trabajo de backend para crear RPC idempotentes y posteriormente conectar estos catálogos al offline-first queda **movido hacia atrás en la cola de pendientes**, porque en este momento no se dispone de una sesión de Claude/Supabase utilizable para ejecutar ese bloque con seguridad.
+
+No inventar RPC ni intentar resolver este bloqueo únicamente desde frontend.
+Cuando Claude/Supabase vuelva a estar disponible, recuperar este bloque como misión backend dedicada.
+
+## AUDITORÍA TÉCNICA — OTROS HALLAZGOS PARA BACKLOG
+
+Estos puntos fueron detectados durante auditorías amplias. No forman parte de la misión actual y NO deben implementarse automáticamente.
+
+### Seguridad
+Revisar posteriormente funciones `SECURITY DEFINER`, grants y policies cuando se haga una auditoría específica de seguridad. No mezclar esa auditoría con una misión funcional frontend.
 
 ### Mantenibilidad
 `public/app.js` concentra gran parte del frontend y es un archivo grande. La modularización puede ser futura, pero no debe introducirse como parte de una misión funcional sin decisión arquitectónica explícita.
 
 ### Pruebas
-Las pruebas con fake-indexeddb usadas en B2.2-A/B2.2-B.2 no constituyen por sí solas un sistema reproducible de CI dentro del repositorio. Futuramente conviene formalizar tests y CI, pero no es prioridad durante el bloque offline actual.
+Las pruebas con fake-indexeddb no sustituyen la prueba real en navegador/dispositivo. Futuramente conviene formalizar CI y pruebas E2E, pero no deben bloquear el avance funcional actual.
 
 ### Git
-El proyecto utiliza actualmente commits directos a `main` y no tiene un flujo consolidado de PR/CI. Futuramente conviene mejorar trazabilidad, protección de rama y mensajes de commit.
+El proyecto utiliza PRs para algunas entregas recientes, pero el flujo global de PR/CI todavía debe consolidarse posteriormente.
 
-### Detalles menores detectados
+### Detalles menores
 - revisar iconos referenciados por `manifest.json` si realmente faltan;
 - revisar uso de `--ember` si continúa sin definición en `:root`;
 - revisar `compatibility_date` de Wrangler si corresponde;
 - revisar carga de scripts/CDN si se busca mayor robustez ante redes lentas.
 
-## REGLA DE PRIORIDAD
+## REGLA DE PRIORIDAD ACTUAL
 
-Los hallazgos anteriores son BACKLOG. No deben distraer del bloque técnico activo.
+La regla nueva de trabajo es: **cada misión debe producir avance funcional tangible del producto; no hacer auditorías eternas si existe una implementación concreta que pueda mejorar el producto.**
 
 Orden actual:
-1. B2.2-B.3.1 — panel de operaciones pendientes.
-2. Auditoría/verificación de B2.2-B.3.1.
-3. B2.2-B.3.2 si corresponde.
-4. Solo después continuar con la siguiente misión definida en el Cerebro.
+1. **Integrar/verificar PR #4 (R1)** cuando corresponda; no duplicar su trabajo.
+2. **R2 FRONTEND — siguiente misión:** continuar el crecimiento funcional desde GitHub con una mejora concreta y verificable, priorizando el núcleo operativo y evitando depender de Supabase/Claude.
+3. Validación real de los escenarios offline pendientes cuando Roberto pueda ejecutarlos en navegador/dispositivo.
+4. Continuar con el siguiente bloque funcional grande del producto.
+5. **Backend de catálogos offline-first** queda deliberadamente más atrás y se recuperará cuando exista una sesión de Claude/Supabase utilizable.
+6. Seguridad profunda, CI, modularización y detalles menores permanecen después del avance funcional principal.
 
 ## REGLA PARA FUTURAS SESIONES CON OTRAS IA
 
@@ -132,8 +157,7 @@ El analista/arquitecto debe:
 - verificar GitHub antes de afirmar estado;
 - usar el código real como autoridad técnica;
 - no pedir al usuario archivos que el analista pueda leer desde GitHub;
-- entregar al ejecutor una misión pequeña y concreta;
-- dividir misiones pesadas en sesiones cuando sea necesario;
+- entregar al ejecutor una misión concreta;
 - auditar el resultado antes de considerarlo cerrado.
 
-El ejecutor (Claude, Vibe u otra IA) se encarga del código. El analista se encarga de continuidad, arquitectura, auditoría y definición de misiones.
+El ejecutor se encarga del código. El analista se encarga de continuidad, arquitectura, auditoría y definición de misiones.
