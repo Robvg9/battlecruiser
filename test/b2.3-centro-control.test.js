@@ -355,3 +355,177 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R5 — Historial de ventas accionable (buscador + contador)
+// ============================================================
+
+function ventasEjemplo() {
+  return [
+    { id: "11111111-aaaa-4bbb-8ccc-111111111111", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "22222222-bbbb-4ccc-8ddd-222222222222", fecha: "2026-08-15T11:30:00Z", total: 1500, almacenes: { nombre: "Caja 2" } },
+    { id: "33333333-cccc-4ddd-8eee-333333333333", fecha: "2026-08-14T09:00:00Z", total: 75.50, almacenes: { nombre: "Caja 1" } },
+    { id: "44444444-dddd-4eee-8fff-444444444444", fecha: "2026-08-16T14:00:00Z", total: 320, almacenes: { nombre: "Depósito" } },
+  ];
+}
+
+test("R5: muestra todas las ventas inicialmente con ID corto visible", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  window.renderVentasHistorial();
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.innerHTML.includes("Caja 1"), "muestra almacén");
+  assert.ok(lista.innerHTML.includes("#11111111"), "muestra ID corto de venta 1");
+  assert.ok(lista.innerHTML.includes("#22222222"), "muestra ID corto de venta 2");
+  assert.ok(lista.innerHTML.includes("$1500.00"), "muestra total");
+  const contador = document.getElementById("ventas-contador");
+  assert.ok(contador.textContent.includes("4 ventas"), "contador muestra total");
+});
+
+test("R5: buscar por ID corto encuentra la venta", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "2222";
+  // Disparar el evento input que actualiza _ventasBusqueda y re-renderiza.
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.innerHTML.includes("Caja 2"), "encuentra la venta por ID corto");
+  assert.ok(!lista.innerHTML.includes("Caja 1"), "no muestra las otras");
+  assert.ok(!lista.innerHTML.includes("Depósito"), "no muestra las otras");
+  const contador = document.getElementById("ventas-contador");
+  assert.ok(contador.textContent.includes("Mostrando 1 de 4"), "contador muestra 1 de 4");
+});
+
+test("R5: buscar por almacén encuentra las ventas coincidentes", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "Caja 1";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  const lista = document.getElementById("lista-ventas");
+  // Caja 1 tiene 2 ventas.
+  assert.ok(lista.innerHTML.includes("#11111111"), "venta 1 de Caja 1");
+  assert.ok(lista.innerHTML.includes("#33333333"), "venta 3 de Caja 1");
+  assert.ok(!lista.innerHTML.includes("Caja 2"), "no muestra Caja 2");
+  assert.ok(!lista.innerHTML.includes("Depósito"), "no muestra Depósito");
+  const contador = document.getElementById("ventas-contador");
+  assert.ok(contador.textContent.includes("Mostrando 2 de 4"), "contador muestra 2 de 4");
+});
+
+test("R5: buscar por total encuentra la venta", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "1500";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.innerHTML.includes("Caja 2"), "encuentra por total");
+  assert.ok(!lista.innerHTML.includes("Caja 1"), "no muestra las otras");
+});
+
+test("R5: estado sin resultados muestra mensaje claro + botón Ver todas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "zzzzinexistente";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(/No encontramos ventas con esos criterios/.test(lista.innerHTML), "mensaje sin resultados");
+  assert.ok(lista.querySelector(".ventas-ver-todas-btn"), "botón Ver todas presente");
+  const contador = document.getElementById("ventas-contador");
+  assert.ok(contador.textContent.includes("Mostrando 0 de 4"), "contador muestra 0 de 4");
+});
+
+test("R5: botón 'Ver todas' restaura la lista completa", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "Caja 2";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  // Ahora click en "Ver todas" (no hay porque hay 1 resultado; forzamos sin resultados).
+  input.value = "zzzz";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  const btnVerTodas = document.querySelector("#lista-ventas .ventas-ver-todas-btn");
+  assert.ok(btnVerTodas, "botón presente en estado sin resultados");
+  btnVerTodas.click();
+  await esperar(10);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.innerHTML.includes("#11111111") && lista.innerHTML.includes("#44444444"), "lista completa restaurada");
+  assert.strictEqual(input.value, "", "input limpiado");
+  const contador = document.getElementById("ventas-contador");
+  assert.ok(contador.textContent.includes("4 ventas"), "contador restaurado a total");
+});
+
+test("R5: _cache.ventas NO se modifica al buscar/filtrar", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasEjemplo();
+  window._cache.ventas = ventas;
+  const input = document.getElementById("ventas-buscar");
+  input.value = "Caja 1";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  // _cache.ventas debe seguir siendo el mismo array con 4 elementos.
+  assert.strictEqual(window._cache.ventas.length, 4, "_cache.ventas conserva los 4 elementos");
+  assert.strictEqual(window._cache.ventas, ventas, "_cache.ventas es la misma referencia (no se clona ni reemplaza)");
+  assert.strictEqual(window._cache.ventas[1].id, "22222222-bbbb-4ccc-8ddd-222222222222", "elemento intacto");
+});
+
+test("R5: sin ventas muestra estado vacío y contador vacío", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [];
+  window.renderVentasHistorial();
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(/Todav\u00eda no hay ventas registradas/.test(lista.innerHTML), "estado vacío");
+  const contador = document.getElementById("ventas-contador");
+  assert.strictEqual(contador.textContent, "", "contador vacío sin ventas");
+});
+
+test("R5: no regresión — métricas del Centro de Control siguen funcionando con _cache.ventas", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  // construirActividadReciente usa _cache.ventas: debe seguir funcionando.
+  const movs = window.construirActividadReciente();
+  const ventaMovs = movs.filter((m) => /Venta/.test(m.texto));
+  assert.ok(ventaMovs.length === 4, "las 4 ventas aparecen en actividad reciente del Centro de Control");
+  assert.ok(ventaMovs.some((m) => m.resultado === "$250.00"), "monto correcto en actividad");
+});
+
+test("R5: búsqueda case-insensitive", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasEjemplo();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "dep\u00f3sito"; // minúsculas con acento
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(10);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.innerHTML.includes("Depósito"), "búsqueda case-insensitive encuentra Depósito");
+  assert.ok(!lista.innerHTML.includes("Caja 1"), "no muestra las otras");
+});

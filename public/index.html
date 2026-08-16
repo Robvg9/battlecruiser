@@ -309,6 +309,12 @@
       <p class="msg" id="msg-venta"></p>
 
       <h3>Historial de ventas</h3>
+      <!-- R5: buscador del historial de ventas. Filtra _cache.ventas en memoria,
+           sin consultas nuevas. Funciona offline con las ventas ya cargadas. -->
+      <div class="ventas-historial-controles">
+        <input id="ventas-buscar" type="text" placeholder="Buscar por #referencia, almacén o fecha…" autocomplete="off">
+        <span id="ventas-contador" class="muted ventas-contador"></span>
+      </div>
       <div id="lista-ventas" class="lista"></div>
     </section>
 
