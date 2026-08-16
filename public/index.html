@@ -310,6 +310,13 @@
 
       <h3>Historial de ventas</h3>
       <div id="lista-ventas" class="lista"></div>
+      <!-- R7: detalle accionable + auditoria de una venta. Reutiliza el
+           patron visual de #pendiente-detalle. Muestra los datos reales en
+           cache (id, fecha, almacen, total) y, si hay conexion, las lineas
+           reales via reporte_ventas + auditoria matematica (suma de
+           subtotales vs total registrado). Offline: el historial sigue
+           funcionando; las lineas se informan como no disponibles. -->
+      <div id="venta-detalle" class="venta-detalle hidden" role="dialog" aria-label="Detalle de venta"></div>
     </section>
 
     <section id="tab-almacenes" class="tab-panel">

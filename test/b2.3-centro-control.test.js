@@ -355,3 +355,267 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R7 — Auditoría matemática del detalle de una venta
+// ============================================================
+
+function ventasAuditoria() {
+  return [
+    { id: "11111111-aaaa-4bbb-8ccc-111111111111", fecha: "2026-08-15T10:30:00Z", total: 150, almacenes: { nombre: "Caja 1" } },
+    { id: "22222222-bbbb-4ccc-8ddd-222222222222", fecha: "2026-08-15T11:00:00Z", total: 145, almacenes: { nombre: "Caja 2" } },
+    { id: "33333333-cccc-4ddd-8eee-333333333333", fecha: "2026-08-15T12:00:00Z", total: 80, almacenes: { nombre: "Caja 1" } },
+  ];
+}
+
+function mockReporteVentasConLineas(ventas, mapLineas) {
+  // mapLineas: funcion que devuelve las lineas para una venta dada.
+  const conLineas = ventas.map((v) => Object.assign({}, v, {
+    almacen: v.almacenes ? v.almacenes.nombre : null,
+    lineas: mapLineas(v),
+  }));
+  return async (nombre, params) => {
+    if (nombre === "reporte_ventas") {
+      const f = params && params.p_desde;
+      const filtradas = f ? conLineas.filter((v) => v.fecha.slice(0, 10) === f) : conLineas;
+      return { data: filtradas, error: null };
+    }
+    return { data: "ok", error: null };
+  };
+}
+
+async function abrirVenta(window, document, ventaId) {
+  window.renderVentasHistorial();
+  await esperar(20);
+  document.querySelector("#lista-ventas .venta-item[data-venta-id='" + ventaId + "']").click();
+  await esperar(50);
+}
+
+test("R7.1: el detalle muestra productos, cantidades, precios y subtotales reales", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  client.rpc = mockReporteVentasConLineas(ventas, (v) => [
+    { producto_id: "p1", producto: "Café", cantidad: 2, precio_unitario: 50, subtotal: 100 },
+    { producto_id: "p2", producto: "Tostada", cantidad: 1, precio_unitario: 50, subtotal: 50 },
+  ]);
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(/Café/.test(detalle.innerHTML), "muestra producto");
+  assert.ok(/2 u/.test(detalle.innerHTML), "muestra cantidad");
+  assert.ok(/\$50\.00/.test(detalle.innerHTML), "muestra precio unitario");
+  assert.ok(/\$100\.00/.test(detalle.innerHTML), "muestra subtotal de la línea");
+});
+
+test("R7.2: suma de subtotales coincide con total registrado → TOTAL COINCIDE", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  // Líneas que suman exactamente 150 = total registrado.
+  client.rpc = mockReporteVentasConLineas(ventas, (v) => [
+    { producto_id: "p1", producto: "Café", cantidad: 2, precio_unitario: 50, subtotal: 100 },
+    { producto_id: "p2", producto: "Tostada", cantidad: 1, precio_unitario: 50, subtotal: 50 },
+  ]);
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  const auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/TOTAL COINCIDE/.test(auditoria.innerHTML), "estado TOTAL COINCIDE");
+  assert.ok(auditoria.innerHTML.includes("$150.00"), "muestra total registrado");
+  assert.ok(/Total de productos/.test(auditoria.innerHTML), "muestra total de productos");
+  assert.ok(/\$0\.00/.test(auditoria.innerHTML), "diferencia $0.00");
+});
+
+test("R7.3: suma de subtotales NO coincide → DIFERENCIA DETECTADA + diferencia", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  // Total registrado 150, pero líneas suman 145 → diferencia $5.
+  client.rpc = mockReporteVentasConLineas(ventas, (v) => {
+    if (v.id === "11111111-aaaa-4bbb-8ccc-111111111111") {
+      return [
+        { producto_id: "p1", producto: "Café", cantidad: 2, precio_unitario: 50, subtotal: 100 },
+        { producto_id: "p2", producto: "Tostada", cantidad: 1, precio_unitario: 45, subtotal: 45 },
+      ];
+    }
+    return [];
+  });
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  const auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/DIFERENCIA DETECTADA/.test(auditoria.innerHTML), "estado DIFERENCIA DETECTADA");
+  assert.ok(auditoria.innerHTML.includes("$145.00"), "muestra total de productos (145)");
+  assert.ok(auditoria.innerHTML.includes("$5.00"), "muestra la diferencia ($5)");
+});
+
+test("R7.4: diferencia inferior a la tolerancia (centavos) se considera coincidente", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  // Total registrado 150, líneas suman 149.999 (error de coma flotante) → coincide.
+  client.rpc = mockReporteVentasConLineas(ventas, (v) => [
+    { producto_id: "p1", producto: "Café", cantidad: 1, precio_unitario: 99.999, subtotal: 99.999 },
+    { producto_id: "p2", producto: "Tostada", cantidad: 1, precio_unitario: 50, subtotal: 50 },
+  ]);
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  const auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/TOTAL COINCIDE/.test(auditoria.innerHTML), "tolerancia de centavos → coincide");
+  assert.ok(!/DIFERENCIA DETECTADA/.test(auditoria.innerHTML), "no marca diferencia por error de coma flotante");
+});
+
+test("R7.5: venta sin líneas → SIN LÍNEAS DISPONIBLES", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  client.rpc = mockReporteVentasConLineas(ventas, () => []);
+  await abrirVenta(window, document, "33333333-cccc-4ddd-8eee-333333333333");
+  const auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/Sin líneas disponibles/.test(auditoria.innerHTML), "estado SIN LÍNEAS DISPONIBLES");
+  assert.ok(auditoria.innerHTML.includes("$80.00"), "muestra total registrado de todas formas");
+});
+
+test("R7.6: offline — el detalle abre y avisa que las líneas no están disponibles sin conexión", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  window.renderVentasHistorial();
+  await esperar(20);
+  document.querySelector("#lista-ventas .venta-item[data-venta-id='11111111-aaaa-4bbb-8ccc-111111111111']").click();
+  await esperar(30);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle visible offline");
+  assert.ok(/\$150\.00/.test(detalle.innerHTML), "muestra total (dato en caché)");
+  const auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/no disponibles sin conexión/.test(auditoria.innerHTML), "avisa que las líneas requieren conexión");
+  // No inventa líneas ni productos.
+  assert.ok(!/Café/.test(detalle.innerHTML), "no inventa productos offline");
+  assert.ok(!/TOTAL COINCIDE/.test(auditoria.innerHTML), "no audita sin líneas");
+});
+
+test("R7.7: la auditoría NO modifica _cache.ventas", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  client.rpc = mockReporteVentasConLineas(ventas, (v) => [
+    { producto_id: "p1", producto: "Café", cantidad: 2, precio_unitario: 50, subtotal: 100 },
+  ]);
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  document.querySelector(".venta-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.strictEqual(window._cache.ventas, ventas, "_cache.ventas es la misma referencia");
+  assert.strictEqual(window._cache.ventas.length, 3, "_cache.ventas conserva los 3 elementos");
+  assert.strictEqual(window._cache.ventas[0].total, 150, "total de la venta intacto");
+});
+
+test("R7.8: cerrar el detalle sigue funcionando tras la auditoría", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  client.rpc = mockReporteVentasConLineas(ventas, () => [
+    { producto_id: "p1", producto: "Café", cantidad: 2, precio_unitario: 50, subtotal: 100 },
+  ]);
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle abierto");
+  detalle.querySelector(".venta-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.ok(detalle.classList.contains("hidden"), "detalle cerrado");
+  assert.strictEqual(detalle.innerHTML, "", "contenido limpiado");
+  // El historial sigue intacto.
+  assert.strictEqual(document.querySelectorAll("#lista-ventas .venta-item").length, 3, "historial conservado");
+});
+
+test("R7.9: el historial sigue funcionando (no regresión)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasAuditoria();
+  window.renderVentasHistorial();
+  await esperar(20);
+  const items = document.querySelectorAll("#lista-ventas .venta-item");
+  assert.strictEqual(items.length, 3, "historial muestra 3 ventas");
+  assert.ok(items[0].getAttribute("data-venta-id"), "items accionables");
+  // Sin ventas: estado vacío.
+  window._cache.ventas = [];
+  window.renderVentasHistorial();
+  await esperar(10);
+  assert.ok(/Todavía no hay ventas registradas/.test(document.getElementById("lista-ventas").innerHTML), "estado vacío");
+});
+
+test("R7.10: abrir una segunda venta no conserva auditoría de la primera", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  client.rpc = mockReporteVentasConLineas(ventas, (v) => {
+    if (v.id === "11111111-aaaa-4bbb-8ccc-111111111111") {
+      return [{ producto_id: "p1", producto: "Café", cantidad: 2, precio_unitario: 50, subtotal: 100 },
+              { producto_id: "p2", producto: "Tostada", cantidad: 1, precio_unitario: 50, subtotal: 50 }];
+    }
+    // Venta 2: total 145, líneas suman 145 → coincide.
+    return [{ producto_id: "p3", producto: "Jugo", cantidad: 1, precio_unitario: 145, subtotal: 145 }];
+  });
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  let auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/TOTAL COINCIDE/.test(auditoria.innerHTML), "venta 1: coincide (150)");
+  assert.ok(auditoria.innerHTML.includes("$150.00"), "venta 1: total 150");
+  // Abrir venta 2.
+  await abrirVenta(window, document, "22222222-bbbb-4ccc-8ddd-222222222222");
+  auditoria = document.getElementById("venta-detalle-auditoria");
+  assert.ok(/TOTAL COINCIDE/.test(auditoria.innerHTML), "venta 2: coincide (145)");
+  assert.ok(auditoria.innerHTML.includes("$145.00"), "venta 2: total 145");
+  assert.ok(!auditoria.innerHTML.includes("$150.00"), "no conserva total de la venta 1");
+  assert.ok(!/Café/.test(document.getElementById("venta-detalle").innerHTML), "no conserva líneas de venta 1");
+});
+
+test("R7.11: abrir/cerrar varias veces no acumula listeners ni elementos duplicados", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasAuditoria();
+  window._cache.ventas = ventas;
+  client.rpc = mockReporteVentasConLineas(ventas, () => [
+    { producto_id: "p1", producto: "Café", cantidad: 1, precio_unitario: 50, subtotal: 50 },
+  ]);
+  for (let i = 0; i < 3; i++) {
+    await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+    document.querySelector(".venta-detalle-cerrar-btn").click();
+    await esperar(10);
+  }
+  // Un solo contenedor de detalle.
+  assert.strictEqual(document.querySelectorAll("#venta-detalle").length, 1, "un solo contenedor de detalle");
+  // Un solo botón de cerrar tras las aperturas.
+  await abrirVenta(window, document, "11111111-aaaa-4bbb-8ccc-111111111111");
+  assert.strictEqual(document.querySelectorAll("#venta-detalle .venta-detalle-cerrar-btn").length, 1, "un solo botón cerrar");
+  // Una sola sección de auditoría.
+  assert.strictEqual(document.querySelectorAll("#venta-detalle-auditoria").length, 1, "una sola sección de auditoría");
+});
+
+test("R7.12: no duplicación de arquitectura — una sola fuente y un solo detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(window._cacheVentas, undefined, "no hay segunda caché de ventas");
+  assert.strictEqual(window._ventasCache, undefined, "no hay segunda caché (alias)");
+  assert.strictEqual(document.querySelectorAll("#venta-detalle").length, 1, "un solo contenedor de detalle");
+  assert.strictEqual(typeof window.mostrarDetalleVenta, "function", "una sola función mostrarDetalleVenta");
+  assert.strictEqual(typeof window.cerrarDetalleVenta, "function", "una sola función cerrarDetalleVenta");
+  assert.strictEqual(typeof window.redondearCentavos, "function", "una sola función redondearCentavos");
+  assert.strictEqual(typeof window.renderVentasHistorial, "function", "una sola función renderVentasHistorial");
+});
