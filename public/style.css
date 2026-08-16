@@ -906,7 +906,7 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .com-conv-ultmsg { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .com-conv-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .com-conv-fecha { font-size: 10px; }
-.com-conv-badge { background: var(--ember, #c9a24d); color: var(--bg, #0f1620); font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; min-width: 18px; text-align: center; }
+.com-conv-badge { background: var(--gold); color: var(--void); font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; min-width: 18px; text-align: center; }
 .com-chat-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--gold-dim); background: rgba(201,162,77,0.04); }
 .com-chat-titulo { flex: 1; font-weight: 600; color: var(--text); font-size: 14px; }
 .com-volver-btn { display: none; }

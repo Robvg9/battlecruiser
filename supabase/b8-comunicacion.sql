@@ -540,29 +540,28 @@ DECLARE
   v_total int := 0;
 BEGIN
   IF v_uid IS NULL THEN RETURN 0; END IF;
-  SELECT COALESCE(sum(sub.n), 0) INTO v_total FROM (
-    SELECT count(*) AS n FROM public.mensajes m
-    WHERE m.usuario_id <> v_uid
-      AND m.conversacion_id IN (
-        SELECT pc.conversacion_id FROM public.participantes_conversacion pc WHERE pc.usuario_id = v_uid
+  -- B8.5: una sola consulta unificada. Cuenta mensajes de otros autores
+  -- en conversaciones donde el usuario participa, más GENERAL si tiene permiso.
+  -- Antes había dos consultas que duplicaban el total (bug corregido).
+  SELECT count(*) INTO v_total
+  FROM public.mensajes m
+  WHERE m.usuario_id <> v_uid
+    AND m.creado_en > COALESCE(
+      (SELECT pc.ultimo_leido_en FROM public.participantes_conversacion pc
+        WHERE pc.conversacion_id = m.conversacion_id AND pc.usuario_id = v_uid),
+      '1970-01-01'::timestamptz)
+    AND (
+      -- Conversaciones donde el usuario es participante.
+      m.conversacion_id IN (
+        SELECT pc.conversacion_id FROM public.participantes_conversacion pc
+        WHERE pc.usuario_id = v_uid
       )
-      AND m.creado_en > COALESCE(
-        (SELECT pc.ultimo_leido_en FROM public.participantes_conversacion pc
-          WHERE pc.conversacion_id = m.conversacion_id AND pc.usuario_id = v_uid), '1970-01-01'::timestamptz)
-  ) sub;
-  -- GENERAL: contar también si el usuario tiene el permiso.
-  IF public.tiene_permiso('comunicacion', 'ver') THEN
-    SELECT COALESCE(sum(sub.n), 0) INTO v_total FROM (
-      SELECT count(*) AS n FROM public.mensajes m
-      JOIN public.conversaciones c ON c.id = m.conversacion_id
-      WHERE c.tipo = 'GENERAL'
-        AND m.usuario_id <> v_uid
-        AND m.creado_en > COALESCE(
-          (SELECT pc.ultimo_leido_en FROM public.participantes_conversacion pc
-            WHERE pc.conversacion_id = m.conversacion_id AND pc.usuario_id = v_uid), '1970-01-01'::timestamptz)
-    ) sub;
-    v_total := v_total + COALESCE(v_total, 0);
-  END IF;
+      OR
+      -- GENERAL: visible si el usuario tiene el permiso.
+      (m.conversacion_id IN (
+        SELECT c.id FROM public.conversaciones c WHERE c.tipo = 'GENERAL'
+      ) AND public.tiene_permiso('comunicacion', 'ver'))
+    );
   RETURN v_total;
 END;
 $$;

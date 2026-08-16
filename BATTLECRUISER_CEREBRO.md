@@ -96,7 +96,7 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - B7 — Operación humana IMPLEMENTADO. Turnos, cuadres, responsabilidades e incidencias. Reutiliza _validar_usuario_operacion (B6), tiene_permiso, registrar_auditoria (B4), operaciones_pendientes + ejecutarOperacion (B2). Crea tablas turnos/cuadres/responsabilidades/incidencias + RPC seguros (abrir_turno, cerrar_turno, registrar_cuadre, revisar_cuadre, crear_responsabilidad, crear_incidencia, etc.). SQL versionado (pendiente de aplicar).
 - B8 — Comunicación y coordinación IMPLEMENTADO. Conversaciones (general, privada, soporte, contextuales), mensajes, no leídos. Reutiliza ejecutarOperacion + cola offline (B2), tiene_permiso (B3), registrar_auditoria (B4). Crea tablas conversaciones/participantes_conversacion/mensajes + RPC seguros (crear_conversacion, enviar_mensaje, listar_*, marcar_leida, etc.). SQL versionado (pendiente de aplicar).
 - App v8.0, Service Worker shell-v29.
-- Validación automatizada: **137/137 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6 + 27 B7 + 30 B8).
+- Validación automatizada: **140/140 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6 + 27 B7 + 33 B8).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -828,6 +828,45 @@ Confirmado que NO existen: `conversaciones`, `participantes_conversacion`, `mens
 
 ### Versión
 - App v8.0. Service Worker shell-v29.
+
+## B8.5 — AUDITORÍA TOTAL + LIMPIEZA + CORRECCIÓN — REALIZADA
+
+### Estado
+Auditoría profunda del sistema completo (B1-B8). Se corrigieron bugs reales, se verificó la arquitectura y se actualizó el Cerebro para reflejar el estado real.
+
+### Auditoría REAL de Supabase (introspección en vivo, 2026-08-15)
+**Tablas que EXISTEN** (400 con RLS): usuarios, roles, permisos, productos, almacenes, stock, categorias, unidades, presentaciones, producto_presentaciones, ventas, ventas_lineas, transferencias, transferencias_lineas, vales_salida, lotes_compra.
+**Tablas que NO existen** (404): compras, movimientos_stock, auditoria_operaciones, turnos, cuadres, responsabilidades, incidencias, conversaciones, participantes_conversacion, mensajes.
+**RPC que EXISTEN**: perfil_usuario_actual, permisos_usuario_actual, usuario_esta_activo, listar_usuarios_admin, listar_roles_admin.
+**RPC que NO existen** (todas las de B4-B8): registrar_auditoria, listar_auditoria_admin, registrar_compra/venta/transferencia/vale_salida, crear_producto, inventario_enriquecido, movimientos_producto, rentabilidad_ventas, historial_compras, abrir_turno, cerrar_turno, registrar_cuadre, revisar_cuadre, crear_responsabilidad, actualizar_responsabilidad, crear_incidencia, resolver_incidencia, listar_turnos/cuadres/responsabilidades/incidencias, turno_actual_usuario, crear_conversacion, enviar_mensaje, listar_conversaciones_usuario, listar_mensajes_conversacion, marcar_conversacion_leida, agregar_participante, cerrar_conversacion, contar_no_leidos_global, listar_usuarios_para_chat, reporte_*.
+
+**CONCLUSIÓN**: todo el SQL de B3-B8 está VERSIONADO pero NO APLICADO. Solo las RPC básicas de B3 (perfil/permisos/usuario/listar) están aplicadas.
+
+### Bugs encontrados y corregidos
+1. **BUG crítico: `_usuarioActual` usado como función**. En `renderEstadoMando` y `construirAlertasMando` se comprobaba `typeof _usuarioActual === "function"` (siempre false porque es una variable `let`). Consecuencia: la sesión del usuario NUNCA se mostraba en el Centro de Mando y la alerta de usuario inactivo NUNCA se generaba. **Corregido**: usar la variable directamente.
+2. **BUG crítico: `contar_no_leidos_global` duplicaba el total**. El SQL contaba mensajes de conversaciones del usuario, luego contaba GENERAL de nuevo y hacía `v_total := v_total + v_total` (duplicaba). **Corregido**: una sola consulta unificada.
+3. **BUG menor: CSS B8 usaba variables inexistentes** (`--ember`, `--bg` no definidas en `:root`). **Corregido**: usar `--gold` y `--void` (variables reales del proyecto).
+
+### Verificación de arquitectura (0 duplicados confirmado)
+- **1 sola base IndexedDB** (`battlecruiser-cache`), **2 stores** (`lecturas`, `operaciones_pendientes`). No hay stores duplicados.
+- **1 sola cola offline** (`operaciones_pendientes`), **1 solo `_sincronizando`**, **1 solo `RPC_POR_TIPO`** (con todos los tipos B2-B8). No hay colas/sincronizadores duplicados.
+- **1 sola caché** (`_cache`). No hay cachés paralelas.
+- **1 solo sistema de permisos** (`tiene_permiso` + `tiene_permiso` en backend). No hay sistemas paralelos.
+- **1 sola auditoría** (`registrar_auditoria` B4). No hay tablas/funciones duplicadas.
+- **1 sola lógica FIFO** (`_consumir_fifo` B6 sobre `lotes_compra`). No hay segundo sistema FIFO.
+- **0 IDs HTML duplicados**, **0 funciones duplicadas** (B7/B8 con sufijos son funciones distintas).
+- **`node --check`**: OK. **Suite completa**: 140/140 PASS.
+
+### Lo que NO se tocó y por qué
+- **`public/app.js` tamaño (~289 KB)**: es deuda técnica conocida (un solo archivo grande). La modularización requiere una decisión arquitectónica explícita (no se hace en B8.5 para no introducir riesgo).
+- **SQL no aplicado**: no se puede aplicar desde el sandbox (sin conector service_role ni SQL Editor). Roberto debe ejecutar los SQL en orden.
+- **Realtime (visto/escribiendo)**: fuera de alcance, no es un bug.
+- **`ventas` sin `usuario_id`**: limita la precisión del cálculo de dinero esperado por turno (B7 usa almacén+período). Corregirlo requiere migrar el esquema de `ventas` (decisión arquitectónica, no se hace sin validar compatibilidad).
+
+### Problemas que requieren decisión de Roberto
+- ⚠️ Aplicar los SQL de B3-B8 en Supabase (orden: b3 → b4 → b5 → b6 → b7 → b8).
+- ⚠️ Decidir si se agrega `usuario_id` a `ventas` para precisión por trabajador en cuadres.
+- ⚠️ Decidir cuándo modularizar `app.js` (deuda técnica, no rompe nada pero dificulta mantenimiento).
 
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.

@@ -4330,9 +4330,10 @@ function renderEstadoMando(estado) {
   if (!el) return;
   el.className = "cc-estado cc-estado-" + estado.nivel;
   let extra = "";
-  if (_usuarioActual && typeof _usuarioActual === "function") {
-    const u = _usuarioActual();
-    if (u) extra = '<span class="cc-estado-detalle">Sesión: ' + escHtml(u.nombre || "") + (u.rol ? " · " + escHtml(u.rol) : "") + "</span>";
+  // B8.5: _usuarioActual es una variable (let _usuarioActual), no una función.
+  // Antes se comprobaba typeof === "function" (siempre false) → nunca mostraba la sesión.
+  if (_usuarioActual) {
+    extra = '<span class="cc-estado-detalle">Sesión: ' + escHtml(_usuarioActual.nombre || "") + (_usuarioActual.rol ? " · " + escHtml(_usuarioActual.rol) : "") + "</span>";
   }
   el.innerHTML = '<div class="cc-estado-cabecera"><span class="cc-estado-titulo">' + escHtml(estado.texto) + "</span><span class=\"cc-estado-detalle\">" + escHtml(estado.detalle) + "</span>" + extra + "</div>";
 }
@@ -4370,11 +4371,9 @@ function construirAlertasMando(ops) {
     alertas.push({ nivel: "atencion", tipo: "Sin conexión", texto: "Trabajando offline. Los datos pueden no estar actualizados.", op: null });
   }
   // Usuario inactivo intentando operar — solo si el contexto indica inactivo.
-  if (_usuarioActual && typeof _usuarioActual === "function") {
-    const u = _usuarioActual();
-    if (u && u.activo === false) {
-      alertas.push({ nivel: "critico", tipo: "Usuario inactivo", texto: "Tu usuario está inactivo. No podés operar.", op: null });
-    }
+  // B8.5: _usuarioActual es variable, no función.
+  if (_usuarioActual && _usuarioActual.activo === false) {
+    alertas.push({ nivel: "critico", tipo: "Usuario inactivo", texto: "Tu usuario está inactivo. No podés operar.", op: null });
   }
   return alertas.sort((a, b) => {
     const orden = { critico: 0, atencion: 1, normal: 2 };
