@@ -7,9 +7,10 @@ Este documento complementa `BATTLECRUISER_CEREBRO.md` con hallazgos recientes ve
 
 - Repo: `Robvg9/battlecruiser`.
 - Rama de trabajo actual: `main`.
-- App: v7.0.
-- Service Worker: shell-v28.
+- App: v8.0.
+- Service Worker: shell-v29.
 - B7 IMPLEMENTADO: turnos, cuadres, responsabilidades, incidencias. SQL en supabase/b7-operacion-humana.sql (pendiente de aplicar).
+- B8 IMPLEMENTADO: comunicación y coordinación (conversaciones, mensajes, chat contextual, soporte). SQL en supabase/b8-comunicacion.sql (pendiente de aplicar).
 
 ### CORRECCIÓN CRÍTICA de B6 (auditoría en vivo contra Supabase)
 - `lotes_compra` **SÍ EXISTE** (columnas: id, producto_id, almacen_id, cantidad_restante, costo_unitario, fecha_compra, cantidad_inicial). Este addendum y el Cerebro B5 decían que NO existía: estaban equivocados.

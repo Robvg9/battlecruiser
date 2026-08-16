@@ -887,3 +887,45 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 #reportes-filtros label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--mist); }
 #reportes-conn-info { font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+
+/* ============================================================
+   B8 — Comunicación y Coordinación
+   Layout de chat nativo de BattleCruiser (oscuro, elegante).
+   ============================================================ */
+.com-layout { display: flex; gap: 12px; min-height: 420px; max-height: 60vh; }
+.com-col-lista { flex: 1 1 38%; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.com-col-chat { flex: 1 1 62%; min-width: 0; display: flex; flex-direction: column; border: 1px solid var(--gold-dim); border-radius: 8px; background: var(--stone); overflow: hidden; }
+.com-lista-header { display: flex; gap: 6px; }
+.com-lista { flex: 1; overflow-y: auto; border: 1px solid var(--gold-dim); border-radius: 8px; background: var(--stone); }
+.com-conv-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--gold-dim); cursor: pointer; transition: background 0.15s; }
+.com-conv-item:hover { background: rgba(201,162,77,0.06); }
+.com-conv-activa { background: rgba(201,162,77,0.1); }
+.com-conv-icono { font-size: 18px; }
+.com-conv-contenido { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.com-conv-titulo { font-weight: 600; color: var(--text); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.com-conv-ultmsg { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.com-conv-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.com-conv-fecha { font-size: 10px; }
+.com-conv-badge { background: var(--ember, #c9a24d); color: var(--bg, #0f1620); font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; min-width: 18px; text-align: center; }
+.com-chat-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--gold-dim); background: rgba(201,162,77,0.04); }
+.com-chat-titulo { flex: 1; font-weight: 600; color: var(--text); font-size: 14px; }
+.com-volver-btn { display: none; }
+.com-mensajes { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.com-msg { max-width: 75%; padding: 8px 12px; border-radius: 10px; background: var(--stone); border: 1px solid var(--gold-dim); align-self: flex-start; }
+.com-msg-propio { align-self: flex-end; background: rgba(201,162,77,0.12); border-color: var(--gold-dim); }
+.com-msg-pendiente { opacity: 0.7; border-style: dashed; }
+.com-msg-autor { font-size: 11px; font-weight: 600; color: var(--mist); margin-bottom: 2px; }
+.com-msg-contenido { font-size: 13.5px; color: var(--text); word-wrap: break-word; }
+.com-msg-meta { font-size: 10px; margin-top: 3px; }
+.com-input-bar { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--gold-dim); background: var(--stone); }
+.com-input-bar input { flex: 1; }
+.com-nueva-panel { margin-top: 12px; padding: 12px; border: 1px solid var(--gold-dim); border-radius: 8px; background: var(--stone); }
+/* Móvil: lista y chat apilados, botón volver visible. */
+@media (max-width: 768px) {
+  .com-layout { flex-direction: column; max-height: none; }
+  .com-col-lista { flex: 1 1 auto; }
+  .com-col-chat { flex: 1 1 auto; min-height: 50vh; }
+  .com-volver-btn { display: inline-block; }
+  .com-msg { max-width: 88%; }
+  .com-input-bar { position: sticky; bottom: 0; }
+}

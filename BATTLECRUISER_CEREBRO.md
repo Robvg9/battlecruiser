@@ -94,8 +94,9 @@ El sistema se orienta a cafeterías/puntos de venta y almacenes, con ventas, inv
 - B5 — Reportes y análisis operativo implementado. Reutiliza tablas existentes + tiene_permiso('reportes','ver'). SQL de reportes versionado (pendiente de aplicar).
 - B6 — Núcleo operativo + inventario inteligente IMPLEMENTADO. Reutiliza lotes_compra (SÍ EXISTE, ver auditoría), tiene_permiso, operaciones_idempotencia, operaciones_pendientes, _cache. Crea compras + movimientos_stock (no existían). RPC registrar_compra/venta/transferencia/vale con FIFO, costo real, atomicidad. SQL versionado (pendiente de aplicar).
 - B7 — Operación humana IMPLEMENTADO. Turnos, cuadres, responsabilidades e incidencias. Reutiliza _validar_usuario_operacion (B6), tiene_permiso, registrar_auditoria (B4), operaciones_pendientes + ejecutarOperacion (B2). Crea tablas turnos/cuadres/responsabilidades/incidencias + RPC seguros (abrir_turno, cerrar_turno, registrar_cuadre, revisar_cuadre, crear_responsabilidad, crear_incidencia, etc.). SQL versionado (pendiente de aplicar).
-- App v7.0, Service Worker shell-v28.
-- Validación automatizada: **107/107 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6 + 27 B7).
+- B8 — Comunicación y coordinación IMPLEMENTADO. Conversaciones (general, privada, soporte, contextuales), mensajes, no leídos. Reutiliza ejecutarOperacion + cola offline (B2), tiene_permiso (B3), registrar_auditoria (B4). Crea tablas conversaciones/participantes_conversacion/mensajes + RPC seguros (crear_conversacion, enviar_mensaje, listar_*, marcar_leida, etc.). SQL versionado (pendiente de aplicar).
+- App v8.0, Service Worker shell-v29.
+- Validación automatizada: **137/137 PASS** (16 B2.3 + 14 B3 + 12 B4 + 11 B5 + 27 B6 + 27 B7 + 30 B8).
 - La prueba real desde navegador/dispositivo todavía no se considera fase de aceptación final; queda deliberadamente para el final del desarrollo.
 
 ## IDEMPOTENCIA — ARQUITECTURA REAL
@@ -721,7 +722,7 @@ Hallazgos que **corrigen** afirmaciones anteriores del Cerebro:
 - `node --check public/app.js`: OK.
 
 ### Versión
-- App v7.0. Service Worker shell-v28. Cache-busting vía bump del SW.
+- App v8.0. Service Worker shell-v29. Cache-busting vía bump del SW.
 
 ## B7 — OPERACIÓN HUMANA: TURNOS + CUADRES + RESPONSABILIDADES + INCIDENCIAS — IMPLEMENTADO
 
@@ -776,6 +777,58 @@ Confirmado que NO existen: `turnos`, `cuadres`, `responsabilidades`, `incidencia
 ### Versión
 - App v7.0. Service Worker shell-v28. Cache-busting vía bump del SW.
 
+## B8 — COMUNICACIÓN Y COORDINACIÓN OPERATIVA — IMPLEMENTADO
+
+### Estado
+B8 está IMPLEMENTADO en el frontend y el SQL está versionado en `supabase/b8-comunicacion.sql`. **NO aplicado aún en Supabase** (pendiente de que Roberto lo ejecute en el SQL Editor). El frontend degrada con mensajes claros si los RPC aún no existen.
+
+### Auditoría REAL en vivo contra Supabase (2026-08-15)
+Confirmado que NO existen: `conversaciones`, `participantes_conversacion`, `mensajes` (todas 404). B8 las crea.
+
+### Qué se implementó
+1. **Tabla `conversaciones`** (nueva): tipo (GENERAL/PRIVADA/SOPORTE/INCIDENCIA/TURNO/RESPONSABILIDAD), título, creador, referencias contextuales (incidencia_id, turno_id, responsabilidad_id), estado (ACTIVA/CERRADA). RLS + REVOKE.
+2. **Tabla `participantes_conversacion`** (nueva): quién participa en cada conversación, ultimo_leido_en (para contador de no leídos). UNIQUE(conversacion_id, usuario_id). RLS + REVOKE.
+3. **Tabla `mensajes`** (nueva): conversacion_id, usuario_id, usuario_nombre, contenido, estado, idempotency_key. RLS + REVOKE.
+4. **RPC `crear_conversacion`**: idempotente (contextual: si ya existe del mismo tipo+referencia, la devuelve). GENERAL: una sola. Crea participantes.
+5. **RPC `enviar_mensaje`**: valida acceso (participante o GENERAL), contenido no vacío, idempotencia (no duplica con idempotency_key). Registra auditoría.
+6. **RPC `listar_conversaciones_usuario`**: devuelve conversaciones del usuario + GENERAL, con último mensaje y no leídos.
+7. **RPC `listar_mensajes_conversacion`**: valida acceso, paginado.
+8. **RPC `marcar_conversacion_leida`**: actualiza ultimo_leido_en.
+9. **RPC `agregar_participante`**, **`cerrar_conversacion`**: validan creador/admin.
+10. **RPC `contar_no_leidos_global`**: total para el badge del sidebar.
+11. **RPC `listar_usuarios_para_chat`**: usuarios activos para iniciar conversación.
+12. **Helper `_es_participante`**: valida acceso (participante o GENERAL con permiso).
+13. **Frontend**: pestaña Comunicación (lista + chat responsive con botón volver en móvil), badge de no leídos en sidebar, soporte, conversación contextual (abrirConversacionContextual), alertas en Centro de Mando, refresco al iniciar y reconectar.
+
+### Arquitectura (reutilización, 0 duplicados)
+- `ejecutarOperacion` + `operaciones_pendientes` + `sincronizarCola` + `_sincronizando` (B2) = única cola offline. Los tipos `mensaje` y `conversacion` se añadieron al MISMO `RPC_POR_TIPO`.
+- `tienePermiso` (B3) = autorización frontend. Permisos `comunicacion.ver`, `comunicacion.crear`.
+- `registrar_auditoria` (B4) = única auditoría (enviar_mensaje y crear_conversacion la llaman).
+- `_validar_usuario_operacion` (B6) = validación central.
+- `_cache` (B2) = única caché.
+- RLS: un usuario solo lee conversaciones donde participa (o GENERAL si tiene permiso). Las privadas jamás quedan expuestas por SELECT directo: las RPC validan `_es_participante`.
+- Stores nuevos: 0. Colas nuevas: 0. Cachés nuevas: 0. Sincronizadores nuevos: 0.
+
+### Seguridad
+- Todos los RPC: SECURITY DEFINER, `search_path = public, pg_temp`, validan `auth.uid()`, `usuario_esta_activo()` y `tiene_permiso`.
+- RLS + REVOKE a anon en todas las tablas nuevas.
+- Idempotencia: enviar_mensaje no duplica con idempotency_key.
+- El frontend no puede saltarse las restricciones (las RPC validan acceso antes de devolver datos).
+
+### Limitaciones reales
+- El SQL de B8 (y B3-B7) **NO está aplicado** en Supabase. Roberto debe ejecutar los SQL en orden. Mientras tanto, el frontend avisa que faltan los RPC.
+- Las pruebas de B8 validan la lógica con un mock que refleja la semántica de los RPC. La validación SQL real requiere aplicar el SQL.
+- No se implementó "visto/escribiendo" en tiempo real (requeriría Supabase Realtime, fuera de alcance de B8). Se priorizó comunicación sólida offline-first.
+- Las pruebas reales con perfiles/dispositivos quedan para la fase final de aceptación.
+
+### Pruebas
+- `test/b8-comunicacion.test.js`: 30 casos (crear conversación, general idempotente, privada, privacidad, participantes, enviar mensaje, vacío rechazado, idempotencia, duplicado, listado, historial, marcar leído, no leídos, soporte, contextuales incidencia/turno/responsabilidad, permisos, inactivo, offline, reintento, reconexión, error de servidor, auditoría, Centro de Mando, compatibilidad B3/B4/B7, 0 duplicados).
+- Suite global: **137/137 PASS** (B2.3 + B3 + B4 + B5 + B6 + B7 + B8).
+- `node --check public/app.js`: OK.
+
+### Versión
+- App v8.0. Service Worker shell-v29.
+
 ## LECCIONES ARQUITECTÓNICAS
 - Auditar primero, programar después.
 - Si una arquitectura existente resuelve el problema, reutilizarla.
@@ -797,9 +850,9 @@ La visión futura incluye una aplicación instalable para teléfono en lugar de 
 
 **Cerrado:** B2.3 — Centro de Control Operacional; B3 — Sistema operacional de usuarios, roles, permisos y control; B4 — Centro de Mando + auditoría + trazabilidad; B5 — Reportes y análisis operativo (frontend completo; SQL de B3/B4/B5 pendiente de aplicar en Supabase).
 
-**Actual:** proyecto consolidado en `main` (v7.0). B7 — Operación humana (turnos, cuadres, responsabilidades, incidencias) IMPLEMENTADO (frontend + SQL versionado, pendiente de aplicar en Supabase).
+**Actual:** proyecto consolidado en `main` (v8.0). B8 — Comunicación y coordinación operativa IMPLEMENTADO (frontend + SQL versionado, pendiente de aplicar en Supabase).
 
-**Siguiente bloque general:** aplicar los SQL de B3/B4/B5/B6/B7 en Supabase, luego pruebas reales multi-usuario/dispositivo, y módulos pendientes (comunicación/Centro de Mando, recompensas, empaquetado como app instalable).
+**Siguiente bloque general:** aplicar los SQL de B3-B8 en Supabase, luego pruebas reales multi-usuario/dispositivo, y módulos pendientes (recompensas, empaquetado como app instalable, Realtime para visto/escribiendo).
 
 **Posterior:** módulos operativos de negocio → turnos/cuadre → auditoría y responsabilidad → aprobaciones → comunicación/Centro de Mando → recompensas → empaquetado → aceptación final.
 

@@ -33,7 +33,10 @@
 // v28 — Mision B7: bump por Operacion Humana (turnos, cuadres,
 // responsabilidades, incidencias, aprobaciones; nuevas pestanas Turnos y
 // Operacion; integracion en Centro de Mando).
-const CACHE_NAME = "battlecruiser-shell-v28";
+// v29 — Mision B8: bump por Comunicacion y Coordinacion Operativa
+// (conversaciones, mensajes, chat contextual, no leidos, soporte;
+// nueva pestana Comunicacion; integracion en Centro de Mando).
+const CACHE_NAME = "battlecruiser-shell-v29";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

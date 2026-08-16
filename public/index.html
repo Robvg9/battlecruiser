@@ -63,7 +63,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <p class="error" id="login-error"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote">v7.0 · La Cueva</p>
+      <p class="footnote">v8.0 · La Cueva</p>
     </form>
   </div>
 
@@ -89,6 +89,7 @@
         <button class="tab-btn" data-tab="movimientos">Movimientos</button>
         <button class="tab-btn" data-tab="turnos">Turnos</button>
         <button class="tab-btn" data-tab="operacion">Operación</button>
+        <button class="tab-btn" data-tab="comunicacion">Comunicación <span id="com-tab-badge" class="pendientes-tab-badge hidden"></span></button>
         <button class="tab-btn" data-tab="mando">Centro de Mando</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
@@ -552,6 +553,56 @@
       </div>
     </section>
 
+    <section id="tab-comunicacion" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Comunicación</h3>
+        <span id="com-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Conversaciones generales, privadas, de soporte y contextuales.</p>
+
+      <!-- Layout responsive: lista + conversación -->
+      <div class="com-layout">
+        <!-- Columna lista de conversaciones -->
+        <div class="com-col-lista" id="com-col-lista">
+          <div class="com-lista-header">
+            <button type="button" id="com-nueva-btn" class="cc-accion">Nueva</button>
+            <button type="button" id="com-soporte-btn" class="cc-accion">Soporte</button>
+          </div>
+          <div id="lista-conversaciones" class="lista com-lista"></div>
+        </div>
+
+        <!-- Columna conversación abierta -->
+        <div class="com-col-chat hidden" id="com-col-chat">
+          <div class="com-chat-header">
+            <button type="button" id="com-volver-btn" class="cc-accion com-volver-btn">← Volver</button>
+            <span id="com-chat-titulo" class="com-chat-titulo"></span>
+            <button type="button" id="com-cerrar-btn" class="cc-accion hidden">Cerrar</button>
+          </div>
+          <div id="com-mensajes" class="com-mensajes"></div>
+          <form id="form-mensaje" class="com-input-bar">
+            <input id="mensaje-input" type="text" placeholder="Escribí un mensaje…" autocomplete="off" required>
+            <button type="submit">Enviar</button>
+          </form>
+          <p class="msg" id="msg-mensaje"></p>
+        </div>
+      </div>
+
+      <!-- Formulario de nueva conversación (oculto por defecto) -->
+      <div id="com-nueva-panel" class="com-nueva-panel hidden">
+        <h4>Nueva conversación</h4>
+        <form id="form-nueva-conv" class="inline-form">
+          <select id="nueva-conv-tipo">
+            <option value="PRIVADA">Privada</option>
+            <option value="SOPORTE">Soporte</option>
+          </select>
+          <select id="nueva-conv-usuario"><option value="">Usuario…</option></select>
+          <input id="nueva-conv-titulo" placeholder="Asunto (opcional)">
+          <button type="submit">Crear</button>
+        </form>
+        <p class="msg" id="msg-nueva-conv"></p>
+      </div>
+    </section>
+
     <section id="tab-mando" class="tab-panel">
       <div class="pendientes-header">
         <h3>Centro de Mando</h3>
@@ -616,7 +667,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v7.0 · La Cueva</span>
+      <span class="app-footer-version">v8.0 · La Cueva</span>
     </footer>
   </div>
 
