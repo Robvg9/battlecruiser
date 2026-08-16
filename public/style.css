@@ -690,6 +690,21 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .pendiente-detalle .pendiente-eliminar-btn {
   border-color: var(--wine); color: var(--wine);
 }
+/* R6: detalle de venta (mismo patron visual que #pendiente-detalle) */
+.venta-detalle { margin-top: 12px; border: 1px solid var(--gold-dim); border-radius: 6px; background: rgba(28,24,18,0.6); padding: 12px 14px; }
+.venta-detalle.hidden { display: none; }
+.venta-detalle .detalle-fila { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid rgba(201,162,77,0.08); }
+.venta-detalle .detalle-fila:last-child { border-bottom: none; }
+.venta-detalle .detalle-etiqueta { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--mist); text-transform: uppercase; letter-spacing: 0.05em; }
+.venta-detalle .detalle-valor { font-size: 13.5px; color: var(--text); text-align: right; word-break: break-all; }
+.venta-lineas-lista { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.venta-linea { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.venta-linea > span:first-child { color: var(--text); font-size: 12.5px; }
+.lista-item-accion { cursor: pointer; transition: background 0.08s ease, border-color 0.08s ease; }
+.lista-item-accion:hover { background: rgba(201,162,77,0.07); border-color: var(--gold-dim); }
+.lista-item-accion:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.venta-item[aria-expanded="true"] { border-color: var(--gold); }
+
 .pendiente-detalle .pendiente-eliminar-btn:hover {
   background: rgba(122,35,49,0.15); color: var(--wine);
 }

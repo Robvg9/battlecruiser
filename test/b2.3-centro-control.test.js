@@ -355,3 +355,210 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R6 — Detalle accionable de una venta del historial
+// ============================================================
+
+function ventasConId() {
+  return [
+    { id: "11111111-aaaa-4bbb-8ccc-111111111111", fecha: "2026-08-15T10:30:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "22222222-bbbb-4ccc-8ddd-222222222222", fecha: "2026-08-15T11:00:00Z", total: 1500, almacenes: { nombre: "Caja 2" } },
+  ];
+}
+
+function mockReporteVentas(ventas) {
+  // Devuelve las ventas con lineas reales (como el RPC reporte_ventas).
+  const conLineas = ventas.map((v) => Object.assign({}, v, {
+    almacen: v.almacenes ? v.almacenes.nombre : null,
+    lineas: [
+      { producto_id: "p1", producto: "Caf\u00e9", cantidad: 2, precio_unitario: 125, subtotal: 250 },
+      { producto_id: "p2", producto: "Tostada", cantidad: 1, precio_unitario: 0, subtotal: 0 },
+    ],
+  }));
+  return async (nombre, params) => {
+    if (nombre === "reporte_ventas") {
+      // Filtrar por fecha como hace el frontend, devolver las que coincidan.
+      const f = params && params.p_desde;
+      const filtradas = f ? conLineas.filter((v) => v.fecha.slice(0, 10) === f) : conLineas;
+      return { data: filtradas, error: null };
+    }
+    return { data: "ok", error: null };
+  };
+}
+
+async function cargarHistorial(window) {
+  // R6: render directo desde _cache.ventas (sin consulta), como hace la app
+  // cuando ya tiene los datos cargados. Probar comportamiento real.
+  window.renderVentasHistorial();
+  await esperar(20);
+}
+
+test("R6: cada venta del historial es accionable (data-venta-id + role button)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  await cargarHistorial(window);
+  const items = document.querySelectorAll("#lista-ventas .venta-item");
+  assert.strictEqual(items.length, 2, "hay 2 ventas accionables");
+  assert.ok(items[0].getAttribute("data-venta-id"), "primera venta tiene data-venta-id");
+  assert.strictEqual(items[0].getAttribute("role"), "button", "role button");
+  assert.strictEqual(items[0].getAttribute("tabindex"), "0", "tabindex 0 para teclado");
+});
+
+test("R6: click en una venta abre el detalle con su ID", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  await cargarHistorial(window);
+  const item = document.querySelector("#lista-ventas .venta-item[data-venta-id='11111111-aaaa-4bbb-8ccc-111111111111']");
+  assert.ok(item, "item de venta 1 presente");
+  item.click();
+  await esperar(20);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle visible tras click");
+  assert.ok(detalle.innerHTML.includes("11111111-aaaa-4bbb-8ccc-111111111111"), "muestra el ID completo de la venta");
+});
+
+test("R6: el detalle muestra los datos reales disponibles (fecha, almac\u00e9n, total)", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  client.rpc = mockReporteVentas(ventasConId());
+  await cargarHistorial(window);
+  document.querySelector("#lista-ventas .venta-item").click();
+  await esperar(40);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(/Caja 1/.test(detalle.innerHTML), "muestra almac\u00e9n");
+  assert.ok(/\$250\.00/.test(detalle.innerHTML), "muestra total");
+  assert.ok(/Fecha y hora/.test(detalle.innerHTML), "muestra etiqueta de fecha");
+});
+
+test("R6: el detalle carga las l\u00edneas reales online (productos, cantidades, precios)", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  client.rpc = mockReporteVentas(ventasConId());
+  await cargarHistorial(window);
+  document.querySelector("#lista-ventas .venta-item[data-venta-id='11111111-aaaa-4bbb-8ccc-111111111111']").click();
+  await esperar(40);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(/Caf\u00e9/.test(detalle.innerHTML), "muestra producto de la l\u00ednea");
+  assert.ok(/2 u/.test(detalle.innerHTML), "muestra cantidad");
+  assert.ok(/\$125\.00/.test(detalle.innerHTML), "muestra precio unitario");
+  assert.ok(/\$250\.00/.test(detalle.innerHTML), "muestra subtotal de la l\u00ednea");
+});
+
+test("R6: offline — el detalle abre y avisa que las l\u00edneas requieren conexi\u00f3n", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  await cargarHistorial(window);
+  // Pasar a offline.
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  document.querySelector("#lista-ventas .venta-item").click();
+  await esperar(30);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle visible offline");
+  assert.ok(/\$250\.00/.test(detalle.innerHTML), "muestra total (dato en cache)");
+  assert.ok(/Sin conexi\u00f3n/.test(detalle.innerHTML), "avisa que las l\u00edneas requieren conexi\u00f3n");
+  // No inventa l\u00edneas.
+  assert.ok(!/Caf\u00e9/.test(detalle.innerHTML), "no inventa productos offline");
+});
+
+test("R6: cerrar el detalle vuelve al historial y conserva la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  await cargarHistorial(window);
+  document.querySelector("#lista-ventas .venta-item").click();
+  await esperar(20);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle abierto");
+  // Cerrar.
+  detalle.querySelector(".venta-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.ok(detalle.classList.contains("hidden"), "detalle cerrado");
+  // La lista sigue intacta.
+  const items = document.querySelectorAll("#lista-ventas .venta-item");
+  assert.strictEqual(items.length, 2, "historial conservado al cerrar detalle");
+});
+
+test("R6: abrir/cerrar una venta no modifica _cache.ventas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = ventasConId();
+  window._cache.ventas = ventas;
+  await cargarHistorial(window);
+  document.querySelector("#lista-ventas .venta-item").click();
+  await esperar(30);
+  document.querySelector(".venta-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.strictEqual(window._cache.ventas, ventas, "_cache.ventas es la misma referencia");
+  assert.strictEqual(window._cache.ventas.length, 2, "_cache.ventas conserva los 2 elementos");
+});
+
+test("R6: abrir una venta y luego otra actualiza el detalle (no acumula)", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  client.rpc = mockReporteVentas(ventasConId());
+  await cargarHistorial(window);
+  // Abrir venta 1.
+  document.querySelector("#lista-ventas .venta-item[data-venta-id='11111111-aaaa-4bbb-8ccc-111111111111']").click();
+  await esperar(40);
+  let detalle = document.getElementById("venta-detalle");
+  assert.ok(detalle.innerHTML.includes("Caja 1"), "detalle muestra venta 1");
+  // Abrir venta 2.
+  document.querySelector("#lista-ventas .venta-item[data-venta-id='22222222-bbbb-4ccc-8ddd-222222222222']").click();
+  await esperar(40);
+  detalle = document.getElementById("venta-detalle");
+  assert.ok(detalle.innerHTML.includes("Caja 2"), "detalle actualizado a venta 2");
+  assert.ok(!detalle.innerHTML.includes("11111111-aaaa-4bbb-8ccc-111111111111"), "no acumula el detalle anterior");
+});
+
+test("R6: teclado — Enter abre el detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = ventasConId();
+  await cargarHistorial(window);
+  const item = document.querySelector("#lista-ventas .venta-item");
+  item.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await esperar(20);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "Enter abre el detalle");
+});
+
+test("R6: no regresi\u00f3n — historial sin ventas sigue mostrando estado vac\u00edo", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [];
+  await cargarHistorial(window);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(/Todav\u00eda no hay ventas registradas/.test(lista.innerHTML), "estado vac\u00edo");
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(detalle.classList.contains("hidden"), "detalle cerrado sin ventas");
+});
+
+test("R6: no duplicaci\u00f3n — una sola fuente _cache.ventas y un solo contenedor de detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  // No existe una segunda cache de ventas ni un segundo detalle.
+  assert.strictEqual(window._cacheVentas, undefined, "no hay segunda cache de ventas");
+  assert.strictEqual(window._ventasCache, undefined, "no hay segunda cache de ventas (alias)");
+  assert.strictEqual(document.querySelectorAll("#venta-detalle").length, 1, "un solo contenedor de detalle");
+  assert.strictEqual(typeof window.mostrarDetalleVenta, "function", "una sola funcion mostrarDetalleVenta");
+  assert.strictEqual(typeof window.cerrarDetalleVenta, "function", "una sola funcion cerrarDetalleVenta");
+});

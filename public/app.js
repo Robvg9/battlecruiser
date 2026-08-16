@@ -3652,6 +3652,29 @@ safeInit("form-venta-linea", () => {
   }
 });
 
+// R6: listener delegado del historial de ventas. Click o Enter en una venta
+// abre su detalle real. No crea un segundo sistema de navegacion: reutiliza
+// el contenedor #venta-detalle y mostrarDetalleVenta().
+safeInit("ventas-historial-detalle", () => {
+  const lista = document.getElementById("lista-ventas");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".venta-item[data-venta-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-venta-id");
+    if (id) mostrarDetalleVenta(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".venta-item[data-venta-id]")) {
+        e.preventDefault();
+        abrir(e.target);
+      }
+    }
+  });
+});
+
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
 // carrito — evita registrar un listener por cada línea que se agrega/quita.
 safeInit("venta-lineas-interaccion", () => {
@@ -3789,20 +3812,140 @@ async function refrescarVentasHistorial() {
   // no se guardaba aca porque el Resumen viejo no las usaba.
   _cache.ventas = data || [];
   renderResumen();
+  // R6: el render se delega a renderVentasHistorial() para poder re-renderizar
+  // la lista (p.ej. tras abrir/cerrar un detalle) sin consultar de nuevo.
+  renderVentasHistorial();
+}
+
+// R6: render del historial de ventas. Pinta _cache.ventas como entradas
+// accionables (click/Enter abre el detalle). No consulta nada nuevo y no
+// modifica _cache.ventas. Reutiliza el patron de las demas listas.
+function renderVentasHistorial() {
   const lista = document.getElementById("lista-ventas");
   if (!lista) return;
-  if (!data || data.length === 0) {
+  const data = _cache.ventas || [];
+  if (data.length === 0) {
     setEmpty("lista-ventas", "Todavía no hay ventas registradas.");
     return;
   }
   lista.innerHTML = "";
   data.forEach((v) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    div.innerHTML = `<span>${v.almacenes.nombre}</span>
+    // R6: cada venta es accionable. data-venta-id permite abrir el detalle
+    // real de esa venta. role/tabindex para teclado (Enter/Espacio). Reutiliza
+    // el estilo lista-item existente + clase accion para feedback visual.
+    div.className = "lista-item lista-item-accion venta-item";
+    div.setAttribute("data-venta-id", v.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
     lista.appendChild(div);
   });
+}
+
+// R6: detalle accionable de una venta. Reutiliza _cache.ventas (unica fuente,
+// no se modifica) para los datos base y, si hay conexion, consulta las lineas
+// reales via reporte_ventas (RPC ya existente, sin inventar datos). Offline:
+// muestra los datos en cache y avisa que las lineas requieren conexion.
+// Reutiliza el patron visual de #pendiente-detalle (cabecera + cuerpo + cerrar).
+let _ventaDetalleCargandoId = null; // evita cargas solapadas del detalle
+
+function mostrarDetalleVenta(ventaId) {
+  const cont = document.getElementById("venta-detalle");
+  if (!cont) return;
+  // Buscar la venta en _cache.ventas (no consulta nueva para los datos base).
+  const venta = (_cache.ventas || []).find((v) => v.id === ventaId);
+  if (!venta) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró la venta.</p>'
+      + '<button type="button" class="cc-accion venta-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarVentaDetalle();
+    return;
+  }
+  const fechaHora = venta.fecha ? new Date(venta.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  let html = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Venta #' + (venta.id ? idCorto(venta.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn venta-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(venta.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(venta.almacenes ? venta.almacenes.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total</span><span class="detalle-valor">$' + money(venta.total || 0) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Líneas</span><span class="detalle-valor" id="venta-detalle-lineas"><span class="muted">Cargando…</span></span></div>'
+    + '</div>';
+  cont.innerHTML = html;
+  cont.classList.remove("hidden");
+  _enlazarCerrarVentaDetalle();
+  // Cargar las lineas reales solo si hay conexion (no obligatorio para navegar).
+  if (navigator.onLine) {
+    _cargarLineasVenta(ventaId, venta.fecha);
+  } else {
+    const el = document.getElementById("venta-detalle-lineas");
+    if (el) el.innerHTML = '<span class="muted">⚪ Sin conexión — las líneas requieren datos de Supabase.</span>';
+  }
+  cont.focus();
+}
+
+// Carga las lineas reales de una venta via reporte_ventas (RPC existente que
+// ya devuelve lineas como JSON). Filtra por fecha de la venta y luego por id.
+// No inventa datos: si no hay lineas, lo muestra. Si falla, informa.
+async function _cargarLineasVenta(ventaId, fechaVenta) {
+  if (_ventaDetalleCargandoId === ventaId) return;
+  _ventaDetalleCargandoId = ventaId;
+  const el = document.getElementById("venta-detalle-lineas");
+  if (!el) { _ventaDetalleCargandoId = null; return; }
+  try {
+    // Filtrar por la fecha de la venta para reducir el conjunto, luego buscar
+    // por id en el resultado. reporte_ventas ya existe y devuelve lineas.
+    const fecha = fechaVenta ? new Date(fechaVenta).toISOString().slice(0, 10) : null;
+    const { data, error } = await client.rpc("reporte_ventas", {
+      p_desde: fecha, p_hasta: fecha, p_almacen_id: null, p_producto_id: null,
+      p_limite: 200, p_offset: 0,
+    });
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<span class="muted">Las líneas requieren aplicar supabase/b5-reportes.sql en Supabase.</span>';
+      } else {
+        el.innerHTML = '<span class="muted">No se pudieron cargar las líneas.</span>';
+      }
+      return;
+    }
+    if (_ventaDetalleCargandoId !== ventaId) return; // se cerró/cambió
+    const venta = (data || []).find((v) => v.id === ventaId);
+    const lineas = venta && Array.isArray(venta.lineas) ? venta.lineas : [];
+    if (lineas.length === 0) {
+      el.innerHTML = '<span class="muted">Sin líneas registradas para esta venta.</span>';
+      return;
+    }
+    el.innerHTML = '<div class="venta-lineas-lista">' + lineas.map((l) =>
+      '<div class="venta-linea"><span>' + escHtml(l.producto || "—") + '</span>'
+      + '<span class="muted">' + (l.cantidad || 0) + ' u · $' + money(l.precio_unitario || 0) + ' = $' + money(l.subtotal || 0) + '</span></div>'
+    ).join("") + '</div>';
+  } catch (e) {
+    el.innerHTML = '<span class="muted">No se pudieron cargar las líneas.</span>';
+  } finally {
+    _ventaDetalleCargandoId = null;
+  }
+}
+
+function _enlazarCerrarVentaDetalle() {
+  const cont = document.getElementById("venta-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".venta-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleVenta);
+  });
+}
+
+function cerrarDetalleVenta() {
+  const cont = document.getElementById("venta-detalle");
+  if (cont) {
+    cont.classList.add("hidden");
+    cont.innerHTML = "";
+  }
+  _ventaDetalleCargandoId = null;
 }
 
 // ============================================================
