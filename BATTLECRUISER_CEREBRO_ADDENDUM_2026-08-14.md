@@ -3,13 +3,18 @@
 
 Este documento complementa `BATTLECRUISER_CEREBRO.md` con hallazgos recientes verificados sobre el estado técnico del repositorio. No sustituye al Cerebro maestro.
 
-## ESTADO REAL CONFIRMADO (actualizado R1 — 2026-08-16)
+## ESTADO REAL CONFIRMADO (actualizado R2 — 2026-08-16)
 
 - Repo: `Robvg9/battlecruiser`.
 - Rama base: `main`.
 - PR R1 frontend: **#4 abierto, draft, mergeable**. Base `main`; head `vibe/r1-frontend-b53-b8-catalogos-c16993`.
 - R1 tiene `150/150` tests PASS y `node --check public/app.js` OK, según la entrega del ejecutor.
 - R1 todavía NO está mergeado en `main`; por tanto, no considerarlo parte de producción hasta que sea integrado/verificado.
+- PR R2 frontend: **#5 abierto, ready-for-review, mergeable**. Base `main`; head `vibe/r2-centro-control-ventas-c16993`.
+- R2 es independiente de R1 y funciona sobre `main` puro.
+- R2 tiene `144/144` tests PASS sobre `main` puro y `node --check public/app.js` OK, según la entrega del ejecutor.
+- R2 añade al Centro de Control el resumen de ventas recientes y las ventas dentro de Últimos movimientos.
+- R2 todavía NO está mergeado en `main`; no considerarlo parte de producción hasta que sea integrado/verificado.
 - App/Service Worker y demás estados deben seguir verificándose contra el código real, no contra versiones antiguas del Cerebro.
 - B7 implementado: turnos, cuadres, responsabilidades, incidencias. SQL en `supabase/b7-operacion-humana.sql` (pendiente de aplicar según el estado documentado).
 - B8 implementado en frontend: comunicación y coordinación (conversaciones, mensajes, chat contextual, soporte). SQL en `supabase/b8-comunicacion.sql` (pendiente de aplicar según el estado documentado).
@@ -97,6 +102,36 @@ Cambios:
 
 No considerar R1 completamente cerrada hasta integrar/verificar PR #4.
 
+## R2 — FRONTEND: CENTRO DE CONTROL + ACTIVIDAD COMERCIAL
+
+ENTREGADA EN PR #5, todavía **NO MERGEADA**.
+
+Objetivo cumplido: producir un avance funcional real sin depender de Supabase/Claude y sin rehacer R1.
+
+### Cambio funcional
+Antes, el Centro de Control (pantalla inicial) mostraba productos, almacenes, stock bajo y movimientos de transferencias/vales, pero no reflejaba las ventas aunque `_cache.ventas` ya existía.
+
+Ahora:
+- existe un card **Ventas recientes** con monto total vendido y cantidad de ventas;
+- las ventas aparecen en **Últimos movimientos**;
+- los movimientos se ordenan por fecha;
+- cuando no hay ventas se muestra `$0.00` y `0 venta(s)` honestamente.
+
+### Arquitectura respetada
+- reutiliza `_cache.ventas` existente;
+- no crea consultas nuevas;
+- no crea segunda cola, store, caché, sincronizador ni idempotencia;
+- no modifica `ejecutarOperacion`, `sincronizarCola`, `operaciones_pendientes`, `_sincronizando` ni `idempotency_key`;
+- R2 funciona sobre `main` puro y es independiente de R1.
+
+### Verificación
+- `node --check public/app.js` → OK.
+- Suite completa sobre `main` puro → **144/144 PASS** (140 originales + 4 tests R2).
+- Tests R2 cubren monto/cantidad, caso vacío, ventas en movimientos y orden por fecha.
+- No hay bloqueo de Supabase/Claude para esta funcionalidad.
+
+No considerar R2 completamente cerrada hasta integrar/verificar PR #5 y realizar la prueba real correspondiente.
+
 ## BACKEND DE CATÁLOGOS — BACKLOG DIFERIDO
 
 Hallazgo de R1:
@@ -115,6 +150,31 @@ El trabajo de backend para crear RPC idempotentes y posteriormente conectar esto
 
 No inventar RPC ni intentar resolver este bloqueo únicamente desde frontend.
 Cuando Claude/Supabase vuelva a estar disponible, recuperar este bloque como misión backend dedicada.
+
+## ESTRATEGIA ACTUAL DE EJECUCIÓN — VIBE PRIMERO
+
+Decisión operativa confirmada por Roberto:
+
+**Continuar el desarrollo con Vibe como ejecutor principal de las tareas de GitHub/frontend y dejar las tareas dependientes de Claude/Supabase para el final.**
+
+Motivo:
+- Vibe puede editar directamente los archivos del repositorio y entregar PRs verificables.
+- Las misiones frontend que no dependen de cambios de backend pueden seguir produciendo avance real.
+- No tiene sentido detener el producto esperando disponibilidad de Claude/Supabase.
+- Los bloques que realmente necesiten SQL/RPC/RLS o trabajo directo en Supabase se acumularán en una cola posterior.
+
+### Regla de ejecución
+Mientras exista una mejora funcional implementable desde GitHub/frontend, **Vibe continúa**.
+
+Claude/Supabase queda reservado para:
+- RPC nuevos;
+- cambios SQL;
+- RLS/grants/SECURITY DEFINER;
+- backend de catálogos offline-first;
+- cualquier otra tarea que requiera realmente la infraestructura Supabase.
+
+No enviar a Claude una misión que Vibe pueda completar de forma segura desde el repositorio.
+No enviar archivos manualmente al ejecutor cuando el repositorio ya contiene la fuente de verdad que puede leer.
 
 ## AUDITORÍA TÉCNICA — OTROS HALLAZGOS PARA BACKLOG
 
@@ -144,11 +204,12 @@ La regla nueva de trabajo es: **cada misión debe producir avance funcional tang
 
 Orden actual:
 1. **Integrar/verificar PR #4 (R1)** cuando corresponda; no duplicar su trabajo.
-2. **R2 FRONTEND — siguiente misión:** continuar el crecimiento funcional desde GitHub con una mejora concreta y verificable, priorizando el núcleo operativo y evitando depender de Supabase/Claude.
+2. **Continuar con Vibe** mediante el siguiente avance funcional concreto de frontend/GitHub que pueda ejecutarse sin depender de Supabase/Claude.
 3. Validación real de los escenarios offline pendientes cuando Roberto pueda ejecutarlos en navegador/dispositivo.
 4. Continuar con el siguiente bloque funcional grande del producto.
 5. **Backend de catálogos offline-first** queda deliberadamente más atrás y se recuperará cuando exista una sesión de Claude/Supabase utilizable.
-6. Seguridad profunda, CI, modularización y detalles menores permanecen después del avance funcional principal.
+6. Cualquier otra tarea estrictamente dependiente de Claude/Supabase se mantiene en la cola posterior.
+7. Seguridad profunda, CI, modularización y detalles menores permanecen después del avance funcional principal.
 
 ## REGLA PARA FUTURAS SESIONES CON OTRAS IA
 
