@@ -288,17 +288,43 @@ test("B3.27 Arquitectura: no hay stores/colas/cachés de permisos duplicados", a
 });
 
 test("B3.2 Degradación: si el SQL de B3 no está aplicado, la app sigue usable", async () => {
-  const { window } = montarEntorno({
-    perfil: null, // RPC inexistente: perfil null
+  // R1: cuando el SQL de B3 no está aplicado, los RPC perfil_usuario_actual
+  // y permisos_usuario_actual NO existen en Supabase: devuelven un error de
+  // función inexistente (42883 / "Could not find"), NO un array vacío sin
+  // error. Ese caso (backend responde "sin permisos") se cubre en B3.2b.
+  const { window, client } = montarEntorno({
+    perfil: null,
     permisos: null,
   });
   marcarOnline(window);
   await esperar(80);
+  // Simular el estado real de "SQL B3 no aplicado": los RPC no existen.
+  client.rpc = async (nombre) => {
+    return { data: null, error: { message: "Could not find the function" } };
+  };
+  await window.cargarContextoUsuario();
+  await esperar(30);
   // Sin SQL de B3, el contexto degrada: usuario mínimo desde Auth, permisos vacíos.
   assert.ok(window._usuarioActual(), "hay contexto mínimo desde Auth");
   assert.strictEqual(window.contextoB3Disponible(), false, "B3 no disponible sin SQL");
   // tienePermiso degrada a true (no bloquea la app existente; seguridad real en backend).
   assert.strictEqual(window.tienePermiso("productos", "ver"), true, "degradación: no bloquea");
+});
+
+test("B3.2b R1: usuario sin permisos (backend responde array vacío) NO ve todo", async () => {
+  // R1/B3.6: si el backend responde correctamente (sin error) que el usuario
+  // no tiene permisos, tienePermiso NO debe degradar a true (eso sería una
+  // falsa autorización). Solo la degradación legítima (RPC inexistente por
+  // SQL no aplicado) mantiene true. Un fallo de red tampoco autoriza.
+  const { window } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "SinPerm", activo: true, role_id: "r2", rol: "Dependiente" }],
+    permisos: [], // backend respondió: este usuario no tiene permisos
+  });
+  marcarOnline(window);
+  await esperar(80);
+  assert.ok(window._usuarioActual(), "hay contexto");
+  assert.strictEqual(window.tienePermiso("productos", "ver"), false, "sin permisos reales no autoriza");
+  assert.strictEqual(window.tienePermiso("reportes", "ver"), false, "sin permisos reales no autoriza");
 });
 
 test("B3.3 (cierre): usuario inactivo bloqueado via usuario_esta_activo online (bloqueo real)", async () => {

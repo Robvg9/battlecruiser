@@ -21,6 +21,11 @@ function safeInit(nombre, fn) {
   }
 }
 
+// R1/B8: helper de espera usado por abrirSoporte/abrirConversacionContextual
+// para dejar que el cambio de pestaña se procese antes de abrir la conversación.
+// Antes estas funciones referenciaban esperar() sin definirla (bug latente).
+function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
 function money(n) {
   const v = Number(n);
   return Number.isFinite(v) ? v.toFixed(2) : "0.00";
@@ -68,6 +73,13 @@ let _novedadesVistas = new Set();
 let _usuarioActual = null;
 let _permisosEfectivos = {};
 let _cargandoUsuario = false;
+// R1/B3.6: distingue la degradacion legitima (SQL B3 no aplicado: el RPC
+// no existe) de un fallo de red o de un usuario que realmente no tiene
+// permisos. Sin esto, un fallo de red al cargar permisos dejaria
+// _permisosEfectivos vacio y tienePermiso() devolveria true para todo
+// (UX incorrectamente permisiva / falsa autorizacion).
+let _permisosCargaExitosa = false; // el RPC respondio un array (aunque fuera [])
+let _permisosCargaFallidaRed = false; // la carga fallo por error de red
 
 function showApp(session) {
   loginForm.classList.add("hidden");
@@ -3967,16 +3979,29 @@ async function cargarContextoUsuario() {
     // Permisos efectivos vía RPC (matriz seccion->accion). Si no existe,
     // _permisosEfectivos queda vacío y tienePermiso() degrada a true solo
     // para no romper la app existente (la seguridad real sigue en backend).
+    // R1: registramos si la carga fue exitosa o fallo por red, para que
+    // tienePermiso() no convierta un fallo de red en una falsa autorizacion.
     _permisosEfectivos = {};
+    _permisosCargaExitosa = false;
+    _permisosCargaFallidaRed = false;
     try {
       const { data: perms, error } = await client.rpc("permisos_usuario_actual", {});
-      if (!error && Array.isArray(perms)) {
+      if (error) {
+        // Error de red: NO abrir todo por un fallo de conectividad.
+        if (esErrorDeRed(error)) _permisosCargaFallidaRed = true;
+        // Si el error es 42883 (RPC inexistente, SQL B3 no aplicado), se
+        // mantiene la degradacion legitima: ningun flag se setea en true.
+      } else if (Array.isArray(perms)) {
+        _permisosCargaExitosa = true;
         perms.forEach((p) => {
           if (!_permisosEfectivos[p.seccion]) _permisosEfectivos[p.seccion] = {};
           _permisosEfectivos[p.seccion][p.accion] = true;
         });
       }
-    } catch (e) { /* RPC inexistente */ }
+    } catch (e) {
+      // Excepcion de red (Failed to fetch, etc.): fallo de red, no autorizar.
+      if (esErrorDeRed(e)) _permisosCargaFallidaRed = true;
+    }
 
     aplicarPermisosAInterfaz();
     mostrarInfoUsuarioEnHeader();
@@ -3993,6 +4018,8 @@ async function cargarContextoUsuario() {
 function limpiarContextoUsuario() {
   _usuarioActual = null;
   _permisosEfectivos = {};
+  _permisosCargaExitosa = false;
+  _permisosCargaFallidaRed = false;
   _novedadesVistas = new Set();
   // El badge de Centro de Control se resetea para no arrastrar estado.
   const badge = document.getElementById("resumen-tab-badge");
@@ -4011,9 +4038,15 @@ function limpiarContextoUsuario() {
 function tienePermiso(seccion, accion) {
   if (!_usuarioActual) return false; // sin sesión: nada
   if (Object.keys(_permisosEfectivos).length === 0) {
-    // Degradación: SQL de B3 no aplicado todavía. No bloquear la app
-    // existente (la autorización real está en el backend). La sección de
-    // administración de usuarios avisará que falta el SQL.
+    // Sin matriz cargada. La degradación a true solo es legítima cuando el
+    // SQL de B3 no está aplicado todavía (el RPC no existe). En cambio:
+    // - Si la carga falló por red (_permisosCargaFallidaRed): un fallo de
+    //   conectividad NO debe convertirse en autorización. Devolver false.
+    // - Si la carga fue exitosa pero el usuario no tiene permisos
+    //   (_permisosCargaExitosa): el backend respondió, no inventar acceso.
+    // Solo si ninguna de las dos ocurrió (SQL no aplicado) se conserva la
+    // degradación histórica a true para no bloquear la app existente.
+    if (_permisosCargaFallidaRed || _permisosCargaExitosa) return false;
     return true;
   }
   const sec = _permisosEfectivos[seccion];
@@ -4882,25 +4915,63 @@ function renderRentabilidad(filas) {
   const el = document.getElementById("rep-detalle");
   if (!el) return;
   if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin datos de rentabilidad.</p>'; return; }
+  // B5.3: el costo FIFO de una venta puede NO estar disponible (ventas
+  // históricas sin costo_unitario/costo_total). NULL/ausencia de costo NO es
+  // 0: nunca mostrar CMV 0, ganancia = ingresos ni margen 100% como si el
+  // costo fuera real. Reutilizamos el contrato real del backend: cuando el
+  // costo no existe, cmv llega null/undefined (no un 0 falso). Si el backend
+  // evoluciona a devolver un flag "disponible", se respetará igual porque
+  // acá solo se considera costo disponible cuando cmv es un número finito.
   let totalIng = 0, totalCmv = 0;
+  let hayCostoAlguno = false;
   el.innerHTML = "";
   filas.forEach((r) => {
-    totalIng += Number(r.ingresos || 0);
-    totalCmv += Number(r.cmv || 0);
+    const ingresos = Number(r.ingresos || 0);
+    totalIng += ingresos;
+    const cmvNum = Number(r.cmv);
+    const costoDisponible = Number.isFinite(cmvNum) && r.cmv !== null && r.cmv !== undefined;
+    let gan, margen, cmvTxt, ganTxt, margenTxt;
+    if (costoDisponible) {
+      totalCmv += cmvNum;
+      hayCostoAlguno = true;
+      gan = Number(r.ganancia_bruta);
+      if (!Number.isFinite(gan)) gan = ingresos - cmvNum;
+      const margenNum = Number(r.margen_porcentaje);
+      margen = Number.isFinite(margenNum) && r.margen_porcentaje !== null && r.margen_porcentaje !== undefined
+        ? margenNum
+        : (ingresos > 0 ? (gan / ingresos * 100) : 0);
+      cmvTxt = "$" + money(cmvNum);
+      ganTxt = "$" + money(gan);
+      margenTxt = money(margen) + "%";
+    } else {
+      // Sin costo real: no inventar CMV 0, ganancia ni margen.
+      cmvTxt = "costo no disponible";
+      ganTxt = "—";
+      margenTxt = "—";
+    }
     const div = document.createElement("div");
     div.className = "rep-fila";
     const fecha = r.fecha ? new Date(r.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
-    const gan = Number(r.ganancia_bruta || 0);
-    const margen = Number(r.margen_porcentaje || 0);
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(r.almacen || "—") + '</span><span class="muted">' + fecha + ' · Ing $' + money(r.ingresos || 0) + ' · CMV $' + money(r.cmv || 0) + ' · <b>Gan $' + money(gan) + '</b> (' + money(margen) + '%)</span></span>';
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(r.almacen || "—") + '</span><span class="muted">' + fecha + ' · Ing $' + money(ingresos) + ' · CMV ' + escHtml(cmvTxt) + ' · <b>Gan ' + escHtml(ganTxt) + '</b> (' + escHtml(margenTxt) + ')</span></span>';
     el.appendChild(div);
   });
-  // Totales al pie.
+  // Totales al pie: solo se calculan sobre las ventas con costo disponible.
+  // Si ninguna venta tuvo costo, el total no inventa margen: lo deja sin costo.
   const tot = document.createElement("div");
   tot.className = "rep-fila rep-totales";
-  const totGan = totalIng - totalCmv;
-  const totMargen = totalIng > 0 ? (totGan / totalIng * 100) : 0;
-  tot.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">TOTALES</span><span class="muted">Ing $' + money(totalIng) + ' · CMV $' + money(totalCmv) + ' · <b>Gan $' + money(totGan) + '</b> (' + money(totMargen) + '%)</span></span>';
+  let totCmvTxt, totGanTxt, totMargenTxt;
+  if (hayCostoAlguno) {
+    const totGan = totalIng - totalCmv;
+    const totMargen = totalIng > 0 ? (totGan / totalIng * 100) : 0;
+    totCmvTxt = "$" + money(totalCmv);
+    totGanTxt = "$" + money(totGan);
+    totMargenTxt = money(totMargen) + "%";
+  } else {
+    totCmvTxt = "costo no disponible";
+    totGanTxt = "—";
+    totMargenTxt = "—";
+  }
+  tot.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">TOTALES</span><span class="muted">Ing $' + money(totalIng) + ' · CMV ' + escHtml(totCmvTxt) + ' · <b>Gan ' + escHtml(totGanTxt) + '</b> (' + escHtml(totMargenTxt) + ')</span></span>';
   el.appendChild(tot);
 }
 
@@ -6155,9 +6226,9 @@ async function crearConversacion(tipo, titulo, participante_id) {
   const r = await ejecutarOperacion("conversacion", {
     p_tipo: tipo, p_titulo: titulo || null, p_participante_id: participante_id || null,
   });
-  // Nota: crear_conversacion no está en RPC_POR_TIPO porque es una operación
-  // de creación puntual que el frontend intenta online directo (no mueve stock).
-  // Pero por consistencia con la cola offline, usamos ejecutarOperacion.
+  // Reutiliza ejecutarOperacion + RPC_POR_TIPO.conversacion (="crear_conversacion"),
+  // igual que abrirSoporte/abrirConversacionContextual. La idempotency_key la
+  // genera/conserve la infraestructura offline existente (única cola).
   if (!r.ok) {
     setMsg("msg-nueva-conv", "No se pudo crear: " + explicarError(r.error, "crear conversación"), false);
     return null;
@@ -6170,36 +6241,38 @@ async function crearConversacion(tipo, titulo, participante_id) {
 }
 
 // ---- B8: crear conversación contextual (incidencia/turno/responsabilidad) ----
+// R1: reutiliza ejecutarOperacion("conversacion") igual que crearConversacion(),
+// para que la idempotency_key la genere/conserve la infraestructura offline
+// existente (no llama directo a client.rpc ni crea una segunda cola). Offline
+// la operación queda pendiente; al no tener data.id todavía, no se navega a la
+// conversación hasta que se sincronice.
 async function abrirConversacionContextual(tipo, entidadId) {
-  if (!navigator.onLine) {
-    setMsg("msg-mensaje", "⚪ Sin conexión — no se puede abrir la conversación contextual.", false);
-    return;
-  }
   // La RPC crear_conversacion es idempotente: si ya existe, la devuelve.
   const params = { p_tipo: tipo };
   if (tipo === "INCIDENCIA") params.p_incidencia_id = entidadId;
   else if (tipo === "TURNO") params.p_turno_id = entidadId;
   else if (tipo === "RESPONSABILIDAD") params.p_responsabilidad_id = entidadId;
-  try {
-    const { data, error } = await client.rpc("crear_conversacion", params);
-    if (error) {
-      const msg = String(error.message || error);
-      if (msg.includes("Could not find") || msg.includes("42883")) {
-        setMsg("msg-mensaje", "Falta aplicar supabase/b8-comunicacion.sql en Supabase.", false);
-      } else {
-        setMsg("msg-mensaje", "No se pudo abrir: " + escHtml(msg), false);
-      }
-      return;
+  const r = await ejecutarOperacion("conversacion", params);
+  if (!r.ok) {
+    const msg = String((r.error && (r.error.message || r.error.code)) || r.error || "");
+    if (msg.includes("Could not find") || msg.includes("42883")) {
+      setMsg("msg-mensaje", "Falta aplicar supabase/b8-comunicacion.sql en Supabase.", false);
+    } else {
+      setMsg("msg-mensaje", "No se pudo abrir: " + escHtml(msg), false);
     }
-    if (data && data.id) {
-      // Navegar a la pestaña Comunicación y abrir la conversación.
-      const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-      if (btn) btn.click();
-      await esperar(100);
-      await abrirConversacion(data.id, tipo);
-    }
-  } catch (e) {
-    setMsg("msg-mensaje", "Error al abrir conversación contextual.", false);
+    return;
+  }
+  if (r.offline) {
+    setMsg("msg-mensaje", "⏳ Pendiente — la conversación se abrirá al reconectar.", true);
+    return;
+  }
+  const data = r.data;
+  if (data && data.id) {
+    // Navegar a la pestaña Comunicación y abrir la conversación.
+    const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
+    if (btn) btn.click();
+    await esperar(100);
+    await abrirConversacion(data.id, tipo);
   }
 }
 
@@ -6221,20 +6294,29 @@ async function cerrarConversacion() {
 }
 
 // ---- B8: soporte ----
+// R1: reutiliza ejecutarOperacion("conversacion") igual que crearConversacion(),
+// para que la idempotency_key la genere/conserve la infraestructura offline
+// existente (no llama directo a client.rpc ni crea una segunda cola). Offline
+// la operación queda pendiente; al no tener data.id todavía, no se navega a la
+// conversación hasta que se sincronice.
 async function abrirSoporte() {
-  if (!navigator.onLine) { setMsg("msg-nueva-conv", "⚪ Sin conexión.", false); return; }
-  try {
-    const { data, error } = await client.rpc("crear_conversacion", { p_tipo: "SOPORTE" });
-    if (error) { setMsg("msg-nueva-conv", "No se pudo abrir soporte: " + escHtml(error.message || error), false); return; }
-    if (data && data.id) {
-      document.getElementById("com-nueva-panel").classList.add("hidden");
-      const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-      if (btn) btn.click();
-      await esperar(100);
-      await abrirConversacion(data.id, "SOPORTE");
-    }
-  } catch (e) {
-    setMsg("msg-nueva-conv", "Error al abrir soporte.", false);
+  const r = await ejecutarOperacion("conversacion", { p_tipo: "SOPORTE" });
+  if (!r.ok) {
+    setMsg("msg-nueva-conv", "No se pudo abrir soporte: " + escHtml((r.error && (r.error.message || r.error.code)) || r.error || ""), false);
+    return;
+  }
+  if (r.offline) {
+    setMsg("msg-nueva-conv", "⏳ Pendiente — el soporte se abrirá al reconectar.", true);
+    return;
+  }
+  const data = r.data;
+  if (data && data.id) {
+    const panel = document.getElementById("com-nueva-panel");
+    if (panel) panel.classList.add("hidden");
+    const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
+    if (btn) btn.click();
+    await esperar(100);
+    await abrirConversacion(data.id, "SOPORTE");
   }
 }
 

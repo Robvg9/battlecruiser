@@ -492,3 +492,77 @@ test("B8.5.3: contar_no_leidos_global no duplica el total (lógica SQL)", () => 
   assert.ok(lista.length === 1, "una sola conversación");
   assert.ok(true, "la corrección del SQL evita el doble conteo");
 });
+
+
+// ============================================================
+// R1 — B8: creación de conversaciones vía ejecutarOperacion (idempotencia)
+// ============================================================
+
+test("R1 B8: abrirSoporte usa ejecutarOperacion y envía p_idempotency_key", async () => {
+  const { window, client } = montarEntorno(perfil());
+  marcarOnline(window);
+  await esperar(120);
+  await window.abrirSoporte();
+  await esperar(40);
+  const call = client.__rpcCalls.find((c) => c.nombre === "crear_conversacion");
+  assert.ok(call, "abrirSoporte llamó a crear_conversacion");
+  assert.strictEqual(call.params.p_tipo, "SOPORTE", "tipo SOPORTE");
+  assert.ok(call.params.p_idempotency_key, "R1: la idempotency_key la generó ejecutarOperacion");
+});
+
+test("R1 B8: abrirConversacionContextual usa ejecutarOperacion y envía p_idempotency_key", async () => {
+  const { window, client } = montarEntorno(perfil());
+  marcarOnline(window);
+  await esperar(120);
+  await window.abrirConversacionContextual("INCIDENCIA", "inc-1");
+  await esperar(40);
+  const call = client.__rpcCalls.find((c) => c.nombre === "crear_conversacion");
+  assert.ok(call, "abrirConversacionContextual llamó a crear_conversacion");
+  assert.strictEqual(call.params.p_tipo, "INCIDENCIA", "tipo INCIDENCIA");
+  assert.strictEqual(call.params.p_incidencia_id, "inc-1", "entidad contextual pasada");
+  assert.ok(call.params.p_idempotency_key, "R1: la idempotency_key la generó ejecutarOperacion");
+});
+
+test("R1 B8: abrirConversacionContextual para TURNO pasa p_turno_id", async () => {
+  const { window, client } = montarEntorno(perfil());
+  marcarOnline(window);
+  await esperar(120);
+  await window.abrirConversacionContextual("TURNO", "turno-9");
+  await esperar(40);
+  const call = client.__rpcCalls.find((c) => c.nombre === "crear_conversacion");
+  assert.ok(call, "llamó a crear_conversacion");
+  assert.strictEqual(call.params.p_turno_id, "turno-9", "p_turno_id pasada");
+  assert.ok(call.params.p_idempotency_key, "idempotency_key generada por ejecutarOperacion");
+});
+
+test("R1 B8: abrirSoporte offline encola la operación (no falla por no tener data.id)", async () => {
+  const { window } = montarEntorno(perfil());
+  marcarOnline(window);
+  await esperar(120);
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  // No debe lanzar ni navegar: queda pendiente sin data.id.
+  await window.abrirSoporte();
+  await esperar(40);
+  const pendientes = await window.obtenerOperacionesPorEstado("PENDIENTE");
+  const convPend = pendientes.find((op) => op.tipo === "conversacion");
+  assert.ok(convPend, "abrirSoporte offline encoló la creación de conversación");
+  assert.strictEqual(convPend.payload.p_tipo, "SOPORTE", "payload con tipo SOPORTE");
+  assert.ok(convPend.idempotency_key, "operación encolada con idempotency_key");
+});
+
+test("R1 B8: no quedan llamadas directas a client.rpc(crear_conversacion) fuera de ejecutarOperacion", async () => {
+  // Verificación estructural: todas las llamadas a crear_conversacion deben
+  // llegar con p_idempotency_key (lo que prueba que pasan por ejecutarOperacion).
+  const { window, client } = montarEntorno(perfil());
+  marcarOnline(window);
+  await esperar(120);
+  await window.abrirSoporte();
+  await window.abrirConversacionContextual("RESPONSABILIDAD", "resp-1");
+  await window.crearConversacion("PRIVADA", "T", "u2");
+  await esperar(40);
+  const calls = client.__rpcCalls.filter((c) => c.nombre === "crear_conversacion");
+  assert.ok(calls.length >= 3, "las tres rutas llamaron a crear_conversacion");
+  for (const c of calls) {
+    assert.ok(c.params.p_idempotency_key, "toda llamada a crear_conversacion lleva idempotency_key (vía ejecutarOperacion)");
+  }
+});
