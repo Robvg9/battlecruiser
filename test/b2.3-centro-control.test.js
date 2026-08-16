@@ -355,3 +355,110 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R3 — Alertas accionables del Centro de Control
+// ============================================================
+
+function stockBajo(cant, min, prod, alm) {
+  return { producto_id: "p" + prod, almacen_id: "a" + alm, cantidad: cant, minimo: min,
+           productos: { nombre: "Prod " + prod }, almacenes: { nombre: "Alm " + alm } };
+}
+
+test("R3: alerta visible cuando hay productos bajo mínimo (cabecera con cantidad)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajo(2, 10, 1, 1), stockBajo(0, 5, 2, 2)];
+  window.renderResumen();
+  const alertas = document.getElementById("resumen-alertas-lista");
+  assert.ok(/2 producto\(s\) bajo mínimo/.test(alertas.innerHTML), "cabecera muestra la cantidad afectada");
+  assert.ok(/Prod 1/.test(alertas.innerHTML), "lista el producto 1");
+  assert.ok(/Prod 2/.test(alertas.innerHTML), "lista el producto 2");
+});
+
+test("R3: alerta accionable — botón 'Ver inventario' navega al tab inventario", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajo(3, 10, 1, 1)];
+  window.renderResumen();
+  // El tab inventario NO debe estar activo antes de click.
+  const tabInv = document.querySelector('.tab-btn[data-tab="inventario"]');
+  assert.ok(!tabInv.classList.contains("active"), "inventario no activo antes del click");
+  // Click en el botón de la cabecera de alertas.
+  const btn = document.querySelector("#resumen-alertas-lista .alerta-ir-btn");
+  assert.ok(btn, "botón Ver inventario presente");
+  btn.click();
+  assert.ok(tabInv.classList.contains("active"), "inventario se activa al click");
+  assert.ok(document.getElementById("tab-inventario").classList.contains("visible"), "panel inventario visible");
+});
+
+test("R3: items de alerta son clickeables y navegan a inventario", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajo(1, 10, 1, 1)];
+  window.renderResumen();
+  const item = document.querySelector("#resumen-alertas-lista .alerta-item");
+  assert.ok(item, "item de alerta presente");
+  assert.strictEqual(item.getAttribute("data-ir-tab"), "inventario", "item lleva data-ir-tab=inventario");
+  item.click();
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "navega a inventario");
+});
+
+test("R3: card 'Bajo mínimo' del grid es accionable solo cuando hay alertas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  // Con alertas: el card es accionable.
+  window._cache.stock = [stockBajo(2, 10, 1, 1)];
+  window.renderResumen();
+  const cardAlerta = document.querySelector("#resumen-grid .resumen-card-accion");
+  assert.ok(cardAlerta, "card bajo mínimo es accionable cuando hay alertas");
+  assert.strictEqual(cardAlerta.getAttribute("data-ir-tab"), "inventario", "card lleva data-ir-tab");
+  cardAlerta.click();
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "card navega a inventario");
+});
+
+test("R3: sin productos bajo mínimo no hay alertas accionables (estado vacío sin falsas alertas)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [{ producto_id: "p1", almacen_id: "a1", cantidad: 50, minimo: 10,
+                           productos: { nombre: "Prod 1" }, almacenes: { nombre: "Alm 1" } }];
+  window.renderResumen();
+  const grid = document.getElementById("resumen-grid");
+  assert.ok(!grid.querySelector(".resumen-card-accion"), "ningún card accionable sin alertas");
+  const alertas = document.getElementById("resumen-alertas-lista");
+  assert.ok(/Nada bajo el mínimo por ahora/.test(alertas.innerHTML), "estado vacío");
+  assert.ok(!alertas.querySelector(".alerta-ir-btn"), "sin botón de acción cuando no hay alertas");
+});
+
+test("R3: helper irATab está disponible y es idempotente", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(typeof window.irATab, "function", "irATab disponible");
+  // irATab con tab inexistente no lanza.
+  assert.doesNotThrow(() => window.irATab("no-existe"));
+  // irATab sin argumento no lanza.
+  assert.doesNotThrow(() => window.irATab(undefined));
+});
+
+test("R3: no regresión — Centro de Control sigue mostrando productos/almacenes/movimientos", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.productos = [{ id: "p1", nombre: "Café" }];
+  window._cache.almacenes = [{ id: "a1", nombre: "Caja 1" }];
+  window._cache.stock = [];
+  window._cache.transferencias = [{ fecha: "2026-08-15T10:00:00Z", origen: { nombre: "A" }, destino: { nombre: "B" }, estado: "ok" }];
+  window.renderResumen();
+  const grid = document.getElementById("resumen-grid");
+  assert.ok(grid.innerHTML.includes("1"), "muestra cantidad de productos");
+  const movs = document.getElementById("resumen-movs-lista");
+  assert.ok(/Transferencia/.test(movs.innerHTML), "movimientos siguen presentes");
+  assert.ok(/Nada bajo el mínimo por ahora/.test(document.getElementById("resumen-alertas-lista").innerHTML), "alertas vacías OK");
+});

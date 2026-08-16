@@ -2382,7 +2382,7 @@ function renderResumen() {
   grid.innerHTML = `
     <div class="resumen-card"><div class="valor">${_cache.productos.length}</div><div class="etiqueta">Productos</div></div>
     <div class="resumen-card"><div class="valor">${_cache.almacenes.length}</div><div class="etiqueta">Almacenes</div></div>
-    <div class="resumen-card ${bajoMinimo.length ? "alerta" : ""}"><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div></div>
+    <div class="resumen-card ${bajoMinimo.length ? "alerta resumen-card-accion" : ""}" ${bajoMinimo.length ? 'data-ir-tab="inventario" role="button" tabindex="0"' : ""}><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div>${bajoMinimo.length ? '<div class="muted">Tocá para ver inventario</div>' : ""}</div>
     <div class="resumen-card"><div class="valor">${_cache.transferencias.length + _cache.vales.length}</div><div class="etiqueta">Movimientos recientes</div></div>
   `;
 
@@ -2391,10 +2391,22 @@ function renderResumen() {
     if (bajoMinimo.length === 0) {
       alertasEl.innerHTML = '<p class="lista-estado">Nada bajo el mínimo por ahora.</p>';
     } else {
+      // R3: alertas accionables. La cabecera muestra la cantidad afectada y un
+      // boton que lleva directo al Inventario (donde se ve el stock enriquecido
+      // y se puede actuar). Reutiliza irATab() + navegacion existente. No hace
+      // consultas nuevas: pinta desde _cache.stock.
       alertasEl.innerHTML = "";
+      const cab = document.createElement("div");
+      cab.className = "lista-item alerta-cabecera";
+      cab.innerHTML = '<span class="cc-asunto-tipo">' + bajoMinimo.length + ' producto(s) bajo mínimo</span>'
+        + '<button type="button" class="cc-accion alerta-ir-btn" data-ir-tab="inventario">Ver inventario</button>';
+      alertasEl.appendChild(cab);
       bajoMinimo.forEach((s) => {
         const div = document.createElement("div");
-        div.className = "lista-item";
+        div.className = "lista-item alerta-item";
+        div.setAttribute("data-ir-tab", "inventario");
+        div.setAttribute("role", "button");
+        div.setAttribute("tabindex", "0");
         div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
           <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
         alertasEl.appendChild(div);
@@ -2430,6 +2442,16 @@ function renderResumen() {
   // actividad reciente e inventario. Cuando _cache cambia, refrescar el
   // Centro tambien. No hace consultas nuevas: solo pinta desde _cache.
   if (typeof refrescarCentroControl === "function") refrescarCentroControl();
+}
+
+// R3: helper de navegacion reutilizable. Activa un tab por data-tab usando
+// el listener existente (click en .tab-btn). Reutiliza el patron que ya usaban
+// cc-ir-pendientes-btn / cc-ir-inventario-btn / abrirSoporte, sin duplicar
+// logica de navegacion ni crear un segundo sistema de routing.
+function irATab(tab) {
+  if (!tab) return;
+  const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+  if (btn) btn.click();
 }
 
 // ---- Navegación por tabs ----
@@ -2483,6 +2505,27 @@ safeInit("tabs", () => {
       // Al salir de la pestana Pendientes, cerrar el detalle si estaba
       // abierto para que no quede visible encima de otra seccion.
       cerrarDetalleOperacion();
+    }
+  });
+});
+
+// R3: navegacion accionable del Centro de Control. Items del panel "Stock
+// bajo mínimo" y el card "Bajo mínimo" llevan directo a Inventario con un
+// click o Enter. Reutiliza irATab() y el listener de tabs existente. No
+// agrega routing nuevo ni consultas.
+safeInit("resumen-alertas-accion", () => {
+  const panel = document.getElementById("tab-resumen");
+  if (!panel) return;
+  const manejar = (target) => {
+    const accion = target.closest("[data-ir-tab]");
+    if (!accion) return;
+    irATab(accion.getAttribute("data-ir-tab"));
+  };
+  panel.addEventListener("click", (e) => manejar(e.target));
+  panel.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      manejar(e.target);
+      if (e.target.closest("[data-ir-tab]")) e.preventDefault();
     }
   });
 });
