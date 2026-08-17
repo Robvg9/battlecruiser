@@ -161,9 +161,14 @@ async function actualizarApp(btn) {
   btn.disabled = true;
   btn.textContent = "Actualizando...";
   try {
+    // V1.3: borrar SOLO las caches de BattleCruiser (mismo prefijo que usa el
+    // service worker en su activate: "battlecruiser-shell-"). Nunca tocar caches
+    // de otras aplicaciones que compartan este mismo origen.
     if ("caches" in window) {
       const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
+      await Promise.all(
+        keys.filter((k) => k.startsWith("battlecruiser-shell-")).map((k) => caches.delete(k))
+      );
     }
     if ("serviceWorker" in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();

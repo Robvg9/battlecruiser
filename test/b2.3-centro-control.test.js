@@ -1081,3 +1081,37 @@ test("OFFLINE: doble sincronización simultánea → 1 sola ejecución real (mut
   const llamadas = client.__rpcCalls.filter((c) => c.nombre === "registrar_compra");
   assert.strictEqual(llamadas.length, 1, "una sola ejecución real gracias al mutex _sincronizando");
 });
+
+
+// ============================================================
+// V1.3 — actualizarApp() solo borra caches de BattleCruiser
+// No debe tocar caches de otras aplicaciones del mismo origen.
+// ============================================================
+
+test("V1.3: actualizarApp solo borra caches con prefijo battlecruiser-shell-", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  // Mock de caches que registra qué se borró. Simula caches propias + ajenas.
+  const borradas = [];
+  Object.defineProperty(window, "caches", {
+    value: {
+      keys: async () => ["battlecruiser-shell-v29", "battlecruiser-shell-v28", "otra-app-cache", "mi-cache-personal"],
+      delete: async (k) => { borradas.push(k); return true; },
+    },
+    configurable: true,
+  });
+  // location.reload() lanza en jsdom; el try/catch de abajo lo captura.
+  // Reemplazar solo reload (location no es redefinible en jsdom).
+  window.location.reload = () => {};
+  const btn = window.document.getElementById("update-app-btn");
+  try {
+    await window.actualizarApp(btn);
+  } catch (e) {
+    // reload puede lanzar en jsdom; lo importante es lo que se borró antes.
+  }
+  assert.ok(borradas.includes("battlecruiser-shell-v29"), "borró la cache actual de BattleCruiser");
+  assert.ok(borradas.includes("battlecruiser-shell-v28"), "borró la cache vieja de BattleCruiser");
+  assert.ok(!borradas.includes("otra-app-cache"), "NO borró la cache de otra aplicación");
+  assert.ok(!borradas.includes("mi-cache-personal"), "NO borró una cache personal ajena");
+});
