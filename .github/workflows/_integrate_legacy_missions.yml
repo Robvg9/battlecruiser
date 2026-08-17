@@ -22,46 +22,222 @@ jobs:
           git config user.name "BattleCruiser Integrator"
           git config user.email "battlecruiser-integrator@users.noreply.github.com"
 
-      - name: Reset integration workspace to current main
-        run: git reset --hard origin/main
-
-      - name: Apply mission code changes (tests handled separately)
-        shell: bash
+      - name: Integrate R3 safely into current main
+        shell: python
         run: |
-          apply_code() {
-            local label="$1" base="$2" head="$3"
-            shift 3
-            echo "=== $label ==="
-            git diff --binary "$base" "$head" -- "$@" > "/tmp/${label}.patch"
-            if [ -s "/tmp/${label}.patch" ]; then
-              git apply --3way --index "/tmp/${label}.patch"
-            fi
-          }
+          from pathlib import Path
+          p = Path("public/app.js")
+          s = p.read_text()
 
-          apply_code r3 ab46a9ae6cf49f0062f71905d345390128ae2459 d167621afd2c6b30306a177313f68243c96a23ac public/app.js public/style.css
-          git commit -m "integrate R3: actionable low-stock alerts"
+          old_card = '''    <div class="resumen-card ${bajoMinimo.length ? "alerta" : ""}"><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div></div>'''
+          new_card = '''    <div class="resumen-card ${bajoMinimo.length ? "alerta resumen-card-accion" : ""}" ${bajoMinimo.length ? 'data-ir-tab="inventario" role="button" tabindex="0"' : ""}><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div>${bajoMinimo.length ? '<div class="muted">Tocá para ver inventario</div>' : ""}</div>'''
+          if old_card not in s:
+              raise SystemExit("R3 card anchor not found")
+          s = s.replace(old_card, new_card, 1)
 
-          apply_code r5 bebd6ea9ba6fb32c63deb5f0728c0de503b76551 8b38f00384626b25b3f6adcd622aec096f05b65c public/app.js public/index.html public/style.css
+          old_alert = '''    } else {
+      alertasEl.innerHTML = "";
+      bajoMinimo.forEach((s) => {
+        const div = document.createElement("div");
+        div.className = "lista-item";
+        div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
+          <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
+        alertasEl.appendChild(div);
+      });
+    }
+  }'''
+          new_alert = '''    } else {
+      alertasEl.innerHTML = "";
+      const cab = document.createElement("div");
+      cab.className = "lista-item alerta-cabecera";
+      cab.innerHTML = '<span class="cc-asunto-tipo">' + bajoMinimo.length + ' producto(s) bajo mínimo</span>'
+        + '<button type="button" class="cc-accion alerta-ir-btn" data-ir-tab="inventario">Ver inventario</button>';
+      alertasEl.appendChild(cab);
+      bajoMinimo.forEach((s) => {
+        const div = document.createElement("div");
+        div.className = "lista-item alerta-item";
+        div.setAttribute("data-ir-tab", "inventario");
+        div.setAttribute("role", "button");
+        div.setAttribute("tabindex", "0");
+        div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
+          <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
+        alertasEl.appendChild(div);
+      });
+    }
+  }'''
+          if old_alert not in s:
+              raise SystemExit("R3 alert anchor not found")
+          s = s.replace(old_alert, new_alert, 1)
+
+          marker = '// ---- Navegación por tabs ----'
+          helper = '''// R3: navegación accionable del Centro de Control. Reutiliza el sistema de tabs existente.
+function irATab(tab) {
+  if (!tab) return;
+  const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+  if (btn) btn.click();
+}
+
+'''
+          if 'function irATab(tab)' not in s:
+              s = s.replace(marker, helper + marker, 1)
+
+          marker2 = '// ---- Menú lateral desplegable — reemplaza los tabs horizontales ----'
+          listener = '''// R3: items y card de stock bajo mínimo accionables.
+safeInit("resumen-alertas-accion", () => {
+  const panel = document.getElementById("tab-resumen");
+  if (!panel) return;
+  const manejar = (target) => {
+    const accion = target.closest("[data-ir-tab]");
+    if (!accion) return;
+    irATab(accion.getAttribute("data-ir-tab"));
+  };
+  panel.addEventListener("click", (e) => manejar(e.target));
+  panel.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      manejar(e.target);
+      if (e.target.closest("[data-ir-tab]")) e.preventDefault();
+    }
+  });
+});
+
+'''
+          if 'safeInit("resumen-alertas-accion"' not in s:
+              s = s.replace(marker2, listener + marker2, 1)
+          p.write_text(s)
+
+      - name: Integrate R3 CSS cleanly
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/style.css'); s=p.read_text()
+          marker='.resumen-card.alerta .valor { color: var(--wine); }'
+          css='''.resumen-card-accion { cursor: pointer; transition: transform 0.08s ease; }\n.resumen-card-accion:hover { transform: translateY(-1px); }\n.resumen-card-accion:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }\n.alerta-item { cursor: pointer; transition: background 0.08s ease; }\n.alerta-item:hover { background: rgba(201,162,77,0.07); }\n.alerta-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }\n.alerta-cabecera { display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(125,24,24,0.06); }\n.alerta-cabecera .cc-asunto-tipo { font-size:11px; color:var(--wine); }'''
+          if '.resumen-card-accion' not in s: s=s.replace(marker, marker+'\n'+css,1)
+          p.write_text(s)
+
+      - name: Commit R3
+        run: git add public/app.js public/style.css && git commit -m "integrate R3: actionable low-stock alerts"
+
+      - name: Integrate R5 code
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 8b38f00384626b25b3f6adcd622aec096f05b65c -- public/app.js public/index.html public/style.css > /tmp/r5.patch
+          git apply --3way --index /tmp/r5.patch
           git commit -m "integrate R5: searchable sales history"
 
-          # R6 is superseded by R7: R7 contains the same actionable sale detail plus the mathematical audit.
-          apply_code r7 bebd6ea9ba6fb32c63deb5f0728c0de503b76551 d18cd8e627df7e3cc0bdf76093c2835d2167a6d7 public/app.js public/index.html public/style.css
-          git commit -m "integrate R7: sales audit"
+      - name: Integrate R7 sales audit into R5 without overwriting search
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/app.js'); s=p.read_text()
+          marker='// Un solo listener delegado para +/-, edición directa y "Quitar" dentro del\n// carrito'
 
-          # R8 supersedes the narrower R11/R12 implementations: it contains both transfer and voucher details.
-          apply_code r8 bebd6ea9ba6fb32c63deb5f0728c0de503b76551 de87edf057da8d2024c1ef522089f4ee04ebda0d public/app.js public/index.html public/style.css
-          git commit -m "integrate R8: transfer and voucher audit details"
+          listener='''// R7: listener delegado del historial de ventas.\nsafeInit("ventas-historial-detalle", () => {\n  const lista = document.getElementById("lista-ventas");\n  if (!lista) return;\n  const abrir = (target) => {\n    const item = target.closest(".venta-item[data-venta-id]");\n    if (!item) return;\n    const id = item.getAttribute("data-venta-id");\n    if (id) mostrarDetalleVenta(id);\n  };\n  lista.addEventListener("click", (e) => abrir(e.target));\n  lista.addEventListener("keydown", (e) => {\n    if (e.key === "Enter" || e.key === " ") {\n      if (e.target.closest(".venta-item[data-venta-id]")) {\n        e.preventDefault();\n        abrir(e.target);\n      }\n    }\n  });\n});\n\n'''
+          if 'safeInit("ventas-historial-detalle"' not in s: s=s.replace(marker,listener+marker,1)
 
-          apply_code r9 bebd6ea9ba6fb32c63deb5f0728c0de503b76551 1a63532037493ea9e4861fa534b829e736686b11 public/app.js public/index.html public/style.css
-          git commit -m "integrate R9: actionable recent movements"
+          old='''    div.className = "lista-item";\n    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>\n      <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;'''
+          new='''    div.className = "lista-item lista-item-accion venta-item";\n    div.setAttribute("data-venta-id", v.id || "");\n    div.setAttribute("role", "button");\n    div.setAttribute("tabindex", "0");\n    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>\n      <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;'''
+          if old not in s: raise SystemExit('R7 sales render anchor not found')
+          s=s.replace(old,new,1)
 
-          apply_code r10 bebd6ea9ba6fb32c63deb5f0728c0de503b76551 9c711a56592361732516fb5bb0612a3ae01fedb3 public/app.js public/index.html public/style.css
-          git commit -m "integrate R10: operational movement filters"
+          marker2='// ============================================================\n// Sesión 21 — Pestaña "Configuración"'
+          detail=r'''// R7: auditoría matemática y detalle de venta.\nlet _ventaDetalleCargandoId = null;\nfunction redondearCentavos(n) { const v=Number(n); return Number.isFinite(v) ? Math.round((v+Number.EPSILON)*100)/100 : 0; }\nfunction mostrarDetalleVenta(ventaId) {\n  const cont=document.getElementById("venta-detalle"); if(!cont) return;\n  const venta=(_cache.ventas||[]).find(v=>v.id===ventaId);\n  if(!venta){ cont.innerHTML='<p class="lista-estado">No se encontró la venta.</p><button type="button" class="cc-accion venta-detalle-cerrar-btn">Volver</button>'; cont.classList.remove("hidden"); _enlazarCerrarVentaDetalle(); return; }\n  const fechaHora=venta.fecha?new Date(venta.fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";\n  cont.innerHTML='<div class="detalle-cabecera"><span class="detalle-tipo">Venta #'+(venta.id?idCorto(venta.id):"—")+'</span><button type="button" class="detalle-cerrar-btn venta-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button></div>'\n    +'<div class="detalle-cuerpo"><div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">'+escHtml(venta.id||"—")+'</span></div>'\n    +'<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">'+escHtml(fechaHora)+'</span></div>'\n    +'<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">'+escHtml(venta.almacenes?venta.almacenes.nombre:"—")+'</span></div>'\n    +'<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$'+money(venta.total||0)+'</span></div>'\n    +'<div class="detalle-fila"><span class="detalle-etiqueta">Líneas</span><span class="detalle-valor" id="venta-detalle-lineas"><span class="muted">Cargando…</span></span></div></div>'\n    +'<div class="venta-auditoria" id="venta-detalle-auditoria"></div>';\n  cont.classList.remove("hidden"); _enlazarCerrarVentaDetalle();\n  if(navigator.onLine) _cargarLineasVenta(ventaId,venta.fecha,venta.total); else _renderAuditoriaVenta(null,venta.total,false);\n  cont.focus();\n}\nasync function _cargarLineasVenta(ventaId,fechaVenta,totalRegistrado){\n  if(_ventaDetalleCargandoId===ventaId)return; _ventaDetalleCargandoId=ventaId; const el=document.getElementById("venta-detalle-lineas"); if(!el){_ventaDetalleCargandoId=null;return;}\n  try{ const fecha=fechaVenta?new Date(fechaVenta).toISOString().slice(0,10):null; const {data,error}=await client.rpc("reporte_ventas",{p_desde:fecha,p_hasta:fecha,p_almacen_id:null,p_producto_id:null,p_limite:200,p_offset:0});\n    if(error){el.innerHTML='<span class="muted">No se pudieron cargar las líneas.</span>';_renderAuditoriaVenta(null,totalRegistrado,true);return;}\n    const venta=(data||[]).find(v=>v.id===ventaId); const lineas=venta&&Array.isArray(venta.lineas)?venta.lineas:[];\n    if(!lineas.length) el.innerHTML='<span class="muted">Sin líneas registradas para esta venta.</span>';\n    else el.innerHTML='<div class="venta-lineas-lista">'+lineas.map(l=>'<div class="venta-linea"><span class="venta-linea-producto">'+escHtml(l.producto||"—")+'</span><span class="venta-linea-cant">'+(l.cantidad||0)+' u</span><span class="venta-linea-precio">$'+money(l.precio_unitario||0)+'</span><span class="venta-linea-subtotal">$'+money(l.subtotal||0)+'</span></div>').join("")+'</div>';\n    _renderAuditoriaVenta(lineas,totalRegistrado,true);\n  }catch(e){el.innerHTML='<span class="muted">No se pudieron cargar las líneas.</span>';_renderAuditoriaVenta(null,totalRegistrado,true);}finally{_ventaDetalleCargandoId=null;}\n}\nfunction _renderAuditoriaVenta(lineas,totalRegistrado,lineasCargadas){\n  const cont=document.getElementById("venta-detalle-auditoria"); if(!cont)return; const totalReg=redondearCentavos(totalRegistrado);\n  if(!lineasCargadas){cont.innerHTML='<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4><div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$'+money(totalReg)+'</span></div><div class="venta-auditoria-estado estado-info">🔵 Líneas no disponibles sin conexión</div>';return;}\n  if(!lineas||!lineas.length){cont.innerHTML='<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4><div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$'+money(totalReg)+'</span></div><div class="venta-auditoria-estado estado-neutro">⚪ Sin líneas disponibles</div>';return;}\n  const totalLineas=redondearCentavos(lineas.reduce((s,l)=>s+(Number(l.subtotal)||0),0)); const diferencia=redondearCentavos(totalReg-totalLineas); const coincide=Math.abs(diferencia)<0.01;\n  const estado=coincide?'<div class="venta-auditoria-estado estado-ok">✅ TOTAL COINCIDE</div>':'<div class="venta-auditoria-estado estado-alerta">🟠 DIFERENCIA DETECTADA</div>';\n  cont.innerHTML='<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4><div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$'+money(totalReg)+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Total de productos</span><span class="detalle-valor">$'+money(totalLineas)+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Diferencia</span><span class="detalle-valor">$'+money(Math.abs(diferencia))+'</span></div>'+estado;\n}\nfunction _enlazarCerrarVentaDetalle(){const cont=document.getElementById("venta-detalle");if(!cont)return;cont.querySelectorAll(".venta-detalle-cerrar-btn").forEach(btn=>btn.addEventListener("click",cerrarDetalleVenta));}\nfunction cerrarDetalleVenta(){const cont=document.getElementById("venta-detalle");if(cont){cont.classList.add("hidden");cont.innerHTML="";} _ventaDetalleCargandoId=null;}\n\n'''
+          detail=detail.replace('\\n','\n')
+          if 'function mostrarDetalleVenta(ventaId)' not in s: s=s.replace(marker2,detail+marker2,1)
+          p.write_text(s)
 
-          apply_code r13 bebd6ea9ba6fb32c63deb5f0728c0de503b76551 7a063c6e9937d3f79812e6efc637c6323b12cc6a public/app.js public/index.html public/style.css
-          git commit -m "integrate R13: actionable control-center alerts"
+      - name: Add R7 sales detail container
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/index.html'); s=p.read_text()
+          anchor='<div id="lista-ventas" class="lista"></div>'
+          if 'id="venta-detalle"' not in s: s=s.replace(anchor,anchor+'\n      <div id="venta-detalle" class="venta-detalle hidden" role="dialog" aria-label="Detalle de venta"></div>',1)
+          p.write_text(s)
+          PY
 
-      - name: Append mission tests without test-file merge conflicts
+      - name: Add clean R7/R8/R10 styles
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/style.css'); s=p.read_text()
+          marker='.pendiente-detalle .pendiente-eliminar-btn:hover {'
+          css='''.lista-item-accion { cursor:pointer; transition:background 0.08s ease,border-color 0.08s ease; }\n.lista-item-accion:hover { background:rgba(201,162,77,0.07); border-color:var(--gold-dim); }\n.lista-item-accion:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }\n.venta-detalle,.mov-detalle { margin-top:12px; border:1px solid var(--gold-dim); border-radius:6px; background:rgba(28,24,18,0.6); padding:12px 14px; }\n.venta-detalle.hidden,.mov-detalle.hidden { display:none; }\n.venta-detalle .detalle-fila,.mov-detalle .detalle-fila { display:flex; justify-content:space-between; gap:12px; padding:3px 0; border-bottom:1px solid rgba(201,162,77,0.08); }\n.venta-detalle .detalle-etiqueta,.mov-detalle .detalle-etiqueta { font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--mist); text-transform:uppercase; letter-spacing:0.05em; }\n.venta-detalle .detalle-valor,.mov-detalle .detalle-valor { font-size:13.5px; color:var(--text); text-align:right; word-break:break-all; }\n.venta-auditoria { margin-top:14px; padding-top:10px; border-top:1px solid rgba(201,162,77,0.18); }\n.venta-auditoria-titulo { font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--gold); margin-bottom:8px; }\n.venta-auditoria-estado { margin-top:10px; padding:8px 10px; border-radius:5px; font-size:12.5px; font-weight:600; text-align:center; }\n.venta-auditoria-estado.estado-ok { background:rgba(76,175,80,0.12); color:#6ec06e; border:1px solid rgba(76,175,80,0.3); }\n.venta-auditoria-estado.estado-alerta { background:rgba(125,24,24,0.14); color:var(--wine); border:1px solid rgba(125,24,24,0.4); }\n.venta-auditoria-estado.estado-neutro { background:rgba(201,162,77,0.06); color:var(--mist); border:1px solid var(--gold-dim); }\n.venta-auditoria-estado.estado-info { background:rgba(33,150,243,0.1); color:#5aa9e6; border:1px solid rgba(33,150,243,0.3); }\n.venta-lineas-lista { display:flex; flex-direction:column; gap:4px; margin-top:4px; }\n.venta-linea { display:flex; gap:10px; padding:3px 0; align-items:baseline; }\n.venta-linea-producto { flex:1 1 auto; color:var(--text); font-size:12.5px; }\n.venta-linea-cant,.venta-linea-precio { color:var(--mist); font-size:11.5px; white-space:nowrap; }\n.venta-linea-subtotal { color:var(--text); font-size:12.5px; font-weight:600; white-space:nowrap; }\n.mov-buscador-controles { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }\n.mov-buscador-controles input { flex:1 1 220px; font-family:'IBM Plex Mono',monospace; font-size:13px; padding:7px 10px; border:1px solid var(--gold-dim); border-radius:5px; background:transparent; color:var(--text); }\n.mov-buscador-controles input:focus { outline:2px solid var(--gold); outline-offset:-1px; }\n.mov-contador { font-size:11.5px; letter-spacing:0.03em; white-space:nowrap; }\n'''
+          if '.mov-buscador-controles' not in s: s=s.replace(marker,css+'\n'+marker,1)
+          p.write_text(s)
+
+      - name: Integrate R10 transfer/vale filters only
+        shell: bash
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 9c711a56592361732516fb5bb0612a3ae01fedb3 -- public/app.js public/index.html > /tmp/r10.patch
+          # Keep the transfer/vale render hunks and the HTML; skip sales render and shared listener hunks,
+          # because R5/R7 already provide the sales search/detail implementation.
+          awk 'BEGIN{skip=0} /^@@ /{skip=0; if($0 ~ /-3789/ || $0 ~ /-3652/) skip=1} {if(!skip) print}' /tmp/r10.patch > /tmp/r10-filtered.patch
+          git apply --3way --index /tmp/r10-filtered.patch
+
+      - name: Make R10 transfer/vale rows actionable for R8 details
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/app.js'); s=p.read_text()
+          old='''    div.className = "lista-item";\n    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>\n      <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;'''
+          new='''    div.className = "lista-item lista-item-accion mov-item";\n    div.setAttribute("data-mov-tipo", "transferencia"); div.setAttribute("data-mov-id", t.id || ""); div.setAttribute("role", "button"); div.setAttribute("tabindex", "0");\n    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>\n      <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;'''
+          if old not in s: raise SystemExit('transfer row anchor missing')
+          s=s.replace(old,new,1)
+          old2='''    div.className = "lista-item";\n    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>\n      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;'''
+          new2='''    div.className = "lista-item lista-item-accion mov-item";\n    div.setAttribute("data-mov-tipo", "vale"); div.setAttribute("data-mov-id", v.id || ""); div.setAttribute("role", "button"); div.setAttribute("tabindex", "0");\n    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>\n      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;'''
+          if old2 not in s: raise SystemExit('vale row anchor missing')
+          s=s.replace(old2,new2,1)
+          # R10 shared counter/listener for transferencias + vales only.
+          marker='// Un solo listener delegado para +/-, edición directa y "Quitar" dentro del\n// carrito'
+          extra=r'''// R10: filtros frontend de transferencias y vales.\nlet _trfBusqueda = "", _valesBusqueda = "";\nfunction actualizarContador(elId, visibles, total) { const el=document.getElementById(elId); if(!el)return; el.textContent=total===0?"":(visibles===total?total+(total===1?" elemento":" elementos"):"Mostrando "+visibles+" de "+total); }\nsafeInit("movimientos-buscadores-trf-vales", () => {\n  const cfgs=[{i:"trf-buscar",l:"lista-transferencias",v:"trf",c:"trf-contador",r:renderTransferenciasLista},{i:"vales-buscar",l:"lista-vales",v:"vale",c:"vales-contador",r:renderValesLista}];\n  cfgs.forEach(cfg=>{const input=document.getElementById(cfg.i);const lista=document.getElementById(cfg.l);if(!input||!lista)return;input.addEventListener("input",()=>{if(cfg.v==="trf")_trfBusqueda=input.value||"";else _valesBusqueda=input.value||"";cfg.r();});lista.addEventListener("click",e=>{if(e.target.closest(".mov-ver-todas-btn")){if(cfg.v==="trf")_trfBusqueda="";else _valesBusqueda="";input.value="";cfg.r();}});});\n});\n\n'''.replace('\\n','\n')
+          if 'movimientos-buscadores-trf-vales' not in s: s=s.replace(marker,extra+marker,1)
+          # Insert R8 detail functions before the common cart listener.
+          detail=r'''// R8: detalles accionables de transferencias y vales.\nfunction mostrarDetalleTransferencia(movId){const cont=document.getElementById("transferencia-detalle");if(!cont)return;const mov=(_cache.transferencias||[]).find(t=>t.id===movId);if(!mov){cont.innerHTML='<p class="lista-estado">No se encontró la transferencia.</p><button type="button" class="cc-accion mov-detalle-cerrar-btn">Volver</button>';cont.classList.remove("hidden");_enlazarCerrarMovDetalle(cont);return;}const fh=mov.fecha?new Date(mov.fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";cont.innerHTML='<div class="detalle-cabecera"><span class="detalle-tipo">Transferencia #'+(mov.id?idCorto(mov.id):"—")+'</span><button type="button" class="detalle-cerrar-btn mov-detalle-cerrar-btn">&times;</button></div><div class="detalle-cuerpo"><div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">'+escHtml(mov.id||"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">'+escHtml(fh)+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">'+escHtml(mov.estado||"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">'+escHtml(mov.origen?mov.origen.nombre:"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">'+escHtml(mov.destino?mov.destino.nombre:"—")+'</span></div></div>';cont.classList.remove("hidden");_enlazarCerrarMovDetalle(cont);cont.focus();}\nfunction mostrarDetalleVale(movId){const cont=document.getElementById("vale-detalle");if(!cont)return;const mov=(_cache.vales||[]).find(v=>v.id===movId);if(!mov){cont.innerHTML='<p class="lista-estado">No se encontró el vale.</p><button type="button" class="cc-accion mov-detalle-cerrar-btn">Volver</button>';cont.classList.remove("hidden");_enlazarCerrarMovDetalle(cont);return;}const fh=mov.fecha?new Date(mov.fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";cont.innerHTML='<div class="detalle-cabecera"><span class="detalle-tipo">Vale #'+(mov.id?idCorto(mov.id):"—")+'</span><button type="button" class="detalle-cerrar-btn mov-detalle-cerrar-btn">&times;</button></div><div class="detalle-cuerpo"><div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">'+escHtml(mov.id||"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">'+escHtml(fh)+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Tipo</span><span class="detalle-valor">'+escHtml(mov.tipo||"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Producto</span><span class="detalle-valor">'+escHtml(mov.productos?mov.productos.nombre:"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">'+escHtml(mov.almacenes?mov.almacenes.nombre:"—")+'</span></div><div class="detalle-fila"><span class="detalle-etiqueta">Cantidad</span><span class="detalle-valor">'+money(mov.cantidad||0)+' u</span></div></div>';cont.classList.remove("hidden");_enlazarCerrarMovDetalle(cont);cont.focus();}\nfunction cerrarDetalleMov(cont){if(cont){cont.classList.add("hidden");cont.innerHTML="";}}\nfunction _enlazarCerrarMovDetalle(cont){if(!cont)return;cont.querySelectorAll(".mov-detalle-cerrar-btn").forEach(btn=>btn.addEventListener("click",()=>cerrarDetalleMov(cont)));}\nsafeInit("movimientos-detalle",()=>{["lista-transferencias","lista-vales"].forEach(id=>{const lista=document.getElementById(id);if(!lista)return;const abrir=target=>{const item=target.closest(".mov-item[data-mov-id]");if(!item)return;const tipo=item.getAttribute("data-mov-tipo"),mid=item.getAttribute("data-mov-id");if(tipo==="transferencia")mostrarDetalleTransferencia(mid);else if(tipo==="vale")mostrarDetalleVale(mid);};lista.addEventListener("click",e=>abrir(e.target));lista.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){if(e.target.closest(".mov-item[data-mov-id]")){e.preventDefault();abrir(e.target);}}});});});\n\n'''.replace('\\n','\n')
+          if 'function mostrarDetalleTransferencia(movId)' not in s: s=s.replace(marker,detail+marker,1)
+          p.write_text(s)
+
+      - name: Add R8 detail containers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/index.html'); s=p.read_text()
+          a='<div id="lista-transferencias" class="lista"></div>'
+          b='<div id="lista-vales" class="lista"></div>'
+          if 'id="transferencia-detalle"' not in s: s=s.replace(a,a+'\n      <div id="transferencia-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de transferencia"></div>',1)
+          if 'id="vale-detalle"' not in s: s=s.replace(b,b+'\n      <div id="vale-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de vale"></div>',1)
+          p.write_text(s)
+          PY
+
+      - name: Add R10 search HTML
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 9c711a56592361732516fb5bb0612a3ae01fedb3 -- public/index.html > /tmp/r10html.patch
+          git apply --3way --index /tmp/r10html.patch
+
+      - name: Integrate R9 recent movement navigation
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/app.js'); s=p.read_text()
+          old='''    const movs = [\n      ...(_cache.ventas || []).map((v) => ({\n        fecha: v.fecha, texto: `Venta: ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"}`, estado: "$" + money(v.total),\n      })),\n      ..._cache.transferencias.map((t) => ({\n        fecha: t.fecha, texto: `Transferencia: ${t.origen.nombre} → ${t.destino.nombre}`, estado: t.estado,\n      })),\n      ..._cache.vales.map((v) => ({\n        fecha: v.fecha, texto: `Vale (${v.tipo}): ${v.productos.nombre} · ${v.almacenes.nombre}`, estado: money(v.cantidad),\n      })),\n    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);'''.replace('\\n','\n')
+          # R3/R2 current main may already have slightly different labels; use the exact current block if present.
+          if old not in s:
+              start=s.find('    const movs = [', s.find('const movsEl'))
+              end=s.find('    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);',start)
+              if start<0 or end<0: raise SystemExit('R9 movement block anchor missing')
+              end += len('    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);')
+              old=s[start:end]
+          new='''    const movs = [\n      ...(_cache.ventas || []).map((v) => ({ tipo:"venta", id:v.id, fecha:v.fecha, texto:`Venta: ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "—"}`, estado:"$"+money(v.total) })),\n      ..._cache.transferencias.map((t) => ({ tipo:"transferencia", id:t.id, fecha:t.fecha, texto:`Transferencia: ${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"}`, estado:t.estado })),\n      ..._cache.vales.map((v) => ({ tipo:"vale", id:v.id, fecha:v.fecha, texto:`Vale (${v.tipo || "?"}): ${v.productos ? v.productos.nombre : "—"} · ${v.almacenes ? v.almacenes.nombre : "—"}`, estado:money(v.cantidad) })),\n    ].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,8);'''.replace('\\n','\n')
+          s=s.replace(old,new,1)
+          old2='''        const div = document.createElement("div");\n        div.className = "lista-item";\n        div.innerHTML = `<span>${fechaCorta(m.fecha)}</span>\n          <span class="muted">${m.texto} · ${m.estado}</span>`;'''.replace('\\n','\n')
+          new2='''        const div = document.createElement("div");\n        const tabDestino = m.tipo === "venta" ? "ventas" : m.tipo === "transferencia" ? "transferencias" : "vales";\n        div.className = "lista-item lista-item-accion resumen-mov-item";\n        div.setAttribute("data-mov-tipo",m.tipo); div.setAttribute("data-mov-id",m.id||""); div.setAttribute("data-mov-tab",tabDestino); div.setAttribute("role","button"); div.setAttribute("tabindex","0");\n        div.innerHTML = `<span>${fechaCorta(m.fecha)} <span class="muted">· ${escHtml(m.tipo)}</span></span><span class="muted">${m.texto} · ${m.estado}</span>`;'''.replace('\\n','\n')
+          if old2 not in s: raise SystemExit('R9 item anchor missing')
+          s=s.replace(old2,new2,1)
+          marker='// Un solo listener delegado para +/-, edición directa y "Quitar" dentro del\n// carrito'
+          nav='''// R9: navegación desde Últimos movimientos del Centro de Control.\nsafeInit("resumen-movs-accion",()=>{const movsEl=document.getElementById("resumen-movs-lista");if(!movsEl)return;const navegar=target=>{const item=target.closest(".resumen-mov-item[data-mov-tab]");if(!item)return;const btn=document.querySelector('.tab-btn[data-tab="'+item.getAttribute("data-mov-tab")+'"]');if(btn)btn.click();};movsEl.addEventListener("click",e=>navegar(e.target));movsEl.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){if(e.target.closest(".resumen-mov-item[data-mov-tab]")){e.preventDefault();navegar(e.target);}}});});\n\n'''
+          if 'safeInit("resumen-movs-accion"' not in s: s=s.replace(marker,nav+marker,1)
+          p.write_text(s)
+
+      - name: Append all non-redundant mission tests
         shell: bash
         run: |
           append_tests() {
@@ -75,10 +251,9 @@ jobs:
           append_tests bebd6ea9ba6fb32c63deb5f0728c0de503b76551 de87edf057da8d2024c1ef522089f4ee04ebda0d r8
           append_tests bebd6ea9ba6fb32c63deb5f0728c0de503b76551 1a63532037493ea9e4861fa534b829e736686b11 r9
           append_tests bebd6ea9ba6fb32c63deb5f0728c0de503b76551 9c711a56592361732516fb5bb0612a3ae01fedb3 r10
-          append_tests bebd6ea9ba6fb32c63deb5f0728c0de503b76551 7a063c6e9937d3f79812e6efc637c6323b12cc6a r13
           node --check test/b2.3-centro-control.test.js
           git add test/b2.3-centro-control.test.js
-          git commit -m "integrate legacy mission tests R5-R13"
+          git commit -m "integrate legacy mission tests R5-R10"
 
       - name: Verify final code
         run: |
