@@ -35,18 +35,7 @@ jobs:
             git fetch origin "$head" --depth=1
             if [[ "$label" == "R7" ]]; then
               git show "$head:public/app.js" > /tmp/r7-app.js
-              python3 - <<'PY'
-              from pathlib import Path
-              cur = Path('public/app.js').read_text()
-              other = Path('/tmp/r7-app.js').read_text()
-              start = '// ---- Historial de ventas — Sesión 19 ----'
-              end = '// ============================================================\n// Sesión 21'
-              a = cur.find(start); b = cur.find(end, a)
-              c = other.find(start); d = other.find(end, c)
-              if min(a,b,c,d) < 0:
-                  raise SystemExit('R7 sales-history block markers not found')
-              Path('public/app.js').write_text(cur[:a] + other[c:d] + cur[b:], encoding='utf-8')
-          PY
+              python3 -c "from pathlib import Path; cur=Path('public/app.js').read_text(); other=Path('/tmp/r7-app.js').read_text(); start='// ---- Historial de ventas'; end='// ============================================================\\n// Sesión 21'; a=cur.find(start); b=cur.find(end,a); c=other.find(start); d=other.find(end,c); assert min(a,b,c,d)>=0; Path('public/app.js').write_text(cur[:a]+other[c:d]+cur[b:],encoding='utf-8')"
               git diff --diff-filter=ACMRT --binary "$base" "$head" -- . ':!public/app.js' > /tmp/R7.patch
               git apply --3way --theirs /tmp/R7.patch
             else
