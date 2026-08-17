@@ -58,3 +58,19 @@ No seguir agregando tablas por inercia.
 Primero: auditoría de compatibilidad **frontend ↔ RPC B7/B8**, después prueba real controlada de los flujos, y solo entonces nuevas funciones.
 
 Regla: código versionado ≠ SQL aplicado ≠ despliegue ≠ prueba real. Los cuatro estados deben quedar confirmados por separado.
+
+## REGLA PERMANENTE PARA VIBE — DIRECTAMENTE EN MAIN
+
+A partir de ahora, toda misión normal de BattleCruiser enviada a Vibe debe incluir explícitamente esta instrucción:
+
+> **REGLA DE ENTREGA: NO CREES UNA RAMA. NO CREES UN PR. TRABAJA DIRECTAMENTE SOBRE `main`. Lee el estado actual de `main`, implementa los cambios directamente ahí, ejecuta las pruebas, haz commit y push a `origin/main`.**
+
+Reglas asociadas:
+- No crear ramas `vibe/*`.
+- No abrir Pull Requests salvo que Roberto lo solicite explícitamente.
+- Verificar siempre el estado real de `main` antes de implementar.
+- No asumir que un PR anterior está integrado: comprobar el código real de `main`.
+- Reportar por separado código escrito, commit, push, despliegue, funcionamiento y prueba real.
+- Si una misión necesita una excepción arquitectónica o de entrega, detenerse y señalarla antes de crear una rama.
+
+La versión completa de esta regla también está en `BATTLECRUISER_VIBE_REGLAS_MAIN.txt`.
