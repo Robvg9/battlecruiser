@@ -691,6 +691,12 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   border-color: var(--wine); color: var(--wine);
 }
 .pendiente-detalle .pendiente-eliminar-btn:hover {
+/* R9: items accionables del Centro de Control */
+.lista-item-accion { cursor: pointer; transition: background 0.08s ease, border-color 0.08s ease; }
+.lista-item-accion:hover { background: rgba(201,162,77,0.07); border-color: var(--gold-dim); }
+.lista-item-accion:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.pendiente-detalle .pendiente-eliminar-btn:hover {
   background: rgba(122,35,49,0.15); color: var(--wine);
 }
 

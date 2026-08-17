@@ -2404,12 +2404,22 @@ function renderResumen() {
 
   const movsEl = document.getElementById("resumen-movs-lista");
   if (movsEl) {
+    // R9: cada movimiento lleva tipo + id reales para ser accionable (click/Enter
+    // navega a la seccion correspondiente). Reutiliza _cache (no consulta nueva).
+    // Incluye ventas si _cache.ventas tiene datos (campos reales: id, fecha,
+    // total, almacenes.nombre).
     const movs = [
+      ...(_cache.ventas || []).map((v) => ({
+        tipo: "venta", id: v.id, fecha: v.fecha,
+        texto: `Venta: ${v.almacenes ? v.almacenes.nombre : "—"}`, estado: "$" + money(v.total),
+      })),
       ..._cache.transferencias.map((t) => ({
-        fecha: t.fecha, texto: `Transferencia: ${t.origen.nombre} → ${t.destino.nombre}`, estado: t.estado,
+        tipo: "transferencia", id: t.id, fecha: t.fecha,
+        texto: `Transferencia: ${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"}`, estado: t.estado,
       })),
       ..._cache.vales.map((v) => ({
-        fecha: v.fecha, texto: `Vale (${v.tipo}): ${v.productos.nombre} · ${v.almacenes.nombre}`, estado: money(v.cantidad),
+        tipo: "vale", id: v.id, fecha: v.fecha,
+        texto: `Vale (${v.tipo || "?"}): ${v.productos ? v.productos.nombre : "—"} · ${v.almacenes ? v.almacenes.nombre : "—"}`, estado: money(v.cantidad),
       })),
     ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);
 
@@ -2419,8 +2429,16 @@ function renderResumen() {
       movsEl.innerHTML = "";
       movs.forEach((m) => {
         const div = document.createElement("div");
-        div.className = "lista-item";
-        div.innerHTML = `<span>${fechaCorta(m.fecha)}</span>
+        // R9: accionable. data-mov-tipo + data-mov-id permiten navegar a la
+        // seccion del movimiento. role/tabindex para teclado (Enter).
+        const tabDestino = m.tipo === "venta" ? "ventas" : m.tipo === "transferencia" ? "transferencias" : "vales";
+        div.className = "lista-item lista-item-accion resumen-mov-item";
+        div.setAttribute("data-mov-tipo", m.tipo);
+        div.setAttribute("data-mov-id", m.id || "");
+        div.setAttribute("data-mov-tab", tabDestino);
+        div.setAttribute("role", "button");
+        div.setAttribute("tabindex", "0");
+        div.innerHTML = `<span>${fechaCorta(m.fecha)} <span class="muted">· ${escHtml(m.tipo)}</span></span>
           <span class="muted">${m.texto} · ${m.estado}</span>`;
         movsEl.appendChild(div);
       });
@@ -3650,6 +3668,32 @@ safeInit("form-venta-linea", () => {
       fillSelect(productoSelect, ventaProductosLista, "id", (p) => p.nombre, true);
     }
   }
+});
+
+// R9: navegacion accionable desde "Ultimos movimientos" del Centro de Control.
+// Click o Enter en un movimiento navega al tab correspondiente (ventas,
+// transferencias, vales). Reutiliza el listener de tabs existente via
+// .tab-btn[data-tab=X].click(). No crea un segundo sistema de navegacion.
+safeInit("resumen-movs-accion", () => {
+  const movsEl = document.getElementById("resumen-movs-lista");
+  if (!movsEl) return;
+  const navegar = (target) => {
+    const item = target.closest(".resumen-mov-item[data-mov-tab]");
+    if (!item) return;
+    const tab = item.getAttribute("data-mov-tab");
+    if (!tab) return;
+    const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+    if (btn) btn.click();
+  };
+  movsEl.addEventListener("click", (e) => navegar(e.target));
+  movsEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".resumen-mov-item[data-mov-tab]")) {
+        e.preventDefault();
+        navegar(e.target);
+      }
+    }
+  });
 });
 
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
