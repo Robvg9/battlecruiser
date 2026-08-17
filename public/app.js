@@ -3261,19 +3261,46 @@ async function refrescarTransferencias() {
 
   _cache.transferencias = data || [];
   renderResumen();
+  renderTransferenciasLista();
+}
+
+// R10: render de transferencias con búsqueda frontend sobre _cache.
+let _trfBusqueda = "";
+function renderTransferenciasLista() {
   const lista = document.getElementById("lista-transferencias");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const todas = _cache.transferencias || [];
+  if (todas.length === 0) {
     setEmpty("lista-transferencias", "Todavía no hay transferencias registradas.");
+    actualizarContador("trf-contador", 0, 0);
+    return;
+  }
+  const termino = _trfBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((t) => {
+        const orig = t.origen && t.origen.nombre ? t.origen.nombre.toLowerCase() : "";
+        const dest = t.destino && t.destino.nombre ? t.destino.nombre.toLowerCase() : "";
+        const est = t.estado ? t.estado.toLowerCase() : "";
+        const fec = t.fecha ? fechaCorta(t.fecha).toLowerCase() : "";
+        const id = t.id ? t.id.toLowerCase() : "";
+        return orig.includes(termino) || dest.includes(termino) || est.includes(termino) || fec.includes(termino) || id.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos transferencias con esos criterios.</p>'
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="transferencias">Ver todas</button>';
+    actualizarContador("trf-contador", 0, todas.length);
     return;
   }
   lista.innerHTML = "";
-  data.forEach((t) => {
+  filtradas.forEach((t) => {
     const div = document.createElement("div");
     div.className = "lista-item";
-    div.innerHTML = `<span>${t.origen.nombre} → ${t.destino.nombre}</span>
-      <span class="muted">${fechaCorta(t.fecha)} · ${t.estado}</span>`;
+    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;
     lista.appendChild(div);
   });
+  actualizarContador("trf-contador", filtradas.length, todas.length);
 }
 
 safeInit("form-transferencia", () => {
@@ -3329,22 +3356,46 @@ async function refrescarVales() {
 
   _cache.vales = data || [];
   renderResumen();
+  renderValesLista();
+}
+
+// R10: render de vales con búsqueda frontend sobre _cache.
+let _valesBusqueda = "";
+function renderValesLista() {
   const lista = document.getElementById("lista-vales");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const todas = _cache.vales || [];
+  if (todas.length === 0) {
     setEmpty("lista-vales", "Todavía no hay vales de salida registrados.");
+    actualizarContador("vales-contador", 0, 0);
+    return;
+  }
+  const termino = _valesBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((v) => {
+        const prod = v.productos && v.productos.nombre ? v.productos.nombre.toLowerCase() : "";
+        const alm = v.almacenes && v.almacenes.nombre ? v.almacenes.nombre.toLowerCase() : "";
+        const tipo = v.tipo ? v.tipo.toLowerCase() : "";
+        const fec = v.fecha ? fechaCorta(v.fecha).toLowerCase() : "";
+        const id = v.id ? v.id.toLowerCase() : "";
+        return prod.includes(termino) || alm.includes(termino) || tipo.includes(termino) || fec.includes(termino) || id.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos vales con esos criterios.</p>'
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="vales">Ver todos</button>';
+    actualizarContador("vales-contador", 0, todas.length);
     return;
   }
   lista.innerHTML = "";
-  data.forEach((v) => {
+  filtradas.forEach((v) => {
     const div = document.createElement("div");
     div.className = "lista-item";
-    // Sesión 17: antes esta lista no mostraba la fecha (Transferencias sí la
-    // mostraba) — para un vale de salida (merma/donación/regalo/vencido) la
-    // fecha es un dato que hace falta para llevar cuenta real.
-    div.innerHTML = `<span>${v.productos.nombre} <span class="muted">· ${v.almacenes.nombre}</span></span>
-      <span class="muted">${fechaCorta(v.fecha)} · ${v.tipo} · ${money(v.cantidad)}</span>`;
+    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
+  actualizarContador("vales-contador", filtradas.length, todas.length);
 }
 
 safeInit("form-vale", () => {
@@ -3652,6 +3703,57 @@ safeInit("form-venta-linea", () => {
   }
 });
 
+// R10: helper de contador "Mostrando X de Y". Reutilizable para las 3 listas.
+function actualizarContador(elId, visibles, total) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (total === 0) { el.textContent = ""; return; }
+  el.textContent = visibles === total
+    ? total + (total === 1 ? " elemento" : " elementos")
+    : "Mostrando " + visibles + " de " + total;
+}
+
+// R10: listeners de búsqueda para ventas, transferencias y vales.
+// Un solo safeInit que registra los 3 buscadores + botones "Ver todos".
+safeInit("movimientos-buscadores", () => {
+  const configs = [
+    { inputId: "ventas-buscar", contadorId: "ventas-contador", listaId: "lista-ventas",
+      estadoVar: "_ventasBusqueda", renderFn: "renderVentasHistorial" },
+    { inputId: "trf-buscar", contadorId: "trf-contador", listaId: "lista-transferencias",
+      estadoVar: "_trfBusqueda", renderFn: "renderTransferenciasLista" },
+    { inputId: "vales-buscar", contadorId: "vales-contador", listaId: "lista-vales",
+      estadoVar: "_valesBusqueda", renderFn: "renderValesLista" },
+  ];
+  configs.forEach((cfg) => {
+    const input = document.getElementById(cfg.inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      // El estado vive en la variable global correspondiente.
+      if (cfg.estadoVar === "_ventasBusqueda") _ventasBusqueda = input.value || "";
+      else if (cfg.estadoVar === "_trfBusqueda") _trfBusqueda = input.value || "";
+      else if (cfg.estadoVar === "_valesBusqueda") _valesBusqueda = input.value || "";
+      if (cfg.renderFn === "renderVentasHistorial") renderVentasHistorial();
+      else if (cfg.renderFn === "renderTransferenciasLista") renderTransferenciasLista();
+      else if (cfg.renderFn === "renderValesLista") renderValesLista();
+    });
+    // Botón "Ver todos" (delegado dentro de la lista).
+    const lista = document.getElementById(cfg.listaId);
+    if (lista) {
+      lista.addEventListener("click", (e) => {
+        if (e.target.closest(".mov-ver-todas-btn")) {
+          if (cfg.estadoVar === "_ventasBusqueda") _ventasBusqueda = "";
+          else if (cfg.estadoVar === "_trfBusqueda") _trfBusqueda = "";
+          else if (cfg.estadoVar === "_valesBusqueda") _valesBusqueda = "";
+          input.value = "";
+          if (cfg.renderFn === "renderVentasHistorial") renderVentasHistorial();
+          else if (cfg.renderFn === "renderTransferenciasLista") renderTransferenciasLista();
+          else if (cfg.renderFn === "renderValesLista") renderValesLista();
+        }
+      });
+    }
+  });
+});
+
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
 // carrito — evita registrar un listener por cada línea que se agrega/quita.
 safeInit("venta-lineas-interaccion", () => {
@@ -3789,20 +3891,46 @@ async function refrescarVentasHistorial() {
   // no se guardaba aca porque el Resumen viejo no las usaba.
   _cache.ventas = data || [];
   renderResumen();
+  renderVentasHistorial();
+}
+
+// R10: render del historial de ventas con búsqueda frontend sobre _cache.ventas.
+// No consulta nada nuevo, no modifica _cache.ventas. Patrón: DATOS → FILTRO → LISTA.
+let _ventasBusqueda = "";
+function renderVentasHistorial() {
   const lista = document.getElementById("lista-ventas");
   if (!lista) return;
-  if (!data || data.length === 0) {
+  const todas = _cache.ventas || [];
+  if (todas.length === 0) {
     setEmpty("lista-ventas", "Todavía no hay ventas registradas.");
+    actualizarContador("ventas-contador", 0, 0);
+    return;
+  }
+  const termino = _ventasBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((v) => {
+        const alm = v.almacenes && v.almacenes.nombre ? v.almacenes.nombre.toLowerCase() : "";
+        const fec = v.fecha ? fechaCorta(v.fecha).toLowerCase() : "";
+        const tot = v.total != null ? money(v.total) : "";
+        const id = v.id ? v.id.toLowerCase() : "";
+        return alm.includes(termino) || fec.includes(termino) || tot.includes(termino) || id.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos ventas con esos criterios.</p>'
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="ventas">Ver todas las ventas</button>';
+    actualizarContador("ventas-contador", 0, todas.length);
     return;
   }
   lista.innerHTML = "";
-  data.forEach((v) => {
+  filtradas.forEach((v) => {
     const div = document.createElement("div");
     div.className = "lista-item";
-    div.innerHTML = `<span>${v.almacenes.nombre}</span>
+    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
     lista.appendChild(div);
   });
+  actualizarContador("ventas-contador", filtradas.length, todas.length);
 }
 
 // ============================================================

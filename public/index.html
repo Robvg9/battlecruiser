@@ -309,6 +309,10 @@
       <p class="msg" id="msg-venta"></p>
 
       <h3>Historial de ventas</h3>
+      <div class="mov-buscador-controles">
+        <input id="ventas-buscar" type="text" placeholder="Buscar por #referencia, almacén o fecha…" autocomplete="off">
+        <span id="ventas-contador" class="muted mov-contador"></span>
+      </div>
       <div id="lista-ventas" class="lista"></div>
     </section>
 
@@ -336,6 +340,10 @@
         <input id="trf-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Transferir</button>
       </form>
+      <div class="mov-buscador-controles">
+        <input id="trf-buscar" type="text" placeholder="Buscar por #referencia, origen, destino o estado…" autocomplete="off">
+        <span id="trf-contador" class="muted mov-contador"></span>
+      </div>
       <div id="lista-transferencias" class="lista"></div>
       <p class="msg" id="msg-transferencias"></p>
     </section>
@@ -354,6 +362,10 @@
         <input id="vale-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Registrar vale</button>
       </form>
+      <div class="mov-buscador-controles">
+        <input id="vales-buscar" type="text" placeholder="Buscar por #referencia, producto, tipo o almacén…" autocomplete="off">
+        <span id="vales-contador" class="muted mov-contador"></span>
+      </div>
       <div id="lista-vales" class="lista"></div>
       <p class="msg" id="msg-vales"></p>
     </section>

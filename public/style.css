@@ -691,6 +691,13 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   border-color: var(--wine); color: var(--wine);
 }
 .pendiente-detalle .pendiente-eliminar-btn:hover {
+/* R10: controles de búsqueda de movimientos */
+.mov-buscador-controles { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mov-buscador-controles input { flex: 1 1 220px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 7px 10px; border: 1px solid var(--gold-dim); border-radius: 5px; background: transparent; color: var(--text); }
+.mov-buscador-controles input:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
+.mov-contador { font-size: 11.5px; letter-spacing: 0.03em; white-space: nowrap; }
+
+.pendiente-detalle .pendiente-eliminar-btn:hover {
   background: rgba(122,35,49,0.15); color: var(--wine);
 }
 

@@ -355,3 +355,127 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R10 — Filtros operativos en movimientos (búsqueda frontend)
+// ============================================================
+
+test("R10.1: búsqueda de ventas por almacén + contador", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "v1", fecha: "2026-08-15T10:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } },
+    { id: "v2", fecha: "2026-08-15T11:00:00Z", total: 200, almacenes: { nombre: "Caja 2" } },
+  ];
+  window.renderVentasHistorial();
+  await esperar(20);
+  const input = document.getElementById("ventas-buscar");
+  input.value = "Caja 1";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(20);
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.innerHTML.includes("v1"), "encuentra venta 1");
+  assert.ok(!lista.innerHTML.includes("v2"), "no muestra venta 2");
+  assert.ok(document.getElementById("ventas-contador").textContent.includes("Mostrando 1 de 2"), "contador 1 de 2");
+});
+
+test("R10.2: búsqueda negativa de ventas + Ver todas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [{ id: "v1", fecha: "2026-08-15T10:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } }];
+  window.renderVentasHistorial();
+  await esperar(20);
+  const input = document.getElementById("ventas-buscar");
+  input.value = "zzzz";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(20);
+  assert.ok(/No encontramos/.test(document.getElementById("lista-ventas").innerHTML), "estado sin resultados");
+  document.querySelector("#lista-ventas .mov-ver-todas-btn").click();
+  await esperar(20);
+  assert.ok(document.getElementById("lista-ventas").innerHTML.includes("v1"), "lista restaurada");
+  assert.strictEqual(input.value, "", "input limpiado");
+});
+
+test("R10.3: _cache.ventas no se modifica al buscar", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventas = [{ id: "v1", fecha: "2026-08-15T10:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } }];
+  window._cache.ventas = ventas;
+  window.renderVentasHistorial();
+  await esperar(20);
+  document.getElementById("ventas-buscar").value = "Caja";
+  document.getElementById("ventas-buscar").dispatchEvent(new window.Event("input"));
+  await esperar(20);
+  assert.strictEqual(window._cache.ventas, ventas, "misma referencia");
+  assert.strictEqual(window._cache.ventas.length, 1, "1 elemento");
+});
+
+test("R10.4: búsqueda de transferencias por origen/destino + contador", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [
+    { id: "t1", fecha: "2026-08-15T10:00:00Z", estado: "ok", origen: { nombre: "A" }, destino: { nombre: "B" } },
+    { id: "t2", fecha: "2026-08-15T11:00:00Z", estado: "ok", origen: { nombre: "C" }, destino: { nombre: "D" } },
+  ];
+  window.renderTransferenciasLista();
+  await esperar(20);
+  const input = document.getElementById("trf-buscar");
+  input.value = "A";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(20);
+  assert.ok(document.getElementById("lista-transferencias").innerHTML.includes("t1"), "encuentra t1");
+  assert.ok(!document.getElementById("lista-transferencias").innerHTML.includes("t2"), "no muestra t2");
+  assert.ok(document.getElementById("trf-contador").textContent.includes("Mostrando 1 de 2"), "contador trf");
+});
+
+test("R10.5: búsqueda de vales por tipo + contador", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = [
+    { id: "va1", fecha: "2026-08-15T09:00:00Z", tipo: "merma", cantidad: 3, productos: { nombre: "Café" }, almacenes: { nombre: "C1" } },
+    { id: "va2", fecha: "2026-08-15T14:00:00Z", tipo: "donacion", cantidad: 1, productos: { nombre: "Pan" }, almacenes: { nombre: "C2" } },
+  ];
+  window.renderValesLista();
+  await esperar(20);
+  const input = document.getElementById("vales-buscar");
+  input.value = "merma";
+  input.dispatchEvent(new window.Event("input"));
+  await esperar(20);
+  assert.ok(document.getElementById("lista-vales").innerHTML.includes("va1"), "encuentra va1");
+  assert.ok(!document.getElementById("lista-vales").innerHTML.includes("va2"), "no muestra va2");
+  assert.ok(document.getElementById("vales-contador").textContent.includes("Mostrando 1 de 2"), "contador vales");
+});
+
+test("R10.6: estado vacío de las 3 listas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [];
+  window._cache.transferencias = [];
+  window._cache.vales = [];
+  window.renderVentasHistorial();
+  window.renderTransferenciasLista();
+  window.renderValesLista();
+  await esperar(20);
+  assert.ok(/Todav\u00eda no hay ventas/.test(document.getElementById("lista-ventas").innerHTML), "vacío ventas");
+  assert.ok(/Todav\u00eda no hay transferencias/.test(document.getElementById("lista-transferencias").innerHTML), "vacío trf");
+  assert.ok(/Todav\u00eda no hay vales/.test(document.getElementById("lista-vales").innerHTML), "vacío vales");
+});
+
+test("R10.7: no duplicaci\u00f3n de listeners — un solo buscador por lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(document.querySelectorAll("#ventas-buscar").length, 1, "un input ventas");
+  assert.strictEqual(document.querySelectorAll("#trf-buscar").length, 1, "un input trf");
+  assert.strictEqual(document.querySelectorAll("#vales-buscar").length, 1, "un input vales");
+  assert.strictEqual(typeof window.renderVentasHistorial, "function", "una sola renderVentasHistorial");
+  assert.strictEqual(typeof window.renderTransferenciasLista, "function", "una sola renderTransferenciasLista");
+  assert.strictEqual(typeof window.renderValesLista, "function", "una sola renderValesLista");
+});
