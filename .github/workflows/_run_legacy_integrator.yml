@@ -1,43 +1,84 @@
-# legacy integrator trigger
-name: run legacy integrator logic safely
+name: consolidate-main
 on:
   push:
     branches: [main]
 permissions:
   contents: write
 jobs:
-  run_integrator:
-    if: ${{ contains(github.event.head_commit.message, 'run legacy integrator') }}
+  consolidate:
+    if: ${{ contains(github.event.head_commit.message, 'CONSOLIDATE MAIN') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Execute existing integrator logic with safe R5 handling
+      - name: Consolidate selected mission heads into current main
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re, subprocess
-          text = Path('.github/workflows/_integrate_legacy_missions.yml').read_text()
-          blocks = re.split(r'\n      - name: ', text)[1:]
-          def run_cmd(cmd, shell):
-              if shell == 'python': subprocess.run(['python'], input=cmd, text=True, check=True)
-              else: subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
-          for block in blocks:
-              lines=block.splitlines(); name=lines[0].strip()
-              m=re.search(r'\n        run: \|\n((?:          .*\n?)*)', block)
-              if not m: continue
-              cmd='\n'.join(line[10:] if len(line)>=10 else '' for line in m.group(1).splitlines())
-              shell='python' if '\n        shell: python' in block else 'bash'
-              if name.startswith('Checkout main') or name=='Configure git': continue
-              if name=='Integrate R5 code' and '_ventasBusqueda' in Path('public/app.js').read_text():
-                  print('R5 already present in main; skipping duplicate R5 patch.'); continue
-              if name=='Remove integration workflow and push final main':
-                  cmd='''git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js\ngit diff --cached --quiet || git commit -m "legacy integration complete"\ngit push origin HEAD:main'''
-              if name=='Integrate R5 code': cmd=cmd.replace('git apply --3way --index /tmp/r5.patch','git apply --3way --union --index /tmp/r5.patch')
-              cmd=cmd.replace('git apply --3way --index /tmp/r10-filtered.patch','git apply --3way --union --index /tmp/r10-filtered.patch')
-              cmd=cmd.replace('git apply --3way --index /tmp/r10html.patch','git apply --3way --union --index /tmp/r10html.patch')
-              cmd=cmd.replace('git commit -m ','git diff --cached --quiet || git commit -m ')
-              print(f'>>> {name}'); run_cmd(cmd,shell)
-          PY
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+          npm ci --ignore-scripts
+
+          # Only unique improvements are replayed. R4 is already merged;
+          # R7 supersedes R6, R8 supersedes R11, and R3 supersedes R13.
+          missions=(
+            'R3|ab46a9ae6cf49f0062f71905d345390128ae2459|d167621afd2c6b30306a177313f68243c96a23ac'
+            'R5|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|8b38f00384626b25b3f6adcd622aec096f05b65c'
+            'R7|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d18cd8e627df7e3cc0bdf76093c2835d2167a6d7'
+            'R8|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|de87edf057da8d2024c1ef522089f4ee04ebda0d'
+            'R9|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|1a63532037493ea9e4861fa534b829e736686b11'
+            'R10|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|9c711a56592361732516fb5bb0612a3ae01fedb3'
+            'R12|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|4c3d7f3c81a6e9e85be35659ca835be715636520'
+          )
+
+          for spec in "${missions[@]}"; do
+            IFS='|' read -r label base head <<< "$spec"
+            echo "===== INTEGRANDO $label ====="
+            git fetch origin "$head" --depth=1
+            mapfile -t changed < <(git diff --name-status "$base" "$head")
+            for row in "${changed[@]}"; do
+              status="${row%%$'\t'*}"
+              path="${row#*$'\t'}"
+              if [[ "$path" == *$'\t'* ]]; then path="${path##*$'\t'}"; fi
+              mkdir -p "$(dirname "$path")"
+              case "$status" in
+                D)
+                  if git cat-file -e "HEAD:$path" 2>/dev/null; then
+                    git rm -f -- "$path"
+                  fi
+                  ;;
+                *)
+                  cur="$(mktemp)"; orig="$(mktemp)"; other="$(mktemp)"
+                  if git cat-file -e "HEAD:$path" 2>/dev/null; then git show "HEAD:$path" > "$cur"; else : > "$cur"; fi
+                  if git cat-file -e "$base:$path" 2>/dev/null; then git show "$base:$path" > "$orig"; else : > "$orig"; fi
+                  git show "$head:$path" > "$other"
+                  git merge-file --union "$cur" "$orig" "$other" || rc=$?
+                  rc=${rc:-0}
+                  if grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$cur"; then
+                    echo "ERROR: conflict markers remain in $path while integrating $label" >&2
+                    exit 1
+                  fi
+                  cp "$cur" "$path"
+                  rm -f "$cur" "$orig" "$other"
+                  ;;
+              esac
+            done
+            git add -A
+            if git diff --cached --quiet; then
+              echo "$label: no hay cambios nuevos (ya integrado o absorbido)."
+            else
+              git commit -m "consolidate $label into main"
+            fi
+            node --check public/app.js
+            npm test
+          done
+
+          # Final safety checks before touching origin/main.
+          ! grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test || { echo 'Conflict markers detected'; exit 1; }
+          node --check public/app.js
+          npm test
+          git status --short
+          git push origin HEAD:main
