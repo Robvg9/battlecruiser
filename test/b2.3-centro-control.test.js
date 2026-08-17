@@ -355,3 +355,138 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R11 — Auditoría de transferencias: detalle accionable
+// ============================================================
+
+function trfsR11() {
+  return [
+    { id: "t1-aaaa", fecha: "2026-08-15T10:00:00Z", estado: "completada", origen: { nombre: "Depósito" }, destino: { nombre: "Caja 1" } },
+    { id: "t2-bbbb", fecha: "2026-08-15T11:00:00Z", estado: "pendiente", origen: { nombre: "Caja 1" }, destino: { nombre: "Caja 2" } },
+  ];
+}
+
+test("R11.1: transferencias accionables (data-trf-id + role)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = trfsR11();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  const items = document.querySelectorAll("#lista-transferencias .trf-item");
+  assert.strictEqual(items.length, 2, "2 transferencias accionables");
+  assert.strictEqual(items[0].getAttribute("role"), "button", "role button");
+  assert.strictEqual(items[0].getAttribute("tabindex"), "0", "tabindex 0");
+  assert.ok(items[0].getAttribute("data-trf-id"), "tiene data-trf-id");
+});
+
+test("R11.2: click abre detalle con ID, origen, destino, estado", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = trfsR11();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .trf-item[data-trf-id='t1-aaaa']").click();
+  await esperar(20);
+  const d = document.getElementById("transferencia-detalle");
+  assert.ok(!d.classList.contains("hidden"), "detalle visible");
+  assert.ok(d.innerHTML.includes("t1-aaaa"), "muestra ID completo");
+  assert.ok(/Dep\u00f3sito/.test(d.innerHTML), "muestra origen");
+  assert.ok(/Caja 1/.test(d.innerHTML), "muestra destino");
+  assert.ok(/completada/.test(d.innerHTML), "muestra estado");
+  assert.ok(/Fecha y hora/.test(d.innerHTML), "muestra fecha y hora");
+});
+
+test("R11.3: Enter abre el detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = trfsR11();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .trf-item").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await esperar(20);
+  assert.ok(!document.getElementById("transferencia-detalle").classList.contains("hidden"), "Enter abre detalle");
+});
+
+test("R11.4: cerrar conserva la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = trfsR11();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .trf-item").click();
+  await esperar(20);
+  document.querySelector(".trf-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.ok(document.getElementById("transferencia-detalle").classList.contains("hidden"), "detalle cerrado");
+  assert.strictEqual(document.querySelectorAll("#lista-transferencias .trf-item").length, 2, "lista conservada");
+});
+
+test("R11.5: segunda transferencia no conserva datos de la primera", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = trfsR11();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .trf-item[data-trf-id='t1-aaaa']").click();
+  await esperar(20);
+  let d = document.getElementById("transferencia-detalle");
+  assert.ok(/Dep\u00f3sito/.test(d.innerHTML), "detalle muestra trf 1");
+  document.querySelector("#lista-transferencias .trf-item[data-trf-id='t2-bbbb']").click();
+  await esperar(20);
+  d = document.getElementById("transferencia-detalle");
+  assert.ok(/pendiente/.test(d.innerHTML), "detalle actualizado a trf 2");
+  assert.ok(!d.innerHTML.includes("t1-aaaa"), "no conserva ID de la primera");
+});
+
+test("R11.6: _cache.transferencias no se modifica", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const trfs = trfsR11();
+  window._cache.transferencias = trfs;
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .trf-item").click();
+  await esperar(20);
+  document.querySelector(".trf-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.strictEqual(window._cache.transferencias, trfs, "misma referencia");
+  assert.strictEqual(window._cache.transferencias.length, 2, "2 elementos");
+});
+
+test("R11.7: lista vacía + detalle cerrado", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [];
+  window.renderTransferenciasLista();
+  await esperar(20);
+  assert.ok(/Todav\u00eda no hay transferencias/.test(document.getElementById("lista-transferencias").innerHTML), "estado vacío");
+  assert.ok(document.getElementById("transferencia-detalle").classList.contains("hidden"), "detalle cerrado");
+});
+
+test("R11.8: no listeners duplicados tras abrir/cerrar 3 veces", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = trfsR11();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  for (let i = 0; i < 3; i++) {
+    document.querySelector("#lista-transferencias .trf-item").click();
+    await esperar(10);
+    document.querySelector(".trf-detalle-cerrar-btn").click();
+    await esperar(10);
+  }
+  assert.strictEqual(document.querySelectorAll("#transferencia-detalle").length, 1, "un solo contenedor");
+  document.querySelector("#lista-transferencias .trf-item").click();
+  await esperar(10);
+  assert.strictEqual(document.querySelectorAll("#transferencia-detalle .trf-detalle-cerrar-btn").length, 1, "un solo botón cerrar");
+});

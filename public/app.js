@@ -3261,19 +3261,74 @@ async function refrescarTransferencias() {
 
   _cache.transferencias = data || [];
   renderResumen();
+  renderTransferenciasLista();
+}
+
+// R11: render de transferencias como entradas accionables (click/Enter abre
+// el detalle). No consulta nada nuevo, no modifica _cache.transferencias.
+function renderTransferenciasLista() {
   const lista = document.getElementById("lista-transferencias");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const data = _cache.transferencias || [];
+  if (data.length === 0) {
     setEmpty("lista-transferencias", "Todavía no hay transferencias registradas.");
     return;
   }
   lista.innerHTML = "";
   data.forEach((t) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    div.innerHTML = `<span>${t.origen.nombre} → ${t.destino.nombre}</span>
-      <span class="muted">${fechaCorta(t.fecha)} · ${t.estado}</span>`;
+    div.className = "lista-item lista-item-accion trf-item";
+    div.setAttribute("data-trf-id", t.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;
     lista.appendChild(div);
   });
+}
+
+// R11: detalle accionable de una transferencia. Reutiliza _cache.transferencias
+// (unica fuente, no se modifica). Datos reales: id, fecha, estado, origen, destino.
+// Reutiliza el patron visual de #pendiente-detalle.
+function mostrarDetalleTransferencia(trfId) {
+  const cont = document.getElementById("transferencia-detalle");
+  if (!cont) return;
+  const trf = (_cache.transferencias || []).find((t) => t.id === trfId);
+  if (!trf) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró la transferencia.</p>'
+      + '<button type="button" class="cc-accion trf-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarTrfDetalle();
+    return;
+  }
+  const fechaHora = trf.fecha ? new Date(trf.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  cont.innerHTML = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + escHtml(trf.estado || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + '</span></div>'
+    + '</div>';
+  cont.classList.remove("hidden");
+  _enlazarCerrarTrfDetalle();
+  cont.focus();
+}
+
+function _enlazarCerrarTrfDetalle() {
+  const cont = document.getElementById("transferencia-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".trf-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleTransferencia);
+  });
+}
+
+function cerrarDetalleTransferencia() {
+  const cont = document.getElementById("transferencia-detalle");
+  if (cont) { cont.classList.add("hidden"); cont.innerHTML = ""; }
 }
 
 safeInit("form-transferencia", () => {
@@ -3650,6 +3705,25 @@ safeInit("form-venta-linea", () => {
       fillSelect(productoSelect, ventaProductosLista, "id", (p) => p.nombre, true);
     }
   }
+});
+
+// R11: listener delegado del historial de transferencias. Click o Enter abre
+// el detalle. No crea un segundo sistema de navegacion.
+safeInit("transferencias-detalle", () => {
+  const lista = document.getElementById("lista-transferencias");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".trf-item[data-trf-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-trf-id");
+    if (id) mostrarDetalleTransferencia(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".trf-item[data-trf-id]")) { e.preventDefault(); abrir(e.target); }
+    }
+  });
 });
 
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
