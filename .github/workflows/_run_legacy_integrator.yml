@@ -8,12 +8,12 @@ jobs:
   consolidate:
     if: ${{ contains(github.event.head_commit.message, 'CONSOLIDATE MAIN') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Consolidate selected mission commits into current main
+      - name: Consolidate unique mission improvements into current main
         shell: bash
         run: |
           set -euo pipefail
@@ -22,9 +22,10 @@ jobs:
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
           npm ci --ignore-scripts
 
+          # Final unique set. Superseded missions are deliberately not replayed:
+          # R5 is included by R10, R6 by R7, R11 by R8, R13 by R3.
           missions=(
             'R3|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d167621afd2c6b30306a177313f68243c96a23ac'
-            'R5|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|8b38f00384626b25b3f6adcd622aec096f05b65c'
             'R7|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d18cd8e627df7e3cc0bdf76093c2835d2167a6d7'
             'R8|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|de87edf057da8d2024c1ef522089f4ee04ebda0d'
             'R9|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|1a63532037493ea9e4861fa534b829e736686b11'
@@ -36,51 +37,16 @@ jobs:
             IFS='|' read -r label base head <<< "$spec"
             echo "===== INTEGRANDO $label ====="
             git fetch origin "$head" --depth=1
-            mapfile -t changed < <(git diff --name-status "$base" "$head")
-            for row in "${changed[@]}"; do
-              status="${row%%$'\t'*}"
-              path="${row#*$'\t'}"
+            git diff --diff-filter=ACMRT --binary "$base" "$head" > "/tmp/${label}.patch"
 
-              # Never delete current-main files from stale mission branches.
-              if [[ "$status" == D* ]]; then
-                echo "$label: preserve current-main deletion candidate: $path"
-                continue
-              fi
+            # True 3-way patch application. Git resolves only conflicting hunks
+            # in favor of the mission while preserving unrelated current-main work.
+            git apply --3way --theirs "/tmp/${label}.patch"
 
-              mkdir -p "$(dirname "$path")"
-
-              # Mission test files are additive blocks appended at EOF. Merge them
-              # structurally by marker instead of line-union, avoiding corruption.
-              if [[ "$path" == "test/b2.3-centro-control.test.js" ]]; then
-                cur="$(mktemp)"; other="$(mktemp)"
-                git show "HEAD:$path" > "$cur"
-                git show "$head:$path" > "$other"
-                marker="// ============================================================"
-                case "$label" in
-                  R3|R5|R7|R8|R9|R10|R12)
-                    block_start=$(grep -n "${label} —" "$other" | head -1 | cut -d: -f1 || true)
-                    if [[ -n "${block_start}" ]] && ! grep -q "${label} —" "$cur"; then
-                      tail -n +"${block_start}" "$other" >> "$cur"
-                    fi
-                    ;;
-                esac
-                cp "$cur" "$path"
-                rm -f "$cur" "$other"
-                continue
-              fi
-
-              cur="$(mktemp)"; orig="$(mktemp)"; other="$(mktemp)"
-              if git cat-file -e "HEAD:$path" 2>/dev/null; then git show "HEAD:$path" > "$cur"; else : > "$cur"; fi
-              git show "$base:$path" > "$orig"
-              git show "$head:$path" > "$other"
-              git merge-file --union --diff-algorithm=histogram "$cur" "$orig" "$other" || true
-              if grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$cur"; then
-                echo "ERROR: unresolved conflict markers in $path while integrating $label" >&2
-                exit 1
-              fi
-              cp "$cur" "$path"
-              rm -f "$cur" "$orig" "$other"
-            done
+            if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test; then
+              echo "ERROR: conflict markers remain after $label" >&2
+              exit 1
+            fi
 
             git add -A
             if git diff --cached --quiet; then
@@ -88,6 +54,7 @@ jobs:
             else
               git commit -m "consolidate $label into main"
             fi
+
             node --check public/app.js
             node --check test/b2.3-centro-control.test.js
             npm test
@@ -97,4 +64,5 @@ jobs:
           node --check public/app.js
           node --check test/b2.3-centro-control.test.js
           npm test
+          git status --short
           git push origin HEAD:main
