@@ -536,6 +536,15 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 .resumen-card .valor { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 600; color: var(--gold); line-height: 1.1; }
 .resumen-card .etiqueta { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--mist); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
 .resumen-card.alerta .valor { color: var(--wine); }
+/* R13: alertas accionables del Centro de Control */
+.resumen-card-accion { cursor: pointer; transition: transform 0.08s ease; }
+.resumen-card-accion:hover { transform: translateY(-1px); }
+.resumen-card-accion:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.alerta-item { cursor: pointer; transition: background 0.08s ease; }
+.alerta-item:hover { background: rgba(201,162,77,0.07); }
+.alerta-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.alerta-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(125,24,24,0.06); }
+.alerta-cabecera .cc-asunto-tipo { font-size: 11px; color: var(--wine); }
 .resumen-alertas { margin-bottom: 22px; }
 .resumen-movs .lista-item span:first-child { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--mist); min-width: 80px; }
 
