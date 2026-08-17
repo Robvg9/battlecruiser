@@ -6,7 +6,7 @@ permissions:
   contents: write
 jobs:
   prepare:
-    if: ${{ !contains(github.event.head_commit.message, 'legacy R7 union prepared') && !contains(github.event.head_commit.message, 'legacy integration complete') }}
+    if: ${{ contains(github.event.head_commit.message, 'legacy R7 trigger') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
