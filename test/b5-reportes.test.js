@@ -16,7 +16,7 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-function mockCliente({ perfil, permisos, resumen, ventas, transferencias, vales, stock, movimiento } = {}) {
+function mockCliente({ perfil, permisos, resumen, ventas, transferencias, vales, stock, movimiento, rentabilidad, compras } = {}) {
   const rpcCalls = [];
   const client = {
     auth: {
@@ -37,6 +37,8 @@ function mockCliente({ perfil, permisos, resumen, ventas, transferencias, vales,
       if (nombre === "reporte_vales") return { data: vales || [], error: null };
       if (nombre === "reporte_stock") return { data: stock || [], error: null };
       if (nombre === "reporte_movimiento_inventario") return { data: movimiento || [], error: null };
+      if (nombre === "rentabilidad_ventas") return { data: rentabilidad || [], error: null };
+      if (nombre === "historial_compras") return { data: compras || [], error: null };
       return { data: null, error: { message: "Could not find the function" } };
     },
     from: () => ({
@@ -271,4 +273,106 @@ test("B5.10: sub-reportes se cambian correctamente", async () => {
   const detalle = document.getElementById("rep-detalle");
   assert.ok(detalle.innerHTML.includes("A"), "debe mostrar el origen de transferencias");
   assert.ok(detalle.innerHTML.includes("completada"), "debe mostrar el estado");
+});
+
+
+// ============================================================
+// B5.3 R1 — Rentabilidad: NULL/costo no disponible ≠ 0
+// ============================================================
+
+test("B5.3 R1: venta con costo real muestra CMV, ganancia y margen", async () => {
+  const { window, document } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "reportes", accion: "ver" }],
+    rentabilidad: [
+      { id: "v1", fecha: "2026-08-15T10:00:00Z", almacen: "Caja 1", ingresos: 1000, cmv: 600, ganancia_bruta: 400, margen_porcentaje: 40 },
+    ],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  await window.refrescarReportes();
+  await esperar(20);
+  document.querySelector('.rep-tab-btn[data-rep="rentabilidad"]').click();
+  await esperar(30);
+  const detalle = document.getElementById("rep-detalle");
+  assert.ok(detalle.innerHTML.includes("Caja 1"), "muestra el almacén");
+  assert.ok(detalle.innerHTML.includes("1000.00"), "muestra ingresos");
+  assert.ok(detalle.innerHTML.includes("$600.00"), "muestra CMV real");
+  assert.ok(detalle.innerHTML.includes("$400.00"), "muestra ganancia real");
+  assert.ok(detalle.innerHTML.includes("40.00%"), "muestra margen real");
+  // NO debe mostrar la marca de costo no disponible cuando hay costo.
+  assert.ok(!/costo no disponible/.test(detalle.innerHTML), "no muestra 'costo no disponible' con costo real");
+});
+
+test("B5.3 R1: venta SIN costo (cmv null) no muestra CMV 0 ni margen 100%", async () => {
+  const { window, document } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "reportes", accion: "ver" }],
+    rentabilidad: [
+      // Venta histórica sin costo FIFO: cmv, ganancia_bruta y margen llegan null.
+      { id: "v2", fecha: "2026-08-15T11:00:00Z", almacen: "Caja 2", ingresos: 500, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+    ],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  await window.refrescarReportes();
+  await esperar(20);
+  document.querySelector('.rep-tab-btn[data-rep="rentabilidad"]').click();
+  await esperar(30);
+  const detalle = document.getElementById("rep-detalle");
+  assert.ok(detalle.innerHTML.includes("Caja 2"), "muestra el almacén");
+  assert.ok(detalle.innerHTML.includes("500.00"), "muestra ingresos");
+  assert.ok(/costo no disponible/.test(detalle.innerHTML), "marca el costo como no disponible (no inventa 0)");
+  // CRÍTICO: nunca mostrar margen 100% ni CMV $0 cuando no hay costo.
+  assert.ok(!/CMV \$0\.00/.test(detalle.innerHTML), "no muestra CMV $0.00 falso");
+  assert.ok(!/100\.00%/.test(detalle.innerHTML), "no muestra margen 100% falso");
+});
+
+test("B5.3 R1: totales al pie respetan costo no disponible cuando ninguna venta tiene costo", async () => {
+  const { window, document } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "reportes", accion: "ver" }],
+    rentabilidad: [
+      { id: "v3", fecha: "2026-08-15T09:00:00Z", almacen: "Caja 1", ingresos: 300, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+      { id: "v4", fecha: "2026-08-15T12:00:00Z", almacen: "Caja 2", ingresos: 200, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+    ],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  await window.refrescarReportes();
+  await esperar(20);
+  document.querySelector('.rep-tab-btn[data-rep="rentabilidad"]').click();
+  await esperar(30);
+  const detalle = document.getElementById("rep-detalle");
+  // El total de ingresos sí se muestra (500), pero el total de CMV/ganancia no se inventa.
+  assert.ok(/TOTALES/.test(detalle.innerHTML), "muestra fila de totales");
+  assert.ok(/costo no disponible/.test(detalle.innerHTML), "totales marcan costo no disponible");
+  assert.ok(!/CMV \$0\.00/.test(detalle.innerHTML), "totales no muestran CMV $0.00");
+  assert.ok(!/100\.00%/.test(detalle.innerHTML), "totales no muestran margen 100%");
+});
+
+test("B5.3 R1: mixto — ventas con y sin costo; totales solo suman las que tienen costo", async () => {
+  const { window, document } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "reportes", accion: "ver" }],
+    rentabilidad: [
+      { id: "v5", fecha: "2026-08-15T09:00:00Z", almacen: "Caja 1", ingresos: 1000, cmv: 600, ganancia_bruta: 400, margen_porcentaje: 40 },
+      { id: "v6", fecha: "2026-08-15T12:00:00Z", almacen: "Caja 2", ingresos: 500, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+    ],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  await window.refrescarReportes();
+  await esperar(20);
+  document.querySelector('.rep-tab-btn[data-rep="rentabilidad"]').click();
+  await esperar(30);
+  const detalle = document.getElementById("rep-detalle");
+  // La venta con costo muestra sus valores reales.
+  assert.ok(detalle.innerHTML.includes("$600.00"), "venta con costo muestra CMV real");
+  // La venta sin costo marca no disponible.
+  assert.ok(/costo no disponible/.test(detalle.innerHTML), "venta sin costo marcada");
+  // Totales: ingresos suman ambas (1500), pero CMV solo la que tiene costo (600).
+  assert.ok(detalle.innerHTML.includes("1500.00"), "total ingresos suma ambas ventas");
+  assert.ok(/TOTALES[\s\S]*\$600\.00/.test(detalle.innerHTML), "total CMV solo suma la venta con costo");
+  assert.ok(!/100\.00%/.test(detalle.innerHTML), "ningún margen 100% falso");
 });
