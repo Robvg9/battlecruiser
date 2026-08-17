@@ -1,5 +1,0 @@
-ARCHIVED LEGACY AUTOMATION
-
-Original file: .github/fix_integrator.py
-
-This automation is obsolete after R1-R13 consolidation and is intentionally kept out of .github so GitHub Actions cannot execute it. Original source remains in Git history.
