@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   quality:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -33,18 +33,4 @@ jobs:
           node --check public/service-worker.js
 
       - name: Automated tests
-        continue-on-error: true
         run: npm test
-
-      - name: Configure git
-        run: |
-          git config user.name "BattleCruiser Integrator"
-          git config user.email "battlecruiser-integrator@users.noreply.github.com"
-
-      - name: Repair integrator
-        if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, 'legacy integration complete') }}
-        run: python3 .github/fix_integrator.py
-
-      - name: Integrate legacy missions directly into main
-        if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, 'legacy integration complete') }}
-        run: python3 .github/integrate_legacy.py
