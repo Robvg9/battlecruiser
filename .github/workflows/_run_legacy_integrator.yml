@@ -8,7 +8,7 @@ jobs:
   consolidate:
     if: ${{ contains(github.event.head_commit.message, 'CONSOLIDATE MAIN') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,9 +21,6 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
           npm ci --ignore-scripts
-
-          # Final unique set. Superseded missions are deliberately not replayed:
-          # R5 is included by R10, R6 by R7, R11 by R8, R13 by R3.
           missions=(
             'R3|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d167621afd2c6b30306a177313f68243c96a23ac'
             'R7|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d18cd8e627df7e3cc0bdf76093c2835d2167a6d7'
@@ -32,37 +29,38 @@ jobs:
             'R10|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|9c711a56592361732516fb5bb0612a3ae01fedb3'
             'R12|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|4c3d7f3c81a6e9e85be35659ca835be715636520'
           )
-
           for spec in "${missions[@]}"; do
             IFS='|' read -r label base head <<< "$spec"
             echo "===== INTEGRANDO $label ====="
             git fetch origin "$head" --depth=1
-            git diff --diff-filter=ACMRT --binary "$base" "$head" > "/tmp/${label}.patch"
-
-            # True 3-way patch application. Git resolves only conflicting hunks
-            # in favor of the mission while preserving unrelated current-main work.
-            git apply --3way --theirs "/tmp/${label}.patch"
-
-            if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test; then
-              echo "ERROR: conflict markers remain after $label" >&2
-              exit 1
-            fi
-
-            git add -A
-            if git diff --cached --quiet; then
-              echo "$label: no hay cambios nuevos."
+            if [[ "$label" == "R7" ]]; then
+              git show "$head:public/app.js" > /tmp/r7-app.js
+              python3 - <<'PY'
+              from pathlib import Path
+              cur = Path('public/app.js').read_text()
+              other = Path('/tmp/r7-app.js').read_text()
+              start = '// ---- Historial de ventas — Sesión 19 ----'
+              end = '// ============================================================\n// Sesión 21'
+              a, b = cur.find(start), cur.find(end, cur.find(start))
+              c, d = other.find(start), other.find(end, other.find(start))
+              if min(a,b,c,d) < 0: raise SystemExit('R7 sales-history block markers not found')
+              Path('public/app.js').write_text(cur[:a] + other[c:d] + cur[b:], encoding='utf-8')
+              PY
+              git diff --diff-filter=ACMRT --binary "$base" "$head" -- . ':!public/app.js' > /tmp/R7.patch
+              git apply --3way --theirs /tmp/R7.patch
             else
-              git commit -m "consolidate $label into main"
+              git diff --diff-filter=ACMRT --binary "$base" "$head" > "/tmp/${label}.patch"
+              git apply --3way --theirs "/tmp/${label}.patch"
             fi
-
+            if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test; then exit 1; fi
+            git add -A
+            git diff --cached --quiet || git commit -m "consolidate $label into main"
             node --check public/app.js
             node --check test/b2.3-centro-control.test.js
             npm test
           done
-
-          ! grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test || { echo 'Conflict markers detected'; exit 1; }
+          ! grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test || exit 1
           node --check public/app.js
           node --check test/b2.3-centro-control.test.js
           npm test
-          git status --short
           git push origin HEAD:main
