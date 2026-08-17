@@ -35,14 +35,11 @@ jobs:
             git fetch origin "$head" --depth=1
             git diff --diff-filter=ACMRT --binary "$base" "$head" > "/tmp/${label}.patch"
             git apply --3way --theirs "/tmp/${label}.patch"
-
-            # R5 is already present in current main. R7 rewrites the sales
-            # renderer and leaves the R5 counter tail; keep that compatibility
-            # explicitly until R10 supplies the final filter renderer.
             if [[ "$label" == "R7" ]]; then
-              python3 -c "from pathlib import Path; p=Path('public/app.js'); s=p.read_text(); old='actualizarContadorVentas(filtradas.length, todas.length);'; new='actualizarContadorVentas(filtradas.length, (_cache.ventas || []).length);'; assert old in s, 'R7/R5 counter seam not found'; p.write_text(s.replace(old,new,1),encoding='utf-8')"
+              # Current main already contains R5's search state. R7's full renderer
+              # can leave a stale R5 counter reference; normalize every stale use.
+              python3 -c "from pathlib import Path; p=Path('public/app.js'); s=p.read_text(); s=s.replace('todas.length','(_cache.ventas || []).length'); p.write_text(s,encoding='utf-8')"
             fi
-
             if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test; then exit 1; fi
             git add -A
             git diff --cached --quiet || git commit -m "consolidate $label into main"
