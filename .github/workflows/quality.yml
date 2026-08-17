@@ -68,6 +68,13 @@ jobs:
           s=s.replace("sh('git','apply','--3way','--index','/tmp/r10code.patch')","sh('git','apply','/tmp/r10code.patch')",1)
           old2="Path('/tmp/r10html.patch').write_text(patch); sh('git','apply','--3way','--index','/tmp/r10html.patch')"
           if old2 in s: s=s.replace(old2,"Path('/tmp/r10html.patch').write_text(patch)",1)
+          start=s.find("extra='''let _trfBusqueda")
+          if start>=0:
+              end=s.find("if 'movimientos-buscadores-trf-vales' not in s",start)
+              end2=s.find("\n",end)
+              replacement='''extra='''safeInit("movimientos-buscadores-trf-vales",()=>{[{i:"trf-buscar",v:"trf",r:renderTransferenciasLista},{i:"vales-buscar",v:"vale",r:renderValesLista}].forEach(c=>{const input=document.getElementById(c.i);if(!input)return;input.addEventListener("input",()=>{if(c.v==="trf")_trfBusqueda=input.value||"";else _valesBusqueda=input.value||"";c.r();});});});\n\n'''
+'''
+              s=s[:start]+replacement+s[end2+1:]
           p.write_text(s)
           PY
 
