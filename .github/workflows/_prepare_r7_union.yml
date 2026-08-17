@@ -1,0 +1,33 @@
+name: prepare legacy R7 union
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: ${{ !contains(github.event.head_commit.message, 'legacy R7 union prepared') && !contains(github.event.head_commit.message, 'legacy integration complete') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "BattleCruiser Integrator"
+          git config user.email "battlecruiser-integrator@users.noreply.github.com"
+      - name: Apply R7 with three-way union
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 d18cd8e627df7e3cc0bdf76093c2835d2167a6d7 -- public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js > /tmp/r7.patch
+          git apply --3way --union --index /tmp/r7.patch
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate
+        run: |
+          node --check public/app.js
+          npm test
+      - name: Commit and push directly to main
+        run: |
+          git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js
+          git commit -m "legacy R7 union prepared"
+          git push origin HEAD:main
