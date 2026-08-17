@@ -1,3 +1,4 @@
+# legacy integrator trigger
 name: run legacy integrator logic safely
 on:
   push:
@@ -18,35 +19,23 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re, subprocess
-
           text = Path('.github/workflows/_integrate_legacy_missions.yml').read_text()
           blocks = re.split(r'\n      - name: ', text)[1:]
-
           def run_cmd(cmd, shell):
-              if shell == 'python':
-                  subprocess.run(['python'], input=cmd, text=True, check=True)
-              else:
-                  subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
-
+              if shell == 'python': subprocess.run(['python'], input=cmd, text=True, check=True)
+              else: subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
           for block in blocks:
-              lines = block.splitlines()
-              name = lines[0].strip()
-              m = re.search(r'\n        run: \|\n((?:          .*\n?)*)', block)
-              if not m:
-                  continue
-              cmd = '\n'.join(line[10:] if len(line) >= 10 else '' for line in m.group(1).splitlines())
-              shell = 'python' if '\n        shell: python' in block else 'bash'
-
-              if name.startswith('Checkout main') or name == 'Configure git':
-                  continue
-              if name == 'Integrate R5 code' and '_ventasBusqueda' in Path('public/app.js').read_text():
-                  print('R5 already present in main; skipping duplicate R5 patch.')
-                  continue
-              if name == 'Remove integration workflow and push final main':
-                  cmd = '''git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js\ngit diff --cached --quiet || git commit -m "legacy integration complete"\ngit push origin HEAD:main'''
-              if name == 'Integrate R5 code':
-                  cmd = cmd.replace('git apply --3way --index /tmp/r5.patch','git apply --3way --union --index /tmp/r5.patch')
-              cmd = cmd.replace('git commit -m ', 'git diff --cached --quiet || git commit -m ')
-              print(f'>>> {name}')
-              run_cmd(cmd, shell)
+              lines=block.splitlines(); name=lines[0].strip()
+              m=re.search(r'\n        run: \|\n((?:          .*\n?)*)', block)
+              if not m: continue
+              cmd='\n'.join(line[10:] if len(line)>=10 else '' for line in m.group(1).splitlines())
+              shell='python' if '\n        shell: python' in block else 'bash'
+              if name.startswith('Checkout main') or name=='Configure git': continue
+              if name=='Integrate R5 code' and '_ventasBusqueda' in Path('public/app.js').read_text():
+                  print('R5 already present in main; skipping duplicate R5 patch.'); continue
+              if name=='Remove integration workflow and push final main':
+                  cmd='''git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js\ngit diff --cached --quiet || git commit -m "legacy integration complete"\ngit push origin HEAD:main'''
+              if name=='Integrate R5 code': cmd=cmd.replace('git apply --3way --index /tmp/r5.patch','git apply --3way --union --index /tmp/r5.patch')
+              cmd=cmd.replace('git commit -m ','git diff --cached --quiet || git commit -m ')
+              print(f'>>> {name}'); run_cmd(cmd,shell)
           PY
