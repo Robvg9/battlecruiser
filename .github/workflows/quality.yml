@@ -35,6 +35,11 @@ jobs:
       - name: Automated tests
         run: npm test
 
+      - name: Configure git for integration
+        run: |
+          git config user.name "BattleCruiser Integrator"
+          git config user.email "battlecruiser-integrator@users.noreply.github.com"
+
       - name: Integrate legacy missions directly into main
         if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, 'legacy integration complete') }}
         run: python3 .github/integrate_legacy.py
