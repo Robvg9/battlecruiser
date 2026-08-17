@@ -1,5 +1,0 @@
-# ARCHIVED — VIBE RULES
-
-The permanent Vibe delivery rule is now embedded directly in `/BATTLECRUISER_CEREBRO.md`.
-
-Historical version remains available in Git history.
