@@ -36,47 +36,14 @@ jobs:
         continue-on-error: true
         run: npm test
 
-      - name: Configure git for integration
+      - name: Configure git
         run: |
           git config user.name "BattleCruiser Integrator"
           git config user.email "battlecruiser-integrator@users.noreply.github.com"
 
-      - name: Repair temporary integration script
+      - name: Repair integrator
         if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, 'legacy integration complete') }}
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('.github/integrate_legacy.py')
-          s=p.read_text()
-          old='''lines=patch.splitlines(True); out=[]; h=[]; keep=False
-          for line in lines:
-              if line.startswith('@@ '):
-                  keep=('-3261' in line or '-3329' in line)
-              if keep: out.append(line)
-          Path('/tmp/r10code.patch').write_text(''.join(out))'''
-          new='''lines=patch.splitlines(True); out=[]; in_hunk=False; keep=False
-          for line in lines:
-              if line.startswith('diff --git ') or line.startswith('index ') or line.startswith('--- ') or line.startswith('+++ '):
-                  out.append(line); in_hunk=False; continue
-              if line.startswith('@@ '):
-                  in_hunk=True; keep=('-3261' in line or '-3329' in line)
-                  if keep: out.append(line)
-                  continue
-              if in_hunk and keep: out.append(line)
-          Path('/tmp/r10code.patch').write_text(''.join(out))'''
-          if old in s: s=s.replace(old,new,1)
-          s=s.replace("sh('git','apply','--3way','--index','/tmp/r10code.patch')","sh('git','apply','/tmp/r10code.patch')",1)
-          old2="Path('/tmp/r10html.patch').write_text(patch); sh('git','apply','--3way','--index','/tmp/r10html.patch')"
-          if old2 in s: s=s.replace(old2,"Path('/tmp/r10html.patch').write_text(patch)",1)
-          start=s.find("extra='''let _trfBusqueda")
-          if start>=0:
-              end=s.find("if 'movimientos-buscadores-trf-vales' not in s",start)
-              end2=s.find("\n",end)
-              replacement='''extra='''safeInit("movimientos-buscadores-trf-vales",()=>{[{i:"trf-buscar",v:"trf",r:renderTransferenciasLista},{i:"vales-buscar",v:"vale",r:renderValesLista}].forEach(c=>{const input=document.getElementById(c.i);if(!input)return;input.addEventListener("input",()=>{if(c.v==="trf")_trfBusqueda=input.value||"";else _valesBusqueda=input.value||"";c.r();});});});\n\n'''
-'''
-              s=s[:start]+replacement+s[end2+1:]
-          p.write_text(s)
-          PY
+        run: python3 .github/fix_integrator.py
 
       - name: Integrate legacy missions directly into main
         if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, 'legacy integration complete') }}
