@@ -691,6 +691,13 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   border-color: var(--wine); color: var(--wine);
 }
 .pendiente-detalle .pendiente-eliminar-btn:hover {
+/* R12: indicación visual según tipo de vale (sin cambiar lógica) */
+.vale-tipo-merma { border-left: 3px solid var(--wine); }
+.vale-tipo-donacion { border-left: 3px solid #4a90d9; }
+.vale-tipo-regalo { border-left: 3px solid var(--gold); }
+.vale-tipo-vencido { border-left: 3px solid #8a6d3b; }
+
+.pendiente-detalle .pendiente-eliminar-btn:hover {
   background: rgba(122,35,49,0.15); color: var(--wine);
 }
 

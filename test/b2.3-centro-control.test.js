@@ -355,3 +355,139 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R12 — Auditoría de vales: detalle accionable
+// ============================================================
+
+function valesR12() {
+  return [
+    { id: "va1", fecha: "2026-08-15T09:00:00Z", tipo: "merma", cantidad: 5, productos: { nombre: "Café" }, almacenes: { nombre: "Caja 1" } },
+    { id: "va2", fecha: "2026-08-15T14:00:00Z", tipo: "donacion", cantidad: 2, productos: { nombre: "Pan" }, almacenes: { nombre: "Caja 2" } },
+  ];
+}
+
+test("R12.1: vales accionables (data-vale-id + role)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesR12();
+  window.renderValesLista();
+  await esperar(20);
+  const items = document.querySelectorAll("#lista-vales .vale-item");
+  assert.strictEqual(items.length, 2, "2 vales accionables");
+  assert.strictEqual(items[0].getAttribute("role"), "button", "role button");
+  assert.strictEqual(items[0].getAttribute("tabindex"), "0", "tabindex 0");
+  assert.ok(items[0].getAttribute("data-vale-id"), "tiene data-vale-id");
+  assert.ok(items[0].className.includes("vale-tipo-merma"), "indicación visual tipo merma");
+});
+
+test("R12.2: click abre detalle con tipo, producto, cantidad, almacén", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesR12();
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .vale-item[data-vale-id='va1']").click();
+  await esperar(20);
+  const d = document.getElementById("vale-detalle");
+  assert.ok(!d.classList.contains("hidden"), "detalle visible");
+  assert.ok(d.innerHTML.includes("va1"), "muestra ID");
+  assert.ok(/Merma/.test(d.innerHTML), "muestra tipo legible");
+  assert.ok(/Caf\u00e9/.test(d.innerHTML), "muestra producto");
+  assert.ok(/Caja 1/.test(d.innerHTML), "muestra almacén");
+  assert.ok(/5\.00 u/.test(d.innerHTML), "muestra cantidad exacta");
+});
+
+test("R12.3: Enter abre el detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesR12();
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .vale-item").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await esperar(20);
+  assert.ok(!document.getElementById("vale-detalle").classList.contains("hidden"), "Enter abre detalle");
+});
+
+test("R12.4: cerrar conserva la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesR12();
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .vale-item").click();
+  await esperar(20);
+  document.querySelector(".vale-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.ok(document.getElementById("vale-detalle").classList.contains("hidden"), "detalle cerrado");
+  assert.strictEqual(document.querySelectorAll("#lista-vales .vale-item").length, 2, "lista conservada");
+});
+
+test("R12.5: segundo vale no conserva datos del primero", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesR12();
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .vale-item[data-vale-id='va1']").click();
+  await esperar(20);
+  let d = document.getElementById("vale-detalle");
+  assert.ok(/Caf\u00e9/.test(d.innerHTML), "detalle vale 1");
+  document.querySelector("#lista-vales .vale-item[data-vale-id='va2']").click();
+  await esperar(20);
+  d = document.getElementById("vale-detalle");
+  assert.ok(/Pan/.test(d.innerHTML), "detalle actualizado a vale 2");
+  assert.ok(!d.innerHTML.includes("va1"), "no conserva ID del primero");
+});
+
+test("R12.6: _cache.vales no se modifica", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const vales = valesR12();
+  window._cache.vales = vales;
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .vale-item").click();
+  await esperar(20);
+  document.querySelector(".vale-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.strictEqual(window._cache.vales, vales, "misma referencia");
+  assert.strictEqual(window._cache.vales.length, 2, "2 elementos");
+});
+
+test("R12.7: lista vacía + detalle cerrado", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = [];
+  window.renderValesLista();
+  await esperar(20);
+  assert.ok(/Todav\u00eda no hay vales/.test(document.getElementById("lista-vales").innerHTML), "estado vacío");
+  assert.ok(document.getElementById("vale-detalle").classList.contains("hidden"), "detalle cerrado");
+});
+
+test("R12.8: no listeners duplicados tras abrir/cerrar 3 veces", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesR12();
+  window.renderValesLista();
+  await esperar(20);
+  for (let i = 0; i < 3; i++) {
+    document.querySelector("#lista-vales .vale-item").click();
+    await esperar(10);
+    document.querySelector(".vale-detalle-cerrar-btn").click();
+    await esperar(10);
+  }
+  assert.strictEqual(document.querySelectorAll("#vale-detalle").length, 1, "un solo contenedor");
+  document.querySelector("#lista-vales .vale-item").click();
+  await esperar(10);
+  assert.strictEqual(document.querySelectorAll("#vale-detalle .vale-detalle-cerrar-btn").length, 1, "un solo botón cerrar");
+});

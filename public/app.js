@@ -3329,22 +3329,78 @@ async function refrescarVales() {
 
   _cache.vales = data || [];
   renderResumen();
+  renderValesLista();
+}
+
+// R12: render de vales como entradas accionables (click/Enter abre el detalle).
+// No consulta nada nuevo, no modifica _cache.vales.
+function renderValesLista() {
   const lista = document.getElementById("lista-vales");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const data = _cache.vales || [];
+  if (data.length === 0) {
     setEmpty("lista-vales", "Todavía no hay vales de salida registrados.");
     return;
   }
   lista.innerHTML = "";
   data.forEach((v) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    // Sesión 17: antes esta lista no mostraba la fecha (Transferencias sí la
-    // mostraba) — para un vale de salida (merma/donación/regalo/vencido) la
-    // fecha es un dato que hace falta para llevar cuenta real.
-    div.innerHTML = `<span>${v.productos.nombre} <span class="muted">· ${v.almacenes.nombre}</span></span>
-      <span class="muted">${fechaCorta(v.fecha)} · ${v.tipo} · ${money(v.cantidad)}</span>`;
+    // R12: indicación visual según el tipo (sin cambiar la lógica de negocio).
+    div.className = "lista-item lista-item-accion vale-item vale-tipo-" + (v.tipo || "desconocido");
+    div.setAttribute("data-vale-id", v.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
+}
+
+// R12: detalle accionable de un vale. Reutiliza _cache.vales (unica fuente, no
+// se modifica). Datos reales: id, fecha, tipo, cantidad, producto, almacén.
+// Reutiliza el patron visual de #pendiente-detalle.
+function mostrarDetalleVale(valeId) {
+  const cont = document.getElementById("vale-detalle");
+  if (!cont) return;
+  const vale = (_cache.vales || []).find((v) => v.id === valeId);
+  if (!vale) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró el vale.</p>'
+      + '<button type="button" class="cc-accion vale-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarValeDetalle();
+    return;
+  }
+  const fechaHora = vale.fecha ? new Date(vale.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  // R12: etiqueta legible del tipo para auditoría (sin cambiar el dato real).
+  const tipoEtiqueta = { merma: "Merma", donacion: "Donación", regalo: "Regalo", vencido: "Vencido" }[vale.tipo] || vale.tipo || "—";
+  cont.innerHTML = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Vale #' + (vale.id ? idCorto(vale.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn vale-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(vale.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Tipo</span><span class="detalle-valor">' + escHtml(tipoEtiqueta) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Producto</span><span class="detalle-valor">' + escHtml(vale.productos ? vale.productos.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(vale.almacenes ? vale.almacenes.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Cantidad</span><span class="detalle-valor">' + money(vale.cantidad || 0) + ' u</span></div>'
+    + '</div>';
+  cont.classList.remove("hidden");
+  _enlazarCerrarValeDetalle();
+  cont.focus();
+}
+
+function _enlazarCerrarValeDetalle() {
+  const cont = document.getElementById("vale-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".vale-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleVale);
+  });
+}
+
+function cerrarDetalleVale() {
+  const cont = document.getElementById("vale-detalle");
+  if (cont) { cont.classList.add("hidden"); cont.innerHTML = ""; }
 }
 
 safeInit("form-vale", () => {
@@ -3650,6 +3706,24 @@ safeInit("form-venta-linea", () => {
       fillSelect(productoSelect, ventaProductosLista, "id", (p) => p.nombre, true);
     }
   }
+});
+
+// R12: listener delegado del historial de vales. Click o Enter abre el detalle.
+safeInit("vales-detalle", () => {
+  const lista = document.getElementById("lista-vales");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".vale-item[data-vale-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-vale-id");
+    if (id) mostrarDetalleVale(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".vale-item[data-vale-id]")) { e.preventDefault(); abrir(e.target); }
+    }
+  });
 });
 
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
