@@ -20,6 +20,8 @@ jobs:
         run: |
           git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 8b38f00384626b25b3f6adcd622aec096f05b65c -- public/app.js public/index.html public/style.css > /tmp/r5.patch
           git apply --3way --union --index /tmp/r5.patch
+      - name: Install dependencies
+        run: npm ci
       - name: Validate
         run: |
           node --check public/app.js
