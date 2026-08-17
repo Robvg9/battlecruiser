@@ -1,0 +1,76 @@
+name: integrate legacy missions into main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: ${{ !contains(github.event.head_commit.message, 'legacy integration complete') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "BattleCruiser Integrator"
+          git config user.email "battlecruiser-integrator@users.noreply.github.com"
+
+      - name: Integrate R3
+        run: |
+          git diff --binary ab46a9ae6cf49f0062f71905d345390128ae2459 d167621afd2c6b30306a177313f68243c96a23ac > /tmp/r3.patch
+          git apply --3way --index /tmp/r3.patch
+          git commit -m "integrate R3: actionable low-stock alerts"
+
+      - name: Integrate R5
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 8b38f00384626b25b3f6adcd622aec096f05b65c > /tmp/r5.patch
+          git apply --3way --index /tmp/r5.patch
+          git commit -m "integrate R5: searchable sales history"
+
+      - name: Integrate R7
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 d18cd8e627df7e3cc0bdf76093c2835d2167a6d7 > /tmp/r7.patch
+          git apply --3way --index /tmp/r7.patch
+          git commit -m "integrate R7: sales audit"
+
+      - name: Integrate R8
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 de87edf057da8d2024c1ef522089f4ee04ebda0d > /tmp/r8.patch
+          git apply --3way --index /tmp/r8.patch
+          git commit -m "integrate R8: transfer and voucher audit details"
+
+      - name: Integrate R9
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 1a63532037493ea9e4861fa534b829e736686b11 > /tmp/r9.patch
+          git apply --3way --index /tmp/r9.patch
+          git commit -m "integrate R9: actionable recent movements"
+
+      - name: Integrate R10
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 9c711a56592361732516fb5bb0612a3ae01fedb3 > /tmp/r10.patch
+          git apply --3way --index /tmp/r10.patch
+          git commit -m "integrate R10: operational movement filters"
+
+      - name: Integrate R13
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 7a063c6e9937d3f79812e6efc637c6323b12cc6a > /tmp/r13.patch
+          git apply --3way --index /tmp/r13.patch
+          git commit -m "integrate R13: actionable control-center alerts"
+
+      - name: Verify final code
+        run: |
+          node --check public/app.js
+          npm test
+
+      - name: Remove integration workflow and push final main
+        run: |
+          git rm .github/workflows/_integrate_legacy_missions.yml
+          git commit -m "docs: legacy integration complete [skip ci]"
+          git push origin HEAD:main
