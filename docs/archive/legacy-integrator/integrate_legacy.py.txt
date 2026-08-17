@@ -1,0 +1,5 @@
+ARCHIVED LEGACY AUTOMATION
+
+Original file: .github/integrate_legacy.py
+
+Obsolete after R1-R13 consolidation. Original source remains in Git history. It is intentionally outside .github so it cannot mutate main automatically.
