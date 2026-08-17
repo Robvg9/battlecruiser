@@ -36,6 +36,8 @@ jobs:
               if name=='Remove integration workflow and push final main':
                   cmd='''git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js\ngit diff --cached --quiet || git commit -m "legacy integration complete"\ngit push origin HEAD:main'''
               if name=='Integrate R5 code': cmd=cmd.replace('git apply --3way --index /tmp/r5.patch','git apply --3way --union --index /tmp/r5.patch')
+              cmd=cmd.replace('git apply --3way --index /tmp/r10-filtered.patch','git apply --3way --union --index /tmp/r10-filtered.patch')
+              cmd=cmd.replace('git apply --3way --index /tmp/r10html.patch','git apply --3way --union --index /tmp/r10html.patch')
               cmd=cmd.replace('git commit -m ','git diff --cached --quiet || git commit -m ')
               print(f'>>> {name}'); run_cmd(cmd,shell)
           PY
