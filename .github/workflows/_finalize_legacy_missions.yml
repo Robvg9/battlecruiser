@@ -1,0 +1,68 @@
+name: finalize legacy missions on main
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: ${{ contains(github.event.head_commit.message, 'legacy R7 union prepared') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "BattleCruiser Integrator"
+          git config user.email "battlecruiser-integrator@users.noreply.github.com"
+      - name: Integrate R8 with three-way union
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 de87edf057da8d2024c1ef522089f4ee04ebda0d -- public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js > /tmp/r8.patch
+          git apply --3way --union --index /tmp/r8.patch
+      - name: Integrate R9 with three-way union
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 1a63532037493ea9e4861fa534b829e736686b11 -- public/app.js public/style.css test/b2.3-centro-control.test.js > /tmp/r9.patch
+          git apply --3way --union --index /tmp/r9.patch
+      - name: Integrate R10 with three-way union
+        run: |
+          git diff --binary bebd6ea9ba6fb32c63deb5f0728c0de503b76551 9c711a56592361732516fb5bb0612a3ae01fedb3 -- public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js > /tmp/r10.patch
+          git apply --3way --union --index /tmp/r10.patch
+      - name: Add R12 visual type indication without duplicating R8 detail logic
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/app.js'); s=p.read_text()
+          old='''    div.className = "lista-item lista-item-accion vale-item";'''
+          if old in s and 'vale-tipo-' not in s:
+              s=s.replace(old, '''    div.className = "lista-item lista-item-accion vale-item vale-tipo-" + String(v.tipo || "otro").toLowerCase().replace(/[^a-z0-9_-]/g, "-");''', 1)
+          elif 'vale-item' not in s:
+              raise SystemExit('R12 vale render anchor not found')
+          p.write_text(s)
+          p=Path('public/style.css'); s=p.read_text()
+          css='''.vale-item { border-left: 3px solid var(--gold); }\n.vale-tipo-merma { border-left-color: var(--wine); }\n.vale-tipo-donacion { border-left-color: #2f7d32; }\n.vale-tipo-regalo { border-left-color: #6b4fa1; }\n.vale-tipo-vencido { border-left-color: #c47a00; }'''
+          if '.vale-tipo-merma' not in s: s += '\n'+css+'\n'
+          p.write_text(s)
+      - name: Install dependencies
+        run: npm ci
+      - name: Full validation
+        run: |
+          node --check public/app.js
+          npm test
+      - name: Verify legacy functionality markers
+        shell: python
+        run: |
+          from pathlib import Path
+          app=Path('public/app.js').read_text()
+          html=Path('public/index.html').read_text()
+          required=['_ventasBusqueda','renderVentasHistorial','mostrarDetalleVenta','redondearCentavos','mostrarDetalleTransferencia','mostrarDetalleVale']
+          missing=[x for x in required if x not in app]
+          if missing: raise SystemExit('Missing required integrated features: '+', '.join(missing))
+          for x in ['ventas-buscar','transferencias-buscar','vales-buscar','venta-detalle','transferencia-detalle','vale-detalle']:
+              if x not in html: raise SystemExit('Missing HTML marker: '+x)
+      - name: Cleanup legacy integration workflows and push directly to main
+        run: |
+          rm -f .github/workflows/_integrate_legacy_missions.yml .github/workflows/_prepare_r5_union.yml .github/workflows/_prepare_r7_union.yml .github/workflows/_finalize_legacy_missions.yml
+          git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js .github/workflows
+          git commit -m "legacy integration complete"
+          git push origin HEAD:main
