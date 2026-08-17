@@ -33,15 +33,8 @@ jobs:
             IFS='|' read -r label base head <<< "$spec"
             echo "===== INTEGRANDO $label ====="
             git fetch origin "$head" --depth=1
-            if [[ "$label" == "R7" ]]; then
-              git show "$head:public/app.js" > /tmp/r7-app.js
-              python3 -c "from pathlib import Path; cur=Path('public/app.js').read_text(); other=Path('/tmp/r7-app.js').read_text(); start='// ---- Historial de ventas'; end='// ============================================================\\n// Sesión 21'; a=cur.find(start); b=cur.find(end,a); c=other.find(start); d=other.find(end,c); assert min(a,b,c,d)>=0; Path('public/app.js').write_text(cur[:a]+other[c:d]+cur[b:],encoding='utf-8')"
-              git diff --diff-filter=ACMRT --binary "$base" "$head" -- . ':!public/app.js' > /tmp/R7.patch
-              git apply --3way --theirs /tmp/R7.patch
-            else
-              git diff --diff-filter=ACMRT --binary "$base" "$head" > "/tmp/${label}.patch"
-              git apply --3way --theirs "/tmp/${label}.patch"
-            fi
+            git diff --diff-filter=ACMRT --binary "$base" "$head" > "/tmp/${label}.patch"
+            git apply --3way --theirs "/tmp/${label}.patch"
             if grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test; then exit 1; fi
             git add -A
             git diff --cached --quiet || git commit -m "consolidate $label into main"
