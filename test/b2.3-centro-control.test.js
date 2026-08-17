@@ -355,3 +355,193 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R9 — Centro de Control → movimientos accionables
+// ============================================================
+
+function movsR9() {
+  return {
+    ventas: [{ id: "v-0001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } }],
+    transferencias: [{ id: "t-0001", fecha: "2026-08-15T11:00:00Z", estado: "completada", origen: { nombre: "A" }, destino: { nombre: "B" } }],
+    vales: [{ id: "va-001", fecha: "2026-08-15T09:00:00Z", tipo: "merma", cantidad: 3, productos: { nombre: "Café" }, almacenes: { nombre: "Caja 1" } }],
+  };
+}
+
+test("R9.1: cada movimiento del Centro de Control es accionable (data-mov-tipo + role)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.ventas = m.ventas;
+  window._cache.transferencias = m.transferencias;
+  window._cache.vales = m.vales;
+  window.renderResumen();
+  await esperar(20);
+  const items = document.querySelectorAll("#resumen-movs-lista .resumen-mov-item");
+  assert.ok(items.length === 3, "hay 3 movimientos accionables");
+  items.forEach((it) => {
+    assert.ok(it.getAttribute("data-mov-tipo"), "tiene data-mov-tipo");
+    assert.ok(it.getAttribute("data-mov-id"), "tiene data-mov-id");
+    assert.strictEqual(it.getAttribute("role"), "button", "role button");
+    assert.strictEqual(it.getAttribute("tabindex"), "0", "tabindex 0");
+  });
+});
+
+test("R9.2: click en una venta navega al tab ventas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.ventas = m.ventas;
+  window._cache.transferencias = m.transferencias;
+  window._cache.vales = m.vales;
+  window.renderResumen();
+  await esperar(20);
+  const itemVenta = Array.from(document.querySelectorAll("#resumen-movs-lista .resumen-mov-item")).find((i) => i.getAttribute("data-mov-tipo") === "venta");
+  assert.ok(itemVenta, "hay un item de venta");
+  itemVenta.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="ventas"]').classList.contains("active"), "navega al tab ventas");
+  assert.ok(document.getElementById("tab-ventas").classList.contains("visible"), "panel ventas visible");
+});
+
+test("R9.3: click en una transferencia navega al tab transferencias", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.transferencias = m.transferencias;
+  window._cache.vales = m.vales;
+  window._cache.ventas = m.ventas;
+  window.renderResumen();
+  await esperar(20);
+  const itemTrf = Array.from(document.querySelectorAll("#resumen-movs-lista .resumen-mov-item")).find((i) => i.getAttribute("data-mov-tipo") === "transferencia");
+  itemTrf.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="transferencias"]').classList.contains("active"), "navega al tab transferencias");
+});
+
+test("R9.4: click en un vale navega al tab vales", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.vales = m.vales;
+  window._cache.transferencias = m.transferencias;
+  window._cache.ventas = m.ventas;
+  window.renderResumen();
+  await esperar(20);
+  const itemVale = Array.from(document.querySelectorAll("#resumen-movs-lista .resumen-mov-item")).find((i) => i.getAttribute("data-mov-tipo") === "vale");
+  itemVale.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="vales"]').classList.contains("active"), "navega al tab vales");
+});
+
+test("R9.5: Enter navega al tab correspondiente", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.transferencias = m.transferencias;
+  window._cache.vales = [];
+  window._cache.ventas = [];
+  window.renderResumen();
+  await esperar(20);
+  const item = document.querySelector("#resumen-movs-lista .resumen-mov-item");
+  item.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="transferencias"]').classList.contains("active"), "Enter navega a transferencias");
+});
+
+test("R9.6: ID conservado en el item accionable", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.ventas = m.ventas;
+  window._cache.transferencias = [];
+  window._cache.vales = [];
+  window.renderResumen();
+  await esperar(20);
+  const item = document.querySelector("#resumen-movs-lista .resumen-mov-item");
+  assert.strictEqual(item.getAttribute("data-mov-id"), "v-0001", "ID conservado");
+});
+
+test("R9.7: lista vacía muestra estado sin movimientos", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [];
+  window._cache.vales = [];
+  window._cache.ventas = [];
+  window.renderResumen();
+  await esperar(20);
+  assert.ok(/Todavía no hay movimientos registrados/.test(document.getElementById("resumen-movs-lista").innerHTML), "estado vacío");
+});
+
+test("R9.8: no mutación de cache al navegar", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  const trfs = m.transferencias;
+  const vales = m.vales;
+  window._cache.transferencias = trfs;
+  window._cache.vales = vales;
+  window._cache.ventas = m.ventas;
+  window.renderResumen();
+  await esperar(20);
+  document.querySelector("#resumen-movs-lista .resumen-mov-item").click();
+  await esperar(20);
+  assert.strictEqual(window._cache.transferencias, trfs, "cache transferencias intacta");
+  assert.strictEqual(window._cache.vales, vales, "cache vales intacta");
+});
+
+test("R9.9: no segundo router — un solo listener de tabs", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(window._routerMovs, undefined, "no hay segundo router");
+  assert.strictEqual(window._navSistema, undefined, "no hay segundo sistema de navegación");
+  assert.strictEqual(typeof window.renderResumen, "function", "renderResumen única");
+});
+
+test("R9.10: offline — la navegación funciona sin conexión", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.transferencias = m.transferencias;
+  window._cache.vales = [];
+  window._cache.ventas = [];
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  window.renderResumen();
+  await esperar(20);
+  const item = document.querySelector("#resumen-movs-lista .resumen-mov-item");
+  assert.ok(item, "hay movimiento visible offline");
+  item.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="transferencias"]').classList.contains("active"), "navega offline");
+});
+
+test("R9.11: no se acumulan listeners al re-renderizar varias veces", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const m = movsR9();
+  window._cache.transferencias = m.transferencias;
+  window._cache.vales = [];
+  window._cache.ventas = [];
+  for (let i = 0; i < 3; i++) {
+    window.renderResumen();
+    await esperar(10);
+  }
+  const items = document.querySelectorAll("#resumen-movs-lista .resumen-mov-item");
+  assert.strictEqual(items.length, 1, "un solo item (no duplicado por re-render)");
+  // Click sigue funcionando tras múltiples renders.
+  items[0].click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="transferencias"]').classList.contains("active"), "navegación funciona tras re-renders");
+});
