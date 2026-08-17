@@ -22,9 +22,6 @@ jobs:
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
           npm ci --ignore-scripts
 
-          # Unique product improvements only:
-          # R4 is already merged; R7 supersedes R6; R8 supersedes R11; R3 supersedes R13.
-          # The base is each mission commit's ORIGINAL parent, not the later PR base_sha.
           missions=(
             'R3|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d167621afd2c6b30306a177313f68243c96a23ac'
             'R5|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|8b38f00384626b25b3f6adcd622aec096f05b65c'
@@ -43,20 +40,40 @@ jobs:
             for row in "${changed[@]}"; do
               status="${row%%$'\t'*}"
               path="${row#*$'\t'}"
-              # Never let a stale topic branch delete unrelated current-main files.
-              # These missions are additive product work; deletions are skipped unless
-              # explicitly reintroduced later after manual review.
+
+              # Never delete current-main files from stale mission branches.
               if [[ "$status" == D* ]]; then
-                echo "$label: preserving current-main file deleted by stale topic: $path"
+                echo "$label: preserve current-main deletion candidate: $path"
                 continue
               fi
+
               mkdir -p "$(dirname "$path")"
+
+              # Mission test files are additive blocks appended at EOF. Merge them
+              # structurally by marker instead of line-union, avoiding corruption.
+              if [[ "$path" == "test/b2.3-centro-control.test.js" ]]; then
+                cur="$(mktemp)"; other="$(mktemp)"
+                git show "HEAD:$path" > "$cur"
+                git show "$head:$path" > "$other"
+                marker="// ============================================================"
+                case "$label" in
+                  R3|R5|R7|R8|R9|R10|R12)
+                    block_start=$(grep -n "${label} —" "$other" | head -1 | cut -d: -f1 || true)
+                    if [[ -n "${block_start}" ]] && ! grep -q "${label} —" "$cur"; then
+                      tail -n +"${block_start}" "$other" >> "$cur"
+                    fi
+                    ;;
+                esac
+                cp "$cur" "$path"
+                rm -f "$cur" "$other"
+                continue
+              fi
+
               cur="$(mktemp)"; orig="$(mktemp)"; other="$(mktemp)"
               if git cat-file -e "HEAD:$path" 2>/dev/null; then git show "HEAD:$path" > "$cur"; else : > "$cur"; fi
               git show "$base:$path" > "$orig"
               git show "$head:$path" > "$other"
-              rc=0
-              git merge-file --union "$cur" "$orig" "$other" || rc=$?
+              git merge-file --union --diff-algorithm=histogram "$cur" "$orig" "$other" || true
               if grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$cur"; then
                 echo "ERROR: unresolved conflict markers in $path while integrating $label" >&2
                 exit 1
@@ -64,6 +81,7 @@ jobs:
               cp "$cur" "$path"
               rm -f "$cur" "$orig" "$other"
             done
+
             git add -A
             if git diff --cached --quiet; then
               echo "$label: no hay cambios nuevos."
@@ -71,11 +89,12 @@ jobs:
               git commit -m "consolidate $label into main"
             fi
             node --check public/app.js
+            node --check test/b2.3-centro-control.test.js
             npm test
           done
 
           ! grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test || { echo 'Conflict markers detected'; exit 1; }
           node --check public/app.js
+          node --check test/b2.3-centro-control.test.js
           npm test
-          git status --short
           git push origin HEAD:main
