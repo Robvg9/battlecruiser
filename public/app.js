@@ -2403,7 +2403,7 @@ function renderResumen() {
   grid.innerHTML = `
     <div class="resumen-card"><div class="valor">${_cache.productos.length}</div><div class="etiqueta">Productos</div></div>
     <div class="resumen-card"><div class="valor">${_cache.almacenes.length}</div><div class="etiqueta">Almacenes</div></div>
-    <div class="resumen-card ${bajoMinimo.length ? "alerta" : ""}"><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div></div>
+    <div class="resumen-card ${bajoMinimo.length ? "alerta resumen-card-accion" : ""}" ${bajoMinimo.length ? 'data-ir-tab="inventario" role="button" tabindex="0"' : ""}><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div>${bajoMinimo.length ? '<div class="muted">Tocá para ver inventario</div>' : ""}</div>
     <div class="resumen-card"><div class="valor">$${money(totalVendido)}</div><div class="etiqueta">Ventas recientes</div><div class="muted">${ventasRecientes.length} venta(s)</div></div>
     <div class="resumen-card"><div class="valor">${_cache.transferencias.length + _cache.vales.length}</div><div class="etiqueta">Otros movimientos</div></div>
   `;
@@ -2413,10 +2413,22 @@ function renderResumen() {
     if (bajoMinimo.length === 0) {
       alertasEl.innerHTML = '<p class="lista-estado">Nada bajo el mínimo por ahora.</p>';
     } else {
+      // R3: alertas accionables. La cabecera muestra la cantidad afectada y un
+      // botón que lleva directo al Inventario (donde se ve el stock enriquecido
+      // y se puede actuar). Reutiliza irATab() + navegación existente. No hace
+      // consultas nuevas: pinta desde _cache.stock.
       alertasEl.innerHTML = "";
+      const cab = document.createElement("div");
+      cab.className = "lista-item alerta-cabecera";
+      cab.innerHTML = '<span class="cc-asunto-tipo">' + bajoMinimo.length + ' producto(s) bajo mínimo</span>'
+        + '<button type="button" class="cc-accion alerta-ir-btn" data-ir-tab="inventario">Ver inventario</button>';
+      alertasEl.appendChild(cab);
       bajoMinimo.forEach((s) => {
         const div = document.createElement("div");
-        div.className = "lista-item";
+        div.className = "lista-item alerta-item";
+        div.setAttribute("data-ir-tab", "inventario");
+        div.setAttribute("role", "button");
+        div.setAttribute("tabindex", "0");
         div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
           <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
         alertasEl.appendChild(div);
@@ -2426,15 +2438,21 @@ function renderResumen() {
 
   const movsEl = document.getElementById("resumen-movs-lista");
   if (movsEl) {
+    // R9: cada movimiento lleva tipo + id reales para ser accionable
+    // (click/Enter navega a la sección correspondiente). Reutiliza _cache
+    // (no consulta nueva). Incluye ventas (R2), transferencias y vales.
     const movs = [
       ...(_cache.ventas || []).map((v) => ({
-        fecha: v.fecha, texto: `Venta: ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"}`, estado: "$" + money(v.total),
+        tipo: "venta", id: v.id, fecha: v.fecha,
+        texto: `Venta: ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"}`, estado: "$" + money(v.total),
       })),
       ..._cache.transferencias.map((t) => ({
-        fecha: t.fecha, texto: `Transferencia: ${t.origen.nombre} → ${t.destino.nombre}`, estado: t.estado,
+        tipo: "transferencia", id: t.id, fecha: t.fecha,
+        texto: `Transferencia: ${t.origen.nombre} → ${t.destino.nombre}`, estado: t.estado,
       })),
       ..._cache.vales.map((v) => ({
-        fecha: v.fecha, texto: `Vale (${v.tipo}): ${v.productos.nombre} · ${v.almacenes.nombre}`, estado: money(v.cantidad),
+        tipo: "vale", id: v.id, fecha: v.fecha,
+        texto: `Vale (${v.tipo}): ${v.productos.nombre} · ${v.almacenes.nombre}`, estado: money(v.cantidad),
       })),
     ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);
 
@@ -2444,8 +2462,16 @@ function renderResumen() {
       movsEl.innerHTML = "";
       movs.forEach((m) => {
         const div = document.createElement("div");
-        div.className = "lista-item";
-        div.innerHTML = `<span>${fechaCorta(m.fecha)}</span>
+        // R9: accionable. data-mov-tipo + data-mov-tab permiten navegar a la
+        // sección del movimiento. role/tabindex para teclado (Enter).
+        const tabDestino = m.tipo === "venta" ? "ventas" : m.tipo === "transferencia" ? "transferencias" : "vales";
+        div.className = "lista-item lista-item-accion resumen-mov-item";
+        div.setAttribute("data-mov-tipo", m.tipo);
+        div.setAttribute("data-mov-id", m.id || "");
+        div.setAttribute("data-mov-tab", tabDestino);
+        div.setAttribute("role", "button");
+        div.setAttribute("tabindex", "0");
+        div.innerHTML = `<span>${fechaCorta(m.fecha)} <span class="muted">· ${escHtml(m.tipo)}</span></span>
           <span class="muted">${m.texto} · ${m.estado}</span>`;
         movsEl.appendChild(div);
       });
@@ -2455,6 +2481,16 @@ function renderResumen() {
   // actividad reciente e inventario. Cuando _cache cambia, refrescar el
   // Centro tambien. No hace consultas nuevas: solo pinta desde _cache.
   if (typeof refrescarCentroControl === "function") refrescarCentroControl();
+}
+
+// R3: helper de navegación reutilizable. Activa un tab por data-tab usando
+// el listener existente (click en .tab-btn). Reutiliza el patrón que ya usaban
+// cc-ir-pendientes-btn / cc-ir-inventario-btn / abrirSoporte, sin duplicar
+// lógica de navegación ni crear un segundo sistema de routing.
+function irATab(tab) {
+  if (!tab) return;
+  const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+  if (btn) btn.click();
 }
 
 // ---- Navegación por tabs ----
@@ -2508,6 +2544,45 @@ safeInit("tabs", () => {
       // Al salir de la pestana Pendientes, cerrar el detalle si estaba
       // abierto para que no quede visible encima de otra seccion.
       cerrarDetalleOperacion();
+    }
+  });
+});
+
+// R3: navegación accionable del Centro de Control. Items del panel "Stock
+// bajo mínimo" y el card "Bajo mínimo" llevan directo a Inventario con un
+// click o Enter. Reutiliza irATab() y el listener de tabs existente.
+safeInit("resumen-alertas-accion", () => {
+  const panel = document.getElementById("tab-resumen");
+  if (!panel) return;
+  const manejar = (target) => {
+    const accion = target.closest("[data-ir-tab]");
+    if (!accion) return;
+    irATab(accion.getAttribute("data-ir-tab"));
+  };
+  panel.addEventListener("click", (e) => manejar(e.target));
+  panel.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      manejar(e.target);
+      if (e.target.closest("[data-ir-tab]")) e.preventDefault();
+    }
+  });
+});
+
+// R9: cada movimiento de "Últimos movimientos" (venta/transferencia/vale) es
+// accionable: click/Enter navega al tab correspondiente conservando el ID.
+// Reutiliza irATab() + _cache. Sin segundo router, offline-first intacto.
+safeInit("resumen-movs-accion", () => {
+  const movsEl = document.getElementById("resumen-movs-lista");
+  if (!movsEl) return;
+  const abrir = (target) => {
+    const item = target.closest(".resumen-mov-item[data-mov-tab]");
+    if (!item) return;
+    irATab(item.getAttribute("data-mov-tab"));
+  };
+  movsEl.addEventListener("click", (e) => abrir(e.target));
+  movsEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".resumen-mov-item[data-mov-tab]")) { e.preventDefault(); abrir(e.target); }
     }
   });
 });
@@ -3286,19 +3361,53 @@ async function refrescarTransferencias() {
 
   _cache.transferencias = data || [];
   renderResumen();
+  renderTransferenciasLista();
+}
+
+// R10+R11: render accionable del historial de transferencias. Filtra
+// _cache.transferencias en memoria segun _trfBusqueda (sin consultas nuevas,
+// sin tocar _cache). Cada fila es accionable (click/Enter abre el detalle
+// real con auditoria). Muestra ID corto + contador + estado sin resultados.
+let _trfBusqueda = "";
+function renderTransferenciasLista() {
   const lista = document.getElementById("lista-transferencias");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const todas = _cache.transferencias || [];
+  if (todas.length === 0) {
     setEmpty("lista-transferencias", "Todavía no hay transferencias registradas.");
+    actualizarContador("trf-contador", 0, 0);
+    return;
+  }
+  const termino = _trfBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((t) => {
+        const orig = t.origen && t.origen.nombre ? t.origen.nombre.toLowerCase() : "";
+        const dest = t.destino && t.destino.nombre ? t.destino.nombre.toLowerCase() : "";
+        const est = t.estado ? t.estado.toLowerCase() : "";
+        const fec = t.fecha ? fechaCorta(t.fecha).toLowerCase() : "";
+        const id = t.id ? t.id.toLowerCase() : "";
+        return orig.includes(termino) || dest.includes(termino) || est.includes(termino) || fec.includes(termino) || id.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos transferencias con esos criterios.</p>'
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="transferencias">Ver todas</button>';
+    actualizarContador("trf-contador", 0, todas.length);
     return;
   }
   lista.innerHTML = "";
-  data.forEach((t) => {
+  filtradas.forEach((t) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    div.innerHTML = `<span>${t.origen.nombre} → ${t.destino.nombre}</span>
-      <span class="muted">${fechaCorta(t.fecha)} · ${t.estado}</span>`;
+    // R11: accionable. data-trf-id permite abrir el detalle real.
+    div.className = "lista-item lista-item-accion trf-item";
+    div.setAttribute("data-trf-id", t.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;
     lista.appendChild(div);
   });
+  actualizarContador("trf-contador", filtradas.length, todas.length);
 }
 
 safeInit("form-transferencia", () => {
@@ -3354,23 +3463,340 @@ async function refrescarVales() {
 
   _cache.vales = data || [];
   renderResumen();
+  renderValesLista();
+}
+
+// R10+R12: render accionable del historial de vales. Filtra _cache.vales en
+// memoria segun _valesBusqueda (sin consultas nuevas, sin tocar _cache).
+// Cada fila es accionable (click/Enter abre el detalle real) e incluye
+// indicacion visual por tipo (borde color). ID corto + contador.
+let _valesBusqueda = "";
+function renderValesLista() {
   const lista = document.getElementById("lista-vales");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const todas = _cache.vales || [];
+  if (todas.length === 0) {
     setEmpty("lista-vales", "Todavía no hay vales de salida registrados.");
+    actualizarContador("vales-contador", 0, 0);
+    return;
+  }
+  const termino = _valesBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((v) => {
+        const prod = v.productos && v.productos.nombre ? v.productos.nombre.toLowerCase() : "";
+        const alm = v.almacenes && v.almacenes.nombre ? v.almacenes.nombre.toLowerCase() : "";
+        const tipo = v.tipo ? v.tipo.toLowerCase() : "";
+        const fec = v.fecha ? fechaCorta(v.fecha).toLowerCase() : "";
+        const id = v.id ? v.id.toLowerCase() : "";
+        return prod.includes(termino) || alm.includes(termino) || tipo.includes(termino) || fec.includes(termino) || id.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos vales con esos criterios.</p>'
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="vales">Ver todos</button>';
+    actualizarContador("vales-contador", 0, todas.length);
     return;
   }
   lista.innerHTML = "";
-  data.forEach((v) => {
+  filtradas.forEach((v) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    // Sesión 17: antes esta lista no mostraba la fecha (Transferencias sí la
-    // mostraba) — para un vale de salida (merma/donación/regalo/vencido) la
-    // fecha es un dato que hace falta para llevar cuenta real.
-    div.innerHTML = `<span>${v.productos.nombre} <span class="muted">· ${v.almacenes.nombre}</span></span>
-      <span class="muted">${fechaCorta(v.fecha)} · ${v.tipo} · ${money(v.cantidad)}</span>`;
+    // R12: indicacion visual segun el tipo (sin cambiar la logica de negocio).
+    div.className = "lista-item lista-item-accion vale-item vale-tipo-" + (v.tipo || "desconocido");
+    div.setAttribute("data-vale-id", v.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
+  actualizarContador("vales-contador", filtradas.length, todas.length);
 }
+
+// ============================================================
+// R11 / R12 / R6-R7 — Detalle accionable + auditoría de movimientos
+// ============================================================
+// Reutilizan _cache (única fuente, no se modifica) y el patrón visual de
+// #pendiente-detalle (.detalle-cabecera/.detalle-cuerpo/.detalle-fila).
+// Solo muestran datos reales que existen en la consulta actual.
+
+// R11: detalle accionable de una transferencia. Datos reales: id, fecha,
+// estado, origen, destino. No consulta nada nuevo (offline-first intacto).
+function mostrarDetalleTransferencia(trfId) {
+  const cont = document.getElementById("transferencia-detalle");
+  if (!cont) return;
+  const trf = (_cache.transferencias || []).find((t) => t.id === trfId);
+  if (!trf) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró la transferencia.</p>'
+      + '<button type="button" class="cc-accion trf-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarTrfDetalle();
+    return;
+  }
+  const fechaHora = trf.fecha ? new Date(trf.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  cont.innerHTML = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + escHtml(trf.estado || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + '</span></div>'
+    + '</div>';
+  cont.classList.remove("hidden");
+  _enlazarCerrarTrfDetalle();
+  cont.focus();
+}
+function _enlazarCerrarTrfDetalle() {
+  const cont = document.getElementById("transferencia-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".trf-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleTransferencia);
+  });
+}
+function cerrarDetalleTransferencia() {
+  const cont = document.getElementById("transferencia-detalle");
+  if (cont) { cont.classList.add("hidden"); cont.innerHTML = ""; }
+}
+
+// R12: detalle accionable de un vale. Datos reales: id, fecha, tipo,
+// cantidad, producto, almacén. Etiqueta legible del tipo para auditoría
+// (sin cambiar el dato real). Indicación visual por tipo en la lista.
+function mostrarDetalleVale(valeId) {
+  const cont = document.getElementById("vale-detalle");
+  if (!cont) return;
+  const vale = (_cache.vales || []).find((v) => v.id === valeId);
+  if (!vale) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró el vale.</p>'
+      + '<button type="button" class="cc-accion vale-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarValeDetalle();
+    return;
+  }
+  const fechaHora = vale.fecha ? new Date(vale.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const tipoEtiqueta = { merma: "Merma", donacion: "Donación", regalo: "Regalo", vencido: "Vencido" }[vale.tipo] || vale.tipo || "—";
+  cont.innerHTML = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Vale #' + (vale.id ? idCorto(vale.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn vale-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(vale.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Tipo</span><span class="detalle-valor">' + escHtml(tipoEtiqueta) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Producto</span><span class="detalle-valor">' + escHtml(vale.productos ? vale.productos.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(vale.almacenes ? vale.almacenes.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Cantidad</span><span class="detalle-valor">' + money(vale.cantidad || 0) + ' u</span></div>'
+    + '</div>';
+  cont.classList.remove("hidden");
+  _enlazarCerrarValeDetalle();
+  cont.focus();
+}
+function _enlazarCerrarValeDetalle() {
+  const cont = document.getElementById("vale-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".vale-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleVale);
+  });
+}
+function cerrarDetalleVale() {
+  const cont = document.getElementById("vale-detalle");
+  if (cont) { cont.classList.add("hidden"); cont.innerHTML = ""; }
+}
+
+// R7: helper de redondeo a centavos para comparar montos sin error de coma
+// flotante (149.999999 vs 150.00). Reutiliza el mismo criterio que money().
+function redondearCentavos(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.round((v + Number.EPSILON) * 100) / 100 : 0;
+}
+
+// R6/R7: detalle accionable + auditoría de una venta. Reutiliza _cache.ventas
+// (única fuente, no se modifica) para los datos base y, si hay conexión,
+// consulta las líneas reales vía reporte_ventas (RPC ya existente). La
+// auditoría calcula SUMA_DE_LINEAS (suma de subtotales reales) y la compara
+// contra TOTAL_REGISTRADO con tolerancia de centavos. No modifica la venta.
+let _ventaDetalleCargandoId = null; // evita cargas solapadas del detalle
+function mostrarDetalleVenta(ventaId) {
+  const cont = document.getElementById("venta-detalle");
+  if (!cont) return;
+  const venta = (_cache.ventas || []).find((v) => v.id === ventaId);
+  if (!venta) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró la venta.</p>'
+      + '<button type="button" class="cc-accion venta-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarVentaDetalle();
+    return;
+  }
+  const fechaHora = venta.fecha ? new Date(venta.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  let html = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Venta #' + (venta.id ? idCorto(venta.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn venta-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(venta.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(venta.almacenes ? venta.almacenes.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(venta.total || 0) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Líneas</span><span class="detalle-valor" id="venta-detalle-lineas"><span class="muted">Cargando…</span></span></div>'
+    + '</div>'
+    + '<div class="venta-auditoria" id="venta-detalle-auditoria"></div>';
+  cont.innerHTML = html;
+  cont.classList.remove("hidden");
+  _enlazarCerrarVentaDetalle();
+  // Cargar las líneas reales solo si hay conexión (no obligatorio para navegar).
+  if (navigator.onLine) {
+    _cargarLineasVenta(ventaId, venta.fecha, venta.total);
+  } else {
+    _renderAuditoriaVenta(null, venta.total, false);
+  }
+  cont.focus();
+}
+// Carga las líneas reales de una venta vía reporte_ventas (RPC existente que
+// ya devuelve lineas como JSON). No inventa datos: si no hay líneas, lo muestra.
+async function _cargarLineasVenta(ventaId, fechaVenta, totalRegistrado) {
+  if (_ventaDetalleCargandoId === ventaId) return;
+  _ventaDetalleCargandoId = ventaId;
+  const el = document.getElementById("venta-detalle-lineas");
+  if (!el) { _ventaDetalleCargandoId = null; return; }
+  try {
+    const fecha = fechaVenta ? new Date(fechaVenta).toISOString().slice(0, 10) : null;
+    const { data, error } = await client.rpc("reporte_ventas", {
+      p_desde: fecha, p_hasta: fecha, p_almacen_id: null, p_producto_id: null,
+      p_limite: 200, p_offset: 0,
+    });
+    if (error) {
+      const msg = String(error.message || error.code || error);
+      if (msg.includes("Could not find") || msg.includes("42883")) {
+        el.innerHTML = '<span class="muted">Las líneas requieren aplicar supabase/b5-reportes.sql en Supabase.</span>';
+      } else {
+        el.innerHTML = '<span class="muted">No se pudieron cargar las líneas.</span>';
+      }
+      _renderAuditoriaVenta(null, totalRegistrado, true);
+      return;
+    }
+    if (_ventaDetalleCargandoId !== ventaId) return; // se cerró/cambió
+    const venta = (data || []).find((v) => v.id === ventaId);
+    const lineas = venta && Array.isArray(venta.lineas) ? venta.lineas : [];
+    if (lineas.length === 0) {
+      el.innerHTML = '<span class="muted">Sin líneas registradas para esta venta.</span>';
+    } else {
+      el.innerHTML = '<div class="venta-lineas-lista">' + lineas.map((l) =>
+        '<div class="venta-linea">'
+        + '<span class="venta-linea-producto">' + escHtml(l.producto || "—") + '</span>'
+        + '<span class="venta-linea-cant">' + (l.cantidad || 0) + ' u</span>'
+        + '<span class="venta-linea-precio">$' + money(l.precio_unitario || 0) + '</span>'
+        + '<span class="venta-linea-subtotal">' + (l.subtotal || 0) + '</span>'
+        + '</div>'
+      ).join("") + '</div>';
+    }
+    _renderAuditoriaVenta(lineas, totalRegistrado, true);
+  } catch (e) {
+    el.innerHTML = '<span class="muted">No se pudieron cargar las líneas.</span>';
+    _renderAuditoriaVenta(null, totalRegistrado, true);
+  } finally {
+    _ventaDetalleCargandoId = null;
+  }
+}
+// R7: auditoría matemática de la venta. Calcula SUMA_DE_LINEAS (suma de
+// subtotales reales) y la compara contra TOTAL_REGISTRADO con tolerancia
+// de un centavo. Estados visuales derivados de datos reales (no almacena):
+//   - TOTAL COINCIDE (verde)
+//   - DIFERENCIA DETECTADA (naranja) + monto de la diferencia
+//   - SIN LÍNEAS DISPONIBLES (gris)
+//   - LÍNEAS NO DISPONIBLES SIN CONEXIÓN (azul)
+function _renderAuditoriaVenta(lineas, totalRegistrado, lineasCargadas) {
+  const cont = document.getElementById("venta-detalle-auditoria");
+  if (!cont) return;
+  const totalReg = redondearCentavos(totalRegistrado);
+  if (!lineasCargadas) {
+    cont.innerHTML = '<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4>'
+      + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(totalReg) + '</span></div>'
+      + '<div class="venta-auditoria-estado estado-info">⚪ Líneas no disponibles sin conexión</div>';
+    return;
+  }
+  if (!lineas || lineas.length === 0) {
+    cont.innerHTML = '<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4>'
+      + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(totalReg) + '</span></div>'
+      + '<div class="venta-auditoria-estado estado-neutro">⚪ Sin líneas disponibles</div>';
+    return;
+  }
+  const totalLineas = redondearCentavos(lineas.reduce((s, l) => s + (Number(l.subtotal) || 0), 0));
+  const diferencia = redondearCentavos(totalReg - totalLineas);
+  const coincide = Math.abs(diferencia) < 0.01;
+  const estadoHtml = coincide
+    ? '<div class="venta-auditoria-estado estado-ok">✅ TOTAL COINCIDE</div>'
+    : '<div class="venta-auditoria-estado estado-alerta">🟠 DIFERENCIA DETECTADA</div>';
+  cont.innerHTML = '<h4 class="venta-auditoria-titulo">Auditoría de la venta</h4>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total registrado</span><span class="detalle-valor">$' + money(totalReg) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Total de productos</span><span class="detalle-valor">$' + money(totalLineas) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Diferencia</span><span class="detalle-valor">$' + money(Math.abs(diferencia)) + '</span></div>'
+    + estadoHtml;
+}
+function _enlazarCerrarVentaDetalle() {
+  const cont = document.getElementById("venta-detalle");
+  if (!cont) return;
+  cont.querySelectorAll(".venta-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", cerrarDetalleVenta);
+  });
+}
+function cerrarDetalleVenta() {
+  const cont = document.getElementById("venta-detalle");
+  if (cont) { cont.classList.add("hidden"); cont.innerHTML = ""; }
+  _ventaDetalleCargandoId = null;
+}
+
+// R6/R7/R11/R12: listeners delegados para abrir/cerrar los detalles desde
+// las listas accionables (ventas/transferencias/vales). Un solo listener
+// por lista (click + teclado Enter/Espacio). Reutilizan _cache.
+safeInit("ventas-detalle", () => {
+  const lista = document.getElementById("lista-ventas");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".venta-item[data-venta-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-venta-id");
+    if (id) mostrarDetalleVenta(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".venta-item[data-venta-id]")) { e.preventDefault(); abrir(e.target); }
+    }
+  });
+});
+safeInit("transferencias-detalle", () => {
+  const lista = document.getElementById("lista-transferencias");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".trf-item[data-trf-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-trf-id");
+    if (id) mostrarDetalleTransferencia(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".trf-item[data-trf-id]")) { e.preventDefault(); abrir(e.target); }
+    }
+  });
+});
+safeInit("vales-detalle", () => {
+  const lista = document.getElementById("lista-vales");
+  if (!lista) return;
+  const abrir = (target) => {
+    const item = target.closest(".vale-item[data-vale-id]");
+    if (!item) return;
+    const id = item.getAttribute("data-vale-id");
+    if (id) mostrarDetalleVale(id);
+  };
+  lista.addEventListener("click", (e) => abrir(e.target));
+  lista.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.target.closest(".vale-item[data-vale-id]")) { e.preventDefault(); abrir(e.target); }
+    }
+  });
+});
 
 safeInit("form-vale", () => {
   document.getElementById("form-vale").addEventListener("submit", async (e) => {
@@ -3677,27 +4103,46 @@ safeInit("form-venta-linea", () => {
   }
 });
 
-// R5: buscador del historial de ventas. Filtra _cache.ventas en memoria
-// (sin consultas nuevas) y reutiliza renderVentasHistorial(). Offline: funciona
-// con las ventas ya cargadas localmente, sin depender de internet para buscar.
-safeInit("ventas-historial-buscador", () => {
-  const input = document.getElementById("ventas-buscar");
-  if (!input) return;
-  input.addEventListener("input", () => {
-    _ventasBusqueda = input.value || "";
-    renderVentasHistorial();
-  });
-  // Boton "Ver todas" (delegado): limpia la busqueda y el input.
-  const lista = document.getElementById("lista-ventas");
-  if (lista) {
-    lista.addEventListener("click", (e) => {
-      if (e.target.closest(".ventas-ver-todas-btn")) {
-        _ventasBusqueda = "";
-        input.value = "";
-        renderVentasHistorial();
-      }
+// R10: buscadores de movimientos (ventas + transferencias + vales). Un solo
+// listener delegado por lista. El estado vive en variables locales de pestana
+// (_ventasBusqueda/_trfBusqueda/_valesBusqueda): NO es una segunda cache global.
+// _cache sigue siendo la unica fuente; la busqueda solo filtra lo que se pinta.
+safeInit("movimientos-buscadores", () => {
+  const configs = [
+    { inputId: "ventas-buscar", contadorId: "ventas-contador", listaId: "lista-ventas",
+      estadoVar: "_ventasBusqueda", renderFn: "renderVentasHistorial" },
+    { inputId: "trf-buscar", contadorId: "trf-contador", listaId: "lista-transferencias",
+      estadoVar: "_trfBusqueda", renderFn: "renderTransferenciasLista" },
+    { inputId: "vales-buscar", contadorId: "vales-contador", listaId: "lista-vales",
+      estadoVar: "_valesBusqueda", renderFn: "renderValesLista" },
+  ];
+  configs.forEach((cfg) => {
+    const input = document.getElementById(cfg.inputId);
+    if (!input) return;
+    input.addEventListener("input", () => {
+      if (cfg.estadoVar === "_ventasBusqueda") _ventasBusqueda = input.value || "";
+      else if (cfg.estadoVar === "_trfBusqueda") _trfBusqueda = input.value || "";
+      else if (cfg.estadoVar === "_valesBusqueda") _valesBusqueda = input.value || "";
+      if (cfg.renderFn === "renderVentasHistorial") renderVentasHistorial();
+      else if (cfg.renderFn === "renderTransferenciasLista") renderTransferenciasLista();
+      else if (cfg.renderFn === "renderValesLista") renderValesLista();
     });
-  }
+    // Boton "Ver todos" (delegado dentro de la lista).
+    const lista = document.getElementById(cfg.listaId);
+    if (lista) {
+      lista.addEventListener("click", (e) => {
+        if (e.target.closest(".mov-ver-todas-btn")) {
+          if (cfg.estadoVar === "_ventasBusqueda") _ventasBusqueda = "";
+          else if (cfg.estadoVar === "_trfBusqueda") _trfBusqueda = "";
+          else if (cfg.estadoVar === "_valesBusqueda") _valesBusqueda = "";
+          input.value = "";
+          if (cfg.renderFn === "renderVentasHistorial") renderVentasHistorial();
+          else if (cfg.renderFn === "renderTransferenciasLista") renderTransferenciasLista();
+          else if (cfg.renderFn === "renderValesLista") renderValesLista();
+        }
+      });
+    }
+  });
 });
 
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
@@ -3858,7 +4303,7 @@ function renderVentasHistorial() {
   const todas = _cache.ventas || [];
   if (todas.length === 0) {
     setEmpty("lista-ventas", "Todavía no hay ventas registradas.");
-    actualizarContadorVentas(0, 0);
+    actualizarContador("ventas-contador", 0, 0);
     return;
   }
   // Filtrar en memoria por el termino de busqueda (ID corto, almacén, fecha, total).
@@ -3875,33 +4320,35 @@ function renderVentasHistorial() {
     : todas;
   if (filtradas.length === 0) {
     lista.innerHTML = '<p class="lista-estado">🔎 No encontramos ventas con esos criterios.</p>'
-      + '<button type="button" class="cc-accion ventas-ver-todas-btn">Ver todas las ventas</button>';
-    actualizarContadorVentas(0, todas.length);
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="ventas">Ver todas las ventas</button>';
+    actualizarContador("ventas-contador", 0, todas.length);
     return;
   }
   lista.innerHTML = "";
   filtradas.forEach((v) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
+    // R6/R7: cada venta es accionable. data-venta-id abre el detalle con auditoria.
+    div.className = "lista-item lista-item-accion venta-item";
+    div.setAttribute("data-venta-id", v.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
     div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
     lista.appendChild(div);
   });
-  actualizarContadorVentas(filtradas.length, todas.length);
+  actualizarContador("ventas-contador", filtradas.length, todas.length);
 }
 
-// R5: contador visible "Mostrando X de Y ventas". Reutiliza el contenedor
-// existente ventas-contador (anadido al HTML). No consulta nada nuevo.
-function actualizarContadorVentas(visibles, total) {
-  const el = document.getElementById("ventas-contador");
+// R10: contador visible reutilizable para ventas/transferencias/vales.
+// Muestra "Mostrando X de Y" (o "N elementos" cuando coinciden).
+// No consulta nada nuevo: solo pinta el estado del filtro en memoria.
+function actualizarContador(elId, visibles, total) {
+  const el = document.getElementById(elId);
   if (!el) return;
-  if (total === 0) {
-    el.textContent = "";
-    return;
-  }
+  if (total === 0) { el.textContent = ""; return; }
   el.textContent = visibles === total
-    ? total + (total === 1 ? " venta" : " ventas")
-    : "Mostrando " + visibles + " de " + total + " ventas";
+    ? total + (total === 1 ? " elemento" : " elementos")
+    : "Mostrando " + visibles + " de " + total;
 }
 
 // ============================================================

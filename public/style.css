@@ -939,3 +939,62 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   .com-msg { max-width: 88%; }
   .com-input-bar { position: sticky; bottom: 0; }
 }
+
+/* ============================================================
+   R3 / R9 / R10 / R11 / R12 / R7 — Consolidación de mejoras
+   Items accionables, detalles de movimiento y auditoría de venta.
+   Reutiliza el patron #pendiente-detalle (.detalle-*).
+   ============================================================ */
+
+/* R3: alertas accionables del Centro de Control + card accionable */
+.resumen-card-accion { cursor: pointer; transition: transform 0.08s ease; }
+.resumen-card-accion:hover { transform: translateY(-1px); }
+.resumen-card-accion:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.alerta-item { cursor: pointer; transition: background 0.08s ease; }
+.alerta-item:hover { background: rgba(201,162,77,0.07); }
+.alerta-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.alerta-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(125,24,24,0.06); }
+.alerta-cabecera .cc-asunto-tipo { font-size: 11px; color: var(--wine); }
+
+/* R6/R7/R9/R11/R12: items de lista accionables (ventas, transferencias,
+   vales y movimientos del Centro de Control). Mismo patron para todos. */
+.lista-item-accion { cursor: pointer; transition: background 0.08s ease, border-color 0.08s ease; }
+.lista-item-accion:hover { background: rgba(201,162,77,0.07); border-color: var(--gold-dim); }
+.lista-item-accion:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* R6/R7/R11/R12: contenedor de detalle de movimiento (venta/transferencia/vale).
+   Reutiliza .detalle-cabecera/.detalle-cuerpo/.detalle-fila ya existentes. */
+.mov-detalle { margin-top: 12px; border: 1px solid var(--gold-dim); border-radius: 6px; background: rgba(28,24,18,0.6); padding: 12px 14px; }
+.mov-detalle.hidden { display: none; }
+.mov-detalle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.mov-detalle .detalle-fila { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid rgba(201,162,77,0.08); }
+.mov-detalle .detalle-fila:last-child { border-bottom: none; }
+.mov-detalle .detalle-etiqueta { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--mist); text-transform: uppercase; letter-spacing: 0.05em; }
+.mov-detalle .detalle-valor { font-size: 13.5px; color: var(--text); text-align: right; word-break: break-all; }
+
+/* R7: auditoría matemática del detalle de venta */
+.venta-auditoria { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(201,162,77,0.18); }
+.venta-auditoria-titulo { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); margin-bottom: 8px; }
+.venta-auditoria-estado { margin-top: 10px; padding: 8px 10px; border-radius: 5px; font-size: 12.5px; font-weight: 600; text-align: center; }
+.venta-auditoria-estado.estado-ok { background: rgba(76,175,80,0.12); color: #6ec06e; border: 1px solid rgba(76,175,80,0.3); }
+.venta-auditoria-estado.estado-alerta { background: rgba(125,24,24,0.14); color: var(--wine); border: 1px solid rgba(125,24,24,0.4); }
+.venta-auditoria-estado.estado-neutro { background: rgba(201,162,77,0.06); color: var(--mist); border: 1px solid var(--gold-dim); }
+.venta-auditoria-estado.estado-info { background: rgba(33,150,243,0.1); color: #5aa9e6; border: 1px solid rgba(33,150,243,0.3); }
+.venta-lineas-lista { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.venta-linea { display: flex; gap: 10px; padding: 3px 0; align-items: baseline; }
+.venta-linea-producto { flex: 1 1 auto; color: var(--text); font-size: 12.5px; }
+.venta-linea-cant { color: var(--mist); font-size: 11.5px; white-space: nowrap; }
+.venta-linea-precio { color: var(--mist); font-size: 11.5px; white-space: nowrap; }
+.venta-linea-subtotal { color: var(--text); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+
+/* R12: indicación visual según tipo de vale (sin cambiar la lógica de negocio) */
+.vale-tipo-merma { border-left: 3px solid var(--wine); }
+.vale-tipo-donacion { border-left: 3px solid #4a90d9; }
+.vale-tipo-regalo { border-left: 3px solid var(--gold); }
+.vale-tipo-vencido { border-left: 3px solid #8a6d3b; }
+
+/* R10: controles de búsqueda de movimientos (ventas/transferencias/vales) */
+.mov-buscador-controles { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.mov-buscador-controles input { flex: 1 1 220px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 7px 10px; border: 1px solid var(--gold-dim); border-radius: 5px; background: transparent; color: var(--text); }
+.mov-buscador-controles input:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
+.mov-contador { font-size: 11.5px; letter-spacing: 0.03em; white-space: nowrap; }

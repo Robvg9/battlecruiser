@@ -1,6 +1,22 @@
 from pathlib import Path
 import subprocess
 
+# CONSOLIDACION DEFINITIVA (R1->R13) COMPLETA EN MAIN.
+# Si main ya contiene las mejoras consolidadas (marcador: funcion de detalle
+# de transferencia + helper irATab + buscadores de movimientos), el integrador
+# legacy ya no tiene trabajo que hacer: las misiones R3/R5/R6/R7/R8/R9/R10/R11/R12
+# estan integradas directamente en la arquitectura actual. Salir limpiamente
+# evita romper anchors que ya fueron transformados.
+_app = Path('public/app.js')
+if _app.exists():
+    _s = _app.read_text()
+    if ('function mostrarDetalleTransferencia' in _s
+            and 'function irATab' in _s
+            and 'renderTransferenciasLista' in _s
+            and 'renderValesLista' in _s):
+        print('consolidacion R1-R13 ya presente en main: integrador legacy no-op')
+        raise SystemExit(0)
+
 BASE='bebd6ea9ba6fb32c63deb5f0728c0de503b76551'
 
 def sh(*args, capture=False):

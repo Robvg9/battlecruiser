@@ -26,6 +26,18 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          # CONSOLIDACION DEFINITIVA R1-R13 COMPLETA EN MAIN.
+          # Si las mejoras ya estan integradas, el integrador legacy no tiene
+          # trabajo: sale limpiamente para no romper anchors ya transformados.
+          _p = Path("public/app.js")
+          if _p.exists():
+              _s = _p.read_text()
+              if ("function mostrarDetalleTransferencia" in _s
+                      and "function irATab" in _s
+                      and "renderTransferenciasLista" in _s
+                      and "renderValesLista" in _s):
+                  print("consolidacion R1-R13 ya presente en main: integrador legacy no-op")
+                  raise SystemExit(0)
           p = Path("public/app.js")
           s = p.read_text()
 

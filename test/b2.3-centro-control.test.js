@@ -84,6 +84,9 @@ function montarEntorno() {
     .replace(/const _cache = \{/, "window._cache = {")
     .replace(/let _operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
     .replace(/let _novedadesVistas = new Set\(\);/, "window._novedadesVistas = new Set();")
+    .replace(/let _ventasBusqueda = "";/, "window._ventasBusqueda = \"\";")
+    .replace(/let _trfBusqueda = "";/, "window._trfBusqueda = \"\";")
+    .replace(/let _valesBusqueda = "";/, "window._valesBusqueda = \"\";")
     .replace(/return _operacionesPendientesCache;/, "return window._operacionesPendientesCache;")
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
     .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];");
@@ -421,4 +424,436 @@ test("R2: ventas, transferencias y vales coexisten ordenados por fecha", async (
   const trfIdx = movs.innerHTML.indexOf("Transferencia:");
   assert.ok(ventaIdx !== -1 && trfIdx !== -1, "ambos tipos presentes");
   assert.ok(ventaIdx < trfIdx, "venta más reciente aparece primero");
+});
+
+
+// ============================================================
+// R3 — Alertas accionables del Centro de Control (stock bajo mínimo)
+// ============================================================
+
+test("R3: la cabecera de alertas muestra la cantidad de productos bajo mínimo", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [
+    { productos: { nombre: "Tornillos" }, almacenes: { nombre: "Depósito" }, cantidad: 2, minimo: 10 },
+    { productos: { nombre: "Clavos" }, almacenes: { nombre: "Local" }, cantidad: 0, minimo: 5 },
+  ];
+  window.renderResumen();
+  const alertas = document.getElementById("resumen-alertas-lista");
+  assert.ok(/2 producto\(s\) bajo mínimo/.test(alertas.innerHTML), "cabecera con cantidad afectada");
+  assert.ok(/Ver inventario/.test(alertas.innerHTML), "botón Ver inventario presente");
+});
+
+test("R3: el botón 'Ver inventario' navega al tab inventario", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [{ productos: { nombre: "Tornillos" }, almacenes: { nombre: "Depósito" }, cantidad: 2, minimo: 10 }];
+  window.renderResumen();
+  const btn = document.querySelector('#resumen-alertas-lista .alerta-ir-btn');
+  assert.ok(btn, "botón Ver inventario existe");
+  btn.click();
+  const inventarioTab = document.querySelector('.tab-btn[data-tab="inventario"]');
+  assert.ok(inventarioTab.classList.contains("active"), "el tab inventario quedó activo");
+});
+
+test("R3: cada ítem de stock bajo es accionable (data-ir-tab + role button)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [{ productos: { nombre: "Tornillos" }, almacenes: { nombre: "Depósito" }, cantidad: 2, minimo: 10 }];
+  window.renderResumen();
+  const item = document.querySelector('#resumen-alertas-lista .alerta-item');
+  assert.ok(item, "ítem de alerta accionable existe");
+  assert.strictEqual(item.getAttribute("data-ir-tab"), "inventario");
+  assert.strictEqual(item.getAttribute("role"), "button");
+  assert.strictEqual(item.getAttribute("tabindex"), "0");
+});
+
+test("R3: el card 'Bajo mínimo' del grid es accionable solo cuando hay alertas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [{ productos: { nombre: "Tornillos" }, almacenes: { nombre: "Depósito" }, cantidad: 2, minimo: 10 }];
+  window.renderResumen();
+  const grid = document.getElementById("resumen-grid");
+  const cardAccion = grid.querySelector(".resumen-card-accion[data-ir-tab='inventario']");
+  assert.ok(cardAccion, "card accionable cuando hay alertas");
+  // Sin alertas: no debe haber card accionable.
+  window._cache.stock = [];
+  window.renderResumen();
+  const grid2 = document.getElementById("resumen-grid");
+  assert.ok(!grid2.querySelector(".resumen-card-accion"), "sin card accionable cuando no hay alertas");
+});
+
+test("R3: el helper irATab es idempotente (tab inexistente no lanza)", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.doesNotThrow(() => window.irATab("no-existe"));
+  assert.doesNotThrow(() => window.irATab(undefined));
+});
+
+test("R3: estado vacío sin falsas alertas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [];
+  window.renderResumen();
+  const alertas = document.getElementById("resumen-alertas-lista");
+  assert.ok(/Nada bajo el mínimo por ahora/.test(alertas.innerHTML), "estado vacío sin botón de acción");
+  assert.ok(!/Ver inventario/.test(alertas.innerHTML), "sin botón cuando no hay alertas");
+});
+
+
+// ============================================================
+// R5 — Historial de ventas accionable (buscador + ID + contador)
+// ============================================================
+
+test("R5: muestra todas las ventas con ID corto visible", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "a1b2c3d4-0002-0000-0000-000000000002", fecha: "2026-08-15T11:00:00Z", total: 150, almacenes: { nombre: "Caja 1" } },
+  ];
+  window.renderVentasHistorial();
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(/a1b2/.test(lista.innerHTML), "ID corto visible");
+  assert.ok(lista.querySelectorAll(".lista-item").length === 2, "ambas ventas listadas");
+  assert.ok(/2 elementos/.test(document.getElementById("ventas-contador").textContent), "contador total");
+});
+
+test("R5: buscar por ID corto encuentra la venta", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "a1b2c3d4-0002-0000-0000-000000000002", fecha: "2026-08-15T11:00:00Z", total: 150, almacenes: { nombre: "Caja 2" } },
+  ];
+  window._ventasBusqueda = "0001";
+  window.renderVentasHistorial();
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(lista.querySelectorAll(".lista-item").length === 1, "una venta coincide");
+  assert.ok(/Mostrando 1 de 2/.test(document.getElementById("ventas-contador").textContent), "contador diferenciado");
+});
+
+test("R5: estado sin resultados + botón Ver todas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+  ];
+  window._ventasBusqueda = "zzz";
+  window.renderVentasHistorial();
+  const lista = document.getElementById("lista-ventas");
+  assert.ok(/No encontramos/.test(lista.innerHTML), "estado sin resultados");
+  assert.ok(lista.querySelector(".mov-ver-todas-btn"), "botón Ver todas presente");
+});
+
+test("R5: _cache.ventas no se modifica al buscar/filtrar", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "a1b2c3d4-0002-0000-0000-000000000002", fecha: "2026-08-15T11:00:00Z", total: 150, almacenes: { nombre: "Caja 2" } },
+  ];
+  const refOriginal = window._cache.ventas;
+  window._ventasBusqueda = "0001";
+  window.renderVentasHistorial();
+  assert.strictEqual(window._cache.ventas, refOriginal, "misma referencia");
+  assert.strictEqual(window._cache.ventas.length, 2, "no se pierden ventas");
+});
+
+
+// ============================================================
+// R6 + R7 — Detalle accionable de venta + auditoría matemática
+// ============================================================
+
+test("R6: cada venta del historial es accionable (data-venta-id + role)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+  ];
+  window.renderVentasHistorial();
+  const item = document.querySelector('#lista-ventas .venta-item');
+  assert.ok(item, "ítem accionable");
+  assert.strictEqual(item.getAttribute("data-venta-id"), "a1b2c3d4-0001-0000-0000-000000000001");
+  assert.strictEqual(item.getAttribute("role"), "button");
+});
+
+test("R6: click en una venta abre el detalle con su ID", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const venta = { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } };
+  window._cache.ventas = [venta];
+  window.renderVentasHistorial();
+  document.querySelector('#lista-ventas .venta-item').click();
+  await esperar(5);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle visible");
+  assert.ok(/Venta #/.test(detalle.innerHTML), "cabecera con referencia");
+  assert.ok(detalle.innerHTML.includes("Caja 1"), "detalle muestra el almacén");
+  assert.ok(detalle.innerHTML.includes("$250.00"), "detalle muestra el total registrado");
+});
+
+test("R7: redondearCentavos corrige error de coma flotante", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(window.redondearCentavos(149.999999999), 150);
+  assert.strictEqual(window.redondearCentavos(0.1 + 0.2), 0.3);
+});
+
+test("R7: auditoría TOTAL COINCIDE cuando suma de líneas = total", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventaId = "a1b2c3d4-0001-0000-0000-000000000001";
+  window._cache.ventas = [{ id: ventaId, fecha: "2026-08-15T10:00:00Z", total: 300, almacenes: { nombre: "Caja 1" } }];
+  // El RPC reporte_ventas devuelve la venta con sus líneas reales.
+  client.__rpcResult = { data: [{ id: ventaId, lineas: [{ producto: "P1", cantidad: 2, precio_unitario: 100, subtotal: 200 }, { producto: "P2", cantidad: 1, precio_unitario: 100, subtotal: 100 }] }], error: null };
+  window.mostrarDetalleVenta(ventaId);
+  await esperar(20);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(/Auditoría de la venta/.test(detalle.innerHTML), "bloque de auditoría presente");
+  assert.ok(/TOTAL COINCIDE/.test(detalle.innerHTML), "auditoría detecta coincidencia (200+100=300)");
+  assert.ok(detalle.innerHTML.includes("$300.00"), "muestra total registrado");
+});
+
+test("R7: auditoría DIFERENCIA DETECTADA cuando suma ≠ total", async () => {
+  const { window, document, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventaId = "a1b2c3d4-0002-0000-0000-000000000002";
+  window._cache.ventas = [{ id: ventaId, fecha: "2026-08-15T11:00:00Z", total: 300, almacenes: { nombre: "Caja 1" } }];
+  // Las líneas suman 250, pero el total registrado es 300 → diferencia.
+  client.__rpcResult = { data: [{ id: ventaId, lineas: [{ producto: "P1", cantidad: 2, precio_unitario: 100, subtotal: 200 }, { producto: "P2", cantidad: 1, precio_unitario: 50, subtotal: 50 }] }], error: null };
+  window.mostrarDetalleVenta(ventaId);
+  await esperar(20);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(/DIFERENCIA DETECTADA/.test(detalle.innerHTML), "auditoría detecta discrepancia");
+  assert.ok(detalle.innerHTML.includes("$50.00"), "muestra monto de la diferencia");
+});
+
+test("R7: offline, el detalle abre y avisa que las líneas requieren conexión", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  const ventaId = "a1b2c3d4-0003-0000-0000-000000000003";
+  window._cache.ventas = [{ id: ventaId, fecha: "2026-08-15T12:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } }];
+  window.mostrarDetalleVenta(ventaId);
+  await esperar(10);
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(/no disponibles sin conexión/.test(detalle.innerHTML), "avisa offline sin inventar líneas");
+});
+
+test("R6: cerrar el detalle vuelve al historial conservando la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const ventaId = "a1b2c3d4-0004-0000-0000-000000000004";
+  window._cache.ventas = [{ id: ventaId, fecha: "2026-08-15T13:00:00Z", total: 80, almacenes: { nombre: "Caja 1" } }];
+  window.renderVentasHistorial();
+  document.querySelector('#lista-ventas .venta-item').click();
+  await esperar(5);
+  window.cerrarDetalleVenta();
+  const detalle = document.getElementById("venta-detalle");
+  assert.ok(detalle.classList.contains("hidden"), "detalle oculto tras cerrar");
+  assert.ok(document.getElementById("lista-ventas").querySelector(".venta-item"), "historial conservado");
+});
+
+
+// ============================================================
+// R9 — Centro de Control: movimientos accionables (navegación)
+// ============================================================
+
+test("R9: cada movimiento de Últimos movimientos es accionable", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [{ id: "v1", fecha: "2026-08-15T10:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } }];
+  window._cache.transferencias = [{ id: "t1", fecha: "2026-08-15T11:00:00Z", origen: { nombre: "A" }, destino: { nombre: "B" }, estado: "completada" }];
+  window._cache.vales = [{ id: "va1", fecha: "2026-08-15T12:00:00Z", tipo: "merma", cantidad: 3, productos: { nombre: "P" }, almacenes: { nombre: "A" } }];
+  window.renderResumen();
+  const movs = document.getElementById("resumen-movs-lista");
+  const items = movs.querySelectorAll(".resumen-mov-item");
+  assert.ok(items.length === 3, "tres movimientos accionables");
+  items.forEach((it) => {
+    assert.ok(it.getAttribute("data-mov-tab"), "tiene tab destino");
+    assert.strictEqual(it.getAttribute("role"), "button");
+  });
+});
+
+test("R9: click en un movimiento navega al tab correspondiente", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [{ id: "v1", fecha: "2026-08-15T10:00:00Z", total: 100, almacenes: { nombre: "Caja 1" } }];
+  window._cache.transferencias = [];
+  window._cache.vales = [];
+  window.renderResumen();
+  document.querySelector('#resumen-movs-lista .resumen-mov-item').click();
+  assert.ok(document.querySelector('.tab-btn[data-tab="ventas"]').classList.contains("active"), "navega al tab ventas");
+});
+
+
+// ============================================================
+// R10 — Filtros operativos en movimientos (transferencias + vales)
+// ============================================================
+
+test("R10: buscador de transferencias filtra por origen", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [
+    { id: "t1", fecha: "2026-08-15T10:00:00Z", origen: { nombre: "Depósito" }, destino: { nombre: "Local" }, estado: "completada" },
+    { id: "t2", fecha: "2026-08-15T11:00:00Z", origen: { nombre: "Bodega" }, destino: { nombre: "Sucursal" }, estado: "pendiente" },
+  ];
+  window._trfBusqueda = "depósito";
+  window.renderTransferenciasLista();
+  const lista = document.getElementById("lista-transferencias");
+  assert.ok(lista.querySelectorAll(".trf-item").length === 1, "una transferencia coincide");
+  assert.ok(/Mostrando 1 de 2/.test(document.getElementById("trf-contador").textContent), "contador trf");
+});
+
+test("R10: buscador de vales filtra por tipo y marca visual por tipo", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = [
+    { id: "va1", fecha: "2026-08-15T10:00:00Z", tipo: "merma", cantidad: 3, productos: { nombre: "P1" }, almacenes: { nombre: "A" } },
+    { id: "va2", fecha: "2026-08-15T11:00:00Z", tipo: "donacion", cantidad: 1, productos: { nombre: "P2" }, almacenes: { nombre: "B" } },
+  ];
+  window._valesBusqueda = "merma";
+  window.renderValesLista();
+  const lista = document.getElementById("lista-vales");
+  assert.ok(lista.querySelectorAll(".vale-item").length === 1, "un vale coincide");
+  assert.ok(lista.querySelector(".vale-tipo-merma"), "indicación visual por tipo (merma)");
+});
+
+test("R10: cada transferencia y vale muestra ID corto y es accionable", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [{ id: "t1-abc", fecha: "2026-08-15T10:00:00Z", origen: { nombre: "A" }, destino: { nombre: "B" }, estado: "completada" }];
+  window._cache.vales = [{ id: "va1-xyz", fecha: "2026-08-15T11:00:00Z", tipo: "merma", cantidad: 1, productos: { nombre: "P" }, almacenes: { nombre: "A" } }];
+  window.renderTransferenciasLista();
+  window.renderValesLista();
+  const trf = document.querySelector('#lista-transferencias .trf-item');
+  const vale = document.querySelector('#lista-vales .vale-item');
+  assert.ok(trf && trf.getAttribute("data-trf-id") === "t1-abc" && trf.getAttribute("role") === "button", "trf accionable con ID");
+  assert.ok(vale && vale.getAttribute("data-vale-id") === "va1-xyz" && vale.getAttribute("role") === "button", "vale accionable con ID");
+});
+
+
+// ============================================================
+// R11 — Auditoría de transferencias (detalle accionable)
+// ============================================================
+
+test("R11: click en una transferencia abre el detalle con datos reales", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [{ id: "t1-abc", fecha: "2026-08-15T10:00:00Z", origen: { nombre: "Depósito" }, destino: { nombre: "Local" }, estado: "completada" }];
+  window.renderTransferenciasLista();
+  document.querySelector('#lista-transferencias .trf-item').click();
+  const detalle = document.getElementById("transferencia-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle trf visible");
+  assert.ok(/Transferencia #/.test(detalle.innerHTML), "cabecera trf");
+  assert.ok(detalle.innerHTML.includes("Depósito"), "origen real");
+  assert.ok(detalle.innerHTML.includes("Local"), "destino real");
+  assert.ok(/completada/.test(detalle.innerHTML), "estado real");
+});
+
+test("R11: cerrar el detalle de transferencia oculta el panel", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [{ id: "t1-abc", fecha: "2026-08-15T10:00:00Z", origen: { nombre: "A" }, destino: { nombre: "B" }, estado: "completada" }];
+  window.renderTransferenciasLista();
+  document.querySelector('#lista-transferencias .trf-item').click();
+  window.cerrarDetalleTransferencia();
+  assert.ok(document.getElementById("transferencia-detalle").classList.contains("hidden"), "detalle trf oculto");
+});
+
+
+// ============================================================
+// R12 — Auditoría de vales (detalle accionable + tipo legible)
+// ============================================================
+
+test("R12: click en un vale abre el detalle con tipo legible y cantidad", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = [{ id: "va1-xyz", fecha: "2026-08-15T10:00:00Z", tipo: "donacion", cantidad: 5, productos: { nombre: "Harina" }, almacenes: { nombre: "Depósito" } }];
+  window.renderValesLista();
+  document.querySelector('#lista-vales .vale-item').click();
+  const detalle = document.getElementById("vale-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle vale visible");
+  assert.ok(/Vale #/.test(detalle.innerHTML), "cabecera vale");
+  assert.ok(/Donación/.test(detalle.innerHTML), "tipo legible (Donación)");
+  assert.ok(detalle.innerHTML.includes("Harina"), "producto real");
+  assert.ok(/5\.00 u/.test(detalle.innerHTML), "cantidad real");
+});
+
+test("R12: indicación visual por tipo en la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = [
+    { id: "va1", fecha: "2026-08-15T10:00:00Z", tipo: "merma", cantidad: 1, productos: { nombre: "P1" }, almacenes: { nombre: "A" } },
+    { id: "va2", fecha: "2026-08-15T11:00:00Z", tipo: "regalo", cantidad: 1, productos: { nombre: "P2" }, almacenes: { nombre: "B" } },
+  ];
+  window.renderValesLista();
+  const lista = document.getElementById("lista-vales");
+  assert.ok(lista.querySelector(".vale-tipo-merma"), "borde merma");
+  assert.ok(lista.querySelector(".vale-tipo-regalo"), "borde regalo");
+});
+
+
+// ============================================================
+// R10 (integración): el buscador responde a eventos input reales
+// ============================================================
+
+test("R10: escribir en el buscador de ventas filtra la lista vía evento input", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "a1b2c3d4-0002-0000-0000-000000000002", fecha: "2026-08-15T11:00:00Z", total: 150, almacenes: { nombre: "Caja 2" } },
+  ];
+  window.renderVentasHistorial();
+  const input = document.getElementById("ventas-buscar");
+  input.value = "caja 1";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  const lista = document.getElementById("lista-ventas");
+  assert.strictEqual(lista.querySelectorAll(".venta-item").length, 1, "input filtra a 1 venta");
+  assert.ok(/Mostrando 1 de 2/.test(document.getElementById("ventas-contador").textContent), "contador refleja el filtro");
+});
+
+test("R10: botón 'Ver todas' restaura la lista completa", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.ventas = [
+    { id: "a1b2c3d4-0001-0000-0000-000000000001", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } },
+    { id: "a1b2c3d4-0002-0000-0000-000000000002", fecha: "2026-08-15T11:00:00Z", total: 150, almacenes: { nombre: "Caja 2" } },
+  ];
+  window._ventasBusqueda = "zzz-no-existe";
+  window.renderVentasHistorial();
+  // Estado sin resultados -> botón Ver todas.
+  document.querySelector("#lista-ventas .mov-ver-todas-btn").click();
+  assert.strictEqual(document.getElementById("lista-ventas").querySelectorAll(".venta-item").length, 2, "restauradas todas las ventas");
+  assert.strictEqual(document.getElementById("ventas-buscar").value, "", "input limpiado");
 });

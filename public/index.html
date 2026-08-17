@@ -313,9 +313,13 @@
            sin consultas nuevas. Funciona offline con las ventas ya cargadas. -->
       <div class="ventas-historial-controles">
         <input id="ventas-buscar" type="text" placeholder="Buscar por #referencia, almacén o fecha…" autocomplete="off">
-        <span id="ventas-contador" class="muted ventas-contador"></span>
+        <span id="ventas-contador" class="muted mov-contador"></span>
       </div>
       <div id="lista-ventas" class="lista"></div>
+      <!-- R7: detalle accionable + auditoria de una venta. Reutiliza el
+           patron visual de #pendiente-detalle. Muestra los datos reales en
+           _cache.ventas y, si hay conexion, las lineas via reporte_ventas. -->
+      <div id="venta-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de venta"></div>
     </section>
 
     <section id="tab-almacenes" class="tab-panel">
@@ -342,7 +346,15 @@
         <input id="trf-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Transferir</button>
       </form>
+      <!-- R10: buscador de transferencias. Filtra _cache.transferencias en
+           memoria, sin consultas nuevas. Funciona offline. -->
+      <div class="mov-buscador-controles">
+        <input id="trf-buscar" type="text" placeholder="Buscar por #referencia, origen, destino o estado…" autocomplete="off">
+        <span id="trf-contador" class="muted mov-contador"></span>
+      </div>
       <div id="lista-transferencias" class="lista"></div>
+      <!-- R11: detalle accionable de transferencia (patron #pendiente-detalle). -->
+      <div id="transferencia-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de transferencia"></div>
       <p class="msg" id="msg-transferencias"></p>
     </section>
 
@@ -360,7 +372,15 @@
         <input id="vale-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Registrar vale</button>
       </form>
+      <!-- R10: buscador de vales. Filtra _cache.vales en memoria, sin
+           consultas nuevas. Funciona offline. -->
+      <div class="mov-buscador-controles">
+        <input id="vales-buscar" type="text" placeholder="Buscar por #referencia, producto, tipo o almacen…" autocomplete="off">
+        <span id="vales-contador" class="muted mov-contador"></span>
+      </div>
       <div id="lista-vales" class="lista"></div>
+      <!-- R12: detalle accionable de vale (patron #pendiente-detalle). -->
+      <div id="vale-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de vale"></div>
       <p class="msg" id="msg-vales"></p>
     </section>
 
