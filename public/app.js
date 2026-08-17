@@ -3677,6 +3677,29 @@ safeInit("form-venta-linea", () => {
   }
 });
 
+// R5: buscador del historial de ventas. Filtra _cache.ventas en memoria
+// (sin consultas nuevas) y reutiliza renderVentasHistorial(). Offline: funciona
+// con las ventas ya cargadas localmente, sin depender de internet para buscar.
+safeInit("ventas-historial-buscador", () => {
+  const input = document.getElementById("ventas-buscar");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    _ventasBusqueda = input.value || "";
+    renderVentasHistorial();
+  });
+  // Boton "Ver todas" (delegado): limpia la busqueda y el input.
+  const lista = document.getElementById("lista-ventas");
+  if (lista) {
+    lista.addEventListener("click", (e) => {
+      if (e.target.closest(".ventas-ver-todas-btn")) {
+        _ventasBusqueda = "";
+        input.value = "";
+        renderVentasHistorial();
+      }
+    });
+  }
+});
+
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
 // carrito — evita registrar un listener por cada línea que se agrega/quita.
 safeInit("venta-lineas-interaccion", () => {
@@ -3795,6 +3818,12 @@ async function refrescarVentas() {
   await refrescarVentasHistorial();
 }
 
+// R5: estado de busqueda del historial de ventas en memoria. Patron
+// identico a _invFiltroEstado/_movPagina: estado local de pestana, NO una
+// segunda cache global. _cache.ventas sigue siendo la unica fuente de
+// datos completos; este termino solo filtra lo que se pinta en la lista.
+let _ventasBusqueda = "";
+
 // ---- Historial de ventas — Sesión 19 ----
 // Solo lectura: la tabla "ventas" ya se llena de forma atómica dentro del RPC
 // registrar_venta (Sección 5 — nunca desde el cliente). Mismo patrón de
@@ -3814,20 +3843,65 @@ async function refrescarVentasHistorial() {
   // no se guardaba aca porque el Resumen viejo no las usaba.
   _cache.ventas = data || [];
   renderResumen();
+  // R5: el render aplica el filtro de busqueda sobre _cache.ventas sin
+  // modificarlo. Si _cache.ventas esta vacio, muestra el estado vacio.
+  renderVentasHistorial();
+}
+
+// R5: render del historial de ventas accionable. Filtra _cache.ventas en
+// memoria segun _ventasBusqueda (sin consultas nuevas, sin tocar _cache.ventas).
+// Cada fila muestra el ID corto (referencia buscable), almacén, fecha y total.
+// Incluye contador "Mostrando X de Y" y estado sin resultados claro.
+function renderVentasHistorial() {
   const lista = document.getElementById("lista-ventas");
   if (!lista) return;
-  if (!data || data.length === 0) {
+  const todas = _cache.ventas || [];
+  if (todas.length === 0) {
     setEmpty("lista-ventas", "Todavía no hay ventas registradas.");
+    actualizarContadorVentas(0, 0);
+    return;
+  }
+  // Filtrar en memoria por el termino de busqueda (ID corto, almacén, fecha, total).
+  const termino = _ventasBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((v) => {
+        const idC = v.id ? idCorto(v.id).toLowerCase() : "";
+        const idFull = v.id ? v.id.toLowerCase() : "";
+        const alm = v.almacenes && v.almacenes.nombre ? v.almacenes.nombre.toLowerCase() : "";
+        const fec = v.fecha ? fechaCorta(v.fecha).toLowerCase() : "";
+        const tot = v.total != null ? money(v.total) : "";
+        return idC.includes(termino) || idFull.includes(termino) || alm.includes(termino) || fec.includes(termino) || tot.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos ventas con esos criterios.</p>'
+      + '<button type="button" class="cc-accion ventas-ver-todas-btn">Ver todas las ventas</button>';
+    actualizarContadorVentas(0, todas.length);
     return;
   }
   lista.innerHTML = "";
-  data.forEach((v) => {
+  filtradas.forEach((v) => {
     const div = document.createElement("div");
     div.className = "lista-item";
-    div.innerHTML = `<span>${v.almacenes.nombre}</span>
+    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
     lista.appendChild(div);
   });
+  actualizarContadorVentas(filtradas.length, todas.length);
+}
+
+// R5: contador visible "Mostrando X de Y ventas". Reutiliza el contenedor
+// existente ventas-contador (anadido al HTML). No consulta nada nuevo.
+function actualizarContadorVentas(visibles, total) {
+  const el = document.getElementById("ventas-contador");
+  if (!el) return;
+  if (total === 0) {
+    el.textContent = "";
+    return;
+  }
+  el.textContent = visibles === total
+    ? total + (total === 1 ? " venta" : " ventas")
+    : "Mostrando " + visibles + " de " + total + " ventas";
 }
 
 // ============================================================
