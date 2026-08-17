@@ -41,7 +41,7 @@ jobs:
           git config user.name "BattleCruiser Integrator"
           git config user.email "battlecruiser-integrator@users.noreply.github.com"
 
-      - name: Repair temporary integration patch filtering
+      - name: Repair temporary integration script
         if: ${{ github.event_name == 'push' && !contains(github.event.head_commit.message, 'legacy integration complete') }}
         run: |
           python3 - <<'PY'
@@ -66,6 +66,8 @@ jobs:
           Path('/tmp/r10code.patch').write_text(''.join(out))'''
           if old in s: s=s.replace(old,new,1)
           s=s.replace("sh('git','apply','--3way','--index','/tmp/r10code.patch')","sh('git','apply','/tmp/r10code.patch')",1)
+          old2="Path('/tmp/r10html.patch').write_text(patch); sh('git','apply','--3way','--index','/tmp/r10html.patch')"
+          if old2 in s: s=s.replace(old2,"Path('/tmp/r10html.patch').write_text(patch)",1)
           p.write_text(s)
           PY
 
