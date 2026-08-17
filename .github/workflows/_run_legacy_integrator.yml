@@ -1,0 +1,54 @@
+name: run legacy integrator logic safely
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  run_integrator:
+    if: ${{ contains(github.event.head_commit.message, 'run legacy integrator') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Execute existing integrator logic with safe R5 handling
+        shell: bash
+        run: |
+          python -m pip install pyyaml -q
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, yaml
+
+          wf = yaml.safe_load(Path('.github/workflows/_integrate_legacy_missions.yml').read_text())
+          steps = wf['jobs']['integrate']['steps']
+
+          def run_cmd(cmd, shell):
+              if shell == 'python':
+                  subprocess.run(['python'], input=cmd, text=True, check=True)
+              elif shell in ('bash','sh'):
+                  subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
+              else:
+                  subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
+
+          for step in steps:
+              name = step.get('name','')
+              cmd = step.get('run')
+              if not cmd:
+                  continue
+              if name.startswith('Checkout main') or name == 'Configure git':
+                  continue
+              if name == 'Integrate R5 code' and '_ventasBusqueda' in Path('public/app.js').read_text():
+                  print('R5 already present in main; skipping duplicate R5 patch.')
+                  continue
+              if name == 'Remove integration workflow and push final main':
+                  cmd = '''git add public/app.js public/index.html public/style.css test/b2.3-centro-control.test.js\ngit diff --cached --quiet || git commit -m "legacy integration complete"\ngit push origin HEAD:main'''
+              # R5 was the known conflict point. Use a union only for that one patch;
+              # all other mission logic remains the existing manual integrator logic.
+              if name == 'Integrate R5 code':
+                  cmd = cmd.replace('git apply --3way --index /tmp/r5.patch','git apply --3way --union --index /tmp/r5.patch')
+              # Make intermediate commits idempotent if a mission was already partly present.
+              cmd = cmd.replace('git commit -m ', 'git diff --cached --quiet || git commit -m ')
+              print(f'>>> {name}')
+              run_cmd(cmd, step.get('shell','bash'))
+          PY
