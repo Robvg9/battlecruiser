@@ -5809,7 +5809,15 @@ function renderInventario(filas) {
       const div = document.createElement("div");
       div.className = "rep-fila rep-estado-" + (s.estado || "normal");
       const icono = s.estado === "agotado" ? "\ud83d\udd34" : s.estado === "bajo" ? "\ud83d\udfe1" : "\ud83d\udfe2";
-      div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom $' + money(s.costo_promedio || 0) + " \u00b7 valor $" + money(valor) + "</span></span>";
+      // inventario_enriquecido usa COALESCE(..., 0) en el backend:
+      // costo_promedio/valor llegan como 0 cuando NO hay lotes activos con
+      // costo (no como NULL). Mostrar "\u2014" en vez de "$0.00" para no
+      // aparentar un costo real de cero (regla del Cerebro: nunca convertir
+      // ausencia de costo en margen/valor falso). Consistente con el reporte
+      // de rentabilidad, que ya hace lo mismo cuando no hay costo disponible.
+      const costoTxt = valor > 0 ? "$" + money(s.costo_promedio || 0) : "\u2014";
+      const valorTxt = valor > 0 ? "$" + money(valor) : "\u2014";
+      div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom ' + costoTxt + " \u00b7 valor " + valorTxt + "</span></span>";
       el.appendChild(div);
     });
   }

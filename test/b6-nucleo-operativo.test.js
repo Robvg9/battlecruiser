@@ -736,3 +736,43 @@ test("R4: no regresión — resumen de valoración sigue sobre todas las filas",
   // Debe mostrar Agotados: 2 (p1 y p4).
   assert.ok(/2/.test(resumen.innerHTML), "conteo de agotados correcto en resumen");
 });
+
+// V-FINAL: costo ausente no se muestra como $0.00 en el inventario.
+// inventario_enriquecido usa COALESCE(..., 0): cuando no hay lotes activos
+// con costo, costo_promedio y valor_inventario llegan como 0. El frontend
+// debe mostrar "—" (no "$0.00") para no aparentar un costo real de cero
+// (regla del Cerebro: nunca convertir ausencia de costo en margen/valor falso).
+test("V-FINAL: inventario sin costo muestra \\u2014 en vez de $0.00", async () => {
+  // Estado con un producto que tiene stock pero SIN lotes (sin costo).
+  const estado = crearEstadoInventarioMock();
+  estado.stock["p5::a1"] = { cantidad: 10, minimo: 5 };
+  // No se llama estado.compra() para p5: no hay lotes, costo_promedio=0, valor=0.
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p5"), "muestra el producto sin costo");
+  // El costo/valor no deben aparecer como "$0.00".
+  const htmlP5 = detalle.innerHTML;
+  const filaP5 = htmlP5.substring(htmlP5.indexOf("Prod-p5"), htmlP5.indexOf("</span></span>", htmlP5.indexOf("Prod-p5")));
+  assert.ok(!/\$0\.00/.test(filaP5), "no muestra costo $0.00 para producto sin lotes");
+  assert.ok(filaP5.includes("\u2014"), "muestra \u2014 para costo/valor sin datos");
+});
+
+test("V-FINAL: inventario con costo SI muestra $ y el monto real", async () => {
+  // Estado con un producto que tiene lotes con costo real.
+  const estado = crearEstadoInventarioMock();
+  estado.stock["p6::a1"] = { cantidad: 50, minimo: 10 };
+  estado.compra("p6", "a1", 50, 4); // costo unitario 4
+  const { window, document } = montarEntorno(Object.assign(perfil(), { estado }));
+  marcarOnline(window);
+  await esperar(80);
+  await cargarInventario(window);
+  const detalle = document.getElementById("inv-detalle");
+  assert.ok(detalle.innerHTML.includes("Prod-p6"), "muestra el producto con costo");
+  const htmlP6 = detalle.innerHTML;
+  const filaP6 = htmlP6.substring(htmlP6.indexOf("Prod-p6"), htmlP6.indexOf("</span></span>", htmlP6.indexOf("Prod-p6")));
+  assert.ok(/\$4\.00/.test(filaP6), "muestra el costo promedio real ($4.00)");
+  assert.ok(/\$200\.00/.test(filaP6), "muestra el valor de inventario real ($200.00)");
+});
