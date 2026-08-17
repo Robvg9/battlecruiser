@@ -1,0 +1,5 @@
+ARCHIVED LEGACY WORKFLOW
+
+Original file: .github/workflows/_repair_integrator.yml
+
+Obsolete after consolidation. Kept only as historical reference; original source remains in Git history. The .yml extension is intentionally removed so GitHub Actions will not execute it.
