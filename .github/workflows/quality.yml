@@ -65,6 +65,7 @@ jobs:
               if in_hunk and keep: out.append(line)
           Path('/tmp/r10code.patch').write_text(''.join(out))'''
           if old in s: s=s.replace(old,new,1)
+          s=s.replace("sh('git','apply','--3way','--index','/tmp/r10code.patch')","sh('git','apply','--index','/tmp/r10code.patch')",1)
           p.write_text(s)
           PY
 
