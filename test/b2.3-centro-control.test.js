@@ -355,3 +355,244 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R8 — Auditoría de movimientos: detalle accionable de transferencias y vales
+// ============================================================
+
+function transferenciasEjemplo() {
+  return [
+    { id: "aaaaaaaa-1111-4bbb-8ccc-aaaaaaaaaaaa", fecha: "2026-08-15T10:00:00Z", estado: "completada",
+      origen: { nombre: "Depósito" }, destino: { nombre: "Caja 1" } },
+    { id: "bbbbbbbb-2222-4ccc-8ddd-bbbbbbbbbbbb", fecha: "2026-08-15T11:00:00Z", estado: "pendiente",
+      origen: { nombre: "Caja 1" }, destino: { nombre: "Caja 2" } },
+  ];
+}
+
+function valesEjemplo() {
+  return [
+    { id: "cccccccc-3333-4ddd-8eee-cccccccccccc", fecha: "2026-08-15T09:00:00Z", tipo: "merma", cantidad: 5,
+      productos: { nombre: "Café" }, almacenes: { nombre: "Caja 1" } },
+    { id: "dddddddd-4444-4eee-8fff-dddddddddddd", fecha: "2026-08-15T14:00:00Z", tipo: "donacion", cantidad: 2,
+      productos: { nombre: "Tostada" }, almacenes: { nombre: "Caja 2" } },
+  ];
+}
+
+test("R8.1: la lista de transferencias existe y muestra movimientos accionables", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  const items = document.querySelectorAll("#lista-transferencias .mov-item");
+  assert.strictEqual(items.length, 2, "hay 2 transferencias accionables");
+  assert.strictEqual(items[0].getAttribute("data-mov-tipo"), "transferencia", "tipo transferencia");
+  assert.ok(items[0].getAttribute("data-mov-id"), "tiene data-mov-id");
+  assert.strictEqual(items[0].getAttribute("role"), "button", "role button");
+  assert.strictEqual(items[0].getAttribute("tabindex"), "0", "tabindex 0");
+});
+
+test("R8.2: click en una transferencia abre el detalle con sus datos reales", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .mov-item[data-mov-id='aaaaaaaa-1111-4bbb-8ccc-aaaaaaaaaaaa']").click();
+  await esperar(20);
+  const detalle = document.getElementById("transferencia-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle visible tras click");
+  assert.ok(detalle.innerHTML.includes("aaaaaaaa-1111-4bbb-8ccc-aaaaaaaaaaaa"), "muestra ID completo");
+  assert.ok(/Dep\u00f3sito/.test(detalle.innerHTML), "muestra almac\u00e9n origen");
+  assert.ok(/Caja 1/.test(detalle.innerHTML), "muestra almac\u00e9n destino");
+  assert.ok(/completada/.test(detalle.innerHTML), "muestra estado");
+  assert.ok(/Fecha y hora/.test(detalle.innerHTML), "muestra fecha y hora");
+});
+
+test("R8.3: Enter abre el detalle de transferencia (teclado)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  const item = document.querySelector("#lista-transferencias .mov-item");
+  item.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await esperar(20);
+  assert.ok(!document.getElementById("transferencia-detalle").classList.contains("hidden"), "Enter abre detalle");
+});
+
+test("R8.4: cerrar el detalle de transferencia y conservar la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .mov-item").click();
+  await esperar(20);
+  const detalle = document.getElementById("transferencia-detalle");
+  detalle.querySelector(".mov-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.ok(detalle.classList.contains("hidden"), "detalle cerrado");
+  assert.strictEqual(document.querySelectorAll("#lista-transferencias .mov-item").length, 2, "lista conservada");
+});
+
+test("R8.5: abrir una segunda transferencia no conserva datos de la primera", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .mov-item[data-mov-id='aaaaaaaa-1111-4bbb-8ccc-aaaaaaaaaaaa']").click();
+  await esperar(20);
+  let detalle = document.getElementById("transferencia-detalle");
+  assert.ok(/Dep\u00f3sito/.test(detalle.innerHTML), "detalle muestra transferencia 1");
+  document.querySelector("#lista-transferencias .mov-item[data-mov-id='bbbbbbbb-2222-4ccc-8ddd-bbbbbbbbbbbb']").click();
+  await esperar(20);
+  detalle = document.getElementById("transferencia-detalle");
+  assert.ok(/pendiente/.test(detalle.innerHTML), "detalle actualizado a transferencia 2");
+  assert.ok(!detalle.innerHTML.includes("aaaaaaaa-1111-4bbb-8ccc-aaaaaaaaaaaa"), "no conserva ID de la primera");
+});
+
+test("R8.6: _cache.transferencias no se modifica al abrir/cerrar detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const trfs = transferenciasEjemplo();
+  window._cache.transferencias = trfs;
+  window.renderTransferenciasLista();
+  await esperar(20);
+  document.querySelector("#lista-transferencias .mov-item").click();
+  await esperar(20);
+  document.querySelector(".mov-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.strictEqual(window._cache.transferencias, trfs, "misma referencia");
+  assert.strictEqual(window._cache.transferencias.length, 2, "conserva 2 elementos");
+});
+
+test("R8.7: la lista de vales existe y muestra movimientos accionables", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesEjemplo();
+  window.renderValesLista();
+  await esperar(20);
+  const items = document.querySelectorAll("#lista-vales .mov-item");
+  assert.strictEqual(items.length, 2, "hay 2 vales accionables");
+  assert.strictEqual(items[0].getAttribute("data-mov-tipo"), "vale", "tipo vale");
+  assert.strictEqual(items[0].getAttribute("role"), "button", "role button");
+});
+
+test("R8.8: click en un vale abre el detalle con sus datos reales", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesEjemplo();
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .mov-item[data-mov-id='cccccccc-3333-4ddd-8eee-cccccccccccc']").click();
+  await esperar(20);
+  const detalle = document.getElementById("vale-detalle");
+  assert.ok(!detalle.classList.contains("hidden"), "detalle visible");
+  assert.ok(detalle.innerHTML.includes("cccccccc-3333-4ddd-8eee-cccccccccccc"), "muestra ID completo");
+  assert.ok(/Caf\u00e9/.test(detalle.innerHTML), "muestra producto");
+  assert.ok(/Caja 1/.test(detalle.innerHTML), "muestra almac\u00e9n");
+  assert.ok(/merma/.test(detalle.innerHTML), "muestra tipo");
+  assert.ok(/5\.00 u/.test(detalle.innerHTML), "muestra cantidad");
+});
+
+test("R8.9: cerrar el detalle de vale y conservar la lista", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.vales = valesEjemplo();
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .mov-item").click();
+  await esperar(20);
+  const detalle = document.getElementById("vale-detalle");
+  detalle.querySelector(".mov-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.ok(detalle.classList.contains("hidden"), "detalle cerrado");
+  assert.strictEqual(document.querySelectorAll("#lista-vales .mov-item").length, 2, "lista conservada");
+});
+
+test("R8.10: _cache.vales no se modifica al abrir/cerrar detalle", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const vales = valesEjemplo();
+  window._cache.vales = vales;
+  window.renderValesLista();
+  await esperar(20);
+  document.querySelector("#lista-vales .mov-item").click();
+  await esperar(20);
+  document.querySelector(".mov-detalle-cerrar-btn").click();
+  await esperar(10);
+  assert.strictEqual(window._cache.vales, vales, "misma referencia");
+  assert.strictEqual(window._cache.vales.length, 2, "conserva 2 elementos");
+});
+
+test("R8.11: estado vacío funciona (sin transferencias ni vales)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = [];
+  window._cache.vales = [];
+  window.renderTransferenciasLista();
+  window.renderValesLista();
+  await esperar(20);
+  assert.ok(/Todav\u00eda no hay transferencias registradas/.test(document.getElementById("lista-transferencias").innerHTML), "estado vac\u00edo transferencias");
+  assert.ok(/Todav\u00eda no hay vales de salida registrados/.test(document.getElementById("lista-vales").innerHTML), "estado vac\u00edo vales");
+  assert.ok(document.getElementById("transferencia-detalle").classList.contains("hidden"), "detalle cerrado sin movimientos");
+  assert.ok(document.getElementById("vale-detalle").classList.contains("hidden"), "detalle de vale cerrado sin movimientos");
+});
+
+test("R8.12: no se acumulan listeners ni elementos duplicados al abrir/cerrar varias veces", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window.renderTransferenciasLista();
+  await esperar(20);
+  for (let i = 0; i < 3; i++) {
+    document.querySelector("#lista-transferencias .mov-item").click();
+    await esperar(10);
+    document.querySelector(".mov-detalle-cerrar-btn").click();
+    await esperar(10);
+  }
+  assert.strictEqual(document.querySelectorAll("#transferencia-detalle").length, 1, "un solo contenedor de detalle");
+  document.querySelector("#lista-transferencias .mov-item").click();
+  await esperar(10);
+  assert.strictEqual(document.querySelectorAll("#transferencia-detalle .mov-detalle-cerrar-btn").length, 1, "un solo bot\u00f3n cerrar");
+});
+
+test("R8.13: no duplicaci\u00f3n de arquitectura — una sola fuente y un solo detalle por tipo", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(window._cacheTransferencias, undefined, "no hay segunda cach\u00e9 de transferencias");
+  assert.strictEqual(window._cacheVales, undefined, "no hay segunda cach\u00e9 de vales");
+  assert.strictEqual(document.querySelectorAll("#transferencia-detalle").length, 1, "un solo detalle de transferencia");
+  assert.strictEqual(document.querySelectorAll("#vale-detalle").length, 1, "un solo detalle de vale");
+  assert.strictEqual(typeof window.mostrarDetalleTransferencia, "function", "una sola funci\u00f3n mostrarDetalleTransferencia");
+  assert.strictEqual(typeof window.mostrarDetalleVale, "function", "una sola funci\u00f3n mostrarDetalleVale");
+  assert.strictEqual(typeof window.renderTransferenciasLista, "function", "una sola funci\u00f3n renderTransferenciasLista");
+  assert.strictEqual(typeof window.renderValesLista, "function", "una sola funci\u00f3n renderValesLista");
+});
+
+test("R8.14: no regresi\u00f3n — el Centro de Control sigue usando _cache para actividad reciente", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.transferencias = transferenciasEjemplo();
+  window._cache.vales = [];
+  const movs = window.construirActividadReciente();
+  const trfMovs = movs.filter((m) => /Transferencia/.test(m.texto));
+  assert.strictEqual(trfMovs.length, 2, "las transferencias siguen apareciendo en actividad reciente");
+});

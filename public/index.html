@@ -337,6 +337,9 @@
         <button type="submit">Transferir</button>
       </form>
       <div id="lista-transferencias" class="lista"></div>
+      <!-- R8: detalle accionable de una transferencia. Reutiliza el patron
+           visual de #pendiente-detalle. Muestra los datos reales en cache. -->
+      <div id="transferencia-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de transferencia"></div>
       <p class="msg" id="msg-transferencias"></p>
     </section>
 
@@ -355,6 +358,9 @@
         <button type="submit">Registrar vale</button>
       </form>
       <div id="lista-vales" class="lista"></div>
+      <!-- R8: detalle accionable de un vale. Reutiliza el patron visual de
+           #pendiente-detalle. Muestra los datos reales en cache. -->
+      <div id="vale-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de vale"></div>
       <p class="msg" id="msg-vales"></p>
     </section>
 

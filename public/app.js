@@ -3261,17 +3261,31 @@ async function refrescarTransferencias() {
 
   _cache.transferencias = data || [];
   renderResumen();
+  // R8: el render se delega a renderTransferenciasLista() para poder
+  // re-renderizar la lista (p.ej. tras cerrar un detalle) sin consultar de nuevo.
+  renderTransferenciasLista();
+}
+
+// R8: render de la lista de transferencias como entradas accionables (click/
+// Enter abre el detalle). No consulta nada nuevo y no modifica _cache.
+function renderTransferenciasLista() {
   const lista = document.getElementById("lista-transferencias");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const data = _cache.transferencias || [];
+  if (data.length === 0) {
     setEmpty("lista-transferencias", "Todavía no hay transferencias registradas.");
     return;
   }
   lista.innerHTML = "";
   data.forEach((t) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    div.innerHTML = `<span>${t.origen.nombre} → ${t.destino.nombre}</span>
-      <span class="muted">${fechaCorta(t.fecha)} · ${t.estado}</span>`;
+    div.className = "lista-item lista-item-accion mov-item";
+    div.setAttribute("data-mov-tipo", "transferencia");
+    div.setAttribute("data-mov-id", t.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;
     lista.appendChild(div);
   });
 }
@@ -3329,20 +3343,31 @@ async function refrescarVales() {
 
   _cache.vales = data || [];
   renderResumen();
+  // R8: el render se delega a renderValesLista() para poder re-renderizar la
+  // lista (p.ej. tras cerrar un detalle) sin consultar de nuevo.
+  renderValesLista();
+}
+
+// R8: render de la lista de vales como entradas accionables (click/Enter abre
+// el detalle). No consulta nada nuevo y no modifica _cache.
+function renderValesLista() {
   const lista = document.getElementById("lista-vales");
-  if (!data || data.length === 0) {
+  if (!lista) return;
+  const data = _cache.vales || [];
+  if (data.length === 0) {
     setEmpty("lista-vales", "Todavía no hay vales de salida registrados.");
     return;
   }
   lista.innerHTML = "";
   data.forEach((v) => {
     const div = document.createElement("div");
-    div.className = "lista-item";
-    // Sesión 17: antes esta lista no mostraba la fecha (Transferencias sí la
-    // mostraba) — para un vale de salida (merma/donación/regalo/vencido) la
-    // fecha es un dato que hace falta para llevar cuenta real.
-    div.innerHTML = `<span>${v.productos.nombre} <span class="muted">· ${v.almacenes.nombre}</span></span>
-      <span class="muted">${fechaCorta(v.fecha)} · ${v.tipo} · ${money(v.cantidad)}</span>`;
+    div.className = "lista-item lista-item-accion mov-item";
+    div.setAttribute("data-mov-tipo", "vale");
+    div.setAttribute("data-mov-id", v.id || "");
+    div.setAttribute("role", "button");
+    div.setAttribute("tabindex", "0");
+    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
+      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
 }
@@ -3650,6 +3675,111 @@ safeInit("form-venta-linea", () => {
       fillSelect(productoSelect, ventaProductosLista, "id", (p) => p.nombre, true);
     }
   }
+});
+
+// R8: detalle accionable de una transferencia. Reutiliza _cache.transferencias
+// (unica fuente, no se modifica) para mostrar los datos reales en cache. No
+// inventa datos: solo muestra lo que la consulta trae (id, fecha, estado,
+// origen, destino). Reutiliza el patron visual de #pendiente-detalle.
+function mostrarDetalleTransferencia(movId) {
+  const cont = document.getElementById("transferencia-detalle");
+  if (!cont) return;
+  const mov = (_cache.transferencias || []).find((t) => t.id === movId);
+  if (!mov) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró la transferencia.</p>'
+      + '<button type="button" class="cc-accion mov-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarMovDetalle(cont);
+    return;
+  }
+  const fechaHora = mov.fecha ? new Date(mov.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  cont.innerHTML = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Transferencia #' + (mov.id ? idCorto(mov.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn mov-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(mov.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + escHtml(mov.estado || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(mov.origen ? mov.origen.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(mov.destino ? mov.destino.nombre : "—") + '</span></div>'
+    + '</div>';
+  cont.classList.remove("hidden");
+  _enlazarCerrarMovDetalle(cont);
+  cont.focus();
+}
+
+// R8: detalle accionable de un vale. Reutiliza _cache.vales (unica fuente, no
+// se modifica). Datos reales: id, fecha, tipo, cantidad, producto, almacén.
+function mostrarDetalleVale(movId) {
+  const cont = document.getElementById("vale-detalle");
+  if (!cont) return;
+  const mov = (_cache.vales || []).find((v) => v.id === movId);
+  if (!mov) {
+    cont.innerHTML = '<p class="lista-estado">No se encontró el vale.</p>'
+      + '<button type="button" class="cc-accion mov-detalle-cerrar-btn">Volver</button>';
+    cont.classList.remove("hidden");
+    _enlazarCerrarMovDetalle(cont);
+    return;
+  }
+  const fechaHora = mov.fecha ? new Date(mov.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  cont.innerHTML = '<div class="detalle-cabecera">'
+    + '<span class="detalle-tipo">Vale #' + (mov.id ? idCorto(mov.id) : "—") + '</span>'
+    + '<button type="button" class="detalle-cerrar-btn mov-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+    + '</div>'
+    + '<div class="detalle-cuerpo">'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(mov.id || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Tipo</span><span class="detalle-valor">' + escHtml(mov.tipo || "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Producto</span><span class="detalle-valor">' + escHtml(mov.productos ? mov.productos.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(mov.almacenes ? mov.almacenes.nombre : "—") + '</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Cantidad</span><span class="detalle-valor">' + money(mov.cantidad || 0) + ' u</span></div>'
+    + '</div>';
+  cont.classList.remove("hidden");
+  _enlazarCerrarMovDetalle(cont);
+  cont.focus();
+}
+
+// R8: cierra cualquier detalle de movimiento (transferencia o vale).
+function cerrarDetalleMov(cont) {
+  if (!cont) return;
+  cont.classList.add("hidden");
+  cont.innerHTML = "";
+}
+
+function _enlazarCerrarMovDetalle(cont) {
+  if (!cont) return;
+  cont.querySelectorAll(".mov-detalle-cerrar-btn").forEach((btn) => {
+    btn.addEventListener("click", () => cerrarDetalleMov(cont));
+  });
+}
+
+// R8: listener delegado para abrir/cerrar detalles de movimientos (transferencias
+// y vales) con click o Enter. Un solo listener por lista, reutiliza las
+// funciones de detalle existentes. No crea un segundo sistema de navegacion.
+safeInit("movimientos-detalle", () => {
+  ["lista-transferencias", "lista-vales"].forEach((listaId) => {
+    const lista = document.getElementById(listaId);
+    if (!lista) return;
+    const abrir = (target) => {
+      const item = target.closest(".mov-item[data-mov-id]");
+      if (!item) return;
+      const tipo = item.getAttribute("data-mov-tipo");
+      const id = item.getAttribute("data-mov-id");
+      if (!id) return;
+      if (tipo === "transferencia") mostrarDetalleTransferencia(id);
+      else if (tipo === "vale") mostrarDetalleVale(id);
+    };
+    lista.addEventListener("click", (e) => abrir(e.target));
+    lista.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        if (e.target.closest(".mov-item[data-mov-id]")) {
+          e.preventDefault();
+          abrir(e.target);
+        }
+      }
+    });
+  });
 });
 
 // Un solo listener delegado para +/-, edición directa y "Quitar" dentro del
