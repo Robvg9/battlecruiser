@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Consolidate selected mission heads into current main
+      - name: Consolidate selected mission commits into current main
         shell: bash
         run: |
           set -euo pipefail
@@ -22,10 +22,11 @@ jobs:
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
           npm ci --ignore-scripts
 
-          # Only unique improvements are replayed. R4 is already merged;
-          # R7 supersedes R6, R8 supersedes R11, and R3 supersedes R13.
+          # Unique product improvements only:
+          # R4 is already merged; R7 supersedes R6; R8 supersedes R11; R3 supersedes R13.
+          # The base is each mission commit's ORIGINAL parent, not the later PR base_sha.
           missions=(
-            'R3|ab46a9ae6cf49f0062f71905d345390128ae2459|d167621afd2c6b30306a177313f68243c96a23ac'
+            'R3|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d167621afd2c6b30306a177313f68243c96a23ac'
             'R5|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|8b38f00384626b25b3f6adcd622aec096f05b65c'
             'R7|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|d18cd8e627df7e3cc0bdf76093c2835d2167a6d7'
             'R8|bebd6ea9ba6fb32c63deb5f0728c0de503b76551|de87edf057da8d2024c1ef522089f4ee04ebda0d'
@@ -42,33 +43,30 @@ jobs:
             for row in "${changed[@]}"; do
               status="${row%%$'\t'*}"
               path="${row#*$'\t'}"
-              if [[ "$path" == *$'\t'* ]]; then path="${path##*$'\t'}"; fi
+              # Never let a stale topic branch delete unrelated current-main files.
+              # These missions are additive product work; deletions are skipped unless
+              # explicitly reintroduced later after manual review.
+              if [[ "$status" == D* ]]; then
+                echo "$label: preserving current-main file deleted by stale topic: $path"
+                continue
+              fi
               mkdir -p "$(dirname "$path")"
-              case "$status" in
-                D)
-                  if git cat-file -e "HEAD:$path" 2>/dev/null; then
-                    git rm -f -- "$path"
-                  fi
-                  ;;
-                *)
-                  cur="$(mktemp)"; orig="$(mktemp)"; other="$(mktemp)"
-                  if git cat-file -e "HEAD:$path" 2>/dev/null; then git show "HEAD:$path" > "$cur"; else : > "$cur"; fi
-                  if git cat-file -e "$base:$path" 2>/dev/null; then git show "$base:$path" > "$orig"; else : > "$orig"; fi
-                  git show "$head:$path" > "$other"
-                  git merge-file --union "$cur" "$orig" "$other" || rc=$?
-                  rc=${rc:-0}
-                  if grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$cur"; then
-                    echo "ERROR: conflict markers remain in $path while integrating $label" >&2
-                    exit 1
-                  fi
-                  cp "$cur" "$path"
-                  rm -f "$cur" "$orig" "$other"
-                  ;;
-              esac
+              cur="$(mktemp)"; orig="$(mktemp)"; other="$(mktemp)"
+              if git cat-file -e "HEAD:$path" 2>/dev/null; then git show "HEAD:$path" > "$cur"; else : > "$cur"; fi
+              git show "$base:$path" > "$orig"
+              git show "$head:$path" > "$other"
+              rc=0
+              git merge-file --union "$cur" "$orig" "$other" || rc=$?
+              if grep -qE '^(<<<<<<<|=======|>>>>>>>)' "$cur"; then
+                echo "ERROR: unresolved conflict markers in $path while integrating $label" >&2
+                exit 1
+              fi
+              cp "$cur" "$path"
+              rm -f "$cur" "$orig" "$other"
             done
             git add -A
             if git diff --cached --quiet; then
-              echo "$label: no hay cambios nuevos (ya integrado o absorbido)."
+              echo "$label: no hay cambios nuevos."
             else
               git commit -m "consolidate $label into main"
             fi
@@ -76,7 +74,6 @@ jobs:
             npm test
           done
 
-          # Final safety checks before touching origin/main.
           ! grep -R -nE '^(<<<<<<<|=======|>>>>>>>)' public test || { echo 'Conflict markers detected'; exit 1; }
           node --check public/app.js
           npm test
