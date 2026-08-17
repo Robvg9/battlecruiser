@@ -857,3 +857,227 @@ test("R10: botón 'Ver todas' restaura la lista completa", async () => {
   assert.strictEqual(document.getElementById("lista-ventas").querySelectorAll(".venta-item").length, 2, "restauradas todas las ventas");
   assert.strictEqual(document.getElementById("ventas-buscar").value, "", "input limpiado");
 });
+
+
+// ============================================================
+// OFFLINE-FIRST — Verificación de los escenarios obligatorios
+// FIFO, duplicados, internet intermitente, recuperación tras reload/cierre.
+// Reutilizan el propio app.js cargado en el window (no duplican lógica).
+// ============================================================
+
+test("OFFLINE: venta offline se encola y NO llama al RPC", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  // Resetear llamadas del arranque (safeInit cola-offline-arranque pudo sincronizar).
+  client.__rpcCalls.length = 0;
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  const r = await window.ejecutarOperacion("venta", {
+    p_almacen_id: "alm-1", p_lineas: [{ producto_id: "p1", cantidad: 2 }],
+  });
+  assert.ok(r.ok && r.offline, "la venta offline se encola (ok+offline)");
+  assert.ok(r.operacion && r.operacion.idempotency_key, "conserva idempotency_key generada una sola vez");
+  assert.strictEqual(client.__rpcCalls.length, 0, "no se intenta el RPC estando offline");
+});
+
+test("OFFLINE: compra/transferencia/vale offline también entran a la cola", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  const tipos = [
+    ["compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 5 }],
+    ["transferencia", { p_origen_id: "a1", p_destino_id: "a2", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }],
+    ["vale", { p_producto_id: "p1", p_almacen_id: "a1", p_tipo: "merma", p_cantidad: 1 }],
+  ];
+  for (const [tipo, payload] of tipos) {
+    const r = await window.ejecutarOperacion(tipo, payload);
+    assert.ok(r.ok && r.offline, tipo + " offline se encola");
+  }
+  const ops = await window.obtenerOperacionesPorEstado("PENDIENTE");
+  assert.strictEqual(ops.length, 3, "las 3 operaciones quedaron pendientes");
+});
+
+test("OFFLINE: FIFO — la cola ordena por creado_en ASC (la más antigua primero)", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const w = window;
+  const opA = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
+  opA.creado_en = "2026-08-15T10:00:00Z";
+  const opB = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
+  opB.creado_en = "2026-08-15T09:00:00Z"; // más antigua
+  const opC = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
+  opC.creado_en = "2026-08-15T11:00:00Z";
+  await w.guardarOperacionPendiente(opA);
+  await w.guardarOperacionPendiente(opB);
+  await w.guardarOperacionPendiente(opC);
+  const orden = (await w.obtenerOperacionesPorEstado("PENDIENTE")).map((o) => o.id);
+  assert.deepStrictEqual(orden, [opB.id, opA.id, opC.id], "FIFO: la más antigua (09:00) va primero");
+});
+
+test("OFFLINE: idempotency_key se conserva literal al reintentar (no se regenera)", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  const r = await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 3 });
+  const claveOriginal = r.operacion.idempotency_key;
+  // Simular un reintento: actualizarOperacionPendiente (como sincronizarCola) NO regenera la clave.
+  await window.actualizarOperacionPendiente(r.operacion.id, { estado: "SINCRONIZANDO", intentos: 1 });
+  const actualizada = await window.obtenerOperacionPendiente(r.operacion.id);
+  assert.strictEqual(actualizada.idempotency_key, claveOriginal, "idempotency_key intacta tras reintento");
+  assert.strictEqual(actualizada.estado, "SINCRONIZANDO");
+  assert.strictEqual(actualizada.intentos, 1);
+});
+
+test("OFFLINE: sincronización exitosa elimina la op y envía la MISMA idempotency_key", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const op = await crearOp(window, "venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "PENDIENTE");
+  client.__rpcCalls.length = 0;
+  client.__rpcResult = { data: { id: "v-123" }, error: null };
+  await window.sincronizarCola();
+  await esperar(15);
+  const llamada = client.__rpcCalls.find((c) => c.nombre === "registrar_venta");
+  assert.ok(llamada, "se llamó al RPC de venta");
+  assert.strictEqual(llamada.params.p_idempotency_key, op.idempotency_key, "el reintento envía la MISMA idempotency_key");
+  assert.strictEqual(await window.obtenerOperacionPendiente(op.id), null, "la op se eliminó de la cola tras éxito");
+});
+
+test("OFFLINE: error de negocio deja la op en REQUIERE_ATENCION con el error real", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const op = await crearOp(window, "vale", { p_producto_id: "p1", p_almacen_id: "a1", p_tipo: "merma", p_cantidad: 1 }, "PENDIENTE");
+  client.__rpcCalls.length = 0;
+  client.__rpcResult = { data: null, error: { message: "Stock insuficiente para esta operación" } };
+  await window.sincronizarCola();
+  await esperar(15);
+  const restante = await window.obtenerOperacionPendiente(op.id);
+  assert.ok(restante, "la op NO se eliminó");
+  assert.strictEqual(restante.estado, "REQUIERE_ATENCION", "queda en REQUIERE_ATENCION para revisión manual");
+  assert.ok(/Stock insuficiente/.test(restante.ultimo_error), "guarda el error real del backend");
+});
+
+test("OFFLINE: internet intermitente — error de red deja la op en PENDIENTE (no REQUIERE_ATENCION)", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const op = await crearOp(window, "transferencia", { p_origen_id: "a1", p_destino_id: "a2", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "PENDIENTE");
+  client.__rpcCalls.length = 0;
+  client.__rpcResult = { data: null, error: { message: "Failed to fetch" } };
+  await window.sincronizarCola();
+  await esperar(15);
+  const restante = await window.obtenerOperacionPendiente(op.id);
+  assert.ok(restante, "la op sigue en la cola");
+  assert.strictEqual(restante.estado, "PENDIENTE", "vuelve a PENDIENTE: es de red, no de negocio");
+});
+
+test("OFFLINE: internet intermitente — al recuperar la conexión, sincroniza lo pendiente", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const op = await crearOp(window, "compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 2 }, "PENDIENTE");
+  client.__rpcCalls.length = 0;
+  // Primera sincronización: falla por red (intermitente).
+  client.__rpcResult = { data: null, error: { message: "Failed to fetch" } };
+  await window.sincronizarCola();
+  await esperar(15);
+  assert.strictEqual((await window.obtenerOperacionPendiente(op.id)).estado, "PENDIENTE", "quedó pendiente tras el fallo de red");
+  // Recupera Internet: ahora el RPC tiene éxito.
+  client.__rpcResult = { data: { id: "c-1" }, error: null };
+  await window.sincronizarCola();
+  await esperar(15);
+  assert.strictEqual(await window.obtenerOperacionPendiente(op.id), null, "se sincronizó y eliminó al recuperar la conexión");
+});
+
+test("OFFLINE: recuperación tras recarga — la cola persiste en IndexedDB y se reconstruye", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  const r = await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 4 });
+  const clave = r.operacion.idempotency_key;
+  assert.ok(clave, "se encoló la compra con idempotency_key");
+  // Simular que la app se cerró a mitad de sincronización (la op quedó SINCRONIZANDO):
+  // al "volver a abrir" (recuperarOperacionesAtrapadas), debe volver a PENDIENTE para
+  // no quedar atrapada, conservando su idempotency_key (persistencia en IndexedDB).
+  await window.actualizarOperacionPendiente(r.operacion.id, { estado: "SINCRONIZANDO" });
+  await window.recuperarOperacionesAtrapadas();
+  const recuperada = await window.obtenerOperacionPendiente(r.operacion.id);
+  assert.ok(recuperada, "la op sobrevivió (persistencia IndexedDB)");
+  assert.strictEqual(recuperada.estado, "PENDIENTE", "recuperada de SINCRONIZANDO a PENDIENTE tras recarga");
+  assert.strictEqual(recuperada.idempotency_key, clave, "idempotency_key conservada tras la recuperación");
+  // Al tener conexión, la sincronización la resuelve.
+  Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
+  client.__rpcResult = { data: { id: "c-2" }, error: null };
+  await window.sincronizarCola();
+  await esperar(15);
+  assert.strictEqual(await window.obtenerOperacionPendiente(r.operacion.id), null, "se sincronizó tras la recuperación");
+});
+
+test("OFFLINE: proyección de stock descuenta venta/vale/transferencia y suma compra", async () => {
+  const { window: w } = montarEntorno();
+  marcarOnline(w);
+  await esperar(30);
+  Object.defineProperty(w.navigator, "onLine", { value: false, configurable: true });
+  await w.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 10 });
+  await w.ejecutarOperacion("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 3 }] });
+  await w.ejecutarOperacion("vale", { p_producto_id: "p1", p_almacen_id: "a1", p_tipo: "merma", p_cantidad: 2 });
+  await w.ejecutarOperacion("transferencia", { p_origen_id: "a1", p_destino_id: "a2", p_lineas: [{ producto_id: "p1", cantidad: 1 }] });
+  // Proyección p1/a1: +10 (compra) -3 (venta) -2 (vale) -1 (trf origen) = +4.
+  const { ajuste } = w.ajustePendiente("p1", "a1");
+  assert.strictEqual(ajuste, 4, "proyección local: +10 -3 -2 -1 = +4");
+  // La transferencia suma en el destino.
+  const { ajuste: ajusteDest } = w.ajustePendiente("p1", "a2");
+  assert.strictEqual(ajusteDest, 1, "proyección destino de la transferencia: +1");
+});
+
+test("OFFLINE: no se generan operaciones duplicadas — una op = una sola llamada al RPC", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const op = await crearOp(window, "venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "PENDIENTE");
+  client.__rpcCalls.length = 0;
+  client.__rpcResult = { data: { id: "v-x" }, error: null };
+  // Sincronizar dos veces: la segunda no reenvía (la op ya se eliminó tras la primera).
+  await window.sincronizarCola();
+  await esperar(15);
+  await window.sincronizarCola();
+  await esperar(15);
+  const llamadasVenta = client.__rpcCalls.filter((c) => c.nombre === "registrar_venta");
+  assert.strictEqual(llamadasVenta.length, 1, "el RPC se llamó una sola vez (no se duplicó)");
+  assert.strictEqual(llamadasVenta[0].params.p_idempotency_key, op.idempotency_key, "misma idempotency_key en la única llamada");
+});
+
+test("OFFLINE: el contador de pendientes refleja la cola real (badge #cola-pendientes-badge)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
+  await window.ejecutarOperacion("vale", { p_producto_id: "p1", p_almacen_id: "a1", p_tipo: "merma", p_cantidad: 1 });
+  await window.actualizarContadorColaPendiente();
+  await esperar(15);
+  const badge = document.getElementById("cola-pendientes-badge");
+  assert.ok(badge, "existe el badge del contador");
+  assert.ok(!badge.classList.contains("hidden"), "el badge es visible con pendientes");
+  assert.ok(/2 pendientes/.test(badge.textContent), "el contador muestra 2 pendientes: " + badge.textContent);
+});
+
+test("OFFLINE: doble sincronización simultánea → 1 sola ejecución real (mutex _sincronizando)", async () => {
+  const { window, client } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  await crearOp(window, "compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 }, "PENDIENTE");
+  client.__rpcCalls.length = 0;
+  client.__rpcResult = { data: { id: "c-9" }, error: null };
+  // Disparar dos sincronizaciones en paralelo: el mutex debe asegurar que no
+  // se procesen dos veces las mismas operaciones.
+  await Promise.all([window.sincronizarCola(), window.sincronizarCola()]);
+  await esperar(20);
+  const llamadas = client.__rpcCalls.filter((c) => c.nombre === "registrar_compra");
+  assert.strictEqual(llamadas.length, 1, "una sola ejecución real gracias al mutex _sincronizando");
+});
