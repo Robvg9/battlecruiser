@@ -355,3 +355,131 @@ test("B2.3-G: 'visto' quita el realce pero no borra el dato (visto ≠ resuelto)
   const existe = await window.obtenerOperacionPendiente(op.id);
   assert.ok(existe, "la operación no se borró (visto ≠ resuelto)");
 });
+
+
+// ============================================================
+// R13 — Centro de Control: alertas accionables
+// ============================================================
+
+function stockBajoR13(cant, min, prod, alm) {
+  return { producto_id: "p" + prod, almacen_id: "a" + alm, cantidad: cant, minimo: min,
+           productos: { nombre: "Prod " + prod }, almacenes: { nombre: "Alm " + alm } };
+}
+
+test("R13.1: alerta visible cuando hay productos bajo mínimo (cabecera con cantidad)", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajoR13(2, 10, 1, 1), stockBajoR13(0, 5, 2, 2)];
+  window.renderResumen();
+  await esperar(20);
+  const alertas = document.getElementById("resumen-alertas-lista");
+  assert.ok(/2 producto\(s\) bajo m\u00ednimo/.test(alertas.innerHTML), "cabecera con cantidad");
+  assert.ok(/Prod 1/.test(alertas.innerHTML), "lista producto 1");
+  assert.ok(/Prod 2/.test(alertas.innerHTML), "lista producto 2");
+});
+
+test("R13.2: botón 'Ver inventario' navega al tab inventario", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajoR13(3, 10, 1, 1)];
+  window.renderResumen();
+  await esperar(20);
+  const btn = document.querySelector("#resumen-alertas-lista .alerta-ir-btn");
+  assert.ok(btn, "botón presente");
+  btn.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "navega a inventario");
+});
+
+test("R13.3: items de alerta son clickeables y navegan a inventario", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajoR13(1, 10, 1, 1)];
+  window.renderResumen();
+  await esperar(20);
+  const item = document.querySelector("#resumen-alertas-lista .alerta-item");
+  assert.strictEqual(item.getAttribute("data-ir-tab"), "inventario", "item lleva a inventario");
+  item.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "navega");
+});
+
+test("R13.4: card 'Bajo mínimo' del grid es accionable solo cuando hay alertas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajoR13(2, 10, 1, 1)];
+  window.renderResumen();
+  await esperar(20);
+  const card = document.querySelector("#resumen-grid .resumen-card-accion");
+  assert.ok(card, "card accionable cuando hay alertas");
+  card.click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "card navega a inventario");
+});
+
+test("R13.5: sin alertas no hay elementos accionables ni botón", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [{ producto_id: "p1", almacen_id: "a1", cantidad: 50, minimo: 10, productos: { nombre: "P" }, almacenes: { nombre: "A" } }];
+  window.renderResumen();
+  await esperar(20);
+  assert.ok(!document.querySelector("#resumen-grid .resumen-card-accion"), "sin card accionable");
+  assert.ok(/Nada bajo el m\u00ednimo/.test(document.getElementById("resumen-alertas-lista").innerHTML), "estado limpio");
+  assert.ok(!document.querySelector("#resumen-alertas-lista .alerta-ir-btn"), "sin botón");
+});
+
+test("R13.6: no mutación de cache al navegar alertas", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  const stock = [stockBajoR13(2, 10, 1, 1)];
+  window._cache.stock = stock;
+  window.renderResumen();
+  await esperar(20);
+  document.querySelector("#resumen-alertas-lista .alerta-item").click();
+  await esperar(20);
+  assert.strictEqual(window._cache.stock, stock, "cache stock intacta");
+});
+
+test("R13.7: no segundo router — un solo sistema de navegación", async () => {
+  const { window } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  assert.strictEqual(window._routerAlertas, undefined, "no hay segundo router");
+  assert.strictEqual(window._navAlertas, undefined, "no hay segundo sistema nav");
+  assert.strictEqual(typeof window.renderResumen, "function", "renderResumen única");
+});
+
+test("R13.8: offline — las alertas siguen visibles y navegables", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajoR13(2, 10, 1, 1), stockBajoR13(0, 5, 2, 2)];
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  window.renderResumen();
+  assert.ok(/2 producto\(s\) bajo m\u00ednimo/.test(document.getElementById("resumen-alertas-lista").innerHTML), "alerta visible offline");
+  document.querySelector("#resumen-alertas-lista .alerta-ir-btn").click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "navega offline");
+});
+
+test("R13.9: no se acumulan listeners al re-renderizar", async () => {
+  const { window, document } = montarEntorno();
+  marcarOnline(window);
+  await esperar(30);
+  window._cache.stock = [stockBajoR13(2, 10, 1, 1)];
+  for (let i = 0; i < 3; i++) {
+    window.renderResumen();
+    await esperar(10);
+  }
+  const items = document.querySelectorAll("#resumen-alertas-lista .alerta-item");
+  assert.strictEqual(items.length, 1, "un solo item (no duplicado)");
+  items[0].click();
+  await esperar(20);
+  assert.ok(document.querySelector('.tab-btn[data-tab="inventario"]').classList.contains("active"), "navegación funciona tras re-renders");
+});
