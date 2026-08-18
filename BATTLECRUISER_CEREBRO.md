@@ -144,3 +144,100 @@ Una misión queda cerrada cuando:
 - si corresponde, Roberto realiza aceptación real.
 
 **No declarar terminado por palabras de una IA. Declarar terminado por evidencia.**
+---
+
+## 8. CHECKLIST PRUEBAS REALES FINALES
+
+A ejecutar AL FINAL, cuando todos los bloques t\u00e9cnicos est\u00e9n cerrados.
+
+### A. Multiusuario
+- [ ] Usuario A + Usuario B simult\u00e1neamente en el mismo dispositivo.
+- [ ] A crea operaci\u00f3n offline, cierra sesi\u00f3n, B entra: B NO ve ni procesa la op de A.
+- [ ] A crea op offline, cierra sesi\u00f3n, A vuelve a entrar: A recupera y sincroniza su op.
+- [ ] A abre turno, cierra sesi\u00f3n, B entra: B NO ve el turno de A en su UI.
+- [ ] A abre conversaci\u00f3n, cierra sesi\u00f3n, B entra: B NO ve la conversaci\u00f3n de A.
+
+### B. Venta simult\u00e1nea
+- [ ] Dos usuarios crean ventas al mismo tiempo: ambas se registran correctamente.
+- [ ] Dos ventas del mismo usuario en pesta\u00f1as distintas: no duplicaci\u00f3n.
+- [ ] Venta con stock insuficiente: error claro, no se registra.
+
+### C. Turnos simult\u00e1neos
+- [ ] Dos usuarios abren turnos al mismo tiempo: cada uno ve su propio turno.
+- [ ] Usuario A cierra su turno mientras B opera: B sigue operando en su turno.
+- [ ] Cierre de turno con operaciones pendientes: avisa pero permite cerrar.
+
+### D. Offline
+- [ ] Entrar offline: app funciona (lectura de cach\u00e9).
+- [ ] Navegar offline: listas se muestran desde cach\u00e9.
+- [ ] Crear operaci\u00f3n offline: se guarda en cola.
+
+### E. Reconexi\u00f3n
+- [ ] Perder conexi\u00f3n durante operaci\u00f3n: op queda en cola PENDIENTE.
+- [ ] Recuperar conexi\u00f3n: sincronizaci\u00f3n autom\u00e1tica.
+- [ ] Operaci\u00f3n atrapada en SINCRONIZANDO: se recupera y sincroniza.
+
+### F. Conexi\u00f3n intermitente
+- [ ] Conexi\u00f3n intermitente: operaciones se reintentan autom\u00e1ticamente.
+- [ ] Sincronizaci\u00f3n fallida: operaciones quedan PENDIENTE, no se pierden.
+- [ ] Reintento: operaciones se sincronizan en el pr\u00f3ximo intento.
+
+### G. Operaciones pendientes
+- [ ] Operaci\u00f3n pendiente nunca desaparece.
+- [ ] Operaci\u00f3n pendiente nunca se duplica.
+- [ ] Operaci\u00f3n pendiente nunca cambia de usuario.
+- [ ] Operaci\u00f3n pendiente nunca se ejecuta dos veces.
+- [ ] Operaci\u00f3n pendiente nunca queda invisible sin explicaci\u00f3n.
+
+### H. B7 completo
+- [ ] Abrir turno.
+- [ ] Operaciones durante turno.
+- [ ] Cerrar turno.
+- [ ] Declarar cuadre.
+- [ ] Revisar cuadre (aprobar/rechazar).
+
+### I. B8 completo
+- [ ] Abrir soporte.
+- [ ] Crear conversaci\u00f3n.
+- [ ] Enviar mensaje.
+- [ ] Listar mensajes.
+- [ ] Cerrar conversaci\u00f3n.
+
+### J. M\u00f3vil
+- [ ] Navegaci\u00f3n en pantalla pequeña.
+- [ ] Men\u00fas accesibles.
+- [ ] Tablas legibles.
+- [ ] Formularios usables.
+- [ ] Modales visibles.
+- [ ] Paneles funcionales.
+- [ ] Cola offline visible.
+- [ ] Mensajes de conexi\u00f3n claros.
+
+### K. PC
+- [ ] Navegaci\u00f3n en pantalla grande.
+- [ ] Men\u00fas accesibles.
+- [ ] Tablas legibles.
+- [ ] Formularios usables.
+- [ ] Modales visibles.
+- [ ] Paneles funcionales.
+- [ ] Cola offline visible.
+- [ ] Mensajes de conexi\u00f3n claros.
+
+### L. PWA
+- [ ] Instalaci\u00f3n como PWA.
+- [ ] Ejecuci\u00f3n offline.
+- [ ] Actualizaci\u00f3n autom\u00e1tica al abrir.
+
+### M. Logout/login
+- [ ] Logout: limpia contexto correctamente.
+- [ ] Login: carga contexto correctamente.
+- [ ] Cambio r\u00e1pido de usuario: no hay contaminaci\u00f3n de datos.
+
+### N. Recuperaci\u00f3n
+- [ ] Recuperaci\u00f3n de operaciones antiguas tras reconexi\u00f3n.
+- [ ] Recuperaci\u00f3n de datos tras error de red.
+
+### O. No duplicaci\u00f3n
+- [ ] Idempotencia: misma operaci\u00f3n no se ejecuta dos veces.
+- [ ] Sincronizaci\u00f3n simult\u00e1nea entre pesta\u00f1as: no duplicaci\u00f3n.
+- [ ] Reintento tras error: no duplicaci\u00f3n.
