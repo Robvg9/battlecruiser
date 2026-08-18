@@ -407,23 +407,39 @@ function idbAbrir() {
       if (!db.objectStoreNames.contains(IDB_STORE)) {
         db.createObjectStore(IDB_STORE, { keyPath: "clave" });
       }
+      // El object store de la cola offline puede ya existir (migración
+      // IndexedDB v2 -> v3 en un dispositivo que actualiza). En ese caso NO
+      // se recrea ni se borra: createObjectStore solo se llama si falta, y
+      // el handle para añadir/verificar índices se obtiene con
+      // transaction.objectStore() sobre la transacción de versionchange.
+      // Así se garantiza que el índice usuario_id se cree durante la
+      // migración v2 -> v3 incluso cuando el store ya existía.
+      let opsStore;
       if (!db.objectStoreNames.contains(IDB_OPS_STORE)) {
-        // keyPath "id" (UUID generado con crypto.randomUUID(), ver
-        // crearOperacionPendiente). Los índices "estado" y "creado_en" son
-        // para poder consultar sin tener que traer y filtrar en JS todas
-        // las operaciones guardadas cada vez (obtenerOperacionesPorEstado
-        // y el orden FIFO de obtenerTodasLasOperaciones).
-        const opsStore = db.createObjectStore(IDB_OPS_STORE, { keyPath: "id" });
+        // Instalación nueva (o base que todavía no tenía la cola): se crea
+        // el store con su keyPath "id" (UUID generado con crypto.randomUUID(),
+        // ver crearOperacionPendiente). Los índices "estado" y "creado_en"
+        // permiten consultar sin traer y filtrar en JS todas las operaciones
+        // guardadas cada vez (obtenerOperacionesPorEstado y el orden FIFO
+        // de obtenerTodasLasOperaciones).
+        opsStore = db.createObjectStore(IDB_OPS_STORE, { keyPath: "id" });
         opsStore.createIndex("estado", "estado", { unique: false });
         opsStore.createIndex("creado_en", "creado_en", { unique: false });
-        // Fase C (C3): índice por usuario_id para aislar la cola entre sesiones
-        // (dispositivo compartido). No destructivo: si el store ya existía de
-        // la versión 2 sin este índice, onupgradeneeded lo crea ahora; si ya
-        // existía, createIndex es idempotente a nivel de estructura (no falla
-        // ni borra datos existentes al re-abrir con la misma versión).
-        if (!opsStore.indexNames.contains(IDB_OPS_IDX_USUARIO)) {
-          opsStore.createIndex(IDB_OPS_IDX_USUARIO, IDB_OPS_IDX_USUARIO, { unique: false });
-        }
+      } else {
+        // Migración v2 -> v3: el store ya existe. Se recupera su handle
+        // desde la transacción de versionchange (req.transaction) para
+        // poder añadir índices sin recrear el store ni perder las
+        // operaciones pendientes existentes.
+        opsStore = req.transaction.objectStore(IDB_OPS_STORE);
+      }
+      // Fase C (C3): índice por usuario_id para aislar la cola entre sesiones
+      // (dispositivo compartido). Se crea FUERA del bloque condicional del
+      // store, así cubre los dos caminos: instalación nueva (store recién
+      // creado) Y migración v2 -> v3 (store preexistente). Si el índice ya
+      // existía (p.ej. re-abrir con la misma v3), no se vuelve a crear:
+      // createIndex lanzaría ConstraintError al repetir nombre.
+      if (!opsStore.indexNames.contains(IDB_OPS_IDX_USUARIO)) {
+        opsStore.createIndex(IDB_OPS_IDX_USUARIO, IDB_OPS_IDX_USUARIO, { unique: false });
       }
     };
     req.onsuccess = () => {

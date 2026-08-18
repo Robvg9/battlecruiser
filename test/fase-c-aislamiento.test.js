@@ -48,7 +48,7 @@ function mockCliente({ perfil, permisos } = {}) {
   return client;
 }
 
-function montarEntorno(opciones = {}) {
+function prepararDOM(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
@@ -59,10 +59,12 @@ function montarEntorno(opciones = {}) {
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window, "caches", { value: { keys: async () => [], delete: async () => true }, configurable: true });
   Object.defineProperty(window, "serviceWorker", { value: { getRegistrations: async () => [], register: async () => ({ unregister: async () => true }) }, configurable: true });
-
   const client = mockCliente(opciones);
   window.supabase = { createClient: () => client };
+  return { dom, window, document: window.document, client };
+}
 
+function inyectarApp(window, opciones = {}) {
   let appJs = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
   // Exponer internals necesarios para los tests (mismo patrón que b2.3/b6).
   appJs = appJs
@@ -76,11 +78,34 @@ function montarEntorno(opciones = {}) {
     .replace(/_usuarioActualId = /g, "window._usuarioActualId = ")
     .replace(/let _usuarioActual = null;/, "window._usuarioActual = null;")
     .replace(/_usuarioActual = /g, "window._usuarioActual = ")
-    .replace(/let _refrescosPendientes = null;/, "window._refrescosPendientes = null;");
+    .replace(/let _refrescosPendientes = null;/, "window._refrescosPendientes = null;")
+    // Exponer idbAbrir/_idbConexion para el test de migración v2 -> v3:
+    // permite forzar onupgradeneeded de la app sobre una base precreada en v2.
+    .replace(/function idbAbrir\(\) {/, "window.idbAbrir = function idbAbrir() {")
+    .replace(/let _idbConexion = null;/, "let _idbConexion = null; window._idbConexion = () => _idbConexion; window._idbConexionReset = () => { _idbConexion = null; };");
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
-  return { dom, window, document: window.document, client };
+}
+
+// montarEntorno (síncrono): instala nueva + carga app.js de una vez.
+// Mantiene la firma existente para los 23 tests C2/C3/P6/A1.
+function montarEntorno(opciones = {}) {
+  const env = prepararDOM(opciones);
+  inyectarApp(env.window, opciones);
+  return env;
+}
+
+// montarEntornoConIdb (async): permite preparar la base IndexedDB ANTES de
+// cargar app.js. Esto es lo que reproduce una instalación que ya estaba en
+// v2: prepararIdb(idb) crea la estructura v2 (sin el índice usuario_id) e
+// inserta operaciones, y recién después se inyecta app.js (que abre la base
+// en v3 y dispara onupgradeneeded de la migración).
+async function montarEntornoConIdb(opciones, prepararIdb) {
+  const env = prepararDOM(opciones);
+  if (prepararIdb) await prepararIdb(env.window.indexedDB);
+  inyectarApp(env.window, opciones);
+  return env;
 }
 
 function marcarOnline(window) {
@@ -519,4 +544,162 @@ test("P6-2: iniciarEdicionProducto mantiene categoría cuando p.categorias exist
 
   window.iniciarEdicionProducto({ id: "p1", nombre: "Coca", categorias: { nombre: "Bebidas" } });
   assert.strictEqual(select.value, "cat1", "Debe seleccionar Bebidas correctamente");
+});
+
+
+// ============================================================
+// C3-MIG: MIGRACIÓN INDEXEDDB v2 -> v3 (test real de migración)
+// ============================================================
+// Helpers de IndexedDB para los tests de migración. Simulan a mano la
+// estructura EXACTA de v2 (object store operaciones_pendientes con índices
+// "estado" y "creado_en" pero SIN el índice "usuario_id") sobre la MISMA
+// factory que luego usará la app. Es crucial que esta preparación se haga
+// ANTES de inyectar app.js: si la app abre primero, lo haría en v3 y no
+// habría nada que migrar (montarEntornoConIdb garantiza ese orden).
+
+function idbAbrirVersion(idb, nombre, version, onUpgrade) {
+  return new Promise((resolve, reject) => {
+    const req = idb.open(nombre, version);
+    if (onUpgrade) req.onupgradeneeded = () => onUpgrade(req.result);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPutOps(idb, nombre, store, registros) {
+  return new Promise((resolve, reject) => {
+    const req = idb.open(nombre, 2);
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction(store, "readwrite");
+      for (const r of registros) tx.objectStore(store).put(r);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// Crea la base en v2 con el object store operaciones_pendientes y los
+// índices de v2 (estado, creado_en), SIN el índice usuario_id. Devuelve
+// una función async lista para pasar a montarEntornoConIdb.
+function prepararV2ConOps(ops) {
+  const DB_NAME = "battlecruiser-cache";
+  const OPS = "operaciones_pendientes";
+  return async (idb) => {
+    // (a)+(b) Estructura v2: store con índices estado y creado_en, sin usuario_id.
+    const db = await idbAbrirVersion(idb, DB_NAME, 2, (d) => {
+      if (!d.objectStoreNames.contains("lecturas")) d.createObjectStore("lecturas", { keyPath: "clave" });
+      if (!d.objectStoreNames.contains(OPS)) {
+        const store = d.createObjectStore(OPS, { keyPath: "id" });
+        store.createIndex("estado", "estado", { unique: false });
+        store.createIndex("creado_en", "creado_en", { unique: false });
+        // Estructura v2: NO se crea el índice "usuario_id".
+      }
+    });
+    db.close();
+    // (c) Insertar operaciones directamente en la base v2.
+    if (ops && ops.length) await idbPutOps(idb, DB_NAME, OPS, ops);
+    // Verificación de la condición inicial (v2 sin usuario_id).
+    const dbCheck = await idbAbrirVersion(idb, DB_NAME, 2);
+    const storeCheck = dbCheck.transaction(OPS, "readonly").objectStore(OPS);
+    assert.ok(!storeCheck.indexNames.contains("usuario_id"), "Pre-migración (v2): el índice usuario_id NO debe existir. Índices: " + Array.from(storeCheck.indexNames).join(", "));
+    dbCheck.close();
+  };
+}
+
+// Este test NO nace la base en v3. Prepara la estructura de IndexedDB v2
+// (object store operaciones_pendientes con índices "estado" y "creado_en"
+// pero SIN el índice "usuario_id"), inserta operaciones de dos usuarios, y
+// luego monta la app sobre ESA MISMA base. Al abrir en v3, onupgradeneeded
+// de la app migra v2 -> v3. Verifica que la migración crea el índice
+// usuario_id sin borrar el store ni las operaciones, y que el aislamiento
+// por usuario funciona tras migrar.
+test("C3-MIG: migración IndexedDB v2 -> v3 crea índice usuario_id sin perder operaciones ni romper aislamiento", async () => {
+  const opA = { id: "op-A-1", tipo: "venta", payload: {}, usuario_id: "usuario-A", creado_en: "2024-01-01T00:00:00.000Z", actualizado_en: "2024-01-01T00:00:00.000Z", estado: "PENDIENTE", intentos: 0, ultimo_intento: null, ultimo_error: null, idempotency_key: "k-A-1" };
+  const opB = { id: "op-B-1", tipo: "compra", payload: {}, usuario_id: "usuario-B", creado_en: "2024-01-01T00:00:01.000Z", actualizado_en: "2024-01-01T00:00:01.000Z", estado: "PENDIENTE", intentos: 0, ultimo_intento: null, ultimo_error: null, idempotency_key: "k-B-1" };
+
+  // montarEntornoConIdb prepara la base v2 (sin usuario_id) + inserta A y B
+  // ANTES de inyectar app.js. Luego la app abre la misma base en v3 y
+  // dispara onupgradeneeded (migración v2 -> v3).
+  const { window } = await montarEntornoConIdb({ perfil: PERFIL, permisos: PERMISOS_TODOS }, prepararV2ConOps([opA, opB]));
+  marcarOnline(window);
+  await esperar(80);
+
+  const OPS = "operaciones_pendientes";
+
+  // (d)+(e) La migración ya ocurrió al abrir la app en v3. Inspeccionar.
+  const dbMigrated = await window.idbAbrir();
+  const storeInfo = await new Promise((resolve, reject) => {
+    const tx = dbMigrated.transaction(OPS, "readonly");
+    const store = tx.objectStore(OPS);
+    const info = { storeExists: true, indexNames: Array.from(store.indexNames) };
+    tx.oncomplete = () => resolve(info);
+    tx.onerror = () => reject(tx.error);
+  });
+
+  // e1) el object store sigue existiendo (no se recreó ni borró).
+  assert.ok(storeInfo.storeExists, "Tras migración: operaciones_pendientes sigue existiendo");
+
+  // e2) el índice usuario_id fue creado durante la migración.
+  assert.ok(storeInfo.indexNames.includes("usuario_id"), "Tras migración: el índice usuario_id debe existir. Índices presentes: " + storeInfo.indexNames.join(", "));
+  // Los índices v2 originales también deben seguir existiendo.
+  assert.ok(storeInfo.indexNames.includes("estado"), "Tras migración: el índice estado (v2) se conserva");
+  assert.ok(storeInfo.indexNames.includes("creado_en"), "Tras migración: el índice creado_en (v2) se conserva");
+
+  // e3) las operaciones originales siguen existiendo (no se borraron).
+  const todasCrudas = await new Promise((resolve, reject) => {
+    const tx = dbMigrated.transaction(OPS, "readonly");
+    const req2 = tx.objectStore(OPS).getAll();
+    req2.onsuccess = () => resolve(req2.result || []);
+    req2.onerror = () => reject(req2.error);
+  });
+  assert.strictEqual(todasCrudas.length, 2, "Tras migración: las 2 operaciones originales (A y B) deben seguir existiendo");
+  const idsCrudos = todasCrudas.map((o) => o.id).sort();
+  assert.deepStrictEqual(idsCrudos, ["op-A-1", "op-B-1"], "Las operaciones originales conservan sus ids");
+
+  // e4) Usuario A solamente puede obtener SUS operaciones (vía el índice
+  // usuario_id creado en la migración).
+  setUsuario(window, "usuario-A");
+  const opsA = await window.obtenerOperacionesPorEstado("PENDIENTE");
+  assert.strictEqual(opsA.length, 1, "Usuario A solo debe ver 1 operación tras migración");
+  assert.strictEqual(opsA[0].usuario_id, "usuario-A", "La operación visible para A es de usuario-A");
+  assert.strictEqual(opsA[0].tipo, "venta", "La operación visible para A es la venta original");
+
+  // e5) Usuario B solamente puede obtener SUS operaciones.
+  setUsuario(window, "usuario-B");
+  const opsB = await window.obtenerOperacionesPorEstado("PENDIENTE");
+  assert.strictEqual(opsB.length, 1, "Usuario B solo debe ver 1 operación tras migración");
+  assert.strictEqual(opsB[0].usuario_id, "usuario-B", "La operación visible para B es de usuario-B");
+  assert.strictEqual(opsB[0].tipo, "compra", "La operación visible para B es la compra original");
+});
+
+// C3-MIG2: idempotencia de la migración — re-abrir la misma base en v3
+// (índice ya creado) no debe fallar ni duplicar/borrar nada.
+test("C3-MIG2: re-abrir en v3 (índice usuario_id ya existe) es idempotente", async () => {
+  const opA = { id: "op-A-2", tipo: "venta", payload: {}, usuario_id: "usuario-A", creado_en: "2024-01-02T00:00:00.000Z", estado: "PENDIENTE", intentos: 0, idempotency_key: "k-A-2" };
+
+  const { window } = await montarEntornoConIdb({ perfil: PERFIL, permisos: PERMISOS_TODOS }, prepararV2ConOps([opA]));
+  marcarOnline(window);
+  await esperar(80);
+
+  const OPS = "operaciones_pendientes";
+
+  // Primera apertura en v3 (migración) ya ocurrió durante el init de la app.
+  const db1 = await window.idbAbrir();
+  const store1 = db1.transaction(OPS, "readonly").objectStore(OPS);
+  assert.ok(store1.indexNames.contains("usuario_id"), "Tras migración: el índice usuario_id existe");
+
+  // Forzar re-apertura en v3: el índice ya existe; no debe lanzar
+  // ConstraintError ni duplicar/borrar nada.
+  window._idbConexionReset();
+  const db2 = await window.idbAbrir();
+  assert.ok(db2, "Re-abrir en v3 con índice ya existente no debe fallar");
+  const store2 = db2.transaction(OPS, "readonly").objectStore(OPS);
+  assert.ok(store2.indexNames.contains("usuario_id"), "El índice usuario_id sigue presente tras re-abrir");
+
+  setUsuario(window, "usuario-A");
+  const ops = await window.obtenerOperacionesPorEstado("PENDIENTE");
+  assert.strictEqual(ops.length, 1, "La operación de A persiste tras re-abrir en v3");
+  assert.strictEqual(ops[0].id, "op-A-2");
 });
