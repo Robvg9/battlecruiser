@@ -37,6 +37,9 @@ function mockCliente({ perfil, permisos, usuarios, roles, auditoria } = {}) {
       if (nombre === "registrar_auditoria") return { data: 1, error: null };
       if (nombre === "listar_auditoria_admin") return { data: auditoria || [], error: null };
       if (nombre === "asignar_rol_usuario" || nombre === "cambiar_estado_usuario") return { data: null, error: null };
+      // Fase 1 (fix data.id): crear_producto en producción devuelve UUID
+      // escalar, NO un objeto {id: ...}. El mock replica ese contrato real.
+      if (nombre === "crear_producto") return { data: "prod-uuid-999", error: null };
       return { data: null, error: { message: "Could not find the function" } };
     },
     from: () => ({
@@ -159,6 +162,29 @@ test("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", a
   await esperar(80);
   const btnMando = document.querySelector('.tab-btn[data-tab="mando"]');
   assert.ok(btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"), "Centro de Mando visible con permiso");
+});
+
+test("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el RPC devuelve UUID escalar", async () => {
+  // Regresión del bug: registrarAuditoria usaba `data && data.id`, pero RPC
+  // como crear_producto/registrar_venta/registrar_compra/registrar_transferencia/
+  // registrar_vale_salida devuelven un UUID escalar en producción (data ES el
+  // uuid), no un objeto con .id. Antes del fix, p_entidad_id llegaba vacío.
+  const { window, client } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "productos", accion: "crear" }],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  const r = await window.ejecutarOperacion("producto", { p_nombre: "Test", p_categoria_id: "c1" });
+  assert.ok(r.ok, "operación debe resolverse ok");
+  assert.strictEqual(r.data, "prod-uuid-999", "data debe ser el uuid escalar devuelto por el RPC");
+  const llamadaAuditoria = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
+  assert.ok(llamadaAuditoria, "debe haberse llamado a registrar_auditoria");
+  assert.strictEqual(
+    llamadaAuditoria.params.p_entidad_id,
+    "prod-uuid-999",
+    "p_entidad_id debe llevar el uuid real, no null/undefined/'undefined'"
+  );
 });
 
 test("B4.5: auditoría se carga con filtros y respeta permiso", async () => {

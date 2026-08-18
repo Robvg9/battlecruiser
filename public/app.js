@@ -867,6 +867,8 @@ const ETIQUETA_TIPO_OP = {
   transferencia: "Transferencia",
   vale: "Vale de salida",
   producto: "Creación de producto",
+  producto_actualizar: "Edición de producto",
+  producto_estado: "Cambio de estado de producto",
   turno: "Apertura de turno",
   turno_cerrar: "Cierre de turno",
   cuadre: "Cuadre",
@@ -1502,6 +1504,13 @@ const RPC_POR_TIPO = {
   // Misión B2.2-B.2: creación de productos entra a la misma cola/RPC central
   // que compra/venta/transferencia/vale, en vez de un INSERT directo aparte.
   producto: "crear_producto",
+  // Misión 3 (Fase 2): editar producto y activar/desactivar producto NO
+  // estaban conectados a ningún lado del frontend pese a que el RPC ya
+  // existía en producción (actualizar_producto, cambiar_estado_producto) y
+  // estaba correctamente asegurado (tiene_permiso('productos','editar'),
+  // idempotencia). Se agregan a la misma cola offline genérica.
+  producto_actualizar: "actualizar_producto",
+  producto_estado: "cambiar_estado_producto",
   // B7: operaciones de turnos/cuadres/responsabilidades/incidencias
   // pasan por la misma cola offline (idempotencia, FIFO, reintento).
   turno: "abrir_turno",
@@ -1556,7 +1565,13 @@ async function ejecutarOperacion(tipo, payload) {
       // B4: registrar auditoría de la operación exitosa (trazabilidad).
       // No bloquea el flujo si falla (registrarAuditoria captura errores).
       if (typeof registrarAuditoria === "function") {
-        registrarAuditoria(tipo, "Operación " + (ETIQUETA_TIPO_OP[tipo] || tipo) + " ejecutada online.", "exito", String(data && data.id || ""), idempotency_key, null);
+        // Fix data.id: los RPC en RPC_POR_TIPO devuelven UUID escalar (registrar_venta,
+        // registrar_compra, registrar_transferencia, registrar_vale_salida, crear_producto,
+        // actualizar_producto, cambiar_estado_producto) o jsonb con campo "id" (turno,
+        // cuadre, responsabilidad, incidencia, mensaje, conversacion). `data && data.id`
+        // siempre daba undefined para el primer grupo porque data ya ES el uuid.
+        const entidadId = typeof data === "string" ? data : String((data && data.id) || "");
+        registrarAuditoria(tipo, "Operación " + (ETIQUETA_TIPO_OP[tipo] || tipo) + " ejecutada online.", "exito", entidadId, idempotency_key, null);
       }
       return { ok: true, offline: false, data };
     }
@@ -1671,6 +1686,12 @@ function reconciliarTrasOperacion(tipo, resultado) {
       // mueve stock por si mismo. Tras error de negocio no hay producto real.
       if (resultado === "exito") marcarRefrescoPendiente("productos");
       break;
+    case "producto_actualizar":
+    case "producto_estado":
+      // Misión 3: mismo caso que "producto" — no mueven stock, solo hay
+      // que refrescar la lista/selects de productos tras éxito.
+      if (resultado === "exito") marcarRefrescoPendiente("productos");
+      break;
     case "compra":
       // Compra = entrada de stock. (refrescarStockYSelects cubre productos
       // + almacenes + stock, asi que "stock" incluye "productos".)
@@ -1759,12 +1780,14 @@ async function sincronizarCola() {
       });
 
       let error = null;
+      let data = null;
       try {
         const respuesta = await client.rpc(
           RPC_POR_TIPO[op.tipo],
           Object.assign({}, op.payload, { p_idempotency_key: op.idempotency_key })
         );
         error = respuesta.error;
+        data = respuesta.data;
       } catch (e) {
         error = e;
       }
@@ -1774,8 +1797,17 @@ async function sincronizarCola() {
         await actualizarOperacionPendiente(op.id, { estado: "SINCRONIZADA" });
         // B4: registrar auditoría de la sincronización exitosa (trazabilidad
         // de operaciones que fueron offline y ahora se confirmaron).
+        // Misión 3 fix (fase 3, punto 5): antes se pasaba op.id (id LOCAL de
+        // IndexedDB, un contador/uuid propio de la cola) como entidad_id.
+        // Eso apuntaba la auditoría a la operación de cola, no a la
+        // venta/compra/producto real creado en Supabase. Ahora se aplica el
+        // mismo contrato que ejecutarOperacion(): UUID escalar o jsonb con
+        // "id". Si por algún motivo el RPC no devuelve nada utilizable
+        // (no debería pasar en éxito), se cae a op.id como último recurso
+        // para no perder la referencia por completo.
         if (typeof registrarAuditoria === "function") {
-          registrarAuditoria(op.tipo, "Operación " + (ETIQUETA_TIPO_OP[op.tipo] || op.tipo) + " sincronizada (era offline).", "exito", op.id, op.idempotency_key, null);
+          const entidadId = typeof data === "string" ? data : String((data && data.id) || op.id || "");
+          registrarAuditoria(op.tipo, "Operación " + (ETIQUETA_TIPO_OP[op.tipo] || op.tipo) + " sincronizada (era offline).", "exito", entidadId, op.idempotency_key, null);
         }
         await eliminarOperacionPendiente(op.id);
         await refrescarOperacionesPendientesCache();
@@ -2654,7 +2686,7 @@ async function cargarAlmacenes() {
 async function cargarProductos() {
   return withCache("productos", () => client
     .from("productos")
-    .select("id, nombre, unidad, precio_normal, precio_mayorista, categorias(nombre), presentaciones(nombre)")
+    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, categorias(nombre), presentaciones(nombre)")
     .order("nombre"));
 }
 
@@ -2695,17 +2727,93 @@ async function refrescarProductos() {
     setEmpty("lista-productos", mensajeListaVacia("productos", "Todavía no hay productos cargados."));
   } else {
     lista.innerHTML = "";
+    const puedeEditar = tienePermiso("productos", "editar");
     productos.forEach((p) => {
       const div = document.createElement("div");
-      div.className = "lista-item";
-      div.innerHTML = `<span>${p.nombre} <span class="muted">${p.categorias ? "· " + p.categorias.nombre : ""}${p.presentaciones ? " · " + p.presentaciones.nombre : ""}</span></span>
-        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)}</span>`;
+      div.className = "lista-item" + (p.activo === false ? " lista-item-inactivo" : "");
+      const estadoTxt = p.activo === false ? '<span class="muted">· Inactivo</span>' : "";
+      let botones = "";
+      if (puedeEditar) {
+        botones = `<span class="lista-item-acciones">
+          <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
+          <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
+        </span>`;
+      }
+      div.innerHTML = `<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
+        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)}</span>
+        ${botones}`;
       lista.appendChild(div);
     });
   }
 
   return { productos, almacenes };
 }
+
+// Misión 3 (Fase 2): edición y activar/desactivar producto. Delegación de
+// eventos sobre #lista-productos (los botones se recrean en cada refresco).
+safeInit("lista-productos", () => {
+  document.getElementById("lista-productos").addEventListener("click", async (e) => {
+    const btnEditar = e.target.closest(".btn-editar-producto");
+    if (btnEditar) {
+      const producto = (_cache.productos || []).find((p) => p.id === btnEditar.dataset.id);
+      if (producto) iniciarEdicionProducto(producto);
+      return;
+    }
+    const btnToggle = e.target.closest(".btn-toggle-producto");
+    if (btnToggle) {
+      const id = btnToggle.dataset.id;
+      const activoActual = btnToggle.dataset.activo === "true";
+      btnToggle.disabled = true;
+      const resultado = await ejecutarOperacion("producto_estado", {
+        p_producto_id: id,
+        p_activo: !activoActual,
+      });
+      btnToggle.disabled = false;
+      if (!resultado.ok) {
+        setMsg("msg-productos", (resultado.error && resultado.error.message) || "No se pudo cambiar el estado del producto.", false);
+        return;
+      }
+      setMsg("msg-productos", resultado.offline
+        ? "Cambio de estado guardado, se sincronizará cuando vuelva la conexión."
+        : (activoActual ? "Producto desactivado." : "Producto activado."), true);
+      if (!resultado.offline) await refrescarProductos();
+    }
+  });
+});
+
+// Llena el formulario de productos con los datos de un producto existente y
+// lo pone en "modo edición" (el submit pasa a llamar a producto_actualizar
+// en vez de crear uno nuevo).
+function iniciarEdicionProducto(p) {
+  document.getElementById("prod-editando-id").value = p.id;
+  document.getElementById("prod-nombre").value = p.nombre || "";
+  document.getElementById("prod-unidad").value = p.unidad || "";
+  document.getElementById("prod-precio-normal").value = p.precio_normal != null ? p.precio_normal : "";
+  document.getElementById("prod-precio-mayorista").value = p.precio_mayorista != null ? p.precio_mayorista : "";
+  const categoriaSelect = document.getElementById("prod-categoria");
+  if (categoriaSelect && p.categorias) {
+    const opcion = Array.from(categoriaSelect.options).find((o) => o.textContent === p.categorias.nombre);
+    if (opcion) categoriaSelect.value = opcion.value;
+  }
+  const submitBtn = document.getElementById("prod-submit-btn");
+  if (submitBtn) submitBtn.textContent = "Guardar cambios";
+  const cancelarBtn = document.getElementById("prod-cancelar-edicion");
+  if (cancelarBtn) cancelarBtn.classList.remove("hidden");
+  document.getElementById("form-producto").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelarEdicionProducto() {
+  document.getElementById("form-producto").reset();
+  document.getElementById("prod-editando-id").value = "";
+  const submitBtn = document.getElementById("prod-submit-btn");
+  if (submitBtn) submitBtn.textContent = "Agregar producto";
+  const cancelarBtn = document.getElementById("prod-cancelar-edicion");
+  if (cancelarBtn) cancelarBtn.classList.add("hidden");
+}
+
+safeInit("prod-cancelar-edicion", () => {
+  document.getElementById("prod-cancelar-edicion").addEventListener("click", cancelarEdicionProducto);
+});
 
 safeInit("form-producto", () => {
   document.getElementById("form-producto").addEventListener("submit", async (e) => {
@@ -2732,21 +2840,35 @@ safeInit("form-producto", () => {
     // (ejecutarOperacion), usando el RPC crear_producto (ver RPC_POR_TIPO).
     // El payload son EXACTAMENTE los parámetros de crear_producto, sin
     // p_idempotency_key (eso lo agrega ejecutarOperacion/sincronizarCola).
+    // Misión 3 (Fase 2): si prod-editando-id tiene valor, este mismo form
+    // pasa a llamar a producto_actualizar en vez de crear uno nuevo — así
+    // edición y creación comparten la misma cola offline/idempotencia.
+    const editandoId = document.getElementById("prod-editando-id").value || null;
     submitBtn.disabled = true;
-    const resultado = await ejecutarOperacion("producto", {
-      p_nombre: nombre,
-      p_categoria_id: categoria_id,
-      p_unidad: unidad,
-      p_precio_normal: precio_normal,
-      p_precio_mayorista: precio_mayorista,
-    });
+    const resultado = editandoId
+      ? await ejecutarOperacion("producto_actualizar", {
+          p_producto_id: editandoId,
+          p_nombre: nombre,
+          p_categoria_id: categoria_id,
+          p_unidad: unidad,
+          p_precio_normal: precio_normal,
+          p_precio_mayorista: precio_mayorista,
+        })
+      : await ejecutarOperacion("producto", {
+          p_nombre: nombre,
+          p_categoria_id: categoria_id,
+          p_unidad: unidad,
+          p_precio_normal: precio_normal,
+          p_precio_mayorista: precio_mayorista,
+        });
     submitBtn.disabled = false;
 
     if (!resultado.ok) {
-      setMsg("msg-productos", "No se pudo crear: " + explicarError(resultado.error, "crear producto"), false);
+      setMsg("msg-productos", "No se pudo " + (editandoId ? "editar" : "crear") + ": " + explicarError(resultado.error, editandoId ? "editar producto" : "crear producto"), false);
       return;
     }
-    e.target.reset();
+    const estabaEditando = !!editandoId;
+    cancelarEdicionProducto(); // limpia el form y vuelve a modo "crear" en ambos casos
     if (resultado.offline) {
       // Sección "IMPORTANTE SOBRE UX" de la misión: respuesta inmediata de
       // que quedó pendiente, sin inventar un producto definitivo en
@@ -2757,7 +2879,7 @@ safeInit("form-producto", () => {
       setMsg("msg-productos", "✓ Guardado localmente — se sincronizará al recuperar conexión.", true);
       return;
     }
-    setMsg("msg-productos", "Producto creado.", true);
+    setMsg("msg-productos", estabaEditando ? "Producto actualizado." : "Producto creado.", true);
     await refrescarProductos();
   });
 });
@@ -5278,8 +5400,19 @@ function renderResumenEjecutivo(d) {
     card("Productos en stock", inv.productos || 0, (inv.unidades || 0) + " unidades") +
     card("Stock bajo", inv.stock_bajo || 0) +
     card("Stock agotado", inv.stock_agotado || 0) +
-    (comp.disponible === false ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Compras</div><div class="muted">' + escHtml(comp.nota || "No disponible") + '</div></div>' : "") +
-    (mar.disponible === false ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Margen</div><div class="muted">' + escHtml(mar.nota || "No disponible") + '</div></div>' : "");
+    // Misión 3 fix: producción ya devuelve compras.disponible=true con datos
+    // reales (lotes, unidades_compradas, valor_compras) — el frontend solo
+    // manejaba el caso disponible=false, así que la tarjeta de Compras nunca
+    // se mostraba aunque hubiera datos.
+    (comp.disponible === false
+      ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Compras</div><div class="muted">' + escHtml(comp.nota || "No disponible") + '</div></div>'
+      : card("Compras", comp.lotes || 0, (comp.unidades_compradas || 0) + " u · $" + money(comp.valor_compras || 0))) +
+    // Ídem para margen: ahora llega disponible=true con margen_conocido /
+    // margen_pct_conocido (calculado solo sobre líneas con costo FIFO real;
+    // nunca se asume costo 0 para las que no lo tienen).
+    (mar.disponible === false
+      ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Margen</div><div class="muted">' + escHtml(mar.nota || "No disponible") + '</div></div>'
+      : card("Margen", (mar.margen_pct_conocido != null ? money(mar.margen_pct_conocido) + "%" : "—"), "$" + money(mar.margen_conocido || 0) + (mar.lineas_sin_costo ? " · " + mar.lineas_sin_costo + " línea(s) sin costo excluidas" : "")));
 }
 
 // ---- Sub-reportes detallados ----
@@ -5441,11 +5574,26 @@ function renderCompras(filas) {
   if (!el) return;
   if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin compras en el período.</p>'; return; }
   el.innerHTML = "";
+  // Misión 3 fix: historial_compras en producción reporta por LOTE real de
+  // compra (origen='compra', excluye lotes espejo de transferencia — nunca
+  // se muestra una transferencia como si fuera una compra), no por cabecera
+  // de "compra" con proveedor/usuario/total. El contrato real es: lote_id,
+  // fecha_compra, producto, almacen, cantidad_inicial, cantidad_restante,
+  // costo_unitario, costo_total, estado (disponible/parcial/agotado/inconsistente).
+  // El frontend anterior leía c.fecha/c.proveedor/c.usuario/c.total, que
+  // nunca existieron en este RPC — siempre mostraba "—" y $0.00.
+  const ESTADO_TXT = {
+    disponible: "Disponible",
+    parcial: "Parcial",
+    agotado: "Agotado",
+    inconsistente: "Inconsistente",
+  };
   filas.forEach((c) => {
     const div = document.createElement("div");
     div.className = "rep-fila";
-    const fecha = c.fecha ? new Date(c.fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(c.almacen || "—") + '</span><span class="muted">' + fecha + ' · ' + escHtml(c.proveedor || "Sin proveedor") + ' · ' + escHtml(c.usuario || "—") + ' · Total $' + money(c.total || 0) + '</span></span>';
+    const fecha = c.fecha_compra ? new Date(c.fecha_compra).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+    const estadoTxt = ESTADO_TXT[c.estado] || c.estado || "—";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(c.producto || "—") + '</span><span class="muted">' + escHtml(c.almacen || "—") + ' · ' + fecha + ' · ' + (c.cantidad_restante ?? 0) + '/' + (c.cantidad_inicial ?? 0) + ' u (' + escHtml(estadoTxt) + ') · Costo unit. $' + money(c.costo_unitario || 0) + ' · Total $' + money(c.costo_total || 0) + '</span></span>';
     el.appendChild(div);
   });
 }
@@ -5454,26 +5602,27 @@ function renderRentabilidad(filas) {
   const el = document.getElementById("rep-detalle");
   if (!el) return;
   if (!filas || filas.length === 0) { el.innerHTML = '<p class="lista-estado">Sin datos de rentabilidad.</p>'; return; }
-  // B5.3: el costo FIFO de una venta puede NO estar disponible (ventas
-  // históricas sin costo_unitario/costo_total). NULL/ausencia de costo NO es
-  // 0: nunca mostrar CMV 0, ganancia = ingresos ni margen 100% como si el
-  // costo fuera real. Reutilizamos el contrato real del backend: cuando el
-  // costo no existe, cmv llega null/undefined (no un 0 falso). Si el backend
-  // evoluciona a devolver un flag "disponible", se respetará igual porque
-  // acá solo se considera costo disponible cuando cmv es un número finito.
+  // B5.3 / Misión 3 fix: el contrato REAL del backend (rentabilidad_ventas,
+  // verificado contra producción) devuelve por fila: ingreso, costo_total,
+  // margen, margen_porcentaje, costo_disponible (boolean explícito). El
+  // frontend leía ingresos/cmv/ganancia_bruta — nombres que el RPC nunca
+  // devolvió — así que costoDisponible daba siempre false y el reporte
+  // mostraba "costo no disponible" y Ganancia "—" aunque el dato sí existía.
+  // Ahora se usa costo_disponible tal cual lo manda el backend, sin inferirlo
+  // de si un número es finito.
   let totalIng = 0, totalCmv = 0;
   let hayCostoAlguno = false;
   el.innerHTML = "";
   filas.forEach((r) => {
-    const ingresos = Number(r.ingresos || 0);
+    const ingresos = Number(r.ingreso || 0);
     totalIng += ingresos;
-    const cmvNum = Number(r.cmv);
-    const costoDisponible = Number.isFinite(cmvNum) && r.cmv !== null && r.cmv !== undefined;
+    const costoDisponible = r.costo_disponible === true;
     let gan, margen, cmvTxt, ganTxt, margenTxt;
     if (costoDisponible) {
+      const cmvNum = Number(r.costo_total || 0);
       totalCmv += cmvNum;
       hayCostoAlguno = true;
-      gan = Number(r.ganancia_bruta);
+      gan = Number(r.margen);
       if (!Number.isFinite(gan)) gan = ingresos - cmvNum;
       const margenNum = Number(r.margen_porcentaje);
       margen = Number.isFinite(margenNum) && r.margen_porcentaje !== null && r.margen_porcentaje !== undefined
@@ -5483,7 +5632,7 @@ function renderRentabilidad(filas) {
       ganTxt = "$" + money(gan);
       margenTxt = money(margen) + "%";
     } else {
-      // Sin costo real: no inventar CMV 0, ganancia ni margen.
+      // Sin costo real (costo_disponible=false): no inventar CMV 0, ganancia ni margen.
       cmvTxt = "costo no disponible";
       ganTxt = "—";
       margenTxt = "—";
