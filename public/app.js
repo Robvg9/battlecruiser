@@ -564,9 +564,77 @@ function marcarConectividadReal(estado) {
   actualizarIndicadorConexion();
 }
 
+// Diferencia entre:
+// - A. Dispositivo sin conexión (navigator.onLine === false)
+// - B. Dispositivo conectado pero backend inaccesible (_conectividadReal === "offline" && navigator.onLine === true)
+// - C. Conexión disponible y backend funcionando (_conectividadReal === "online")
+// - D. Estado incierto (_conectividadReal === null)
 function estaRealmenteDesconectado() {
-  return !navigator.onLine || _conectividadReal === "offline";
+  // Si el dispositivo no tiene conexión, estamos offline
+  if (!navigator.onLine) return true;
+  // Si el dispositivo tiene conexión pero el backend es inaccesible, estamos "offline" desde el punto de vista de la app
+  if (_conectividadReal === "offline") return true;
+  // Si el dispositivo tiene conexión y el backend respondió al menos una vez, estamos online
+  if (_conectividadReal === "online") return false;
+  // Estado incierto: no se ha resuelto ninguna consulta real aún, pero el dispositivo tiene conexión
+  // En este caso, no consideramos que estamos desconectados (para no mostrar "Sin conexión" prematuramente)
+  return false;
 }
+
+// Devuelve true si el dispositivo tiene conexión pero el backend es inaccesible
+function estaBackendInaccesible() {
+  return navigator.onLine && _conectividadReal === "offline";
+}
+
+// Devuelve true si el dispositivo no tiene conexión
+function estaDispositivoOffline() {
+  return !navigator.onLine;
+}
+
+
+// ============================================================
+// Loading Indicators - Misión 9.0
+// ============================================================
+
+let loadingCount = 0;
+const loadingOverlay = null;
+
+function showLoading() {
+  loadingCount++;
+  if (loadingCount === 1) {
+    // Crear overlay si no existe
+    let overlay = document.getElementById('global-loading-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'global-loading-overlay';
+      overlay.className = 'loading-overlay';
+      overlay.innerHTML = '<div class="spinner"></div>';
+      document.body.appendChild(overlay);
+    }
+    overlay.classList.add('visible');
+  }
+}
+
+function hideLoading() {
+  loadingCount = Math.max(0, loadingCount - 1);
+  if (loadingCount === 0) {
+    const overlay = document.getElementById('global-loading-overlay');
+    if (overlay) {
+      overlay.classList.remove('visible');
+    }
+  }
+}
+
+// Wrapper para operaciones asíncronas con loading
+async function withLoading(fn) {
+  showLoading();
+  try {
+    return await fn();
+  } finally {
+    hideLoading();
+  }
+}
+
 
 async function leerDeCache(clave) {
   const cache = await idbGet(clave);
@@ -2070,22 +2138,29 @@ function actualizarIndicadorConexion(estadoForzado) {
   } else if (estadoForzado === "reconectando") {
     clase = "reconectando";
     texto = "🔄 Reconectando…";
-  } else if (estaRealmenteDesconectado()) {
+  } else if (estaDispositivoOffline()) {
+    // A. Dispositivo sin conexión
     clase = "offline";
     const { conDatos, sinCache } = resumenEstadoCache();
     if (conDatos > 0) {
-      // Al menos una pantalla tiene datos guardados reales para mostrar.
       texto = "🔴 Sin conexión — usando caché";
       mostrarTooltip = true;
     } else if (sinCache > 0) {
-      // Ya se intentó cargar algo y no había nada guardado todavía (primera
-      // vez sin conexión en este dispositivo) — distinto de "no hay datos"
-      // real, así que el texto lo dice explícito.
       texto = "🔴 Sin conexión — sin datos guardados";
     } else {
-      // Todavía no se consultó nada en esta sesión (ej. recién se abrió el
-      // login sin conexión), o todo lo consultado está confirmado vacío.
       texto = "🔴 Sin conexión";
+    }
+  } else if (estaBackendInaccesible()) {
+    // B. Dispositivo conectado pero backend inaccesible
+    clase = "offline";
+    const { conDatos: conDatosB, sinCache: sinCacheB } = resumenEstadoCache();
+    if (conDatosB > 0) {
+      texto = "⚡ Backend inaccesible — usando caché";
+      mostrarTooltip = true;
+    } else if (sinCacheB > 0) {
+      texto = "⚡ Backend inaccesible — sin datos guardados";
+    } else {
+      texto = "⚡ Backend inaccesible";
     }
   }
 
