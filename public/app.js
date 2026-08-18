@@ -1907,7 +1907,16 @@ async function consolidarRefrescosPendientes() {
   }
 }
 
+// Mutex global entre pestañas: localStorage para evitar sincronizaciones
+// simultáneas del mismo usuario en más de una pestaña. El backend
+// maneja idempotencia, pero esto evita RPCs redundantes y posibles errores
+// de negocio en el backend si la idempotencia no es perfecta.
 let _sincronizando = false;
+function sincronizandoGlobal(activo) {
+  if (activo) { localStorage.setItem('battlecruiser-sincronizando', '1'); }
+  else { localStorage.removeItem('battlecruiser-sincronizando'); }
+}
+
 
 async function sincronizarCola() {
   // Sección 8/12: protección contra dos sincronizaciones simultáneas.
@@ -1915,7 +1924,9 @@ async function sincronizarCola() {
   // Fase C (C3): jamás procesar la cola sin sesión confirmada. Sin usuario
   // no hay auth.uid() en el backend y no se debe intentar enviar nada.
   if (!usuarioIdParaCola()) return;
+  if (localStorage.getItem('battlecruiser-sincronizando')) return;
   _sincronizando = true;
+  sincronizandoGlobal(true);
   // B2.2-D: resetear el set de refrescos pendientes para esta
   // sincronizacion. reconciliarTrasOperacion (llamada por op) solo
   // marca categorias; consolidarRefrescosPendientes (en el finally)
@@ -2010,6 +2021,7 @@ async function sincronizarCola() {
     }
   } finally {
     _sincronizando = false;
+    sincronizandoGlobal(false);
     await actualizarContadorColaPendiente();
     // B2.2-D (revision de coste): consolidar los refrescos marcados
     // durante el bucle en una sola pasada al final, en vez del
