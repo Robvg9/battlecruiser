@@ -4866,6 +4866,21 @@ function limpiarContextoUsuario() {
   } catch (_) {}
   // Fase C (C3): limpiar la proyección de operaciones pendientes en memoria.
   try { _operacionesPendientesCache = []; } catch (_) {}
+  // Multiusuario: resetear el estado en memoria de B7/B8 para que el
+  // siguiente usuario no herede el turno abierto, las alertas ni las
+  // conversaciones del anterior. Sin esto, _turnoActual del usuario A
+  // podria usarse en cerrarTurno() tras el login de B (mandaria
+  // p_turno_id del turno de A al backend). El backend rechaza por RLS,
+  // pero es un intento con datos de otro usuario y un error confuso.
+  try { _turnoActual = null; } catch (_) {}
+  try { _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 }; } catch (_) {}
+  try { _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 }; } catch (_) {}
+  // Multiusuario: resetear la conversacion abierta en memoria. Sin esto,
+  // _comConvActual del usuario A persistiria tras logout y, si B escribe
+  // un mensaje sin abrir antes una conversacion propia, enviarMensaje()
+  // mandaria p_conversacion_id de la conversacion de A al backend (el
+  // backend rechaza por RLS, pero es un intento con datos de otro usuario).
+  try { _comConvActual = null; _comConvActualTipo = null; } catch (_) {}
   // El badge de Centro de Control se resetea para no arrastrar estado.
   const badge = document.getElementById("resumen-tab-badge");
   if (badge) { badge.classList.add("hidden"); badge.textContent = ""; }
