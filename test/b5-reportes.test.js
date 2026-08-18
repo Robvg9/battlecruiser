@@ -285,7 +285,7 @@ test("B5.3 R1: venta con costo real muestra CMV, ganancia y margen", async () =>
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "reportes", accion: "ver" }],
     rentabilidad: [
-      { id: "v1", fecha: "2026-08-15T10:00:00Z", almacen: "Caja 1", ingresos: 1000, cmv: 600, ganancia_bruta: 400, margen_porcentaje: 40 },
+      { id: "v1", fecha: "2026-08-15T10:00:00Z", almacen: "Caja 1", ingreso: 1000, costo_total: 600, margen: 400, margen_porcentaje: 40, costo_disponible: true },
     ],
   });
   marcarOnline(window);
@@ -310,7 +310,7 @@ test("B5.3 R1: venta SIN costo (cmv null) no muestra CMV 0 ni margen 100%", asyn
     permisos: [{ seccion: "reportes", accion: "ver" }],
     rentabilidad: [
       // Venta histórica sin costo FIFO: cmv, ganancia_bruta y margen llegan null.
-      { id: "v2", fecha: "2026-08-15T11:00:00Z", almacen: "Caja 2", ingresos: 500, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+      { id: "v2", fecha: "2026-08-15T11:00:00Z", almacen: "Caja 2", ingreso: 500, costo_total: null, margen: null, margen_porcentaje: null, costo_disponible: false },
     ],
   });
   marcarOnline(window);
@@ -333,8 +333,8 @@ test("B5.3 R1: totales al pie respetan costo no disponible cuando ninguna venta 
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "reportes", accion: "ver" }],
     rentabilidad: [
-      { id: "v3", fecha: "2026-08-15T09:00:00Z", almacen: "Caja 1", ingresos: 300, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
-      { id: "v4", fecha: "2026-08-15T12:00:00Z", almacen: "Caja 2", ingresos: 200, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+      { id: "v3", fecha: "2026-08-15T09:00:00Z", almacen: "Caja 1", ingreso: 300, costo_total: null, margen: null, margen_porcentaje: null, costo_disponible: false },
+      { id: "v4", fecha: "2026-08-15T12:00:00Z", almacen: "Caja 2", ingreso: 200, costo_total: null, margen: null, margen_porcentaje: null, costo_disponible: false },
     ],
   });
   marcarOnline(window);
@@ -356,8 +356,8 @@ test("B5.3 R1: mixto — ventas con y sin costo; totales solo suman las que tien
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "reportes", accion: "ver" }],
     rentabilidad: [
-      { id: "v5", fecha: "2026-08-15T09:00:00Z", almacen: "Caja 1", ingresos: 1000, cmv: 600, ganancia_bruta: 400, margen_porcentaje: 40 },
-      { id: "v6", fecha: "2026-08-15T12:00:00Z", almacen: "Caja 2", ingresos: 500, cmv: null, ganancia_bruta: null, margen_porcentaje: null },
+      { id: "v5", fecha: "2026-08-15T09:00:00Z", almacen: "Caja 1", ingreso: 1000, costo_total: 600, margen: 400, margen_porcentaje: 40, costo_disponible: true },
+      { id: "v6", fecha: "2026-08-15T12:00:00Z", almacen: "Caja 2", ingreso: 500, costo_total: null, margen: null, margen_porcentaje: null, costo_disponible: false },
     ],
   });
   marcarOnline(window);

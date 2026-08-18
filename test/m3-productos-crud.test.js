@@ -74,7 +74,8 @@ function montarEntorno(opciones = {}) {
     .replace(/let _operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
     .replace(/return _operacionesPendientesCache;/, "return window._operacionesPendientesCache;")
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
-    .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];");
+    .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
+    .replace(/const RPC_POR_TIPO = \{/, "window.RPC_POR_TIPO = {");
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
