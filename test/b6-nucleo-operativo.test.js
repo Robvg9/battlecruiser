@@ -489,8 +489,10 @@ test("B6.21: auditoría se registra en operación exitosa (reutiliza B4)", async
   await esperar(80);
   await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 });
   await esperar(30);
+  // Fase C (P5): compra está cubierta por el trigger auditar_mutacion_operativa(),
+  // el frontend NO debe duplicar la auditoría.
   const aud = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
-  assert.ok(aud, "se llama a registrar_auditoria tras operación exitosa");
+  assert.ok(!aud, "compra NO debe llamar registrar_auditoria (trigger lo cubre)");
 });
 
 test("B6.22: compatibilidad con B3 — tienePermiso y contexto de usuario funcionan", async () => {

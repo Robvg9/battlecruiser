@@ -371,10 +371,18 @@ const IDB_NAME = "battlecruiser-cache";
 // revisa "si no existe" antes de crear cada store, así que abrir la base
 // con la versión nueva no toca ni borra el store existente de caché de
 // lectura (IDB_STORE / "lecturas").
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const IDB_STORE = "lecturas";
 // ---- Misión B1: store de la cola offline de escrituras pendientes ----
 const IDB_OPS_STORE = "operaciones_pendientes";
+
+// ---- Fase C (C3): índice de usuario en la cola offline ----
+// Cada operación pendiente guarda usuario_id (ver crearOperacionPendiente).
+// El índice "usuario_id" permite leer/procesar SOLO las operaciones del
+// usuario actual sin traer toda la cola y filtrar en JS — fundamental en
+// dispositivo compartido: una sesión jamás debe procesar ni mostrar
+// operaciones de otro usuario.
+const IDB_OPS_IDX_USUARIO = "usuario_id";
 
 // ---- Misión B2.2-A: conexión IndexedDB memoizada ----
 // ANTES: cada llamada a idbAbrir() hacía un indexedDB.open() nuevo — abrir
@@ -408,6 +416,14 @@ function idbAbrir() {
         const opsStore = db.createObjectStore(IDB_OPS_STORE, { keyPath: "id" });
         opsStore.createIndex("estado", "estado", { unique: false });
         opsStore.createIndex("creado_en", "creado_en", { unique: false });
+        // Fase C (C3): índice por usuario_id para aislar la cola entre sesiones
+        // (dispositivo compartido). No destructivo: si el store ya existía de
+        // la versión 2 sin este índice, onupgradeneeded lo crea ahora; si ya
+        // existía, createIndex es idempotente a nivel de estructura (no falla
+        // ni borra datos existentes al re-abrir con la misma versión).
+        if (!opsStore.indexNames.contains(IDB_OPS_IDX_USUARIO)) {
+          opsStore.createIndex(IDB_OPS_IDX_USUARIO, IDB_OPS_IDX_USUARIO, { unique: false });
+        }
       }
     };
     req.onsuccess = () => {
@@ -430,12 +446,24 @@ function idbAbrir() {
   return _idbConexion;
 }
 
+// Fase C (C2): prefija la clave de caché con el usuario actual para aislar
+// los datos offline entre sesiones en dispositivo compartido. Si no hay
+// sesión (login todavía no confirmado), devuelve la clave tal cual: el
+// único camino sin sesión es la pantalla de login, que no cachea lecturas
+// de negocio. Así el usuario B jamás consume datos cacheados del usuario A.
+function claveCacheUsuario(clave) {
+  const uid = usuarioIdParaCola();
+  return uid ? uid + "::" + clave : clave;
+}
+
 async function idbGet(clave) {
+  // Fase C (C2): aislar por usuario el store de lecturas.
+  const claveUsuario = claveCacheUsuario(clave);
   try {
     const db = await idbAbrir();
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, "readonly");
-      const req = tx.objectStore(IDB_STORE).get(clave);
+      const req = tx.objectStore(IDB_STORE).get(claveUsuario);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => reject(req.error);
     });
@@ -446,11 +474,13 @@ async function idbGet(clave) {
 }
 
 async function idbSet(clave, datos) {
+  // Fase C (C2): aislar por usuario el store de lecturas.
+  const claveUsuario = claveCacheUsuario(clave);
   try {
     const db = await idbAbrir();
     await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, "readwrite");
-      tx.objectStore(IDB_STORE).put({ clave, datos, actualizado: new Date().toISOString() });
+      tx.objectStore(IDB_STORE).put({ clave: claveUsuario, datos, actualizado: new Date().toISOString() });
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -673,6 +703,15 @@ async function guardarOperacionPendiente(operacion) {
   }
 }
 
+// Fase C (C3): usuario activo para filtrar la cola offline. Las funciones de
+// lectura/procesamiento de la cola usan este valor para NO traer operaciones
+// de otros usuarios en dispositivo compartido. Devuelve null si no hay sesión
+// (las funciones de lectura devuelven vacío en ese caso; las de procesamiento
+// verifican explícitamente que haya usuario antes de sincronizar).
+function usuarioIdParaCola() {
+  return _usuarioActualId;
+}
+
 // Trae una operación puntual por su id, o null si no existe / si falló la
 // lectura (mismo criterio que idbGet: no lanzar, avisar y devolver vacío).
 async function obtenerOperacionPendiente(id) {
@@ -695,11 +734,14 @@ async function obtenerOperacionPendiente(id) {
 // sincronización las puede recorrer en ese mismo orden sin tener que
 // ordenar de nuevo. Devuelve [] si no hay ninguna o si algo falló.
 async function obtenerTodasLasOperaciones() {
+  // Fase C (C3): aislar por usuario. Sin sesión no se devuelve nada.
+  const uid = usuarioIdParaCola();
+  if (!uid) return [];
   try {
     const db = await idbAbrir();
     const datos = await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_OPS_STORE, "readonly");
-      const req = tx.objectStore(IDB_OPS_STORE).getAll();
+      const req = tx.objectStore(IDB_OPS_STORE).index(IDB_OPS_IDX_USUARIO).getAll(uid);
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => reject(req.error);
     });
@@ -714,12 +756,17 @@ async function obtenerTodasLasOperaciones() {
 // orden FIFO. Usa el índice "estado" del store en vez de traer todo y
 // filtrar en JS.
 async function obtenerOperacionesPorEstado(estado) {
+  // Fase C (C3): aislar por usuario. Sin sesión no se devuelve nada.
+  const uid = usuarioIdParaCola();
+  if (!uid) return [];
   try {
     const db = await idbAbrir();
     const datos = await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_OPS_STORE, "readonly");
+      // El índice compuesto no existe; se filtra por estado y luego por
+      // usuario en memoria (el subconjunto por estado suele ser chico).
       const req = tx.objectStore(IDB_OPS_STORE).index("estado").getAll(estado);
-      req.onsuccess = () => resolve(req.result || []);
+      req.onsuccess = () => resolve((req.result || []).filter((op) => op.usuario_id === uid));
       req.onerror = () => reject(req.error);
     });
     return datos.sort((a, b) => (a.creado_en < b.creado_en ? -1 : a.creado_en > b.creado_en ? 1 : 0));
@@ -789,19 +836,21 @@ async function eliminarOperacionPendiente(id) {
 async function actualizarContadorColaPendiente() {
   const el = document.getElementById("cola-pendientes-badge");
   if (!el) return;
+  // Fase C (C3): aislar por usuario. Sin sesión, no hay nada que contar.
+  const uid = usuarioIdParaCola();
+  if (!uid) { el.classList.add("hidden"); el.textContent = ""; return; }
   try {
     const db = await idbAbrir();
     const { pendientes, atencion } = await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_OPS_STORE, "readonly");
-      const idx = tx.objectStore(IDB_OPS_STORE).index("estado");
-      const reqPendiente = idx.count("PENDIENTE");
-      const reqSincronizando = idx.count("SINCRONIZANDO");
-      const reqAtencion = idx.count("REQUIERE_ATENCION");
-      tx.oncomplete = () => {
-        resolve({
-          pendientes: reqPendiente.result + reqSincronizando.result,
-          atencion: reqAtencion.result,
-        });
+      // No hay índice compuesto [usuario_id, estado]: se trae por usuario_id
+      // y se cuenta por estado en memoria (subconjunto pequeño por usuario).
+      const req = tx.objectStore(IDB_OPS_STORE).index(IDB_OPS_IDX_USUARIO).getAll(uid);
+      req.onsuccess = () => {
+        const ops = req.result || [];
+        const pendientes = ops.filter((o) => o.estado === "PENDIENTE" || o.estado === "SINCRONIZANDO").length;
+        const atencion = ops.filter((o) => o.estado === "REQUIERE_ATENCION").length;
+        resolve({ pendientes, atencion });
       };
       tx.onerror = () => reject(tx.error);
     });
@@ -922,6 +971,9 @@ function resumenOperacionPendiente(op) {
 // Devuelve [] si IndexedDB no está disponible o algo falla (mismo criterio
 // que obtenerOperacionesPorEstado: no lanzar, avisar y devolver vacío).
 async function obtenerOperacionesVisiblesPanel() {
+  // Fase C (C3): aislar por usuario. Sin sesión, no se muestra nada.
+  const uid = usuarioIdParaCola();
+  if (!uid) return [];
   try {
     const db = await idbAbrir();
     const combinadas = await new Promise((resolve, reject) => {
@@ -931,11 +983,11 @@ async function obtenerOperacionesVisiblesPanel() {
       const reqSincronizando = idx.getAll("SINCRONIZANDO");
       const reqAtencion = idx.getAll("REQUIERE_ATENCION");
       tx.oncomplete = () => {
-        resolve(
-          (reqPendiente.result || [])
-            .concat(reqSincronizando.result || [])
-            .concat(reqAtencion.result || [])
-        );
+        // Filtrar por usuario en memoria (subconjunto por estado es chico).
+        const todas = (reqPendiente.result || [])
+          .concat(reqSincronizando.result || [])
+          .concat(reqAtencion.result || []);
+        resolve(todas.filter((op) => op.usuario_id === uid));
       };
       tx.onerror = () => reject(tx.error);
     });
@@ -1401,6 +1453,9 @@ let _operacionesPendientesCache = [];
 // dos getAll indexados) y solo ordena ese subconjunto — normalmente mucho
 // más chico que la cola completa.
 async function refrescarOperacionesPendientesCache() {
+  // Fase C (C3): aislar por usuario. Sin sesión, la proyección queda vacía.
+  const uid = usuarioIdParaCola();
+  if (!uid) { _operacionesPendientesCache = []; return; }
   try {
     const db = await idbAbrir();
     const combinadas = await new Promise((resolve, reject) => {
@@ -1409,7 +1464,9 @@ async function refrescarOperacionesPendientesCache() {
       const reqPendiente = idx.getAll("PENDIENTE");
       const reqSincronizando = idx.getAll("SINCRONIZANDO");
       tx.oncomplete = () => {
-        resolve((reqPendiente.result || []).concat(reqSincronizando.result || []));
+        // Filtrar por usuario en memoria: el subconjunto por estado es chico.
+        const todas = (reqPendiente.result || []).concat(reqSincronizando.result || []);
+        resolve(todas.filter((op) => op.usuario_id === uid));
       };
       tx.onerror = () => reject(tx.error);
     });
@@ -1526,6 +1583,27 @@ const RPC_POR_TIPO = {
   conversacion: "crear_conversacion",
 };
 
+// Fase C (P5): el trigger auditar_mutacion_operativa() de Supabase ya audita
+// atómicamente producto/compra/venta/transferencia/vale. El frontend NO debe
+// duplicar esas auditorías. Los demás tipos (turno, cuadre, responsabilidad,
+// incidencia, mensaje, conversacion) siguen dependiendo del mecanismo explícito.
+function tipoAuditableFrontend(tipo) {
+  switch (tipo) {
+    case "producto":
+    case "producto_actualizar":
+    case "producto_estado":
+    case "compra":
+    case "venta":
+    case "transferencia":
+    case "vale":
+      // Ya auditados por el trigger auditar_mutacion_operativa().
+      return false;
+    default:
+      // turno, cuadre, responsabilidad, incidencia, mensaje, conversacion, etc.
+      return true;
+  }
+}
+
 async function ejecutarOperacion(tipo, payload) {
   // B3.3: un usuario inactivo no debe operar. El backend lo impide; el
   // frontend lo refleja devolviendo un error claro. Reutiliza
@@ -1564,12 +1642,10 @@ async function ejecutarOperacion(tipo, payload) {
     if (!error) {
       // B4: registrar auditoría de la operación exitosa (trazabilidad).
       // No bloquea el flujo si falla (registrarAuditoria captura errores).
-      if (typeof registrarAuditoria === "function") {
-        // Fix data.id: los RPC en RPC_POR_TIPO devuelven UUID escalar (registrar_venta,
-        // registrar_compra, registrar_transferencia, registrar_vale_salida, crear_producto,
-        // actualizar_producto, cambiar_estado_producto) o jsonb con campo "id" (turno,
-        // cuadre, responsabilidad, incidencia, mensaje, conversacion). `data && data.id`
-        // siempre daba undefined para el primer grupo porque data ya ES el uuid.
+      // Fase C (P5): solo auditar en el frontend los tipos NO cubiertos por
+      // el trigger auditar_mutacion_operativa() de Supabase (que ya audita
+      // producto/compra/venta/transferencia/vale atómicamente).
+      if (tipoAuditableFrontend(tipo) && typeof registrarAuditoria === "function") {
         const entidadId = typeof data === "string" ? data : String((data && data.id) || "");
         registrarAuditoria(tipo, "Operación " + (ETIQUETA_TIPO_OP[tipo] || tipo) + " ejecutada online.", "exito", entidadId, idempotency_key, null);
       }
@@ -1585,7 +1661,8 @@ async function ejecutarOperacion(tipo, payload) {
     // Sección 7: error de negocio real (stock insuficiente, sin permiso,
     // producto/almacén/presentación inexistente o inactiva, cantidad o
     // configuración inválida, etc.) — se muestra normal, NUNCA a la cola.
-    if (typeof registrarAuditoria === "function") {
+    // Fase C (P5): solo auditar rechazo de tipos no cubiertos por el trigger.
+    if (tipoAuditableFrontend(tipo) && typeof registrarAuditoria === "function") {
       registrarAuditoria(tipo, "Operación " + (ETIQUETA_TIPO_OP[tipo] || tipo) + " rechazada: " + (error.message || "error de negocio"), "requiere_atencion", null, idempotency_key, null);
     }
     return { ok: false, error };
@@ -1711,11 +1788,31 @@ function reconciliarTrasOperacion(tipo, resultado) {
       break;
     case "turno":
     case "turno_cerrar":
+      // B7: refrescar turno actual y listas de turnos/operación.
+      marcarRefrescoPendiente("turnos");
+      break;
     case "cuadre":
     case "cuadre_revisar":
-      // B7: las operaciones de turnos/cuadres no mueven stock pero
-      // afectan la vista de Turnos/Operación. No hay un refresco
-      // automático de datos cacheados (se cargan al abrir la pestaña).
+      // B7: refrescar cuadres y operación.
+      marcarRefrescoPendiente("cuadres");
+      break;
+    case "responsabilidad":
+    case "responsabilidad_actualizar":
+      // B7: refrescar responsabilidades.
+      marcarRefrescoPendiente("responsabilidades");
+      break;
+    case "incidencia":
+    case "incidencia_resolver":
+      // B7: refrescar incidencias.
+      marcarRefrescoPendiente("incidencias");
+      break;
+    case "mensaje":
+      // B8: refrescar mensajes de la conversación actual y la lista.
+      marcarRefrescoPendiente("comunicacion");
+      break;
+    case "conversacion":
+      // B8: refrescar la lista de conversaciones.
+      marcarRefrescoPendiente("conversaciones");
       break;
     default:
       marcarRefrescoPendiente("stock");
@@ -1745,6 +1842,30 @@ async function consolidarRefrescosPendientes() {
     if (cats.has("transferencias")) await refrescarTransferencias();
     if (cats.has("vales")) await refrescarVales();
     if (cats.has("ventas")) await refrescarVentas();
+    // B7: turnos/cuadres/responsabilidades/incidencias.
+    if (cats.has("turnos")) {
+      if (typeof refrescarTurnoActual === "function") refrescarTurnoActual();
+      if (typeof refrescarListaTurnos === "function") refrescarListaTurnos();
+    }
+    if (cats.has("cuadres")) {
+      if (typeof refrescarListaCuadres === "function") refrescarListaCuadres();
+      if (typeof refrescarOperacion === "function") refrescarOperacion();
+    }
+    if (cats.has("responsabilidades")) {
+      if (typeof refrescarListaResponsabilidades === "function") refrescarListaResponsabilidades();
+    }
+    if (cats.has("incidencias")) {
+      if (typeof refrescarListaIncidencias === "function") refrescarListaIncidencias();
+    }
+    // B8: comunicacion y conversaciones.
+    if (cats.has("comunicacion")) {
+      if (typeof refrescarListaConversaciones === "function") refrescarListaConversaciones();
+      if (typeof actualizarBadgeNoLeidos === "function") actualizarBadgeNoLeidos();
+    }
+    if (cats.has("conversaciones")) {
+      if (typeof refrescarListaConversaciones === "function") refrescarListaConversaciones();
+      if (typeof actualizarBadgeNoLeidos === "function") actualizarBadgeNoLeidos();
+    }
   } catch (e) {
     // Una reconciliacion fallida no debe romper el estado: ya se logueo el
     // warning; la UI mostrara lo ultimo que tenga en _cache.
@@ -1757,6 +1878,9 @@ let _sincronizando = false;
 async function sincronizarCola() {
   // Sección 8/12: protección contra dos sincronizaciones simultáneas.
   if (_sincronizando) return;
+  // Fase C (C3): jamás procesar la cola sin sesión confirmada. Sin usuario
+  // no hay auth.uid() en el backend y no se debe intentar enviar nada.
+  if (!usuarioIdParaCola()) return;
   _sincronizando = true;
   // B2.2-D: resetear el set de refrescos pendientes para esta
   // sincronizacion. reconciliarTrasOperacion (llamada por op) solo
@@ -1805,7 +1929,8 @@ async function sincronizarCola() {
         // "id". Si por algún motivo el RPC no devuelve nada utilizable
         // (no debería pasar en éxito), se cae a op.id como último recurso
         // para no perder la referencia por completo.
-        if (typeof registrarAuditoria === "function") {
+        // Fase C (P5): solo auditar tipos no cubiertos por el trigger de Supabase.
+        if (tipoAuditableFrontend(op.tipo) && typeof registrarAuditoria === "function") {
           const entidadId = typeof data === "string" ? data : String((data && data.id) || op.id || "");
           registrarAuditoria(op.tipo, "Operación " + (ETIQUETA_TIPO_OP[op.tipo] || op.tipo) + " sincronizada (era offline).", "exito", entidadId, op.idempotency_key, null);
         }
@@ -1834,7 +1959,8 @@ async function sincronizarCola() {
 
       // Sección 11: error de negocio real durante la sincronización → queda
       // para revisar a mano, pero la cola sigue con las siguientes.
-      if (typeof registrarAuditoria === "function") {
+      // Fase C (P5): solo auditar tipos no cubiertos por el trigger de Supabase.
+      if (tipoAuditableFrontend(op.tipo) && typeof registrarAuditoria === "function") {
         registrarAuditoria(op.tipo, "Operación " + (ETIQUETA_TIPO_OP[op.tipo] || op.tipo) + " requiere atención: " + (error.message || "error de negocio"), "requiere_atencion", op.id, op.idempotency_key, null);
       }
       await actualizarOperacionPendiente(op.id, {
@@ -2466,7 +2592,7 @@ function renderResumen() {
         div.setAttribute("data-ir-tab", "inventario");
         div.setAttribute("role", "button");
         div.setAttribute("tabindex", "0");
-        div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
+        div.innerHTML = `<span>${escHtml(s.productos.nombre)} <span class="muted">· ${escHtml(s.almacenes.nombre)}</span></span>
           <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
         alertasEl.appendChild(div);
       });
@@ -2791,9 +2917,17 @@ function iniciarEdicionProducto(p) {
   document.getElementById("prod-precio-normal").value = p.precio_normal != null ? p.precio_normal : "";
   document.getElementById("prod-precio-mayorista").value = p.precio_mayorista != null ? p.precio_mayorista : "";
   const categoriaSelect = document.getElementById("prod-categoria");
-  if (categoriaSelect && p.categorias) {
-    const opcion = Array.from(categoriaSelect.options).find((o) => o.textContent === p.categorias.nombre);
-    if (opcion) categoriaSelect.value = opcion.value;
+  if (categoriaSelect) {
+    // Fase C (P6): si el producto NO tiene categoría (p.categorias es null),
+    // limpiar el select explícitamente. Antes, si p.categorias era null, el
+    // if no entraba y el select conservaba la categoría de una edición anterior.
+    if (p.categorias) {
+      const opcion = Array.from(categoriaSelect.options).find((o) => o.textContent === p.categorias.nombre);
+      if (opcion) categoriaSelect.value = opcion.value;
+      else categoriaSelect.value = "";
+    } else {
+      categoriaSelect.value = "";
+    }
   }
   const submitBtn = document.getElementById("prod-submit-btn");
   if (submitBtn) submitBtn.textContent = "Guardar cambios";
@@ -3154,7 +3288,7 @@ function renderCatalogoPresentaciones() {
     const div = document.createElement("div");
     div.className = "lista-item";
     div.innerHTML = `
-      <span>${p.nombre}${p.activo ? "" : ' <span class="muted">· Inactiva</span>'}</span>
+      <span>${escHtml(p.nombre)}${p.activo ? "" : ' <span class="muted">· Inactiva</span>'}</span>
       <span class="pres-acciones">
         ${_permisosPresentaciones.editar ? `<button type="button" class="pres-editar-btn" data-id="${p.id}">Editar</button>` : ""}
         ${_permisosPresentaciones.borrar ? `<button type="button" class="pres-toggle-btn" data-id="${p.id}" data-activo="${p.activo}">${p.activo ? "Desactivar" : "Activar"}</button>` : ""}
@@ -3193,7 +3327,7 @@ function renderAsociacionesProducto() {
     const div = document.createElement("div");
     div.className = "lista-item";
     div.innerHTML = `
-      <span>${pp.presentaciones.nombre} <span class="muted">× ${formatFactor(pp.factor)}</span>${pp.activo ? "" : ' <span class="muted">· Inactiva</span>'}</span>
+      <span>${escHtml(pp.presentaciones.nombre)} <span class="muted">× ${formatFactor(pp.factor)}</span>${pp.activo ? "" : ' <span class="muted">· Inactiva</span>'}</span>
       <span class="pp-acciones">
         ${_permisosPresentaciones.editar ? `<button type="button" class="pp-editar-btn" data-id="${pp.id}" data-factor="${pp.factor}">Editar factor</button>` : ""}
         ${_permisosPresentaciones.borrar ? `<button type="button" class="pp-toggle-btn" data-id="${pp.id}" data-activo="${pp.activo}">${pp.activo ? "Desactivar" : "Activar"}</button>` : ""}
@@ -3244,7 +3378,7 @@ safeInit("presentaciones-catalogo", () => {
       if (!p) return;
       const div = editarBtn.closest(".lista-item");
       div.innerHTML = `
-        <input type="text" class="pres-editar-input" value="${p.nombre.replace(/"/g, "&quot;")}">
+        <input type="text" class="pres-editar-input" value="${escHtml(p.nombre)}">
         <span class="pres-acciones">
           <button type="button" class="pres-guardar-btn" data-id="${id}">Guardar</button>
           <button type="button" class="pres-cancelar-btn">Cancelar</button>
@@ -3345,7 +3479,7 @@ safeInit("presentaciones-por-producto", () => {
       if (!pp) return;
       const div = editarBtn.closest(".lista-item");
       div.innerHTML = `
-        <span>${pp.presentaciones.nombre} ×</span>
+        <span>${escHtml(pp.presentaciones.nombre)} ×</span>
         <span class="pp-acciones">
           <input type="number" step="0.0001" min="0.0001" class="pp-factor-input" value="${pp.factor}">
           <button type="button" class="pp-guardar-btn" data-id="${id}">Guardar</button>
@@ -3420,7 +3554,7 @@ async function refrescarAlmacenes() {
     almacenes.forEach((a) => {
       const div = document.createElement("div");
       div.className = "lista-item";
-      div.innerHTML = `<span>${a.nombre}</span><span class="muted">${a.tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista"}</span>`;
+      div.innerHTML = `<span>${escHtml(a.nombre)}</span><span class="muted">${a.tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista"}</span>`;
       lista.appendChild(div);
     });
   }
@@ -3453,7 +3587,7 @@ async function refrescarStockYSelects() {
     const div = document.createElement("div");
     div.className = "lista-item";
     const bajo = s.minimo != null && s.cantidad <= s.minimo;
-    div.innerHTML = `<span>${s.productos.nombre} <span class="muted">· ${s.almacenes.nombre}</span></span>
+    div.innerHTML = `<span>${escHtml(s.productos.nombre)} <span class="muted">· ${escHtml(s.almacenes.nombre)}</span></span>
       <span class="muted" style="${bajo ? "color:var(--ember)" : ""}">${money(s.cantidad)}${bajo ? " ⚠ bajo mínimo" : ""}</span>`;
     lista.appendChild(div);
   });
@@ -3530,7 +3664,7 @@ function renderTransferenciasLista() {
     div.setAttribute("data-trf-id", t.id || "");
     div.setAttribute("role", "button");
     div.setAttribute("tabindex", "0");
-    div.innerHTML = `<span>${t.origen ? t.origen.nombre : "—"} → ${t.destino ? t.destino.nombre : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>
+    div.innerHTML = `<span>${t.origen ? escHtml(t.origen.nombre) : "—"} → ${t.destino ? escHtml(t.destino.nombre) : "—"} <span class="muted">· #${t.id ? idCorto(t.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(t.fecha)} · ${escHtml(t.estado || "")}</span>`;
     lista.appendChild(div);
   });
@@ -3632,7 +3766,7 @@ function renderValesLista() {
     div.setAttribute("data-vale-id", v.id || "");
     div.setAttribute("role", "button");
     div.setAttribute("tabindex", "0");
-    div.innerHTML = `<span>${v.productos ? v.productos.nombre : "—"} <span class="muted">· ${v.almacenes ? v.almacenes.nombre : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
+    div.innerHTML = `<span>${v.productos ? escHtml(v.productos.nombre) : "—"} <span class="muted">· ${v.almacenes ? escHtml(v.almacenes.nombre) : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
@@ -4071,7 +4205,7 @@ function renderVentaLineas() {
     div.className = "lista-item";
     div.innerHTML = `
       <span class="venta-linea-info">
-        <span>${linea.nombre}</span>
+        <span>${escHtml(linea.nombre)}</span>
         <span class="muted">$${money(linea.precio_unitario)} c/u</span>
       </span>
       <span class="venta-linea-precios">
@@ -4459,7 +4593,7 @@ function renderVentasHistorial() {
     div.setAttribute("data-venta-id", v.id || "");
     div.setAttribute("role", "button");
     div.setAttribute("tabindex", "0");
-    div.innerHTML = `<span>${v.almacenes ? v.almacenes.nombre : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
+    div.innerHTML = `<span>${v.almacenes ? escHtml(v.almacenes.nombre) : "—"} <span class="muted">· #${v.id ? idCorto(v.id) : "—"}</span></span>
       <span class="muted">${fechaCorta(v.fecha)} · $${money(v.total)}</span>`;
     lista.appendChild(div);
   });
@@ -4515,7 +4649,7 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       data.forEach((row) => {
         const div = document.createElement("div");
         div.className = "lista-item";
-        div.innerHTML = `<span>${row.nombre} ${row.activo ? "" : '<span class="muted">· inactivo</span>'}</span>
+        div.innerHTML = `<span>${escHtml(row.nombre)} ${row.activo ? "" : '<span class="muted">· inactivo</span>'}</span>
           <button type="button" class="catalogo-toggle-btn" data-id="${row.id}" data-activo="${row.activo}">${row.activo ? "Desactivar" : "Activar"}</button>`;
         lista.appendChild(div);
       });
@@ -4682,6 +4816,22 @@ function limpiarContextoUsuario() {
   _permisosCargaExitosa = false;
   _permisosCargaFallidaRed = false;
   _novedadesVistas = new Set();
+  // Fase C (C2): limpiar la caché en memoria para que el próximo usuario
+  // no vea datos del anterior. La caché IndexedDB ("lecturas") ya está
+  // aislada por usuario (claveCacheUsuario), pero _cache en memoria se
+  // comparte: hay que resetearla al cambiar de sesión. Se usa try/catch en
+  // vez de typeof porque estas constantes (const) pueden no estar todavía
+  // inicializadas si limpiarContextoUsuario se llama muy temprano (showLogin
+  // al arranque), y typeof no protege contra el TDZ de const.
+  try {
+    _cache.productos = []; _cache.almacenes = []; _cache.stock = [];
+    _cache.transferencias = []; _cache.vales = []; _cache.ventas = [];
+  } catch (_) {}
+  try {
+    Object.keys(_estadoCacheClaves).forEach((k) => delete _estadoCacheClaves[k]);
+  } catch (_) {}
+  // Fase C (C3): limpiar la proyección de operaciones pendientes en memoria.
+  try { _operacionesPendientesCache = []; } catch (_) {}
   // El badge de Centro de Control se resetea para no arrastrar estado.
   const badge = document.getElementById("resumen-tab-badge");
   if (badge) { badge.classList.add("hidden"); badge.textContent = ""; }

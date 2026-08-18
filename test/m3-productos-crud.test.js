@@ -117,8 +117,10 @@ test("M3/F2: ejecutarOperacion('producto_actualizar', ...) llama a actualizar_pr
   assert.ok(llamada, "debe haberse llamado a actualizar_producto");
   assert.strictEqual(llamada.params.p_producto_id, "prod-123");
   assert.ok(llamada.params.p_idempotency_key, "debe llevar idempotency_key");
+  // Fase C (P5): producto_actualizar está cubierto por el trigger, NO se
+  // audita desde el frontend.
   const llamadaAuditoria = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
-  assert.strictEqual(llamadaAuditoria.params.p_entidad_id, "prod-123", "auditoría debe usar el uuid real del producto");
+  assert.ok(!llamadaAuditoria, "producto_actualizar NO debe llamar registrar_auditoria (trigger lo cubre)");
 });
 
 test("M3/F2: ejecutarOperacion('producto_estado', ...) llama a cambiar_estado_producto con p_activo correcto", async () => {
@@ -150,16 +152,16 @@ test("M3/F3 (fix entidad_id): sincronizarCola registra el UUID real del RPC, no 
   await window.guardarOperacionPendiente(op);
   await window.sincronizarCola();
   await esperar(50);
+  // Fase C (P5): producto_estado está cubierto por el trigger
+  // auditar_mutacion_operativa(), el frontend NO debe duplicar la auditoría
+  // ni al sincronizar.
   const llamadaAuditoria = client.__rpcCalls
     .filter((c) => c.nombre === "registrar_auditoria")
     .find((c) => c.params.p_descripcion && c.params.p_descripcion.includes("sincronizada"));
-  assert.ok(llamadaAuditoria, "debe haber auditado la sincronización");
-  assert.strictEqual(
-    llamadaAuditoria.params.p_entidad_id,
-    "prod-789",
-    "entidad_id debe ser el UUID real del producto (devuelto por cambiar_estado_producto), no el id local de la cola"
-  );
-  assert.notStrictEqual(llamadaAuditoria.params.p_entidad_id, op.id, "no debe ser el id local de IndexedDB");
+  assert.ok(!llamadaAuditoria, "producto_estado NO debe auditarse desde el frontend (trigger lo cubre)");
+  // Verificar que el RPC sí se ejecutó (la op se sincronizó).
+  const cambiarEstado = client.__rpcCalls.find((c) => c.nombre === "cambiar_estado_producto");
+  assert.ok(cambiarEstado, "debe haberse llamado a cambiar_estado_producto");
 });
 
 test("M3/F2: sin permiso productos.editar, refrescarProductos no debe ofrecer botones de Editar/Desactivar", async () => {

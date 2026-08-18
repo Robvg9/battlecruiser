@@ -178,13 +178,10 @@ test("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el
   const r = await window.ejecutarOperacion("producto", { p_nombre: "Test", p_categoria_id: "c1" });
   assert.ok(r.ok, "operación debe resolverse ok");
   assert.strictEqual(r.data, "prod-uuid-999", "data debe ser el uuid escalar devuelto por el RPC");
+  // Fase C (P5): el trigger auditar_mutacion_operativa() de Supabase audita
+  // producto atómicamente, así que el frontend NO debe duplicar la auditoría.
   const llamadaAuditoria = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
-  assert.ok(llamadaAuditoria, "debe haberse llamado a registrar_auditoria");
-  assert.strictEqual(
-    llamadaAuditoria.params.p_entidad_id,
-    "prod-uuid-999",
-    "p_entidad_id debe llevar el uuid real, no null/undefined/'undefined'"
-  );
+  assert.ok(!llamadaAuditoria, "producto NO debe llamar registrar_auditoria (trigger lo cubre)");
 });
 
 test("B4.5: auditoría se carga con filtros y respeta permiso", async () => {
@@ -233,9 +230,10 @@ test("B4.4: trazabilidad — operación exitosa registra auditoría con idempote
   const res = await window.ejecutarOperacion("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] });
   assert.strictEqual(res.ok, true, "operación exitosa online");
   await esperar(10);
+  // Fase C (P5): venta está cubierta por el trigger auditar_mutacion_operativa(),
+  // el frontend NO debe duplicar la auditoría.
   const audCall = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
-  assert.ok(audCall, "debe registrar auditoría");
-  assert.ok(audCall.params.p_idempotency_key, "conserva idempotency_key en la auditoría");
+  assert.ok(!audCall, "venta NO debe registrar auditoría (trigger lo cubre)");
 });
 
 test("B4.8: offline no inventa datos de auditoría", async () => {
