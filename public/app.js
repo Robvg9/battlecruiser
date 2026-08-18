@@ -2125,6 +2125,9 @@ safeInit("estado-conexion", () => {
   // existía (Sección 22 original) — se mantiene igual que antes, sin
   // condicionarlo a que haya habido algo para sincronizar.
   async function alReconectar() {
+    // Recuperar operaciones atrapadas en SINCRONIZANDO (p.ej. error de red
+    // a mitad de sincronizacion) antes de intentar sincronizar la cola.
+    await recuperarOperacionesAtrapadas();
     await sincronizarCola();
     if (appShell.classList.contains("visible")) {
       await refrescarTrasReconexion();
