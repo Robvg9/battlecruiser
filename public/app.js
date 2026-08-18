@@ -702,7 +702,25 @@ function crearOperacionPendiente(tipo, payload, idempotencyKeyExistente) {
 // Guarda (crea o reemplaza) una operación completa en la cola. No bloquea
 // la app si IndexedDB falla: avisa por consola y devuelve null en vez de
 // lanzar una excepción que corte el resto del flujo que la llamó.
+//
+// Hardening M1: rechazar operaciones sin usuario_id. Una operación huérfana
+// (usuario_id null/vacío) sería invisible para TODOS los usuarios reales
+// (las lecturas de la cola filtran por usuario_id y sincronizarCola no
+// procesa sin sesión), así que quedaría guardada sin poderse sincronizar
+// jamás: pérdida silenciosa. No es fuga entre usuarios (el aislamiento la
+// sobre-aisla), pero sí pérdida de la propia operación. El flujo normal ya
+// garantiza usuario_id (showApp setea _usuarioActualId antes de operar y
+// ejecutarOperacion verifica usuarioPuedeOperar); este guard es defensa en
+// profundidad para cubrir callers directos de la cola y cualquier
+// desincronización puntual.
 async function guardarOperacionPendiente(operacion) {
+  if (!operacion || !operacion.usuario_id) {
+    console.warn(
+      "[Battlecruiser] No se guarda operación pendiente sin usuario_id (huérfana). tipo=",
+      operacion && operacion.tipo
+    );
+    return null;
+  }
   try {
     const db = await idbAbrir();
     await new Promise((resolve, reject) => {
