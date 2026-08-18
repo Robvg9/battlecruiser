@@ -623,7 +623,8 @@ function estaBackendInaccesible() {
 
 // Devuelve true si el dispositivo no tiene conexión
 function estaDispositivoOffline() {
-
+  return !navigator.onLine;
+}
 
 // ============================================================
 // Loading Indicators - Misiu00f3n 9.0
@@ -664,53 +665,11 @@ async function withLoading(fn) {
     hideLoading();
   }
 }
-  return !navigator.onLine;
-}
 
 
 // ============================================================
 // Loading Indicators - Misión 9.0
 // ============================================================
-
-let loadingCount = 0;
-const loadingOverlay = null;
-
-function showLoading() {
-  loadingCount++;
-  if (loadingCount === 1) {
-    // Crear overlay si no existe
-    let overlay = document.getElementById('global-loading-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'global-loading-overlay';
-      overlay.className = 'loading-overlay';
-      overlay.innerHTML = '<div class="spinner"></div>';
-      document.body.appendChild(overlay);
-    }
-    overlay.classList.add('visible');
-  }
-}
-
-function hideLoading() {
-  loadingCount = Math.max(0, loadingCount - 1);
-  if (loadingCount === 0) {
-    const overlay = document.getElementById('global-loading-overlay');
-    if (overlay) {
-      overlay.classList.remove('visible');
-    }
-  }
-}
-
-// Wrapper para operaciones asíncronas con loading
-async function withLoading(fn) {
-  showLoading();
-  try {
-    return await fn();
-  } finally {
-    hideLoading();
-  }
-}
-
 
 async function leerDeCache(clave) {
   const cache = await idbGet(clave);

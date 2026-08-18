@@ -36,7 +36,7 @@
 // v29 — Mision B8: bump por Comunicacion y Coordinacion Operativa
 // (conversaciones, mensajes, chat contextual, no leidos, soporte;
 // nueva pestana Comunicacion; integracion en Centro de Mando).
-const CACHE_NAME = "battlecruiser-shell-v31"; // v31: Misi00f3n 9.0 - PWA completa con iconos reales (aislamiento cola/caché por usuario, XSS, auditoría redundante, bug categoría)
+const CACHE_NAME = "battlecruiser-shell-v32"; // v32: Misión 9.0 - Cierre técnico completo (corrección código duplicado, PWA validada) (aislamiento cola/caché por usuario, XSS, auditoría redundante, bug categoría)
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
@@ -45,6 +45,7 @@ const SHELL_FILES = [
   "./app.js",
   "./manifest.json",
   "./favicon.png",
+  "./icons/favicon-48x48.png",
   "./icons/icon-192x192.png",
   "./icons/icon-512x512.png",
   "./icons/icon-maskable-512x512.png",
