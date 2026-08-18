@@ -1,4 +1,42 @@
 -- ============================================================
+-- ⚠️  DEPRECATED — ARCHIVO HISTÓRICO, NO REFLEJA PRODUCCIÓN  ⚠️
+-- ============================================================
+-- Este archivo fue un borrador/diseño de la capa operativa que NUNCA
+-- se aplicó tal cual a producción. La auditoría de reconciliación
+-- (RECONCILIACION_SUPABASE_GITHUB.md, Hallazgo 1) verificó que:
+--
+--   - Las 4 funciones helper que define este archivo
+--     (_consumir_fifo, _registrar_movimiento, _resolver_presentacion,
+--     _validar_usuario_operacion) NO EXISTEN en producción.
+--   - Las funciones reales registrar_compra/registrar_venta/
+--     registrar_transferencia/registrar_vale_salida/crear_producto en
+--     producción tienen la lógica FIFO y de conversión de presentación
+--     escrita en línea (no vía helpers) y usan
+--     private.reclamar_idempotencia(...) (esquema private, ver
+--     m5-reconciliacion-supabase-github.sql) en vez de
+--     _validar_usuario_operacion.
+--   - El cuerpo de registrar_compra/registrar_venta real difiere
+--     estructuralmente de la versión de este archivo.
+--
+-- Producción llegó al mismo resultado funcional por un camino
+-- incremental distinto (sesión por sesión, vía migraciones con otros
+-- nombres en schema_migrations).
+--
+-- Este archivo se conserva por valor histórico (regla de la misión:
+-- no borrar SQL viejo). Para el estado real de producción, ver:
+--   - supabase/m5-reconciliacion-supabase-github.sql (esquema private,
+--     tiene_permiso, obtener_conversion_presentacion,
+--     proteger_ultimo_dueno)
+--   - supabase/m3-productos-editar-estado.sql (crear_producto,
+--     actualizar_producto, cambiar_estado_producto con idempotencia real)
+--   - SUPABASE_REAL_STATE.md (estado consolidado de producción)
+--
+-- NO ejecutar este archivo contra producción esperando que refleje el
+-- estado real. Las versiones reales completas de registrar_compra/venta/
+-- transferencia/vale_salida se documentarán en Misión 2/3.
+-- ============================================================
+
+-- ============================================================
 -- B6 — NÚCLEO OPERATIVO + INVENTARIO INTELIGENTE
 -- ============================================================
 -- Migración SQL para Supabase. Convierte el sistema en un núcleo
