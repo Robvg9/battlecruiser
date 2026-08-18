@@ -36,7 +36,7 @@
 // v29 — Mision B8: bump por Comunicacion y Coordinacion Operativa
 // (conversaciones, mensajes, chat contextual, no leidos, soporte;
 // nueva pestana Comunicacion; integracion en Centro de Mando).
-const CACHE_NAME = "battlecruiser-shell-v29";
+const CACHE_NAME = "battlecruiser-shell-v30"; // v30: Fase C (aislamiento cola/caché por usuario, XSS, auditoría redundante, bug categoría)
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
