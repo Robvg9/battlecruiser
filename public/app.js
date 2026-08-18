@@ -123,6 +123,7 @@ safeInit("login", () => {
     e.preventDefault();
     loginError.textContent = "";
     loginBtn.disabled = true;
+    showLoading();
     loginBtn.textContent = "Entrando...";
 
     const email = document.getElementById("email").value.trim();
@@ -130,6 +131,7 @@ safeInit("login", () => {
 
     const { error } = await client.auth.signInWithPassword({ email, password });
 
+    hideLoading();
     loginBtn.disabled = false;
     loginBtn.textContent = "Entrar";
 
@@ -148,6 +150,39 @@ safeInit("logout", () => {
     // B3.19: limpiar el contexto de usuario antes de cerrar sesión.
     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
     await client.auth.signOut();
+
+safeInit("nuevo-usuario", () => {
+  const form = document.getElementById("form-nuevo-usuario");
+  const msgEl = document.getElementById("msg-nuevo-usuario");
+  if (!form || !msgEl) return;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msgEl.textContent = "";
+    const email = document.getElementById("nuevo-usuario-email").value.trim();
+    const password = document.getElementById("nuevo-usuario-password").value;
+
+    if (password.length < 6) {
+      msgEl.textContent = "La contraseña debe tener al menos 6 caracteres.";
+      return;
+    }
+
+    showLoading();
+    try {
+      const { error } = await client.auth.signUp({ email, password });
+      if (error) {
+        msgEl.textContent = "Error al crear usuario: " + (error.message || "Error desconocido");
+        console.error("[Battlecruiser] (nuevo-usuario)", error);
+      } else {
+        msgEl.textContent = "Usuario creado correctamente. Revisa tu correo para confirmar.";
+        form.reset();
+        if (typeof cargarUsuarios === "function") cargarUsuarios();
+      }
+    } finally {
+      hideLoading();
+    }
+  });
+});
   });
 });
 
@@ -588,6 +623,47 @@ function estaBackendInaccesible() {
 
 // Devuelve true si el dispositivo no tiene conexión
 function estaDispositivoOffline() {
+
+
+// ============================================================
+// Loading Indicators - Misiu00f3n 9.0
+// ============================================================
+
+let loadingCount = 0;
+
+function showLoading() {
+  loadingCount++;
+  if (loadingCount === 1) {
+    let overlay = document.getElementById("global-loading-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "global-loading-overlay";
+      overlay.className = "loading-overlay";
+      overlay.innerHTML = "<div class=\"spinner\"></div>";
+      document.body.appendChild(overlay);
+    }
+    overlay.classList.add("visible");
+  }
+}
+
+function hideLoading() {
+  loadingCount = Math.max(0, loadingCount - 1);
+  if (loadingCount === 0) {
+    const overlay = document.getElementById("global-loading-overlay");
+    if (overlay) {
+      overlay.classList.remove("visible");
+    }
+  }
+}
+
+async function withLoading(fn) {
+  showLoading();
+  try {
+    return await fn();
+  } finally {
+    hideLoading();
+  }
+}
   return !navigator.onLine;
 }
 
@@ -2158,6 +2234,10 @@ function actualizarIndicadorConexion(estadoForzado) {
       texto = "⚡ Backend inaccesible — usando caché";
       mostrarTooltip = true;
     } else if (sinCacheB > 0) {
+  } else if (_conectividadReal === null && navigator.onLine) {
+    // D. Todavu00eda comprobando
+    clase = "reconectando";
+    texto = "u23f3 Comprobando conexiu00f3n...";
       texto = "⚡ Backend inaccesible — sin datos guardados";
     } else {
       texto = "⚡ Backend inaccesible";

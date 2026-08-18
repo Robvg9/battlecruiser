@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Battlecruiser</title>
+<title>BattleCruiser</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -678,6 +682,15 @@
         <span id="usuario-actual-info" class="muted"></span>
       </div>
       <p class="msg" id="msg-usuarios"></p>
+      <div class="cc-bloque">
+        <h3>Crear nuevo usuario</h3>
+        <form id="form-nuevo-usuario" class="inline-form">
+          <input id="nuevo-usuario-email" type="email" placeholder="Correo" required>
+          <input id="nuevo-usuario-password" type="password" placeholder="Contrase00f1a (m00ednimo 6 caracteres)" required minlength="6">
+          <button type="submit">Crear usuario</button>
+        </form>
+        <p class="msg" id="msg-nuevo-usuario"></p>
+      </div>
       <div id="lista-usuarios" class="lista"></div>
     </section>
 

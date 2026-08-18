@@ -3,11 +3,23 @@
   "short_name": "BattleCruiser",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f1620",
-  "theme_color": "#0f1620",
+  "background_color": "#0c1c18",
+  "theme_color": "#0c1c18",
   "orientation": "any",
   "scope": "./",
   "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "icons/icon.svg",
       "sizes": "any",
