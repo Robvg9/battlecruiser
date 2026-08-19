@@ -314,6 +314,24 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
   display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px;
   background: var(--stone); border: 1px solid #c9a24d20; border-radius: 6px; font-size: 13px;
 }
+/* Misión 9.2 (Fase 5): panel visible de resultados del buscador de
+   productos en Ventas. Antes el input filtraba solo las <option> de un
+   <select> escondido — sin abrir el desplegable no se veía ningún cambio,
+   por eso la búsqueda "no hacía nada" para Robert. */
+.venta-buscar-wrap { position: relative; flex: 1 1 160px; min-width: 140px; }
+.venta-buscar-wrap input { width: 100%; }
+.venta-buscar-resultados {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+  background: var(--stone); border: 1px solid var(--gold-dim); border-radius: 6px;
+  max-height: 220px; overflow-y: auto; box-shadow: 0 6px 16px rgba(0,0,0,.35);
+}
+.venta-buscar-resultados.hidden { display: none; }
+.venta-buscar-resultado-item {
+  padding: 8px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid #c9a24d15;
+}
+.venta-buscar-resultado-item:last-child { border-bottom: none; }
+.venta-buscar-resultado-item:hover, .venta-buscar-resultado-item.activo { background: #c9a24d22; }
+.venta-buscar-resultado-vacio { padding: 8px 12px; font-size: 12.5px; color: var(--mist); }
 .lista-item .muted { color: var(--mist); font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; }
 /* Misión 3 (Fase 2): estado inactivo + botones de acción por fila en Productos. */
 .lista-item-inactivo { opacity: 0.55; }

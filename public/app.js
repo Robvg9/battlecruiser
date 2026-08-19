@@ -129,18 +129,30 @@ safeInit("login", () => {
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
 
-    const { error } = await client.auth.signInWithPassword({ email, password });
-
-    hideLoading();
-    loginBtn.disabled = false;
-    loginBtn.textContent = "Entrar";
-
-    if (error) {
-      const msg = (error.message || "").toLowerCase();
-      loginError.textContent = (!navigator.onLine || msg.includes("failed to fetch") || msg.includes("timeout"))
-        ? "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento."
-        : "Correo o contraseña incorrectos.";
-      console.error("[Battlecruiser] (login)", error);
+    // Misión 9.2 — Fase 4: antes esta llamada no estaba protegida por
+    // try/finally. signInWithPassword() normalmente devuelve {error} para
+    // credenciales incorrectas, pero puede LANZAR una excepción real (throw)
+    // en fallos de red/CORS/timeout — el mismo caso que el mensaje de abajo
+    // ya anticipaba con "failed to fetch". Sin try/finally, ese throw
+    // saltaba directo fuera del handler y hideLoading()/el botón nunca se
+    // restauraban: la app quedaba "dando vueltas" en el overlay de carga
+    // para siempre. Esto reproduce exactamente el reporte de Robert.
+    try {
+      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (error) {
+        const msg = (error.message || "").toLowerCase();
+        loginError.textContent = (!navigator.onLine || msg.includes("failed to fetch") || msg.includes("timeout"))
+          ? "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento."
+          : "Correo o contraseña incorrectos.";
+        console.error("[Battlecruiser] (login)", error);
+      }
+    } catch (e) {
+      loginError.textContent = "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento.";
+      console.error("[Battlecruiser] (login) excepción inesperada", e);
+    } finally {
+      hideLoading();
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Entrar";
     }
   });
 });
@@ -215,7 +227,20 @@ safeInit("nuevo-usuario", () => {
 
       msgEl.textContent = "Usuario creado correctamente. Asignale un rol en la lista de usuarios. Si la confirmación de email está activada en el proyecto, deberá confirmar su correo antes de poder entrar.";
       form.reset();
-      if (typeof cargarUsuarios === "function") cargarUsuarios();
+      // Misión 9.2 — Fase 3: "cargarUsuarios" no existe, la función real
+      // es "refrescarUsuarios" (confirmado en el código). El typeof-guard
+      // hacía que esto fallara en silencio: el usuario se creaba bien pero
+      // la lista de abajo nunca se actualizaba sin recargar la página.
+      if (typeof refrescarUsuarios === "function") refrescarUsuarios();
+    } catch (e) {
+      // Misión 9.2 — Fase 3: antes NO había catch, solo try/finally. Los
+      // logs reales de Supabase confirman que /auth/v1/signup nunca se
+      // llegó a invocar en las pruebas de Robert (cero peticiones en
+      // edge_logs) — es decir, algo entre showLoading() y el primer
+      // "await" está lanzando una excepción real (no un {error} normal) y
+      // se tragaba sin dejar rastro visible. Ahora se muestra siempre.
+      msgEl.textContent = "Ocurrió un error inesperado al crear el usuario (" + (e && e.message ? e.message : "error desconocido") + "). No se pudo confirmar si quedó creado — revisá la lista antes de reintentar.";
+      console.error("[Battlecruiser] (nuevo-usuario) excepción inesperada", e);
     } finally {
       hideLoading();
     }
@@ -4460,14 +4485,64 @@ function actualizarCantidadLinea(idx, nuevaCantidad) {
 safeInit("venta-producto-buscar", () => {
   const buscarInput = document.getElementById("venta-producto-buscar");
   const productoSelect = document.getElementById("venta-producto");
+  const resultadosEl = document.getElementById("venta-producto-resultados");
+
+  function cerrarResultados() {
+    if (resultadosEl) { resultadosEl.classList.add("hidden"); resultadosEl.innerHTML = ""; }
+  }
+
+  function seleccionarProducto(p) {
+    productoSelect.value = p.id;
+    buscarInput.value = p.nombre;
+    cerrarResultados();
+    actualizarStockDisponibleUI();
+  }
 
   buscarInput.addEventListener("input", () => {
     const termino = buscarInput.value.trim().toLowerCase();
+    // Mantiene el <select> real filtrado (compatibilidad con quien prefiera
+    // abrirlo directo), pero AHORA además se muestra una lista visible y
+    // clicable abajo del input — antes esto solo cambiaba las <option> de
+    // un <select> cerrado, sin ninguna señal visible de que la búsqueda
+    // hacía algo (reporte real de Robert: "no busca ningún producto").
     const filtrados = termino
       ? ventaProductosLista.filter((p) => p.nombre.toLowerCase().includes(termino))
       : ventaProductosLista;
     fillSelect(productoSelect, filtrados, "id", (p) => p.nombre, true);
-    actualizarStockDisponibleUI();
+
+    if (!resultadosEl) return;
+    if (!termino) { cerrarResultados(); return; }
+    if (filtrados.length === 0) {
+      resultadosEl.innerHTML = '<div class="venta-buscar-resultado-vacio">Sin coincidencias</div>';
+      resultadosEl.classList.remove("hidden");
+      return;
+    }
+    resultadosEl.innerHTML = "";
+    filtrados.slice(0, 30).forEach((p) => {
+      const div = document.createElement("div");
+      div.className = "venta-buscar-resultado-item";
+      div.textContent = p.nombre;
+      div.addEventListener("click", () => seleccionarProducto(p));
+      resultadosEl.appendChild(div);
+    });
+    resultadosEl.classList.remove("hidden");
+  });
+
+  buscarInput.addEventListener("focus", () => {
+    if (buscarInput.value.trim()) buscarInput.dispatchEvent(new Event("input"));
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!resultadosEl || resultadosEl.classList.contains("hidden")) return;
+    if (e.target === buscarInput || resultadosEl.contains(e.target)) return;
+    cerrarResultados();
+  });
+
+  productoSelect.addEventListener("change", () => {
+    // Si el producto se elige directo del <select> (sin usar el buscador),
+    // el input de búsqueda no debe quedar con un texto que ya no aplica.
+    const seleccionado = ventaProductosLista.find((p) => p.id === productoSelect.value);
+    if (seleccionado) buscarInput.value = seleccionado.nombre;
   });
 });
 

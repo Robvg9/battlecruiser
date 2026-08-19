@@ -43,7 +43,18 @@
 // nueva RPC crear_usuario_interno para no perder la sesión del admin y sí
 // crear el perfil interno). El SW en sí no cambió de comportamiento — el
 // bump es para que los dispositivos ya instalados bajen los archivos nuevos.
-const CACHE_NAME = "battlecruiser-shell-v33";
+// v34 — Misión 9.2: bump por app.js/index.html/style.css — 3 bugs reales
+// reportados por Robert en prueba física: (1) login sin try/finally podía
+// dejar el loading infinito si signInWithPassword lanzaba una excepción de
+// red real; (2) crear usuario tenía try/finally SIN catch — confirmado con
+// logs reales de Supabase que /auth/v1/signup nunca se invocaba, la
+// excepción se tragaba en silencio antes de llegar a signUp/RPC; también se
+// corrigió cargarUsuarios() (no existía) por refrescarUsuarios(); (3)
+// buscar producto en Ventas solo filtraba un <select> escondido sin ninguna
+// señal visible — ahora muestra una lista clicable real. El SW en sí no
+// cambió de comportamiento — el bump es para que los dispositivos ya
+// instalados bajen los archivos nuevos.
+const CACHE_NAME = "battlecruiser-shell-v34";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
