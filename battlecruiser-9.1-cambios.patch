@@ -1,0 +1,154 @@
+--- original/battlecruiser-main/public/app.js	2026-08-18 23:06:24.000000000 +0000
++++ work/battlecruiser-main/public/app.js	2026-08-19 02:22:00.682824949 +0000
+@@ -150,7 +150,22 @@
+     // B3.19: limpiar el contexto de usuario antes de cerrar sesión.
+     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
+     await client.auth.signOut();
++  });
++});
+ 
++// Misión 9.1 (Fase 9): antes este bloque quedaba anidado dentro del handler
++// de "logout" — el formulario de crear usuario no tenía listener activo
++// hasta que el admin cerrara sesión una vez. Se saca como bloque propio.
++//
++// signUp() se llama con un cliente Supabase EFÍMERO (persistSession:false),
++// nunca con el `client` compartido que tiene la sesión del admin: así, sin
++// importar si la confirmación de email está activada o no en el proyecto,
++// la sesión del admin nunca se toca ni se reemplaza. auth.users no tiene
++// trigger propio (verificado contra Supabase real) y RLS en `usuarios` no
++// permite INSERT desde el cliente, así que el perfil interno se crea con la
++// RPC `crear_usuario_interno` (SECURITY DEFINER + tiene_permiso, mismo
++// patrón que asignar_rol_usuario/cambiar_estado_usuario), usando la sesión
++// normal del admin — la única que queda autenticada en todo momento.
+ safeInit("nuevo-usuario", () => {
+   const form = document.getElementById("form-nuevo-usuario");
+   const msgEl = document.getElementById("msg-nuevo-usuario");
+@@ -159,9 +174,14 @@
+   form.addEventListener("submit", async (e) => {
+     e.preventDefault();
+     msgEl.textContent = "";
++    const nombre = document.getElementById("nuevo-usuario-nombre").value.trim();
+     const email = document.getElementById("nuevo-usuario-email").value.trim();
+     const password = document.getElementById("nuevo-usuario-password").value;
+ 
++    if (!nombre) {
++      msgEl.textContent = "El nombre es obligatorio.";
++      return;
++    }
+     if (password.length < 6) {
+       msgEl.textContent = "La contraseña debe tener al menos 6 caracteres.";
+       return;
+@@ -169,22 +189,38 @@
+ 
+     showLoading();
+     try {
+-      const { error } = await client.auth.signUp({ email, password });
++      const clienteTemporal = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
++        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
++      });
++      const { data, error } = await clienteTemporal.auth.signUp({ email, password });
+       if (error) {
+         msgEl.textContent = "Error al crear usuario: " + (error.message || "Error desconocido");
+         console.error("[Battlecruiser] (nuevo-usuario)", error);
+-      } else {
+-        msgEl.textContent = "Usuario creado correctamente. Revisa tu correo para confirmar.";
+-        form.reset();
+-        if (typeof cargarUsuarios === "function") cargarUsuarios();
++        return;
++      }
++
++      const nuevoId = data && data.user && data.user.id;
++      if (!nuevoId) {
++        msgEl.textContent = "El usuario se creó en autenticación, pero no se recibió su id. Contactá soporte técnico antes de reintentar.";
++        console.error("[Battlecruiser] (nuevo-usuario) signUp sin data.user.id", data);
++        return;
+       }
++
++      const { error: errorPerfil } = await client.rpc("crear_usuario_interno", { p_id: nuevoId, p_nombre: nombre });
++      if (errorPerfil) {
++        msgEl.textContent = "El usuario se creó en autenticación, pero falló al crear su perfil interno (" + (errorPerfil.message || "error desconocido") + "). Contactá soporte técnico antes de reintentar con el mismo correo.";
++        console.error("[Battlecruiser] (nuevo-usuario) crear_usuario_interno", errorPerfil);
++        return;
++      }
++
++      msgEl.textContent = "Usuario creado correctamente. Asignale un rol en la lista de usuarios. Si la confirmación de email está activada en el proyecto, deberá confirmar su correo antes de poder entrar.";
++      form.reset();
++      if (typeof cargarUsuarios === "function") cargarUsuarios();
+     } finally {
+       hideLoading();
+     }
+   });
+ });
+-  });
+-});
+ 
+ // ---- Actualizar app: borra caché del shell y fuerza traer la última versión ----
+ // Sesión 15: pedido explícito de Roberto — que este botón esté también en la
+@@ -627,7 +663,7 @@
+ }
+ 
+ // ============================================================
+-// Loading Indicators - Misiu00f3n 9.0
++// Loading Indicators - Misión 9.0
+ // ============================================================
+ 
+ let loadingCount = 0;
+@@ -668,7 +704,7 @@
+ 
+ 
+ // ============================================================
+-// Loading Indicators - Misión 9.0
++// Caché local de lectura (IndexedDB) — estado offline/online
+ // ============================================================
+ 
+ async function leerDeCache(clave) {
+@@ -2193,14 +2229,14 @@
+       texto = "⚡ Backend inaccesible — usando caché";
+       mostrarTooltip = true;
+     } else if (sinCacheB > 0) {
+-  } else if (_conectividadReal === null && navigator.onLine) {
+-    // D. Todavu00eda comprobando
+-    clase = "reconectando";
+-    texto = "u23f3 Comprobando conexiu00f3n...";
+       texto = "⚡ Backend inaccesible — sin datos guardados";
+     } else {
+       texto = "⚡ Backend inaccesible";
+     }
++  } else if (_conectividadReal === null && navigator.onLine) {
++    // D. Todavía comprobando
++    clase = "reconectando";
++    texto = "⏳ Comprobando conexión...";
+   }
+ 
+   nodos.forEach(({ linea, texto: textoEl }) => {
+--- original/battlecruiser-main/public/index.html	2026-08-18 23:06:24.000000000 +0000
++++ work/battlecruiser-main/public/index.html	2026-08-19 02:22:07.788147557 +0000
+@@ -685,8 +685,9 @@
+       <div class="cc-bloque">
+         <h3>Crear nuevo usuario</h3>
+         <form id="form-nuevo-usuario" class="inline-form">
++          <input id="nuevo-usuario-nombre" type="text" placeholder="Nombre" required>
+           <input id="nuevo-usuario-email" type="email" placeholder="Correo" required>
+-          <input id="nuevo-usuario-password" type="password" placeholder="Contrase00f1a (m00ednimo 6 caracteres)" required minlength="6">
++          <input id="nuevo-usuario-password" type="password" placeholder="Contraseña (mínimo 6 caracteres)" required minlength="6">
+           <button type="submit">Crear usuario</button>
+         </form>
+         <p class="msg" id="msg-nuevo-usuario"></p>
+--- original/battlecruiser-main/public/service-worker.js	2026-08-18 23:06:24.000000000 +0000
++++ work/battlecruiser-main/public/service-worker.js	2026-08-19 02:23:38.245411271 +0000
+@@ -36,7 +36,14 @@
+ // v29 — Mision B8: bump por Comunicacion y Coordinacion Operativa
+ // (conversaciones, mensajes, chat contextual, no leidos, soporte;
+ // nueva pestana Comunicacion; integracion en Centro de Mando).
+-const CACHE_NAME = "battlecruiser-shell-v32"; // v32: Misión 9.0 - Cierre técnico completo (corrección código duplicado, PWA validada) (aislamiento cola/caché por usuario, XSS, auditoría redundante, bug categoría)
++// v33 — Misión 9.1: bump por app.js/index.html (fix estructural real en
++// actualizarIndicadorConexion — estado D quedaba mal anidado dentro del
++// bloque B con una rama vacía; texto Unicode corrupto visible en pantalla;
++// flujo de creación de usuarios reparado: signUp con cliente efímero +
++// nueva RPC crear_usuario_interno para no perder la sesión del admin y sí
++// crear el perfil interno). El SW en sí no cambió de comportamiento — el
++// bump es para que los dispositivos ya instalados bajen los archivos nuevos.
++const CACHE_NAME = "battlecruiser-shell-v33";
+ 
+ // Archivos propios de la app: cambian con cada versión.
+ const SHELL_FILES = [
