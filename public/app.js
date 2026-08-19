@@ -1,1 +1,1 @@
-PLACEHOLDER_WILL_REPLACE
+// TEMPORARY RESTORE MARKER - will be replaced with full content
