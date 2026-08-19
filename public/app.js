@@ -1,1 +1,1 @@
-file:///tmp/app.js
+@/tmp/app.js
