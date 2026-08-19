@@ -1,1 +1,1 @@
-// TEMPORARY - loading real content next
+// TEMPORARY placeholder - will be replaced
