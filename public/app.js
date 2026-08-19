@@ -1126,6 +1126,9 @@ const ETIQUETA_TIPO_OP = {
   incidencia_resolver: "Resolución de incidencia",
   mensaje: "Mensaje",
   conversacion: "Conversación",
+  almacen: "Creación de almacén",
+  almacen_actualizar: "Edición de almacén",
+  almacen_estado: "Cambio de estado de almacén",
 };
 
 // Resumen legible de una operación, armado a partir de su payload (los
@@ -1779,6 +1782,12 @@ const RPC_POR_TIPO = {
   // B8: envío de mensajes y creación de conversaciones pasan por la misma cola offline.
   mensaje: "enviar_mensaje",
   conversacion: "crear_conversacion",
+  // Micromisión 9.3 (Tarea 3A): creación/edición/activar-desactivar de
+  // almacenes pasan por la misma cola offline genérica que producto
+  // (idempotencia, FIFO, reintento). Los RPC ya existen en producción.
+  almacen: "crear_almacen",
+  almacen_actualizar: "editar_almacen",
+  almacen_estado: "activar_desactivar_almacen",
 };
 
 // Fase C (P5): el trigger auditar_mutacion_operativa() de Supabase ya audita
@@ -2011,6 +2020,14 @@ function reconciliarTrasOperacion(tipo, resultado) {
     case "conversacion":
       // B8: refrescar la lista de conversaciones.
       marcarRefrescoPendiente("conversaciones");
+      break;
+    case "almacen":
+    case "almacen_actualizar":
+    case "almacen_estado":
+      // Micromisión 9.3 (Tarea 3A): igual que producto — no mueven stock por
+      // sí mismas, pero "stock" ya cubre almacenes (refrescarStockYSelects
+      // trae productos+almacenes+stock), así que reusamos esa categoría.
+      if (resultado === "exito") marcarRefrescoPendiente("stock");
       break;
     default:
       marcarRefrescoPendiente("stock");
@@ -2926,6 +2943,9 @@ safeInit("tabs", () => {
         infoEl.textContent = "Sesión: " + (_usuarioActual.nombre || "") + (_usuarioActual.rol ? " · " + _usuarioActual.rol : "");
       }
       if (typeof refrescarUsuarios === "function") refrescarUsuarios();
+    } else if (btn.dataset.tab === "config") {
+      // Misión 9.3 — Fase 3: al entrar a Configuración, refrescar Roles y Permisos.
+      if (typeof refrescarRolesAdmin === "function") refrescarRolesAdmin();
     }
     if (btn.dataset.tab !== "pendientes" && typeof cerrarDetalleOperacion === "function") {
       // Al salir de la pestana Pendientes, cerrar el detalle si estaba
@@ -3030,15 +3050,121 @@ async function cargarCategorias() {
 }
 
 async function cargarAlmacenes() {
-  return withCache("almacenes", () => client.from("almacenes").select("id, nombre, tipo").order("nombre"));
+  // Micromisión 9.3 (Tarea 3A): se agrega "activo" al select para poder
+  // reflejar el estado que activar_desactivar_almacen (RPC "almacen_estado")
+  // modifica. No cambia el resto de la forma de la caché.
+  return withCache("almacenes", () => client.from("almacenes").select("id, nombre, tipo, activo").order("nombre"));
 }
 
 async function cargarProductos() {
   return withCache("productos", () => client
     .from("productos")
-    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, categorias(nombre), presentaciones(nombre)")
+    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, categorias(nombre), presentaciones(nombre)")
     .order("nombre"));
 }
+
+// ---- Misión 9.3 — Tarea 1: imagen por producto ----
+// Es una acción INMEDIATA e independiente de ejecutarOperacion/la cola
+// offline: primero hay que subir el archivo binario a Supabase Storage
+// (bucket público "productos", políticas RLS restringen escritura a
+// usuarios con tiene_permiso('productos','editar')), y luego guardar la
+// URL resultante con el RPC actualizar_imagen_producto. No se intenta
+// encolar esto offline: si no hay conexión real, se avisa claramente y no
+// se pierde nada (el resto del producto sigue guardándose/editándose por
+// la cola normal, la imagen queda pendiente para cuando haya Internet).
+const PROD_IMAGEN_TIPOS_VALIDOS = ["image/jpeg", "image/png", "image/jpg"];
+const PROD_IMAGEN_TAMANO_MAX = 5 * 1024 * 1024; // 5MB, igual al límite del bucket
+
+function validarArchivoImagenProducto(file) {
+  if (!file) return null;
+  if (!PROD_IMAGEN_TIPOS_VALIDOS.includes(file.type)) {
+    return "Formato no permitido. Usa JPG o PNG.";
+  }
+  if (file.size > PROD_IMAGEN_TAMANO_MAX) {
+    return "La imagen es muy grande (máximo 5MB).";
+  }
+  return null;
+}
+
+function extensionImagen(file) {
+  if (file.type === "image/png") return "png";
+  return "jpg";
+}
+
+// Sube el archivo a Storage y guarda la URL en el producto vía RPC.
+// Requiere conexión real y requiere que el producto ya exista (tenga id).
+async function subirImagenProducto(productoId, file) {
+  const nombreArchivo = `${productoId}/${Date.now()}.${extensionImagen(file)}`;
+  const { error: errorSubida } = await client.storage
+    .from("productos")
+    .upload(nombreArchivo, file, { upsert: true, contentType: file.type });
+  if (errorSubida) {
+    return { ok: false, error: errorSubida };
+  }
+  const { data: urlData } = client.storage.from("productos").getPublicUrl(nombreArchivo);
+  const { error: errorRpc } = await client.rpc("actualizar_imagen_producto", {
+    p_producto_id: productoId,
+    p_imagen_url: urlData.publicUrl,
+  });
+  if (errorRpc) {
+    return { ok: false, error: errorRpc };
+  }
+  return { ok: true, url: urlData.publicUrl };
+}
+
+async function quitarImagenProducto(productoId) {
+  const { error } = await client.rpc("actualizar_imagen_producto", {
+    p_producto_id: productoId,
+    p_imagen_url: null,
+  });
+  return { ok: !error, error };
+}
+
+// Vista previa local del archivo elegido en el form (antes de subir nada).
+safeInit("prod-imagen-input", () => {
+  const input = document.getElementById("prod-imagen-input");
+  const wrap = document.getElementById("prod-imagen-preview-wrap");
+  const img = document.getElementById("prod-imagen-preview");
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    setMsg("msg-prod-imagen", "", true);
+    if (!file) { wrap.classList.add("hidden"); return; }
+    const error = validarArchivoImagenProducto(file);
+    if (error) {
+      setMsg("msg-prod-imagen", error, false);
+      input.value = "";
+      wrap.classList.add("hidden");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    img.src = url;
+    wrap.classList.remove("hidden");
+  });
+
+  document.getElementById("prod-imagen-quitar").addEventListener("click", async () => {
+    const editandoId = document.getElementById("prod-editando-id").value || null;
+    input.value = "";
+    document.getElementById("prod-imagen-preview-wrap").classList.add("hidden");
+    // Si estamos editando un producto que YA tenía imagen guardada en
+    // Supabase, "Quitar imagen" también la borra de verdad (requiere
+    // conexión); si es solo una selección local sin guardar todavía, no
+    // hay nada más que hacer.
+    if (editandoId && document.getElementById("prod-imagen-preview").dataset.guardada === "true") {
+      if (estaRealmenteDesconectado()) {
+        setMsg("msg-prod-imagen", "Necesitas conexión para quitar la imagen guardada.", false);
+        return;
+      }
+      const resultado = await quitarImagenProducto(editandoId);
+      if (!resultado.ok) {
+        setMsg("msg-prod-imagen", "No se pudo quitar la imagen.", false);
+        return;
+      }
+      document.getElementById("prod-imagen-preview").dataset.guardada = "false";
+      setMsg("msg-prod-imagen", "Imagen quitada.", true);
+      await refrescarProductos();
+    }
+  });
+});
 
 async function refrescarProductos() {
   setLoading("lista-productos", "Cargando productos…");
@@ -3089,7 +3215,10 @@ async function refrescarProductos() {
           <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
         </span>`;
       }
-      div.innerHTML = `<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
+      const miniatura = p.imagen_url
+        ? `<img src="${escHtml(p.imagen_url)}" alt="" class="producto-thumb" loading="lazy">`
+        : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
+      div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
         <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)}</span>
         ${botones}`;
       lista.appendChild(div);
@@ -3157,6 +3286,19 @@ function iniciarEdicionProducto(p) {
   if (submitBtn) submitBtn.textContent = "Guardar cambios";
   const cancelarBtn = document.getElementById("prod-cancelar-edicion");
   if (cancelarBtn) cancelarBtn.classList.remove("hidden");
+  const preview = document.getElementById("prod-imagen-preview");
+  const wrap = document.getElementById("prod-imagen-preview-wrap");
+  document.getElementById("prod-imagen-input").value = "";
+  if (p.imagen_url) {
+    preview.src = p.imagen_url;
+    preview.dataset.guardada = "true";
+    wrap.classList.remove("hidden");
+  } else {
+    preview.removeAttribute("src");
+    preview.dataset.guardada = "false";
+    wrap.classList.add("hidden");
+  }
+  setMsg("msg-prod-imagen", "", true);
   document.getElementById("form-producto").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
@@ -3167,6 +3309,10 @@ function cancelarEdicionProducto() {
   if (submitBtn) submitBtn.textContent = "Agregar producto";
   const cancelarBtn = document.getElementById("prod-cancelar-edicion");
   if (cancelarBtn) cancelarBtn.classList.add("hidden");
+  document.getElementById("prod-imagen-preview-wrap").classList.add("hidden");
+  document.getElementById("prod-imagen-preview").removeAttribute("src");
+  document.getElementById("prod-imagen-preview").dataset.guardada = "false";
+  setMsg("msg-prod-imagen", "", true);
 }
 
 safeInit("prod-cancelar-edicion", () => {
@@ -3202,6 +3348,18 @@ safeInit("form-producto", () => {
     // pasa a llamar a producto_actualizar en vez de crear uno nuevo — así
     // edición y creación comparten la misma cola offline/idempotencia.
     const editandoId = document.getElementById("prod-editando-id").value || null;
+    // Se captura el archivo ANTES de que cancelarEdicionProducto() limpie
+    // el input, para poder subirlo después de que el producto quede
+    // guardado (nuevo o editado) con un id real en Supabase.
+    const archivoImagenInput = document.getElementById("prod-imagen-input");
+    const archivoImagen = archivoImagenInput.files && archivoImagenInput.files[0];
+    if (archivoImagen) {
+      const errorArchivo = validarArchivoImagenProducto(archivoImagen);
+      if (errorArchivo) {
+        setMsg("msg-prod-imagen", errorArchivo, false);
+        return;
+      }
+    }
     submitBtn.disabled = true;
     const resultado = editandoId
       ? await ejecutarOperacion("producto_actualizar", {
@@ -3234,8 +3392,22 @@ safeInit("form-producto", () => {
       // local de "productos" (a diferencia de la proyección de stock ya
       // existente en ajustePendiente/_operacionesPendientesCache): eso
       // pertenece a B2.2-B.3, fuera de alcance acá.
-      setMsg("msg-productos", "✓ Guardado localmente — se sincronizará al recuperar conexión.", true);
+      setMsg("msg-productos", "✓ Guardado localmente — se sincronizará al recuperar conexión."
+        + (archivoImagen ? " La imagen no se pudo subir sin conexión: agrégala editando el producto una vez sincronizado." : ""), true);
       return;
+    }
+    // El producto quedó guardado con un id real (creado o editado online).
+    // Si el usuario había elegido una imagen, se sube ahora — acción
+    // inmediata, fuera de la cola offline (ver subirImagenProducto).
+    const productoIdReal = editandoId || resultado.data;
+    if (archivoImagen && productoIdReal) {
+      const resultadoImagen = await subirImagenProducto(productoIdReal, archivoImagen);
+      if (!resultadoImagen.ok) {
+        setMsg("msg-productos", (estabaEditando ? "Producto actualizado, " : "Producto creado, ")
+          + "pero no se pudo subir la imagen: " + explicarError(resultadoImagen.error, "subir imagen"), false);
+        await refrescarProductos();
+        return;
+      }
     }
     setMsg("msg-productos", estabaEditando ? "Producto actualizado." : "Producto creado.", true);
     await refrescarProductos();
@@ -3765,23 +3937,207 @@ async function inicializarPresentaciones() {
   await refrescarPresentacionesCatalogo();
 }
 
+// Misión 9.3 Tarea 3B: almacén seleccionado en la pestaña Almacenes.
+let _almacenSeleccionadoId = null;
+
+function etiquetaTipoAlmacen(tipo) {
+  return tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista";
+}
+
+function llenarSelectorAlmacenes(almacenes) {
+  const sel = document.getElementById("alm-selector");
+  if (!sel) return;
+  const prev = _almacenSeleccionadoId || sel.value;
+  sel.innerHTML = '<option value="">Elegí un almacén…</option>';
+  (almacenes || []).forEach((a) => {
+    const o = document.createElement("option");
+    o.value = a.id;
+    const estado = a.activo === false ? " · Inactivo" : "";
+    o.textContent = a.nombre + " — " + etiquetaTipoAlmacen(a.tipo) + estado;
+    if (a.activo === false) o.className = "alm-option-inactivo";
+    sel.appendChild(o);
+  });
+  if (prev && (almacenes || []).some((a) => a.id === prev)) {
+    sel.value = prev;
+    _almacenSeleccionadoId = prev;
+  } else {
+    _almacenSeleccionadoId = null;
+    sel.value = "";
+  }
+  actualizarBotonesAccionesAlmacen();
+}
+
+function actualizarBotonesAccionesAlmacen() {
+  const editar = document.getElementById("alm-editar-btn");
+  const toggle = document.getElementById("alm-toggle-btn");
+  const tiene = !!_almacenSeleccionadoId;
+  if (editar) editar.disabled = !tiene;
+  if (toggle) {
+    toggle.disabled = !tiene;
+    if (tiene) {
+      const a = (_cache.almacenes || []).find((x) => x.id === _almacenSeleccionadoId);
+      toggle.textContent = a && a.activo === false ? "Activar almacén" : "Desactivar almacén";
+    } else {
+      toggle.textContent = "Activar / desactivar";
+    }
+  }
+}
+
+function renderPanelAlmacenSeleccionado() {
+  const panel = document.getElementById("alm-info-panel");
+  if (!panel) return;
+  const id = _almacenSeleccionadoId;
+  if (!id) {
+    panel.innerHTML = '<p class="lista-estado">Elegí un almacén para ver su información y productos.</p>';
+    renderProductosDelAlmacen(null);
+    actualizarBotonesAccionesAlmacen();
+    return;
+  }
+  const a = (_cache.almacenes || []).find((x) => x.id === id);
+  if (!a) {
+    panel.innerHTML = '<p class="lista-estado">Almacén no encontrado.</p>';
+    renderProductosDelAlmacen(null);
+    return;
+  }
+  const stock = (_cache.stock || []).filter((s) => s.almacen_id === id);
+  const productosCount = stock.length;
+  let unidades = 0;
+  let bajoMin = 0;
+  let agotados = 0;
+  stock.forEach((s) => {
+    const cant = Number(s.cantidad) || 0;
+    unidades += cant;
+    if (cant <= 0) agotados++;
+    else if (s.minimo != null && cant <= Number(s.minimo)) bajoMin++;
+  });
+  const activo = a.activo !== false;
+  panel.innerHTML =
+    '<div class="alm-info-grid">' +
+      '<div class="alm-info-item"><span class="alm-info-label">Nombre</span><span class="alm-info-valor">' + escHtml(a.nombre) + "</span></div>" +
+      '<div class="alm-info-item"><span class="alm-info-label">Tipo</span><span class="alm-info-valor">' + escHtml(etiquetaTipoAlmacen(a.tipo)) + "</span></div>" +
+      '<div class="alm-info-item"><span class="alm-info-label">Estado</span><span class="alm-info-valor ' + (activo ? "alm-estado-activo" : "alm-estado-inactivo") + '">' + (activo ? "Activo" : "Inactivo") + "</span></div>" +
+      '<div class="alm-info-item"><span class="alm-info-label">Productos</span><span class="alm-info-valor">' + productosCount + "</span></div>" +
+      '<div class="alm-info-item"><span class="alm-info-label">Unidades</span><span class="alm-info-valor">' + money(unidades) + "</span></div>" +
+      '<div class="alm-info-item"><span class="alm-info-label">Alertas</span><span class="alm-info-valor">' +
+        (bajoMin + agotados > 0
+          ? (agotados ? agotados + " agotado(s)" : "") + (agotados && bajoMin ? " · " : "") + (bajoMin ? bajoMin + " bajo mínimo" : "")
+          : "Sin alertas") +
+      "</span></div>" +
+    "</div>";
+  renderProductosDelAlmacen(id);
+  actualizarBotonesAccionesAlmacen();
+}
+
+function renderProductosDelAlmacen(almacen_id) {
+  const lista = document.getElementById("lista-stock");
+  if (!lista) return;
+  if (!almacen_id) {
+    lista.innerHTML = '<p class="lista-estado">Elegí un almacén para ver sus productos.</p>';
+    return;
+  }
+  const stock = (_cache.stock || []).filter((s) => s.almacen_id === almacen_id);
+  if (stock.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos con stock registrado.</p>';
+    return;
+  }
+  const productosById = {};
+  (_cache.productos || []).forEach((p) => { productosById[p.id] = p; });
+  lista.innerHTML = "";
+  stock
+    .slice()
+    .sort((a, b) => {
+      const na = (a.productos && a.productos.nombre) || "";
+      const nb = (b.productos && b.productos.nombre) || "";
+      return na.localeCompare(nb, "es");
+    })
+    .forEach((s) => {
+      const p = productosById[s.producto_id];
+      const nombre = (s.productos && s.productos.nombre) || (p && p.nombre) || "—";
+      const cat = p && p.categorias && p.categorias.nombre ? p.categorias.nombre : "";
+      const imagen = p && p.imagen_url
+        ? '<img src="' + escHtml(p.imagen_url) + '" alt="" class="producto-thumb" loading="lazy">'
+        : '<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>';
+      const cant = Number(s.cantidad) || 0;
+      const bajo = s.minimo != null && cant <= Number(s.minimo);
+      const div = document.createElement("div");
+      div.className = "lista-item alm-producto-item" + (cant <= 0 ? " lista-item-inactivo" : "");
+      div.innerHTML =
+        imagen +
+        '<span class="alm-prod-info"><span class="alm-prod-nombre">' + escHtml(nombre) + "</span>" +
+        (cat ? '<span class="muted"> · ' + escHtml(cat) + "</span>" : "") +
+        "</span>" +
+        '<span class="muted alm-prod-cant"' + (bajo || cant <= 0 ? ' style="color:var(--wine)"' : "") + ">" +
+        money(cant) + (cant <= 0 ? " · Agotado" : bajo ? " · Bajo mínimo" : "") +
+        "</span>";
+      lista.appendChild(div);
+    });
+}
+
+function seleccionarAlmacen(id) {
+  _almacenSeleccionadoId = id || null;
+  const sel = document.getElementById("alm-selector");
+  if (sel) sel.value = id || "";
+  renderPanelAlmacenSeleccionado();
+}
+
+function cerrarFormAlmacen() {
+  const form = document.getElementById("form-almacen");
+  if (!form) return;
+  form.reset();
+  form.classList.add("hidden");
+  const editId = document.getElementById("alm-editando-id");
+  if (editId) editId.value = "";
+  const submit = document.getElementById("alm-submit-btn");
+  if (submit) submit.textContent = "Crear almacén";
+  setMsg("msg-almacenes", "", true);
+}
+
+function abrirFormCrearAlmacen() {
+  cerrarFormAlmacen();
+  const form = document.getElementById("form-almacen");
+  if (form) form.classList.remove("hidden");
+  const nombre = document.getElementById("alm-nombre");
+  if (nombre) nombre.focus();
+}
+
+function abrirFormEditarAlmacen() {
+  if (!_almacenSeleccionadoId) return;
+  const a = (_cache.almacenes || []).find((x) => x.id === _almacenSeleccionadoId);
+  if (!a) return;
+  const form = document.getElementById("form-almacen");
+  if (!form) return;
+  form.classList.remove("hidden");
+  document.getElementById("alm-editando-id").value = a.id;
+  document.getElementById("alm-nombre").value = a.nombre || "";
+  document.getElementById("alm-tipo").value = a.tipo || "";
+  document.getElementById("alm-submit-btn").textContent = "Guardar cambios";
+  document.getElementById("alm-nombre").focus();
+}
+
 async function refrescarAlmacenes() {
   setLoading("lista-almacenes", "Cargando almacenes…");
   const almacenes = await cargarAlmacenes();
   _cache.almacenes = almacenes;
   renderResumen();
+  // Compatibilidad: lista oculta sigue existiendo (otros flujos no dependen de su contenido visual).
   const lista = document.getElementById("lista-almacenes");
-  if (almacenes.length === 0) {
-    setEmpty("lista-almacenes", mensajeListaVacia("almacenes", "Todavía no hay almacenes cargados."));
-  } else {
-    lista.innerHTML = "";
-    almacenes.forEach((a) => {
-      const div = document.createElement("div");
-      div.className = "lista-item";
-      div.innerHTML = `<span>${escHtml(a.nombre)}</span><span class="muted">${a.tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista"}</span>`;
-      lista.appendChild(div);
-    });
+  if (lista) {
+    if (almacenes.length === 0) {
+      setEmpty("lista-almacenes", mensajeListaVacia("almacenes", "Todavía no hay almacenes cargados."));
+    } else {
+      lista.innerHTML = "";
+      almacenes.forEach((a) => {
+        const div = document.createElement("div");
+        div.className = "lista-item" + (a.activo === false ? " lista-item-inactivo" : "");
+        const estado = a.activo === false ? ' <span class="muted">· Inactivo</span>' : "";
+        div.innerHTML = "<span>" + escHtml(a.nombre) + estado + '</span><span class="muted">' + escHtml(etiquetaTipoAlmacen(a.tipo)) + "</span>";
+        lista.appendChild(div);
+      });
+    }
   }
+
+  llenarSelectorAlmacenes(almacenes);
+  renderPanelAlmacenSeleccionado();
 
   fillSelect(document.getElementById("trf-origen"), almacenes, "id", (a) => a.nombre);
   fillSelect(document.getElementById("trf-destino"), almacenes, "id", (a) => a.nombre);
@@ -3801,40 +4157,173 @@ async function refrescarStockYSelects() {
 
   _cache.stock = stock;
   renderResumen();
-  const lista = document.getElementById("lista-stock");
-  if (!stock || stock.length === 0) {
-    setEmpty("lista-stock", mensajeListaVacia("stock", "Todavía no hay stock cargado."));
-    return;
+  // Misión 9.3 Tarea 3B: lista-stock ahora muestra productos del almacén
+  // seleccionado (no el listado global). Si no hay selección, mensaje guía.
+  if (typeof renderProductosDelAlmacen === "function") {
+    renderProductosDelAlmacen(_almacenSeleccionadoId);
+  } else {
+    const lista = document.getElementById("lista-stock");
+    if (!lista) return;
+    if (!stock || stock.length === 0) {
+      setEmpty("lista-stock", mensajeListaVacia("stock", "Todavía no hay stock cargado."));
+      return;
+    }
+    lista.innerHTML = "";
+    stock.forEach((s) => {
+      const div = document.createElement("div");
+      div.className = "lista-item";
+      const bajo = s.minimo != null && s.cantidad <= s.minimo;
+      div.innerHTML = `<span>${escHtml(s.productos.nombre)} <span class="muted">· ${escHtml(s.almacenes.nombre)}</span></span>
+        <span class="muted" style="${bajo ? "color:var(--ember)" : ""}">${money(s.cantidad)}${bajo ? " ⚠ bajo mínimo" : ""}</span>`;
+      lista.appendChild(div);
+    });
   }
-  lista.innerHTML = "";
-  stock.forEach((s) => {
-    const div = document.createElement("div");
-    div.className = "lista-item";
-    const bajo = s.minimo != null && s.cantidad <= s.minimo;
-    div.innerHTML = `<span>${escHtml(s.productos.nombre)} <span class="muted">· ${escHtml(s.almacenes.nombre)}</span></span>
-      <span class="muted" style="${bajo ? "color:var(--ember)" : ""}">${money(s.cantidad)}${bajo ? " ⚠ bajo mínimo" : ""}</span>`;
-    lista.appendChild(div);
-  });
+  if (typeof renderPanelAlmacenSeleccionado === "function" && _almacenSeleccionadoId) {
+    renderPanelAlmacenSeleccionado();
+  }
 }
 
 safeInit("form-almacen", () => {
-  document.getElementById("form-almacen").addEventListener("submit", async (e) => {
+  const form = document.getElementById("form-almacen");
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const nombre = document.getElementById("alm-nombre").value.trim();
     const tipo = document.getElementById("alm-tipo").value;
-    const submitBtn = e.target.querySelector("button[type='submit']");
+    const editandoId = (document.getElementById("alm-editando-id") || {}).value || "";
+    const submitBtn = document.getElementById("alm-submit-btn") || e.target.querySelector("button[type='submit']");
+
+    if (!nombre || !tipo) {
+      setMsg("msg-almacenes", "Completá nombre y tipo.", false);
+      return;
+    }
 
     submitBtn.disabled = true;
-    const { error } = await client.from("almacenes").insert({ nombre, tipo });
+    let resultado;
+    if (editandoId) {
+      // Misión 9.3 Tarea 3B: edición vía editarAlmacen() (RPC ya cableado en 3A).
+      resultado = await editarAlmacen(editandoId, { p_nombre: nombre, p_tipo: tipo });
+    } else {
+      // Micromisión 9.3 (Tarea 3A): crear vía ejecutarOperacion + crear_almacen.
+      resultado = await ejecutarOperacion("almacen", {
+        p_nombre: nombre,
+        p_tipo: tipo,
+      });
+    }
     submitBtn.disabled = false;
 
-    if (error) { setMsg("msg-almacenes", "No se pudo crear: " + explicarError(error, "crear almacén"), false); return; }
-    setMsg("msg-almacenes", "Almacén creado.", true);
-    e.target.reset();
-    await refrescarAlmacenes();
-    await refrescarStockYSelects();
+    if (!resultado.ok) {
+      setMsg("msg-almacenes", "No se pudo " + (editandoId ? "editar" : "crear") + ": " + explicarError(resultado.error, editandoId ? "editar almacén" : "crear almacén"), false);
+      return;
+    }
+    if (resultado.offline) {
+      setMsg("msg-almacenes", (editandoId ? "Cambios" : "Almacén") + " guardado(s), se sincronizará cuando vuelva la conexión.", true);
+      cerrarFormAlmacen();
+    } else {
+      setMsg("msg-almacenes", editandoId ? "Almacén actualizado." : "Almacén creado.", true);
+      cerrarFormAlmacen();
+      await refrescarAlmacenes();
+      await refrescarStockYSelects();
+      if (editandoId) seleccionarAlmacen(editandoId);
+      else if (resultado.data && resultado.data.id) seleccionarAlmacen(resultado.data.id);
+    }
   });
 });
+
+// Misión 9.3 Tarea 3B: selector + menú de acciones (crear / editar / activar-desactivar).
+safeInit("almacenes-ui", () => {
+  const sel = document.getElementById("alm-selector");
+  if (sel) {
+    sel.addEventListener("change", () => {
+      seleccionarAlmacen(sel.value || null);
+    });
+  }
+
+  const btnMenu = document.getElementById("alm-acciones-btn");
+  const menu = document.getElementById("alm-acciones-menu");
+  if (btnMenu && menu) {
+    btnMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.classList.toggle("hidden");
+    });
+    document.addEventListener("click", (e) => {
+      if (!menu.classList.contains("hidden") && !menu.contains(e.target) && e.target !== btnMenu) {
+        menu.classList.add("hidden");
+      }
+    });
+  }
+
+  const btnCrear = document.getElementById("alm-crear-btn");
+  if (btnCrear) {
+    btnCrear.addEventListener("click", () => {
+      if (menu) menu.classList.add("hidden");
+      abrirFormCrearAlmacen();
+    });
+  }
+  const btnEditar = document.getElementById("alm-editar-btn");
+  if (btnEditar) {
+    btnEditar.addEventListener("click", () => {
+      if (menu) menu.classList.add("hidden");
+      abrirFormEditarAlmacen();
+    });
+  }
+  const btnToggle = document.getElementById("alm-toggle-btn");
+  if (btnToggle) {
+    btnToggle.addEventListener("click", async () => {
+      if (menu) menu.classList.add("hidden");
+      if (!_almacenSeleccionadoId) return;
+      const a = (_cache.almacenes || []).find((x) => x.id === _almacenSeleccionadoId);
+      if (!a) return;
+      const nuevoActivo = a.activo === false;
+      btnToggle.disabled = true;
+      const resultado = await activarDesactivarAlmacen(a.id, nuevoActivo);
+      btnToggle.disabled = false;
+      if (!resultado.ok) {
+        setMsg("msg-almacenes", "No se pudo cambiar el estado: " + explicarError(resultado.error, "cambiar estado de almacén"), false);
+        return;
+      }
+      setMsg("msg-almacenes", resultado.offline
+        ? "Cambio de estado guardado, se sincronizará cuando vuelva la conexión."
+        : (nuevoActivo ? "Almacén activado." : "Almacén desactivado."), true);
+      if (!resultado.offline) {
+        await refrescarAlmacenes();
+        await refrescarStockYSelects();
+        seleccionarAlmacen(a.id);
+      }
+    });
+  }
+  const btnCancelar = document.getElementById("alm-cancelar-btn");
+  if (btnCancelar) btnCancelar.addEventListener("click", () => cerrarFormAlmacen());
+});
+
+// Micromisión 9.3 (Tarea 3A): edición y activar/desactivar de almacén,
+// conectadas a los RPC ya existentes en producción a través de la misma
+// cola offline/idempotencia (ejecutarOperacion + RPC_POR_TIPO). Todavía sin
+// UI (botones/formulario) — quedan listas para que una micromisión
+// posterior las conecte a elementos de la interfaz.
+//
+// cambios: { p_nombre, p_tipo } — solo se envían los campos provistos.
+async function editarAlmacen(almacen_id, cambios) {
+  const payload = Object.assign({ p_almacen_id: almacen_id }, cambios || {});
+  const resultado = await ejecutarOperacion("almacen_actualizar", payload);
+  if (resultado.ok && !resultado.offline) {
+    await refrescarAlmacenes();
+    await refrescarStockYSelects();
+  }
+  return resultado;
+}
+
+async function activarDesactivarAlmacen(almacen_id, activo) {
+  const resultado = await ejecutarOperacion("almacen_estado", {
+    p_almacen_id: almacen_id,
+    p_activo: !!activo,
+  });
+  if (resultado.ok && !resultado.offline) {
+    await refrescarAlmacenes();
+    await refrescarStockYSelects();
+  }
+  return resultado;
+}
 
 async function refrescarTransferencias() {
   setLoading("lista-transferencias", "Cargando transferencias…");
@@ -4337,6 +4826,8 @@ let ventaLineas = [];
 let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
 let ventaProductosPrecios = {}; // id -> { nombre, precio_normal, precio_mayorista }
 let ventaProductosLista = []; // lista completa de productos, para el buscador
+let ventaCategoriasLista = []; // Misión 9.3 (Tarea 2): categorías reales, para los filtros del catálogo
+let catalogoCategoriaActiva = ""; // "" = Todos. Estado local de la pestaña, no una segunda cache.
 
 // ---- Stock disponible para el carrito — Sesión 20 ----
 // Reutiliza _cache.stock, que ya carga y mantiene refrescarStockYSelects()
@@ -4407,6 +4898,161 @@ function actualizarStockDisponibleUI() {
   infoEl.className = "msg" + (disponible <= 0 ? " error" : "");
   cantidadInput.setAttribute("max", disponible);
 }
+
+// ---- Misión 9.3 (Tarea 2): agregar línea al carrito — función compartida ----
+// Extraída del handler de submit del buscador tradicional para que el
+// catálogo visual (tarjetas) use exactamente la misma validación de
+// precio/stock y el mismo array ventaLineas, sin crear un segundo camino de
+// venta. Devuelve true si la línea se agregó (o se sumó a una existente),
+// false si hubo un error (y ya deja el mensaje puesto en msg-venta-linea).
+function agregarLineaVenta(producto_id, cantidad, almacen_id) {
+  const tipo = ventaAlmacenesTipo[almacen_id];
+  const producto = ventaProductosPrecios[producto_id];
+  if (!producto) { setMsg("msg-venta-linea", "Producto no encontrado.", false); return false; }
+
+  const precio = tipo === "mayorista" ? producto.precio_mayorista : producto.precio_normal;
+  if (precio === null || precio === undefined) {
+    setMsg("msg-venta-linea", "Este producto no tiene precio mayorista configurado.", false);
+    return false;
+  }
+
+  // Impedir superar el stock disponible: se compara lo que ya está en el
+  // carrito para ese producto + lo que se está por agregar, contra el
+  // stock real de ese producto en el almacén elegido.
+  const existente = ventaLineas.find((l) => l.producto_id === producto_id);
+  const { valor: stockTotal } = obtenerStockDisponible(producto_id, almacen_id);
+  const yaEnCarrito = existente ? existente.cantidad : 0;
+  if (yaEnCarrito + cantidad > stockTotal) {
+    const disponible = Math.max(stockTotal - yaEnCarrito, 0);
+    setMsg("msg-venta-linea", "No hay suficiente stock de " + producto.nombre + " (disponible: " + money(disponible) + ").", false);
+    return false;
+  }
+
+  if (existente) {
+    existente.cantidad += cantidad;
+    existente.subtotal = existente.cantidad * existente.precio_unitario;
+  } else {
+    ventaLineas.push({
+      producto_id, nombre: producto.nombre, cantidad,
+      precio_unitario: precio, subtotal: cantidad * precio,
+    });
+  }
+
+  setMsg("msg-venta-linea", "", true);
+  renderVentaLineas();
+  return true;
+}
+
+// ---- Misión 9.3 (Tarea 2): catálogo visual de productos en Ventas ----
+// Vive al lado del buscador tradicional (no lo reemplaza) y usa las mismas
+// fuentes de datos (ventaProductosLista/ventaCategoriasLista, ya cargadas
+// por refrescarVentas) y la misma función agregarLineaVenta() para tocar el
+// carrito. Solo se muestran productos activos: es una vista nueva pensada
+// para vender rápido, no para administrar catálogo (eso sigue en Productos).
+function renderCatalogoCategorias() {
+  const cont = document.getElementById("catalogo-categorias");
+  if (!cont) return;
+
+  const chips = [{ id: "", nombre: "Todos" }, ...ventaCategoriasLista];
+  cont.innerHTML = "";
+  chips.forEach((c) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "catalogo-chip" + (catalogoCategoriaActiva === c.id ? " activo" : "");
+    btn.textContent = c.nombre;
+    btn.dataset.categoriaId = c.id;
+    cont.appendChild(btn);
+  });
+}
+
+function renderCatalogoGrid() {
+  const grid = document.getElementById("catalogo-grid");
+  if (!grid) return;
+
+  const almacen_id = document.getElementById("venta-almacen") ? document.getElementById("venta-almacen").value : "";
+  const disponibles = ventaProductosLista.filter((p) => {
+    if (p.activo === false) return false;
+    if (catalogoCategoriaActiva && p.categoria_id !== catalogoCategoriaActiva) return false;
+    return true;
+  });
+
+  if (disponibles.length === 0) {
+    grid.innerHTML = '<p class="lista-estado">No hay productos activos para mostrar en esta categoría.</p>';
+    return;
+  }
+
+  const tipo = almacen_id ? ventaAlmacenesTipo[almacen_id] : null;
+  grid.innerHTML = "";
+  disponibles.forEach((p) => {
+    const precio = tipo === "mayorista" ? p.precio_mayorista : p.precio_normal;
+    const precioTxt = precio === null || precio === undefined ? "Sin precio" : "$" + money(precio);
+    const stockTxt = almacen_id ? money(obtenerStockDisponible(p.id, almacen_id).valor) : null;
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "catalogo-card";
+    card.dataset.productoId = p.id;
+    card.innerHTML = `
+      ${p.imagen_url
+        ? `<img src="${escHtml(p.imagen_url)}" alt="" class="catalogo-card-img" loading="lazy">`
+        : `<span class="catalogo-card-img catalogo-card-img-vacia" aria-hidden="true"></span>`}
+      <span class="catalogo-card-nombre">${escHtml(p.nombre)}</span>
+      <span class="catalogo-card-precio">${precioTxt}</span>
+      ${p.categorias ? `<span class="catalogo-card-categoria">${escHtml(p.categorias.nombre)}</span>` : ""}
+      ${stockTxt !== null ? `<span class="catalogo-card-stock">Stock: ${stockTxt}</span>` : ""}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+safeInit("venta-vista-toggle", () => {
+  const btnBuscador = document.getElementById("venta-vista-btn-buscador");
+  const btnCatalogo = document.getElementById("venta-vista-btn-catalogo");
+  const modoBuscador = document.getElementById("venta-modo-buscador");
+  const modoCatalogo = document.getElementById("venta-modo-catalogo");
+  if (!btnBuscador || !btnCatalogo || !modoBuscador || !modoCatalogo) return;
+
+  function mostrar(vista) {
+    const esCatalogo = vista === "catalogo";
+    modoCatalogo.classList.toggle("hidden", !esCatalogo);
+    modoBuscador.classList.toggle("hidden", esCatalogo);
+    btnCatalogo.classList.toggle("activo", esCatalogo);
+    btnBuscador.classList.toggle("activo", !esCatalogo);
+    btnCatalogo.setAttribute("aria-pressed", String(esCatalogo));
+    btnBuscador.setAttribute("aria-pressed", String(!esCatalogo));
+    if (esCatalogo) renderCatalogoGrid(); // refleja el almacén/stock más reciente al entrar
+  }
+
+  btnBuscador.addEventListener("click", () => mostrar("buscador"));
+  btnCatalogo.addEventListener("click", () => mostrar("catalogo"));
+});
+
+safeInit("catalogo-categorias", () => {
+  document.getElementById("catalogo-categorias").addEventListener("click", (e) => {
+    const chip = e.target.closest(".catalogo-chip");
+    if (!chip) return;
+    catalogoCategoriaActiva = chip.dataset.categoriaId || "";
+    renderCatalogoCategorias();
+    renderCatalogoGrid();
+  });
+});
+
+safeInit("catalogo-grid", () => {
+  document.getElementById("catalogo-grid").addEventListener("click", (e) => {
+    const card = e.target.closest(".catalogo-card");
+    if (!card) return;
+    const almacen_id = document.getElementById("venta-almacen").value;
+    if (!almacen_id) { setMsg("msg-venta-linea", "Elegí un almacén.", false); return; }
+    agregarLineaVenta(card.dataset.productoId, 1, almacen_id);
+    renderCatalogoGrid(); // refleja el stock restante en la tarjeta
+  });
+});
+
+// El catálogo depende del almacén elegido (precio y stock cambian), igual
+// que ya le pasa a actualizarStockDisponibleUI() del buscador tradicional.
+safeInit("venta-almacen-catalogo-sync", () => {
+  document.getElementById("venta-almacen").addEventListener("change", renderCatalogoGrid);
+});
 
 function renderVentaLineas() {
   const lista = document.getElementById("venta-lineas");
@@ -4589,44 +5235,13 @@ safeInit("form-venta-linea", () => {
     if (!producto_id) { setMsg("msg-venta-linea", "Elegí un producto.", false); return; }
     if (!(cantidad > 0)) { setMsg("msg-venta-linea", "La cantidad debe ser mayor a 0.", false); return; }
 
-    const tipo = ventaAlmacenesTipo[almacen_id];
-    const producto = ventaProductosPrecios[producto_id];
-    if (!producto) { setMsg("msg-venta-linea", "Producto no encontrado.", false); return; }
+    const ok = agregarLineaVenta(producto_id, cantidad, almacen_id);
+    if (!ok) return;
 
-    const precio = tipo === "mayorista" ? producto.precio_mayorista : producto.precio_normal;
-    if (precio === null || precio === undefined) {
-      setMsg("msg-venta-linea", "Este producto no tiene precio mayorista configurado.", false);
-      return;
-    }
-
-    // Impedir superar el stock disponible: se compara lo que ya está en el
-    // carrito para ese producto + lo que se está por agregar, contra el
-    // stock real de ese producto en el almacén elegido.
-    const existente = ventaLineas.find((l) => l.producto_id === producto_id);
-    const { valor: stockTotal } = obtenerStockDisponible(producto_id, almacen_id);
-    const yaEnCarrito = existente ? existente.cantidad : 0;
-    if (yaEnCarrito + cantidad > stockTotal) {
-      const disponible = Math.max(stockTotal - yaEnCarrito, 0);
-      setMsg("msg-venta-linea", "No hay suficiente stock de " + producto.nombre + " (disponible: " + money(disponible) + ").", false);
-      return;
-    }
-
-    if (existente) {
-      existente.cantidad += cantidad;
-      existente.subtotal = existente.cantidad * existente.precio_unitario;
-    } else {
-      ventaLineas.push({
-        producto_id, nombre: producto.nombre, cantidad,
-        precio_unitario: precio, subtotal: cantidad * precio,
-      });
-    }
-
-    setMsg("msg-venta-linea", "", true);
     cantidadInput.value = "";
     productoSelect.value = "";
     buscarInputReset();
     actualizarStockDisponibleUI();
-    renderVentaLineas();
   });
 
   function buscarInputReset() {
@@ -4775,7 +5390,9 @@ safeInit("confirmar-venta", () => {
 });
 
 async function refrescarVentas() {
-  const [productos, almacenes] = await Promise.all([cargarProductos(), cargarAlmacenes()]);
+  const [productos, almacenes, categorias] = await Promise.all([
+    cargarProductos(), cargarAlmacenes(), cargarCategorias(),
+  ]);
 
   ventaAlmacenesTipo = {};
   almacenes.forEach((a) => { ventaAlmacenesTipo[a.id] = a.tipo; });
@@ -4788,6 +5405,7 @@ async function refrescarVentas() {
   });
 
   ventaProductosLista = productos;
+  ventaCategoriasLista = categorias;
   const buscarInput = document.getElementById("venta-producto-buscar");
   if (buscarInput) buscarInput.value = "";
 
@@ -4795,6 +5413,8 @@ async function refrescarVentas() {
   fillSelect(document.getElementById("venta-producto"), productos, "id", (p) => p.nombre, true);
   renderVentaLineas();
   actualizarStockDisponibleUI();
+  renderCatalogoCategorias();
+  renderCatalogoGrid();
   await refrescarVentasHistorial();
 }
 
@@ -5272,6 +5892,9 @@ async function refrescarUsuarios() {
     return;
   }
   setLoading("lista-usuarios", "Cargando usuarios…");
+  // Refrescar roles ANTES de renderizar usuarios: el <select> de rol de
+  // cada usuario necesita _rolesCache ya cargada (Misión 9.3 — Fase 3).
+  await refrescarRoles();
   try {
     const { data, error } = await client.rpc("listar_usuarios_admin", {});
     if (error) {
@@ -5300,58 +5923,66 @@ function renderizarUsuarios(usuarios) {
     return;
   }
   lista.innerHTML = "";
+  const puedeEditar = tienePermiso("usuarios", "editar");
   usuarios.forEach((u) => {
     const div = document.createElement("div");
     div.className = "lista-item usuario-item" + (u.activo === false ? " usuario-inactivo" : "");
     const estado = u.activo === false ? "🔴 Inactivo" : "🟢 Activo";
+
+    // Misión 9.3 — Fase 3: reemplaza el window.prompt() de texto libre
+    // (donde había que escribir el nombre exacto del rol) por un <select>
+    // real con los roles activos existentes. Pedido explícito: "NO quiero
+    // escribir manualmente el nombre del rol".
+    let selectRol = '<span class="usuario-rol-fijo">Rol: ' + escHtml(u.rol || "—") + '</span>';
+    if (puedeEditar) {
+      const opciones = _rolesCache.map((r) => {
+        const sel = r.id === u.role_id ? " selected" : "";
+        return '<option value="' + escHtml(r.id) + '"' + sel + '>' + escHtml(r.nombre) + '</option>';
+      }).join("");
+      selectRol = '<select class="usr-rol-select" data-id="' + escHtml(u.id) + '">' + opciones + '</select>';
+    }
+
     let acciones = "";
-    if (tienePermiso("usuarios", "editar")) {
+    if (puedeEditar) {
       acciones = '<span class="usuario-acciones">'
-        + '<button type="button" class="cc-accion usr-rol-btn" data-id="' + escHtml(u.id) + '" data-nombre="' + escHtml(u.nombre || "") + '">Cambiar rol</button>'
         + '<button type="button" class="cc-accion usr-estado-btn" data-id="' + escHtml(u.id) + '" data-activo="' + (u.activo !== false ? "true" : "false") + '">' + (u.activo !== false ? "Desactivar" : "Activar") + '</button>'
         + "</span>";
     }
     div.innerHTML = '<span class="usuario-principal">'
       + '<span class="usuario-nombre">' + escHtml(u.nombre || "—") + '</span>'
-      + '<span class="muted">Rol: ' + escHtml(u.rol || "—") + ' · ' + estado + '</span>'
+      + '<span class="muted">' + selectRol + ' · ' + estado + '</span>'
       + '</span>' + acciones;
     lista.appendChild(div);
   });
 }
 
-async function refrescarRoles() {
+async function refrescarRoles(incluirInactivos) {
   try {
-    const { data, error } = await client.rpc("listar_roles_admin", {});
+    const { data, error } = await client.rpc("listar_roles_admin", { p_incluir_inactivos: !!incluirInactivos });
     if (error) { _rolesCache = []; return; }
     _rolesCache = data || [];
   } catch (e) { _rolesCache = []; }
 }
 
-// Cambiar rol de un usuario (reutiliza asignar_rol_usuario, protegido en backend).
-async function abrirCambiarRol(usuarioId, nombreActual) {
+// Misión 9.3 — Fase 3: cambiar rol de un usuario desde el <select> real
+// de renderizarUsuarios (reutiliza asignar_rol_usuario, ya protegido en
+// backend). Reemplaza el flujo anterior de window.prompt() con texto libre.
+async function cambiarRolDesdeSelect(usuarioId, roleId, selectEl) {
   if (!tienePermiso("usuarios", "editar")) return;
-  if (_rolesCache.length === 0) await refrescarRoles();
-  if (_rolesCache.length === 0) {
-    setMsg("msg-usuarios", "No se pudieron cargar los roles. ¿Está aplicado supabase/b3-roles-permisos.sql?", false);
-    return;
-  }
-  const opciones = _rolesCache.map((r) => r.nombre).join(", ");
-  const elegido = window.prompt("Cambiar rol de " + nombreActual + ".\nRoles disponibles: " + opciones + "\n\nEscribí el nombre exacto del rol:");
-  if (!elegido) return;
-  const rol = _rolesCache.find((r) => r.nombre.toLowerCase() === elegido.trim().toLowerCase());
-  if (!rol) {
-    setMsg("msg-usuarios", "Ese rol no existe.", false);
-    return;
-  }
-  const { error } = await client.rpc("asignar_rol_usuario", { p_usuario_id: usuarioId, p_role_id: rol.id });
+  const rol = _rolesCache.find((r) => r.id === roleId);
+  const { error } = await client.rpc("asignar_rol_usuario", { p_usuario_id: usuarioId, p_role_id: roleId });
   if (error) {
     setMsg("msg-usuarios", "No se pudo cambiar el rol: " + escHtml(error.message || error.code || error), false);
+    // Revertir el <select> visualmente si la llamada falló (por ejemplo,
+    // protección del último Dueño activo), para no mostrar un valor que
+    // en realidad no se guardó.
+    await refrescarUsuarios();
     return;
   }
   setMsg("msg-usuarios", "Rol actualizado.", true);
   // B4: auditoría del cambio de rol (trazabilidad administrativa).
   if (typeof registrarAuditoria === "function") {
-    registrarAuditoria("usuario_rol", "Rol de usuario cambiado a '" + rol.nombre + "'.", "exito", usuarioId, null, null);
+    registrarAuditoria("usuario_rol", "Rol de usuario cambiado a '" + (rol ? rol.nombre : roleId) + "'.", "exito", usuarioId, null, null);
   }
   await refrescarUsuarios();
 }
@@ -5378,16 +6009,254 @@ safeInit("admin-usuarios", () => {
   const lista = document.getElementById("lista-usuarios");
   if (!lista) return;
   lista.addEventListener("click", async (e) => {
-    const rolBtn = e.target.closest(".usr-rol-btn");
-    if (rolBtn) {
-      e.stopPropagation();
-      await abrirCambiarRol(rolBtn.dataset.id, rolBtn.dataset.nombre);
-      return;
-    }
     const estBtn = e.target.closest(".usr-estado-btn");
     if (estBtn) {
       e.stopPropagation();
       await cambiarEstadoUsuario(estBtn.dataset.id, estBtn.dataset.activo === "true");
+      return;
+    }
+  });
+  // Misión 9.3 — Fase 3: el cambio de rol ahora es un <select>, se escucha
+  // por "change" (no "click" como los botones de arriba).
+  lista.addEventListener("change", async (e) => {
+    const sel = e.target.closest(".usr-rol-select");
+    if (!sel) return;
+    e.stopPropagation();
+    await cambiarRolDesdeSelect(sel.dataset.id, sel.value, sel);
+  });
+});
+
+// ============================================================
+// Misión 9.3 — Fase 3: administración de Roles y Permisos
+// ============================================================
+// Regla de arquitectura (mission 9.3): los permisos pertenecen al ROL, no
+// al usuario individual. Esta sección administra los roles en sí (crear,
+// renombrar, activar/desactivar, eliminar) y la matriz de permisos de
+// cada rol, reutilizando las RPC crear_rol/editar_rol/
+// activar_desactivar_rol/eliminar_rol/actualizar_permisos_rol y
+// permisos_por_rol (ya existente). El rol "Dueño" está protegido en el
+// backend: no se puede renombrar, desactivar, eliminar ni editar sus
+// permisos desde acá.
+
+const SECCIONES_PERMISOS = ["productos", "categorias", "almacenes", "stock",
+  "transferencias", "vales_salida", "ventas", "reportes", "usuarios",
+  "presentaciones", "auditoria", "turnos", "comunicacion", "unidades"];
+const ACCIONES_PERMISOS = ["ver", "crear", "editar", "borrar", "editar_any"];
+
+let _rolExpandidoId = null; // rol cuya matriz de permisos está abierta
+let _permisosRolActual = []; // matriz cargada del rol expandido
+
+async function refrescarRolesAdmin() {
+  if (!tienePermiso("usuarios", "ver")) {
+    setEmpty("lista-roles", "No tenés permiso para ver roles.");
+    return;
+  }
+  setLoading("lista-roles", "Cargando roles…");
+  try {
+    const { data, error } = await client.rpc("listar_roles_admin", { p_incluir_inactivos: true });
+    if (error) {
+      setEmpty("lista-roles", "No se pudieron cargar los roles: " + escHtml(error.message || error.code || error));
+      return;
+    }
+    renderizarRolesAdmin(data || []);
+  } catch (e) {
+    setEmpty("lista-roles", "Error al cargar roles.");
+    console.warn("[Battlecruiser] listar_roles_admin:", e);
+  }
+}
+
+function renderizarRolesAdmin(roles) {
+  const cont = document.getElementById("lista-roles");
+  if (!cont) return;
+  if (!roles || roles.length === 0) {
+    setEmpty("lista-roles", "Todavía no hay roles.");
+    return;
+  }
+  const puedeEditar = tienePermiso("usuarios", "editar");
+  const puedeBorrar = tienePermiso("usuarios", "borrar");
+  cont.innerHTML = "";
+  roles.forEach((r) => {
+    const esDueno = r.nombre === "Dueño";
+    const div = document.createElement("div");
+    div.className = "lista-item rol-item" + (r.activo === false ? " usuario-inactivo" : "");
+    const estado = r.activo === false ? "🔴 Inactivo" : "🟢 Activo";
+    let acciones = '<button type="button" class="cc-accion rol-permisos-btn" data-id="' + escHtml(r.id) + '">'
+      + (_rolExpandidoId === r.id ? "Ocultar permisos" : "Ver/editar permisos") + '</button>';
+    if (puedeEditar && !esDueno) {
+      acciones += '<button type="button" class="cc-accion rol-renombrar-btn" data-id="' + escHtml(r.id) + '" data-nombre="' + escHtml(r.nombre) + '">Renombrar</button>'
+        + '<button type="button" class="cc-accion rol-estado-btn" data-id="' + escHtml(r.id) + '" data-activo="' + (r.activo !== false ? "true" : "false") + '">' + (r.activo !== false ? "Desactivar" : "Activar") + '</button>';
+    }
+    if (puedeBorrar && !esDueno) {
+      acciones += '<button type="button" class="cc-accion rol-eliminar-btn" data-id="' + escHtml(r.id) + '" data-nombre="' + escHtml(r.nombre) + '" data-usuarios="' + (r.cantidad_usuarios || 0) + '">Eliminar</button>';
+    }
+    div.innerHTML = '<span class="usuario-principal">'
+      + '<span class="usuario-nombre">' + escHtml(r.nombre) + (esDueno ? " 🔒" : "") + '</span>'
+      + '<span class="muted">' + (r.cantidad_usuarios || 0) + ' usuario(s) · ' + estado + '</span>'
+      + '</span><span class="usuario-acciones">' + acciones + '</span>';
+    cont.appendChild(div);
+
+    if (_rolExpandidoId === r.id) {
+      const panel = document.createElement("div");
+      panel.className = "rol-permisos-panel";
+      panel.id = "rol-permisos-panel";
+      panel.innerHTML = '<p class="muted">Cargando permisos…</p>';
+      cont.appendChild(panel);
+      cargarYRenderizarPermisosRol(r.id, esDueno);
+    }
+  });
+}
+
+async function cargarYRenderizarPermisosRol(roleId, esDueno) {
+  const panel = document.getElementById("rol-permisos-panel");
+  if (!panel) return;
+  try {
+    const { data, error } = await client.rpc("permisos_por_rol", { p_role_id: roleId });
+    if (error) {
+      panel.innerHTML = '<p class="msg">No se pudieron cargar los permisos: ' + escHtml(error.message || error.code || error) + '</p>';
+      return;
+    }
+    _permisosRolActual = data || [];
+    const permitidos = new Set(_permisosRolActual.filter((p) => p.permitido).map((p) => p.seccion + "|" + p.accion));
+    const disponibles = new Set(_permisosRolActual.map((p) => p.seccion + "|" + p.accion));
+
+    let tabla = '<table class="permisos-tabla"><thead><tr><th>Sección</th>';
+    ACCIONES_PERMISOS.forEach((a) => { tabla += "<th>" + a + "</th>"; });
+    tabla += "</tr></thead><tbody>";
+    SECCIONES_PERMISOS.forEach((s) => {
+      tabla += "<tr><td>" + s + "</td>";
+      ACCIONES_PERMISOS.forEach((a) => {
+        const key = s + "|" + a;
+        if (!disponibles.has(key)) { tabla += "<td>—</td>"; return; }
+        const checked = permitidos.has(key) ? " checked" : "";
+        const disabled = esDueno ? " disabled" : "";
+        tabla += '<td><input type="checkbox" class="permiso-check" data-seccion="' + s + '" data-accion="' + a + '"' + checked + disabled + '></td>';
+      });
+      tabla += "</tr>";
+    });
+    tabla += "</tbody></table>";
+    if (esDueno) {
+      tabla += '<p class="muted">El rol Dueño siempre tiene todos los permisos; no se puede editar.</p>';
+    } else {
+      tabla += '<button type="button" class="cc-accion" id="rol-permisos-guardar-btn" data-id="' + escHtml(roleId) + '">Guardar permisos</button>';
+    }
+    panel.innerHTML = tabla;
+  } catch (e) {
+    panel.innerHTML = '<p class="msg">Error al cargar permisos.</p>';
+    console.warn("[Battlecruiser] permisos_por_rol:", e);
+  }
+}
+
+safeInit("admin-roles", () => {
+  const form = document.getElementById("form-nuevo-rol");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("rol-nombre");
+      const nombre = input.value.trim();
+      if (!nombre) return;
+      showLoading();
+      try {
+        const { error } = await client.rpc("crear_rol", { p_nombre: nombre });
+        if (error) {
+          setMsg("msg-roles", "No se pudo crear el rol: " + escHtml(error.message || error.code || error), false);
+          return;
+        }
+        setMsg("msg-roles", "Rol creado. Asignale permisos con \"Ver/editar permisos\".", true);
+        form.reset();
+        await refrescarRolesAdmin();
+      } catch (err) {
+        setMsg("msg-roles", "Error inesperado al crear el rol.", false);
+        console.error("[Battlecruiser] crear_rol", err);
+      } finally {
+        hideLoading();
+      }
+    });
+  }
+
+  const lista = document.getElementById("lista-roles");
+  if (!lista) return;
+
+  lista.addEventListener("click", async (e) => {
+    const permisosBtn = e.target.closest(".rol-permisos-btn");
+    if (permisosBtn) {
+      e.stopPropagation();
+      const id = permisosBtn.dataset.id;
+      _rolExpandidoId = (_rolExpandidoId === id) ? null : id;
+      await refrescarRolesAdmin();
+      return;
+    }
+
+    const renombrarBtn = e.target.closest(".rol-renombrar-btn");
+    if (renombrarBtn) {
+      e.stopPropagation();
+      const nuevo = window.prompt("Nuevo nombre para el rol \"" + renombrarBtn.dataset.nombre + "\":", renombrarBtn.dataset.nombre);
+      if (!nuevo || !nuevo.trim() || nuevo.trim() === renombrarBtn.dataset.nombre) return;
+      showLoading();
+      try {
+        const { error } = await client.rpc("editar_rol", { p_role_id: renombrarBtn.dataset.id, p_nombre: nuevo.trim() });
+        if (error) { setMsg("msg-roles", "No se pudo renombrar: " + escHtml(error.message || error.code || error), false); return; }
+        setMsg("msg-roles", "Rol renombrado.", true);
+        await refrescarRolesAdmin();
+        await refrescarUsuarios();
+      } finally { hideLoading(); }
+      return;
+    }
+
+    const estadoBtn = e.target.closest(".rol-estado-btn");
+    if (estadoBtn) {
+      e.stopPropagation();
+      const activar = estadoBtn.dataset.activo !== "true";
+      showLoading();
+      try {
+        const { error } = await client.rpc("activar_desactivar_rol", { p_role_id: estadoBtn.dataset.id, p_activo: activar });
+        if (error) { setMsg("msg-roles", "No se pudo cambiar el estado: " + escHtml(error.message || error.code || error), false); return; }
+        setMsg("msg-roles", activar ? "Rol activado." : "Rol desactivado.", true);
+        await refrescarRolesAdmin();
+      } finally { hideLoading(); }
+      return;
+    }
+
+    const eliminarBtn = e.target.closest(".rol-eliminar-btn");
+    if (eliminarBtn) {
+      e.stopPropagation();
+      const cantUsuarios = parseInt(eliminarBtn.dataset.usuarios || "0", 10);
+      if (cantUsuarios > 0) {
+        setMsg("msg-roles", "No se puede eliminar \"" + eliminarBtn.dataset.nombre + "\": " + cantUsuarios + " usuario(s) todavía lo tienen asignado.", false);
+        return;
+      }
+      if (!window.confirm("¿Eliminar el rol \"" + eliminarBtn.dataset.nombre + "\"? Esta acción no se puede deshacer.")) return;
+      showLoading();
+      try {
+        const { error } = await client.rpc("eliminar_rol", { p_role_id: eliminarBtn.dataset.id });
+        if (error) { setMsg("msg-roles", "No se pudo eliminar: " + escHtml(error.message || error.code || error), false); return; }
+        setMsg("msg-roles", "Rol eliminado.", true);
+        if (_rolExpandidoId === eliminarBtn.dataset.id) _rolExpandidoId = null;
+        await refrescarRolesAdmin();
+      } finally { hideLoading(); }
+      return;
+    }
+
+    const guardarBtn = e.target.closest("#rol-permisos-guardar-btn");
+    if (guardarBtn) {
+      e.stopPropagation();
+      const panel = document.getElementById("rol-permisos-panel");
+      if (!panel) return;
+      const checks = panel.querySelectorAll(".permiso-check");
+      const payload = Array.from(checks).map((c) => ({
+        seccion: c.dataset.seccion,
+        accion: c.dataset.accion,
+        permitido: c.checked,
+      }));
+      showLoading();
+      try {
+        const { error } = await client.rpc("actualizar_permisos_rol", { p_role_id: guardarBtn.dataset.id, p_permisos: payload });
+        if (error) { setMsg("msg-roles", "No se pudieron guardar los permisos: " + escHtml(error.message || error.code || error), false); return; }
+        setMsg("msg-roles", "Permisos guardados. Los usuarios con este rol ya tienen los permisos nuevos.", true);
+        // B4: auditoría del cambio de permisos.
+        if (typeof registrarAuditoria === "function") {
+          registrarAuditoria("rol_permisos", "Permisos del rol actualizados.", "exito", guardarBtn.dataset.id, null, null);
+        }
+      } finally { hideLoading(); }
       return;
     }
   });
@@ -5406,8 +6275,9 @@ Object.assign(window, {
   contextoB3Disponible,
   usuarioPuedeOperar,
   refrescarUsuarios,
-  abrirCambiarRol,
+  cambiarRolDesdeSelect,
   cambiarEstadoUsuario,
+  refrescarRolesAdmin,
 });
 
 

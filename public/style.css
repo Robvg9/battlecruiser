@@ -339,6 +339,74 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 .lista-item-acciones button { font-size: 11.5px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--gold-dim); background: transparent; color: var(--text); cursor: pointer; }
 .lista-item-acciones button:disabled { opacity: 0.6; cursor: default; }
 .lista-estado { padding: 12px; color: var(--mist); font-size: 12.5px; font-style: italic; }
+
+/* Misión 9.3 (Tarea 2): catálogo visual de productos en Ventas. Mismo
+   lenguaje visual que el resto (--stone/--gold/--mist), pensado mobile-first:
+   grid de tarjetas grandes y táctiles, filtros como chips horizontales. */
+.venta-almacen-wrap { margin-bottom: 10px; }
+.venta-almacen-wrap select {
+  width: 100%; padding: 10px 11px; background: var(--stone); border: 1px solid #c9a24d33;
+  border-radius: 6px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px;
+}
+.venta-vista-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+.venta-vista-btn {
+  flex: 1 1 0; padding: 9px; border-radius: 6px; border: 1px solid var(--gold-dim);
+  background: transparent; color: var(--mist); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.venta-vista-btn.activo { background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #211605; border-color: transparent; }
+.catalogo-categorias { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.catalogo-chip {
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--gold-dim);
+  background: var(--stone); color: var(--mist); font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.catalogo-chip.activo { background: var(--gold); color: #211605; border-color: transparent; font-weight: 600; }
+.catalogo-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 6px;
+}
+.catalogo-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  padding: 8px; border-radius: 10px; border: 1px solid #c9a24d26; background: var(--stone);
+  color: var(--text); cursor: pointer; font-family: 'Inter', sans-serif;
+}
+.catalogo-card:active { background: var(--stone-2); }
+.catalogo-card-img { width: 100%; aspect-ratio: 1 / 1; border-radius: 7px; object-fit: cover; background: var(--void); }
+.catalogo-card-img-vacia {
+  display: block;
+  background: var(--void) linear-gradient(135deg, #c9a24d1a 25%, transparent 25%, transparent 50%, #c9a24d1a 50%, #c9a24d1a 75%, transparent 75%, transparent);
+  background-size: 12px 12px;
+}
+.catalogo-card-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; }
+.catalogo-card-precio { font-size: 13px; color: var(--gold-bright); font-weight: 700; }
+.catalogo-card-categoria, .catalogo-card-stock { font-size: 10.5px; color: var(--mist); font-family: 'IBM Plex Mono', monospace; }
+
+/* Misión 9.3 (Tarea 1): imagen por producto — miniatura en la lista y
+   vista previa/controles en el formulario. Reutiliza la paleta y el
+   lenguaje visual ya existente (var(--stone)/--gold-dim/--mist). */
+.producto-thumb {
+  width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+  background: var(--void); border: 1px solid #c9a24d26;
+}
+.producto-thumb-vacia {
+  display: inline-block;
+  background: var(--void) linear-gradient(135deg, #c9a24d1a 25%, transparent 25%, transparent 50%, #c9a24d1a 50%, #c9a24d1a 75%, transparent 75%, transparent);
+  background-size: 10px 10px;
+}
+.prod-imagen-campo { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; }
+.prod-imagen-label { font-size: 11.5px; color: var(--mist); }
+.prod-imagen-campo input[type="file"] {
+  font-size: 12.5px; color: var(--text); background: var(--void); border: 1px solid #c9a24d33;
+  border-radius: 5px; padding: 8px; font-family: 'Inter', sans-serif;
+}
+.prod-imagen-preview-wrap { display: flex; align-items: center; gap: 10px; }
+.prod-imagen-preview-wrap.hidden { display: none; }
+.prod-imagen-preview {
+  width: 64px; height: 64px; border-radius: 8px; object-fit: cover;
+  border: 1px solid var(--gold-dim); background: var(--void);
+}
+.btn-quitar-imagen {
+  font-size: 11.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--gold-dim);
+  background: transparent; color: var(--text); cursor: pointer;
+}
 .msg { font-size: 12.5px; min-height: 16px; color: var(--mist); }
 .msg.error { color: var(--wine); }
 .msg.ok { color: var(--sage); }
@@ -1300,3 +1368,116 @@ button[type="submit"], .btn-confirmar-venta {
   background: var(--stone-2);
   color: var(--gold);
 }
+
+/* ============================================================
+   Misión 9.3 — Fase 3: Roles y Permisos (admin).
+   Reutiliza .cc-bloque / .lista-item / .cc-accion / .msg existentes.
+   ============================================================ */
+.usr-rol-select {
+  background: var(--stone-2, #22201b);
+  color: var(--text);
+  border: 1px solid var(--gold-dim);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  max-width: 160px;
+}
+
+.rol-permisos-panel {
+  margin: 4px 0 10px;
+  padding: 10px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.permisos-tabla {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11.5px;
+}
+
+.permisos-tabla th, .permisos-tabla td {
+  padding: 4px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(201,162,77,0.15);
+  white-space: nowrap;
+}
+
+.permisos-tabla td:first-child, .permisos-tabla th:first-child {
+  text-align: left;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.permisos-tabla input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+#rol-permisos-guardar-btn {
+  margin-top: 8px;
+}
+
+
+/* ============================================================
+   Misión 9.3 Tarea 3B — Gestión completa de Almacenes
+   ============================================================ */
+.alm-header {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  margin-bottom: 14px;
+}
+.alm-selector-wrap { flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; }
+.alm-selector-wrap label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.alm-selector-wrap select {
+  width: 100%; padding: 10px 12px; background: var(--stone);
+  border: 1px solid var(--gold-dim); border-radius: 6px; color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 13.5px;
+}
+.alm-acciones-wrap { position: relative; flex: 0 0 auto; }
+.alm-acciones-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 200px;
+  background: var(--stone-2); border: 1px solid var(--gold-dim); border-radius: 8px;
+  box-shadow: 0 14px 32px rgba(0,0,0,0.45); padding: 6px; z-index: 15;
+}
+.alm-acciones-menu.hidden { display: none; }
+.alm-acciones-menu button {
+  display: block; width: 100%; text-align: left; background: transparent;
+  border: none; color: var(--text); padding: 10px 12px; border-radius: 5px;
+  cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13px; margin: 0;
+}
+.alm-acciones-menu button:hover:not(:disabled) { background: var(--stone); color: var(--gold); }
+.alm-acciones-menu button:disabled { opacity: 0.45; cursor: default; }
+
+.alm-form-panel { margin-bottom: 14px; }
+.alm-form-panel.hidden { display: none; }
+.alm-form-panel #alm-cancelar-btn {
+  flex: 1 1 100%; background: transparent; color: var(--mist);
+  border: 1px solid var(--gold-dim); box-shadow: none;
+}
+.alm-form-panel #alm-cancelar-btn:hover { color: var(--gold); border-color: var(--gold); }
+
+.alm-info-panel {
+  margin-bottom: 16px; padding: 14px 16px;
+  background: var(--stone); border: 1px solid #c9a24d26; border-radius: 8px;
+}
+.alm-info-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;
+}
+.alm-info-item { display: flex; flex-direction: column; gap: 3px; }
+.alm-info-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--mist);
+}
+.alm-info-valor { font-size: 14px; color: var(--text); font-weight: 500; }
+.alm-estado-activo { color: var(--sage); }
+.alm-estado-inactivo { color: var(--wine); }
+
+.alm-productos-titulo {
+  font-family: 'Cormorant Garamond', serif; font-weight: 600;
+  font-size: 17px; color: var(--gold); margin: 8px 0 10px;
+}
+.alm-producto-item { align-items: center; }
+.alm-prod-info { flex: 1; min-width: 0; text-align: left; }
+.alm-prod-nombre { font-weight: 500; }
+.alm-prod-cant { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; white-space: nowrap; }

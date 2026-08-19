@@ -54,7 +54,20 @@
 // señal visible — ahora muestra una lista clicable real. El SW en sí no
 // cambió de comportamiento — el bump es para que los dispositivos ya
 // instalados bajen los archivos nuevos.
-const CACHE_NAME = "battlecruiser-shell-v34";
+// v37 — Misión 9.3, Tarea 2: bump por app.js/index.html/style.css — catálogo
+// visual de productos en Ventas (tarjetas con imagen/nombre/precio/categoría,
+// filtro por categoría real, toggle Buscador/Catálogo). No se creó un
+// segundo sistema de ventas: el catálogo llama a la misma función que ya
+// agregaba líneas al carrito (agregarLineaVenta, extraída del handler del
+// buscador) y respeta almacén/stock/precio/permisos/offline igual que antes.
+// El SW en sí no cambió de comportamiento — el bump es para que los
+// dispositivos ya instalados bajen los archivos nuevos.
+// v38 — Misión 9.3 Tarea 3B: gestión completa de Almacenes (selector,
+// menú de acciones crear/editar/activar-desactivar, panel informativo y
+// productos del almacén seleccionado). El SW en sí no cambió de
+// comportamiento — el bump es para que los dispositivos ya instalados
+// bajen los archivos nuevos.
+const CACHE_NAME = "battlecruiser-shell-v38";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [

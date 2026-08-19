@@ -237,6 +237,15 @@
         </datalist>
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
+        <div class="prod-imagen-campo">
+          <label for="prod-imagen-input" class="prod-imagen-label">Imagen del producto (JPG o PNG, opcional)</label>
+          <input type="file" id="prod-imagen-input" accept="image/jpeg,image/png,image/jpg">
+          <div id="prod-imagen-preview-wrap" class="prod-imagen-preview-wrap hidden">
+            <img id="prod-imagen-preview" class="prod-imagen-preview" alt="Vista previa de la imagen del producto">
+            <button type="button" id="prod-imagen-quitar" class="btn-quitar-imagen">Quitar imagen</button>
+          </div>
+          <div id="msg-prod-imagen" class="msg"></div>
+        </div>
         <button type="submit" id="prod-submit-btn">Agregar producto</button>
         <button type="button" id="prod-cancelar-edicion" class="hidden">Cancelar edición</button>
       </form>
@@ -293,17 +302,33 @@
     </section>
 
     <section id="tab-ventas" class="tab-panel">
-      <form id="form-venta-linea" class="inline-form">
+      <div class="venta-almacen-wrap">
         <select id="venta-almacen" required><option value="">Almacén</option></select>
-        <div class="venta-buscar-wrap">
-          <input id="venta-producto-buscar" type="text" placeholder="Buscar producto…" autocomplete="off">
-          <div id="venta-producto-resultados" class="venta-buscar-resultados hidden"></div>
-        </div>
-        <select id="venta-producto" required><option value="">Producto</option></select>
-        <input id="venta-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad">
-        <button type="submit">Agregar a la venta</button>
-      </form>
-      <p class="msg" id="venta-stock-disponible"></p>
+      </div>
+
+      <div class="venta-vista-toggle" role="tablist" aria-label="Modo de venta">
+        <button type="button" id="venta-vista-btn-buscador" class="venta-vista-btn activo" role="tab" aria-pressed="true">🔍 Buscador</button>
+        <button type="button" id="venta-vista-btn-catalogo" class="venta-vista-btn" role="tab" aria-pressed="false">🗂️ Catálogo</button>
+      </div>
+
+      <div id="venta-modo-buscador">
+        <form id="form-venta-linea" class="inline-form">
+          <div class="venta-buscar-wrap">
+            <input id="venta-producto-buscar" type="text" placeholder="Buscar producto…" autocomplete="off">
+            <div id="venta-producto-resultados" class="venta-buscar-resultados hidden"></div>
+          </div>
+          <select id="venta-producto" required><option value="">Producto</option></select>
+          <input id="venta-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad">
+          <button type="submit">Agregar a la venta</button>
+        </form>
+        <p class="msg" id="venta-stock-disponible"></p>
+      </div>
+
+      <div id="venta-modo-catalogo" class="hidden">
+        <div id="catalogo-categorias" class="catalogo-categorias"></div>
+        <div id="catalogo-grid" class="catalogo-grid"></div>
+      </div>
+
       <p class="msg" id="msg-venta-linea"></p>
 
       <div id="venta-lineas" class="lista">
@@ -331,18 +356,45 @@
     </section>
 
     <section id="tab-almacenes" class="tab-panel">
-      <form id="form-almacen" class="inline-form">
+      <div class="alm-header">
+        <div class="alm-selector-wrap">
+          <label class="muted" for="alm-selector">Almacén</label>
+          <select id="alm-selector">
+            <option value="">Elegí un almacén…</option>
+          </select>
+        </div>
+        <div class="alm-acciones-wrap">
+          <button type="button" id="alm-acciones-btn" class="cc-accion">Acciones ▾</button>
+          <div id="alm-acciones-menu" class="alm-acciones-menu hidden">
+            <button type="button" id="alm-crear-btn">Crear almacén</button>
+            <button type="button" id="alm-editar-btn" disabled>Editar almacén</button>
+            <button type="button" id="alm-toggle-btn" disabled>Activar / desactivar</button>
+          </div>
+        </div>
+      </div>
+
+      <form id="form-almacen" class="inline-form alm-form-panel hidden">
+        <input type="hidden" id="alm-editando-id" value="">
         <input id="alm-nombre" placeholder="Nombre del almacén" required>
         <select id="alm-tipo" required>
           <option value="">Tipo</option>
           <option value="venta">Venta (precio normal)</option>
           <option value="mayorista">Almacén / mayorista (precio mayorista)</option>
         </select>
-        <button type="submit">Agregar almacén</button>
+        <button type="submit" id="alm-submit-btn">Crear almacén</button>
+        <button type="button" id="alm-cancelar-btn" class="cc-accion">Cancelar</button>
       </form>
-      <div id="lista-almacenes" class="lista"></div>
-      <h3>Stock por almacén</h3>
-      <div id="lista-stock" class="lista"></div>
+
+      <div id="alm-info-panel" class="alm-info-panel">
+        <p class="lista-estado">Elegí un almacén para ver su información y productos.</p>
+      </div>
+
+      <h3 class="alm-productos-titulo">Productos del almacén</h3>
+      <div id="lista-stock" class="lista alm-productos-lista">
+        <p class="lista-estado">Elegí un almacén para ver sus productos.</p>
+      </div>
+      <!-- lista-almacenes se mantiene oculto por compatibilidad con refrescarAlmacenes -->
+      <div id="lista-almacenes" class="lista hidden" aria-hidden="true"></div>
       <p class="msg" id="msg-almacenes"></p>
     </section>
 
@@ -699,6 +751,16 @@
     </section>
 
     <section id="tab-config" class="tab-panel">
+      <div class="cc-bloque">
+        <h3>Roles y permisos</h3>
+        <form id="form-nuevo-rol" class="inline-form">
+          <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
+          <button type="submit">Crear rol</button>
+        </form>
+        <p class="msg" id="msg-roles"></p>
+        <div id="lista-roles" class="lista"></div>
+      </div>
+
       <h3>Categorías</h3>
       <form id="form-categoria" class="inline-form">
         <input id="cat-nombre" placeholder="Nombre de la categoría" required>
