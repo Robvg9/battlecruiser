@@ -13,9 +13,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<!-- Fallback inline: si por alguna razón style.css no carga (ej. servidor mal
-     configurado), al menos el layout base y el botón "Cerrar sesión" quedan
-     ocultos por defecto en vez de mostrarse ambas pantallas a la vez. -->
 <style>.app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}</style>
 </head>
 <body>
@@ -107,26 +104,6 @@
         <h1>Battlecruiser</h1>
       </div>
       <div class="header-right">
-        <!-- Sesión 22: mismo indicador de conexión de la pantalla de login,
-             ahora también acá — el modo offline/caché importa sobre todo
-             mientras se está mirando Productos/Stock adentro del panel. -->
-        <div class="status-line status-line-app" id="conn-status-app">
-          <span class="status-dot" id="conn-dot-app"></span><span id="conn-text-app">Conectado</span>
-        </div>
-        <!-- Misión B1: contador mínimo de la cola offline de escrituras
-             pendientes (ver actualizarContadorColaPendiente en app.js).
-             Todavía no hay ningún formulario conectado a la cola, así que
-             por ahora se mantiene oculto siempre — queda listo para la
-             próxima misión. -->
-        <span id="cola-pendientes-badge" class="cola-badge hidden"></span>
-        <span id="user-email"></span>
-        <div class="ajustes-wrap">
-          <button id="ajustes-btn" type="button" class="icon-btn" aria-label="Abrir menú" aria-expanded="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-        </button>
-        <h1>Battlecruiser</h1>
-      </div>
-      <div class="header-right">
         <div class="status-line status-line-app" id="conn-status-app">
           <span class="status-dot" id="conn-dot-app"></span><span id="conn-text-app">Conectado</span>
         </div>
@@ -183,18 +160,15 @@
       <div class="cc-grid">
         <div class="cc-col-ppal">
           <div class="cc-estado" id="cc-estado"></div>
-
           <div class="cc-bloque">
             <h3>Requiere atención</h3>
             <div id="cc-atencion" class="lista"></div>
           </div>
-
           <div class="cc-bloque">
             <h3>Operaciones pendientes</h3>
             <div id="cc-pendientes" class="lista"></div>
           </div>
         </div>
-
         <aside class="cc-col-lateral">
           <div class="cc-bloque">
             <h3>Inventario</h3>
@@ -206,11 +180,9 @@
           </div>
         </aside>
       </div>
-
       <div class="rule-orn">
         <svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg>
       </div>
-
       <div class="resumen-grid" id="resumen-grid">
         <div class="resumen-card"><div class="valor">—</div><div class="etiqueta">Productos</div></div>
       </div>
@@ -262,7 +234,6 @@
         <input id="productos-buscar" type="text"
         placeholder="Buscar por nombre, categoría o unidad..."
         autocomplete="off">
-
         <span id="productos-contador" class="muted mov-contador"></span>
       </div>
       <div id="lista-productos" class="lista"></div>
@@ -300,7 +271,6 @@
           </form>
           <div id="lista-presentaciones-catalogo" class="lista"></div>
         </div>
-
         <div class="presentaciones-producto">
           <h4>Presentaciones por producto</h4>
           <select id="pp-producto-select"><option value="">Elegí un producto…</option></select>
@@ -321,12 +291,10 @@
       <div class="venta-almacen-wrap">
         <select id="venta-almacen" required><option value="">Almacén</option></select>
       </div>
-
       <div class="venta-vista-toggle" role="tablist" aria-label="Modo de venta">
         <button type="button" id="venta-vista-btn-buscador" class="venta-vista-btn activo" role="tab" aria-pressed="true">🔍 Buscador</button>
         <button type="button" id="venta-vista-btn-catalogo" class="venta-vista-btn" role="tab" aria-pressed="false">🗂️ Catálogo</button>
       </div>
-
       <div id="venta-modo-buscador">
         <form id="form-venta-linea" class="inline-form">
           <div class="venta-buscar-wrap">
@@ -339,24 +307,19 @@
         </form>
         <p class="msg" id="venta-stock-disponible"></p>
       </div>
-
       <div id="venta-modo-catalogo" class="hidden">
         <div id="catalogo-categorias" class="catalogo-categorias"></div>
         <div id="catalogo-grid" class="catalogo-grid"></div>
       </div>
-
       <p class="msg" id="msg-venta-linea"></p>
-
       <div id="venta-lineas" class="lista">
         <p class="lista-estado">Todavía no agregaste productos a esta venta.</p>
       </div>
       <div class="venta-total" id="venta-total-wrap">
         <span>Total</span><span class="venta-total-valor" id="venta-total">$0.00</span>
       </div>
-
       <button type="button" id="btn-confirmar-venta" class="btn-confirmar-venta">Confirmar venta</button>
       <p class="msg" id="msg-venta"></p>
-
       <h3>Historial de ventas</h3>
       <div class="ventas-historial-controles">
         <input id="ventas-buscar" type="text" placeholder="Buscar por #referencia, almacén o fecha…" autocomplete="off">
@@ -383,7 +346,6 @@
           </div>
         </div>
       </div>
-
       <form id="form-almacen" class="inline-form alm-form-panel hidden">
         <input type="hidden" id="alm-editando-id" value="">
         <input id="alm-nombre" placeholder="Nombre del almacén" required>
@@ -395,11 +357,9 @@
         <button type="submit" id="alm-submit-btn">Crear almacén</button>
         <button type="button" id="alm-cancelar-btn" class="cc-accion">Cancelar</button>
       </form>
-
       <div id="alm-info-panel" class="alm-info-panel">
         <p class="lista-estado">Elegí un almacén para ver su información y productos.</p>
       </div>
-
       <h3 class="alm-productos-titulo">Productos del almacén</h3>
       <div id="lista-stock" class="lista alm-productos-lista">
         <p class="lista-estado">Elegí un almacén para ver sus productos.</p>
@@ -517,7 +477,6 @@
         <span id="reportes-conn-info" class="muted"></span>
       </div>
       <p class="muted">Análisis operativo del negocio. Datos reales de Supabase.</p>
-
       <div class="mando-filtros" id="reportes-filtros">
         <label>Desde<input type="date" id="rep-filtro-desde"></label>
         <label>Hasta<input type="date" id="rep-filtro-hasta"></label>
@@ -525,12 +484,10 @@
         <button type="button" id="rep-aplicar-btn" class="cc-accion">Aplicar filtros</button>
         <button type="button" id="rep-limpiar-btn" class="cc-accion">Limpiar filtros</button>
       </div>
-
       <div class="cc-bloque">
         <h3>Resumen ejecutivo</h3>
         <div id="rep-resumen" class="rep-grid"></div>
       </div>
-
       <div class="cc-bloque">
         <h3>Reportes detallados</h3>
         <div class="rep-tabs">
@@ -545,7 +502,6 @@
         <div id="rep-detalle" class="lista"></div>
         <div class="mando-paginacion" id="rep-paginacion"></div>
       </div>
-
       <p class="msg" id="msg-reportes"></p>
     </section>
 
@@ -555,7 +511,6 @@
         <span id="turnos-conn-info" class="muted"></span>
       </div>
       <p class="muted">¿Quién está trabajando? ¿En qué turno? ¿Qué hizo?</p>
-
       <div class="cc-bloque">
         <div id="turno-actual" class="turno-actual-card"></div>
         <div class="btn-row" id="turno-acciones">
@@ -564,7 +519,6 @@
         </div>
         <p class="msg" id="msg-turno"></p>
       </div>
-
       <div class="mando-filtros" id="turnos-filtros">
         <select id="turno-filtro-estado">
           <option value="">Todos los estados</option>
@@ -576,13 +530,11 @@
         <select id="turno-filtro-almacen"><option value="">Todos los almacenes</option></select>
         <button type="button" id="turnos-refrescar-btn" class="cc-accion">Refrescar</button>
       </div>
-
       <div class="cc-bloque">
         <h3>Historial de turnos</h3>
         <div id="lista-turnos" class="lista"></div>
         <div class="mando-paginacion" id="turnos-paginacion"></div>
       </div>
-
       <div class="cc-bloque">
         <h3>Cuadres</h3>
         <div id="lista-cuadres" class="lista"></div>
@@ -596,7 +548,6 @@
         <span id="operacion-conn-info" class="muted"></span>
       </div>
       <p class="muted">Responsabilidades, incidencias y aprobaciones.</p>
-
       <div class="cc-bloque">
         <h3>Nueva responsabilidad</h3>
         <form id="form-responsabilidad" class="inline-form">
@@ -611,7 +562,6 @@
         </form>
         <p class="msg" id="msg-resp-crear"></p>
       </div>
-
       <div class="cc-bloque">
         <h3>Responsabilidades</h3>
         <select id="resp-filtro-estado">
@@ -622,7 +572,6 @@
         </select>
         <div id="lista-responsabilidades" class="lista"></div>
       </div>
-
       <div class="cc-bloque">
         <h3>Incidencias</h3>
         <form id="form-incidencia" class="inline-form">
@@ -647,7 +596,6 @@
         <span id="com-conn-info" class="muted"></span>
       </div>
       <p class="muted">Conversaciones generales, privadas, de soporte y contextuales.</p>
-
       <div class="com-layout">
         <div class="com-col-lista" id="com-col-lista">
           <div class="com-lista-header">
@@ -656,7 +604,6 @@
           </div>
           <div id="lista-conversaciones" class="lista com-lista"></div>
         </div>
-
         <div class="com-col-chat hidden" id="com-col-chat">
           <div class="com-chat-header">
             <button type="button" id="com-volver-btn" class="cc-accion com-volver-btn">← Volver</button>
@@ -671,7 +618,6 @@
           <p class="msg" id="msg-mensaje"></p>
         </div>
       </div>
-
       <div id="com-nueva-panel" class="com-nueva-panel hidden">
         <h4>Nueva conversación</h4>
         <form id="form-nueva-conv" class="inline-form">
@@ -692,19 +638,15 @@
         <h3>Centro de Mando</h3>
         <span id="mando-conn-info" class="muted"></span>
       </div>
-
       <div class="cc-estado" id="mando-estado"></div>
-
       <div class="cc-bloque">
         <h3>Alertas</h3>
         <div id="mando-alertas" class="lista"></div>
       </div>
-
       <div class="cc-bloque">
         <h3>Actividad reciente</h3>
         <div id="mando-actividad" class="lista"></div>
       </div>
-
       <div class="cc-bloque">
         <h3>Auditoría</h3>
         <div class="mando-filtros" id="mando-filtros">
@@ -746,21 +688,18 @@
         <p class="msg" id="msg-roles"></p>
         <div id="lista-roles" class="lista"></div>
       </div>
-
       <h3>Categorías</h3>
       <form id="form-categoria" class="inline-form">
         <input id="cat-nombre" placeholder="Nombre de la categoría" required>
         <button type="submit">Agregar categoría</button>
       </form>
       <div id="lista-categorias" class="lista"></div>
-
       <h3>Unidades de medida</h3>
       <form id="form-unidad" class="inline-form">
         <input id="uni-nombre" placeholder="Nombre de la unidad" required>
         <button type="submit">Agregar unidad</button>
       </form>
       <div id="lista-unidades" class="lista"></div>
-
       <p class="msg" id="msg-config"></p>
     </section>
     </main>
