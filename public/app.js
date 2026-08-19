@@ -1,1 +1,1 @@
-// TEMPORARY RESTORE MARKER - will be replaced with full content
+PLACEHOLDER_WILL_READ_FROM_FILE
