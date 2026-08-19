@@ -10,7 +10,7 @@
 // proyección local con presentaciones, recuperación de operaciones atrapadas
 // en SINCRONIZANDO). Este service worker en sí tampoco cambió de
 // comportamiento en esta misión — el bump es solo para que los dispositivos
-// ya instalados bajen el app.js nuevo en vez de seguir serviendo el viejo
+// ya instalados bajen el app.js nuevo en vez de seguir sirviendo el viejo
 // desde caché.
 // v23 — Mision B2.3: bump por el Centro de Control Operacional en
 // app.js/index.html/style.css (capa de lectura/accion sobre la cola
@@ -67,7 +67,8 @@
 // productos del almacén seleccionado). El SW en sí no cambió de
 // comportamiento — el bump es para que los dispositivos ya instalados
 // bajen los archivos nuevos.
-const CACHE_NAME = "battlecruiser-shell-v38";
+// v39 — Misión 9.3 Tarea 6 — mejoras listado Productos
+const CACHE_NAME = "battlecruiser-shell-v39";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
