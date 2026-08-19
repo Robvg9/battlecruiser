@@ -150,7 +150,22 @@ safeInit("logout", () => {
     // B3.19: limpiar el contexto de usuario antes de cerrar sesión.
     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
     await client.auth.signOut();
+  });
+});
 
+// Misión 9.1 (Fase 9): antes este bloque quedaba anidado dentro del handler
+// de "logout" — el formulario de crear usuario no tenía listener activo
+// hasta que el admin cerrara sesión una vez. Se saca como bloque propio.
+//
+// signUp() se llama con un cliente Supabase EFÍMERO (persistSession:false),
+// nunca con el `client` compartido que tiene la sesión del admin: así, sin
+// importar si la confirmación de email está activada o no en el proyecto,
+// la sesión del admin nunca se toca ni se reemplaza. auth.users no tiene
+// trigger propio (verificado contra Supabase real) y RLS en `usuarios` no
+// permite INSERT desde el cliente, así que el perfil interno se crea con la
+// RPC `crear_usuario_interno` (SECURITY DEFINER + tiene_permiso, mismo
+// patrón que asignar_rol_usuario/cambiar_estado_usuario), usando la sesión
+// normal del admin — la única que queda autenticada en todo momento.
 safeInit("nuevo-usuario", () => {
   const form = document.getElementById("form-nuevo-usuario");
   const msgEl = document.getElementById("msg-nuevo-usuario");
@@ -159,9 +174,14 @@ safeInit("nuevo-usuario", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     msgEl.textContent = "";
+    const nombre = document.getElementById("nuevo-usuario-nombre").value.trim();
     const email = document.getElementById("nuevo-usuario-email").value.trim();
     const password = document.getElementById("nuevo-usuario-password").value;
 
+    if (!nombre) {
+      msgEl.textContent = "El nombre es obligatorio.";
+      return;
+    }
     if (password.length < 6) {
       msgEl.textContent = "La contraseña debe tener al menos 6 caracteres.";
       return;
@@ -169,20 +189,36 @@ safeInit("nuevo-usuario", () => {
 
     showLoading();
     try {
-      const { error } = await client.auth.signUp({ email, password });
+      const clienteTemporal = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const { data, error } = await clienteTemporal.auth.signUp({ email, password });
       if (error) {
         msgEl.textContent = "Error al crear usuario: " + (error.message || "Error desconocido");
         console.error("[Battlecruiser] (nuevo-usuario)", error);
-      } else {
-        msgEl.textContent = "Usuario creado correctamente. Revisa tu correo para confirmar.";
-        form.reset();
-        if (typeof cargarUsuarios === "function") cargarUsuarios();
+        return;
       }
+
+      const nuevoId = data && data.user && data.user.id;
+      if (!nuevoId) {
+        msgEl.textContent = "El usuario se creó en autenticación, pero no se recibió su id. Contactá soporte técnico antes de reintentar.";
+        console.error("[Battlecruiser] (nuevo-usuario) signUp sin data.user.id", data);
+        return;
+      }
+
+      const { error: errorPerfil } = await client.rpc("crear_usuario_interno", { p_id: nuevoId, p_nombre: nombre });
+      if (errorPerfil) {
+        msgEl.textContent = "El usuario se creó en autenticación, pero falló al crear su perfil interno (" + (errorPerfil.message || "error desconocido") + "). Contactá soporte técnico antes de reintentar con el mismo correo.";
+        console.error("[Battlecruiser] (nuevo-usuario) crear_usuario_interno", errorPerfil);
+        return;
+      }
+
+      msgEl.textContent = "Usuario creado correctamente. Asignale un rol en la lista de usuarios. Si la confirmación de email está activada en el proyecto, deberá confirmar su correo antes de poder entrar.";
+      form.reset();
+      if (typeof cargarUsuarios === "function") cargarUsuarios();
     } finally {
       hideLoading();
     }
-  });
-});
   });
 });
 
@@ -627,7 +663,7 @@ function estaDispositivoOffline() {
 }
 
 // ============================================================
-// Loading Indicators - Misiu00f3n 9.0
+// Loading Indicators - Misión 9.0
 // ============================================================
 
 let loadingCount = 0;
@@ -668,7 +704,7 @@ async function withLoading(fn) {
 
 
 // ============================================================
-// Loading Indicators - Misión 9.0
+// Caché local de lectura (IndexedDB) — estado offline/online
 // ============================================================
 
 async function leerDeCache(clave) {
@@ -2193,14 +2229,14 @@ function actualizarIndicadorConexion(estadoForzado) {
       texto = "⚡ Backend inaccesible — usando caché";
       mostrarTooltip = true;
     } else if (sinCacheB > 0) {
-  } else if (_conectividadReal === null && navigator.onLine) {
-    // D. Todavu00eda comprobando
-    clase = "reconectando";
-    texto = "u23f3 Comprobando conexiu00f3n...";
       texto = "⚡ Backend inaccesible — sin datos guardados";
     } else {
       texto = "⚡ Backend inaccesible";
     }
+  } else if (_conectividadReal === null && navigator.onLine) {
+    // D. Todavía comprobando
+    clase = "reconectando";
+    texto = "⏳ Comprobando conexión...";
   }
 
   nodos.forEach(({ linea, texto: textoEl }) => {

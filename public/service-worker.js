@@ -36,7 +36,14 @@
 // v29 — Mision B8: bump por Comunicacion y Coordinacion Operativa
 // (conversaciones, mensajes, chat contextual, no leidos, soporte;
 // nueva pestana Comunicacion; integracion en Centro de Mando).
-const CACHE_NAME = "battlecruiser-shell-v32"; // v32: Misión 9.0 - Cierre técnico completo (corrección código duplicado, PWA validada) (aislamiento cola/caché por usuario, XSS, auditoría redundante, bug categoría)
+// v33 — Misión 9.1: bump por app.js/index.html (fix estructural real en
+// actualizarIndicadorConexion — estado D quedaba mal anidado dentro del
+// bloque B con una rama vacía; texto Unicode corrupto visible en pantalla;
+// flujo de creación de usuarios reparado: signUp con cliente efímero +
+// nueva RPC crear_usuario_interno para no perder la sesión del admin y sí
+// crear el perfil interno). El SW en sí no cambió de comportamiento — el
+// bump es para que los dispositivos ya instalados bajen los archivos nuevos.
+const CACHE_NAME = "battlecruiser-shell-v33";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
