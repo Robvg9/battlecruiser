@@ -135,7 +135,8 @@
         }
       });
 
-      if (hayFiltro && typeof actualizarContador === "function") {
+      if (typeof actualizarContador === "function") {
+        // Con o sin filtro: el contador debe reflejar lo visible en DOM.
         actualizarContador("productos-contador", visibles, productos.length);
       }
     } finally {
@@ -153,6 +154,10 @@
     if (selCat) selCat.value = "";
     if (selUni) selUni.value = "";
     if (selStock) selStock.value = "";
+    // Post-9.3 bugfix: tras "Ver todos", productos.js re-renderiza y el
+    // MutationObserver puede haber re-aplicado filtros viejos antes de limpiar.
+    // Hay que volver a mostrar todos los ítems y sincronizar el contador.
+    aplicarFiltros();
   }
 
   function wire() {
