@@ -52,6 +52,10 @@ function prepararDOM(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
+  // Misión de modularización: también se quitan los <script src="js/...">
+  // (los módulos reales se inyectan a mano más abajo, igual que antes se
+  // inyectaba app.js completo — así el test no depende de red).
+  html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
   const window = dom.window;
   global.window = window; global.document = window.document; global.navigator = window.navigator;
@@ -65,7 +69,7 @@ function prepararDOM(opciones = {}) {
 }
 
 function inyectarApp(window, opciones = {}) {
-  let appJs = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
+  let appJs = require("./_leer-app-js").leerAppJsConcatenado(__dirname);
   // Exponer internals necesarios para los tests (mismo patrón que b2.3/b6).
   appJs = appJs
     .replace(/const _cache = \{/, "window._cache = {")
@@ -413,7 +417,7 @@ test("A2-1: escHtml escapa <, >, \", ', &", async () => {
 });
 
 test("A2-2: no quedan interpolaciones .nombre sin escHtml en innerHTML (verificación de código)", async () => {
-  const appJs = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
+  const appJs = require("./_leer-app-js").leerAppJsConcatenado(__dirname);
   // Buscar innerHTML con template literal que interpola .nombre sin escHtml
   const lineas = appJs.split("\n");
   let encontradas = [];

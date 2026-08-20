@@ -53,6 +53,10 @@ function montarEntorno(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
+  // Misión de modularización: también se quitan los <script src="js/...">
+  // (los módulos reales se inyectan a mano más abajo, igual que antes se
+  // inyectaba app.js completo — así el test no depende de red).
+  html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
   const window = dom.window;
   global.window = window; global.document = window.document; global.navigator = window.navigator;
@@ -64,7 +68,7 @@ function montarEntorno(opciones = {}) {
   const client = mockCliente(opciones);
   window.supabase = { createClient: () => client };
 
-  let appJs = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
+  let appJs = require("./_leer-app-js").leerAppJsConcatenado(__dirname);
   appJs = appJs
     .replace(/const _cache = \{/, "window._cache = {")
     .replace(/let _operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
