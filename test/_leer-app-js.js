@@ -2,10 +2,6 @@
 const fs = require("fs");
 const path = require("path");
 
-// Módulos de public/js/, en el mismo orden en que viven en index.html
-// (Misión de modularización de public/app.js). La concatenación de estos
-// archivos, en este orden, es equivalente en comportamiento al app.js
-// anterior a la modularización.
 const MODULOS_APP = [
   "core.js",
   "auth.js",
@@ -20,6 +16,7 @@ const MODULOS_APP = [
   "ventas.js",
   "catalogos.js",
   "configuracion.js",
+  "catalogo-avanzado.js",
   "usuarios-permisos.js",
   "mando.js",
   "reportes.js",

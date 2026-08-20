@@ -1,7 +1,8 @@
+// v43 — T9 catálogo avanzado (js/catalogo-avanzado.js)
 // v42 — Configuración / administración (js/configuracion.js) + restauración usuarios-permisos.
 // v41 — Panel contextual (js/panel-contextual.js) + shell markup.
 // v40 — modularización public/js/*
-const CACHE_NAME = "battlecruiser-shell-v42";
+const CACHE_NAME = "battlecruiser-shell-v43";
 
 const SHELL_FILES = [
   "./index.html",
@@ -20,6 +21,7 @@ const SHELL_FILES = [
   "./js/ventas.js",
   "./js/catalogos.js",
   "./js/configuracion.js",
+  "./js/catalogo-avanzado.js",
   "./js/usuarios-permisos.js",
   "./js/mando.js",
   "./js/reportes.js",
