@@ -9,6 +9,14 @@
 //
 // Misión 9.3 T6: el panel contextual se carga al final para no alterar el
 // orden histórico de los módulos de negocio.
+// Misión 9.3 T8: configuración/mantenimiento se carga tras los módulos base.
+(function cargarConfiguracion() {
+  if (document.querySelector('script[src*="configuracion"]')) return;
+  var s = document.createElement("script");
+  s.src = "js/configuracion.js";
+  s.async = false;
+  document.body.appendChild(s);
+})();
 (function cargarPanelContextual() {
   if (document.querySelector('script[src*="panel-contextual"]')) return;
   var s = document.createElement("script");
