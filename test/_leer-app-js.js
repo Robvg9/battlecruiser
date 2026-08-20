@@ -2,10 +2,10 @@
 const fs = require("fs");
 const path = require("path");
 
-// Módulos de public/js/, en el mismo orden en que vivían las secciones
-// dentro del app.js monolítico original (Misión de modularización de
-// public/app.js). La concatenación de estos archivos, en este orden, es
-// equivalente en comportamiento al app.js anterior a la modularización.
+// Módulos de public/js/, en el mismo orden en que viven en index.html
+// (Misión de modularización de public/app.js). La concatenación de estos
+// archivos, en este orden, es equivalente en comportamiento al app.js
+// anterior a la modularización.
 const MODULOS_APP = [
   "core.js",
   "auth.js",
@@ -19,6 +19,7 @@ const MODULOS_APP = [
   "vales.js",
   "ventas.js",
   "catalogos.js",
+  "configuracion.js",
   "usuarios-permisos.js",
   "mando.js",
   "reportes.js",
@@ -27,10 +28,6 @@ const MODULOS_APP = [
   "comunicacion.js",
 ];
 
-// Devuelve el código completo de la app reconstruido a partir de los
-// módulos de public/js/. baseDir es el __dirname del test que llama
-// (se resuelve "<baseDir>/../public/js/<modulo>"), igual que antes se
-// resolvía "<baseDir>/../public/app.js".
 function leerAppJsConcatenado(baseDir) {
   return MODULOS_APP
     .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
