@@ -64,3 +64,4 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
 
 initCatalogoSimple({ tabla: "categorias", formId: "form-categoria", inputId: "cat-nombre", listaId: "lista-categorias", singular: "categoría" });
 initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nombre", listaId: "lista-unidades", singular: "unidad" });
+

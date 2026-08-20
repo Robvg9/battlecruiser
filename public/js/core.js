@@ -12,7 +12,7 @@ function safeInit(nombre, fn) {
   try {
     fn();
   } catch (e) {
-    console.error("[Battlecruiser] No se pudo iniciar '" + nombre + ":", e);
+    console.error("[Battlecruiser] No se pudo iniciar '" + nombre + "':", e);
   }
 }
 
