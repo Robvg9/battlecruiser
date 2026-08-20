@@ -68,13 +68,41 @@
 // comportamiento — el bump es para que los dispositivos ya instalados
 // bajen los archivos nuevos.
 // v39 — Misión 9.3 Tarea 6 — mejoras listado Productos
-const CACHE_NAME = "battlecruiser-shell-v39";
+// v40 — Misión de modularización de public/app.js: el monolito se dividió
+// en 18 módulos bajo public/js/ cargados como <script> clásicos en el
+// mismo orden en que las secciones vivían en el archivo original (mismo
+// scope global, cero cambios de comportamiento — la concatenación de los
+// módulos es byte a byte idéntica al app.js anterior). app.js quedó como
+// archivo pequeño / entrada final, sin lógica propia. El SW en sí no cambió
+// de comportamiento — el bump es para que los dispositivos ya instalados
+// bajen los archivos nuevos (y no queden mezclando el app.js viejo con el
+// index.html nuevo, que ya no encontraría las funciones esperando en un solo
+// archivo).
+const CACHE_NAME = "battlecruiser-shell-v40";
 
 // Archivos propios de la app: cambian con cada versión.
 const SHELL_FILES = [
   "./index.html",
   "./style.css",
   "./app.js",
+  "./js/core.js",
+  "./js/auth.js",
+  "./js/offline.js",
+  "./js/centro-control.js",
+  "./js/navegacion.js",
+  "./js/productos.js",
+  "./js/presentaciones.js",
+  "./js/almacenes.js",
+  "./js/transferencias.js",
+  "./js/vales.js",
+  "./js/ventas.js",
+  "./js/catalogos.js",
+  "./js/usuarios-permisos.js",
+  "./js/mando.js",
+  "./js/reportes.js",
+  "./js/nucleo-operativo.js",
+  "./js/operacion-humana.js",
+  "./js/comunicacion.js",
   "./manifest.json",
   "./favicon.png",
   "./icons/favicon-48x48.png",
