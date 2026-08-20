@@ -1,10 +1,63 @@
 // ==== Battlecruiser · js/core.js ====
-// Núcleo compartido: constantes, helpers de UI y estado global mínimo.
-// (Módulo extraído de public/app.js — Misión de modularización)
+// Utilidades genéricas: safeInit, formato de fecha/dinero, helpers de UI de listas.
+// (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
-"use strict";
+// ---- Config del proyecto Supabase de Battlecruiser ----
+const SUPABASE_URL = "https://papxnkkjtkxsitcsvcme.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_pczHaS1JDPGrEA31vdbOLg_1l2qFhbm";
 
-const SUPABASE_URL = "https://xkzqjqzqjqzqjqzqjqzq.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhrempp cXpq cXpq cXpq cXpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.placeholder";
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// NOTE: the above is placeholder in this simulation; real content will be used from file
+function safeInit(nombre, fn) {
+  try {
+    fn();
+  } catch (e) {
+    console.error("[Battlecruiser] No se pudo iniciar '" + nombre + ":", e);
+  }
+}
+
+// para dejar que el cambio de pestaña se procese antes de abrir la conversación.
+// Antes estas funciones referenciaban esperar() sin definirla (bug latente).
+function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+function money(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? v.toFixed(2) : "0.00";
+}
+
+function fechaCorta(fecha) {
+  return new Date(fecha).toLocaleDateString("es", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function fechaHora(fecha) {
+  return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function fechaHoraCompleta(fecha) {
+  return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Rellena un <select> with almacenes de _cache, preservando el valor actual.
+function poblarSelectAlmacenes(sel, placeholder) {
+  if (!sel) return;
+  const actual = sel.value;
+  const almacenes = (_cache && _cache.almacenes) ? _cache.almacenes : [];
+  sel.innerHTML = '<option value="">' + (placeholder || 'Todos los almacenes') + '</option>';
+  almacenes.forEach((a) => {
+    const o = document.createElement('option');
+    o.value = a.id; o.textContent = a.nombre;
+    sel.appendChild(o);
+  });
+  if (actual) sel.value = actual;
+}
+
+
+function setLoading(listId, texto) {
+  const el = document.getElementById(listId);
+  if (el) el.innerHTML = '<p class="lista-estado">' + (texto || "Cargando…") + "</p>";
+}
+
+function setEmpty(listId, texto) {
+  const el = document.getElementById(listId);
+  if (el) el.innerHTML = '<p class="lista-estado">' + texto + "</p>";
+}
