@@ -1,22 +1,29 @@
 // ==== Battlecruiser · js/comunicacion.js ====
-// B8 — Comunicación y coordinación operativa (conversaciones y mensajes).
-// (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
+// B8 + Misión 9.3 T7 — Comunicación operativa y chat contextual.
+// Scope global; usa ejecutarOperacion (cola offline única). No inventa tipos SQL.
 
-// ---- B8 — COMUNICACIÓN Y COORDINACIÓN OPERATIVA
-let _comConvActual = null;       // conversación abierta (id)
-let _comConvActualTipo = null;    // tipo de la conversación abierta
-let _comNoLeidosTotal = 0;        // contador global (badge sidebar)
+let _comConvActual = null;
+let _comConvActualTipo = null;
+let _comNoLeidosTotal = 0;
 
-// ---- B8: orquestador de la pestaña Comunicación ----
 async function refrescarComunicacion() {
   if (!appShell || !appShell.classList.contains("visible")) return;
   const conn = document.getElementById("com-conn-info");
   if (conn) conn.textContent = estaRealmenteDesconectado() ? "⚪ Sin conexión" : "🟢 Conectado";
   await refrescarListaConversaciones();
   await actualizarBadgeNoLeidos();
+  // Formulario de envío según permiso.
+  const form = document.getElementById("form-mensaje");
+  if (form) {
+    const puede = typeof tienePermiso === "function" && tienePermiso("comunicacion", "crear");
+    form.classList.toggle("hidden", !puede);
+    if (!puede) {
+      const msg = document.getElementById("msg-mensaje");
+      if (msg && !_comConvActual) { /* leave */ }
+    }
+  }
 }
 
-// ---- B8: badge de no leídos en el sidebar ----
 async function actualizarBadgeNoLeidos() {
   const badge = document.getElementById("com-tab-badge");
   if (!badge) return;
@@ -42,7 +49,6 @@ async function actualizarBadgeNoLeidos() {
   }
 }
 
-// ---- B8: lista de conversaciones ----
 async function refrescarListaConversaciones() {
   const el = document.getElementById("lista-conversaciones");
   if (!el) return;
@@ -101,11 +107,9 @@ function renderListaConversaciones(filas) {
   });
 }
 
-// ---- B8: abrir conversación (cargar mensajes) ----
 async function abrirConversacion(conv_id, tipo) {
   _comConvActual = conv_id;
   _comConvActualTipo = tipo;
-  // En móvil, ocultar la lista y mostrar el chat.
   const colLista = document.getElementById("com-col-lista");
   const colChat = document.getElementById("com-col-chat");
   if (colLista && colChat && window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
@@ -114,17 +118,19 @@ async function abrirConversacion(conv_id, tipo) {
   } else if (colChat) {
     colChat.classList.remove("hidden");
   }
-  // Título.
   const tituloEl = document.getElementById("com-chat-titulo");
   if (tituloEl) {
     const labels = { GENERAL: "General", SOPORTE: "Soporte", INCIDENCIA: "Incidencia", TURNO: "Turno", RESPONSABILIDAD: "Responsabilidad", PRIVADA: "Conversación privada" };
     tituloEl.textContent = labels[tipo] || "Conversación";
   }
-  // Botón de cerrar: solo creador/admin (simplificado: mostrar siempre, el backend valida).
   const cerrarBtn = document.getElementById("com-cerrar-btn");
   if (cerrarBtn) cerrarBtn.classList.remove("hidden");
+  const form = document.getElementById("form-mensaje");
+  if (form) {
+    const puede = typeof tienePermiso === "function" && tienePermiso("comunicacion", "crear");
+    form.classList.toggle("hidden", !puede);
+  }
   await refrescarMensajes(conv_id);
-  // Marcar como leído.
   if (navigator.onLine) {
     try { await client.rpc("marcar_conversacion_leida", { p_conversacion_id: conv_id }); } catch (e) {}
     await actualizarBadgeNoLeidos();
@@ -177,16 +183,16 @@ function renderMensajes(filas) {
     div.innerHTML = '<div class="com-msg-autor">' + escHtml(propio ? "Vos" : (m.usuario_nombre || "—")) + '</div><div class="com-msg-contenido">' + escHtml(m.contenido) + '</div><div class="com-msg-meta muted">' + hora + estadoIcono + "</div>";
     el.appendChild(div);
   });
-  // Scroll al final.
   el.scrollTop = el.scrollHeight;
 }
 
-// ---- B8: enviar mensaje ----
-// Pasa por ejecutarOperacion (cola offline + idempotencia). El backend
-// valida acceso, contenido no vacío e idempotencia.
 async function enviarMensaje(contenido) {
   if (!_comConvActual) {
     setMsg("msg-mensaje", "Abrí una conversación primero.", false);
+    return false;
+  }
+  if (typeof tienePermiso === "function" && !tienePermiso("comunicacion", "crear")) {
+    setMsg("msg-mensaje", "No tenés permiso para enviar mensajes.", false);
     return false;
   }
   const r = await ejecutarOperacion("mensaje", {
@@ -196,12 +202,11 @@ async function enviarMensaje(contenido) {
     setMsg("msg-mensaje", "No se pudo enviar: " + explicarError(r.error, "enviar mensaje"), false);
     return false;
   }
-  setMsg("msg-mensaje", r.offline ? "⏳ Pendiente de enviar — se sincronizará al reconectar." : "", true);
+  setMsg("msg-mensaje", r.offline ? "⏳ Mensaje pendiente de conexión — se sincronizará al reconectar." : "", true);
   if (!r.offline) {
     await refrescarMensajes(_comConvActual);
     await refrescarListaConversaciones();
   } else {
-    // Mostrar el mensaje pendiente localmente.
     appendMensajePendiente(contenido);
   }
   return true;
@@ -212,44 +217,45 @@ function appendMensajePendiente(contenido) {
   if (!el) return;
   const div = document.createElement("div");
   div.className = "com-msg com-msg-propio com-msg-pendiente";
-  div.innerHTML = '<div class="com-msg-autor">Vos</div><div class="com-msg-contenido">' + escHtml(contenido) + '</div><div class="com-msg-meta muted">⏳ Pendiente</div>';
+  div.innerHTML = '<div class="com-msg-autor">Vos</div><div class="com-msg-contenido">' + escHtml(contenido) + '</div><div class="com-msg-meta muted">⏳ Pendiente de conexión</div>';
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
 }
 
-// ---- B8: crear conversación nueva ----
 async function crearConversacion(tipo, titulo, participante_id) {
+  if (typeof tienePermiso === "function" && !tienePermiso("comunicacion", "crear")) {
+    setMsg("msg-nueva-conv", "No tenés permiso para crear conversaciones.", false);
+    return null;
+  }
   const r = await ejecutarOperacion("conversacion", {
     p_tipo: tipo, p_titulo: titulo || null, p_participante_id: participante_id || null,
   });
-  // Reutiliza ejecutarOperacion + RPC_POR_TIPO.conversacion (="crear_conversacion"),
-  // igual que abrirSoporte/abrirConversacionContextual. La idempotency_key la
-  // genera/conserve la infraestructura offline existente (única cola).
   if (!r.ok) {
     setMsg("msg-nueva-conv", "No se pudo crear: " + explicarError(r.error, "crear conversación"), false);
     return null;
   }
-  // Si fue online, r.data.id; si fue offline, no tenemos el id aún.
   const convId = r.data && r.data.id;
   setMsg("msg-nueva-conv", r.offline ? "⏳ Pendiente — se creará al reconectar." : "✓ Conversación creada.", true);
   await refrescarListaConversaciones();
   return convId;
 }
 
-// ---- B8: crear conversación contextual (incidencia/turno/responsabilidad) ----
+/** Tipos con vínculo de entidad en el contrato B8 (incidencia_id / turno_id / responsabilidad_id). */
 async function abrirConversacionContextual(tipo, entidadId) {
-  // La RPC crear_conversacion es idempotente: si ya existe, la devuelve.
   const params = { p_tipo: tipo };
   if (tipo === "INCIDENCIA") params.p_incidencia_id = entidadId;
   else if (tipo === "TURNO") params.p_turno_id = entidadId;
   else if (tipo === "RESPONSABILIDAD") params.p_responsabilidad_id = entidadId;
+  else {
+    setMsg("msg-mensaje", "Este tipo de contexto no está soportado por el backend actual.", false);
+    return;
+  }
   const r = await ejecutarOperacion("conversacion", params);
   if (!r.ok) {
-    const msg = String((r.error && (r.error.message || r.error.code)) || r.error || "");
     if (esRpcFaltante(r.error)) {
       setMsg("msg-mensaje", "Falta aplicar supabase/b8-comunicacion.sql en Supabase.", false);
     } else {
-      setMsg("msg-mensaje", "No se pudo abrir: " + escHtml(msg), false);
+      setMsg("msg-mensaje", "No se pudo abrir: " + explicarError(r.error, "conversación contextual"), false);
     }
     return;
   }
@@ -259,7 +265,7 @@ async function abrirConversacionContextual(tipo, entidadId) {
   }
   const data = r.data;
   if (data && data.id) {
-    // Navegar a la pestaña Comunicación y abrir la conversación.
+    if (typeof cerrarPanelContextual === "function") cerrarPanelContextual();
     const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
     if (btn) btn.click();
     await esperar(100);
@@ -267,7 +273,49 @@ async function abrirConversacionContextual(tipo, entidadId) {
   }
 }
 
-// ---- B8: cerrar conversación ----
+/**
+ * Chat sobre un elemento de negocio (producto, transferencia, venta, etc.).
+ * El backend B8 solo vincula INCIDENCIA/TURNO/RESPONSABILIDAD.
+ * Para el resto: conversación SOPORTE con título descriptivo (sin inventar columnas).
+ */
+async function abrirConversacionSobreEntidad(tipoEntidad, entidadId, tituloLegible) {
+  if (typeof tienePermiso === "function" && !tienePermiso("comunicacion", "crear")) {
+    if (typeof setMsg === "function") setMsg("msg-mensaje", "No tenés permiso para iniciar conversaciones.", false);
+    return;
+  }
+  const t = String(tipoEntidad || "").toUpperCase();
+  if (t === "INCIDENCIA" || t === "TURNO" || t === "RESPONSABILIDAD") {
+    await abrirConversacionContextual(t, entidadId);
+    return;
+  }
+  // Título contextual real; tipo SOPORTE ya permitido por crear_conversacion.
+  const titulo = (tituloLegible || ("Sobre " + (tipoEntidad || "elemento"))).slice(0, 120);
+  const r = await ejecutarOperacion("conversacion", {
+    p_tipo: "SOPORTE",
+    p_titulo: titulo,
+  });
+  if (!r.ok) {
+    if (esRpcFaltante(r.error)) {
+      setMsg("msg-mensaje", "Falta aplicar supabase/b8-comunicacion.sql en Supabase.", false);
+    } else {
+      setMsg("msg-mensaje", "No se pudo abrir: " + explicarError(r.error, "conversación"), false);
+    }
+    return;
+  }
+  if (r.offline) {
+    setMsg("msg-mensaje", "⏳ Pendiente — la conversación se creará al reconectar.", true);
+    return;
+  }
+  if (typeof cerrarPanelContextual === "function") cerrarPanelContextual();
+  const data = r.data;
+  if (data && data.id) {
+    const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
+    if (btn) btn.click();
+    await esperar(100);
+    await abrirConversacion(data.id, "SOPORTE");
+  }
+}
+
 async function cerrarConversacion() {
   if (!_comConvActual) return;
   if (!navigator.onLine) { setMsg("msg-mensaje", "⚪ Sin conexión.", false); return; }
@@ -284,11 +332,10 @@ async function cerrarConversacion() {
   }
 }
 
-// ---- B8: soporte ----
 async function abrirSoporte() {
   const r = await ejecutarOperacion("conversacion", { p_tipo: "SOPORTE" });
   if (!r.ok) {
-    setMsg("msg-nueva-conv", "No se pudo abrir soporte: " + escHtml((r.error && (r.error.message || r.error.code)) || r.error || ""), false);
+    setMsg("msg-nueva-conv", "No se pudo abrir soporte: " + explicarError(r.error, "soporte"), false);
     return;
   }
   if (r.offline) {
@@ -306,7 +353,6 @@ async function abrirSoporte() {
   }
 }
 
-// ---- B8: volver (móvil) ----
 function volverListaConversaciones() {
   const colLista = document.getElementById("com-col-lista");
   const colChat = document.getElementById("com-col-chat");
@@ -315,7 +361,6 @@ function volverListaConversaciones() {
   _comConvActual = null;
 }
 
-// ---- B8: alertas para el Centro de Mando ----
 let _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
 
 async function refrescarAlertasB8() {
@@ -325,7 +370,7 @@ async function refrescarAlertasB8() {
     const convs = data || [];
     _b8CacheAlertas.soportePendiente = convs.filter((c) => c.tipo === "SOPORTE" && Number(c.no_leidos || 0) > 0).length;
     _b8CacheAlertas.convRecientes = convs.filter((c) => Number(c.no_leidos || 0) > 0).length;
-  } catch (e) { /* RPC no existe: no agregar alertas */ }
+  } catch (e) { /* RPC no existe */ }
 }
 
 function construirAlertasB8() {
@@ -347,7 +392,6 @@ function construirAlertasMandoB8Completo(ops) {
   });
 }
 
-// Inicialización de la pestaña Comunicación.
 safeInit("b8-comunicacion", () => {
   const form = document.getElementById("form-mensaje");
   if (form) {
@@ -369,9 +413,12 @@ safeInit("b8-comunicacion", () => {
   if (cerrar) cerrar.addEventListener("click", cerrarConversacion);
   const nueva = document.getElementById("com-nueva-btn");
   if (nueva) nueva.addEventListener("click", async () => {
+    if (typeof tienePermiso === "function" && !tienePermiso("comunicacion", "crear")) {
+      setMsg("msg-nueva-conv", "No tenés permiso para crear conversaciones.", false);
+      return;
+    }
     const panel = document.getElementById("com-nueva-panel");
     if (panel) panel.classList.toggle("hidden");
-    // Cargar usuarios para el select.
     if (navigator.onLine) {
       try {
         const { data } = await client.rpc("listar_usuarios_para_chat", {});
