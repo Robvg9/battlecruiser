@@ -37,7 +37,7 @@ function fechaHoraCompleta(fecha) {
   return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// Rellena un <select> with almacenes de _cache, preservando el valor actual.
+// Rellena un <select> con almacenes de _cache, preservando el valor actual.
 function poblarSelectAlmacenes(sel, placeholder) {
   if (!sel) return;
   const actual = sel.value;
