@@ -122,6 +122,66 @@ safeInit("prod-imagen-input", () => {
   });
 });
 
+let _productosBusqueda = "";
+
+function stockTotalProducto(productoId) {
+  return (_cache.stock || [])
+    .filter((s) => s.producto_id === productoId)
+    .reduce((acc, s) => acc + (Number(s.cantidad) || 0), 0);
+}
+
+// Tarea 6: render del listado de productos con buscador en memoria, unidad y stock total.
+// Filtra _cache.productos (sin consulta nueva a Supabase). Stock se suma desde _cache.stock.
+function renderProductosLista() {
+  const lista = document.getElementById("lista-productos");
+  if (!lista) return;
+  const todas = _cache.productos || [];
+  if (todas.length === 0) {
+    setEmpty("lista-productos", mensajeListaVacia("productos", "Todavía no hay productos cargados."));
+    actualizarContador("productos-contador", 0, 0);
+    return;
+  }
+  const termino = _productosBusqueda.trim().toLowerCase();
+  const filtradas = termino
+    ? todas.filter((p) => {
+        const nom = (p.nombre || "").toLowerCase();
+        const cat = p.categorias && p.categorias.nombre ? p.categorias.nombre.toLowerCase() : "";
+        const uni = (p.unidad || "").toLowerCase();
+        return nom.includes(termino) || cat.includes(termino) || uni.includes(termino);
+      })
+    : todas;
+  if (filtradas.length === 0) {
+    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos productos con esos criterios.</p>'
+      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="productos">Ver todos</button>';
+    actualizarContador("productos-contador", 0, todas.length);
+    return;
+  }
+  lista.innerHTML = "";
+  const puedeEditar = tienePermiso("productos", "editar");
+  filtradas.forEach((p) => {
+    const div = document.createElement("div");
+    div.className = "lista-item" + (p.activo === false ? " lista-item-inactivo" : "");
+    const estadoTxt = p.activo === false ? '<span class="muted">· Inactivo</span>' : "";
+    let botones = "";
+    if (puedeEditar) {
+      botones = `<span class="lista-item-acciones">
+          <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
+          <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
+        </span>`;
+    }
+    const miniatura = p.imagen_url
+      ? `<img src="${escHtml(p.imagen_url)}" alt="" class="producto-thumb" loading="lazy">`
+      : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
+    const unidadTxt = p.unidad ? escHtml(p.unidad) : "—";
+    const stockTot = stockTotalProducto(p.id);
+    div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""} · ${unidadTxt}</span> ${estadoTxt}</span>
+        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)} · Stock ${money(stockTot)}</span>
+        ${botones}`;
+    lista.appendChild(div);
+  });
+  actualizarContador("productos-contador", filtradas.length, todas.length);
+}
+
 async function refrescarProductos() {
   setLoading("lista-productos", "Cargando productos…");
   const [productos, categorias, almacenes] = await Promise.all([
@@ -150,32 +210,7 @@ async function refrescarProductos() {
     }
   }
 
-  const lista = document.getElementById("lista-productos");
-  if (productos.length === 0) {
-    setEmpty("lista-productos", mensajeListaVacia("productos", "Todavía no hay productos cargados."));
-  } else {
-    lista.innerHTML = "";
-    const puedeEditar = tienePermiso("productos", "editar");
-    productos.forEach((p) => {
-      const div = document.createElement("div");
-      div.className = "lista-item" + (p.activo === false ? " lista-item-inactivo" : "");
-      const estadoTxt = p.activo === false ? '<span class="muted">· Inactivo</span>' : "";
-      let botones = "";
-      if (puedeEditar) {
-        botones = `<span class="lista-item-acciones">
-          <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
-          <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
-        </span>`;
-      }
-      const miniatura = p.imagen_url
-        ? `<img src="${escHtml(p.imagen_url)}" alt="" class="producto-thumb" loading="lazy">`
-        : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
-      div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
-        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)}</span>
-        ${botones}`;
-      lista.appendChild(div);
-    });
-  }
+  renderProductosLista();
 
   return { productos, almacenes };
 }
@@ -183,6 +218,14 @@ async function refrescarProductos() {
 // eventos sobre #lista-productos (los botones se recrean en cada refresco).
 safeInit("lista-productos", () => {
   document.getElementById("lista-productos").addEventListener("click", async (e) => {
+    const btnVerTodas = e.target.closest(".mov-ver-todas-btn");
+    if (btnVerTodas && btnVerTodas.dataset.tipo === "productos") {
+      _productosBusqueda = "";
+      const inputBuscar = document.getElementById("productos-buscar");
+      if (inputBuscar) inputBuscar.value = "";
+      renderProductosLista();
+      return;
+    }
     const btnEditar = e.target.closest(".btn-editar-producto");
     if (btnEditar) {
       const producto = (_cache.productos || []).find((p) => p.id === btnEditar.dataset.id);
@@ -208,6 +251,16 @@ safeInit("lista-productos", () => {
         : (activoActual ? "Producto desactivado." : "Producto activado."), true);
       if (!resultado.offline) await refrescarProductos();
     }
+  });
+});
+
+// Tarea 6: buscador en memoria sobre #productos-buscar (nombre, categoría, unidad).
+safeInit("productos-buscar", () => {
+  const input = document.getElementById("productos-buscar");
+  if (!input) return;
+  input.addEventListener("input", () => {
+    _productosBusqueda = input.value || "";
+    renderProductosLista();
   });
 });
 
@@ -490,4 +543,3 @@ safeInit("form-compra", () => {
     await refrescarStockYSelects();
   });
 });
-
