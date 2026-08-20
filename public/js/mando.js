@@ -34,11 +34,76 @@ function renderEstadoMando(estado) {
   if (!el) return;
   el.className = "cc-estado cc-estado-" + estado.nivel;
   let extra = "";
-  // Antes se comprobaba typeof === "function" (siempre false) → nunca mostraba la sesión.
   if (_usuarioActual) {
     extra = '<span class="cc-estado-detalle">Sesión: ' + escHtml(_usuarioActual.nombre || "") + (_usuarioActual.rol ? " · " + escHtml(_usuarioActual.rol) : "") + "</span>";
   }
-  el.innerHTML = '<div class="cc-estado-cabecera"><span class="cc-estado-titulo">' + escHtml(estado.texto) + "</span><span class=\"cc-estado-detalle\">" + escHtml(estado.detalle) + "</span>" + extra + "</div>";
+  el.innerHTML = '<div class="cc-estado-cabecera"><span class="cc-estado-titulo">' + escHtml(estado.texto) + '</span><span class="cc-estado-detalle">' + escHtml(estado.detalle) + "</span>" + extra + "</div>";
+}
+
+/** Indicadores reales del negocio a partir de _cache (sin métricas inventadas). */
+function construirIndicadoresMando(ops) {
+  const stock = _cache.stock || [];
+  const bajo = stock.filter((s) => s.minimo != null && Number(s.cantidad) <= Number(s.minimo) && Number(s.cantidad) > 0);
+  const agotados = stock.filter((s) => Number(s.cantidad) <= 0);
+  const ventas = _cache.ventas || [];
+  const totalVentas = ventas.reduce((s, v) => s + (Number(v.total) || 0), 0);
+  const pendientes = (ops || []).filter((o) => o.estado === "PENDIENTE" || o.estado === "SINCRONIZANDO");
+  const atencion = (ops || []).filter((o) => o.estado === "REQUIERE_ATENCION");
+  const trfPend = pendientes.filter((o) => o.tipo === "transferencia");
+  return {
+    productos: (_cache.productos || []).length,
+    almacenes: (_cache.almacenes || []).length,
+    bajoMinimo: bajo.length,
+    agotados: agotados.length,
+    ventasCount: ventas.length,
+    ventasTotal: totalVentas,
+    transferencias: (_cache.transferencias || []).length,
+    opsPendientes: pendientes.length,
+    opsAtencion: atencion.length,
+    trfPendientes: trfPend.length,
+  };
+}
+
+function renderResumenMando(ops) {
+  const tab = document.getElementById("tab-mando");
+  if (!tab) return;
+  let el = document.getElementById("mando-resumen-grid");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "mando-resumen-grid";
+    el.className = "resumen-grid mando-resumen-grid";
+    const estado = document.getElementById("mando-estado");
+    if (estado && estado.parentNode) {
+      estado.parentNode.insertBefore(el, estado.nextSibling);
+    } else {
+      tab.insertBefore(el, tab.firstChild);
+    }
+  }
+  const ind = construirIndicadoresMando(ops);
+  el.innerHTML =
+    '<div class="resumen-card"><div class="valor">' + ind.productos + '</div><div class="etiqueta">Productos</div></div>' +
+    '<div class="resumen-card"><div class="valor">' + ind.almacenes + '</div><div class="etiqueta">Almacenes</div></div>' +
+    '<div class="resumen-card' + (ind.bajoMinimo || ind.agotados ? " alerta resumen-card-accion" : "") + '"' +
+      (ind.bajoMinimo || ind.agotados ? ' data-ir-tab="inventario" role="button" tabindex="0"' : "") + '>' +
+      '<div class="valor">' + (ind.bajoMinimo + ind.agotados) + '</div>' +
+      '<div class="etiqueta">Stock crítico</div>' +
+      '<div class="muted">' + ind.agotados + ' agotado(s) · ' + ind.bajoMinimo + ' bajo mínimo</div></div>' +
+    '<div class="resumen-card' + (ind.ventasCount ? " resumen-card-accion" : "") + '"' +
+      (ind.ventasCount ? ' data-ir-tab="ventas" role="button" tabindex="0"' : "") + '>' +
+      '<div class="valor">$' + money(ind.ventasTotal) + '</div>' +
+      '<div class="etiqueta">Ventas recientes</div>' +
+      '<div class="muted">' + ind.ventasCount + ' venta(s) en caché</div></div>' +
+    '<div class="resumen-card' + (ind.opsPendientes || ind.opsAtencion ? " alerta resumen-card-accion" : "") + '"' +
+      (ind.opsPendientes || ind.opsAtencion ? ' data-ir-tab="pendientes" role="button" tabindex="0"' : "") + '>' +
+      '<div class="valor">' + (ind.opsPendientes + ind.opsAtencion) + '</div>' +
+      '<div class="etiqueta">Operaciones</div>' +
+      '<div class="muted">' + ind.opsPendientes + ' pend. · ' + ind.opsAtencion + ' atención' +
+        (ind.trfPendientes ? ' · ' + ind.trfPendientes + ' transf.' : '') + '</div></div>' +
+    '<div class="resumen-card' + (ind.transferencias ? " resumen-card-accion" : "") + '"' +
+      (ind.transferencias ? ' data-ir-tab="transferencias" role="button" tabindex="0"' : "") + '>' +
+      '<div class="valor">' + ind.transferencias + '</div>' +
+      '<div class="etiqueta">Transferencias</div>' +
+      '<div class="muted">en historial reciente</div></div>';
 }
 
 function construirAlertasMando(ops) {
@@ -51,10 +116,10 @@ function construirAlertasMando(ops) {
         tipo: "Operación requiere atención",
         texto: (ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operación") + ": " + (op.ultimo_error || "error de negocio"),
         op,
+        tab: "pendientes",
       });
     }
   });
-  // Operaciones pendientes por demasiado tiempo (>24h) — alerta real.
   const ahora = Date.now();
   ops.forEach((op) => {
     if (op.estado === "PENDIENTE" && op.creado_en) {
@@ -65,16 +130,49 @@ function construirAlertasMando(ops) {
           tipo: "Pendiente prolongado",
           texto: (ETIQUETA_TIPO_OP[op.tipo] || op.tipo || "Operación") + " pendiente hace más de 24hs.",
           op,
+          tab: "pendientes",
         });
       }
     }
   });
-  if (offline) {
-    alertas.push({ nivel: "atencion", tipo: "Sin conexión", texto: "Trabajando offline. Los datos pueden no estar actualizados.", op: null });
+  // Transferencias pendientes en cola (dato real de ops offline).
+  const trfPend = ops.filter((o) => o.tipo === "transferencia" && (o.estado === "PENDIENTE" || o.estado === "SINCRONIZANDO"));
+  if (trfPend.length > 0) {
+    alertas.push({
+      nivel: "atencion",
+      tipo: "Transferencias pendientes",
+      texto: trfPend.length + (trfPend.length === 1 ? " transferencia en cola de sincronización." : " transferencias en cola de sincronización."),
+      op: trfPend[0],
+      tab: "pendientes",
+    });
   }
-  // Usuario inactivo intentando operar — solo si el contexto indica inactivo.
+  // Stock bajo / agotado desde caché real (sin inventar umbrales).
+  const stock = _cache.stock || [];
+  const agotados = stock.filter((s) => Number(s.cantidad) <= 0);
+  const bajo = stock.filter((s) => s.minimo != null && Number(s.cantidad) <= Number(s.minimo) && Number(s.cantidad) > 0);
+  if (agotados.length > 0) {
+    alertas.push({
+      nivel: "critico",
+      tipo: "Productos agotados",
+      texto: agotados.length + (agotados.length === 1 ? " producto sin stock." : " productos sin stock."),
+      op: null,
+      tab: "inventario",
+    });
+  }
+  if (bajo.length > 0) {
+    alertas.push({
+      nivel: "atencion",
+      tipo: "Stock bajo mínimo",
+      texto: bajo.length + (bajo.length === 1 ? " producto bajo el mínimo." : " productos bajo el mínimo."),
+      op: null,
+      tab: "inventario",
+    });
+  }
+  if (offline) {
+    alertas.push({ nivel: "atencion", tipo: "Sin conexión", texto: "Trabajando offline. Los datos pueden no estar actualizados.", op: null, tab: null });
+  }
   if (_usuarioActual && _usuarioActual.activo === false) {
-    alertas.push({ nivel: "critico", tipo: "Usuario inactivo", texto: "Tu usuario está inactivo. No podés operar.", op: null });
+    alertas.push({ nivel: "critico", tipo: "Usuario inactivo", texto: "Tu usuario está inactivo. No podés operar.", op: null, tab: null });
   }
   return alertas.sort((a, b) => {
     const orden = { critico: 0, atencion: 1, normal: 2 };
@@ -85,7 +183,6 @@ function construirAlertasMando(ops) {
 function renderAlertasMando(ops) {
   const el = document.getElementById("mando-alertas");
   if (!el) return;
-  // B6+B7+B8: integrar alertas de inventario, operación humana y comunicación.
   const alertas = (typeof construirAlertasMandoB8Completo === "function")
     ? construirAlertasMandoB8Completo(ops)
     : (typeof construirAlertasMandoB7Completo === "function")
@@ -101,14 +198,22 @@ function renderAlertasMando(ops) {
   alertas.forEach((a) => {
     const div = document.createElement("div");
     div.className = "cc-asunto cc-prioridad-" + a.nivel;
-    div.innerHTML = '<span class="cc-asunto-principal"><span class="cc-asunto-tipo">' + escHtml(a.tipo) + "</span><span class=\"muted cc-asunto-resumen\">" + escHtml(a.texto) + "</span></span>";
+    div.innerHTML = '<span class="cc-asunto-principal"><span class="cc-asunto-tipo">' + escHtml(a.tipo) + '</span><span class="muted cc-asunto-resumen">' + escHtml(a.texto) + "</span></span>";
+    const principal = div.querySelector(".cc-asunto-principal");
     if (a.op && a.op.id) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "cc-accion mando-ver-op-btn";
       btn.textContent = "Ver operación";
       btn.dataset.id = a.op.id;
-      div.querySelector(".cc-asunto-principal").appendChild(btn);
+      principal.appendChild(btn);
+    } else if (a.tab) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cc-accion mando-ir-tab-btn";
+      btn.textContent = a.tab === "inventario" ? "Ver inventario" : a.tab === "pendientes" ? "Ver pendientes" : "Ir";
+      btn.dataset.tab = a.tab;
+      principal.appendChild(btn);
     }
     el.appendChild(div);
   });
@@ -131,7 +236,7 @@ function renderActividadMando() {
     const div = document.createElement("div");
     div.className = "cc-actividad-item cc-prioridad-normal";
     const fechaTxt = m.fecha ? fechaHora(m.fecha) : "";
-    div.innerHTML = '<span class="cc-actividad-icono">' + escHtml(m.icono) + "</span><span class=\"cc-actividad-texto\">" + escHtml(m.texto) + "</span><span class=\"cc-actividad-meta\"><span class=\"muted\">" + escHtml(fechaTxt) + "</span><span class=\"cc-actividad-resultado\">" + escHtml(m.resultado) + "</span></span>";
+    div.innerHTML = '<span class="cc-actividad-icono">' + escHtml(m.icono) + '</span><span class="cc-actividad-texto">' + escHtml(m.texto) + '</span><span class="cc-actividad-meta"><span class="muted">' + escHtml(fechaTxt) + '</span><span class="cc-actividad-resultado">' + escHtml(m.resultado) + "</span></span>";
     el.appendChild(div);
   });
 }
@@ -188,7 +293,7 @@ function renderAuditoria(filas) {
     const fechaTxt = f.fecha ? fechaHora(f.fecha) : "";
     const idemp = f.idempotency_key ? " · " + idCorto(f.idempotency_key) : "";
     div.innerHTML = '<span class="cc-actividad-icono">' + escHtml(iconoAuditoria(f.tipo)) + "</span>"
-      + '<span class="cc-actividad-texto">' + escHtml(f.descripcion || f.tipo || "—") + "<br><span class=\"muted\">" + escHtml(f.usuario_nombre || "—") + " · " + escHtml(f.tipo || "") + " · " + escHtml(f.estado || "") + idemp + "</span></span>"
+      + '<span class="cc-actividad-texto">' + escHtml(f.descripcion || f.tipo || "—") + '<br><span class="muted">' + escHtml(f.usuario_nombre || "—") + " · " + escHtml(f.tipo || "") + " · " + escHtml(f.estado || "") + idemp + "</span></span>"
       + '<span class="cc-actividad-meta"><span class="muted">' + escHtml(fechaTxt) + "</span></span>";
     el.appendChild(div);
   });
@@ -235,7 +340,6 @@ function renderPaginacionAuditoria(cargadas) {
   }
 }
 
-// Poblar los <select> de filtros con tipos/estados conocidos.
 function poblarFiltrosAuditoria() {
   const tipos = ["compra", "venta", "transferencia", "vale", "producto", "usuario_rol", "usuario_estado", "sincronizacion"];
   const estados = ["exito", "pendiente", "requiere_atencion", "error"];
@@ -255,6 +359,7 @@ async function refrescarCentroMando() {
   const ops = await obtenerOperacionesVisiblesPanel();
   const estado = calcularEstadoMando(ops, _sincronizando);
   renderEstadoMando(estado);
+  renderResumenMando(ops);
   // B7+B8: refrescar alertas de turnos/cuadres/incidencias y comunicación.
   if (typeof refrescarAlertasB7 === "function") await refrescarAlertasB7();
   if (typeof refrescarAlertasB8 === "function") await refrescarAlertasB8();
@@ -266,10 +371,16 @@ async function refrescarCentroMando() {
     conn.textContent = estaRealmenteDesconectado() ? "⚪ Sin conexión — datos locales" : (_sincronizando ? "🔵 Sincronizando…" : "🟢 Conectado");
   }
   // Auditoría: solo si hay permiso y conexión (no inventar datos offline).
-  if (tienePermiso("auditoria", "ver") && navigator.onLine && contextoB3Disponible()) {
+  if (typeof tienePermiso === "function" && tienePermiso("auditoria", "ver") && navigator.onLine && typeof contextoB3Disponible === "function" && contextoB3Disponible()) {
     await refrescarAuditoria();
   } else if (document.getElementById("mando-auditoria")) {
-    document.getElementById("mando-auditoria").innerHTML = '<p class="lista-estado">' + (estaRealmenteDesconectado() ? "⚪ Sin conexión — auditoría no disponible offline." : "Sin permiso o sin datos de auditoría.") + "</p>";
+    document.getElementById("mando-auditoria").innerHTML = '<p class="lista-estado">' +
+      (estaRealmenteDesconectado()
+        ? "⚪ Sin conexión — auditoría no disponible offline."
+        : (typeof tienePermiso === "function" && !tienePermiso("auditoria", "ver")
+          ? "No tenés permiso para ver auditoría."
+          : "Sin permiso o sin datos de auditoría.")) +
+      "</p>";
   }
 }
 
@@ -286,16 +397,34 @@ safeInit("centro-mando-filtros", () => {
     _auditoriaPagina = 0;
     refrescarAuditoria();
   });
-  // Ver operación de una alerta.
-  const alertas = document.getElementById("mando-alertas");
-  if (alertas) {
-    alertas.addEventListener("click", async (e) => {
-      const btn = e.target.closest(".mando-ver-op-btn");
-      if (btn && btn.dataset.id) {
-        const op = await obtenerOperacionPendiente(btn.dataset.id);
+
+  const tab = document.getElementById("tab-mando");
+  if (tab) {
+    tab.addEventListener("click", async (e) => {
+      const btnOp = e.target.closest(".mando-ver-op-btn");
+      if (btnOp && btnOp.dataset.id) {
+        const op = await obtenerOperacionPendiente(btnOp.dataset.id);
         if (op && typeof mostrarDetalleOperacion === "function") mostrarDetalleOperacion(op);
+        return;
+      }
+      const btnTab = e.target.closest(".mando-ir-tab-btn");
+      if (btnTab && btnTab.dataset.tab && typeof irATab === "function") {
+        irATab(btnTab.dataset.tab);
+        return;
+      }
+      const card = e.target.closest("[data-ir-tab]");
+      if (card && card.getAttribute("data-ir-tab") && typeof irATab === "function") {
+        irATab(card.getAttribute("data-ir-tab"));
+      }
+    });
+    tab.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        const card = e.target.closest("[data-ir-tab]");
+        if (card && typeof irATab === "function") {
+          e.preventDefault();
+          irATab(card.getAttribute("data-ir-tab"));
+        }
       }
     });
   }
 });
-
