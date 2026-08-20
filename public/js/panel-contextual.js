@@ -1,5 +1,6 @@
 // ==== Battlecruiser · js/panel-contextual.js ====
 // Panel contextual reutilizable. Datos reales de _cache. No toca offline/cola.
+// T7: acción "Conversar" vía abrirConversacionSobreEntidad (comunicacion.js).
 
 function _pcEnsureShell() {
   if (document.getElementById("panel-contextual")) return;
@@ -65,6 +66,15 @@ function _pcOfflineNota() {
   return "";
 }
 
+/** Botón de chat solo si hay permiso de comunicación/crear y el helper existe. */
+function _pcBtnChat(tipoEntidad, id, titulo) {
+  if (!_pcPermiso("comunicacion", "crear") && !_pcPermiso("comunicacion", "ver")) return "";
+  if (typeof abrirConversacionSobreEntidad !== "function" && typeof abrirConversacionContextual !== "function") return "";
+  return '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="chat"' +
+    ' data-entidad-tipo="' + _pcEsc(tipoEntidad) + '" data-id="' + _pcEsc(id) + '"' +
+    ' data-titulo="' + _pcEsc(titulo || "") + '">Conversar</button>';
+}
+
 function abrirPanelContextual(tipo, id) {
   _pcEnsureShell();
   var panel = document.getElementById("panel-contextual");
@@ -124,6 +134,7 @@ function renderPanelProducto(id, body) {
       _pcEsc(p.id) + '">Editar producto</button>';
   }
   acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="productos">Ir a Productos</button>';
+  acciones += _pcBtnChat("producto", p.id, "Producto: " + (p.nombre || ""));
   body.innerHTML =
     '<div class="panel-ctx-head">' + img + '<div><strong>' + _pcEsc(p.nombre) + '</strong>' +
     (p.activo === false ? ' <span class="muted">· Inactivo</span>' : "") + '</div></div>' +
@@ -155,7 +166,8 @@ function renderPanelAlmacen(id, body) {
   var tipo = a.tipo === "mayorista" ? "Mayorista" : a.tipo === "venta" ? "Venta" : (a.tipo || "—");
   var activo = a.activo !== false;
   var acciones = '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="almacenes">Ir a Almacenes</button>' +
-    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="seleccionar-almacen" data-id="' + _pcEsc(a.id) + '">Ver en Almacenes</button>';
+    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="seleccionar-almacen" data-id="' + _pcEsc(a.id) + '">Ver en Almacenes</button>' +
+    _pcBtnChat("almacen", a.id, "Almacén: " + (a.nombre || ""));
   body.innerHTML =
     '<div class="detalle-cuerpo">' +
     _pcFila("Nombre", _pcEsc(a.nombre)) +
@@ -198,6 +210,8 @@ async function renderPanelTransferencia(id, body) {
     lineasHtml = '<p class="muted">Líneas no disponibles' +
       (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado() ? " offline." : ".") + "</p>";
   }
+  var tituloTrf = "Transferencia " + (t.origen && t.origen.nombre ? t.origen.nombre : "?") +
+    " → " + (t.destino && t.destino.nombre ? t.destino.nombre : "?");
   body.innerHTML =
     '<div class="detalle-cuerpo">' +
     _pcFila("Referencia", _pcEsc(t.id || "—")) +
@@ -209,7 +223,8 @@ async function renderPanelTransferencia(id, body) {
     '<p class="muted detalle-nota">Modelo atómico: el stock se movió al registrar.</p>' +
     _pcOfflineNota() + '</div>' +
     '<div class="detalle-acciones panel-ctx-acciones">' +
-    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="transferencias">Ir a Transferencias</button></div>';
+    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="transferencias">Ir a Transferencias</button>' +
+    _pcBtnChat("transferencia", t.id, tituloTrf) + "</div>";
 }
 
 function renderPanelVenta(id, body) {
@@ -226,7 +241,8 @@ function renderPanelVenta(id, body) {
     _pcFila("Total", "$" + _pcMoney(v.total)) +
     _pcOfflineNota() + '</div>' +
     '<div class="detalle-acciones panel-ctx-acciones">' +
-    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="ventas">Ir a Ventas</button></div>';
+    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="ventas">Ir a Ventas</button>' +
+    _pcBtnChat("venta", v.id, "Venta " + (v.id ? String(v.id).slice(0, 8) : "")) + "</div>";
 }
 
 function renderPanelVale(id, body) {
@@ -245,7 +261,8 @@ function renderPanelVale(id, body) {
     _pcFila("Cantidad", _pcMoney(v.cantidad) + " u") +
     _pcOfflineNota() + '</div>' +
     '<div class="detalle-acciones panel-ctx-acciones">' +
-    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="vales">Ir a Vales</button></div>';
+    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="vales">Ir a Vales</button>' +
+    _pcBtnChat("vale", v.id, "Vale " + (v.tipo || "")) + "</div>";
 }
 
 safeInit("panel-contextual", function () {
@@ -281,6 +298,15 @@ safeInit("panel-contextual", function () {
         cerrarPanelContextual();
         if (typeof irATab === "function") irATab("almacenes");
         if (typeof seleccionarAlmacen === "function") seleccionarAlmacen(accion.dataset.id);
+      } else if (act === "chat" && accion.dataset.id) {
+        var tipoE = accion.dataset.entidadTipo || "";
+        var tituloE = accion.dataset.titulo || "";
+        if (typeof abrirConversacionSobreEntidad === "function") {
+          abrirConversacionSobreEntidad(tipoE, accion.dataset.id, tituloE);
+        } else if (typeof irATab === "function") {
+          cerrarPanelContextual();
+          irATab("comunicacion");
+        }
       }
       return;
     }
