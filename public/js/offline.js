@@ -536,7 +536,7 @@ function renderizarPanelPendientes(operaciones) {
     const intentos = Number(op.intentos) || 0;
     const intentosTxt = intentos > 0 ? " · " + intentos + (intentos === 1 ? " intento" : " intentos") : "";
     const errorTxt = op.ultimo_error
-      ? '<span class="pendiente-error muted">' + String(op.ultimo_error).replace(/</g, "&lt;") + "</span>'
+      ? '<span class="pendiente-error muted">' + String(op.ultimo_error).replace(/</g, "&lt;") + "</span>"
       : "";
     // Acciones rapidas SOLO para REQUIERE_ATENCION (regla 3/4).
     // Para PENDIENTE/SINCRONIZANDO no se exponen (regla 6/7).
@@ -618,7 +618,7 @@ function escHtml(s) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
 
@@ -753,21 +753,21 @@ function cerrarDetalleOperacion() {
 let _reintentandoPanel = false; // anti doble accion rapida sobre el mismo boton
 async function reintentarOperacionPendiente(id, btn) {
   if (_reintentandoPanel || _sincronizando) {
-    setMsg("msg-pendientes", "Ya hay una sincronización en curso. Esperá un momento.", false);
+    setMsg("msg-pendientes", "Ya hay una sincronizaci\u00f3n en curso. Esper\u00e1 un momento.", false);
     return;
   }
   const op = await obtenerOperacionPendiente(id);
   if (!op) {
-    setMsg("msg-pendientes", "La operación ya no existe.", false);
+    setMsg("msg-pendientes", "La operaci\u00f3n ya no existe.", false);
     await refrescarPanelPendientes();
     return;
   }
   if (op.estado !== "REQUIERE_ATENCION") {
-    setMsg("msg-pendientes", "Esta operación no requiere reintento manual ahora mismo.", false);
+    setMsg("msg-pendientes", "Esta operaci\u00f3n no requiere reintento manual ahora mismo.", false);
     return;
   }
   if (!navigator.onLine) {
-    setMsg("msg-pendientes", "Sin conexión ahora mismo. Se sincronizará solo al recuperar Internet.", false);
+    setMsg("msg-pendientes", "Sin conexi\u00f3n ahora mismo. Se sincronizar\u00e1 solo al recuperar Internet.", false);
     return;
   }
   _reintentandoPanel = true;
@@ -777,7 +777,7 @@ async function reintentarOperacionPendiente(id, btn) {
       estado: "PENDIENTE",
     });
     if (!actualizada) {
-      setMsg("msg-pendientes", "No se pudo reintentar la operación.", false);
+      setMsg("msg-pendientes", "No se pudo reintentar la operaci\u00f3n.", false);
       return;
     }
     cerrarDetalleOperacion();
@@ -786,7 +786,7 @@ async function reintentarOperacionPendiente(id, btn) {
     // El finally de sincronizarCola ya refresca el panel; no hace falta
     // una llamada explicita extra aca (seria duplicada).
     await sincronizarCola();
-    setMsg("msg-pendientes", "Operación reintentada.", true);
+    setMsg("msg-pendientes", "Operaci\u00f3n reintentada.", true);
   } catch (e) {
     setMsg("msg-pendientes", "No se pudo completar el reintento.", false);
   } finally {
@@ -799,22 +799,22 @@ async function reintentarOperacionPendiente(id, btn) {
 async function eliminarOperacionPendienteConfirmada(id, btn) {
   const op = await obtenerOperacionPendiente(id);
   if (!op) {
-    setMsg("msg-pendientes", "La operación ya no existe.", false);
+    setMsg("msg-pendientes", "La operaci\u00f3n ya no existe.", false);
     await refrescarPanelPendientes();
     return;
   }
   if (op.estado === "SINCRONIZANDO") {
     // Proteccion: no eliminar mientras se esta sincronizando (regla 10).
-    setMsg("msg-pendientes", "La operación se está sincronizando ahora mismo. Esperá a que termine.", false);
+    setMsg("msg-pendientes", "La operaci\u00f3n se est\u00e1 sincronizando ahora mismo. Esper\u00e1 a que termine.", false);
     return;
   }
-  if (!window.confirm("¿Eliminar esta operación pendiente?\nEsta acción impedirá que vuelva a intentarse automáticamente.")) {
+  if (!window.confirm("\u00bfEliminar esta operaci\u00f3n pendiente?\nEsta acci\u00f3n impedir\u00e1 que vuelva a intentarse autom\u00e1ticamente.")) {
     return;
   }
   if (btn) btn.disabled = true;
   const ok = await eliminarOperacionPendiente(id);
   if (!ok) {
-    setMsg("msg-pendientes", "No se pudo eliminar la operación.", false);
+    setMsg("msg-pendientes", "No se pudo eliminar la operaci\u00f3n.", false);
     if (btn) btn.disabled = false;
     return;
   }
@@ -823,7 +823,7 @@ async function eliminarOperacionPendienteConfirmada(id, btn) {
   // refrescarPanelPendientes() no se llama explicito aca:
   // actualizarContadorColaPendiente ya refresca el panel si esta
   // visible; si no lo esta, el hook del tab lo refresca al abrirse.
-  setMsg("msg-pendientes", "Operación eliminada.", true);
+  setMsg("msg-pendientes", "Operaci\u00f3n eliminada.", true);
 }
 
 // Botón "Reintentar sincronización": reutiliza directamente sincronizarCola()
@@ -875,7 +875,7 @@ safeInit("panel-pendientes", () => {
       if (item && item.dataset.id) {
         const op = await obtenerOperacionPendiente(item.dataset.id);
         if (op) mostrarDetalleOperacion(op);
-        else { setMsg("msg-pendientes", "La operación ya no existe.", false); await refrescarPanelPendientes(); }
+        else { setMsg("msg-pendientes", "La operaci\u00f3n ya no existe.", false); await refrescarPanelPendientes(); }
       }
     });
   }
@@ -1197,10 +1197,6 @@ async function consolidarRefrescosPendientes() {
     if (cats.has("comunicacion")) {
       if (typeof refrescarListaConversaciones === "function") refrescarListaConversaciones();
       if (typeof actualizarBadgeNoLeidos === "function") actualizarBadgeNoLeidos();
-      // T7.1: refrescar chat abierto tras sync offline (quita ⏳ Pendiente).
-      if (typeof _comConvActual !== "undefined" && _comConvActual && typeof refrescarMensajes === "function") {
-        refrescarMensajes(_comConvActual);
-      }
     }
     if (cats.has("conversaciones")) {
       if (typeof refrescarListaConversaciones === "function") refrescarListaConversaciones();
