@@ -1,3 +1,0 @@
-placeholder-will-delete
-base: aa16271b
-sha_good: 381db7c924f84b685307fb8f145efd41027e1424
