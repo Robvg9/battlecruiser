@@ -1,6 +1,6 @@
 # BATTLECRUISER — CEREBRO (única fuente de verdad)
 
-**Actualizado:** 2026-08-21  
+**Actualizado:** 2026-08-22  
 **Repositorio:** `Robvg9/battlecruiser` · rama `main`  
 **Proyecto Supabase:** `papxnkkjtkxsitcsvcme` (battlecruiser)
 
@@ -50,14 +50,14 @@ PWA offline-first (Cloudflare Pages · `public/`).
 
 ```text
 public/
-├── index.html · style.css · app.js (stub) · service-worker.js (v49)
+├── index.html · style.css · app.js (stub) · service-worker.js (v50)
 ├── manifest.json · icons/
 └── js/
     core · auth · offline · centro-control · navegacion
     productos · presentaciones · almacenes · transferencias · vales
     ventas · venta-turno-ui · catalogos · configuracion · catalogo-avanzado
     usuarios-permisos · mando · reportes · nucleo-operativo
-    operacion-humana · comunicacion · panel-contextual
+    operacion-humana · ciclos · comunicacion · panel-contextual
 ```
 
 Módulos cargados en orden histórico; funciones globales. **No** volver a monolito `app.js`.
@@ -143,7 +143,7 @@ USUARIO → TURNO ABIERTO (1 por usuario) → ALMACÉN DEL TURNO → VENTA
 | Rechazo si `p_almacen_id` ≠ almacén del turno | ✅ |
 | NULL → usa almacén del turno | ✅ |
 | Fix M14b (variable `nombre`) | ✅ |
-| FE: `venta-turno-ui.js`, `#turno-almacen-abrir`, SW v49 | ✅ |
+| FE: `venta-turno-ui.js`, `#turno-almacen-abrir`, SW v50 | ✅ |
 
 **Riesgo residual:** `ventas.js` aún lee `#venta-almacen`; interceptores fuerzan el del turno. Validación Android real pendiente.
 
@@ -175,7 +175,7 @@ ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
 - Flujo: DECLARADA → CONTADA → APROBADA | RECHAZADA
 - RPC vigentes: `declarar_entrega_caja`, `registrar_recepcion_entrega_caja` (paso DECLARADA→CONTADA), `revisar_entrega_caja`, `listar_entregas_caja`, `obtener_entrega_caja`, `obtener_pendientes_cierre_ciclo`
 - `registrar_conteo_entrega_caja` = **legado/huérfana**, coexiste en prod sin uso (ver `docs/BATTLECRUISER_M16_FUNCION_HUERFANA.md`); NO usarla en frontend, no eliminada aún
-- **Nota:** `registrar_conteo_entrega_caja` existe por compatibilidad histórica. No usar en nuevas implementaciones. El flujo vigente utiliza `registrar_recepcion_entrega_caja`.
+- **Nota permanente:** `registrar_conteo_entrega_caja` es función legado/histórica. **NO usar en nuevas implementaciones.** El flujo vigente utiliza `registrar_recepcion_entrega_caja`.
 - Archivo: `m16_entregas_caja.sql`
 - **RECHAZADA no bloquea** el cierre del ciclo (ya está resuelta)
 - Grants: hardeneados en `m15_2_m16_1_hardening_grants_rpc.sql` (2026-08-21)
@@ -198,7 +198,12 @@ ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
 | Cerrar turno | Operador deja de vender (→ CERRADO + cuadre) |
 | Finalizar ciclo | Cierre administrativo de N días tras validaciones |
 
-**UI frontend de ciclos/entregas/cierre:** 🟡 PENDIENTE.
+**UI frontend de ciclos/entregas/cierre:** 🟢 V1 implementada (online-only).
+
+- Tab **Ciclos Operativos** creado (`data-tab="ciclos"`, `#tab-ciclos`).
+- `public/js/ciclos.js` implementa lecturas y mutaciones V1.
+- Las operaciones de ciclos, entregas y cierre funcionan actualmente **solo online**.
+- Offline para ciclos **NO** está implementado todavía (no usa `ejecutarOperacion` / cola IndexedDB).
 
 ---
 
@@ -214,7 +219,7 @@ ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
 | Ciclos (M15) backend | ✅ |
 | Entregas de caja (M16) backend | ✅ |
 | Cierre de ciclo (M17 + M17.1) backend | ✅ |
-| UI ciclos / entregas / cierre | 🟡 Pendiente |
+| UI ciclos / entregas / cierre | 🟢 V1 implementada (online-only) |
 | Aceptación Android E2E multiusuario | 🟡 Pendiente Roberto |
 
 ---
@@ -243,7 +248,8 @@ Regla: introspección producción antes de aplicar cualquier cambio SQL.
 
 ## 11. SERVICE WORKER / PWA
 
-**Cache:** `battlecruiser-shell-v49`  
+**Cache:** `battlecruiser-shell-v50`  
+`SHELL_FILES` incluye `./js/ciclos.js`.  
 Al añadir/renombrar módulos JS: actualizar `SHELL_FILES` y subir versión de cache.  
 `actualizarApp()` en `auth.js` — no modificar sin necesidad explícita.
 
