@@ -1197,6 +1197,10 @@ async function consolidarRefrescosPendientes() {
     if (cats.has("comunicacion")) {
       if (typeof refrescarListaConversaciones === "function") refrescarListaConversaciones();
       if (typeof actualizarBadgeNoLeidos === "function") actualizarBadgeNoLeidos();
+      // T7.1: refrescar chat abierto tras sync offline (quita ⏳ Pendiente).
+      if (typeof _comConvActual !== "undefined" && _comConvActual && typeof refrescarMensajes === "function") {
+        refrescarMensajes(_comConvActual);
+      }
     }
     if (cats.has("conversaciones")) {
       if (typeof refrescarListaConversaciones === "function") refrescarListaConversaciones();
