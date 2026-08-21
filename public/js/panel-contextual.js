@@ -1,6 +1,7 @@
 // ==== Battlecruiser · js/panel-contextual.js ====
 // Panel contextual reutilizable. Datos reales de _cache. No toca offline/cola.
 // T7: acción "Conversar" vía abrirConversacionSobreEntidad (comunicacion.js).
+// Sesión 8/30: no auto-abrir drawer al cambiar #alm-selector (evita doble panel en móvil).
 
 function _pcEnsureShell() {
   if (document.getElementById("panel-contextual")) return;
@@ -64,6 +65,13 @@ function _pcOfflineNota() {
     return '<p class="muted detalle-nota">⚪ Sin conexión — mostrando datos locales disponibles.</p>';
   }
   return "";
+}
+
+/** Tab activo según .tab-panel.visible (misma convención que navegacion.js). */
+function _pcTabActiva(tab) {
+  if (!tab) return false;
+  var panel = document.getElementById("tab-" + tab);
+  return !!(panel && panel.classList.contains("visible"));
 }
 
 /** Botón de chat solo si hay permiso de comunicación/crear y el helper existe. */
@@ -133,7 +141,9 @@ function renderPanelProducto(id, body) {
     acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="editar-producto" data-id="' +
       _pcEsc(p.id) + '">Editar producto</button>';
   }
-  acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="productos">Ir a Productos</button>';
+  if (!_pcTabActiva("productos")) {
+    acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="productos">Ir a Productos</button>';
+  }
   acciones += _pcBtnChat("producto", p.id, "Producto: " + (p.nombre || ""));
   body.innerHTML =
     '<div class="panel-ctx-head">' + img + '<div><strong>' + _pcEsc(p.nombre) + '</strong>' +
@@ -165,9 +175,20 @@ function renderPanelAlmacen(id, body) {
   });
   var tipo = a.tipo === "mayorista" ? "Mayorista" : a.tipo === "venta" ? "Venta" : (a.tipo || "—");
   var activo = a.activo !== false;
-  var acciones = '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="almacenes">Ir a Almacenes</button>' +
-    '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="seleccionar-almacen" data-id="' + _pcEsc(a.id) + '">Ver en Almacenes</button>' +
-    _pcBtnChat("almacen", a.id, "Almacén: " + (a.nombre || ""));
+  var enAlmacenes = _pcTabActiva("almacenes");
+  var yaSeleccionado = typeof _almacenSeleccionadoId !== "undefined" && _almacenSeleccionadoId === a.id;
+  var acciones = "";
+  // Navegación solo si el usuario NO está ya en la pestaña Almacenes (#12).
+  if (!enAlmacenes) {
+    acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="ir-tab" data-tab="almacenes">Ir a Almacenes</button>';
+    acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="seleccionar-almacen" data-id="' +
+      _pcEsc(a.id) + '">Ver en Almacenes</button>';
+  } else if (!yaSeleccionado) {
+    // Ya en Almacenes pero otro almacén seleccionado: fijar este en el selector inline.
+    acciones += '<button type="button" class="cc-accion panel-ctx-accion" data-pc-action="seleccionar-almacen" data-id="' +
+      _pcEsc(a.id) + '">Seleccionar este almacén</button>';
+  }
+  acciones += _pcBtnChat("almacen", a.id, "Almacén: " + (a.nombre || ""));
   body.innerHTML =
     '<div class="detalle-cuerpo">' +
     _pcFila("Nombre", _pcEsc(a.nombre)) +
@@ -179,7 +200,7 @@ function renderPanelAlmacen(id, body) {
       ? ((agotados ? agotados + " agotado(s)" : "") + (agotados && bajo ? " · " : "") + (bajo ? bajo + " bajo mínimo" : ""))
       : "Sin alertas") +
     _pcOfflineNota() + '</div>' +
-    '<div class="detalle-acciones panel-ctx-acciones">' + acciones + "</div>";
+    (acciones ? '<div class="detalle-acciones panel-ctx-acciones">' + acciones + "</div>" : "");
 }
 
 async function renderPanelTransferencia(id, body) {
@@ -332,10 +353,7 @@ safeInit("panel-contextual", function () {
     }
   });
 
-  var almSel = document.getElementById("alm-selector");
-  if (almSel) {
-    almSel.addEventListener("change", function () {
-      if (almSel.value) abrirPanelContextual("almacen", almSel.value);
-    });
-  }
+  // Sesión 8/30 — NO registrar change en #alm-selector aquí.
+  // La selección la gobierna almacenes.js → panel inline (#alm-info-panel).
+  // El drawer contextual sigue disponible vía data-ctx-tipo / otros entry points.
 });
