@@ -170,3 +170,614 @@
         <p class="msg" id="msg-pass"></p>
       </form>
     </div>
+
+    <section id="tab-resumen" class="tab-panel visible">
+      <div class="cc-grid">
+        <div class="cc-col-ppal">
+          <div class="cc-estado" id="cc-estado"></div>
+          <div class="cc-bloque">
+            <h3>Requiere atención</h3>
+            <div id="cc-atencion" class="lista"></div>
+          </div>
+          <div class="cc-bloque">
+            <h3>Operaciones pendientes</h3>
+            <div id="cc-pendientes" class="lista"></div>
+          </div>
+        </div>
+        <aside class="cc-col-lateral">
+          <div class="cc-bloque">
+            <h3>Inventario</h3>
+            <div id="cc-inventario" class="lista"></div>
+          </div>
+          <div class="cc-bloque">
+            <h3>Actividad reciente</h3>
+            <div id="cc-actividad" class="lista"></div>
+          </div>
+        </aside>
+      </div>
+      <div class="rule-orn">
+        <svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg>
+      </div>
+      <div class="resumen-grid" id="resumen-grid">
+        <div class="resumen-card"><div class="valor">—</div><div class="etiqueta">Productos</div></div>
+      </div>
+      <div class="seccion-cuerpo">
+        <div class="seccion-principal">
+          <div class="resumen-movs">
+            <h3>Últimos movimientos</h3>
+            <div id="resumen-movs-lista" class="lista"></div>
+          </div>
+        </div>
+        <aside class="seccion-panel">
+          <div class="resumen-alertas">
+            <h3>Stock bajo mínimo</h3>
+            <div id="resumen-alertas-lista" class="lista"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="tab-productos" class="tab-panel">
+      <form id="form-producto" class="inline-form">
+        <input type="hidden" id="prod-editando-id" value="">
+        <input id="prod-nombre" placeholder="Nombre del producto" required>
+        <select id="prod-categoria"><option value="">Categoría</option></select>
+        <input id="prod-unidad" placeholder="Unidad (ej. unidad, caja)" list="unidades-comunes">
+        <datalist id="unidades-comunes">
+          <option value="unidad"></option>
+          <option value="caja"></option>
+          <option value="paquete"></option>
+          <option value="libra"></option>
+          <option value="kg"></option>
+          <option value="litro"></option>
+        </datalist>
+        <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
+        <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
+        <div class="prod-imagen-campo">
+          <label for="prod-imagen-input" class="prod-imagen-label">Imagen del producto (JPG o PNG, opcional)</label>
+          <input type="file" id="prod-imagen-input" accept="image/jpeg,image/png,image/jpg">
+          <div id="prod-imagen-preview-wrap" class="prod-imagen-preview-wrap hidden">
+            <img id="prod-imagen-preview" class="prod-imagen-preview" alt="Vista previa de la imagen del producto">
+            <button type="button" id="prod-imagen-quitar" class="btn-quitar-imagen">Quitar imagen</button>
+          </div>
+          <div id="msg-prod-imagen" class="msg"></div>
+        </div>
+        <button type="submit" id="prod-submit-btn">Agregar producto</button>
+        <button type="button" id="prod-cancelar-edicion" class="hidden">Cancelar edición</button>
+      </form>
+      <div class="productos-buscador-controles">
+        <input id="productos-buscar" type="text"
+        placeholder="Buscar por nombre, categoría o unidad..."
+        autocomplete="off">
+        <span id="productos-contador" class="muted mov-contador"></span>
+      </div>
+      <div id="lista-productos" class="lista"></div>
+
+      <h3>Registrar compra (entrada de stock)</h3>
+      <form id="form-compra" class="inline-form">
+        <select id="compra-producto" required></select>
+        <select id="compra-almacen" required></select>
+        <select id="compra-presentacion">
+          <option value="">Sin presentación / Unidad base</option>
+        </select>
+        <input id="compra-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad de unidades base" required>
+        <input id="compra-costo" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Costo unitario" required>
+        <div id="compra-resumen" class="compra-resumen hidden">
+          <div class="compra-resumen-linea"><span>Compra</span><span id="compra-resumen-cantidad"></span></div>
+          <div class="compra-resumen-linea"><span>Equivalente</span><span id="compra-resumen-equivalente"></span></div>
+          <div class="compra-resumen-linea"><span>Costo</span><span id="compra-resumen-costo"></span></div>
+          <div class="compra-resumen-linea compra-resumen-total"><span>Total</span><span id="compra-resumen-total"></span></div>
+        </div>
+        <button type="submit">Registrar compra</button>
+      </form>
+      <p class="msg" id="msg-productos"></p>
+
+      <div class="rule-orn">
+        <svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg>
+      </div>
+
+      <h3>Presentaciones comerciales</h3>
+      <div class="presentaciones-panel">
+        <div class="presentaciones-catalogo">
+          <h4>Catálogo de presentaciones</h4>
+          <form id="form-presentacion-nueva" class="inline-form hidden">
+            <input id="pres-nombre-nueva" placeholder="Nombre (ej. Caja)" required>
+            <button type="submit">Crear presentación</button>
+          </form>
+          <div id="lista-presentaciones-catalogo" class="lista"></div>
+        </div>
+        <div class="presentaciones-producto">
+          <h4>Presentaciones por producto</h4>
+          <select id="pp-producto-select"><option value="">Elegí un producto…</option></select>
+          <div id="pp-lista-asociaciones" class="lista">
+            <p class="lista-estado">Elegí un producto para ver sus presentaciones.</p>
+          </div>
+          <form id="form-pp-nueva" class="inline-form hidden">
+            <select id="pp-presentacion-select" required><option value="">Presentación</option></select>
+            <input id="pp-factor" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Factor (ej. 24 = 1 caja son 24 unidades base)" required>
+            <button type="submit">Agregar presentación al producto</button>
+          </form>
+        </div>
+      </div>
+      <p class="msg" id="msg-presentaciones"></p>
+    </section>
+
+    <section id="tab-ventas" class="tab-panel">
+      <div class="venta-almacen-wrap">
+        <select id="venta-almacen" class="hidden" aria-hidden="true" tabindex="-1" disabled><option value="">Almacén</option></select>
+      </div>
+      <div class="venta-vista-toggle" role="tablist" aria-label="Modo de venta">
+        <button type="button" id="venta-vista-btn-buscador" class="venta-vista-btn activo" role="tab" aria-pressed="true">🔍 Buscador</button>
+        <button type="button" id="venta-vista-btn-catalogo" class="venta-vista-btn" role="tab" aria-pressed="false">🗂️ Catálogo</button>
+      </div>
+      <div id="venta-modo-buscador">
+        <form id="form-venta-linea" class="inline-form">
+          <div class="venta-buscar-wrap">
+            <input id="venta-producto-buscar" type="text" placeholder="Buscar producto…" autocomplete="off">
+            <div id="venta-producto-resultados" class="venta-buscar-resultados hidden"></div>
+          </div>
+          <select id="venta-producto" required><option value="">Producto</option></select>
+          <input id="venta-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad">
+          <button type="submit">Agregar a la venta</button>
+        </form>
+        <p class="msg" id="venta-stock-disponible"></p>
+      </div>
+      <div id="venta-modo-catalogo" class="hidden">
+        <div id="catalogo-categorias" class="catalogo-categorias"></div>
+        <div id="catalogo-grid" class="catalogo-grid"></div>
+      </div>
+      <p class="msg" id="msg-venta-linea"></p>
+      <div id="venta-lineas" class="lista">
+        <p class="lista-estado">Todavía no agregaste productos a esta venta.</p>
+      </div>
+      <div class="venta-total" id="venta-total-wrap">
+        <span>Total</span><span class="venta-total-valor" id="venta-total">$0.00</span>
+      </div>
+      <button type="button" id="btn-confirmar-venta" class="btn-confirmar-venta">Confirmar venta</button>
+      <p class="msg" id="msg-venta"></p>
+      <h3>Historial de ventas</h3>
+      <div class="ventas-historial-controles">
+        <input id="ventas-buscar" type="text" placeholder="Buscar por #referencia, almacén o fecha…" autocomplete="off">
+        <span id="ventas-contador" class="muted mov-contador"></span>
+      </div>
+      <div id="lista-ventas" class="lista"></div>
+      <div id="venta-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de venta"></div>
+    </section>
+
+    <section id="tab-almacenes" class="tab-panel">
+      <div class="alm-header">
+        <div class="alm-selector-wrap">
+          <label class="muted" for="alm-selector">Almacén</label>
+          <select id="alm-selector">
+            <option value="">Elegí un almacén…</option>
+          </select>
+        </div>
+        <div class="alm-acciones-wrap">
+          <button type="button" id="alm-acciones-btn" class="cc-accion">Acciones ▾</button>
+          <div id="alm-acciones-menu" class="alm-acciones-menu hidden">
+            <button type="button" id="alm-crear-btn">Crear almacén</button>
+            <button type="button" id="alm-editar-btn" disabled>Editar almacén</button>
+            <button type="button" id="alm-toggle-btn" disabled>Activar / desactivar</button>
+          </div>
+        </div>
+      </div>
+      <form id="form-almacen" class="inline-form alm-form-panel hidden">
+        <input type="hidden" id="alm-editando-id" value="">
+        <input id="alm-nombre" placeholder="Nombre del almacén" required>
+        <select id="alm-tipo" required>
+          <option value="">Tipo</option>
+          <option value="venta">Venta (precio normal)</option>
+          <option value="mayorista">Almacén / mayorista (precio mayorista)</option>
+        </select>
+        <button type="submit" id="alm-submit-btn">Crear almacén</button>
+        <button type="button" id="alm-cancelar-btn" class="cc-accion">Cancelar</button>
+      </form>
+      <div id="alm-info-panel" class="alm-info-panel">
+        <p class="lista-estado">Elegí un almacén para ver su información y productos.</p>
+      </div>
+      <h3 class="alm-productos-titulo">Productos del almacén</h3>
+      <div id="lista-stock" class="lista alm-productos-lista">
+        <p class="lista-estado">Elegí un almacén para ver sus productos.</p>
+      </div>
+      <div id="lista-almacenes" class="lista hidden" aria-hidden="true"></div>
+      <p class="msg" id="msg-almacenes"></p>
+    </section>
+
+    <section id="tab-transferencias" class="tab-panel">
+      <form id="form-transferencia" class="inline-form">
+        <select id="trf-origen" required></select>
+        <select id="trf-destino" required></select>
+        <select id="trf-producto" required></select>
+        <input id="trf-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
+        <button type="submit">Transferir</button>
+      </form>
+      <div class="mov-buscador-controles">
+        <input id="trf-buscar" type="text" placeholder="Buscar por #referencia, origen, destino o estado…" autocomplete="off">
+        <span id="trf-contador" class="muted mov-contador"></span>
+      </div>
+      <div id="lista-transferencias" class="lista"></div>
+      <div id="transferencia-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de transferencia"></div>
+      <p class="msg" id="msg-transferencias"></p>
+    </section>
+
+    <section id="tab-vales" class="tab-panel">
+      <form id="form-vale" class="inline-form">
+        <select id="vale-producto" required></select>
+        <select id="vale-almacen" required></select>
+        <select id="vale-tipo" required>
+          <option value="">Tipo</option>
+          <option value="merma">Merma</option>
+          <option value="donacion">Donación</option>
+          <option value="regalo">Regalo</option>
+          <option value="vencido">Vencido</option>
+        </select>
+        <input id="vale-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
+        <button type="submit">Registrar vale</button>
+      </form>
+      <div class="mov-buscador-controles">
+        <input id="vales-buscar" type="text" placeholder="Buscar por #referencia, producto, tipo o almacen…" autocomplete="off">
+        <span id="vales-contador" class="muted mov-contador"></span>
+      </div>
+      <div id="lista-vales" class="lista"></div>
+      <div id="vale-detalle" class="mov-detalle hidden" role="dialog" aria-label="Detalle de vale"></div>
+      <p class="msg" id="msg-vales"></p>
+    </section>
+
+    <section id="tab-pendientes" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Operaciones pendientes</h3>
+        <button type="button" id="pendientes-refrescar-btn" class="pendientes-refrescar-btn">Reintentar sincronización</button>
+      </div>
+      <div id="lista-pendientes" class="lista"></div>
+      <div id="pendiente-detalle" class="pendiente-detalle hidden"></div>
+      <p class="msg" id="msg-pendientes"></p>
+    </section>
+
+    <section id="tab-inventario" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Inventario</h3>
+        <span id="inv-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Existencia, mínimo, estado, costo promedio y valoración de inventario.</p>
+      <div class="mando-filtros">
+        <select id="inv-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="inv-refrescar-btn" class="cc-accion">Refrescar</button>
+      </div>
+      <div class="inv-filtro-estado" id="inv-filtro-estado" role="group" aria-label="Filtrar por estado">
+        <button type="button" class="inv-estado-btn active" data-estado="todos">Todos</button>
+        <button type="button" class="inv-estado-btn" data-estado="bajo">Bajo mínimo</button>
+        <button type="button" class="inv-estado-btn" data-estado="agotado">Agotados</button>
+        <button type="button" class="inv-estado-btn" data-estado="normal">Normales</button>
+      </div>
+      <div class="cc-bloque">
+        <h3>Valoración de inventario</h3>
+        <div id="inv-resumen" class="rep-grid"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Detalle por producto</h3>
+        <div id="inv-detalle" class="lista"></div>
+      </div>
+      <p class="msg" id="msg-inventario"></p>
+    </section>
+
+    <section id="tab-movimientos" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Movimientos de inventario</h3>
+        <span id="mov-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Trazabilidad: ¿qué entró, qué salió, quién, cuándo, a qué costo?</p>
+      <div class="mando-filtros">
+        <label>Desde<input type="date" id="mov-filtro-desde"></label>
+        <label>Hasta<input type="date" id="mov-filtro-hasta"></label>
+        <select id="mov-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <select id="mov-filtro-tipo">
+          <option value="">Todos los tipos</option>
+          <option value="COMPRA">Compra</option>
+          <option value="VENTA">Venta</option>
+          <option value="TRANSFERENCIA_SALIDA">Transf. salida</option>
+          <option value="TRANSFERENCIA_ENTRADA">Transf. entrada</option>
+          <option value="VALE_SALIDA">Vale</option>
+          <option value="AJUSTE">Ajuste</option>
+        </select>
+        <button type="button" id="mov-refrescar-btn" class="cc-accion">Aplicar</button>
+      </div>
+      <div id="mov-detalle" class="lista"></div>
+      <div class="mando-paginacion" id="mov-paginacion"></div>
+      <p class="msg" id="msg-movimientos"></p>
+    </section>
+
+    <section id="tab-reportes" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Reportes</h3>
+        <span id="reportes-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Análisis operativo del negocio. Datos reales de Supabase.</p>
+      <div class="mando-filtros" id="reportes-filtros">
+        <label>Desde<input type="date" id="rep-filtro-desde"></label>
+        <label>Hasta<input type="date" id="rep-filtro-hasta"></label>
+        <select id="rep-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="rep-aplicar-btn" class="cc-accion">Aplicar filtros</button>
+        <button type="button" id="rep-limpiar-btn" class="cc-accion">Limpiar filtros</button>
+      </div>
+      <div class="cc-bloque">
+        <h3>Resumen ejecutivo</h3>
+        <div id="rep-resumen" class="rep-grid"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Reportes detallados</h3>
+        <div class="rep-tabs">
+          <button type="button" class="rep-tab-btn active" data-rep="ventas">Ventas</button>
+          <button type="button" class="rep-tab-btn" data-rep="compras">Compras</button>
+          <button type="button" class="rep-tab-btn" data-rep="rentabilidad">Rentabilidad</button>
+          <button type="button" class="rep-tab-btn" data-rep="transferencias">Transferencias</button>
+          <button type="button" class="rep-tab-btn" data-rep="vales">Vales</button>
+          <button type="button" class="rep-tab-btn" data-rep="stock">Stock</button>
+          <button type="button" class="rep-tab-btn" data-rep="movimiento">Movimiento</button>
+        </div>
+        <div id="rep-detalle" class="lista"></div>
+        <div class="mando-paginacion" id="rep-paginacion"></div>
+      </div>
+      <p class="msg" id="msg-reportes"></p>
+    </section>
+
+    <section id="tab-turnos" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Turnos</h3>
+        <span id="turnos-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">¿Quién está trabajando? ¿En qué turno? ¿Qué hizo?</p>
+      <div class="cc-bloque">
+        <div id="turno-actual" class="turno-actual-card"></div>
+        <div class="btn-row" id="turno-acciones">
+          <select id="turno-almacen-abrir" aria-label="Almacén para abrir turno">
+            <option value="">Selecciona un almacén</option>
+          </select>
+          <button type="button" id="btn-abrir-turno" class="cc-accion">Abrir turno</button>
+          <button type="button" id="btn-cerrar-turno" class="cc-accion hidden">Cerrar turno</button>
+        </div>
+        <p class="msg" id="msg-turno"></p>
+      </div>
+      <div class="mando-filtros" id="turnos-filtros">
+        <select id="turno-filtro-estado">
+          <option value="">Todos los estados</option>
+          <option value="ABIERTO">Abierto</option>
+          <option value="CERRADO">Cerrado</option>
+          <option value="PROGRAMADO">Programado</option>
+          <option value="CANCELADO">Cancelado</option>
+        </select>
+        <select id="turno-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="turnos-refrescar-btn" class="cc-accion">Refrescar</button>
+      </div>
+      <div class="cc-bloque">
+        <h3>Historial de turnos</h3>
+        <div id="lista-turnos" class="lista"></div>
+        <div class="mando-paginacion" id="turnos-paginacion"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Cuadres</h3>
+        <div id="lista-cuadres" class="lista"></div>
+        <p class="msg" id="msg-cuadre"></p>
+      </div>
+    </section>
+
+    <section id="tab-ciclos" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Ciclos Operativos</h3>
+        <span id="ciclos-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Ciclos, sesiones, entregas de caja y cierre administrativo (M15-M17).</p>
+      <div class="mando-filtros" id="ciclos-filtros">
+        <select id="ciclo-filtro-estado">
+          <option value="">Todos los estados</option>
+          <option value="PLANIFICADO">Planificado</option>
+          <option value="ACTIVO">Activo</option>
+          <option value="EN_VALIDACION">En validación</option>
+          <option value="VALIDADO">Validado</option>
+          <option value="ARCHIVADO">Archivado</option>
+        </select>
+        <select id="ciclo-filtro-almacen"><option value="">Todos los almacenes</option></select>
+        <button type="button" id="ciclos-refrescar-btn" class="cc-accion">Refrescar</button>
+      </div>
+      <div class="cc-bloque">
+        <h3>Listado de ciclos</h3>
+        <div id="lista-ciclos" class="lista">
+          <p class="lista-estado">Abrí esta sección con conexión para cargar ciclos.</p>
+        </div>
+      </div>
+      <div id="ciclo-detalle" class="cc-bloque"></div>
+      <p class="msg" id="msg-ciclos"></p>
+    </section>
+
+    <section id="tab-operacion" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Operación</h3>
+        <span id="operacion-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Responsabilidades, incidencias y aprobaciones.</p>
+      <div class="cc-bloque">
+        <h3>Nueva responsabilidad</h3>
+        <form id="form-responsabilidad" class="inline-form">
+          <input id="resp-titulo" placeholder="Título de la tarea" required>
+          <input id="resp-desc" placeholder="Descripción (opcional)">
+          <select id="resp-prioridad">
+            <option value="normal">Normal</option>
+            <option value="alta">Alta</option>
+            <option value="baja">Baja</option>
+          </select>
+          <button type="submit">Crear</button>
+        </form>
+        <p class="msg" id="msg-resp-crear"></p>
+      </div>
+      <div class="cc-bloque">
+        <h3>Responsabilidades</h3>
+        <select id="resp-filtro-estado">
+          <option value="">Todos los estados</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="EN_PROGRESO">En progreso</option>
+          <option value="COMPLETADA">Completada</option>
+        </select>
+        <div id="lista-responsabilidades" class="lista"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Incidencias</h3>
+        <form id="form-incidencia" class="inline-form">
+          <select id="inc-tipo">
+            <option value="faltante">Faltante</option>
+            <option value="sobrante">Sobrante</option>
+            <option value="dano">Daño</option>
+            <option value="error_operativo">Error operativo</option>
+            <option value="otro">Otro</option>
+          </select>
+          <input id="inc-desc" placeholder="Descripción de la incidencia" required>
+          <button type="submit">Reportar</button>
+        </form>
+        <p class="msg" id="msg-inc-crear"></p>
+        <div id="lista-incidencias" class="lista"></div>
+      </div>
+    </section>
+
+    <section id="tab-comunicacion" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Comunicación</h3>
+        <span id="com-conn-info" class="muted"></span>
+      </div>
+      <p class="muted">Conversaciones generales, privadas, de soporte y contextuales.</p>
+      <div class="com-layout">
+        <div class="com-col-lista" id="com-col-lista">
+          <div class="com-lista-header">
+            <button type="button" id="com-nueva-btn" class="cc-accion">Nueva</button>
+            <button type="button" id="com-soporte-btn" class="cc-accion">Soporte</button>
+          </div>
+          <div id="lista-conversaciones" class="lista com-lista"></div>
+        </div>
+        <div class="com-col-chat hidden" id="com-col-chat">
+          <div class="com-chat-header">
+            <button type="button" id="com-volver-btn" class="cc-accion com-volver-btn">← Volver</button>
+            <span id="com-chat-titulo" class="com-chat-titulo"></span>
+            <button type="button" id="com-cerrar-btn" class="cc-accion hidden">Cerrar</button>
+          </div>
+          <div id="com-mensajes" class="com-mensajes"></div>
+          <form id="form-mensaje" class="com-input-bar">
+            <input id="mensaje-input" type="text" placeholder="Escribí un mensaje…" autocomplete="off" required>
+            <button type="submit">Enviar</button>
+          </form>
+          <p class="msg" id="msg-mensaje"></p>
+        </div>
+      </div>
+      <div id="com-nueva-panel" class="com-nueva-panel hidden">
+        <h4>Nueva conversación</h4>
+        <form id="form-nueva-conv" class="inline-form">
+          <select id="nueva-conv-tipo">
+            <option value="PRIVADA">Privada</option>
+            <option value="SOPORTE">Soporte</option>
+          </select>
+          <select id="nueva-conv-usuario"><option value="">Usuario…</option></select>
+          <input id="nueva-conv-titulo" placeholder="Asunto (opcional)">
+          <button type="submit">Crear</button>
+        </form>
+        <p class="msg" id="msg-nueva-conv"></p>
+      </div>
+    </section>
+
+    <section id="tab-mando" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Centro de Mando</h3>
+        <span id="mando-conn-info" class="muted"></span>
+      </div>
+      <div class="cc-estado" id="mando-estado"></div>
+      <div class="cc-bloque">
+        <h3>Alertas</h3>
+        <div id="mando-alertas" class="lista"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Actividad reciente</h3>
+        <div id="mando-actividad" class="lista"></div>
+      </div>
+      <div class="cc-bloque">
+        <h3>Auditoría</h3>
+        <div class="mando-filtros" id="mando-filtros">
+          <select id="filtro-aud-tipo"><option value="">Todos los tipos</option></select>
+          <select id="filtro-aud-estado"><option value="">Todos los estados</option></select>
+          <button type="button" id="aud-limpiar-btn" class="cc-accion">Limpiar filtros</button>
+        </div>
+        <div id="mando-auditoria" class="lista"></div>
+        <div class="mando-paginacion" id="mando-paginacion"></div>
+      </div>
+    </section>
+
+    <section id="tab-usuarios" class="tab-panel">
+      <div class="pendientes-header">
+        <h3>Usuarios</h3>
+        <span id="usuario-actual-info" class="muted"></span>
+      </div>
+      <p class="msg" id="msg-usuarios"></p>
+      <div class="cc-bloque">
+        <h3>Crear nuevo usuario</h3>
+        <form id="form-nuevo-usuario" class="inline-form">
+          <input id="nuevo-usuario-nombre" type="text" placeholder="Nombre" required>
+          <input id="nuevo-usuario-email" type="email" placeholder="Correo" required>
+          <input id="nuevo-usuario-password" type="password" placeholder="Contraseña (mínimo 6 caracteres)" required minlength="6">
+          <button type="submit">Crear usuario</button>
+        </form>
+        <p class="msg" id="msg-nuevo-usuario"></p>
+      </div>
+      <div id="lista-usuarios" class="lista"></div>
+    </section>
+
+    <section id="tab-config" class="tab-panel">
+      <div class="cc-bloque">
+        <h3>Roles y permisos</h3>
+        <form id="form-nuevo-rol" class="inline-form">
+          <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
+          <button type="submit">Crear rol</button>
+        </form>
+        <p class="msg" id="msg-roles"></p>
+        <div id="lista-roles" class="lista"></div>
+      </div>
+      <h3>Categorías</h3>
+      <form id="form-categoria" class="inline-form">
+        <input id="cat-nombre" placeholder="Nombre de la categoría" required>
+        <button type="submit">Agregar categoría</button>
+      </form>
+      <div id="lista-categorias" class="lista"></div>
+      <h3>Unidades de medida</h3>
+      <form id="form-unidad" class="inline-form">
+        <input id="uni-nombre" placeholder="Nombre de la unidad" required>
+        <button type="submit">Agregar unidad</button>
+      </form>
+      <div id="lista-unidades" class="lista"></div>
+      <p class="msg" id="msg-config"></p>
+    </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>Salón Privado Battlecruiser</span>
+      <span class="app-footer-version">v9.2 — BattleCruiser</span>
+    </footer>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<!-- Módulos de app.js (orden idéntico al original) -->
+<script src="js/core.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/offline.js"></script>
+<script src="js/centro-control.js"></script>
+<script src="js/navegacion.js"></script>
+<script src="js/productos.js"></script>
+<script src="js/presentaciones.js"></script>
+<script src="js/almacenes.js"></script>
+<script src="js/transferencias.js"></script>
+<script src="js/vales.js"></script>
+<script src="js/ventas.js"></script>
+<script src="js/catalogos.js"></script>
+<script src="js/usuarios-permisos.js"></script>
+<script src="js/mando.js"></script>
+<script src="js/reportes.js"></script>
+<script src="js/nucleo-operativo.js"></script>
+<script src="js/operacion-humana.js"></script>
+<script src="js/ciclos.js"></script>
+<script src="js/venta-turno-ui.js"></script>
+<script src="js/comunicacion.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
