@@ -1,11 +1,11 @@
-# BATTLECRUISER_CEREBRO_V4
+# BATTLECRUISER — V9.2
 
 **Actualizado:** 2026-08-20  
 **Repositorio:** `Robvg9/battlecruiser`  
 **Rama:** `main`  
-**Fuente de verdad:** GitHub `main` + Supabase producción + pruebas reales de Roberto.
+**Fuente de verdad:** GitHub `main` + verificaciones reales del repo.
 
-> Único Cerebro vigente. Informes históricos en `docs/archive/`.
+> Único Cerebro vigente. Informes históricos en `docs/archive/` y `BATTLECRUISER_MISION_9.1_INFORME_FINAL.md`.
 
 ---
 
@@ -53,15 +53,15 @@ PWA web **offline-first** (Cloudflare / static `public/`).
 public/
 ├── index.html          ← shell UI + carga ordenada de módulos
 ├── style.css
-├── app.js              ← STUB / punto de entrada final (sin lógica de negocio)
-├── service-worker.js   ← battlecruiser-shell-v40
+├── app.js              ← STUB / punto de entrada final (inyecta módulos T6/T8/T9)
+├── service-worker.js   ← battlecruiser-shell-v45
 ├── manifest.json
 ├── favicon.png / icons/
 └── js/                 ← módulos (scripts clásicos, scope global compartido)
     ├── core.js
     ├── auth.js
-    ├── offline.js              ← IndexedDB, cola, ejecutarOperacion, sincronizarCola
-    ├── centro-control.js       ← Centro de Control (tab resumen)
+    ├── offline.js              ← IndexedDB, cola, ejecutarOperacion, sincronizarCola, consolidarRefrescosPendientes
+    ├── centro-control.js
     ├── navegacion.js
     ├── productos.js
     ├── presentaciones.js
@@ -70,12 +70,15 @@ public/
     ├── vales.js
     ├── ventas.js
     ├── catalogos.js
+    ├── configuracion.js        ← T8
+    ├── catalogo-avanzado.js    ← T9
     ├── usuarios-permisos.js
-    ├── mando.js                ← Centro de Mando (tab mando)
+    ├── mando.js
     ├── reportes.js
     ├── nucleo-operativo.js
     ├── operacion-humana.js
-    └── comunicacion.js
+    ├── comunicacion.js
+    └── panel-contextual.js     ← T6
 ```
 
 La **modularización** reemplazó el antiguo `app.js` monolítico. Los módulos se cargan en el mismo orden histórico; las funciones siguen siendo globales. `app.js` no debe volver a concentrar la lógica de la aplicación.
@@ -153,9 +156,12 @@ Componentes clave en `public/js/offline.js`:
 - `ejecutarOperacion` / `sincronizarCola` / `recuperarOperacionesAtrapadas`
 - mutex `_sincronizando` (+ flag multi-pestaña en localStorage)
 - router `RPC_POR_TIPO`
+- `consolidarRefrescosPendientes()` (incluye T7.1)
 - panel de pendientes y badges
 
 **No duplicar esta arquitectura.**
+
+El código actual documenta que `sincronizarCola()` evita sincronizaciones simultáneas y procesa FIFO una operación a la vez.
 
 ---
 
@@ -170,6 +176,41 @@ Usuario → Rol → Permisos del Rol
 - **No** permisos individuales por usuario
 - Protección del último Dueño (backend)
 
+### Hardening de permisos (completado)
+
+Ya se revocó:
+
+```sql
+REVOKE EXECUTE ON FUNCTION public._validar_usuario_operacion(text, text) FROM authenticated;
+```
+
+Los helpers `_consume_fifo` / `_consumir_fifo`, `_registrar_movimiento`, `_resolver_presentacion` fueron investigados contra Supabase real y **NO existen en producción**. Son artefactos del código deprecated de B6. No deben aparecer como pendientes.
+
+### obtener_conversion_presentacion
+
+`public.obtener_conversion_presentacion(...)` **SÍ existe en producción**.
+
+- SECURITY DEFINER, owner postgres
+- `authenticated EXECUTE = true`
+- Callers reales: `registrar_compra`, `registrar_venta`, `registrar_transferencia`, `registrar_vale_salida`
+- No tiene caller frontend actualmente
+- No tiene trigger que la invoque
+
+**MANTENER / NO TOCAR.**
+
+Razón arquitectónica: no depende de `auth.uid()`, no protege datos sensibles, es una utilidad de conversión de catálogo; podría tener uso legítimo futuro desde UI.
+
+### Superficie de permisos
+
+Barrido completo posterior confirmó:
+
+- helpers internos cerrables ya cerrados;
+- RPC con caller frontend mantienen `authenticated`;
+- RPC preparadas para UI futura permanecen expuestas;
+- no existe otro revoke claramente accionable.
+
+**Conclusión: NO HAY OTRO CAMBIO DE PERMISOS PENDIENTE IDENTIFICADO.**
+
 ---
 
 ## 7. ESTADO REAL DE MÓDULOS
@@ -177,7 +218,7 @@ Usuario → Rol → Permisos del Rol
 ### Productos — COMPLETADO
 
 CRUD, imágenes, categorías, presentaciones, búsqueda, stock, catálogo visual.  
-Archivo: `public/js/productos.js` (+ presentaciones, catalogos).
+Archivo: `public/js/productos.js` (+ presentaciones, catalogos, catalogo-avanzado).
 
 ### Ventas — COMPLETADO
 
@@ -189,38 +230,47 @@ Archivo: `public/js/ventas.js`.
 Gestión crear/editar/activar-desactivar, panel informativo, productos por almacén, permisos. Backend M13.  
 Archivo: `public/js/almacenes.js`.
 
-### Transferencias — COMPLETADO (Misión 9.3 T4)
+### Transferencias — COMPLETADO
 
 Archivo: `public/js/transferencias.js`.
 
-Incluye: creación (origen/destino/producto/cantidad), validaciones (origen≠destino, cantidad, stock origen, permisos), historial, búsqueda, detalle con líneas, offline, integración con `ejecutarOperacion("transferencia")`.
+Incluye: creación (origen/destino/producto/cantidad), validaciones, historial, búsqueda, detalle, offline, integración con `ejecutarOperacion("transferencia")`.
 
-**Modelo backend atómico** (`registrar_transferencia`):
+**Modelo backend atómico** (`registrar_transferencia`): al crear se mueve stock origen → destino (FIFO) de inmediato. No existe recepción separada ni estados intermedios en el contrato actual.
 
-- Al crear se mueve stock origen → destino (FIFO) de inmediato.
-- **No existe** recepción separada, cancelación ni estados intermedios en el contrato actual.
-- **No inventar** esos flujos en frontend.
+### Centro de Mando — COMPLETADO
 
-### Centro de Mando — COMPLETADO (Misión 9.3 T5)
+Archivo: `public/js/mando.js` (+ `centro-control.js`).
 
-Archivo: `public/js/mando.js` (+ `centro-control.js` para el tab Resumen).
+### Presentaciones — IMPLEMENTADO
 
-Incluye: indicadores reales desde `_cache`, resumen operativo, alertas (ops, stock crítico, transferencias en cola, offline), actividad reciente, auditoría (permiso `auditoria/ver`), navegación contextual a tabs.
+- catálogo de presentaciones
+- producto_presentaciones
+- factores
+- activación/desactivación
+- asociación producto-presentación
+- conversión a unidades base
+- integración en compras, ventas, transferencias, vales
 
-Datos vacíos y offline degradan con mensajes claros; no inventa métricas.
+### Comunicación — IMPLEMENTADO + T7.1
 
-### Otros bloques (estado general)
+Archivo: `public/js/comunicacion.js` + refuerzo en `offline.js`.
+
+### Otros bloques
 
 | Bloque | Estado |
 |--------|--------|
-| Offline / cola / idempotencia (B1–B2.3) | Integrado |
+| Offline / cola / idempotencia | Integrado y estable |
 | Usuarios / roles / permisos (B3) | Implementado |
 | Reportes (B5) | Reconciliado |
 | Núcleo operativo / inventario (B6) | Reconciliado |
 | Turnos / operación humana (B7) | Implementado en producción |
-| Comunicación (B8) | Implementado en producción; pendiente refinamiento UX en 9.3 T7 |
+| Comunicación (B8) | Implementado + T7.1 aplicado |
+| Panel contextual (T6) | Implementado |
+| Configuración (T8) | Implementado |
+| Catálogo avanzado (T9) | Implementado |
 
-Pendiente de **aceptación real** de Roberto: multiusuario, concurrencia, E2E B7/B8, PWA móvil/PC, offline intermitente.
+Pendiente de **aceptación real** de Roberto: multiusuario, concurrencia, E2E B7/B8, PWA móvil/PC, offline intermitente, pruebas manuales finales.
 
 ---
 
@@ -237,27 +287,40 @@ Migraciones relevantes en repo (no duplicar):
 - M3 productos / revoke anon
 - M4 auditoría e integridad
 - M5 private + permisos + último Dueño
-- M6 mutaciones críticas: compra, venta, **transferencia**, vale
+- M6 mutaciones críticas: compra, venta, transferencia, vale
 - M7 reportes inventario/movimientos/rentabilidad
 - M11 roles CRUD, M12 imagen producto, M13 almacenes
 - b3–b8 históricos; `b6-nucleo-operativo.sql` = **DEPRECATED**
+- `revoke_authenticated_validar_usuario_operacion.sql` (hardening)
 
 Regla Claude: introspección de producción antes de aplicar cambios.
 
 ---
 
-## 9. SERVICE WORKER
+## 9. SERVICE WORKER / PWA
 
-**Cache:** `battlecruiser-shell-v40`
+**Cache:** `battlecruiser-shell-v45`
 
 Controla caché PWA, shell offline y precarga de módulos listados en `SHELL_FILES`.
 
-Incluye todos los `public/js/*.js`, `index.html`, `style.css`, `app.js`, icons, manifest.
+Incluye todos los `public/js/*.js` relevantes, `index.html`, `style.css`, `app.js`, icons, manifest.
 
 **Al añadir o renombrar módulos:** actualizar `SHELL_FILES` y subir el número de versión del cache.
 
 Estrategia shell: network-first (timeout corto) con fallback a caché.  
 Supabase GET: timeout; escrituras POST: red directa sin timeout artificial.
+
+### actualizarApp()
+
+Existe en `public/js/auth.js`.
+
+- Botón de actualización en login (`#update-app-btn-login`)
+- Botón dentro de la app (menú Ajustes)
+- Borra únicamente caches `battlecruiser-shell-*`
+- Desregistra Service Workers
+- Fuerza reload
+
+**NO modificar esta lógica sin necesidad explícita.**
 
 ---
 
@@ -281,58 +344,117 @@ test/
 Antes de cerrar una tarea:
 
 1. `node --check` de archivos modificados
-2. `npm test` / `node --test test/*.test.js`
+2. `npm test` / `node --test test/*.test.js` (si el entorno lo permite)
 3. Verificar referencias HTML ↔ JS y `SHELL_FILES`
 4. Sin PLACEHOLDER / TEMPORARY / archivos truncados
 
-Última cifra histórica documentada (pre-modularización, 2026-08-18): **212/212 PASS**. Re-ejecutar tras cambios grandes.
+**Tests históricos de Misión 9.1 (documentados en informe):** 242 PASS, 0 FAIL; `node --check public/app.js` PASS; `node --check public/service-worker.js` PASS; manifest válido.
+
+Esta misión (V9.2 versionado + Cerebro) **no re-ejecuta** `npm test` ni inventa resultados. Distinguir siempre tests históricos vs. ejecución actual.
 
 ---
 
-## 11. ROADMAP MISIÓN 9.3
+## 11. HISTORIAL RECIENTE Y ESTADO V9.2
 
-### COMPLETADO
+### A. Cierre funcional previo (Misión 9.1)
 
-| Tarea | Descripción |
-|-------|-------------|
-| ✅ T1 | Imagen de productos |
-| ✅ T2 | Catálogo visual en ventas |
-| ✅ T3 | Gestión completa de almacenes |
-| ✅ T4 | Transferencias (workflow + offline + permisos; modelo atómico) |
-| ✅ T5 | Centro de Mando (dashboard operativo con datos reales) |
+La Misión 9.1 quedó cerrada.
 
-### PENDIENTE
+El informe `BATTLECRUISER_MISION_9.1_INFORME_FINAL.md` registra:
 
-| Tarea | Objetivo |
-|-------|----------|
-| **T6** Panel contextual | Panel derecho dinámico según contexto (producto, venta, almacén, transferencia, incidencia, responsabilidad, turno). Reducir navegación. Respetar permisos. No romper móvil. |
-| **T7** Comunicación | Conversaciones, soporte, chat contextual, incidencias; permisos/RLS; offline donde corresponda. |
-| **T8** Configuración | Usuarios, roles, permisos, herramientas admin. No inventar backup falso. |
-| **T9** Catálogo avanzado | Filtros/navegación/UX del catálogo sin romper Tarea 6 productos. |
-| **T10** UX global | Unificar toasts, errores, loading, confirmaciones, estados offline — coherencia, no rediseño masivo. |
+- 242 tests PASS
+- 0 FAIL
+- `node --check public/app.js` PASS
+- `node --check public/service-worker.js` PASS
+- manifest válido
 
-Orden obligatorio: T6 → T7 → T8 → T9 → T10.  
-Al cerrar T10 no inventar tareas nuevas; solo auditoría de bugs/regresiones.
+Son **tests históricos ejecutados en Misión 9.1**, no una nueva ejecución de esta misión.
+
+### B. T7.1 — Comunicación offline
+
+**T7.1 está aplicado en `main`.**
+
+Commit conocido de la corrección original: `d2e0aafc499ca9ab26d19a36c754430d837efbb5` (y consolidaciones posteriores; HEAD de verificación incluye el cambio).
+
+Cambio:
+
+`consolidarRefrescosPendientes()` ahora refresca la conversación abierta mediante:
+
+```js
+refrescarMensajes(_comConvActual)
+```
+
+cuando existe una conversación abierta y la categoría `comunicacion` fue marcada para refresco.
+
+Esto resuelve:
+
+ENVIAR MENSAJE OFFLINE → queda pendiente → recuperar Internet → sincronizar → operación confirmada → refrescar lista + badge → refrescar conversación abierta → desaparece el estado visual ⏳ Pendiente.
+
+**T7.1 NO modificó:**
+
+- IndexedDB
+- FIFO
+- idempotencia
+- `sincronizarCola()` (más allá del uso de consolidación)
+- `ejecutarOperacion()`
+- RPC
+- Supabase
+
+### C. Incidente de offline.js
+
+Existió un incidente donde `public/js/offline.js` fue sobrescrito accidentalmente con `PLACEHOLDER_WILL_FAIL` y posteriormente restaurado.
+
+**Estado FINAL actual (verificado en GitHub):**
+
+- `PLACEHOLDER_WILL_FAIL` → **0 resultados**
+- `offline.js` íntegro
+- Existen: `sincronizarCola`, `consolidarRefrescosPendientes`, `RPC_POR_TIPO`
+
+El Cerebro refleja el estado final, no el placeholder.
+
+### D–F. Seguridad / permisos
+
+Ver sección 6 (Hardening completado, `obtener_conversion_presentacion` mantener, sin más revokes pendientes).
+
+### G. Offline-first
+
+Implementado y estable:
+
+- IndexedDB
+- operaciones_pendientes
+- estados PENDIENTE / SINCRONIZANDO / SINCRONIZADA / REQUIERE_ATENCION
+- idempotency_key
+- FIFO
+- `sincronizarCola()`
+- reconciliación
+- consolidación de refrescos (T7.1 incluido)
+- recuperación de operaciones atrapadas
+- panel de operaciones pendientes
+
+### H. Presentaciones
+
+Estado real implementado (ver sección 7).
+
+### I. PWA / Actualizar app
+
+Ver sección 9 (`actualizarApp()` documentado; no modificado en esta misión).
+
+### J. Estado final V9.2
+
+**V9.2 = CIERRE FUNCIONAL + HARDENING + T7.1 + VERSIONADO**
+
+El proyecto queda listo para **PRUEBAS MANUALES FINALES**.
+
+No abrir otra misión de desarrollo salvo que una prueba manual encuentre un bug real.
 
 ---
 
-## 12. HISTORIAL IMPORTANTE
-
-- `app.js` monolítico se modularizó (`public/js/*`) por tamaño y riesgo de truncamiento en GitHub.
-- Los módulos conservan **scope global** y el mismo orden de carga; comportamiento equivalente a la concatenación del monolito.
-- Service Worker actualizado a **v40** con todos los módulos en `SHELL_FILES`.
-- Tests adaptados a la estructura modular.
-- T4 Transferencias (2026-08-20): validación stock/permisos, detalle con líneas; backend atómico documentado.
-- T5 Centro de Mando (2026-08-20): indicadores y alertas desde `_cache` + cola; sin métricas inventadas.
-
----
-
-## 13. DEFINITION OF DONE
+## 12. DEFINITION OF DONE
 
 Una misión queda cerrada cuando:
 
 - cambio en `main` (commit + push)
-- tests y `node --check` relevantes OK
+- tests y `node --check` relevantes OK (cuando el entorno lo permite)
 - sin duplicación de arquitectura offline/permisos/RPC
 - dependencias backend documentadas si faltan
 - Cerebro refleja el estado real
@@ -342,17 +464,18 @@ Una misión queda cerrada cuando:
 
 ---
 
-## 14. ORGANIZACIÓN DEL REPO
+## 13. ORGANIZACIÓN DEL REPO
 
 ```text
 /
-├── BATTLECRUISER_CEREBRO.md   ← este archivo (V4)
+├── BATTLECRUISER_CEREBRO.md          ← este archivo (V9.2)
+├── BATTLECRUISER_MISION_9.1_INFORME_FINAL.md
 ├── package.json
-├── public/                   ← app desplegable
+├── public/                           ← app desplegable
 ├── test/
-├── supabase/                 ← SQL versionado
+├── supabase/                         ← SQL versionado
 ├── .github/workflows/
-└── docs/archive/             ← evidencia histórica
+└── docs/archive/                     ← evidencia histórica
 ```
 
 No dejar handoffs temporales en la raíz.
