@@ -529,17 +529,70 @@ BEGIN
 END;
 $function$;
 
+-- -----------------------------------------------------------------
+-- 10. FIX APLICADO EN ESTA SESIÓN (2026-08-21): crear_rol() no incluía
+--     la sección 'entregas_caja' en la matriz de permisos que arma para
+--     roles nuevos (tampoco 'ciclos' de M15, pre-existente, no tocado
+--     aquí por estar fuera de alcance de M16). Efecto real: un rol
+--     nuevo no fallaba en seguridad (tiene_permiso hace COALESCE a
+--     false si no hay fila), pero jamás recibía filas 'entregas_caja'
+--     para poder habilitarlas desde la gestión de roles. Se corrige
+--     agregando 'entregas_caja' a la matriz base (ver/crear/editar/
+--     borrar) y su 'editar_any' extra, igual patrón que 'turnos'.
+-- -----------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.crear_rol(p_nombre text)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_nombre text;
+  v_role_id uuid;
+BEGIN
+  IF NOT public.tiene_permiso('usuarios', 'crear') THEN
+    RAISE EXCEPTION 'No tenés permiso para crear roles.' USING ERRCODE = '42501';
+  END IF;
+
+  v_nombre := trim(p_nombre);
+  IF v_nombre IS NULL OR v_nombre = '' THEN
+    RAISE EXCEPTION 'El nombre del rol es obligatorio.' USING ERRCODE = '22023';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.roles WHERE lower(nombre) = lower(v_nombre)) THEN
+    RAISE EXCEPTION 'Ya existe un rol con ese nombre.' USING ERRCODE = '23505';
+  END IF;
+
+  INSERT INTO public.roles (nombre, activo) VALUES (v_nombre, true)
+    RETURNING id INTO v_role_id;
+
+  INSERT INTO public.permisos (role_id, seccion, accion, permitido)
+    SELECT v_role_id, s.seccion, a.accion, false
+    FROM (VALUES ('productos'),('categorias'),('almacenes'),('stock'),
+                 ('transferencias'),('vales_salida'),('ventas'),('reportes'),
+                 ('usuarios'),('presentaciones'),('auditoria'),('turnos'),
+                 ('comunicacion'),('unidades'),('entregas_caja')) AS s(seccion)
+    CROSS JOIN (VALUES ('ver'),('crear'),('editar'),('borrar')) AS a(accion);
+
+  INSERT INTO public.permisos (role_id, seccion, accion, permitido)
+    VALUES (v_role_id, 'turnos', 'editar_any', false),
+           (v_role_id, 'entregas_caja', 'editar_any', false);
+
+  RETURN v_role_id;
+END;
+$function$;
+
 -- =================================================================
 -- FIN M16
 --
 -- NOTA DE FIDELIDAD SOBRE GRANTS DE EJECUCIÓN (verificado en pg_proc.proacl):
--- Ninguna migración de M16 ejecutó REVOKE EXECUTE sobre estas funciones.
--- Postgres otorga EXECUTE a PUBLIC por defecto en toda función nueva,
--- y ese default sigue vigente hoy para las 7 funciones de este archivo
--- (incluida la huérfana registrar_conteo_entrega_caja): anon y PUBLIC
--- pueden ejecutarlas directamente, aunque la RLS sin policies impide
--- que anon lea/escriba la tabla igual. Este archivo NO agrega ningún
--- REVOKE porque no lo hay en el estado real; se deja constancia acá
--- para que quede visible, tal como pediste que se reporte cualquier
--- hallazgo relevante para "grants necesarios".
+-- Las 7 funciones de este archivo (incluida la huérfana
+-- registrar_conteo_entrega_caja) tienen EXECUTE otorgado explícitamente
+-- a anon/authenticated/service_role/postgres (proacl NO es NULL: no es
+-- el default de Postgres, es una concesión explícita presente en todo
+-- el esquema del proyecto). En la práctica esto no habilita a 'anon':
+-- cada RPC llama a _validar_usuario_operacion(), que exige auth.uid()
+-- no nulo y aborta con 'No hay sesión activa' si no hay sesión — anon
+-- nunca tiene auth.uid(). Se corrige acá la nota de la versión anterior
+-- de este archivo, que decía erróneamente que el ACL era el default.
 -- =================================================================
