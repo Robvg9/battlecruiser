@@ -23,6 +23,10 @@
 .venta-sin-turno{margin-bottom:14px;padding:14px;border-radius:8px;border:1px solid var(--gold-dim);background:var(--stone)}
 .venta-sin-turno .cc-accion{margin-top:8px}
 #venta-almacen.hidden{display:none!important}
+/* Sesión 8/30 — selector almacén al abrir turno */
+#turno-acciones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#turno-almacen-abrir{min-width:180px;flex:1 1 160px;padding:9px 11px;background:var(--void);border:1px solid #c9a24d33;border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px}
+#turno-almacen-abrir.hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -524,6 +528,9 @@
       <div class="cc-bloque">
         <div id="turno-actual" class="turno-actual-card"></div>
         <div class="btn-row" id="turno-acciones">
+          <select id="turno-almacen-abrir" aria-label="Almacén para abrir turno">
+            <option value="">Selecciona un almacén</option>
+          </select>
           <button type="button" id="btn-abrir-turno" class="cc-accion">Abrir turno</button>
           <button type="button" id="btn-cerrar-turno" class="cc-accion hidden">Cerrar turno</button>
         </div>

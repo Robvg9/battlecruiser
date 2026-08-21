@@ -1,8 +1,9 @@
+// v49 — Sesión 8: selector almacén al abrir turno (M14)
 // v48 — Sesión 8: almacenes sin doble panel (selector → solo inline)
 // v47 — Sesión 6: venta-turno-ui.js + restore index
 // v46 — Sesión 6: ventas gobernadas por almacén del turno
 // v45 — post-9.3: fix Ver todos + filtros T9
-const CACHE_NAME = "battlecruiser-shell-v48";
+const CACHE_NAME = "battlecruiser-shell-v49";
 
 const SHELL_FILES = [
   "./index.html",
