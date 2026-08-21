@@ -1,10 +1,11 @@
+// v46 — Sesión 6: ventas gobernadas por almacén del turno
 // v45 — post-9.3: fix Ver todos + filtros T9
 // v44 — T10 UX: refresco al entrar a Productos/Configuración
 // v43 — T9 catálogo avanzado (js/catalogo-avanzado.js)
 // v42 — Configuración / administración (js/configuracion.js) + restauración usuarios-permisos.
 // v41 — Panel contextual (js/panel-contextual.js) + shell markup.
 // v40 — modularización public/js/*
-const CACHE_NAME = "battlecruiser-shell-v45";
+const CACHE_NAME = "battlecruiser-shell-v46";
 
 const SHELL_FILES = [
   "./index.html",
