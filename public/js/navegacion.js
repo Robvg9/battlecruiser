@@ -37,6 +37,8 @@ safeInit("tabs", () => {
       if (typeof refrescarMovimientos === "function") refrescarMovimientos();
     } else if (btn.dataset.tab === "turnos") {
       if (typeof refrescarTurnos === "function") refrescarTurnos();
+    } else if (btn.dataset.tab === "ciclos") {
+      if (typeof refrescarCiclos === "function") refrescarCiclos();
     } else if (btn.dataset.tab === "operacion") {
       if (typeof refrescarOperacion === "function") refrescarOperacion();
     } else if (btn.dataset.tab === "comunicacion") {
