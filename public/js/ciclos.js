@@ -9,6 +9,8 @@
 // Vigente para DECLARADA→CONTADA: registrar_recepcion_entrega_caja.
 //
 // V1 MUTACIONES: online-only. NO toca offline.js / ejecutarOperacion / sincronizarCola.
+//
+// Misión 4.2: loading siempre con salida (timeout + finally + mensajes seguros).
 
 // ---------------------------------------------------------------------------
 // Estado en memoria del módulo (no IndexedDB propio; no cola paralela)
@@ -17,6 +19,8 @@ let _cicloActualId = null;
 let _ciclosCache = [];
 let _entregasCache = [];
 let _cicloDetalleActual = null;
+
+const CICLOS_RPC_TIMEOUT_MS = 25000;
 
 // ---------------------------------------------------------------------------
 // Mapa RPC — contratos backend existentes (NO inventar firmas)
@@ -40,15 +44,47 @@ const CICLOS_RPC_MUTACION = {
 };
 
 // ---------------------------------------------------------------------------
+// Helpers UI seguros (setMsg del proyecto no null-checkea el elemento)
+// ---------------------------------------------------------------------------
+function ciclosSetMsg(id, text, ok) {
+  try {
+    if (typeof setMsg === "function") {
+      const el = document.getElementById(id);
+      if (!el) {
+        console.warn("[Battlecruiser] ciclosSetMsg: falta #" + id);
+        return;
+      }
+      setMsg(id, text, ok);
+      return;
+    }
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = text;
+      el.className = "msg " + (ok ? "ok" : "error");
+    }
+  } catch (e) {
+    console.warn("[Battlecruiser] ciclosSetMsg:", e);
+  }
+}
+
+function ciclosForzarHideLoading() {
+  try {
+    if (typeof hideLoading === "function") hideLoading();
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Online obligatorio (V1) — no encola
 // ---------------------------------------------------------------------------
-function ciclosRequiereOnline(msgEl) {
+function ciclosRequiereOnline(msgId) {
   if (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado()) {
-    if (msgEl) setMsg(msgEl, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
+    if (msgId) ciclosSetMsg(msgId, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
     return false;
   }
   if (!navigator.onLine) {
-    if (msgEl) setMsg(msgEl, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
+    if (msgId) ciclosSetMsg(msgId, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
     return false;
   }
   return true;
@@ -63,8 +99,14 @@ function ciclosExplicarError(error, contexto) {
   return String((error && (error.message || error.code)) || error || "error desconocido");
 }
 
+function ciclosNormalizarData(data) {
+  if (data == null) return null;
+  if (Array.isArray(data)) return data[0] || null;
+  return data;
+}
+
 // ---------------------------------------------------------------------------
-// Mutación genérica online-only
+// Mutación genérica online-only — loading SIEMPRE sale (finally + timeout)
 // ---------------------------------------------------------------------------
 async function ciclosMutar(rpcNombre, payload, msgId) {
   if (!ciclosRequiereOnline(msgId || "msg-ciclos")) {
@@ -72,15 +114,37 @@ async function ciclosMutar(rpcNombre, payload, msgId) {
   }
   const key = ciclosNuevaIdempotencyKey();
   const params = Object.assign({}, payload, { p_idempotency_key: key });
+
+  let loadingShown = false;
   try {
-    if (typeof showLoading === "function") showLoading();
-    const { data, error } = await client.rpc(rpcNombre, params);
-    if (error) return { ok: false, error: error };
-    return { ok: true, data: data };
+    if (typeof showLoading === "function") {
+      showLoading();
+      loadingShown = true;
+    }
+
+    const rpcCall = client.rpc(rpcNombre, params);
+    let timeoutId = null;
+    const timeoutPromise = new Promise(function (_, reject) {
+      timeoutId = setTimeout(function () {
+        reject(new Error("Tiempo de espera agotado (" + Math.round(CICLOS_RPC_TIMEOUT_MS / 1000) + "s). Revisá la conexión e intentá de nuevo."));
+      }, CICLOS_RPC_TIMEOUT_MS);
+    });
+
+    let result;
+    try {
+      result = await Promise.race([rpcCall, timeoutPromise]);
+    } finally {
+      if (timeoutId != null) clearTimeout(timeoutId);
+    }
+
+    if (result && result.error) {
+      return { ok: false, error: result.error };
+    }
+    return { ok: true, data: ciclosNormalizarData(result && result.data) };
   } catch (e) {
     return { ok: false, error: e };
   } finally {
-    if (typeof hideLoading === "function") hideLoading();
+    if (loadingShown) ciclosForzarHideLoading();
   }
 }
 
@@ -152,7 +216,7 @@ function renderFormCrearCiclo() {
     '<select id="ciclo-nuevo-almacen" required>' + opts + "</select>" +
     '<label class="muted">Inicio <input type="date" id="ciclo-nuevo-inicio" required value="' + hoyStr + '"></label>' +
     '<input id="ciclo-nuevo-dias" type="number" min="1" max="31" step="1" value="1" placeholder="Días (1–31)" required>' +
-    '<button type="submit" class="cc-accion">Crear ciclo</button>' +
+    '<button type="submit" class="cc-accion" id="btn-crear-ciclo">Crear ciclo</button>' +
     "</form>" +
     '<p class="msg" id="msg-ciclo-crear"></p>';
 }
@@ -179,10 +243,25 @@ async function refrescarListaCiclos() {
   const p_almacen_id = almSel && almSel.value ? almSel.value : null;
 
   try {
-    const { data, error } = await client.rpc(CICLOS_RPC_LECTURA.listar, {
+    const rpcCall = client.rpc(CICLOS_RPC_LECTURA.listar, {
       p_almacen_id: p_almacen_id,
       p_estado: p_estado,
     });
+    let timeoutId = null;
+    const timeoutPromise = new Promise(function (_, reject) {
+      timeoutId = setTimeout(function () {
+        reject(new Error("timeout listar ciclos"));
+      }, CICLOS_RPC_TIMEOUT_MS);
+    });
+    let result;
+    try {
+      result = await Promise.race([rpcCall, timeoutPromise]);
+    } finally {
+      if (timeoutId != null) clearTimeout(timeoutId);
+    }
+
+    const data = result && result.data;
+    const error = result && result.error;
     if (error) {
       const msg = String(error.message || error);
       if (typeof esRpcFaltante === "function" && esRpcFaltante(error)) {
@@ -196,7 +275,7 @@ async function refrescarListaCiclos() {
     _ciclosCache = filas;
     renderListaCiclos(filas);
   } catch (e) {
-    setEmpty("lista-ciclos", "Error al cargar ciclos.");
+    setEmpty("lista-ciclos", "Error al cargar ciclos (tiempo de espera o red).");
     console.warn("[Battlecruiser] listar_ciclos_operativos:", e);
   }
 }
@@ -240,15 +319,34 @@ async function mostrarDetalleCiclo(cicloId) {
   det.innerHTML = '<p class="lista-estado">Cargando detalle…</p>';
   _cicloActualId = cicloId;
   try {
-    const { data, error } = await client.rpc(CICLOS_RPC_LECTURA.obtener, { p_ciclo_id: cicloId });
+    const rpcCall = client.rpc(CICLOS_RPC_LECTURA.obtener, { p_ciclo_id: cicloId });
+    let timeoutId = null;
+    const timeoutPromise = new Promise(function (_, reject) {
+      timeoutId = setTimeout(function () {
+        reject(new Error("timeout detalle ciclo"));
+      }, CICLOS_RPC_TIMEOUT_MS);
+    });
+    let result;
+    try {
+      result = await Promise.race([rpcCall, timeoutPromise]);
+    } finally {
+      if (timeoutId != null) clearTimeout(timeoutId);
+    }
+
+    const data = ciclosNormalizarData(result && result.data);
+    const error = result && result.error;
     if (error) {
       det.innerHTML = '<p class="lista-estado">Error: ' + (typeof escHtml === "function" ? escHtml(error.message || error) : String(error.message || error)) + "</p>";
+      return;
+    }
+    if (!data) {
+      det.innerHTML = '<p class="lista-estado">Ciclo no encontrado.</p>';
       return;
     }
     _cicloDetalleActual = data;
     await cargarYRenderDetalleCompleto(data);
   } catch (e) {
-    det.innerHTML = '<p class="lista-estado">Error al cargar el detalle del ciclo.</p>';
+    det.innerHTML = '<p class="lista-estado">Error al cargar el detalle del ciclo (tiempo de espera o red).</p>';
     console.warn("[Battlecruiser] obtener_ciclo_operativo:", e);
   }
 }
@@ -398,185 +496,246 @@ function renderDetalleCiclo(c, entregas, pendientes) {
 // ---------------------------------------------------------------------------
 async function crearCicloDesdeForm(e) {
   e.preventDefault();
-  if (!tienePermiso("ciclos", "crear")) {
-    setMsg("msg-ciclo-crear", "No tenés permiso para crear ciclos.", false);
-    return;
+  const btn = document.getElementById("btn-crear-ciclo");
+  if (btn) btn.disabled = true;
+  try {
+    if (!tienePermiso("ciclos", "crear")) {
+      ciclosSetMsg("msg-ciclo-crear", "No tenés permiso para crear ciclos.", false);
+      return;
+    }
+    const alm = document.getElementById("ciclo-nuevo-almacen");
+    const inicio = document.getElementById("ciclo-nuevo-inicio");
+    const dias = document.getElementById("ciclo-nuevo-dias");
+    const almacen_id = alm ? (alm.value || "").trim() : "";
+    const inicio_plan = inicio ? (inicio.value || "").trim() : "";
+    const cantidad_dias = dias ? parseInt(dias.value, 10) : 0;
+    if (!almacen_id) {
+      ciclosSetMsg("msg-ciclo-crear", "Seleccioná un almacén.", false);
+      return;
+    }
+    if (!inicio_plan) {
+      ciclosSetMsg("msg-ciclo-crear", "Indicá la fecha de inicio.", false);
+      return;
+    }
+    if (!Number.isFinite(cantidad_dias) || cantidad_dias < 1 || cantidad_dias > 31) {
+      ciclosSetMsg("msg-ciclo-crear", "Cantidad de días debe estar entre 1 y 31.", false);
+      return;
+    }
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.crear, {
+      p_almacen_id: almacen_id,
+      p_inicio_plan: inicio_plan,
+      p_cantidad_dias: cantidad_dias,
+    }, "msg-ciclo-crear");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-ciclo-crear", "No se pudo crear: " + ciclosExplicarError(r.error, "crear ciclo"), false);
+      return;
+    }
+    ciclosSetMsg("msg-ciclo-crear", "✓ Ciclo creado (PLANIFICADO).", true);
+    const form = document.getElementById("form-crear-ciclo");
+    if (form) form.reset();
+    await refrescarListaCiclos();
+    const nuevoId = r.data && r.data.id ? r.data.id : null;
+    if (nuevoId) await mostrarDetalleCiclo(nuevoId);
+  } catch (err) {
+    console.warn("[Battlecruiser] crearCicloDesdeForm:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-ciclo-crear", "Error inesperado al crear ciclo.", false);
+    setEmpty("lista-ciclos", "Error al actualizar listado. Pulsá Refrescar.");
+  } finally {
+    if (btn) btn.disabled = false;
+    ciclosForzarHideLoading();
   }
-  const alm = document.getElementById("ciclo-nuevo-almacen");
-  const inicio = document.getElementById("ciclo-nuevo-inicio");
-  const dias = document.getElementById("ciclo-nuevo-dias");
-  const almacen_id = alm ? (alm.value || "").trim() : "";
-  const inicio_plan = inicio ? (inicio.value || "").trim() : "";
-  const cantidad_dias = dias ? parseInt(dias.value, 10) : 0;
-  if (!almacen_id) {
-    setMsg("msg-ciclo-crear", "Seleccioná un almacén.", false);
-    return;
-  }
-  if (!inicio_plan) {
-    setMsg("msg-ciclo-crear", "Indicá la fecha de inicio.", false);
-    return;
-  }
-  if (!Number.isFinite(cantidad_dias) || cantidad_dias < 1 || cantidad_dias > 31) {
-    setMsg("msg-ciclo-crear", "Cantidad de días debe estar entre 1 y 31.", false);
-    return;
-  }
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.crear, {
-    p_almacen_id: almacen_id,
-    p_inicio_plan: inicio_plan,
-    p_cantidad_dias: cantidad_dias,
-  }, "msg-ciclo-crear");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-ciclo-crear", "No se pudo crear: " + ciclosExplicarError(r.error, "crear ciclo"), false);
-    return;
-  }
-  setMsg("msg-ciclo-crear", "✓ Ciclo creado (PLANIFICADO).", true);
-  const form = document.getElementById("form-crear-ciclo");
-  if (form) form.reset();
-  await refrescarListaCiclos();
-  if (r.data && r.data.id) await mostrarDetalleCiclo(r.data.id);
 }
 
 async function iniciarCiclo(cicloId) {
-  if (!tienePermiso("ciclos", "editar")) {
-    setMsg("msg-ciclo-detalle", "No tenés permiso para iniciar ciclos.", false);
-    return;
+  try {
+    if (!tienePermiso("ciclos", "editar")) {
+      ciclosSetMsg("msg-ciclo-detalle", "No tenés permiso para iniciar ciclos.", false);
+      return;
+    }
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.iniciar, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-ciclo-detalle", "No se pudo iniciar: " + ciclosExplicarError(r.error, "iniciar ciclo"), false);
+      return;
+    }
+    ciclosSetMsg("msg-ciclo-detalle", "✓ Ciclo iniciado (ACTIVO).", true);
+    await refrescarListaCiclos();
+    await mostrarDetalleCiclo(cicloId);
+  } catch (err) {
+    console.warn("[Battlecruiser] iniciarCiclo:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-ciclo-detalle", "Error inesperado al iniciar ciclo.", false);
+  } finally {
+    ciclosForzarHideLoading();
   }
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.iniciar, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-ciclo-detalle", "No se pudo iniciar: " + ciclosExplicarError(r.error, "iniciar ciclo"), false);
-    return;
-  }
-  setMsg("msg-ciclo-detalle", "✓ Ciclo iniciado (ACTIVO).", true);
-  await refrescarListaCiclos();
-  await mostrarDetalleCiclo(cicloId);
 }
 
 async function iniciarValidacionCiclo(cicloId) {
-  if (!tienePermiso("ciclos", "editar")) {
-    setMsg("msg-ciclo-detalle", "No tenés permiso para pasar a validación.", false);
-    return;
+  try {
+    if (!tienePermiso("ciclos", "editar")) {
+      ciclosSetMsg("msg-ciclo-detalle", "No tenés permiso para pasar a validación.", false);
+      return;
+    }
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.iniciarValidacion, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-ciclo-detalle", "No se pudo pasar a validación: " + ciclosExplicarError(r.error, "iniciar validación"), false);
+      return;
+    }
+    ciclosSetMsg("msg-ciclo-detalle", "✓ Ciclo en validación (EN_VALIDACION).", true);
+    await refrescarListaCiclos();
+    await mostrarDetalleCiclo(cicloId);
+  } catch (err) {
+    console.warn("[Battlecruiser] iniciarValidacionCiclo:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-ciclo-detalle", "Error inesperado al pasar a validación.", false);
+  } finally {
+    ciclosForzarHideLoading();
   }
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.iniciarValidacion, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-ciclo-detalle", "No se pudo pasar a validación: " + ciclosExplicarError(r.error, "iniciar validación"), false);
-    return;
-  }
-  setMsg("msg-ciclo-detalle", "✓ Ciclo en validación (EN_VALIDACION).", true);
-  await refrescarListaCiclos();
-  await mostrarDetalleCiclo(cicloId);
 }
 
 async function finalizarCiclo(cicloId) {
-  if (!tienePermiso("ciclos", "editar_any")) {
-    setMsg("msg-ciclo-detalle", "No tenés permiso para finalizar ciclos.", false);
-    return;
+  try {
+    if (!tienePermiso("ciclos", "editar_any")) {
+      ciclosSetMsg("msg-ciclo-detalle", "No tenés permiso para finalizar ciclos.", false);
+      return;
+    }
+    if (!window.confirm("¿Finalizar este ciclo operativo? Pasará a VALIDADO. Solo si no hay entregas/cuadres pendientes.")) {
+      return;
+    }
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.finalizar, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-ciclo-detalle", "No se pudo finalizar: " + ciclosExplicarError(r.error, "finalizar ciclo"), false);
+      return;
+    }
+    ciclosSetMsg("msg-ciclo-detalle", "✓ Ciclo finalizado (VALIDADO).", true);
+    await refrescarListaCiclos();
+    await mostrarDetalleCiclo(cicloId);
+  } catch (err) {
+    console.warn("[Battlecruiser] finalizarCiclo:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-ciclo-detalle", "Error inesperado al finalizar ciclo.", false);
+  } finally {
+    ciclosForzarHideLoading();
   }
-  if (!window.confirm("¿Finalizar este ciclo operativo? Pasará a VALIDADO. Solo si no hay entregas/cuadres pendientes.")) {
-    return;
-  }
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.finalizar, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-ciclo-detalle", "No se pudo finalizar: " + ciclosExplicarError(r.error, "finalizar ciclo"), false);
-    return;
-  }
-  setMsg("msg-ciclo-detalle", "✓ Ciclo finalizado (VALIDADO).", true);
-  await refrescarListaCiclos();
-  await mostrarDetalleCiclo(cicloId);
 }
 
 async function declararEntregaDesdeForm(e) {
   e.preventDefault();
-  if (!tienePermiso("entregas_caja", "crear")) {
-    setMsg("msg-entrega-crear", "No tenés permiso para declarar entregas.", false);
-    return;
+  try {
+    if (!tienePermiso("entregas_caja", "crear")) {
+      ciclosSetMsg("msg-entrega-crear", "No tenés permiso para declarar entregas.", false);
+      return;
+    }
+    const cicloId = (document.getElementById("entrega-ciclo-id") || {}).value;
+    const montoEl = document.getElementById("entrega-monto");
+    const sesionEl = document.getElementById("entrega-sesion");
+    const monto = montoEl ? parseFloat(montoEl.value) : NaN;
+    const sesion_id = sesionEl && sesionEl.value ? sesionEl.value : null;
+    if (!cicloId) {
+      ciclosSetMsg("msg-entrega-crear", "Ciclo no identificado.", false);
+      return;
+    }
+    if (!Number.isFinite(monto) || monto < 0) {
+      ciclosSetMsg("msg-entrega-crear", "Monto inválido.", false);
+      return;
+    }
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.declararEntrega, {
+      p_ciclo_id: cicloId,
+      p_monto_declarado: monto,
+      p_sesion_id: sesion_id,
+    }, "msg-entrega-crear");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-entrega-crear", "No se pudo declarar: " + ciclosExplicarError(r.error, "declarar entrega"), false);
+      return;
+    }
+    ciclosSetMsg("msg-entrega-crear", "✓ Entrega declarada.", true);
+    if (montoEl) montoEl.value = "";
+    await mostrarDetalleCiclo(cicloId);
+  } catch (err) {
+    console.warn("[Battlecruiser] declararEntregaDesdeForm:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-entrega-crear", "Error inesperado al declarar entrega.", false);
+  } finally {
+    ciclosForzarHideLoading();
   }
-  const cicloId = (document.getElementById("entrega-ciclo-id") || {}).value;
-  const montoEl = document.getElementById("entrega-monto");
-  const sesionEl = document.getElementById("entrega-sesion");
-  const monto = montoEl ? parseFloat(montoEl.value) : NaN;
-  const sesion_id = sesionEl && sesionEl.value ? sesionEl.value : null;
-  if (!cicloId) {
-    setMsg("msg-entrega-crear", "Ciclo no identificado.", false);
-    return;
-  }
-  if (!Number.isFinite(monto) || monto < 0) {
-    setMsg("msg-entrega-crear", "Monto inválido.", false);
-    return;
-  }
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.declararEntrega, {
-    p_ciclo_id: cicloId,
-    p_monto_declarado: monto,
-    p_sesion_id: sesion_id,
-  }, "msg-entrega-crear");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-entrega-crear", "No se pudo declarar: " + ciclosExplicarError(r.error, "declarar entrega"), false);
-    return;
-  }
-  setMsg("msg-entrega-crear", "✓ Entrega declarada.", true);
-  if (montoEl) montoEl.value = "";
-  await mostrarDetalleCiclo(cicloId);
 }
 
 async function recepcionEntrega(entregaId) {
-  if (!tienePermiso("entregas_caja", "editar")) {
-    setMsg("msg-ciclo-detalle", "No tenés permiso para registrar conteo.", false);
-    return;
+  try {
+    if (!tienePermiso("entregas_caja", "editar")) {
+      ciclosSetMsg("msg-ciclo-detalle", "No tenés permiso para registrar conteo.", false);
+      return;
+    }
+    const input = window.prompt("Monto contado:", "");
+    if (input === null) return;
+    const monto = parseFloat(input);
+    if (!Number.isFinite(monto) || monto < 0) {
+      ciclosSetMsg("msg-ciclo-detalle", "Monto contado inválido.", false);
+      return;
+    }
+    const obs = window.prompt("Observación de conteo (opcional):", "") || null;
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.recepcionEntrega, {
+      p_entrega_id: entregaId,
+      p_monto_contado: monto,
+      p_observacion_conteo: obs,
+    }, "msg-ciclo-detalle");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-ciclo-detalle", "No se pudo registrar recepción: " + ciclosExplicarError(r.error, "recepción entrega"), false);
+      return;
+    }
+    ciclosSetMsg("msg-ciclo-detalle", "✓ Conteo registrado (CONTADA).", true);
+    if (_cicloActualId) await mostrarDetalleCiclo(_cicloActualId);
+  } catch (err) {
+    console.warn("[Battlecruiser] recepcionEntrega:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-ciclo-detalle", "Error inesperado al registrar conteo.", false);
+  } finally {
+    ciclosForzarHideLoading();
   }
-  const input = window.prompt("Monto contado:", "");
-  if (input === null) return;
-  const monto = parseFloat(input);
-  if (!Number.isFinite(monto) || monto < 0) {
-    setMsg("msg-ciclo-detalle", "Monto contado inválido.", false);
-    return;
-  }
-  const obs = window.prompt("Observación de conteo (opcional):", "") || null;
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.recepcionEntrega, {
-    p_entrega_id: entregaId,
-    p_monto_contado: monto,
-    p_observacion_conteo: obs,
-  }, "msg-ciclo-detalle");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-ciclo-detalle", "No se pudo registrar recepción: " + ciclosExplicarError(r.error, "recepción entrega"), false);
-    return;
-  }
-  setMsg("msg-ciclo-detalle", "✓ Conteo registrado (CONTADA).", true);
-  if (_cicloActualId) await mostrarDetalleCiclo(_cicloActualId);
 }
 
 async function revisarEntrega(entregaId, decision) {
-  if (!tienePermiso("entregas_caja", "editar_any")) {
-    setMsg("msg-ciclo-detalle", "No tenés permiso para revisar entregas.", false);
-    return;
-  }
-  let comentario = null;
-  if (decision === "rechazar") {
-    comentario = window.prompt("Motivo del rechazo (obligatorio):", "");
-    if (comentario === null) return;
-    if (!String(comentario).trim()) {
-      setMsg("msg-ciclo-detalle", "El rechazo requiere un motivo.", false);
+  try {
+    if (!tienePermiso("entregas_caja", "editar_any")) {
+      ciclosSetMsg("msg-ciclo-detalle", "No tenés permiso para revisar entregas.", false);
       return;
     }
-  } else {
-    comentario = window.prompt("Comentario de aprobación (opcional):", "") || null;
+    let comentario = null;
+    if (decision === "rechazar") {
+      comentario = window.prompt("Motivo del rechazo (obligatorio):", "");
+      if (comentario === null) return;
+      if (!String(comentario).trim()) {
+        ciclosSetMsg("msg-ciclo-detalle", "El rechazo requiere un motivo.", false);
+        return;
+      }
+    } else {
+      comentario = window.prompt("Comentario de aprobación (opcional):", "") || null;
+    }
+    const r = await ciclosMutar(CICLOS_RPC_MUTACION.revisarEntrega, {
+      p_entrega_id: entregaId,
+      p_decision: decision,
+      p_comentario: comentario,
+    }, "msg-ciclo-detalle");
+    if (!r.ok) {
+      if (r.offline) return;
+      ciclosSetMsg("msg-ciclo-detalle", "No se pudo revisar: " + ciclosExplicarError(r.error, "revisar entrega"), false);
+      return;
+    }
+    ciclosSetMsg("msg-ciclo-detalle", "✓ Entrega " + (decision === "aprobar" ? "aprobada" : "rechazada") + ".", true);
+    if (_cicloActualId) await mostrarDetalleCiclo(_cicloActualId);
+  } catch (err) {
+    console.warn("[Battlecruiser] revisarEntrega:", err);
+    ciclosForzarHideLoading();
+    ciclosSetMsg("msg-ciclo-detalle", "Error inesperado al revisar entrega.", false);
+  } finally {
+    ciclosForzarHideLoading();
   }
-  const r = await ciclosMutar(CICLOS_RPC_MUTACION.revisarEntrega, {
-    p_entrega_id: entregaId,
-    p_decision: decision,
-    p_comentario: comentario,
-  }, "msg-ciclo-detalle");
-  if (!r.ok) {
-    if (r.offline) return;
-    setMsg("msg-ciclo-detalle", "No se pudo revisar: " + ciclosExplicarError(r.error, "revisar entrega"), false);
-    return;
-  }
-  setMsg("msg-ciclo-detalle", "✓ Entrega " + (decision === "aprobar" ? "aprobada" : "rechazada") + ".", true);
-  if (_cicloActualId) await mostrarDetalleCiclo(_cicloActualId);
 }
 
 // ---------------------------------------------------------------------------
