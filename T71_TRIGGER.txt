@@ -1,1 +1,1 @@
-temporary trigger for one-shot T7.1 repair; remove in workflow
+trigger quality recovery run
