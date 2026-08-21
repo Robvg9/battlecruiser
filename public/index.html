@@ -561,32 +561,54 @@
     </section>
 
     <section id="tab-ciclos" class="tab-panel">
-      <div class="pendientes-header">
-        <h3>Ciclos Operativos</h3>
-        <span id="ciclos-conn-info" class="muted"></span>
-      </div>
-      <p class="muted">Ciclos, sesiones, entregas de caja y cierre administrativo (M15-M17).</p>
-      <div class="mando-filtros" id="ciclos-filtros">
-        <select id="ciclo-filtro-estado">
-          <option value="">Todos los estados</option>
-          <option value="PLANIFICADO">Planificado</option>
-          <option value="ACTIVO">Activo</option>
-          <option value="EN_VALIDACION">En validación</option>
-          <option value="VALIDADO">Validado</option>
-          <option value="ARCHIVADO">Archivado</option>
-        </select>
-        <select id="ciclo-filtro-almacen"><option value="">Todos los almacenes</option></select>
-        <button type="button" id="ciclos-refrescar-btn" class="cc-accion">Refrescar</button>
-      </div>
-      <div class="cc-bloque">
-        <h3>Listado de ciclos</h3>
-        <div id="lista-ciclos" class="lista">
-          <p class="lista-estado">Abrí esta sección con conexión para cargar ciclos.</p>
-        </div>
-      </div>
-      <div id="ciclo-detalle" class="cc-bloque"></div>
-      <p class="msg" id="msg-ciclos"></p>
-    </section>
+  <div class="pendientes-header">
+    <h3>Ciclos Operativos</h3>
+    <span id="ciclos-conn-info" class="muted"></span>
+  </div>
+
+  <p class="muted">
+    Ciclos, sesiones, entregas de caja y cierre administrativo (M15-M17).
+  </p>
+
+  <div class="mando-filtros" id="ciclos-filtros">
+
+    <select id="ciclo-filtro-estado">
+      <option value="">Todos los estados</option>
+      <option value="PLANIFICADO">Planificado</option>
+      <option value="ACTIVO">Activo</option>
+      <option value="EN_VALIDACION">En validación</option>
+      <option value="VALIDADO">Validado</option>
+      <option value="ARCHIVADO">Archivado</option>
+    </select>
+
+    <select id="ciclo-filtro-almacen">
+      <option value="">Todos los almacenes</option>
+    </select>
+
+    <button type="button"
+      id="ciclos-refrescar-btn"
+      class="cc-accion">
+      Refrescar
+    </button>
+
+  </div>
+
+  <div class="cc-bloque">
+    <h3>Listado de ciclos</h3>
+
+    <div id="lista-ciclos" class="lista">
+      <p class="lista-estado">
+        Abrí esta sección con conexión para cargar ciclos.
+      </p>
+    </div>
+
+  </div>
+
+  <div id="ciclo-detalle" class="cc-bloque"></div>
+
+  <p class="msg" id="msg-ciclos"></p>
+
+</section>
 
     <section id="tab-operacion" class="tab-panel">
       <div class="pendientes-header">
