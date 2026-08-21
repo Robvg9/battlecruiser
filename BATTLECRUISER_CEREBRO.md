@@ -175,6 +175,7 @@ ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
 - Flujo: DECLARADA → CONTADA → APROBADA | RECHAZADA
 - RPC vigentes: `declarar_entrega_caja`, `registrar_recepcion_entrega_caja` (paso DECLARADA→CONTADA), `revisar_entrega_caja`, `listar_entregas_caja`, `obtener_entrega_caja`, `obtener_pendientes_cierre_ciclo`
 - `registrar_conteo_entrega_caja` = **legado/huérfana**, coexiste en prod sin uso (ver `docs/BATTLECRUISER_M16_FUNCION_HUERFANA.md`); NO usarla en frontend, no eliminada aún
+- **Nota:** `registrar_conteo_entrega_caja` existe por compatibilidad histórica. No usar en nuevas implementaciones. El flujo vigente utiliza `registrar_recepcion_entrega_caja`.
 - Archivo: `m16_entregas_caja.sql`
 - **RECHAZADA no bloquea** el cierre del ciclo (ya está resuelta)
 - Grants: hardeneados en `m15_2_m16_1_hardening_grants_rpc.sql` (2026-08-21)
