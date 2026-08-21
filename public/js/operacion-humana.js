@@ -1,9 +1,45 @@
 // ==== Battlecruiser · js/operacion-humana.js ====
 // B7 — Operación humana: turnos, cuadres, responsabilidades e incidencias.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
+// Sesión 8/30: apertura de turno con selector dedicado #turno-almacen-abrir (post-M14).
 
 // ---- B7 — OPERACIÓN HUMANA: TURNOS + CUADRES + RESPONSABILIDADES + INCIDENCIAS
 let _turnoActual = null; // turno abierto del usuario (cache en memoria)
+
+/** Nombre de almacén para la tarjeta de turno (RPC o catálogo _cache). */
+function nombreAlmacenDeTurno(t) {
+  if (!t) return "—";
+  if (t.almacen_nombre) return String(t.almacen_nombre);
+  if (t.almacenes && t.almacenes.nombre) return String(t.almacenes.nombre);
+  const id = t.almacen_id;
+  if (!id) return "—";
+  if (typeof resolverNombreAlmacen === "function") {
+    const n = resolverNombreAlmacen(id);
+    if (n) return n;
+  }
+  const a = (_cache.almacenes || []).find(function (x) { return x.id === id; });
+  return a && a.nombre ? a.nombre : "—";
+}
+
+/** Rellena #turno-almacen-abrir con almacenes activos (no usa el filtro del historial). */
+function poblarSelectAlmacenAbrirTurno() {
+  const sel = document.getElementById("turno-almacen-abrir");
+  if (!sel) return;
+  const actual = sel.value;
+  const almacenes = ((_cache && _cache.almacenes) || []).filter(function (a) {
+    return a.activo !== false;
+  });
+  sel.innerHTML = '<option value="">Selecciona un almacén</option>';
+  almacenes.forEach(function (a) {
+    const o = document.createElement("option");
+    o.value = a.id;
+    o.textContent = a.nombre || a.id;
+    sel.appendChild(o);
+  });
+  if (actual && almacenes.some(function (a) { return a.id === actual; })) {
+    sel.value = actual;
+  }
+}
 
 // ---- B7: turno actual del usuario ----
 // Consulta turno_actual_usuario (RPC B7). Si hay turno abierto, muestra
@@ -12,6 +48,7 @@ async function refrescarTurnoActual() {
   const el = document.getElementById("turno-actual");
   const btnAbrir = document.getElementById("btn-abrir-turno");
   const btnCerrar = document.getElementById("btn-cerrar-turno");
+  const selAbrir = document.getElementById("turno-almacen-abrir");
   if (!el) return;
   if (!tienePermiso("turnos", "ver")) {
     el.innerHTML = '<p class="lista-estado">No tenés permiso para ver turnos.</p>';
@@ -34,8 +71,10 @@ async function refrescarTurnoActual() {
     }
     _turnoActual = data;
     renderTurnoActual(data);
-    if (btnAbrir) btnAbrir.classList.toggle("hidden", !!(data && data.estado === "ABIERTO"));
-    if (btnCerrar) btnCerrar.classList.toggle("hidden", !(data && data.estado === "ABIERTO"));
+    const abierto = !!(data && data.estado === "ABIERTO");
+    if (btnAbrir) btnAbrir.classList.toggle("hidden", abierto);
+    if (btnCerrar) btnCerrar.classList.toggle("hidden", !abierto);
+    if (selAbrir) selAbrir.classList.toggle("hidden", abierto);
   } catch (e) {
     el.innerHTML = '<p class="lista-estado">Error al cargar el turno actual.</p>';
     console.warn("[Battlecruiser] turno_actual_usuario:", e);
@@ -50,34 +89,60 @@ function renderTurnoActual(t) {
     return;
   }
   const apertura = t.apertura_real ? fechaHora(t.apertura_real) : "—";
+  const almNombre = nombreAlmacenDeTurno(t);
   let cuadreHtml = "";
   if (t.cuadre) {
     const c = t.cuadre;
     cuadreHtml = '<div class="muted">Cuadre: $' + money(c.dinero_esperado || 0) + " esperado · estado " + escHtml(c.estado || "—") + "</div>";
   }
-  el.innerHTML = '<div class="turno-card-info"><span class="cc-asunto-tipo">Turno ' + escHtml(t.estado || "—") + '</span><span class="muted">Apertura: ' + apertura + " · " + escHtml(t.usuario_nombre || "—") + "</span>" + cuadreHtml + "</div>";
+  el.innerHTML =
+    '<div class="turno-card-info">' +
+    '<span class="cc-asunto-tipo">Turno ' + escHtml(t.estado || "—") + "</span>" +
+    '<span class="muted">Almacén: <strong>' + escHtml(almNombre) + "</strong></span>" +
+    '<span class="muted">Apertura: ' + apertura + " · " + escHtml(t.usuario_nombre || "—") + "</span>" +
+    cuadreHtml +
+    "</div>";
 }
 
 // ---- B7: abrir turno ----
-// Pasa por ejecutarOperacion (cola offline + idempotencia). El backend
-// valida usuario activo, permiso y doble apertura.
+// Pasa por ejecutarOperacion (cola offline + idempotencia). M14 exige p_almacen_id.
+// Fuente exclusiva: #turno-almacen-abrir (NO #turno-filtro-almacen).
 async function abrirTurno() {
-  const almacenSel = document.getElementById("turno-filtro-almacen");
-  const almacen_id = almacenSel ? (almacenSel.value || null) : null;
+  const almacenSel = document.getElementById("turno-almacen-abrir");
+  const almacen_id = almacenSel ? (almacenSel.value || "").trim() : "";
+  if (!almacen_id) {
+    setMsg("msg-turno", "Seleccioná un almacén antes de abrir el turno.", false);
+    if (almacenSel) almacenSel.focus();
+    return;
+  }
   const r = await ejecutarOperacion("turno", {
     p_almacen_id: almacen_id,
   });
-  const msg = document.getElementById("msg-turno");
   if (!r.ok) {
-    if (msg) setMsg("msg-turno", "No se pudo abrir el turno: " + explicarError(r.error, "abrir turno"), false);
+    setMsg("msg-turno", "No se pudo abrir el turno: " + explicarError(r.error, "abrir turno"), false);
     return;
   }
   if (r.offline) {
-    if (msg) setMsg("msg-turno", "✓ Turno guardado localmente — se sincronizará al recuperar conexión.", true);
+    setMsg("msg-turno", "✓ Turno guardado localmente — se sincronizará al recuperar conexión.", true);
+    // Optimista: recordar almacén elegido para UI de ventas hasta el refresh online.
+    if (!_turnoActual || _turnoActual.estado !== "ABIERTO") {
+      _turnoActual = Object.assign({}, _turnoActual || {}, {
+        estado: "ABIERTO",
+        almacen_id: almacen_id,
+      });
+    } else {
+      _turnoActual.almacen_id = almacen_id;
+    }
+    if (typeof actualizarPanelAlmacenVenta === "function") {
+      try { actualizarPanelAlmacenVenta(); } catch (e) { /* no crítico */ }
+    }
   } else {
-    if (msg) setMsg("msg-turno", "✓ Turno abierto.", true);
+    setMsg("msg-turno", "✓ Turno abierto.", true);
   }
   await refrescarTurnoActual();
+  if (typeof actualizarPanelAlmacenVenta === "function") {
+    try { actualizarPanelAlmacenVenta(); } catch (e) { /* no crítico */ }
+  }
 }
 
 // ---- B7: cerrar turno ----
@@ -106,6 +171,9 @@ async function cerrarTurno() {
   }
   await refrescarTurnoActual();
   await refrescarListaTurnos();
+  if (typeof actualizarPanelAlmacenVenta === "function") {
+    try { actualizarPanelAlmacenVenta(); } catch (e) { /* no crítico */ }
+  }
 }
 
 // ---- B7: lista de turnos (historial) ----
@@ -258,9 +326,11 @@ async function refrescarTurnos() {
   if (!appShell || !appShell.classList.contains("visible")) return;
   const conn = document.getElementById("turnos-conn-info");
   if (conn) conn.textContent = estaRealmenteDesconectado() ? "⚪ Sin conexión" : "🟢 Conectado";
-  // Poblar select de almacenes con _cache.
-  const sel = document.getElementById("turno-filtro-almacen");
-  poblarSelectAlmacenes(sel);
+  // Filtro del historial (independiente del selector de apertura).
+  const selFiltro = document.getElementById("turno-filtro-almacen");
+  poblarSelectAlmacenes(selFiltro);
+  // Selector dedicado para abrir turno (M14).
+  poblarSelectAlmacenAbrirTurno();
   await refrescarTurnoActual();
   await refrescarListaTurnos();
 }
@@ -499,7 +569,7 @@ safeInit("b7-turnos", () => {
   if (btnAbrir) btnAbrir.addEventListener("click", abrirTurno);
   if (btnCerrar) btnCerrar.addEventListener("click", cerrarTurno);
   if (refrescar) refrescar.addEventListener("click", () => refrescarListaTurnos());
-  // Filtro de estado.
+  // Filtro de estado del historial (no afecta apertura).
   const estadoSel = document.getElementById("turno-filtro-estado");
   if (estadoSel) estadoSel.addEventListener("change", () => refrescarListaTurnos());
   // Delegación de clicks en cuadres.
@@ -557,4 +627,3 @@ safeInit("b7-operacion", () => {
     });
   }
 });
-
