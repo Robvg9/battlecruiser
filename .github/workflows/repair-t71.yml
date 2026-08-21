@@ -1,18 +1,17 @@
 name: one-shot T7.1 repair
 on:
-  push:
-    branches: [main]
+  pull_request:
+    types: [opened]
 permissions:
   contents: write
 jobs:
   repair:
-    if: github.event.head_commit.message != 'fix(offline): T7.1 refresh open chat after sync'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Restore known-good file and apply T7.1
         shell: bash
         run: |
@@ -49,7 +48,7 @@ jobs:
           git diff --check
           test "$(git diff --numstat -- public/js/offline.js | awk '{print $1}')" = "3"
           test "$(git diff --numstat -- public/js/offline.js | awk '{print $2}')" = "0"
-      - name: Commit and push exactly one frontend change
+      - name: Commit repair and remove one-shot workflow
         shell: bash
         run: |
           set -euo pipefail
@@ -59,4 +58,4 @@ jobs:
           git add public/js/offline.js .github/workflows/repair-t71.yml
           git diff --cached --check
           git commit -m 'fix(offline): T7.1 refresh open chat after sync'
-          git push origin HEAD:main
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
