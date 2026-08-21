@@ -1,6 +1,6 @@
 # BATTLECRUISER — V9.2
 
-**Actualizado:** 2026-08-20  
+**Actualizado:** 2026-08-21  
 **Repositorio:** `Robvg9/battlecruiser`  
 **Rama:** `main`  
 **Fuente de verdad:** GitHub `main` + verificaciones reales del repo.
@@ -23,6 +23,7 @@ No es solo un POS. Es la plataforma para controlar la operación completa de un 
 - vales de salida
 - empleados, roles y permisos
 - turnos, cuadres, responsabilidades e incidencias
+- **ciclos operativos y sesiones (mañana/tarde)** — M15
 - comunicación interna y soporte
 - auditoría y trazabilidad
 - reportes y administración
@@ -40,6 +41,7 @@ BattleCruiser busca ser **el sistema operativo interno del negocio**:
 - controlar pérdidas y mermas
 - tomar decisiones administrativas con datos
 - trazabilidad completa de operaciones
+- ciclos de varios días con sesiones y validación de caja (próxima fase)
 
 ---
 
@@ -53,14 +55,14 @@ PWA web **offline-first** (Cloudflare / static `public/`).
 public/
 ├── index.html          ← shell UI + carga ordenada de módulos
 ├── style.css
-├── app.js              ← STUB / punto de entrada final (inyecta módulos T6/T8/T9)
-├── service-worker.js   ← battlecruiser-shell-v45
+├── app.js              ← STUB / punto de entrada final
+├── service-worker.js   ← battlecruiser-shell-v49
 ├── manifest.json
 ├── favicon.png / icons/
-└── js/                 ← módulos (scripts clásicos, scope global compartido)
+└── js/
     ├── core.js
     ├── auth.js
-    ├── offline.js              ← IndexedDB, cola, ejecutarOperacion, sincronizarCola, consolidarRefrescosPendientes
+    ├── offline.js              ← IndexedDB, cola, ejecutarOperacion, sincronizarCola
     ├── centro-control.js
     ├── navegacion.js
     ├── productos.js
@@ -69,31 +71,31 @@ public/
     ├── transferencias.js
     ├── vales.js
     ├── ventas.js
+    ├── venta-turno-ui.js       ← Sesión 6: almacén de venta = turno ABIERTO
     ├── catalogos.js
-    ├── configuracion.js        ← T8
-    ├── catalogo-avanzado.js    ← T9
+    ├── configuracion.js
+    ├── catalogo-avanzado.js
     ├── usuarios-permisos.js
     ├── mando.js
     ├── reportes.js
     ├── nucleo-operativo.js
-    ├── operacion-humana.js
+    ├── operacion-humana.js     ← turnos; selector #turno-almacen-abrir (Sesión 8)
     ├── comunicacion.js
-    └── panel-contextual.js     ← T6
+    └── panel-contextual.js     ← sin auto-drawer en #alm-selector (Sesión 7/8)
 ```
 
-La **modularización** reemplazó el antiguo `app.js` monolítico. Los módulos se cargan en el mismo orden histórico; las funciones siguen siendo globales. `app.js` no debe volver a concentrar la lógica de la aplicación.
+La **modularización** reemplazó el antiguo `app.js` monolítico. Los módulos se cargan en el mismo orden histórico; las funciones siguen siendo globales.
 
 ### Backend
 
 **Supabase:** PostgreSQL, RPC, RLS, Storage, Auth, auditoría.
 
-SQL versionado en `supabase/` (M3–M7, M11–M13, b3–b8, etc.).  
+SQL versionado en `supabase/` (M3–M7, M11–M15, b3–b8, etc.).  
 Antes de crear backend nuevo: verificar contratos existentes en producción.
 
 ### Tests
 
-Carpeta `test/`. Script: `npm test` → `node --test test/*.test.js`.  
-Dependencias de test: `jsdom`, `fake-indexeddb`.
+Carpeta `test/`. Script: `npm test` → `node --test test/*.test.js`.
 
 ---
 
@@ -108,6 +110,7 @@ Dependencias de test: `jsdom`, `fake-indexeddb`.
 - permisos (Usuario → Rol → Permisos del Rol)
 - RLS y autenticación
 - Service Worker / PWA
+- **M14:** cadena `usuario → turno ABIERTO → almacen_id → venta`
 
 ### NO crear
 
@@ -131,7 +134,7 @@ Dependencias de test: `jsdom`, `fake-indexeddb`.
 | Rol | Responsabilidad |
 |-----|-----------------|
 | ChatGPT | Coordinación, arquitectura, misiones, roadmap |
-| Vibe | Ejecución frontend/GitHub/tests en `main` |
+| Grok / Vibe | Ejecución frontend/GitHub/tests en `main` |
 | Claude | Supabase: RPC, SQL, RLS, introspección producción |
 | Roberto | Pruebas reales, UX, aceptación final |
 
@@ -151,17 +154,10 @@ Usuario
          → reconciliación + proyección local de stock (ajustePendiente)
 ```
 
-Componentes clave en `public/js/offline.js`:
-
-- `ejecutarOperacion` / `sincronizarCola` / `recuperarOperacionesAtrapadas`
-- mutex `_sincronizando` (+ flag multi-pestaña en localStorage)
-- router `RPC_POR_TIPO`
-- `consolidarRefrescosPendientes()` (incluye T7.1)
-- panel de pendientes y badges
+Tipos relevantes de cola: `venta`, `turno`, `turno_cerrar`, `cuadre`, etc.  
+El payload de venta incluye `p_almacen_id` (conservado al sincronizar).
 
 **No duplicar esta arquitectura.**
-
-El código actual documenta que `sincronizarCola()` evita sincronizaciones simultáneas y procesa FIFO una operación a la vez.
 
 ---
 
@@ -174,157 +170,180 @@ Usuario → Rol → Permisos del Rol
 - Comprobación frontend: `tienePermiso(recurso, accion)`
 - Comprobación backend: `tiene_permiso(...)` en RPC
 - **No** permisos individuales por usuario
-- Protección del último Dueño (backend)
 
-### Hardening de permisos (completado)
-
-Ya se revocó:
+### Hardening (completado)
 
 ```sql
 REVOKE EXECUTE ON FUNCTION public._validar_usuario_operacion(text, text) FROM authenticated;
 ```
 
-Los helpers `_consume_fifo` / `_consumir_fifo`, `_registrar_movimiento`, `_resolver_presentacion` fueron investigados contra Supabase real y **NO existen en producción**. Son artefactos del código deprecated de B6. No deben aparecer como pendientes.
+`public.obtener_conversion_presentacion(...)` **existe en producción** — MANTENER / NO TOCAR.
 
-### obtener_conversion_presentacion
-
-`public.obtener_conversion_presentacion(...)` **SÍ existe en producción**.
-
-- SECURITY DEFINER, owner postgres
-- `authenticated EXECUTE = true`
-- Callers reales: `registrar_compra`, `registrar_venta`, `registrar_transferencia`, `registrar_vale_salida`
-- No tiene caller frontend actualmente
-- No tiene trigger que la invoque
-
-**MANTENER / NO TOCAR.**
-
-Razón arquitectónica: no depende de `auth.uid()`, no protege datos sensibles, es una utilidad de conversión de catálogo; podría tener uso legítimo futuro desde UI.
-
-### Superficie de permisos
-
-Barrido completo posterior confirmó:
-
-- helpers internos cerrables ya cerrados;
-- RPC con caller frontend mantienen `authenticated`;
-- RPC preparadas para UI futura permanecen expuestas;
-- no existe otro revoke claramente accionable.
-
-**Conclusión: NO HAY OTRO CAMBIO DE PERMISOS PENDIENTE IDENTIFICADO.**
+**Conclusión previa:** no hay otro revoke claramente accionable pendiente.
 
 ---
 
-## 7. ESTADO REAL DE MÓDULOS
+## 7. CADENA OPERATIVA DE VENTA (M14) — AUTORIDAD BACKEND
 
-### Productos — COMPLETADO
+```text
+USUARIO
+  → TURNO ABIERTO (un solo ABIERTO por usuario)
+    → ALMACÉN DEL TURNO (obligatorio)
+      → VENTA (registrar_venta usa siempre turno.almacen_id)
+```
 
-CRUD, imágenes, categorías, presentaciones, búsqueda, stock, catálogo visual.  
-Archivo: `public/js/productos.js` (+ presentaciones, catalogos, catalogo-avanzado).
+**Implementado en producción (M14 / M14b):**
 
-### Ventas — COMPLETADO
+| Pieza | Estado |
+|-------|--------|
+| `abrir_turno` exige `p_almacen_id` activo | ✅ |
+| CHECK `turnos_abierto_requiere_almacen` | ✅ |
+| `registrar_venta` exige turno ABIERTO | ✅ |
+| Rechazo si `p_almacen_id` ≠ almacén del turno | ✅ |
+| Si `p_almacen_id` NULL → usa almacén del turno | ✅ |
+| Fix M14b (conflicto variable `nombre`) | ✅ |
 
-Catálogo visual, buscador, carrito, historial, offline vía `ejecutarOperacion("venta")`.  
-Archivo: `public/js/ventas.js`.
+**Frontend alineado (Sesiones 6 y 8):**
 
-### Almacenes — COMPLETADO
+- `venta-turno-ui.js`: sin selector libre de almacén en ventas; panel “Vendiendo desde”; bloqueo sin turno
+- `#turno-almacen-abrir` dedicado para abrir turno (no reutilizar `#turno-filtro-almacen`)
+- Cola offline conserva `p_almacen_id`
 
-Gestión crear/editar/activar-desactivar, panel informativo, productos por almacén, permisos. Backend M13.  
-Archivo: `public/js/almacenes.js`.
+**Riesgo residual documentado (Sesión 9):** `ventas.js` aún lee `#venta-almacen`; los interceptores de `venta-turno-ui.js` fuerzan el valor del turno. Validación Android real pendiente.
 
-### Transferencias — COMPLETADO
+---
 
-Archivo: `public/js/transferencias.js`.
+## 8. CICLOS OPERATIVOS (M15) — VERSIONADO EN REPO
 
-Incluye: creación (origen/destino/producto/cantidad), validaciones, historial, búsqueda, detalle, offline, integración con `ejecutarOperacion("transferencia")`.
+**Archivo:** `supabase/m15_ciclos_operativos.sql`  
+**Estado:** ✅ **VERSIONADO / PRESENTE** en GitHub (reconciliación del DDL ya existente en producción; no es “migración nueva” a ejecutar a ciegas).
 
-**Modelo backend atómico** (`registrar_transferencia`): al crear se mueve stock origen → destino (FIFO) de inmediato. No existe recepción separada ni estados intermedios en el contrato actual.
+### Modelo
 
-### Centro de Mando — COMPLETADO
+```text
+ciclo operativo (cantidad_dias configurable 1–31)
+  → 2 sesiones por día: MANANA | TARDE
+      → turnos.ciclo_id / turnos.sesion_id (nullable; no rompen M14)
+          → operaciones del operador (ventas bajo turno ABIERTO)
+```
 
-Archivo: `public/js/mando.js` (+ `centro-control.js`).
+**Ejemplos (comprobados en producción por Claude):**
 
-### Presentaciones — IMPLEMENTADO
+| Días | Sesiones |
+|------|----------|
+| 2 | 4 |
+| 3 | 6 |
+| 4 | 8 |
+| 6 | 12 |
 
-- catálogo de presentaciones
-- producto_presentaciones
-- factores
-- activación/desactivación
-- asociación producto-presentación
-- conversión a unidades base
-- integración en compras, ventas, transferencias, vales
+El ciclo **no** es exclusivamente de 3 días.
 
-### Comunicación — IMPLEMENTADO + T7.1
+### Objetos
 
-Archivo: `public/js/comunicacion.js` + refuerzo en `offline.js`.
-
-### Otros bloques
-
-| Bloque | Estado |
+| Objeto | Notas |
 |--------|--------|
-| Offline / cola / idempotencia | Integrado y estable |
-| Usuarios / roles / permisos (B3) | Implementado |
-| Reportes (B5) | Reconciliado |
-| Núcleo operativo / inventario (B6) | Reconciliado |
-| Turnos / operación humana (B7) | Implementado en producción |
-| Comunicación (B8) | Implementado + T7.1 aplicado |
-| Panel contextual (T6) | Implementado |
-| Configuración (T8) | Implementado |
-| Catálogo avanzado (T9) | Implementado |
+| `ciclos_operativos` | `almacen_id`, `inicio_plan`, `cantidad_dias` 1–31, `fin_plan`, estados `PLANIFICADO`/`ACTIVO`/`EN_VALIDACION`/`VALIDADO`/`ARCHIVADO` |
+| `sesiones_ciclo` | `dia_n`, `bloque` MANANA/TARDE, `UNIQUE(ciclo_id, dia_n, bloque)` |
+| `turnos.ciclo_id` / `turnos.sesion_id` | FK nullable; **no** alteran abrir_turno/cerrar_turno/registrar_venta |
+| Trigger `trg_validar_dia_n_sesion` | Impide `dia_n` fuera de `cantidad_dias` |
+| RPC `crear_ciclo_operativo` | Genera 2 sesiones/día automáticamente |
+| RPC `listar_ciclos_operativos` | Filtros almacén/estado |
+| RPC `obtener_ciclo_operativo` | Detalle + sesiones |
 
-Pendiente de **aceptación real** de Roberto: multiusuario, concurrencia, E2E B7/B8, PWA móvil/PC, offline intermitente, pruebas manuales finales.
+**M14 sigue gobernando la venta.** El ciclo **no reemplaza** al turno de operador.
+
+### Distinción crítica
+
+| Acción | Significado |
+|--------|-------------|
+| **Cerrar turno** | El operador deja de vender (turno → CERRADO; se puede generar cuadre) |
+| **Finalizar / validar ciclo** | Cierre administrativo del ciclo de N días tras validaciones |  
+
+**Aún NO implementado (próxima fase backend):**
+
+| Capacidad | Estado |
+|-----------|--------|
+| Entregas de dinero (declarar → contar → aprobar jefe) | 🔴 NO IMPLEMENTADO |
+| Validación de gastos / reinversiones / entradas | 🔴 NO IMPLEMENTADO |
+| Validación multi-eje de operaciones del turno | 🔴 NO IMPLEMENTADO |
+| Cierre parcial formal del ciclo | 🔴 NO IMPLEMENTADO |
+| Aprobación final del ciclo (workflow completo) | 🔴 NO IMPLEMENTADO |
+| UI frontend de ciclos/sesiones | 🟡 PENDIENTE |
+
+Cuadres/incidencias B7 **sí existen** y se reutilizan para el cierre del **operador**, no sustituyen la validación final del ciclo.
 
 ---
 
-## 8. BACKEND (Supabase)
+## 9. ESTADO REAL DE MÓDULOS
 
-- PostgreSQL + RPC SECURITY DEFINER + RLS
-- Auth (usuarios)
-- Storage (imágenes de producto)
-- Auditoría / trazabilidad
-- Idempotencia: `private.operaciones_idempotencia`
+### Productos — COMPLETADO (funcional base)
 
-Migraciones relevantes en repo (no duplicar):
+CRUD, imágenes, categorías, presentaciones, búsqueda, stock, catálogo visual.
+
+### Ventas — COMPLETADO + gobernado por turno (M14 + FE Sesión 6)
+
+Catálogo, carrito, historial, offline. Almacén operativo = turno ABIERTO.
+
+### Almacenes — COMPLETADO + UX Sesión 7/8
+
+Panel inline al seleccionar; sin doble drawer en móvil por `#alm-selector`. Botones contextuales según pestaña.
+
+### Transferencias / Vales / Centro de Mando / Presentaciones / Comunicación — IMPLEMENTADOS
+
+(Ver historial 9.1 / T7.1.)
+
+### Turnos / operación humana (B7 + M14 + FE 8)
+
+| Capacidad | Estado |
+|-----------|--------|
+| Abrir/cerrar turno con almacén | ✅ |
+| Cuadre al cerrar + revisar_cuadre | ✅ |
+| Selector dedicado `#turno-almacen-abrir` | ✅ |
+| Ciclos/sesiones M15 (backend) | ✅ VERSIONADO |
+| UI ciclos | 🟡 PENDIENTE |
+| Entregas de caja / validación ciclo | 🔴 NO IMPLEMENTADO |
+
+Pendiente de **aceptación real** de Roberto: multiusuario, E2E Android del flujo turno→venta, PWA móvil, offline intermitente.
+
+---
+
+## 10. BACKEND (Supabase) — MAPA DE MIGRACIONES RELEVANTES
 
 - M3 productos / revoke anon
 - M4 auditoría e integridad
 - M5 private + permisos + último Dueño
 - M6 mutaciones críticas: compra, venta, transferencia, vale
-- M7 reportes inventario/movimientos/rentabilidad
-- M11 roles CRUD, M12 imagen producto, M13 almacenes
+- M7 reportes
+- M11 roles CRUD, M12 imagen, M13 almacenes
+- **M14 / M14b** turno gobierna venta (+ fix variable)
+- **M15** ciclos operativos + sesiones (archivo de reconciliación en repo)
 - b3–b8 históricos; `b6-nucleo-operativo.sql` = **DEPRECATED**
-- `revoke_authenticated_validar_usuario_operacion.sql` (hardening)
+- `revoke_authenticated_validar_usuario_operacion.sql`
 
 Regla Claude: introspección de producción antes de aplicar cambios.
 
 ---
 
-## 9. SERVICE WORKER / PWA
+## 11. SERVICE WORKER / PWA
 
-**Cache:** `battlecruiser-shell-v45`
+**Cache actual:** `battlecruiser-shell-v49`
 
-Controla caché PWA, shell offline y precarga de módulos listados en `SHELL_FILES`.
+Comentarios de versión en código:
 
-Incluye todos los `public/js/*.js` relevantes, `index.html`, `style.css`, `app.js`, icons, manifest.
+- v49 — Sesión 8: selector almacén al abrir turno (M14)
+- v48 — Sesión 8: almacenes sin doble panel
+- v47 — Sesión 6: venta-turno-ui.js + restore index
+- v46 — Sesión 6: ventas gobernadas por almacén del turno
+
+`SHELL_FILES` incluye `venta-turno-ui.js`, `operacion-humana.js`, `panel-contextual.js`, etc.
 
 **Al añadir o renombrar módulos:** actualizar `SHELL_FILES` y subir el número de versión del cache.
 
-Estrategia shell: network-first (timeout corto) con fallback a caché.  
-Supabase GET: timeout; escrituras POST: red directa sin timeout artificial.
-
-### actualizarApp()
-
-Existe en `public/js/auth.js`.
-
-- Botón de actualización en login (`#update-app-btn-login`)
-- Botón dentro de la app (menú Ajustes)
-- Borra únicamente caches `battlecruiser-shell-*`
-- Desregistra Service Workers
-- Fuerza reload
-
-**NO modificar esta lógica sin necesidad explícita.**
+`actualizarApp()` en `auth.js` — NO modificar sin necesidad explícita.
 
 ---
 
-## 10. TESTS
+## 12. TESTS
 
 ```text
 test/
@@ -341,122 +360,59 @@ test/
 └── _leer-app-js.js
 ```
 
-Antes de cerrar una tarea:
-
-1. `node --check` de archivos modificados
-2. `npm test` / `node --test test/*.test.js` (si el entorno lo permite)
-3. Verificar referencias HTML ↔ JS y `SHELL_FILES`
-4. Sin PLACEHOLDER / TEMPORARY / archivos truncados
-
-**Tests históricos de Misión 9.1 (documentados en informe):** 242 PASS, 0 FAIL; `node --check public/app.js` PASS; `node --check public/service-worker.js` PASS; manifest válido.
-
-Esta misión (V9.2 versionado + Cerebro) **no re-ejecuta** `npm test` ni inventa resultados. Distinguir siempre tests históricos vs. ejecución actual.
+**Tests históricos Misión 9.1:** 242 PASS (no re-ejecutados en cada sesión documental).
 
 ---
 
-## 11. HISTORIAL RECIENTE Y ESTADO V9.2
+## 13. HISTORIAL — CIERRE HASTA SESIÓN 11
 
-### A. Cierre funcional previo (Misión 9.1)
+### Base V9.2 (previo al plan 30 sesiones)
 
-La Misión 9.1 quedó cerrada.
+- Misión 9.1 cerrada (tests históricos 242 PASS).
+- T7.1 comunicación offline aplicado (`consolidarRefrescosPendientes` + `refrescarMensajes`).
+- Hardening permisos; `offline.js` íntegro (incidente PLACEHOLDER resuelto).
+- Versionado visible V9.2.
 
-El informe `BATTLECRUISER_MISION_9.1_INFORME_FINAL.md` registra:
+### Sesiones del plan 30 (evidencia de código / misiones)
 
-- 242 tests PASS
-- 0 FAIL
-- `node --check public/app.js` PASS
-- `node --check public/service-worker.js` PASS
-- manifest válido
+| Sesión | Tema | Estado documental |
+|--------|------|-------------------|
+| 1–5 | Investigación loader/conectividad; productos; almacén en ventas; backend M14 (Claude) | Investigación / backend M14 ✅ en prod; detalle fino de 1–5 no re-expandido aquí |
+| **6** | FE turno→almacén→venta; regresión `index.html` restaurada; `venta-turno-ui.js`; SW v46–v47 | ✅ PASS (post-reparación) |
+| **7** | Investigación almacenes #11/#12/#13 (doble panel) | ✅ investigación; fix en 8 |
+| **8** | Fix doble panel almacenes; `#turno-almacen-abrir`; SW **v49** | ✅ PASS |
+| **9** | Auditoría post-M14 del flujo completo FE+offline | ✅ PASS auditoría (riesgos residuales anotados) |
+| **10** | — | 🟡 **Pendiente de reconciliación documental** (sin evidencia suficiente en repo/Cerebro para declarar PASS/FAIL) |
+| **11** | Investigación modelo La Cueva (ciclo / sesiones / turno operador) | ✅ investigación; alimentó M15 |
+| **M15** | Ciclos operativos versionados + pruebas funcionales Claude en prod | ✅ VERSIONADO / PRESENTE |
 
-Son **tests históricos ejecutados en Misión 9.1**, no una nueva ejecución de esta misión.
+### Detalle compacto Sesiones 6–9 y 11
 
-### B. T7.1 — Comunicación offline
+**Sesión 6 — PASS (tras reparación)**  
+Restauración de `index.html` desde commit sano; recuperación de paneles/formularios/IDs; integración turno → almacén → venta; carga de `venta-turno-ui.js`; Service Worker actualizado.
 
-**T7.1 está aplicado en `main`.**
+**Sesión 7 — investigación**  
+Doble reacción al seleccionar almacén (`almacenes.js` + `panel-contextual.js`). Solución aplicada en sesión 8: eliminar auto-open del drawer en change de `#alm-selector`; panel inline como comportamiento normal; botones contextuales según pestaña. Sin backend.
 
-Commit conocido de la corrección original: `d2e0aafc499ca9ab26d19a36c754430d837efbb5` (y consolidaciones posteriores; HEAD de verificación incluye el cambio).
+**Sesión 8 — PASS**  
+Apertura de turno post-M14: deja de usarse `#turno-filtro-almacen`; selector `#turno-almacen-abrir`; validación FE de almacén obligatorio; `p_almacen_id` correcto; `renderTurnoActual` muestra almacén; SW v49; M14 intacto.
 
-Cambio:
+**Sesión 9 — PASS (auditoría)**  
+Confirmado: ventas usan almacén del turno; selector libre no operativo; venta sin turno bloqueada; `cerrarTurno` actualiza estado; cola conserva `p_almacen_id`; M14 autoridad. Riesgos: dependencia de interceptores en `ventas.js`; falta validación Android real.
 
-`consolidarRefrescosPendientes()` ahora refresca la conversación abierta mediante:
-
-```js
-refrescarMensajes(_comConvActual)
-```
-
-cuando existe una conversación abierta y la categoría `comunicacion` fue marcada para refresco.
-
-Esto resuelve:
-
-ENVIAR MENSAJE OFFLINE → queda pendiente → recuperar Internet → sincronizar → operación confirmada → refrescar lista + badge → refrescar conversación abierta → desaparece el estado visual ⏳ Pendiente.
-
-**T7.1 NO modificó:**
-
-- IndexedDB
-- FIFO
-- idempotencia
-- `sincronizarCola()` (más allá del uso de consolidación)
-- `ejecutarOperacion()`
-- RPC
-- Supabase
-
-### C. Incidente de offline.js
-
-Existió un incidente donde `public/js/offline.js` fue sobrescrito accidentalmente con `PLACEHOLDER_WILL_FAIL` y posteriormente restaurado.
-
-**Estado FINAL actual (verificado en GitHub):**
-
-- `PLACEHOLDER_WILL_FAIL` → **0 resultados**
-- `offline.js` íntegro
-- Existen: `sincronizarCola`, `consolidarRefrescosPendientes`, `RPC_POR_TIPO`
-
-El Cerebro refleja el estado final, no el placeholder.
-
-### D–F. Seguridad / permisos
-
-Ver sección 6 (Hardening completado, `obtener_conversion_presentacion` mantener, sin más revokes pendientes).
-
-### G. Offline-first
-
-Implementado y estable:
-
-- IndexedDB
-- operaciones_pendientes
-- estados PENDIENTE / SINCRONIZANDO / SINCRONIZADA / REQUIERE_ATENCION
-- idempotency_key
-- FIFO
-- `sincronizarCola()`
-- reconciliación
-- consolidación de refrescos (T7.1 incluido)
-- recuperación de operaciones atrapadas
-- panel de operaciones pendientes
-
-### H. Presentaciones
-
-Estado real implementado (ver sección 7).
-
-### I. PWA / Actualizar app
-
-Ver sección 9 (`actualizarApp()` documentado; no modificado en esta misión).
-
-### J. Estado final V9.2
-
-**V9.2 = CIERRE FUNCIONAL + HARDENING + T7.1 + VERSIONADO**
-
-El proyecto queda listo para **PRUEBAS MANUALES FINALES**.
-
-No abrir otra misión de desarrollo salvo que una prueba manual encuentre un bug real.
+**Sesión 11 — investigación**  
+Modelo de negocio: separar **CICLO → SESIONES MANANA/TARDE → TURNO OPERATIVO DEL USUARIO → OPERACIONES**. El ciclo no reemplaza el turno que gobierna ventas. M14 se mantiene. Entregas/validación final = próxima fase.
 
 ---
 
-## 12. DEFINITION OF DONE
+## 14. DEFINITION OF DONE
 
 Una misión queda cerrada cuando:
 
-- cambio en `main` (commit + push)
+- cambio en `main` (commit + push) cuando aplique
 - tests y `node --check` relevantes OK (cuando el entorno lo permite)
 - sin duplicación de arquitectura offline/permisos/RPC
-- dependencias backend documentadas si faltan
+- M14 no debilitado
 - Cerebro refleja el estado real
 - aceptación real de Roberto cuando corresponda
 
@@ -464,16 +420,16 @@ Una misión queda cerrada cuando:
 
 ---
 
-## 13. ORGANIZACIÓN DEL REPO
+## 15. ORGANIZACIÓN DEL REPO
 
 ```text
 /
-├── BATTLECRUISER_CEREBRO.md          ← este archivo (V9.2)
+├── BATTLECRUISER_CEREBRO.md          ← este archivo (V9.2, sync Sesión 11 / M15)
 ├── BATTLECRUISER_MISION_9.1_INFORME_FINAL.md
 ├── package.json
 ├── public/                           ← app desplegable
 ├── test/
-├── supabase/                         ← SQL versionado
+├── supabase/                         ← SQL versionado (incl. m14*, m15_ciclos_operativos.sql)
 ├── .github/workflows/
 └── docs/archive/                     ← evidencia histórica
 ```
