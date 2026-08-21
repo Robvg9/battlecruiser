@@ -1,9 +1,10 @@
+// v50 — Ciclos Operativos V1.1: estructura módulo ciclos.js
 // v49 — Sesión 8: selector almacén al abrir turno (M14)
 // v48 — Sesión 8: almacenes sin doble panel (selector → solo inline)
 // v47 — Sesión 6: venta-turno-ui.js + restore index
 // v46 — Sesión 6: ventas gobernadas por almacén del turno
 // v45 — post-9.3: fix Ver todos + filtros T9
-const CACHE_NAME = "battlecruiser-shell-v49";
+const CACHE_NAME = "battlecruiser-shell-v50";
 
 const SHELL_FILES = [
   "./index.html",
@@ -29,6 +30,7 @@ const SHELL_FILES = [
   "./js/reportes.js",
   "./js/nucleo-operativo.js",
   "./js/operacion-humana.js",
+  "./js/ciclos.js",
   "./js/comunicacion.js",
   "./js/panel-contextual.js",
   "./manifest.json",
