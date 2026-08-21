@@ -117,6 +117,7 @@ var TAB_A_SECCION = {
   inventario: "reportes",
   movimientos: "reportes",
   turnos: "turnos",
+  ciclos: "ciclos",
   operacion: "turnos",
   comunicacion: "comunicacion",
 };
@@ -304,7 +305,8 @@ safeInit("admin-usuarios", () => {
 
 const SECCIONES_PERMISOS = ["productos", "categorias", "almacenes", "stock",
   "transferencias", "vales_salida", "ventas", "reportes", "usuarios",
-  "presentaciones", "auditoria", "turnos", "comunicacion", "unidades"];
+  "presentaciones", "auditoria", "turnos", "comunicacion", "unidades",
+  "ciclos", "entregas_caja"];
 const ACCIONES_PERMISOS = ["ver", "crear", "editar", "borrar", "editar_any"];
 
 let _rolExpandidoId = null;
