@@ -168,13 +168,16 @@ ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
 - Tablas: `ciclos_operativos`, `sesiones_ciclo`
 - RPC: `crear_ciclo_operativo`, `iniciar_ciclo_operativo`, `iniciar_validacion_ciclo_operativo`, `listar_*`, `obtener_*`, `_ciclo_operativo_json`
 - `fin_plan` es columna **GENERATED** (no escribirla)
-- Archivos: `m15_ciclos_operativos.sql`, `m15_ciclos_permisos_roles.sql`
+- Archivos: `m15_ciclos_operativos.sql` (+ `m15_1_completar_versionado.sql`, agrega `iniciar_ciclo_operativo`/`iniciar_validacion_ciclo_operativo` que existían en producción pero no en el archivo original), `m15_ciclos_permisos_roles.sql`
+- Grants: hardeneados en `m15_2_m16_1_hardening_grants_rpc.sql` (2026-08-21)
 
 ### M16 — Entregas de caja ✅
 - Flujo: DECLARADA → CONTADA → APROBADA | RECHAZADA
-- RPC: `declarar_entrega_caja`, `registrar_conteo_entrega_caja`, `revisar_entrega_caja`, `obtener_pendientes_cierre_ciclo`
+- RPC vigentes: `declarar_entrega_caja`, `registrar_recepcion_entrega_caja` (paso DECLARADA→CONTADA), `revisar_entrega_caja`, `listar_entregas_caja`, `obtener_entrega_caja`, `obtener_pendientes_cierre_ciclo`
+- `registrar_conteo_entrega_caja` = **legado/huérfana**, coexiste en prod sin uso (ver `docs/BATTLECRUISER_M16_FUNCION_HUERFANA.md`); NO usarla en frontend, no eliminada aún
 - Archivo: `m16_entregas_caja.sql`
 - **RECHAZADA no bloquea** el cierre del ciclo (ya está resuelta)
+- Grants: hardeneados en `m15_2_m16_1_hardening_grants_rpc.sql` (2026-08-21)
 
 ### M17 — Cierre de ciclo operativo ✅
 - RPC: `finalizar_ciclo_operativo(p_ciclo_id, p_idempotency_key)`
@@ -228,6 +231,8 @@ ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
 | **m16_entregas_caja.sql** | Entregas de caja |
 | **m17_cierre_ciclo_operativo.sql** | Finalizar ciclo |
 | **m17_1_hardening_grants_rpc.sql** | Grants RPC M17 |
+| **m15_1_completar_versionado.sql** | Versionado M15: `iniciar_ciclo_operativo`/`iniciar_validacion_ciclo_operativo` |
+| **m15_2_m16_1_hardening_grants_rpc.sql** | Grants RPC M15/M16 |
 | b3–b8 | Históricos (b6 = DEPRECATED) |
 | revoke_* | Hardening permisos |
 
