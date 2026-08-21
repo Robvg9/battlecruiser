@@ -8,63 +8,40 @@
 // PROHIBIDO: registrar_conteo_entrega_caja (legado/huérfana).
 // Vigente para DECLARADA→CONTADA: registrar_recepcion_entrega_caja.
 //
-// V1.1 FASE ESTRUCTURA: esqueleto + mapa RPC + hooks de navegación.
-// La lógica completa de formularios/acciones se autoriza en fase posterior.
+// V1 MUTACIONES: online-only. NO toca offline.js / ejecutarOperacion / sincronizarCola.
 
 // ---------------------------------------------------------------------------
 // Estado en memoria del módulo (no IndexedDB propio; no cola paralela)
 // ---------------------------------------------------------------------------
-let _cicloActualId = null; // id del ciclo seleccionado en detalle (si hay)
-let _ciclosCache = [];     // última lista leída (solo memoria de sesión)
+let _cicloActualId = null;
+let _ciclosCache = [];
+let _entregasCache = [];
+let _cicloDetalleActual = null;
 
 // ---------------------------------------------------------------------------
 // Mapa RPC — contratos backend existentes (NO inventar firmas)
 // ---------------------------------------------------------------------------
-// Lecturas (client.rpc directo; online obligatorio en V1.1)
 const CICLOS_RPC_LECTURA = {
-  listar: "listar_ciclos_operativos",           // (p_almacen_id?, p_estado?) → jsonb[]
-  obtener: "obtener_ciclo_operativo",           // (p_ciclo_id) → jsonb + sesiones
-  listarEntregas: "listar_entregas_caja",       // (p_ciclo_id?, p_almacen_id?, p_estado?)
-  obtenerEntrega: "obtener_entrega_caja",       // (p_entrega_id)
-  pendientesCierre: "obtener_pendientes_cierre_ciclo", // (p_ciclo_id) → {puede_finalizar,...}
+  listar: "listar_ciclos_operativos",
+  obtener: "obtener_ciclo_operativo",
+  listarEntregas: "listar_entregas_caja",
+  obtenerEntrega: "obtener_entrega_caja",
+  pendientesCierre: "obtener_pendientes_cierre_ciclo",
 };
 
-// Mutaciones (requieren p_idempotency_key; ver decisión offline abajo)
-// Nombres alineados con RPC reales. NO usar en ejecutarOperacion hasta
-// que se autorice extender RPC_POR_TIPO en offline.js (fase posterior).
 const CICLOS_RPC_MUTACION = {
-  crear: "crear_ciclo_operativo",                         // p_almacen_id, p_inicio_plan, p_cantidad_dias, p_idempotency_key
-  iniciar: "iniciar_ciclo_operativo",                     // p_ciclo_id, p_idempotency_key
-  iniciarValidacion: "iniciar_validacion_ciclo_operativo", // p_ciclo_id, p_idempotency_key
-  declararEntrega: "declarar_entrega_caja",               // p_ciclo_id, p_monto_declarado, p_sesion_id?, p_turno_id?, p_almacen_id?, p_idempotency_key
-  recepcionEntrega: "registrar_recepcion_entrega_caja",   // p_entrega_id, p_monto_contado, p_observacion_conteo?, p_idempotency_key
-  revisarEntrega: "revisar_entrega_caja",                 // p_entrega_id, p_decision ('aprobar'|'rechazar'), p_comentario?, p_idempotency_key
-  finalizar: "finalizar_ciclo_operativo",                 // p_ciclo_id, p_idempotency_key
+  crear: "crear_ciclo_operativo",
+  iniciar: "iniciar_ciclo_operativo",
+  iniciarValidacion: "iniciar_validacion_ciclo_operativo",
+  declararEntrega: "declarar_entrega_caja",
+  recepcionEntrega: "registrar_recepcion_entrega_caja",
+  revisarEntrega: "revisar_entrega_caja",
+  finalizar: "finalizar_ciclo_operativo",
 };
 
 // ---------------------------------------------------------------------------
-// Decisión OFFLINE (V1.1) — documentada, sin tocar offline.js
+// Online obligatorio (V1) — no encola
 // ---------------------------------------------------------------------------
-// Lecturas:
-//   - Online obligatorio. Sin conexión: mensaje claro (patrón turnos B7).
-//   - No se cachea lista de ciclos en IndexedDB en esta fase (evitar datos
-//     de caja/cierre desactualizados que induzcan a cerrar mal).
-//
-// Mutaciones críticas (dinero / caja / cierre):
-//   - declarar_entrega_caja, registrar_recepcion_entrega_caja,
-//     revisar_entrega_caja, finalizar_ciclo_operativo
-//   → BLOQUEAR offline con mensaje: requieren validación de dinero/caja
-//     y no deben encolarse a ciegas en V1.1.
-//
-// Mutaciones de estado de ciclo (sin monto):
-//   - crear_ciclo_operativo, iniciar_ciclo_operativo,
-//     iniciar_validacion_ciclo_operativo
-//   → También online-only en V1.1 (idempotencia existe en backend, pero
-//     no se extiende RPC_POR_TIPO todavía para no tocar offline core).
-//
-// NO se crea cola paralela. NO se modifica ejecutarOperacion / sincronizarCola.
-// ---------------------------------------------------------------------------
-
 function ciclosRequiereOnline(msgEl) {
   if (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado()) {
     if (msgEl) setMsg(msgEl, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
@@ -77,8 +54,38 @@ function ciclosRequiereOnline(msgEl) {
   return true;
 }
 
+function ciclosNuevaIdempotencyKey() {
+  return crypto.randomUUID();
+}
+
+function ciclosExplicarError(error, contexto) {
+  if (typeof explicarError === "function") return explicarError(error, contexto);
+  return String((error && (error.message || error.code)) || error || "error desconocido");
+}
+
 // ---------------------------------------------------------------------------
-// Orquestador de pestaña (hook desde navegacion.js)
+// Mutación genérica online-only
+// ---------------------------------------------------------------------------
+async function ciclosMutar(rpcNombre, payload, msgId) {
+  if (!ciclosRequiereOnline(msgId || "msg-ciclos")) {
+    return { ok: false, offline: true };
+  }
+  const key = ciclosNuevaIdempotencyKey();
+  const params = Object.assign({}, payload, { p_idempotency_key: key });
+  try {
+    if (typeof showLoading === "function") showLoading();
+    const { data, error } = await client.rpc(rpcNombre, params);
+    if (error) return { ok: false, error: error };
+    return { ok: true, data: data };
+  } catch (e) {
+    return { ok: false, error: e };
+  } finally {
+    if (typeof hideLoading === "function") hideLoading();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Orquestador de pestaña
 // ---------------------------------------------------------------------------
 async function refrescarCiclos() {
   if (!appShell || !appShell.classList.contains("visible")) return;
@@ -98,13 +105,56 @@ async function refrescarCiclos() {
     return;
   }
 
-  // Filtros: reutilizar catálogo de almacenes si está en _cache
   const selAlm = document.getElementById("ciclo-filtro-almacen");
   if (selAlm && typeof poblarSelectAlmacenes === "function") {
     poblarSelectAlmacenes(selAlm, "Todos los almacenes");
   }
 
+  renderFormCrearCiclo();
   await refrescarListaCiclos();
+}
+
+function renderFormCrearCiclo() {
+  let wrap = document.getElementById("ciclos-crear-wrap");
+  if (!wrap) {
+    const lista = document.getElementById("lista-ciclos");
+    if (!lista || !lista.parentElement) return;
+    wrap = document.createElement("div");
+    wrap.id = "ciclos-crear-wrap";
+    wrap.className = "cc-bloque";
+    lista.parentElement.insertBefore(wrap, lista);
+  }
+
+  if (!tienePermiso("ciclos", "crear")) {
+    wrap.innerHTML = "";
+    wrap.classList.add("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+
+  const almacenes = ((_cache && _cache.almacenes) || []).filter(function (a) {
+    return a.activo !== false;
+  });
+  let opts = '<option value="">Elegí almacén…</option>';
+  almacenes.forEach(function (a) {
+    opts += '<option value="' + escHtml(a.id) + '">' + escHtml(a.nombre || a.id) + "</option>";
+  });
+
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dd = String(hoy.getDate()).padStart(2, "0");
+  const hoyStr = yyyy + "-" + mm + "-" + dd;
+
+  wrap.innerHTML =
+    "<h3>Crear ciclo operativo</h3>" +
+    '<form id="form-crear-ciclo" class="inline-form">' +
+    '<select id="ciclo-nuevo-almacen" required>' + opts + "</select>" +
+    '<label class="muted">Inicio <input type="date" id="ciclo-nuevo-inicio" required value="' + hoyStr + '"></label>' +
+    '<input id="ciclo-nuevo-dias" type="number" min="1" max="31" step="1" value="1" placeholder="Días (1–31)" required>' +
+    '<button type="submit" class="cc-accion">Crear ciclo</button>' +
+    "</form>" +
+    '<p class="msg" id="msg-ciclo-crear"></p>';
 }
 
 async function refrescarListaCiclos() {
@@ -142,7 +192,6 @@ async function refrescarListaCiclos() {
       }
       return;
     }
-    // listar_ciclos_operativos retorna jsonb (array)
     const filas = Array.isArray(data) ? data : data ? [data] : [];
     _ciclosCache = filas;
     renderListaCiclos(filas);
@@ -178,8 +227,9 @@ function renderListaCiclos(filas) {
   });
 }
 
-// Detalle / entregas / cierre: stubs para fase de lógica completa.
-// No invocan mutaciones todavía.
+// ---------------------------------------------------------------------------
+// Detalle + mutaciones de estado
+// ---------------------------------------------------------------------------
 async function mostrarDetalleCiclo(cicloId) {
   const det = document.getElementById("ciclo-detalle");
   if (!det || !cicloId) return;
@@ -195,14 +245,43 @@ async function mostrarDetalleCiclo(cicloId) {
       det.innerHTML = '<p class="lista-estado">Error: ' + (typeof escHtml === "function" ? escHtml(error.message || error) : String(error.message || error)) + "</p>";
       return;
     }
-    renderDetalleCiclo(data);
+    _cicloDetalleActual = data;
+    await cargarYRenderDetalleCompleto(data);
   } catch (e) {
     det.innerHTML = '<p class="lista-estado">Error al cargar el detalle del ciclo.</p>';
     console.warn("[Battlecruiser] obtener_ciclo_operativo:", e);
   }
 }
 
-function renderDetalleCiclo(c) {
+async function cargarYRenderDetalleCompleto(c) {
+  const det = document.getElementById("ciclo-detalle");
+  if (!det || !c) return;
+
+  let entregas = [];
+  let pendientes = null;
+  try {
+    const rEnt = await client.rpc(CICLOS_RPC_LECTURA.listarEntregas, { p_ciclo_id: c.id });
+    if (!rEnt.error) {
+      entregas = Array.isArray(rEnt.data) ? rEnt.data : rEnt.data ? [rEnt.data] : [];
+    }
+    _entregasCache = entregas;
+  } catch (e) {
+    console.warn("[Battlecruiser] listar_entregas_caja:", e);
+  }
+
+  if (c.estado === "EN_VALIDACION") {
+    try {
+      const rPen = await client.rpc(CICLOS_RPC_LECTURA.pendientesCierre, { p_ciclo_id: c.id });
+      if (!rPen.error) pendientes = rPen.data;
+    } catch (e) {
+      console.warn("[Battlecruiser] obtener_pendientes_cierre_ciclo:", e);
+    }
+  }
+
+  renderDetalleCiclo(c, entregas, pendientes);
+}
+
+function renderDetalleCiclo(c, entregas, pendientes) {
   const det = document.getElementById("ciclo-detalle");
   if (!det || !c) return;
   const esc = typeof escHtml === "function" ? escHtml : function (s) { return String(s == null ? "" : s); };
@@ -216,23 +295,292 @@ function renderDetalleCiclo(c) {
     sesHtml = '<ul class="lista">';
     sesiones.forEach(function (s) {
       sesHtml +=
-        "<li class=\"muted\">Día " + esc(s.dia_n) + " · " + esc(s.bloque) +
+        '<li class="muted">Día ' + esc(s.dia_n) + " · " + esc(s.bloque) +
         " · " + esc(s.fecha || "") + " · " + esc(s.estado || "") + "</li>";
     });
     sesHtml += "</ul>";
   }
+
+  let accionesHtml = '<div class="btn-row" id="ciclo-acciones" style="margin:10px 0;flex-wrap:wrap;gap:8px;">';
+  if (c.estado === "PLANIFICADO" && tienePermiso("ciclos", "editar")) {
+    accionesHtml += '<button type="button" class="cc-accion" id="btn-iniciar-ciclo" data-id="' + esc(c.id) + '">Iniciar ciclo (→ ACTIVO)</button>';
+  }
+  if (c.estado === "ACTIVO" && tienePermiso("ciclos", "editar")) {
+    accionesHtml += '<button type="button" class="cc-accion" id="btn-iniciar-validacion" data-id="' + esc(c.id) + '">Pasar a validación (→ EN_VALIDACION)</button>';
+  }
+  if (c.estado === "EN_VALIDACION" && tienePermiso("ciclos", "editar_any")) {
+    const puede = pendientes && pendientes.puede_finalizar === true;
+    const nEnt = pendientes && pendientes.entregas_pendientes
+      ? (Array.isArray(pendientes.entregas_pendientes) ? pendientes.entregas_pendientes.length : 0)
+      : "?";
+    const nCua = pendientes && pendientes.cuadres_pendientes
+      ? (Array.isArray(pendientes.cuadres_pendientes) ? pendientes.cuadres_pendientes.length : 0)
+      : "?";
+    if (puede) {
+      accionesHtml += '<button type="button" class="cc-accion" id="btn-finalizar-ciclo" data-id="' + esc(c.id) + '">Finalizar ciclo (→ VALIDADO)</button>';
+    } else {
+      accionesHtml += '<span class="muted">No se puede finalizar: hay pendientes (entregas: ' + nEnt + ", cuadres: " + nCua + ").</span>";
+    }
+  }
+  accionesHtml += "</div>";
+
+  let formEntregaHtml = "";
+  if ((c.estado === "ACTIVO" || c.estado === "EN_VALIDACION") && tienePermiso("entregas_caja", "crear")) {
+    let sesOpts = '<option value="">Sin sesión específica</option>';
+    sesiones.forEach(function (s) {
+      sesOpts += '<option value="' + esc(s.id) + '">Día ' + esc(s.dia_n) + " " + esc(s.bloque) + "</option>";
+    });
+    formEntregaHtml =
+      '<div class="cc-bloque" id="ciclo-form-entrega">' +
+      "<h4>Declarar entrega de caja</h4>" +
+      '<form id="form-declarar-entrega" class="inline-form">' +
+      '<input type="hidden" id="entrega-ciclo-id" value="' + esc(c.id) + '">' +
+      '<input id="entrega-monto" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Monto declarado" required>' +
+      '<select id="entrega-sesion">' + sesOpts + "</select>" +
+      '<button type="submit" class="cc-accion">Declarar</button>' +
+      "</form>" +
+      '<p class="msg" id="msg-entrega-crear"></p>' +
+      "</div>";
+  }
+
+  let entregasHtml = '<div class="cc-bloque"><h4>Entregas de caja</h4>';
+  if (!tienePermiso("entregas_caja", "ver")) {
+    entregasHtml += '<p class="muted">Sin permiso para ver entregas.</p>';
+  } else if (!entregas || entregas.length === 0) {
+    entregasHtml += '<p class="lista-estado">Sin entregas registradas.</p>';
+  } else {
+    entregasHtml += '<div class="lista" id="lista-entregas-ciclo">';
+    entregas.forEach(function (e) {
+      const monDec = Number(e.monto_declarado);
+      const monCon = e.monto_contado != null ? Number(e.monto_contado) : null;
+      const dif = e.diferencia != null ? Number(e.diferencia) : null;
+      let accionesE = "";
+      if (e.estado === "DECLARADA" && tienePermiso("entregas_caja", "editar")) {
+        accionesE += '<button type="button" class="cc-accion btn-recepcion-entrega" data-id="' + esc(e.id) + '">Registrar conteo</button>';
+      }
+      if (e.estado === "CONTADA" && tienePermiso("entregas_caja", "editar_any")) {
+        accionesE += '<button type="button" class="cc-accion btn-revisar-entrega" data-id="' + esc(e.id) + '" data-decision="aprobar">Aprobar</button>';
+        accionesE += '<button type="button" class="cc-accion btn-revisar-entrega" data-id="' + esc(e.id) + '" data-decision="rechazar">Rechazar</button>';
+      }
+      entregasHtml +=
+        '<div class="lista-item rep-fila rep-estado-' + esc(String(e.estado || "").toLowerCase()) + '" data-entrega-id="' + esc(e.id) + '">' +
+        '<span class="rep-fila-principal">' +
+        '<span class="cc-asunto-tipo">' + esc(e.estado || "—") + "</span>" +
+        '<span class="muted">Declarado $' + (typeof money === "function" ? money(monDec) : monDec) +
+        (monCon != null ? " · Contado $" + (typeof money === "function" ? money(monCon) : monCon) : "") +
+        (dif != null ? " · Dif $" + (typeof money === "function" ? money(dif) : dif) : "") +
+        " · " + esc(e.declarado_nombre || "—") +
+        "</span>" + accionesE +
+        "</span>" +
+        (e.observacion_conteo ? '<div class="muted">Obs conteo: ' + esc(e.observacion_conteo) + "</div>" : "") +
+        (e.comentario_revision ? '<div class="muted">Revisión: ' + esc(e.comentario_revision) + "</div>" : "") +
+        "</div>";
+    });
+    entregasHtml += "</div>";
+  }
+  entregasHtml += "</div>";
+
   det.innerHTML =
     '<div class="cc-bloque">' +
     "<h3>Ciclo · " + esc(c.estado || "—") + "</h3>" +
     '<p class="muted">Almacén: <strong>' + esc(c.almacen_nombre || "—") + "</strong></p>" +
     '<p class="muted">Plan: ' + inicio + " → " + fin + " (" + esc(c.cantidad_dias) + " días)</p>" +
+    accionesHtml +
     "<h4>Sesiones</h4>" + sesHtml +
-    '<p class="muted">Entregas y cierre: se completan en la fase de lógica (V1.2+).</p>' +
-    "</div>";
+    "</div>" +
+    formEntregaHtml +
+    entregasHtml +
+    '<p class="msg" id="msg-ciclo-detalle"></p>';
 }
 
 // ---------------------------------------------------------------------------
-// Init: listeners mínimos (filtros + click en lista → detalle)
+// Handlers de mutación
+// ---------------------------------------------------------------------------
+async function crearCicloDesdeForm(e) {
+  e.preventDefault();
+  if (!tienePermiso("ciclos", "crear")) {
+    setMsg("msg-ciclo-crear", "No tenés permiso para crear ciclos.", false);
+    return;
+  }
+  const alm = document.getElementById("ciclo-nuevo-almacen");
+  const inicio = document.getElementById("ciclo-nuevo-inicio");
+  const dias = document.getElementById("ciclo-nuevo-dias");
+  const almacen_id = alm ? (alm.value || "").trim() : "";
+  const inicio_plan = inicio ? (inicio.value || "").trim() : "";
+  const cantidad_dias = dias ? parseInt(dias.value, 10) : 0;
+  if (!almacen_id) {
+    setMsg("msg-ciclo-crear", "Seleccioná un almacén.", false);
+    return;
+  }
+  if (!inicio_plan) {
+    setMsg("msg-ciclo-crear", "Indicá la fecha de inicio.", false);
+    return;
+  }
+  if (!Number.isFinite(cantidad_dias) || cantidad_dias < 1 || cantidad_dias > 31) {
+    setMsg("msg-ciclo-crear", "Cantidad de días debe estar entre 1 y 31.", false);
+    return;
+  }
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.crear, {
+    p_almacen_id: almacen_id,
+    p_inicio_plan: inicio_plan,
+    p_cantidad_dias: cantidad_dias,
+  }, "msg-ciclo-crear");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-ciclo-crear", "No se pudo crear: " + ciclosExplicarError(r.error, "crear ciclo"), false);
+    return;
+  }
+  setMsg("msg-ciclo-crear", "✓ Ciclo creado (PLANIFICADO).", true);
+  const form = document.getElementById("form-crear-ciclo");
+  if (form) form.reset();
+  await refrescarListaCiclos();
+  if (r.data && r.data.id) await mostrarDetalleCiclo(r.data.id);
+}
+
+async function iniciarCiclo(cicloId) {
+  if (!tienePermiso("ciclos", "editar")) {
+    setMsg("msg-ciclo-detalle", "No tenés permiso para iniciar ciclos.", false);
+    return;
+  }
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.iniciar, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-ciclo-detalle", "No se pudo iniciar: " + ciclosExplicarError(r.error, "iniciar ciclo"), false);
+    return;
+  }
+  setMsg("msg-ciclo-detalle", "✓ Ciclo iniciado (ACTIVO).", true);
+  await refrescarListaCiclos();
+  await mostrarDetalleCiclo(cicloId);
+}
+
+async function iniciarValidacionCiclo(cicloId) {
+  if (!tienePermiso("ciclos", "editar")) {
+    setMsg("msg-ciclo-detalle", "No tenés permiso para pasar a validación.", false);
+    return;
+  }
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.iniciarValidacion, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-ciclo-detalle", "No se pudo pasar a validación: " + ciclosExplicarError(r.error, "iniciar validación"), false);
+    return;
+  }
+  setMsg("msg-ciclo-detalle", "✓ Ciclo en validación (EN_VALIDACION).", true);
+  await refrescarListaCiclos();
+  await mostrarDetalleCiclo(cicloId);
+}
+
+async function finalizarCiclo(cicloId) {
+  if (!tienePermiso("ciclos", "editar_any")) {
+    setMsg("msg-ciclo-detalle", "No tenés permiso para finalizar ciclos.", false);
+    return;
+  }
+  if (!window.confirm("¿Finalizar este ciclo operativo? Pasará a VALIDADO. Solo si no hay entregas/cuadres pendientes.")) {
+    return;
+  }
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.finalizar, { p_ciclo_id: cicloId }, "msg-ciclo-detalle");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-ciclo-detalle", "No se pudo finalizar: " + ciclosExplicarError(r.error, "finalizar ciclo"), false);
+    return;
+  }
+  setMsg("msg-ciclo-detalle", "✓ Ciclo finalizado (VALIDADO).", true);
+  await refrescarListaCiclos();
+  await mostrarDetalleCiclo(cicloId);
+}
+
+async function declararEntregaDesdeForm(e) {
+  e.preventDefault();
+  if (!tienePermiso("entregas_caja", "crear")) {
+    setMsg("msg-entrega-crear", "No tenés permiso para declarar entregas.", false);
+    return;
+  }
+  const cicloId = (document.getElementById("entrega-ciclo-id") || {}).value;
+  const montoEl = document.getElementById("entrega-monto");
+  const sesionEl = document.getElementById("entrega-sesion");
+  const monto = montoEl ? parseFloat(montoEl.value) : NaN;
+  const sesion_id = sesionEl && sesionEl.value ? sesionEl.value : null;
+  if (!cicloId) {
+    setMsg("msg-entrega-crear", "Ciclo no identificado.", false);
+    return;
+  }
+  if (!Number.isFinite(monto) || monto < 0) {
+    setMsg("msg-entrega-crear", "Monto inválido.", false);
+    return;
+  }
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.declararEntrega, {
+    p_ciclo_id: cicloId,
+    p_monto_declarado: monto,
+    p_sesion_id: sesion_id,
+  }, "msg-entrega-crear");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-entrega-crear", "No se pudo declarar: " + ciclosExplicarError(r.error, "declarar entrega"), false);
+    return;
+  }
+  setMsg("msg-entrega-crear", "✓ Entrega declarada.", true);
+  if (montoEl) montoEl.value = "";
+  await mostrarDetalleCiclo(cicloId);
+}
+
+async function recepcionEntrega(entregaId) {
+  if (!tienePermiso("entregas_caja", "editar")) {
+    setMsg("msg-ciclo-detalle", "No tenés permiso para registrar conteo.", false);
+    return;
+  }
+  const input = window.prompt("Monto contado:", "");
+  if (input === null) return;
+  const monto = parseFloat(input);
+  if (!Number.isFinite(monto) || monto < 0) {
+    setMsg("msg-ciclo-detalle", "Monto contado inválido.", false);
+    return;
+  }
+  const obs = window.prompt("Observación de conteo (opcional):", "") || null;
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.recepcionEntrega, {
+    p_entrega_id: entregaId,
+    p_monto_contado: monto,
+    p_observacion_conteo: obs,
+  }, "msg-ciclo-detalle");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-ciclo-detalle", "No se pudo registrar recepción: " + ciclosExplicarError(r.error, "recepción entrega"), false);
+    return;
+  }
+  setMsg("msg-ciclo-detalle", "✓ Conteo registrado (CONTADA).", true);
+  if (_cicloActualId) await mostrarDetalleCiclo(_cicloActualId);
+}
+
+async function revisarEntrega(entregaId, decision) {
+  if (!tienePermiso("entregas_caja", "editar_any")) {
+    setMsg("msg-ciclo-detalle", "No tenés permiso para revisar entregas.", false);
+    return;
+  }
+  let comentario = null;
+  if (decision === "rechazar") {
+    comentario = window.prompt("Motivo del rechazo (obligatorio):", "");
+    if (comentario === null) return;
+    if (!String(comentario).trim()) {
+      setMsg("msg-ciclo-detalle", "El rechazo requiere un motivo.", false);
+      return;
+    }
+  } else {
+    comentario = window.prompt("Comentario de aprobación (opcional):", "") || null;
+  }
+  const r = await ciclosMutar(CICLOS_RPC_MUTACION.revisarEntrega, {
+    p_entrega_id: entregaId,
+    p_decision: decision,
+    p_comentario: comentario,
+  }, "msg-ciclo-detalle");
+  if (!r.ok) {
+    if (r.offline) return;
+    setMsg("msg-ciclo-detalle", "No se pudo revisar: " + ciclosExplicarError(r.error, "revisar entrega"), false);
+    return;
+  }
+  setMsg("msg-ciclo-detalle", "✓ Entrega " + (decision === "aprobar" ? "aprobada" : "rechazada") + ".", true);
+  if (_cicloActualId) await mostrarDetalleCiclo(_cicloActualId);
+}
+
+// ---------------------------------------------------------------------------
+// Init
 // ---------------------------------------------------------------------------
 safeInit("ciclos-operativos", function () {
   const refrescarBtn = document.getElementById("ciclos-refrescar-btn");
@@ -259,6 +607,46 @@ safeInit("ciclos-operativos", function () {
       const item = e.target.closest("[data-ciclo-id]");
       if (item && item.dataset.cicloId) {
         mostrarDetalleCiclo(item.dataset.cicloId);
+      }
+    });
+  }
+
+  document.addEventListener("submit", function (e) {
+    if (e.target && e.target.id === "form-crear-ciclo") {
+      crearCicloDesdeForm(e);
+    }
+    if (e.target && e.target.id === "form-declarar-entrega") {
+      declararEntregaDesdeForm(e);
+    }
+  });
+
+  const det = document.getElementById("ciclo-detalle");
+  if (det) {
+    det.addEventListener("click", function (e) {
+      const btnIniciar = e.target.closest("#btn-iniciar-ciclo");
+      if (btnIniciar) {
+        iniciarCiclo(btnIniciar.dataset.id);
+        return;
+      }
+      const btnVal = e.target.closest("#btn-iniciar-validacion");
+      if (btnVal) {
+        iniciarValidacionCiclo(btnVal.dataset.id);
+        return;
+      }
+      const btnFin = e.target.closest("#btn-finalizar-ciclo");
+      if (btnFin) {
+        finalizarCiclo(btnFin.dataset.id);
+        return;
+      }
+      const btnRec = e.target.closest(".btn-recepcion-entrega");
+      if (btnRec) {
+        recepcionEntrega(btnRec.dataset.id);
+        return;
+      }
+      const btnRev = e.target.closest(".btn-revisar-entrega");
+      if (btnRev) {
+        revisarEntrega(btnRev.dataset.id, btnRev.dataset.decision);
+        return;
       }
     });
   }
