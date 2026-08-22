@@ -32,3 +32,18 @@
   s.async = false;
   document.body.appendChild(s);
 })();
+
+// El loading guard se instala al final de la carga del documento, después de
+// todos los módulos estáticos. Así reemplaza el controlador global anterior
+// sin tocar IndexedDB, Supabase ni las operaciones de negocio.
+(function cargarLoadingGuard() {
+  function cargar() {
+    if (document.querySelector('script[src*="loading-guard"]')) return;
+    var s = document.createElement("script");
+    s.src = "js/loading-guard.js";
+    s.async = false;
+    document.body.appendChild(s);
+  }
+  if (document.readyState === "complete") cargar();
+  else window.addEventListener("load", cargar, { once: true });
+})();
