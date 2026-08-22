@@ -8,9 +8,15 @@ const SUPABASE_ANON_KEY = "sb_publishable_pczHaS1JDPGrEA31vdbOLg_1l2qFhbm";
 
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// El guard global debe instalarse DESPUÉS de todos los módulos para que sus
-// funciones showLoading/hideLoading sean las definitivas, incluso si el
-// index.html pertenece a una versión anterior del shell.
+(function cargarModuloHistoriales(){
+  function cargar(){
+    if(document.querySelector('script[data-battlecruiser-historiales="1"]')) return;
+    const css=document.createElement('link'); css.rel='stylesheet'; css.href='style-historiales.css'; document.head.appendChild(css);
+    const s=document.createElement('script'); s.src='js/historial-detalle.js'; s.async=false; s.dataset.battlecruiserHistoriales='1'; document.body.appendChild(s);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cargar,{once:true}); else cargar();
+})();
+
 (function programarLoadingGuard() {
   function cargar() {
     try {
@@ -29,54 +35,13 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 })();
 
 function safeInit(nombre, fn) {
-  try {
-    fn();
-  } catch (e) {
-    console.error("[Battlecruiser] No se pudo iniciar '" + nombre + "':", e);
-  }
+  try { fn(); } catch (e) { console.error("[Battlecruiser] No se pudo iniciar '" + nombre + "':", e); }
 }
-
-// para dejar que el cambio de pestaña se procese antes de abrir la conversación.
-// Antes estas funciones referenciaban esperar() sin definirla (bug latente).
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
-
-function money(n) {
-  const v = Number(n);
-  return Number.isFinite(v) ? v.toFixed(2) : "0.00";
-}
-
-function fechaCorta(fecha) {
-  return new Date(fecha).toLocaleDateString("es", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function fechaHora(fecha) {
-  return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function fechaHoraCompleta(fecha) {
-  return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-// Rellena un <select> con almacenes de _cache, preservando el valor actual.
-function poblarSelectAlmacenes(sel, placeholder) {
-  if (!sel) return;
-  const actual = sel.value;
-  const almacenes = (_cache && _cache.almacenes) ? _cache.almacenes : [];
-  sel.innerHTML = '<option value="">' + (placeholder || 'Todos los almacenes') + '</option>';
-  almacenes.forEach((a) => {
-    const o = document.createElement('option');
-    o.value = a.id; o.textContent = a.nombre;
-    sel.appendChild(o);
-  });
-  if (actual) sel.value = actual;
-}
-
-function setLoading(listId, texto) {
-  const el = document.getElementById(listId);
-  if (el) el.innerHTML = '<p class="lista-estado">' + (texto || "Cargando…") + "</p>";
-}
-
-function setEmpty(listId, texto) {
-  const el = document.getElementById(listId);
-  if (el) el.innerHTML = '<p class="lista-estado">' + texto + "</p>";
-}
+function money(n) { const v = Number(n); return Number.isFinite(v) ? v.toFixed(2) : "0.00"; }
+function fechaCorta(fecha) { return new Date(fecha).toLocaleDateString("es", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function fechaHora(fecha) { return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+function fechaHoraCompleta(fecha) { return new Date(fecha).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+function poblarSelectAlmacenes(sel, placeholder) { if (!sel) return; const actual = sel.value; const almacenes = (_cache && _cache.almacenes) ? _cache.almacenes : []; sel.innerHTML = '<option value="">' + (placeholder || 'Todos los almacenes') + '</option>'; almacenes.forEach((a) => { const o = document.createElement('option'); o.value = a.id; o.textContent = a.nombre; sel.appendChild(o); }); if (actual) sel.value = actual; }
+function setLoading(listId, texto) { const el = document.getElementById(listId); if (el) el.innerHTML = '<p class="lista-estado">' + (texto || "Cargando…") + "</p>"; }
+function setEmpty(listId, texto) { const el = document.getElementById(listId); if (el) el.innerHTML = '<p class="lista-estado">' + texto + "</p>"; }
