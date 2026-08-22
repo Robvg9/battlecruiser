@@ -3,10 +3,6 @@
 // aplicación. Todo el código que antes vivía acá ahora está dividido en
 // módulos dentro de public/js/ (ver lista y orden de carga en index.html).
 //
-// Los módulos se cargan como <script> clásicos (no ES modules), en el mismo
-// orden en que las secciones aparecían originalmente en el archivo, y
-// comparten el mismo scope global.
-//
 // Misión 9.3 T6: el panel contextual se carga al final para no alterar el
 // orden histórico de los módulos de negocio.
 // Misión 9.3 T8: configuración/mantenimiento se carga tras los módulos base.
@@ -43,6 +39,15 @@
   if (document.querySelector('script[src*="aprobaciones-admin"]')) return;
   var s = document.createElement("script");
   s.src = "js/aprobaciones-admin.js";
+  s.async = false;
+  document.body.appendChild(s);
+})();
+
+// M26 — correcciones de UX detectadas en pruebas manuales.
+(function cargarIntegridadUI() {
+  if (document.querySelector('script[src*="m26-ui-integridad"]')) return;
+  var s = document.createElement("script");
+  s.src = "js/m26-ui-integridad.js?v=26";
   s.async = false;
   document.body.appendChild(s);
 })();
