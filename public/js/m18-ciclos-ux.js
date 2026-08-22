@@ -7,297 +7,44 @@
   'use strict';
 
   const RPC = {
-    listarCiclos: 'listar_ciclos_operativos',
-    crearCiclo: 'crear_ciclo_operativo',
-    iniciarCiclo: 'iniciar_ciclo_operativo',
-    iniciarValidacion: 'iniciar_validacion_ciclo_operativo',
-    finalizarCiclo: 'finalizar_ciclo_operativo',
-    listarSesiones: 'listar_sesiones_operativas',
-    iniciarSesion: 'iniciar_sesion_operativa',
-    cerrarSesion: 'cerrar_sesion_operativa',
-    listarEntregas: 'listar_entregas_caja',
-    declararEntrega: 'declarar_entrega_caja',
-    recibirEntrega: 'registrar_recepcion_entrega_caja',
-    revisarEntrega: 'revisar_entrega_caja',
-    pendientesCierre: 'obtener_pendientes_cierre_ciclo'
+    listarCiclos: 'listar_ciclos_operativos', crearCiclo: 'crear_ciclo_operativo', iniciarCiclo: 'iniciar_ciclo_operativo', iniciarValidacion: 'iniciar_validacion_ciclo_operativo', finalizarCiclo: 'finalizar_ciclo_operativo', listarSesiones: 'listar_sesiones_operativas', iniciarSesion: 'iniciar_sesion_operativa', cerrarSesion: 'cerrar_sesion_operativa', listarEntregas: 'listar_entregas_caja', declararEntrega: 'declarar_entrega_caja', recibirEntrega: 'registrar_recepcion_entrega_caja', revisarEntrega: 'revisar_entrega_caja', pendientesCierre: 'obtener_pendientes_cierre_ciclo'
   };
-
   const RPC_TIMEOUT_MS = 25000;
   const state = { ciclo: null, sesiones: [], entregas: [], almacenId: null, paso: 1 };
   let ready = false;
-
-  function esc(v) {
-    if (typeof escHtml === 'function') return escHtml(v == null ? '' : String(v));
-    return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-  function fmtDate(v) {
-    if (!v) return '—';
-    if (typeof fechaCorta === 'function') return fechaCorta(v);
-    return String(v).split('-').reverse().join('/');
-  }
-  function labelEstado(s) {
-    return ({PLANIFICADO:'Planificado',ACTIVO:'Activo',EN_VALIDACION:'En validación',VALIDADO:'Validado',ARCHIVADO:'Archivado',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CANCELADA:'Cancelada',DECLARADA:'Declarada',CONTADA:'Contada',APROBADA:'Aprobada',RECHAZADA:'Rechazada'})[s] || s || '—';
-  }
-  function setHtml(html) {
-    const root = document.getElementById('ciclos-m18-root');
-    if (root) root.innerHTML = html;
-  }
-  function msg(text, ok) {
-    const el = document.getElementById('m18-msg');
-    if (el) { el.textContent = text || ''; el.className = 'm18-msg ' + (ok ? 'ok' : 'error'); }
-  }
+  function esc(v) { if (typeof escHtml === 'function') return escHtml(v == null ? '' : String(v)); return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmtDate(v) { if (!v) return '—'; if (typeof fechaCorta === 'function') return fechaCorta(v); return String(v).split('-').reverse().join('/'); }
+  function labelEstado(s) { return ({PLANIFICADO:'Planificado',ACTIVO:'Activo',EN_VALIDACION:'En validación',VALIDADO:'Validado',ARCHIVADO:'Archivado',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CANCELADA:'Cancelada',DECLARADA:'Declarada',CONTADA:'Contada',APROBADA:'Aprobada',RECHAZADA:'Rechazada'})[s] || s || '—'; }
+  function setHtml(html) { const root = document.getElementById('ciclos-m18-root'); if (root) root.innerHTML = html; }
+  function msg(text, ok) { const el = document.getElementById('m18-msg'); if (el) { el.textContent = text || ''; el.className = 'm18-msg ' + (ok ? 'ok' : 'error'); } }
   function uuid() { return crypto.randomUUID(); }
-
-  async function rpc(name, params) {
-    let timeoutId = null;
-    try {
-      if (typeof showLoading === 'function') showLoading();
-      const call = client.rpc(name, params || {});
-      const timeout = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error('Tiempo de espera agotado. La operación no respondió en 25 segundos.')), RPC_TIMEOUT_MS);
-      });
-      const r = await Promise.race([call, timeout]);
-      if (r && !r.error && typeof marcarConectividadReal === 'function') marcarConectividadReal('online');
-      if (r && r.error && typeof esErrorDeRed === 'function' && typeof marcarConectividadReal === 'function') {
-        marcarConectividadReal(esErrorDeRed(r.error) ? 'offline' : 'online');
-      }
-      return r;
-    } catch (e) {
-      if (typeof esErrorDeRed === 'function' && esErrorDeRed(e) && typeof marcarConectividadReal === 'function') marcarConectividadReal('offline');
-      return { data: null, error: e };
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (typeof resetLoadingOverlay === 'function') resetLoadingOverlay();
-      else if (typeof hideLoading === 'function') hideLoading();
-    }
-  }
-
-  function activeCycle(cycles, almacenId) {
-    return (cycles || []).find(c => c.almacen_id === almacenId && ['ACTIVO','EN_VALIDACION'].includes(c.estado)) ||
-      (cycles || []).filter(c => c.almacen_id === almacenId && !['ARCHIVADO','VALIDADO'].includes(c.estado)).sort((a,b) => String(b.inicio_plan).localeCompare(String(a.inicio_plan)))[0] || null;
-  }
-
-  function renderStyles() {
-    if (document.getElementById('m18-ciclos-style')) return;
-    const s = document.createElement('style'); s.id = 'm18-ciclos-style';
-    s.textContent = `
-      #tab-ciclos .mando-filtros,#tab-ciclos > .cc-bloque,#tab-ciclos > #ciclo-detalle,#tab-ciclos > #msg-ciclos{display:none!important}
-      .m18-wrap{max-width:760px;margin:0 auto}.m18-step{display:flex;gap:8px;align-items:center;margin:0 0 16px}.m18-step span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--gold-dim);color:var(--gold);font-family:'IBM Plex Mono',monospace}.m18-step strong{font-size:14px}.m18-progress{font-size:11px;color:var(--mist);margin:-10px 0 12px 36px}.m18-card{border:1px solid var(--gold-dim);background:var(--stone);border-radius:10px;padding:16px;margin:10px 0}.m18-card h4{margin:0 0 7px}.m18-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;font-size:13px}.m18-meta b{color:var(--gold)}.m18-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.m18-actions button{min-height:42px}.m18-back{background:transparent!important}.m18-session{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--gold-dim);padding:12px 0}.m18-session:first-child{border-top:0}.m18-session small{display:block;color:var(--mist)}.m18-status{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mist);font-family:'IBM Plex Mono',monospace}.m18-msg{min-height:20px;margin-top:10px}.m18-msg.error{color:#d98b7f}.m18-msg.ok{color:#8fc79d}.m18-empty{padding:18px;text-align:center;color:var(--mist)}.m18-check{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--gold-dim)}
-      @media(max-width:600px){.m18-meta{grid-template-columns:1fr}.m18-session{align-items:flex-start;flex-direction:column}}
-    `; document.head.appendChild(s);
-  }
-
-  async function getCycles() {
-    const r = await rpc(RPC.listarCiclos, {p_almacen_id:null,p_estado:null});
-    if (r.error) throw r.error;
-    const d = r.data;
-    return Array.isArray(d) ? d : (d && Array.isArray(d.ciclos) ? d.ciclos : d ? [d] : []);
-  }
-  async function getSessions(cicloId) {
-    const r = await rpc(RPC.listarSesiones, {p_ciclo_id:cicloId,p_almacen_id:null,p_fecha:null,p_estado:null});
-    if (r.error) throw r.error;
-    return Array.isArray(r.data) ? r.data : (r.data ? [r.data] : []);
-  }
-  async function getEntregas(cicloId) {
-    const r = await rpc(RPC.listarEntregas, {p_ciclo_id:cicloId});
-    if (r.error) throw r.error;
-    return Array.isArray(r.data) ? r.data : (r.data ? [r.data] : []);
-  }
-  function almacenes() {
-    return ((_cache && _cache.almacenes) || []).filter(a => a.activo !== false);
-  }
-  function step(n, title, total=5) {
-    return `<div class="m18-step"><span>${n}</span><strong>${esc(title)}</strong></div><div class="m18-progress">Paso ${n} de ${total}</div>`;
-  }
-
-  async function home() {
-    state.paso = 1;
-    const as = almacenes();
-    let cycles = [];
-    try { cycles = await getCycles(); } catch(e) { setHtml('<div class="m18-empty">No se pudieron cargar los ciclos. Revisá la conexión.</div>'); return; }
-    const cards = as.map(a => {
-      const c = activeCycle(cycles, a.id);
-      return `<div class="m18-card"><h4>🏪 ${esc(a.nombre || a.id)}</h4>${c ? `<div class="m18-meta"><div>Estado<br><b>${esc(labelEstado(c.estado))}</b></div><div>Periodo<br><b>${esc(fmtDate(c.inicio_plan))} → ${esc(fmtDate(c.fin_plan))}</b></div></div><div class="m18-actions"><button class="cc-accion" data-m18-enter="${esc(c.id)}">Entrar al ciclo</button></div>` : `<p class="muted">No hay ciclo activo o planificado.</p><div class="m18-actions"><button class="cc-accion" data-m18-create="${esc(a.id)}">Crear ciclo</button></div>`}</div>`;
-    }).join('');
-    setHtml(`${step(1,'Ciclo')}${cards || '<div class="m18-empty">No hay almacenes disponibles.</div>'}<p id="m18-msg" class="m18-msg"></p>`);
-  }
-
-  async function createCycle(almacenId) {
-    const hoy = new Date(); const iso = new Date(hoy.getTime()-hoy.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    setHtml(`${step(1,'Crear ciclo')}<div class="m18-card"><h4>Nuevo ciclo</h4><label class="muted">Inicio<br><input id="m18-inicio" type="date" value="${iso}"></label><br><br><label class="muted">Días<br><input id="m18-dias" type="number" min="1" max="31" value="1"></label><div class="m18-actions"><button class="cc-accion m18-back" data-m18-home>← Volver</button><button class="cc-accion" data-m18-save="${esc(almacenId)}">Crear ciclo</button></div><p id="m18-msg" class="m18-msg"></p></div>`);
-  }
-
-  async function saveCycle(almacenId) {
-    const inicio = document.getElementById('m18-inicio')?.value;
-    const dias = Number(document.getElementById('m18-dias')?.value || 0);
-    if (!inicio || !Number.isInteger(dias) || dias < 1 || dias > 31) { msg('Indicá una fecha y entre 1 y 31 días.', false); return; }
-    const r = await rpc(RPC.crearCiclo,{p_almacen_id:almacenId,p_inicio_plan:inicio,p_cantidad_dias:dias,p_idempotency_key:uuid()});
-    if (r.error) { msg(String(r.error.message || r.error),false); return; }
-    await enter(r.data?.id || r.data?.id_ciclo);
-  }
-
-  async function enter(cicloId) {
-    let cycles = []; try { cycles = await getCycles(); } catch(e) { msg('No se pudo cargar el ciclo.',false); return; }
-    const c = cycles.find(x => x.id === cicloId) || activeCycle(cycles, state.almacenId);
-    if (!c) { await home(); return; }
-    state.ciclo = c; state.almacenId = c.almacen_id; state.paso = 2;
-    renderCycle(c);
-  }
-
-  function renderCycle(c) {
-    const puedeIniciar = c.estado === 'PLANIFICADO';
-    setHtml(`${step(2,'Dinero recogido')}
-      <div class="m18-card"><h4>${esc(c.almacen_nombre || 'Almacén')}</h4>
-      <div class="m18-meta"><div>Estado<br><b>${esc(labelEstado(c.estado))}</b></div><div>Periodo<br><b>${esc(fmtDate(c.inicio_plan))} → ${esc(fmtDate(c.fin_plan))}</b></div></div>
-      <p class="muted">Primero abre el ciclo. Después registrarás el dinero recogido de cada sesión.</p>
-      <div class="m18-actions">${puedeIniciar?'<button class="cc-accion" data-m18-start-cycle>Iniciar ciclo</button>':''}<button class="cc-accion" data-m18-money>Registrar dinero recogido</button><button class="cc-accion" data-m18-sessions>Continuar → Sesiones</button><button class="cc-accion m18-back" data-m18-home>← Ciclos</button></div>
-      <p id="m18-msg" class="m18-msg"></p></div>`);
-  }
-
-  async function cycleMutation(name) {
-    const r = await rpc(name,{p_ciclo_id:state.ciclo.id,p_idempotency_key:uuid()});
-    if (r.error) { msg(String(r.error.message || r.error),false); return false; }
-    await enter(state.ciclo.id); return true;
-  }
-
-  async function moneyStep() {
-    if (!state.ciclo) return home();
-    let ss=[]; try { ss=await getSessions(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las sesiones.',false); return; }
-    state.sesiones=ss; state.paso=2;
-    const rows=ss.map(s=>`<div class="m18-session"><div><b>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'}</b><small>Día ${esc(s.dia_n)} · ${esc(fmtDate(s.fecha))}${s.usuario_nombre?' · '+esc(s.usuario_nombre):''}</small></div><div class="m18-actions"><button class="cc-accion" data-m18-declare="${esc(s.id)}">Registrar dinero recogido</button></div></div>`).join('');
-    setHtml(`${step(2,'Dinero recogido')}<div class="m18-card"><h4>Dinero recogido por sesión</h4>${rows || '<div class="m18-empty">No hay sesiones.</div>'}<div class="m18-actions"><button class="cc-accion" data-m18-sessions>Continuar → Conteo</button><button class="cc-accion m18-back" data-m18-cycle>← Atrás</button></div><p id="m18-msg" class="m18-msg"></p></div>`);
-  }
-
-  async function declareMoney(sesionId) {
-    const input = window.prompt('Dinero recogido de esta sesión:', '');
-    if (input === null) return;
-    const monto = Number(input);
-    if (!Number.isFinite(monto) || monto < 0) { msg('Monto inválido.',false); return; }
-    const r = await rpc(RPC.declararEntrega,{p_ciclo_id:state.ciclo.id,p_monto_declarado:monto,p_sesion_id:sesionId,p_idempotency_key:uuid()});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    msg('✓ Dinero recogido registrado.',true);
-    await moneyStep();
-  }
-
-  async function sessions() {
-    if (!state.ciclo) return home();
-    let ss=[]; try { ss=await getSessions(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las sesiones.',false); return; }
-    state.sesiones=ss; state.paso=3;
-    const rows=ss.map(s=>`<div class="m18-session"><div><b>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'}</b><small>Día ${esc(s.dia_n)} · ${esc(fmtDate(s.fecha))}${s.usuario_nombre?' · '+esc(s.usuario_nombre):''}</small><span class="m18-status">${esc(labelEstado(s.estado))}</span></div><div class="m18-actions">${s.estado==='PENDIENTE'?`<button class="cc-accion" data-m18-start-session="${esc(s.id)}">Abrir sesión</button>`:''}${s.estado==='EN_CURSO'?`<button class="cc-accion" data-m18-work-session="${esc(s.id)}">Entrar</button><button class="cc-accion" data-m18-close-session="${esc(s.id)}">Cerrar</button>`:''}</div></div>`).join('');
-    setHtml(`${step(3,'Conteo y entrega')}<div class="m18-card"><h4>Sesiones del ciclo</h4><p class="muted">Abre cada turno y, al terminar, realiza el conteo de su entrega.</p>${rows || '<div class="m18-empty">No hay sesiones.</div>'}<div class="m18-actions"><button class="cc-accion" data-m18-count>Ir al conteo de entregas</button><button class="cc-accion m18-back" data-m18-money>← Dinero recogido</button></div><p id="m18-msg" class="m18-msg"></p></div>`);
-  }
-
-  async function countStep() {
-    if (!state.ciclo) return home();
-    let es=[]; try { es=await getEntregas(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las entregas.',false); return; }
-    state.entregas=es; state.paso=3;
-    const rows=es.map(e=>`<div class="m18-check"><div><b>${esc(labelEstado(e.estado))}</b><small class="muted">Declarado: ${esc(e.monto_declarado)} · Contado: ${e.monto_contado==null?'—':esc(e.monto_contado)}</small></div><div class="m18-actions">${e.estado==='DECLARADA'?`<button class="cc-accion" data-m18-receive="${esc(e.id)}">Hacer conteo</button>`:''}${e.estado==='CONTADA'?`<button class="cc-accion" data-m18-review="${esc(e.id)}" data-decision="aprobar">Aprobar</button>`:''}</div></div>`).join('');
-    setHtml(`${step(3,'Conteo y entrega')}<div class="m18-card"><h4>Conteo de dinero</h4>${rows || '<div class="m18-empty">Todavía no hay entregas registradas.</div>'}<div class="m18-actions"><button class="cc-accion" data-m18-validation>Continuar → Cuadre y validación</button><button class="cc-accion m18-back" data-m18-sessions>← Sesiones</button></div><p id="m18-msg" class="m18-msg"></p></div>`);
-  }
-
-  async function receiveMoney(id) {
-    const input=window.prompt('Monto contado:', '');
-    if(input===null)return;
-    const monto=Number(input);
-    if(!Number.isFinite(monto)||monto<0){msg('Monto contado inválido.',false);return;}
-    const obs=window.prompt('Observación del conteo (opcional):','')||null;
-    const r=await rpc(RPC.recibirEntrega,{p_entrega_id:id,p_monto_contado:monto,p_observacion_conteo:obs,p_idempotency_key:uuid()});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    await countStep();
-  }
-
-  async function reviewMoney(id, decision) {
-    const comentario=window.prompt(decision==='aprobar'?'Comentario de aprobación (opcional):':'Motivo del rechazo:','')||null;
-    if(decision==='rechazar'&&!comentario){msg('El rechazo requiere un motivo.',false);return;}
-    const r=await rpc(RPC.revisarEntrega,{p_entrega_id:id,p_decision:decision,p_comentario:comentario,p_idempotency_key:uuid()});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    await countStep();
-  }
-
-  async function validationStep() {
-    if(!state.ciclo)return home();
-    const r=await rpc(RPC.pendientesCierre,{p_ciclo_id:state.ciclo.id});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    const p=r.data||{};
-    const entregas=Array.isArray(p.entregas_pendientes)?p.entregas_pendientes.length:0;
-    const cuadres=Array.isArray(p.cuadres_pendientes)?p.cuadres_pendientes.length:0;
-    const puede=p.puede_finalizar===true;
-    setHtml(`${step(4,'Cuadre y validación')}<div class="m18-card"><h4>Revisión completa del ciclo</h4><div class="m18-check"><span>Entregas pendientes</span><b>${entregas}</b></div><div class="m18-check"><span>Cuadres pendientes</span><b>${cuadres}</b></div><p class="muted">Aquí se comprueba que las entregas, cuadres y demás acciones requeridas por el backend estén listas antes del cierre.</p><div class="m18-actions">${state.ciclo.estado==='ACTIVO'?'<button class="cc-accion" data-m18-validate>Iniciar validación</button>':''}<button class="cc-accion" data-m18-final-check>Continuar → Verificación final</button><button class="cc-accion m18-back" data-m18-count>← Conteo</button></div><p id="m18-msg" class="m18-msg">${puede?'Todo listo para finalizar.':'Todavía existen pendientes.'}</p></div>`);
-  }
-
-  async function finalCheck() {
-    if(!state.ciclo)return home();
-    const r=await rpc(RPC.pendientesCierre,{p_ciclo_id:state.ciclo.id});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    const p=r.data||{}; const puede=p.puede_finalizar===true;
-    setHtml(`${step(5,'Verificación final')}<div class="m18-card"><h4>¿Todo correcto?</h4><div class="m18-check"><span>Entregas</span><b>${Array.isArray(p.entregas_pendientes)?p.entregas_pendientes.length:0} pendientes</b></div><div class="m18-check"><span>Cuadres</span><b>${Array.isArray(p.cuadres_pendientes)?p.cuadres_pendientes.length:0} pendientes</b></div><p class="muted">Si todo está validado, el ciclo puede pasar a VALIDADO. La comprobación final la decide el backend.</p><div class="m18-actions">${puede?'<button class="cc-accion" data-m18-finish>Finalizar y validar ciclo</button>':''}<button class="cc-accion m18-back" data-m18-validation>← Cuadre y validación</button></div><p id="m18-msg" class="m18-msg">${puede?'✓ Sin pendientes detectados.':'⚠ Hay pendientes que deben resolverse antes de finalizar.'}</p></div>`);
-  }
-
-  async function startSession(id) {
-    const r=await rpc(RPC.iniciarSesion,{p_sesion_id:id,p_idempotency_key:uuid(),p_observacion:null});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    await sessions();
-    await workSession(id);
-  }
-  async function workSession(id) {
-    const s=state.sesiones.find(x=>x.id===id) || (await getSessions(state.ciclo.id)).find(x=>x.id===id);
-    if(!s)return sessions();
-    state.paso=3;
-    setHtml(`${step(3,'Conteo y entrega')}<div class="m18-card"><h4>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'} · ${esc(fmtDate(s.fecha))}</h4><div class="m18-meta"><div>Trabajador<br><b>${esc(s.usuario_nombre||'—')}</b></div><div>Almacén<br><b>${esc(s.almacen_nombre||state.ciclo.almacen_nombre||'—')}</b></div></div><div class="m18-actions"><button class="cc-accion" data-m18-tab="ventas">Registrar ventas</button><button class="cc-accion" data-m18-tab="movimientos">Registrar movimientos</button><button class="cc-accion" data-m18-money>Registrar dinero recogido</button><button class="cc-accion" data-m18-close-session="${esc(id)}">Cerrar turno</button></div><p id="m18-msg" class="m18-msg"></p></div>`);
-  }
-  async function closeSession(id){
-    const r=await rpc(RPC.cerrarSesion,{p_sesion_id:id,p_idempotency_key:uuid(),p_observacion:null});
-    if(r.error){msg(String(r.error.message||r.error),false);return;}
-    await moneyStep();
-  }
-
-  async function refresh() {
-    renderStyles();
-    const tab=document.getElementById('tab-ciclos');
-    if(!tab)return;
-    const oldTurnos=document.querySelector('#tabs [data-tab="turnos"]'); if(oldTurnos) oldTurnos.style.display='none';
-    const root=document.getElementById('ciclos-m18-root'); if(!root)return;
-    await home();
-  }
-
-  function bind() {
-    if(ready)return; ready=true;
-    document.addEventListener('click',async e=>{
-      const t=e.target.closest('[data-m18-enter]'); if(t){e.preventDefault();await enter(t.dataset.m18Enter);return;}
-      t=e.target.closest('[data-m18-create]'); if(t){e.preventDefault();await createCycle(t.dataset.m18Create);return;}
-      t=e.target.closest('[data-m18-save]'); if(t){e.preventDefault();await saveCycle(t.dataset.m18Save);return;}
-      t=e.target.closest('[data-m18-home]'); if(t){e.preventDefault();await home();return;}
-      t=e.target.closest('[data-m18-money]'); if(t){e.preventDefault();await moneyStep();return;}
-      t=e.target.closest('[data-m18-declare]'); if(t){e.preventDefault();await declareMoney(t.dataset.m18Declare);return;}
-      t=e.target.closest('[data-m18-sessions]'); if(t){e.preventDefault();await sessions();return;}
-      t=e.target.closest('[data-m18-cycle]'); if(t){e.preventDefault();await renderCycle(state.ciclo);return;}
-      t=e.target.closest('[data-m18-start-cycle]'); if(t){e.preventDefault();await cycleMutation(RPC.iniciarCiclo);return;}
-      t=e.target.closest('[data-m18-validate]'); if(t){e.preventDefault();await cycleMutation(RPC.iniciarValidacion);return;}
-      t=e.target.closest('[data-m18-count]'); if(t){e.preventDefault();await countStep();return;}
-      t=e.target.closest('[data-m18-receive]'); if(t){e.preventDefault();await receiveMoney(t.dataset.m18Receive);return;}
-      t=e.target.closest('[data-m18-review]'); if(t){e.preventDefault();await reviewMoney(t.dataset.m18Review,t.dataset.decision);return;}
-      t=e.target.closest('[data-m18-validation]'); if(t){e.preventDefault();await validationStep();return;}
-      t=e.target.closest('[data-m18-final-check]'); if(t){e.preventDefault();await finalCheck();return;}
-      t=e.target.closest('[data-m18-finish]'); if(t){e.preventDefault();await cycleMutation(RPC.finalizarCiclo);return;}
-      t=e.target.closest('[data-m18-start-session]'); if(t){e.preventDefault();await startSession(t.dataset.m18StartSession);return;}
-      t=e.target.closest('[data-m18-work-session]'); if(t){e.preventDefault();await workSession(t.dataset.m18WorkSession);return;}
-      t=e.target.closest('[data-m18-close-session]'); if(t){e.preventDefault();await closeSession(t.dataset.m18CloseSession);return;}
-      t=e.target.closest('[data-m18-tab]'); if(t){e.preventDefault();const b=document.querySelector(`#tabs [data-tab="${t.dataset.m18Tab}"]`);if(b)b.click();return;}
-      const tabBtn=e.target.closest('#tabs [data-tab="ciclos"]'); if(tabBtn){setTimeout(refresh,0);}
-    });
-    const old=window.refrescarCiclos;
-    window.refrescarCiclos=refresh;
-    if(old) window._battlecruiserRefrescarCiclosLegacy=old;
-  }
-
-  function init(){
-    const tab=document.getElementById('tab-ciclos'); if(!tab)return;
-    if(!document.getElementById('ciclos-m18-root')){
-      tab.innerHTML='<div class="pendientes-header"><h3>Ciclos Operativos</h3><span id="ciclos-conn-info" class="muted"></span></div><p class="muted">Guía de cierre: ciclo → dinero recogido → conteo → cuadre/validación → verificación final.</p><div id="ciclos-m18-root" class="m18-wrap"></div>';
-    }
-    bind();
-    refresh();
-  }
-
+  async function rpc(name, params) { let timeoutId = null; try { if (typeof showLoading === 'function') showLoading(); const call = client.rpc(name, params || {}); const timeout = new Promise((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Tiempo de espera agotado. La operación no respondió en 25 segundos.')), RPC_TIMEOUT_MS); }); const r = await Promise.race([call, timeout]); if (r && !r.error && typeof marcarConectividadReal === 'function') marcarConectividadReal('online'); if (r && r.error && typeof esErrorDeRed === 'function' && typeof marcarConectividadReal === 'function') marcarConectividadReal(esErrorDeRed(r.error) ? 'offline' : 'online'); return r; } catch (e) { if (typeof esErrorDeRed === 'function' && esErrorDeRed(e) && typeof marcarConectividadReal === 'function') marcarConectividadReal('offline'); return { data: null, error: e }; } finally { if (timeoutId) clearTimeout(timeoutId); if (typeof resetLoadingOverlay === 'function') resetLoadingOverlay(); else if (typeof hideLoading === 'function') hideLoading(); } }
+  function activeCycle(cycles, almacenId) { return (cycles || []).find(c => c.almacen_id === almacenId && ['ACTIVO','EN_VALIDACION'].includes(c.estado)) || (cycles || []).filter(c => c.almacen_id === almacenId && !['ARCHIVADO','VALIDADO'].includes(c.estado)).sort((a,b) => String(b.inicio_plan).localeCompare(String(a.inicio_plan)))[0] || null; }
+  function renderStyles() { if (document.getElementById('m18-ciclos-style')) return; const s = document.createElement('style'); s.id = 'm18-ciclos-style'; s.textContent = `#tab-ciclos .mando-filtros,#tab-ciclos > .cc-bloque,#tab-ciclos > #ciclo-detalle,#tab-ciclos > #msg-ciclos{display:none!important}.m18-wrap{max-width:760px;margin:0 auto}.m18-step{display:flex;gap:8px;align-items:center;margin:0 0 16px}.m18-step span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--gold-dim);color:var(--gold);font-family:'IBM Plex Mono',monospace}.m18-step strong{font-size:14px}.m18-progress{font-size:11px;color:var(--mist);margin:-10px 0 12px 36px}.m18-card{border:1px solid var(--gold-dim);background:var(--stone);border-radius:10px;padding:16px;margin:10px 0}.m18-card h4{margin:0 0 7px}.m18-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;font-size:13px}.m18-meta b{color:var(--gold)}.m18-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.m18-actions button{min-height:42px}.m18-back{background:transparent!important}.m18-session{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--gold-dim);padding:12px 0}.m18-session:first-child{border-top:0}.m18-session small{display:block;color:var(--mist)}.m18-status{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mist);font-family:'IBM Plex Mono',monospace}.m18-msg{min-height:20px;margin-top:10px}.m18-msg.error{color:#d98b7f}.m18-msg.ok{color:#8fc79d}.m18-empty{padding:18px;text-align:center;color:var(--mist)}.m18-check{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--gold-dim)}@media(max-width:600px){.m18-meta{grid-template-columns:1fr}.m18-session{align-items:flex-start;flex-direction:column}}`; document.head.appendChild(s); }
+  async function getCycles() { const r = await rpc(RPC.listarCiclos, {p_almacen_id:null,p_estado:null}); if (r.error) throw r.error; const d = r.data; return Array.isArray(d) ? d : (d && Array.isArray(d.ciclos) ? d.ciclos : d ? [d] : []); }
+  async function getSessions(cicloId) { const r = await rpc(RPC.listarSesiones, {p_ciclo_id:cicloId,p_almacen_id:null,p_fecha:null,p_estado:null}); if (r.error) throw r.error; return Array.isArray(r.data) ? r.data : (r.data ? [r.data] : []); }
+  async function getEntregas(cicloId) { const r = await rpc(RPC.listarEntregas, {p_ciclo_id:cicloId}); if (r.error) throw r.error; return Array.isArray(r.data) ? r.data : (r.data ? [r.data] : []); }
+  function almacenes() { return ((_cache && _cache.almacenes) || []).filter(a => a.activo !== false); }
+  function step(n, title, total=5) { return `<div class="m18-step"><span>${n}</span><strong>${esc(title)}</strong></div><div class="m18-progress">Paso ${n} de ${total}</div>`; }
+  async function home() { state.paso = 1; const as = almacenes(); let cycles = []; try { cycles = await getCycles(); } catch(e) { setHtml('<div class="m18-empty">No se pudieron cargar los ciclos. Revisá la conexión.</div>'); return; } const cards = as.map(a => { const c = activeCycle(cycles, a.id); return `<div class="m18-card"><h4>🏪 ${esc(a.nombre || a.id)}</h4>${c ? `<div class="m18-meta"><div>Estado<br><b>${esc(labelEstado(c.estado))}</b></div><div>Periodo<br><b>${esc(fmtDate(c.inicio_plan))} → ${esc(fmtDate(c.fin_plan))}</b></div></div><div class="m18-actions"><button type="button" class="cc-accion" data-m18-enter="${esc(c.id)}">Entrar al ciclo</button></div>` : `<p class="muted">No hay ciclo activo o planificado.</p><div class="m18-actions"><button type="button" class="cc-accion" data-m18-create="${esc(a.id)}">Crear ciclo</button></div>`}</div>`; }).join(''); setHtml(`${step(1,'Ciclo')}${cards || '<div class="m18-empty">No hay almacenes disponibles.</div>'}<p id="m18-msg" class="m18-msg"></p>`); }
+  async function createCycle(almacenId) { const hoy = new Date(); const iso = new Date(hoy.getTime()-hoy.getTimezoneOffset()*60000).toISOString().slice(0,10); setHtml(`${step(1,'Crear ciclo')}<div class="m18-card"><h4>Nuevo ciclo</h4><label class="muted">Inicio<br><input id="m18-inicio" type="date" value="${iso}"></label><br><br><label class="muted">Días<br><input id="m18-dias" type="number" min="1" max="31" value="1"></label><div class="m18-actions"><button type="button" class="cc-accion m18-back" data-m18-home>← Volver</button><button type="button" class="cc-accion" data-m18-save="${esc(almacenId)}">Crear ciclo</button></div><p id="m18-msg" class="m18-msg"></p></div>`); }
+  async function saveCycle(almacenId) { const inicio = document.getElementById('m18-inicio')?.value; const dias = Number(document.getElementById('m18-dias')?.value || 0); if (!inicio || !Number.isInteger(dias) || dias < 1 || dias > 31) { msg('Indicá una fecha y entre 1 y 31 días.', false); return; } const r = await rpc(RPC.crearCiclo,{p_almacen_id:almacenId,p_inicio_plan:inicio,p_cantidad_dias:dias,p_idempotency_key:uuid()}); if (r.error) { msg(String(r.error.message || r.error),false); return; } await enter(r.data?.id || r.data?.id_ciclo); }
+  async function enter(cicloId) { let cycles = []; try { cycles = await getCycles(); } catch(e) { msg('No se pudo cargar el ciclo.',false); return; } const c = cycles.find(x => x.id === cicloId) || activeCycle(cycles, state.almacenId); if (!c) { await home(); return; } state.ciclo = c; state.almacenId = c.almacen_id; state.paso = 2; renderCycle(c); }
+  function renderCycle(c) { const puedeIniciar = c.estado === 'PLANIFICADO'; setHtml(`${step(2,'Dinero recogido')}<div class="m18-card"><h4>${esc(c.almacen_nombre || 'Almacén')}</h4><div class="m18-meta"><div>Estado<br><b>${esc(labelEstado(c.estado))}</b></div><div>Periodo<br><b>${esc(fmtDate(c.inicio_plan))} → ${esc(fmtDate(c.fin_plan))}</b></div></div><p class="muted">Primero abre el ciclo. Después registrarás el dinero recogido de cada sesión.</p><div class="m18-actions">${puedeIniciar?'<button type="button" class="cc-accion" data-m18-start-cycle>Iniciar ciclo</button>':''}<button type="button" class="cc-accion" data-m18-money>Registrar dinero recogido</button><button type="button" class="cc-accion" data-m18-sessions>Continuar → Sesiones</button><button type="button" class="cc-accion m18-back" data-m18-home>← Ciclos</button></div><p id="m18-msg" class="m18-msg"></p></div>`); }
+  async function cycleMutation(name) { const r = await rpc(name,{p_ciclo_id:state.ciclo.id,p_idempotency_key:uuid()}); if (r.error) { msg(String(r.error.message || r.error),false); return false; } await enter(state.ciclo.id); return true; }
+  async function moneyStep() { if (!state.ciclo) return home(); let ss=[]; try { ss=await getSessions(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las sesiones.',false); return; } state.sesiones=ss; state.paso=2; const rows=ss.map(s=>`<div class="m18-session"><div><b>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'}</b><small>Día ${esc(s.dia_n)} · ${esc(fmtDate(s.fecha))}${s.usuario_nombre?' · '+esc(s.usuario_nombre):''}</small></div><div class="m18-actions"><button type="button" class="cc-accion" data-m18-declare="${esc(s.id)}">Registrar dinero recogido</button></div></div>`).join(''); setHtml(`${step(2,'Dinero recogido')}<div class="m18-card"><h4>Dinero recogido por sesión</h4>${rows || '<div class="m18-empty">No hay sesiones.</div>'}<div class="m18-actions"><button type="button" class="cc-accion" data-m18-sessions>Continuar → Conteo</button><button type="button" class="cc-accion m18-back" data-m18-cycle>← Atrás</button></div><p id="m18-msg" class="m18-msg"></p></div>`); }
+  async function declareMoney(sesionId) { const input = window.prompt('Dinero recogido de esta sesión:', ''); if (input === null) return; const monto = Number(input); if (!Number.isFinite(monto) || monto < 0) { msg('Monto inválido.',false); return; } const r = await rpc(RPC.declararEntrega,{p_ciclo_id:state.ciclo.id,p_monto_declarado:monto,p_sesion_id:sesionId,p_idempotency_key:uuid()}); if(r.error){msg(String(r.error.message||r.error),false);return;} msg('✓ Dinero recogido registrado.',true); await moneyStep(); }
+  async function sessions() { if (!state.ciclo) return home(); let ss=[]; try { ss=await getSessions(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las sesiones.',false); return; } state.sesiones=ss; state.paso=3; const rows=ss.map(s=>`<div class="m18-session"><div><b>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'}</b><small>Día ${esc(s.dia_n)} · ${esc(fmtDate(s.fecha))}${s.usuario_nombre?' · '+esc(s.usuario_nombre):''}</small><span class="m18-status">${esc(labelEstado(s.estado))}</span></div><div class="m18-actions">${s.estado==='PENDIENTE'?`<button type="button" class="cc-accion" data-m18-start-session="${esc(s.id)}">Abrir sesión</button>`:''}${s.estado==='EN_CURSO'?`<button type="button" class="cc-accion" data-m18-work-session="${esc(s.id)}">Entrar</button><button type="button" class="cc-accion" data-m18-close-session="${esc(s.id)}">Cerrar</button>`:''}</div></div>`).join(''); setHtml(`${step(3,'Conteo y entrega')}<div class="m18-card"><h4>Sesiones del ciclo</h4><p class="muted">Abre cada turno y, al terminar, realiza el conteo de su entrega.</p>${rows || '<div class="m18-empty">No hay sesiones.</div>'}<div class="m18-actions"><button type="button" class="cc-accion" data-m18-count>Ir al conteo de entregas</button><button type="button" class="cc-accion m18-back" data-m18-money>← Dinero recogido</button></div><p id="m18-msg" class="m18-msg"></p></div>`); }
+  async function countStep() { if (!state.ciclo) return home(); let es=[]; try { es=await getEntregas(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las entregas.',false); return; } state.entregas=es; state.paso=3; const rows=es.map(e=>`<div class="m18-check"><div><b>${esc(labelEstado(e.estado))}</b><small class="muted">Declarado: ${esc(e.monto_declarado)} · Contado: ${e.monto_contado==null?'—':esc(e.monto_contado)}</small></div><div class="m18-actions">${e.estado==='DECLARADA'?`<button type="button" class="cc-accion" data-m18-receive="${esc(e.id)}">Hacer conteo</button>`:''}${e.estado==='CONTADA'?`<button type="button" class="cc-accion" data-m18-review="${esc(e.id)}" data-decision="aprobar">Aprobar</button>`:''}</div></div>`).join(''); setHtml(`${step(3,'Conteo y entrega')}<div class="m18-card"><h4>Conteo de dinero</h4>${rows || '<div class="m18-empty">Todavía no hay entregas registradas.</div>'}<div class="m18-actions"><button type="button" class="cc-accion" data-m18-validation>Continuar → Cuadre y validación</button><button type="button" class="cc-accion m18-back" data-m18-sessions>← Sesiones</button></div><p id="m18-msg" class="m18-msg"></p></div>`); }
+  async function receiveMoney(id) { const input=window.prompt('Monto contado:', ''); if(input===null)return; const monto=Number(input); if(!Number.isFinite(monto)||monto<0){msg('Monto contado inválido.',false);return;} const obs=window.prompt('Observación del conteo (opcional):','')||null; const r=await rpc(RPC.recibirEntrega,{p_entrega_id:id,p_monto_contado:monto,p_observacion_conteo:obs,p_idempotency_key:uuid()}); if(r.error){msg(String(r.error.message||r.error),false);return;} await countStep(); }
+  async function reviewMoney(id, decision) { const comentario=window.prompt(decision==='aprobar'?'Comentario de aprobación (opcional):':'Motivo del rechazo:','')||null; if(decision==='rechazar'&&!comentario){msg('El rechazo requiere un motivo.',false);return;} const r=await rpc(RPC.revisarEntrega,{p_entrega_id:id,p_decision:decision,p_comentario:comentario,p_idempotency_key:uuid()}); if(r.error){msg(String(r.error.message||r.error),false);return;} await countStep(); }
+  async function validationStep() { if(!state.ciclo)return home(); const r=await rpc(RPC.pendientesCierre,{p_ciclo_id:state.ciclo.id}); if(r.error){msg(String(r.error.message||r.error),false);return;} const p=r.data||{}; const entregas=Array.isArray(p.entregas_pendientes)?p.entregas_pendientes.length:0; const cuadres=Array.isArray(p.cuadres_pendientes)?p.cuadres_pendientes.length:0; const puede=p.puede_finalizar===true; setHtml(`${step(4,'Cuadre y validación')}<div class="m18-card"><h4>Revisión completa del ciclo</h4><div class="m18-check"><span>Entregas pendientes</span><b>${entregas}</b></div><div class="m18-check"><span>Cuadres pendientes</span><b>${cuadres}</b></div><p class="muted">Aquí se comprueba que las entregas, cuadres y demás acciones requeridas por el backend estén listas antes del cierre.</p><div class="m18-actions">${state.ciclo.estado==='ACTIVO'?'<button type="button" class="cc-accion" data-m18-validate>Iniciar validación</button>':''}<button type="button" class="cc-accion" data-m18-final-check>Continuar → Verificación final</button><button type="button" class="cc-accion m18-back" data-m18-count>← Conteo</button></div><p id="m18-msg" class="m18-msg">${puede?'Todo listo para finalizar.':'Todavía existen pendientes.'}</p></div>`); }
+  async function finalCheck() { if(!state.ciclo)return home(); const r=await rpc(RPC.pendientesCierre,{p_ciclo_id:state.ciclo.id}); if(r.error){msg(String(r.error.message||r.error),false);return;} const p=r.data||{}; const puede=p.puede_finalizar===true; setHtml(`${step(5,'Verificación final')}<div class="m18-card"><h4>¿Todo correcto?</h4><div class="m18-check"><span>Entregas</span><b>${Array.isArray(p.entregas_pendientes)?p.entregas_pendientes.length:0} pendientes</b></div><div class="m18-check"><span>Cuadres</span><b>${Array.isArray(p.cuadres_pendientes)?p.cuadres_pendientes.length:0} pendientes</b></div><p class="muted">Si todo está validado, el ciclo puede pasar a VALIDADO. La comprobación final la decide el backend.</p><div class="m18-actions">${puede?'<button type="button" class="cc-accion" data-m18-finish>Finalizar y validar ciclo</button>':''}<button type="button" class="cc-accion m18-back" data-m18-validation>← Cuadre y validación</button></div><p id="m18-msg" class="m18-msg">${puede?'✓ Sin pendientes detectados.':'⚠ Hay pendientes que deben resolverse antes de finalizar.'}</p></div>`); }
+  async function startSession(id) { const r=await rpc(RPC.iniciarSesion,{p_sesion_id:id,p_idempotency_key:uuid(),p_observacion:null}); if(r.error){msg(String(r.error.message||r.error),false);return;} await sessions(); await workSession(id); }
+  async function workSession(id) { const s=state.sesiones.find(x=>x.id===id) || (await getSessions(state.ciclo.id)).find(x=>x.id===id); if(!s)return sessions(); state.paso=3; setHtml(`${step(3,'Conteo y entrega')}<div class="m18-card"><h4>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'} · ${esc(fmtDate(s.fecha))}</h4><div class="m18-meta"><div>Trabajador<br><b>${esc(s.usuario_nombre||'—')}</b></div><div>Almacén<br><b>${esc(s.almacen_nombre||state.ciclo.almacen_nombre||'—')}</b></div></div><div class="m18-actions"><button type="button" class="cc-accion" data-m18-tab="ventas">Registrar ventas</button><button type="button" class="cc-accion" data-m18-tab="movimientos">Registrar movimientos</button><button type="button" class="cc-accion" data-m18-money>Registrar dinero recogido</button><button type="button" class="cc-accion" data-m18-close-session="${esc(id)}">Cerrar turno</button></div><p id="m18-msg" class="m18-msg"></p></div>`); }
+  async function closeSession(id){ const r=await rpc(RPC.cerrarSesion,{p_sesion_id:id,p_idempotency_key:uuid(),p_observacion:null}); if(r.error){msg(String(r.error.message||r.error),false);return;} await moneyStep(); }
+  async function refresh() { renderStyles(); const tab=document.getElementById('tab-ciclos'); if(!tab)return; const oldTurnos=document.querySelector('#tabs [data-tab="turnos"]'); if(oldTurnos) oldTurnos.style.display='none'; const root=document.getElementById('ciclos-m18-root'); if(!root)return; await home(); }
+  function bind() { if(ready)return; ready=true; document.addEventListener('click',async e=>{ const t=e.target.closest('[data-m18-enter]'); if(t){e.preventDefault();await enter(t.dataset.m18Enter);return;} e.target.closest('[data-m18-create]')&&(e.preventDefault(),await createCycle(e.target.closest('[data-m18-create]').dataset.m18Create)); const t2=e.target.closest('[data-m18-save]'); if(t2){e.preventDefault();await saveCycle(t2.dataset.m18Save);return;} const t3=e.target.closest('[data-m18-home]'); if(t3){e.preventDefault();await home();return;} const t4=e.target.closest('[data-m18-money]'); if(t4){e.preventDefault();await moneyStep();return;} const t5=e.target.closest('[data-m18-declare]'); if(t5){e.preventDefault();await declareMoney(t5.dataset.m18Declare);return;} const t6=e.target.closest('[data-m18-sessions]'); if(t6){e.preventDefault();await sessions();return;} const t7=e.target.closest('[data-m18-cycle]'); if(t7){e.preventDefault();await renderCycle(state.ciclo);return;} const t8=e.target.closest('[data-m18-start-cycle]'); if(t8){e.preventDefault();await cycleMutation(RPC.iniciarCiclo);return;} const t9=e.target.closest('[data-m18-validate]'); if(t9){e.preventDefault();await cycleMutation(RPC.iniciarValidacion);return;} const t10=e.target.closest('[data-m18-count]'); if(t10){e.preventDefault();await countStep();return;} const t11=e.target.closest('[data-m18-receive]'); if(t11){e.preventDefault();await receiveMoney(t11.dataset.m18Receive);return;} const t12=e.target.closest('[data-m18-review]'); if(t12){e.preventDefault();await reviewMoney(t12.dataset.m18Review,t12.dataset.decision);return;} const t13=e.target.closest('[data-m18-validation]'); if(t13){e.preventDefault();await validationStep();return;} const t14=e.target.closest('[data-m18-final-check]'); if(t14){e.preventDefault();await finalCheck();return;} const t15=e.target.closest('[data-m18-finish]'); if(t15){e.preventDefault();await cycleMutation(RPC.finalizarCiclo);return;} const t16=e.target.closest('[data-m18-start-session]'); if(t16){e.preventDefault();await startSession(t16.dataset.m18StartSession);return;} const t17=e.target.closest('[data-m18-work-session]'); if(t17){e.preventDefault();await workSession(t17.dataset.m18WorkSession);return;} const t18=e.target.closest('[data-m18-close-session]'); if(t18){e.preventDefault();await closeSession(t18.dataset.m18CloseSession);return;} const t19=e.target.closest('[data-m18-tab]'); if(t19){e.preventDefault();const b=document.querySelector(`#tabs [data-tab="${t19.dataset.m18Tab}"]`);if(b)b.click();return;} const tabBtn=e.target.closest('#tabs [data-tab="ciclos"]'); if(tabBtn){setTimeout(refresh,0);} }, true); const old=window.refrescarCiclos; window.refrescarCiclos=refresh; if(old) window._battlecruiserRefrescarCiclosLegacy=old; }
+  function init(){ const tab=document.getElementById('tab-ciclos'); if(!tab)return; if(!document.getElementById('ciclos-m18-root')) tab.innerHTML='<div class="pendientes-header"><h3>Ciclos Operativos</h3><span id="ciclos-conn-info" class="muted"></span></div><p class="muted">Guía de cierre: ciclo → dinero recogido → conteo → cuadre/validación → verificación final.</p><div id="ciclos-m18-root" class="m18-wrap"></div>'; bind(); refresh(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true}); else init();
 })();
