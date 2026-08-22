@@ -11,8 +11,8 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 (function cargarModuloHistoriales(){
   function cargar(){
     if(document.querySelector('script[data-battlecruiser-historiales="1"]')) return;
-    const css=document.createElement('link'); css.rel='stylesheet'; css.href='style-historiales.css'; document.head.appendChild(css);
-    const s=document.createElement('script'); s.src='js/historial-detalle.js'; s.async=false; s.dataset.battlecruiserHistoriales='1'; document.body.appendChild(s);
+    const css=document.createElement('link'); css.rel='stylesheet'; css.href='style-historiales.css?v=56'; document.head.appendChild(css);
+    const s=document.createElement('script'); s.src='js/historial-detalle.js?v=56'; s.async=false; s.dataset.battlecruiserHistoriales='1'; document.body.appendChild(s);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cargar,{once:true}); else cargar();
 })();
@@ -20,7 +20,7 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 (function cargarModuloCompraMultiple(){
   function cargar(){
     if(document.querySelector('script[data-battlecruiser-compra-multiple="1"]')) return;
-    const s=document.createElement('script'); s.src='js/compra-multiple.js'; s.async=false; s.dataset.battlecruiserCompraMultiple='1'; document.head.appendChild(s);
+    const s=document.createElement('script'); s.src='js/compra-multiple.js?v=58'; s.async=false; s.dataset.battlecruiserCompraMultiple='1'; document.head.appendChild(s);
   }
   cargar();
 })();
