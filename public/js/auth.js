@@ -37,10 +37,9 @@ function showLogin() {
   _usuarioActualId = null;
   // un usuario B jamás vea permisos/datos del usuario A anterior.
   if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
-  // Foco directo en "Correo" al mostrar el login: con 6+ vendedores entrando y
-  // saliendo de la cuenta seguido en la misma caja, ahorra un tap cada vez.
-  const emailInput = document.getElementById("email");
-  if (emailInput) emailInput.focus();
+  // Foco directo en "Usuario" al mostrar el login.
+  const usuarioInput = document.getElementById("email");
+  if (usuarioInput) usuarioInput.focus();
 }
 
 // Por defecto arranca en login hasta confirmar sesión real (evita el parpadeo de ver ambas pantallas)
@@ -56,6 +55,16 @@ client.auth.onAuthStateChange((_event, session) => {
 });
 
 safeInit("login", () => {
+  const usuarioInput = document.getElementById("email");
+  const usuarioLabel = document.querySelector('label[for="email"]');
+  if (usuarioInput) {
+    usuarioInput.type = "text";
+    usuarioInput.autocomplete = "username";
+    usuarioInput.placeholder = "Tu usuario";
+    usuarioInput.removeAttribute("inputmode");
+  }
+  if (usuarioLabel) usuarioLabel.textContent = "Usuario";
+
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     loginError.textContent = "";
@@ -63,16 +72,36 @@ safeInit("login", () => {
     showLoading();
     loginBtn.textContent = "Entrando...";
 
-    const email = document.getElementById("email").value.trim();
+    const nombreUsuario = usuarioInput ? usuarioInput.value.trim() : "";
     const password = document.getElementById("password").value;
 
     try {
-      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (!nombreUsuario) {
+        loginError.textContent = "Escribe tu usuario.";
+        return;
+      }
+
+      const { data: emailLogin, error: errorUsuario } = await client.rpc(
+        "obtener_email_login_por_nombre",
+        { p_nombre: nombreUsuario }
+      );
+
+      if (errorUsuario || !emailLogin) {
+        loginError.textContent = "Usuario o contraseña incorrectos.";
+        if (errorUsuario) console.error("[Battlecruiser] (resolver usuario)", errorUsuario);
+        return;
+      }
+
+      const { error } = await client.auth.signInWithPassword({
+        email: emailLogin,
+        password,
+      });
+
       if (error) {
         const msg = (error.message || "").toLowerCase();
         loginError.textContent = (!navigator.onLine || msg.includes("failed to fetch") || msg.includes("timeout"))
           ? "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento."
-          : "Correo o contraseña incorrectos.";
+          : "Usuario o contraseña incorrectos.";
         console.error("[Battlecruiser] (login)", error);
       }
     } catch (e) {
