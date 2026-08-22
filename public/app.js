@@ -4,7 +4,7 @@
 // módulos dentro de public/js/ (ver lista y orden de carga en index.html).
 //
 // Los módulos se cargan como <script> clásicos (no ES modules), en el mismo
-// orden en que las secciones aparecían originalmente en este archivo, y
+// orden en que las secciones aparecían originalmente en el archivo, y
 // comparten el mismo scope global.
 //
 // Misión 9.3 T6: el panel contextual se carga al final para no alterar el
@@ -27,6 +27,15 @@
   if (document.querySelector('script[src*="online-offline-guard"]')) return;
   var s = document.createElement("script");
   s.src = "js/online-offline-guard.js";
+  s.async = false;
+  document.body.appendChild(s);
+})();
+
+// M20 — Operaciones financieras: reinversión integrada con caja + inventario.
+(function cargarOperacionesFinancieras() {
+  if (document.querySelector('script[src*="operaciones-financieras"]')) return;
+  var s = document.createElement("script");
+  s.src = "js/operaciones-financieras.js";
   s.async = false;
   document.body.appendChild(s);
 })();
