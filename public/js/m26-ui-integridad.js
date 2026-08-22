@@ -3,21 +3,17 @@
   'use strict';
 
   function unificarTurnos() {
-    // M21 usa técnicamente #tab-ciclos como panel real de Turnos y oculta
-    // #tab-turnos. La UI no debe mostrar dos accesos.
     var real = document.getElementById('tab-ciclos');
     if (!real) return;
     document.querySelectorAll('.tab-btn[data-tab="turnos"]').forEach(function (b) { b.remove(); });
     var botonesCiclos = Array.from(document.querySelectorAll('.tab-btn[data-tab="ciclos"]'));
     botonesCiclos.slice(1).forEach(function (b) { b.remove(); });
     var btn = botonesCiclos[0];
-    if (btn) btn.textContent = 'Turnos';
-    // Todos los accesos internos a "Turnos" deben abrir el panel real.
+    if (btn) { btn.textContent = 'Turnos'; btn.setAttribute('data-tab', 'ciclos'); }
     document.querySelectorAll('[data-ir-tab="turnos"], [data-tab="turnos"]').forEach(function (el) {
       if (el.classList && el.classList.contains('tab-btn')) return;
       el.setAttribute('data-ir-tab', 'ciclos');
     });
-    // Nunca mostrar el panel legacy vacío.
     var legacy = document.getElementById('tab-turnos');
     if (legacy) legacy.style.display = 'none';
   }
@@ -52,23 +48,42 @@
     }
   }
 
+  // ÚNICA regla de ubicación: estos bloques pueden existir visualmente solo
+  // dentro del modal de Productos > Nomenclatura y catálogos.
   function esconderNomenclaturaFueraDeProductos() {
     var ids = ['lista-categorias', 'lista-unidades', 'lista-presentaciones-catalogo', 'pp-lista-asociaciones'];
     ids.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
-      var bloque = el.closest('.cc-bloque') || el.closest('.card') || el.closest('.presentaciones-catalogo') || el.closest('.presentaciones-producto');
-      if (bloque && !bloque.closest('#productos-nomenclatura-modal')) bloque.style.display = 'none';
+      var dentroModal = !!el.closest('#productos-nomenclatura-modal');
+      var bloque = el.closest('.cc-bloque') || el.closest('.card') || el.closest('.presentaciones-catalogo') || el.closest('.presentaciones-producto') || el.parentElement;
+      if (bloque && !dentroModal) {
+        bloque.dataset.bcNomenclatura = '1';
+        bloque.style.setProperty('display', 'none', 'important');
+        bloque.setAttribute('aria-hidden', 'true');
+      } else if (bloque && dentroModal) {
+        bloque.removeAttribute('aria-hidden');
+      }
+    });
+
+    // El botón de acceso solo puede vivir dentro de Productos.
+    document.querySelectorAll('#productos-tools-nomenclatura').forEach(function (tools) {
+      if (!tools.closest('#tab-productos')) tools.remove();
+    });
+    var botones = Array.from(document.querySelectorAll('#productos-nomenclatura-btn'));
+    botones.forEach(function (b, i) {
+      if (i > 0 || !b.closest('#tab-productos')) b.remove();
     });
   }
 
   function prepararNomenclaturaRobusta() {
     var modal = document.getElementById('productos-nomenclatura-modal');
     var btn = document.getElementById('productos-nomenclatura-btn');
-    if (!modal || !btn) return;
+    if (!modal || !btn || !btn.closest('#tab-productos')) return;
     esconderNomenclaturaFueraDeProductos();
     if (btn.dataset.bcM26 === '1') return;
     btn.dataset.bcM26 = '1';
+
     btn.addEventListener('click', function () {
       modal.classList.remove('hidden');
       modal.style.display = 'flex';
@@ -82,15 +97,30 @@
         var el = document.getElementById(id), slot = document.getElementById(slots[id]);
         if (!el || !slot) return;
         var bloque = el.closest('.cc-bloque') || el.closest('.card') || el.closest('.presentaciones-catalogo') || el.closest('.presentaciones-producto') || el.parentElement;
-        if (bloque && !slot.contains(bloque)) { bloque.style.display = ''; slot.appendChild(bloque); }
+        if (bloque && !slot.contains(bloque)) {
+          bloque.style.removeProperty('display');
+          bloque.removeAttribute('aria-hidden');
+          slot.appendChild(bloque);
+        }
       });
     });
+
     var close = document.getElementById('productos-nomenclatura-cerrar');
-    if (close) close.addEventListener('click', function () {
-      modal.classList.add('hidden');
-      modal.style.display = '';
-      setTimeout(esconderNomenclaturaFueraDeProductos, 0);
-    });
+    if (close && close.dataset.bcM26Close !== '1') {
+      close.dataset.bcM26Close = '1';
+      close.addEventListener('click', function () {
+        modal.classList.add('hidden');
+        modal.style.display = '';
+        setTimeout(esconderNomenclaturaFueraDeProductos, 0);
+      });
+    }
+
+    if (modal.dataset.bcM26Watch !== '1') {
+      modal.dataset.bcM26Watch = '1';
+      modal.addEventListener('click', function () {
+        setTimeout(esconderNomenclaturaFueraDeProductos, 0);
+      });
+    }
   }
 
   function arreglarAgregarProducto() {
@@ -133,8 +163,16 @@
   }
 
   function run() {
-    unificarTurnos(); ocultarCompraEnProductos(); asegurarUnaBusquedaProductos(); protegerPaneles(); prepararNomenclaturaRobusta(); arreglarAgregarProducto(); arreglarEdicionProducto(); asegurarAccesoGasto();
+    unificarTurnos();
+    ocultarCompraEnProductos();
+    asegurarUnaBusquedaProductos();
+    protegerPaneles();
+    prepararNomenclaturaRobusta();
+    arreglarAgregarProducto();
+    arreglarEdicionProducto();
+    asegurarAccesoGasto();
   }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 2000); }); else setTimeout(run, 2000);
   setInterval(run, 3000);
 })();
