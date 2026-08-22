@@ -32,6 +32,13 @@
   s.async = false;
   document.body.appendChild(s);
 })();
+(function cargarHistorialDetalle() {
+  if (document.querySelector('script[src*="historial-detalle"]')) return;
+  var s = document.createElement("script");
+  s.src = "js/historial-detalle.js";
+  s.async = false;
+  document.body.appendChild(s);
+})();
 
 // El loading guard se instala al final de la carga del documento, después de
 // todos los módulos estáticos. Así reemplaza el controlador global anterior
