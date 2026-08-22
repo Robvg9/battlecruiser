@@ -1,3 +1,4 @@
+// v68 — Aprobaciones administrativas en Centro de Control
 // v67 — auditoría profunda online/offline: recuperación real + guardia de conectividad
 // v66 — Productos: nomenclatura + presentaciones obligatorias al crear producto
 // v65 — UX Centro de Control + Configuración + Productos
@@ -16,10 +17,10 @@
 // v52 — estabilización loading global
 // v51 — Login por nombre de usuario + contraseña
 // v50 — Ciclos Operativos V1.1: estructura módulo ciclos.js
-const CACHE_NAME = "battlecruiser-shell-v67";
+const CACHE_NAME = "battlecruiser-shell-v68";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js","./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js","./js/historial-detalle.js","./js/compra-multiple.js","./js/compra-vale-style.js","./js/movimiento-multiple.js","./js/inventario-detalle.js","./js/runtime-guards.js","./style-historiales.css",
-  "./js/centro-control.js","./js/navegacion.js","./js/ciclos-unificacion.js","./js/productos.js","./js/presentaciones.js","./js/almacenes.js","./js/transferencias.js","./js/vales.js","./js/ventas.js","./js/venta-turno-ui.js","./js/catalogos.js","./js/configuracion.js","./js/ui-revision-2026-08.js","./js/catalogo-avanzado.js","./js/usuarios-permisos.js","./js/mando.js","./js/reportes.js","./js/nucleo-operativo.js","./js/operacion-humana.js","./js/ciclos.js","./js/m18-ciclos-ux.js","./js/comunicacion.js","./js/panel-contextual.js","./js/manifest.json","./favicon.png","./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png","./icons/icon-maskable-512x512.png","./icons/icon.svg"
+  "./js/centro-control.js","./js/navegacion.js","./js/ciclos-unificacion.js","./js/productos.js","./js/presentaciones.js","./js/almacenes.js","./js/transferencias.js","./js/vales.js","./js/ventas.js","./js/venta-turno-ui.js","./js/catalogos.js","./js/configuracion.js","./js/ui-revision-2026-08.js","./js/catalogo-avanzado.js","./js/usuarios-permisos.js","./js/mando.js","./js/reportes.js","./js/nucleo-operativo.js","./js/operacion-humana.js","./js/ciclos.js","./js/m18-ciclos-ux.js","./js/comunicacion.js","./js/panel-contextual.js","./js/aprobaciones-admin.js","./js/manifest.json","./favicon.png","./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png","./icons/icon-maskable-512x512.png","./icons/icon.svg"
 ];
 const CDN_FILES=["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll([...SHELL_FILES,...CDN_FILES])));self.skipWaiting();});
