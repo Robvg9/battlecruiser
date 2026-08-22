@@ -13,6 +13,10 @@
     const costo=form.querySelector('#compra-costo');
     if(!producto||!almacen||!presentacion||!cantidad||!costo) return;
     const resumen=document.getElementById('compra-resumen');
+    const proveedorInput=document.createElement('input'); proveedorInput.id='compra-proveedor-multiple'; proveedorInput.placeholder='Proveedor (opcional)';
+    const fechaInput=document.createElement('input'); fechaInput.id='compra-fecha-multiple'; fechaInput.type='datetime-local';
+    fechaInput.value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+    form.insertBefore(proveedorInput, producto); form.insertBefore(fechaInput, producto);
     const add=document.createElement('button'); add.type='button'; add.id='compra-agregar-linea'; add.textContent='+ Agregar producto';
     const lista=document.createElement('div'); lista.id='compra-lineas-multiples'; lista.className='lista';
     const total=document.createElement('div'); total.id='compra-total-multiple'; total.className='venta-total'; total.innerHTML='<span>Total compra</span><span id="compra-total-multiple-valor">$0.00</span>';
@@ -40,10 +44,10 @@
       if(!lineas.length){setMsg('msg-productos','Agrega al menos un producto a la compra.',false);return;}
       if(!almacen.value){setMsg('msg-productos','Selecciona el almacén.',false);return;}
       const btn=form.querySelector('button[type="submit"]'); btn.disabled=true;
-      const {data,error}=await client.rpc('registrar_compra_multiple',{p_almacen_id:almacen.value,p_proveedor:null,p_fecha:new Date().toISOString(),p_lineas:lineas.map(l=>({producto_id:l.producto_id,cantidad:l.presentacion_id?null:l.cantidad,costo_unitario:l.costo_unitario,presentacion_id:l.presentacion_id,cantidad_presentacion:l.cantidad_presentacion})),p_idempotency_key:crypto.randomUUID()});
+      const {data,error}=await client.rpc('registrar_compra_multiple',{p_almacen_id:almacen.value,p_proveedor:proveedorInput.value.trim()||null,p_fecha:fechaInput.value?new Date(fechaInput.value).toISOString():new Date().toISOString(),p_lineas:lineas.map(l=>({producto_id:l.producto_id,cantidad:l.presentacion_id?null:l.cantidad,costo_unitario:l.costo_unitario,presentacion_id:l.presentacion_id,cantidad_presentacion:l.cantidad_presentacion})),p_idempotency_key:crypto.randomUUID()});
       btn.disabled=false;
       if(error){setMsg('msg-productos','No se pudo registrar la compra: '+explicarError(error,'registrar compra'),false);return;}
-      lineas=[]; form.reset(); render(); setMsg('msg-productos','✓ Compra registrada completa. Stock actualizado.',true);
+      lineas=[]; proveedorInput.value=''; fechaInput.value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16); form.reset(); render(); setMsg('msg-productos','✓ Compra registrada completa. Stock actualizado.',true);
       if(typeof refrescarStockYSelects==='function') await refrescarStockYSelects();
     });
     render();
