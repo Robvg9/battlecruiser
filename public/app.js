@@ -20,9 +20,6 @@
 })();
 
 // Misión Online/Offline — auditoría profunda y recuperación automática.
-// Se carga al final porque app.js es el último módulo del shell: en ese punto
-// offline.js, auth y el resto de módulos ya existen. La guardia no crea una
-// segunda caché ni una segunda cola; endurece las funciones existentes.
 (function cargarGuardiaOnlineOffline() {
   if (document.querySelector('script[src*="online-offline-guard"]')) return;
   var s = document.createElement("script");
@@ -36,6 +33,16 @@
   if (document.querySelector('script[src*="operaciones-financieras"]')) return;
   var s = document.createElement("script");
   s.src = "js/operaciones-financieras.js";
+  s.async = false;
+  document.body.appendChild(s);
+})();
+
+// Misión 2/7 — Aprobaciones administrativas. Se carga al final para reutilizar
+// permisos, cliente Supabase, cache y Centro de Control ya inicializados.
+(function cargarAprobacionesAdmin() {
+  if (document.querySelector('script[src*="aprobaciones-admin"]')) return;
+  var s = document.createElement("script");
+  s.src = "js/aprobaciones-admin.js";
   s.async = false;
   document.body.appendChild(s);
 })();
