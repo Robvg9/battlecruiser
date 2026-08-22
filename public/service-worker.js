@@ -1,10 +1,11 @@
+// v56 — historial detalle completo basado en datos reales de RPC
 // v55 — historiales: filas interactivas + detalle común
 // v54 — loading guard bootstrap after all modules
 // v53 — loading recovery on authenticated session
 // v52 — estabilización loading global
 // v51 — Login por nombre de usuario + contraseña
 // v50 — Ciclos Operativos V1.1: estructura módulo ciclos.js
-const CACHE_NAME = "battlecruiser-shell-v55";
+const CACHE_NAME = "battlecruiser-shell-v56";
 
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js","./js/core.js","./js/auth.js","./js/offline.js","./js/loading-guard.js","./js/historial-detalle.js","./style-historiales.css",
