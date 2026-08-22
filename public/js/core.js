@@ -17,14 +17,6 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cargar,{once:true}); else cargar();
 })();
 
-(function cargarModuloCompras(){
-  function cargar(){
-    if(document.querySelector('script[data-battlecruiser-compras="1"]')) return;
-    const s=document.createElement('script'); s.src='js/compras.js'; s.async=false; s.dataset.battlecruiserCompras='1'; document.body.appendChild(s);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cargar,{once:true}); else cargar();
-})();
-
 (function programarLoadingGuard() {
   function cargar() {
     try {
