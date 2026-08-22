@@ -1,3 +1,4 @@
+// v54 — loading guard bootstrap after all modules
 // v53 — loading recovery on authenticated session
 // v52 — estabilización loading global
 // v51 — Login por nombre de usuario + contraseña
@@ -7,7 +8,7 @@
 // v47 — Sesión 6: venta-turno-ui.js + restore index
 // v46 — Sesión 6: ventas gobernadas por almacén del turno
 // v45 — post-9.3: fix Ver todos + filtros T9
-const CACHE_NAME = "battlecruiser-shell-v53";
+const CACHE_NAME = "battlecruiser-shell-v54";
 
 const SHELL_FILES = [
   "./index.html",
