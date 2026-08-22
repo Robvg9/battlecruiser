@@ -1,0 +1,40 @@
+name: M18.2 patch
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch M18.2
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/js/m18-ciclos-ux.js')
+          s=p.read_text()
+          s=s.replace("listarEntregas: 'listar_entregas_caja', declararEntrega: 'declarar_entrega_caja', recibirEntrega:", "listarEntregas: 'listar_entregas_caja', declararEntrega: 'declarar_entrega_caja', editarEntrega: 'editar_entrega_caja', recibirEntrega:")
+          old="""  async function moneyStep() { if (!state.ciclo) return home(); let ss=[]; try { ss=await getSessions(state.ciclo.id); } catch(e) { msg('No se pudieron cargar las sesiones.',false); return; } state.sesiones=ss; state.paso=2; const rows=ss.map(s=>`<div class=\"m18-session\"><div><b>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'}</b><small>Día ${esc(s.dia_n)} · ${esc(fmtDate(s.fecha))}${s.usuario_nombre?' · '+esc(s.usuario_nombre):''}</small></div><div class=\"m18-actions\"><button type=\"button\" class=\"cc-accion\" data-m18-declare=\"${esc(s.id)}\">Registrar dinero recogido</button></div></div>`).join(''); setHtml(`${step(2,'Dinero recogido')}<div class=\"m18-card\"><h4>Dinero recogido por sesión</h4>${rows || '<div class=\"m18-empty\">No hay sesiones.</div>'}<div class=\"m18-actions\"><button type=\"button\" class=\"cc-accion\" data-m18-sessions>Continuar → Conteo</button><button type=\"button\" class=\"cc-accion m18-back\" data-m18-cycle>← Atrás</button></div><p id=\"m18-msg\" class=\"m18-msg\"></p></div>`); }"""
+          new="""  async function moneyStep() { if (!state.ciclo) return home(); let ss=[], es=[]; try { [ss,es]=await Promise.all([getSessions(state.ciclo.id),getEntregas(state.ciclo.id)]); } catch(e) { msg('No se pudieron cargar las sesiones o entregas.',false); return; } state.sesiones=ss; state.entregas=es; state.paso=2; const bySession=new Map(es.filter(x=>x.sesion_id).map(x=>[x.sesion_id,x])); const rows=ss.map(s=>{ const e=bySession.get(s.id); let action=e ? (e.estado==='DECLARADA'?`<button type=\"button\" class=\"cc-accion\" data-m18-edit-declare=\"${esc(e.id)}\">Editar dinero</button>`:`<span class=\"m18-status\">✓ ${esc(labelEstado(e.estado))}</span>`) : `<button type=\"button\" class=\"cc-accion\" data-m18-declare=\"${esc(s.id)}\">Registrar dinero recogido</button>`; return `<div class=\"m18-session\"><div><b>${s.bloque==='MANANA'?'☀️ Mañana':'🌙 Tarde'}</b><small>Día ${esc(s.dia_n)} · ${esc(fmtDate(s.fecha))}${s.usuario_nombre?' · '+esc(s.usuario_nombre):''}</small>${e?`<span class=\"m18-status\">Declarado: ${esc(e.monto_declarado)} · ${esc(labelEstado(e.estado))}</span>`:''}</div><div class=\"m18-actions\">${action}</div></div>`; }).join(''); setHtml(`${step(2,'Dinero recogido')}<div class=\"m18-card\"><h4>Dinero recogido por sesión</h4><p class=\"muted\">Cada sesión solo puede tener una declaración: mañana y tarde. Si está pendiente, puedes corregirla antes del conteo administrativo.</p>${rows || '<div class=\"m18-empty\">No hay sesiones.</div>'}<div class=\"m18-actions\"><button type=\"button\" class=\"cc-accion\" data-m18-sessions>Continuar → Conteo</button><button type=\"button\" class=\"cc-accion m18-back\" data-m18-cycle>← Atrás</button></div><p id=\"m18-msg\" class=\"m18-msg\"></p></div>`); }
+  async function declareMoney(sesionId) { const existing=(state.entregas||[]).find(e=>e.sesion_id===sesionId); const input=window.prompt(existing?'Corregir dinero recogido de esta sesión:':'Dinero recogido de esta sesión:', existing?String(existing.monto_declarado):''); if(input===null)return; const monto=Number(input); if(!Number.isFinite(monto)||monto<0){msg('Monto inválido.',false);return;} const r=await rpc(existing?RPC.editarEntrega:RPC.declararEntrega,existing?{p_entrega_id:existing.id,p_monto_declarado:monto,p_idempotency_key:uuid()}:{p_ciclo_id:state.ciclo.id,p_monto_declarado:monto,p_sesion_id:sesionId,p_idempotency_key:uuid()}); if(r.error){msg(String(r.error.message||r.error),false);return;} msg(existing?'✓ Declaración corregida. Sigue pendiente de revisión.':'✓ Dinero recogido registrado. Queda pendiente de revisión.',true); await moneyStep(); }
+"""
+          if old not in s: raise SystemExit('moneyStep block not found')
+          s=s.replace(old,new)
+          marker="const t5=e.target.closest('[data-m18-declare]'); if(t5){e.preventDefault();await declareMoney(t5.dataset.m18Declare);return;}"
+          repl=marker+" const te=e.target.closest('[data-m18-edit-declare]'); if(te){e.preventDefault();await declareMoney((state.entregas||[]).find(x=>x.id===te.dataset.m18EditDeclare)?.sesion_id);return;}"
+          if marker not in s: raise SystemExit('click marker not found')
+          s=s.replace(marker,repl)
+          p.write_text(s)
+
+          Path('supabase/m18_2_entrega_caja_una_por_sesion.sql').write_text('''-- M18.2 — una entrega de caja por sesión + edición mientras DECLARADA\nCREATE UNIQUE INDEX IF NOT EXISTS uq_entregas_caja_sesion_unica ON public.entregas_caja (sesion_id) WHERE sesion_id IS NOT NULL;\n\nCREATE OR REPLACE FUNCTION public.editar_entrega_caja(p_entrega_id uuid,p_monto_declarado numeric,p_idempotency_key uuid DEFAULT NULL::uuid)\nRETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public','pg_temp' AS $function$\nDECLARE uid uuid; e record; v_idempotente uuid;\nBEGIN\n uid:=public._validar_usuario_operacion('entregas_caja','editar');\n IF p_idempotency_key IS NULL THEN RAISE EXCEPTION 'Se requiere idempotency_key'; END IF;\n IF p_monto_declarado IS NULL OR p_monto_declarado<0 THEN RAISE EXCEPTION 'monto_declarado inválido: debe ser mayor o igual a 0.' USING ERRCODE='23514'; END IF;\n v_idempotente:=private.reclamar_idempotencia(p_idempotency_key,uid,'editar_entrega_caja',jsonb_build_object('entrega_id',p_entrega_id,'monto_declarado',p_monto_declarado));\n IF v_idempotente IS NOT NULL THEN RETURN public._entrega_caja_json(v_idempotente)||jsonb_build_object('idempotente',true); END IF;\n SELECT * INTO e FROM public.entregas_caja WHERE id=p_entrega_id FOR UPDATE;\n IF e.id IS NULL THEN RAISE EXCEPTION 'La entrega de caja no existe.' USING ERRCODE='23503'; END IF;\n IF e.estado<>'DECLARADA' THEN RAISE EXCEPTION 'Solo se puede editar una entrega todavía pendiente de revisión. Estado actual: %.',e.estado USING ERRCODE='23514'; END IF;\n UPDATE public.entregas_caja SET monto_declarado=p_monto_declarado,fecha_declaracion=now(),actualizado_en=now() WHERE id=p_entrega_id;\n UPDATE private.operaciones_idempotencia SET resultado_id=p_entrega_id WHERE idempotency_key=p_idempotency_key;\n PERFORM public.registrar_auditoria('entrega_caja','Entrega de caja editada por '||uid,'exito',p_entrega_id::text,p_idempotency_key,jsonb_build_object('monto_declarado',p_monto_declarado));\n RETURN public._entrega_caja_json(p_entrega_id);\nEND; $function$;\nGRANT EXECUTE ON FUNCTION public.editar_entrega_caja(uuid,numeric,uuid) TO authenticated;\n''')
+          Path('.github/workflows/m18_2_patch.yml').unlink()
+          PY
+          git config user.name 'battlecruiser-bot'
+          git config user.email 'battlecruiser-bot@users.noreply.github.com'
+          git add public/js/m18-ciclos-ux.js supabase/m18_2_entrega_caja_una_por_sesion.sql .github/workflows/m18_2_patch.yml
+          git commit -m 'feat: one cash declaration per session with editable pending state'
+          git push
