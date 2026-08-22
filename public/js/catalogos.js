@@ -270,3 +270,79 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true }); else boot();
 })();
+
+/* ================================================================
+   M22 — PRODUCTOS: EXPERIENCIA LIMPIA
+   No crea un segundo sistema: solo reorganiza la UI existente.
+   ================================================================ */
+(function initProductosUI22(){
+  const boot=()=>{
+    const tab=document.getElementById("tab-productos");
+    const form=document.getElementById("form-producto");
+    const lista=document.getElementById("lista-productos");
+    if(!tab||!form||!lista||document.getElementById("m22-productos-ui")) return;
+
+    const root=document.createElement("div");
+    root.id="m22-productos-ui";
+    root.innerHTML=`
+      <div class="m22-prod-head">
+        <div><div class="m22-prod-title">Productos</div><div class="m22-prod-sub">Catálogo operativo</div></div>
+        <button type="button" class="cc-accion" id="m22-agregar-producto">＋ Agregar producto</button>
+      </div>
+      <div class="m22-prod-filtros">
+        <input id="m22-prod-buscar" type="search" placeholder="Buscar producto…" autocomplete="off">
+        <select id="m22-prod-categoria"><option value="">Todas las categorías</option></select>
+        <select id="m22-prod-estado"><option value="">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select>
+      </div>
+    `;
+    tab.insertBefore(root,tab.firstChild);
+
+    const formHost=form.closest(".card")||form.parentElement;
+    if(formHost){
+      formHost.id=formHost.id||"m22-producto-form-host";
+      formHost.classList.add("m22-form-host","hidden");
+      const close=document.createElement("button");
+      close.type="button";close.id="m22-cerrar-form";close.className="icon-btn";close.textContent="×";close.setAttribute("aria-label","Cerrar");
+      const heading=document.createElement("div");heading.className="m22-form-head";heading.innerHTML='<h3>Agregar producto</h3><p>Define la presentación obligatoria antes de guardar.</p>';
+      formHost.insertBefore(close,formHost.firstChild);formHost.insertBefore(heading,close.nextSibling);
+    }
+
+    const buscar=document.getElementById("m22-prod-buscar");
+    const cat=document.getElementById("m22-prod-categoria");
+    const estado=document.getElementById("m22-prod-estado");
+    const llenarCategorias=()=>{
+      const rows=Array.isArray(window._cache?.categorias)?window._cache.categorias:[];
+      const actual=cat.value;
+      cat.innerHTML='<option value="">Todas las categorías</option>';
+      [...rows].filter(x=>x.activo!==false).sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'')).forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.nombre;cat.appendChild(o)});
+      if(actual)cat.value=actual;
+    };
+    const filtrar=()=>{
+      const q=(buscar.value||'').trim().toLowerCase();const c=cat.value;const e=estado.value;
+      [...lista.children].forEach(item=>{
+        if(!item.classList.contains('lista-item')) return;
+        const texto=(item.textContent||'').toLowerCase();
+        const productoId=item.dataset.ctxId||'';
+        const p=(window._cache?.productos||[]).find(x=>x.id===productoId);
+        const okQ=!q||texto.includes(q);const okC=!c||p?.categoria_id===c;const okE=!e||(e==='activo'&&p?.activo!==false)||(e==='inactivo'&&p?.activo===false);
+        item.classList.toggle('m22-filter-hidden',!(okQ&&okC&&okE));
+      });
+    };
+    buscar.addEventListener('input',filtrar);cat.addEventListener('change',filtrar);estado.addEventListener('change',filtrar);
+    document.getElementById("m22-agregar-producto").addEventListener('click',()=>{
+      formHost.classList.remove('hidden');formHost.scrollIntoView({behavior:'smooth',block:'center'});
+    });
+    document.getElementById("m22-cerrar-form").addEventListener('click',()=>{formHost.classList.add('hidden');if(typeof cancelarEdicionProducto==='function')cancelarEdicionProducto()});
+
+    const original=window.refrescarProductos;
+    if(typeof original==='function'&&!original.__m22){
+      const wrapped=async function(){const r=await original.apply(this,arguments);llenarCategorias();setTimeout(filtrar,0);return r};
+      wrapped.__m22=true;window.refrescarProductos=wrapped;
+    }
+    llenarCategorias();setTimeout(filtrar,200);
+
+    const observer=new MutationObserver(()=>{llenarCategorias();filtrar()});
+    observer.observe(lista,{childList:true,subtree:false});
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else setTimeout(boot,250);
+})();
