@@ -1,12 +1,58 @@
 // ==== Battlecruiser · app.js ====
-// Misión de modularización: este archivo dejó de contener la lógica de la
-// aplicación. Todo el código que antes vivía acá ahora está dividido en
-// módulos dentro de public/js/ (ver lista y orden de carga en index.html).
-//
-// Misión 9.3 T6: el panel contextual se carga al final para no alterar el
-// orden histórico de los módulos de negocio.
-// Misión 9.3 T8: configuración/mantenimiento se carga tras los módulos base.
-// Misión 9.3 T9: catálogo avanzado (filtros) tras productos.
+// Misión de modularización: cargador de módulos + hotfixes de integración.
+
+(function hotfixV923() {
+  const VERSION = "9.2.3";
+  const aplicar = () => {
+    const input = document.getElementById("email");
+    const label = document.querySelector('label[for="email"]');
+    if (input) {
+      input.type = "text";
+      input.required = true;
+      input.autocomplete = "username";
+      input.placeholder = "Tu usuario";
+      input.removeAttribute("pattern");
+      input.removeAttribute("inputmode");
+    }
+    if (label) label.textContent = "Usuario";
+    document.querySelectorAll(".footnote, .app-footer-version").forEach(el => {
+      el.textContent = `v${VERSION} — BattleCruiser`;
+    });
+
+    ["update-app-btn-login", "update-app-btn"].forEach(id => {
+      const old = document.getElementById(id);
+      if (!old || old.dataset.v923 === "1") return;
+      const btn = old.cloneNode(true);
+      old.replaceWith(btn);
+      btn.dataset.v923 = "1";
+      btn.addEventListener("click", async () => {
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Actualizando…";
+        try {
+          if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+          }
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.filter(k => k.startsWith("battlecruiser-shell-")).map(k => caches.delete(k)));
+          }
+        } catch (e) {
+          console.warn("[BattleCruiser] actualización: limpieza parcial", e);
+        }
+        // Cache-bust real: evita recargar exactamente la misma URL cacheada.
+        const u = new URL(location.href);
+        u.searchParams.set("bc_update", `${VERSION}-${Date.now()}`);
+        location.replace(u.toString());
+        setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1500);
+      });
+    });
+  };
+  aplicar();
+  window.addEventListener("pageshow", aplicar);
+})();
+
 (function cargarConfiguracion() {
   if (document.querySelector('script[src*="configuracion"]')) return;
   var s = document.createElement("script");
@@ -15,7 +61,6 @@
   document.body.appendChild(s);
 })();
 
-// Misión Online/Offline — auditoría profunda y recuperación automática.
 (function cargarGuardiaOnlineOffline() {
   if (document.querySelector('script[src*="online-offline-guard"]')) return;
   var s = document.createElement("script");
@@ -24,7 +69,6 @@
   document.body.appendChild(s);
 })();
 
-// M20 — Operaciones financieras: reinversión integrada con caja + inventario.
 (function cargarOperacionesFinancieras() {
   if (document.querySelector('script[src*="operaciones-financieras"]')) return;
   var s = document.createElement("script");
@@ -33,8 +77,6 @@
   document.body.appendChild(s);
 })();
 
-// Misión 2/7 — Aprobaciones administrativas. Se carga al final para reutilizar
-// permisos, cliente Supabase, cache y Centro de Control ya inicializados.
 (function cargarAprobacionesAdmin() {
   if (document.querySelector('script[src*="aprobaciones-admin"]')) return;
   var s = document.createElement("script");
@@ -43,7 +85,6 @@
   document.body.appendChild(s);
 })();
 
-// M26 — correcciones de UX detectadas en pruebas manuales.
 (function cargarIntegridadUI() {
   if (document.querySelector('script[src*="m26-ui-integridad"]')) return;
   var s = document.createElement("script");
