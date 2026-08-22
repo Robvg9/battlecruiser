@@ -11,6 +11,8 @@
 // V1 MUTACIONES: online-only. NO toca offline.js / ejecutarOperacion / sincronizarCola.
 //
 // Misión 4.2: loading siempre con salida (timeout + finally + mensajes seguros).
+// Misión 4.3: corrige loading post-creación + sticky "backend inaccesible"
+//   (notifica marcarConectividadReal tras RPC; drena loadingCount atascado).
 
 // ---------------------------------------------------------------------------
 // Estado en memoria del módulo (no IndexedDB propio; no cola paralela)
@@ -75,14 +77,42 @@ function ciclosForzarHideLoading() {
   }
 }
 
+// Drena loadingCount atascado (show sin hide en otros módulos) y oculta overlay.
+function ciclosResetLoadingCompleto() {
+  try {
+    if (typeof resetLoadingOverlay === "function") {
+      resetLoadingOverlay();
+      return;
+    }
+    if (typeof hideLoading === "function") {
+      for (var i = 0; i < 12; i++) hideLoading();
+    }
+    var overlay = document.getElementById("global-loading-overlay");
+    if (overlay) overlay.classList.remove("visible");
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function ciclosMarcarBackendOnline() {
+  try {
+    if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+  } catch (e) { /* ignore */ }
+}
+
+function ciclosMarcarBackendOffline() {
+  try {
+    if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+  } catch (e) { /* ignore */ }
+}
+
 // ---------------------------------------------------------------------------
 // Online obligatorio (V1) — no encola
 // ---------------------------------------------------------------------------
 function ciclosRequiereOnline(msgId) {
-  if (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado()) {
-    if (msgId) ciclosSetMsg(msgId, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
-    return false;
-  }
+  // Solo bloqueo duro por dispositivo sin red.
+  // NO bloquear por _conectividadReal sticky ("backend inaccesible"):
+  // permitir el intento RPC; éxito corrige el indicador.
   if (!navigator.onLine) {
     if (msgId) ciclosSetMsg(msgId, "Sin conexión. Las operaciones de ciclos y caja requieren Internet.", false);
     return false;
@@ -138,13 +168,29 @@ async function ciclosMutar(rpcNombre, payload, msgId) {
     }
 
     if (result && result.error) {
+      if (typeof esErrorDeRed === "function" && esErrorDeRed(result.error)) {
+        ciclosMarcarBackendOffline();
+      } else {
+        // Respuesta real del backend (negocio/permiso) => backend alcanzable
+        ciclosMarcarBackendOnline();
+      }
       return { ok: false, error: result.error };
     }
+    ciclosMarcarBackendOnline();
     return { ok: true, data: ciclosNormalizarData(result && result.data) };
   } catch (e) {
+    if (typeof esErrorDeRed === "function" && esErrorDeRed(e)) {
+      ciclosMarcarBackendOffline();
+    }
+    // Timeout local de FE no implica backend caído
+    var msg = String((e && e.message) || e || "");
+    if (msg.indexOf("Tiempo de espera") === -1 && msg.indexOf("timeout") === -1) {
+      /* ya marcado si es red */
+    }
     return { ok: false, error: e };
   } finally {
     if (loadingShown) ciclosForzarHideLoading();
+    ciclosResetLoadingCompleto();
   }
 }
 
@@ -230,7 +276,7 @@ async function refrescarListaCiclos() {
     return;
   }
 
-  if (!navigator.onLine || (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado())) {
+  if (!navigator.onLine) {
     setEmpty("lista-ciclos", "⚪ Sin conexión — el listado de ciclos no está disponible offline.");
     return;
   }
@@ -271,12 +317,19 @@ async function refrescarListaCiclos() {
       }
       return;
     }
-    const filas = Array.isArray(data) ? data : data ? [data] : [];
+    // listar devuelve jsonb (array). Aceptar array u objeto suelto.
+    var filas = [];
+    if (Array.isArray(data)) filas = data;
+    else if (data && Array.isArray(data.ciclos)) filas = data.ciclos;
+    else if (data) filas = [data];
     _ciclosCache = filas;
+    ciclosMarcarBackendOnline();
     renderListaCiclos(filas);
   } catch (e) {
     setEmpty("lista-ciclos", "Error al cargar ciclos (tiempo de espera o red).");
     console.warn("[Battlecruiser] listar_ciclos_operativos:", e);
+  } finally {
+    ciclosResetLoadingCompleto();
   }
 }
 
@@ -344,10 +397,13 @@ async function mostrarDetalleCiclo(cicloId) {
       return;
     }
     _cicloDetalleActual = data;
+    ciclosMarcarBackendOnline();
     await cargarYRenderDetalleCompleto(data);
   } catch (e) {
     det.innerHTML = '<p class="lista-estado">Error al cargar el detalle del ciclo (tiempo de espera o red).</p>';
     console.warn("[Battlecruiser] obtener_ciclo_operativo:", e);
+  } finally {
+    ciclosResetLoadingCompleto();
   }
 }
 
@@ -544,7 +600,7 @@ async function crearCicloDesdeForm(e) {
     setEmpty("lista-ciclos", "Error al actualizar listado. Pulsá Refrescar.");
   } finally {
     if (btn) btn.disabled = false;
-    ciclosForzarHideLoading();
+    ciclosResetLoadingCompleto();
   }
 }
 
