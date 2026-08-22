@@ -2,25 +2,30 @@
 // Utilidades genéricas: safeInit, formato de fecha/dinero, helpers de UI de listas.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
-// ---- Config del proyecto Supabase de Battlecruiser ----
+// ---- Config del proyecto Supabase de BattleCruiser ----
 const SUPABASE_URL = "https://papxnkkjtkxsitcsvcme.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_pczHaS1JDPGrEA31vdbOLg_1l2qFhbm";
 
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// El guard global de loading debe cargarse aunque index.html provenga de una
-// versión anterior del shell. Se inicia desde core, que es el primer módulo.
-(function cargarLoadingGuard() {
-  try {
-    if (document.querySelector('script[data-battlecruiser-loading-guard="1"]')) return;
-    const s = document.createElement("script");
-    s.src = "js/loading-guard.js";
-    s.async = false;
-    s.dataset.battlecruiserLoadingGuard = "1";
-    document.head.appendChild(s);
-  } catch (e) {
-    console.warn("[BattleCruiser] No se pudo cargar loading-guard.js:", e);
+// El guard global debe instalarse DESPUÉS de todos los módulos para que sus
+// funciones showLoading/hideLoading sean las definitivas, incluso si el
+// index.html pertenece a una versión anterior del shell.
+(function programarLoadingGuard() {
+  function cargar() {
+    try {
+      if (document.querySelector('script[data-battlecruiser-loading-guard="1"]')) return;
+      const s = document.createElement("script");
+      s.src = "js/loading-guard.js";
+      s.async = false;
+      s.dataset.battlecruiserLoadingGuard = "1";
+      document.head.appendChild(s);
+    } catch (e) {
+      console.warn("[BattleCruiser] No se pudo cargar loading-guard.js:", e);
+    }
   }
+  if (document.readyState === "complete") cargar();
+  else window.addEventListener("load", cargar, { once: true });
 })();
 
 function safeInit(nombre, fn) {
@@ -65,7 +70,6 @@ function poblarSelectAlmacenes(sel, placeholder) {
   });
   if (actual) sel.value = actual;
 }
-
 
 function setLoading(listId, texto) {
   const el = document.getElementById(listId);
