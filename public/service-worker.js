@@ -34,7 +34,7 @@ const SHELL_FILES = [
   "./js/ciclos.js",
   "./js/comunicacion.js",
   "./js/panel-contextual.js",
-  "./js/manifest.json",
+  "./manifest.json",
   "./favicon.png",
   "./icons/favicon-48x48.png",
   "./icons/icon-192x192.png",
