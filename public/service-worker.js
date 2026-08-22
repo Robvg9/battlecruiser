@@ -1,3 +1,4 @@
+// v59 — reparación de carga del módulo Compras y cache-busting
 // v58 — compras múltiples: presentaciones y costo por presentación
 // v57 — compra múltiple sobre formulario existente
 // v56 — historial detalle completo basado en datos reales de RPC
@@ -7,7 +8,7 @@
 // v52 — estabilización loading global
 // v51 — Login por nombre de usuario + contraseña
 // v50 — Ciclos Operativos V1.1: estructura módulo ciclos.js
-const CACHE_NAME = "battlecruiser-shell-v58";
+const CACHE_NAME = "battlecruiser-shell-v59";
 
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js","./js/core.js","./js/auth.js","./js/offline.js","./js/loading-guard.js","./js/historial-detalle.js","./js/compra-multiple.js","./style-historiales.css",
