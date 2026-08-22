@@ -1,3 +1,4 @@
+// v76 — M22: Productos UX limpia + filtros + nomenclatura confinada a Productos
 // v75 — Misión 2/7: aprobaciones administrativas + corrección de monto/cantidad real
 // v74 — M21: Turnos UX + puente de navegación + entrega de inventario + cuadre unificado
 // v73 — M21: Turnos UX 1-5 + entrega de inventario + siguiente turno + cuadre unificado
@@ -5,7 +6,7 @@
 // v71 — M20: caja + reinversiones + operaciones financieras
 // v70 — aprobación administrativa M19: gastos, mermas y bajas
 // v69 — inyección segura de aprobaciones administrativas en el shell
-const CACHE_NAME = "battlecruiser-shell-v75";
+const CACHE_NAME = "battlecruiser-shell-v76";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js","./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js","./js/historial-detalle.js","./js/compra-multiple.js","./js/compra-vale-style.js","./js/movimiento-multiple.js","./js/inventario-detalle.js","./js/runtime-guards.js","./style-historiales.css",
   "./js/centro-control.js","./js/navegacion.js","./js/ciclos-unificacion.js","./js/productos.js","./js/presentaciones.js","./js/almacenes.js","./js/transferencias.js","./js/vales.js","./js/ventas.js","./js/venta-turno-ui.js","./js/catalogos.js","./js/configuracion.js","./js/ui-revision-2026-08.js","./js/catalogo-avanzado.js","./js/usuarios-permisos.js","./js/mando.js","./js/reportes.js","./js/nucleo-operativo.js","./js/operacion-humana.js","./js/ciclos.js","./js/m18-ciclos-ux.js","./js/comunicacion.js","./js/panel-contextual.js","./js/aprobaciones-admin.js","./js/operaciones-financieras.js","./js/manifest.json","./favicon.png","./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png","./icons/icon-maskable-512x512.png","./icons/icon.svg"
