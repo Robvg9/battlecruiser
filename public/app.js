@@ -18,39 +18,15 @@
   s.async = false;
   document.body.appendChild(s);
 })();
-(function cargarCatalogoAvanzado() {
-  if (document.querySelector('script[src*="catalogo-avanzado"]')) return;
-  var s = document.createElement("script");
-  s.src = "js/catalogo-avanzado.js";
-  s.async = false;
-  document.body.appendChild(s);
-})();
-(function cargarPanelContextual() {
-  if (document.querySelector('script[src*="panel-contextual"]')) return;
-  var s = document.createElement("script");
-  s.src = "js/panel-contextual.js";
-  s.async = false;
-  document.body.appendChild(s);
-})();
-(function cargarHistorialDetalle() {
-  if (document.querySelector('script[src*="historial-detalle"]')) return;
-  var s = document.createElement("script");
-  s.src = "js/historial-detalle.js";
-  s.async = false;
-  document.body.appendChild(s);
-})();
 
-// El loading guard se instala al final de la carga del documento, después de
-// todos los módulos estáticos. Así reemplaza el controlador global anterior
-// sin tocar IndexedDB, Supabase ni las operaciones de negocio.
-(function cargarLoadingGuard() {
-  function cargar() {
-    if (document.querySelector('script[src*="loading-guard"]')) return;
-    var s = document.createElement("script");
-    s.src = "js/loading-guard.js";
-    s.async = false;
-    document.body.appendChild(s);
-  }
-  if (document.readyState === "complete") cargar();
-  else window.addEventListener("load", cargar, { once: true });
+// Misión Online/Offline — auditoría profunda y recuperación automática.
+// Se carga al final porque app.js es el último módulo del shell: en ese punto
+// offline.js, auth y el resto de módulos ya existen. La guardia no crea una
+// segunda caché ni una segunda cola; endurece las funciones existentes.
+(function cargarGuardiaOnlineOffline() {
+  if (document.querySelector('script[src*="online-offline-guard"]')) return;
+  var s = document.createElement("script");
+  s.src = "js/online-offline-guard.js";
+  s.async = false;
+  document.body.appendChild(s);
 })();
