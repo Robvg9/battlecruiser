@@ -17,6 +17,14 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cargar,{once:true}); else cargar();
 })();
 
+(function cargarModuloCompraMultiple(){
+  function cargar(){
+    if(document.querySelector('script[data-battlecruiser-compra-multiple="1"]')) return;
+    const s=document.createElement('script'); s.src='js/compra-multiple.js'; s.async=false; s.dataset.battlecruiserCompraMultiple='1'; document.head.appendChild(s);
+  }
+  cargar();
+})();
+
 (function programarLoadingGuard() {
   function cargar() {
     try {
