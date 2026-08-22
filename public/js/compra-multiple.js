@@ -14,17 +14,17 @@
   }
 
   function init(){
-    if(document.getElementById('tab-compra-multiple')) return;
+    if(document.getElementById('tab-compras')) return;
     const tabs=document.getElementById('tabs');
     const main=document.querySelector('.main-content');
     if(!tabs||!main) return;
 
     const tab=document.createElement('button');
-    tab.type='button'; tab.className='tab-btn'; tab.id='tab-compra-multiple'; tab.dataset.tab='compra-multiple'; tab.textContent='Compras';
+    tab.type='button'; tab.className='tab-btn'; tab.id='btn-tab-compras'; tab.dataset.tab='compras'; tab.textContent='Compras';
     tabs.insertBefore(tab, tabs.querySelector('[data-tab="transferencias"]') || null);
 
     const section=document.createElement('section');
-    section.id='tab-compra-multiple'; section.className='tab-panel';
+    section.id='tab-compras'; section.className='tab-panel';
     section.innerHTML=`
       <div class="seccion-cuerpo compra-multiple-panel">
         <div class="seccion-principal">
