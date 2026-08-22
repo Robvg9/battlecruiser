@@ -1,0 +1,14 @@
+/* BattleCruiser — UX común de historiales */
+.rep-fila{cursor:pointer;position:relative;transition:transform .12s ease,background .12s ease;}
+.rep-fila:hover{transform:translateY(-1px);}
+.rep-fila::after{content:'›';position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:22px;opacity:.45;}
+#historial-detalle-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;}
+.historial-detalle-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(3px);}
+.historial-detalle-card{position:relative;z-index:1;width:min(680px,100%);max-height:88vh;overflow:auto;background:var(--void,#101612);border:1px solid var(--gold-dim,#8a7038);border-radius:10px;box-shadow:0 18px 60px rgba(0,0,0,.5);padding:22px;}
+.historial-detalle-card h2{margin:0 42px 18px 0;color:var(--gold,#c9a24d);font-family:'Cormorant Garamond',serif;font-size:28px;}
+.historial-detalle-close{position:absolute;right:12px;top:10px;border:0;background:transparent;color:var(--text,#eee);font-size:30px;cursor:pointer;line-height:1;}
+.historial-detalle-row{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(0,1.3fr);gap:12px;padding:10px 0;border-bottom:1px solid rgba(201,162,77,.15);}
+.historial-detalle-row span{color:var(--mist,#aaa);font-size:12px;overflow-wrap:anywhere;}
+.historial-detalle-row strong{color:var(--text,#eee);font-weight:500;overflow-wrap:anywhere;}
+.historial-detalle-text{line-height:1.65;white-space:normal;color:var(--text,#eee);}
+@media(max-width:520px){.historial-detalle-row{grid-template-columns:1fr;gap:3px}.historial-detalle-card{padding:18px}}
