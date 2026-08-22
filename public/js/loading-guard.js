@@ -1,8 +1,5 @@
 // ==== BattleCruiser · js/loading-guard.js ====
-// Misión: estabilización definitiva del overlay global de carga.
-// Se instala DESPUÉS de los módulos existentes y sustituye el contador
-// global anterior por un controlador independiente de operaciones activas.
-// No toca IndexedDB, Supabase ni la lógica de negocio.
+// Control global del overlay de carga + recuperación ante estados residuales.
 (function instalarLoadingGuard() {
   "use strict";
 
@@ -29,14 +26,23 @@
       timer = null;
     }
     var el = document.getElementById("global-loading-overlay");
-    if (el) el.classList.remove("visible");
+    if (el) {
+      el.classList.remove("visible");
+      el.style.display = "none";
+    }
+  }
+
+  function mostrar() {
+    var el = obtenerOverlay();
+    el.style.display = "flex";
+    el.classList.add("visible");
   }
 
   function vigilar() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(function () {
       if (activos > 0) {
-        console.error("[Battlecruiser] Loading global excedió 35s; se fuerza recuperación de UI.", {
+        console.error("[BattleCruiser] Loading global excedió 35s; se fuerza recuperación de UI.", {
           operaciones_activas: activos,
         });
         activos = 0;
@@ -45,13 +51,9 @@
     }, MAX_LOADING_MS);
   }
 
-  // Descarta cualquier estado residual creado por la implementación anterior.
-  var viejo = document.getElementById("global-loading-overlay");
-  if (viejo) viejo.classList.remove("visible");
-
   window.showLoading = function () {
     activos += 1;
-    obtenerOverlay().classList.add("visible");
+    mostrar();
     if (activos === 1) vigilar();
   };
 
@@ -74,5 +76,34 @@
     }
   };
 
-  console.info("[Battlecruiser] Loading guard activo.");
+  // La autenticación puede emitir SIGNED_IN antes de que la promesa de
+  // signInWithPassword termine. Si eso ocurre, el loading iniciado por el
+  // formulario no debe bloquear la aplicación aunque esa promesa se demore.
+  function instalarRecuperacionAuth() {
+    if (typeof client === "undefined" || !client.auth) return;
+    try {
+      client.auth.onAuthStateChange(function (event, session) {
+        if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+          window.resetLoadingOverlay();
+        }
+      });
+      client.auth.getSession().then(function (resultado) {
+        if (resultado && resultado.data && resultado.data.session) {
+          window.resetLoadingOverlay();
+        }
+      }).catch(function () {});
+    } catch (e) {
+      console.warn("[BattleCruiser] No se pudo instalar recuperación de loading por Auth:", e);
+    }
+  }
+
+  // Limpia cualquier overlay residual que pudiera existir antes de instalar el guard.
+  var viejo = document.getElementById("global-loading-overlay");
+  if (viejo) {
+    viejo.classList.remove("visible");
+    viejo.style.display = "none";
+  }
+
+  instalarRecuperacionAuth();
+  console.info("[BattleCruiser] Loading guard activo.");
 })();
