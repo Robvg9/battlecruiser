@@ -10,9 +10,9 @@
 //
 // V1 MUTACIONES: online-only. NO toca offline.js / ejecutarOperacion / sincronizarCola.
 //
-// Misión 4.2: loading siempre con salida (timeout + finally + mensajes seguros).
-// Misión 4.3: corrige loading post-creación + sticky "backend inaccesible"
-//   (notifica marcarConectividadReal tras RPC; drena loadingCount atascado).
+// Misión 4.2–4.4: loading con salida (timeout + finally).
+// Conectividad: notifica marcarConectividadReal tras RPC.
+// Overlay: usa resetLoadingOverlay() global de offline.js (sin drenar contador).
 
 // ---------------------------------------------------------------------------
 // Estado en memoria del módulo (no IndexedDB propio; no cola paralela)
@@ -77,18 +77,14 @@ function ciclosForzarHideLoading() {
   }
 }
 
-// Drena loadingCount atascado (show sin hide en otros módulos) y oculta overlay.
+// Cierre seguro del overlay global (API en offline.js).
 function ciclosResetLoadingCompleto() {
   try {
     if (typeof resetLoadingOverlay === "function") {
       resetLoadingOverlay();
       return;
     }
-    if (typeof hideLoading === "function") {
-      for (var i = 0; i < 12; i++) hideLoading();
-    }
-    var overlay = document.getElementById("global-loading-overlay");
-    if (overlay) overlay.classList.remove("visible");
+    if (typeof hideLoading === "function") hideLoading();
   } catch (e) {
     /* ignore */
   }
@@ -189,8 +185,10 @@ async function ciclosMutar(rpcNombre, payload, msgId) {
     }
     return { ok: false, error: e };
   } finally {
-    if (loadingShown) ciclosForzarHideLoading();
-    ciclosResetLoadingCompleto();
+    if (loadingShown) {
+      if (typeof resetLoadingOverlay === "function") resetLoadingOverlay();
+      else ciclosForzarHideLoading();
+    }
   }
 }
 
@@ -328,8 +326,6 @@ async function refrescarListaCiclos() {
   } catch (e) {
     setEmpty("lista-ciclos", "Error al cargar ciclos (tiempo de espera o red).");
     console.warn("[Battlecruiser] listar_ciclos_operativos:", e);
-  } finally {
-    ciclosResetLoadingCompleto();
   }
 }
 
@@ -402,8 +398,6 @@ async function mostrarDetalleCiclo(cicloId) {
   } catch (e) {
     det.innerHTML = '<p class="lista-estado">Error al cargar el detalle del ciclo (tiempo de espera o red).</p>';
     console.warn("[Battlecruiser] obtener_ciclo_operativo:", e);
-  } finally {
-    ciclosResetLoadingCompleto();
   }
 }
 
@@ -600,7 +594,8 @@ async function crearCicloDesdeForm(e) {
     setEmpty("lista-ciclos", "Error al actualizar listado. Pulsá Refrescar.");
   } finally {
     if (btn) btn.disabled = false;
-    ciclosResetLoadingCompleto();
+    if (typeof resetLoadingOverlay === "function") resetLoadingOverlay();
+    else ciclosForzarHideLoading();
   }
 }
 
