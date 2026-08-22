@@ -1,4 +1,3 @@
-// v57 — compras múltiples: módulo frontend + RPC
 // v56 — historial detalle completo basado en datos reales de RPC
 // v55 — historiales: filas interactivas + detalle común
 // v54 — loading guard bootstrap after all modules
@@ -6,10 +5,10 @@
 // v52 — estabilización loading global
 // v51 — Login por nombre de usuario + contraseña
 // v50 — Ciclos Operativos V1.1: estructura módulo ciclos.js
-const CACHE_NAME = "battlecruiser-shell-v57";
+const CACHE_NAME = "battlecruiser-shell-v56";
 
 const SHELL_FILES = [
-  "./index.html","./style.css","./app.js","./js/core.js","./js/auth.js","./js/offline.js","./js/loading-guard.js","./js/historial-detalle.js","./js/compras.js","./style-historiales.css",
+  "./index.html","./style.css","./app.js","./js/core.js","./js/auth.js","./js/offline.js","./js/loading-guard.js","./js/historial-detalle.js","./style-historiales.css",
   "./js/centro-control.js","./js/navegacion.js","./js/productos.js","./js/presentaciones.js","./js/almacenes.js","./js/transferencias.js","./js/vales.js","./js/ventas.js","./js/venta-turno-ui.js","./js/catalogos.js","./js/configuracion.js","./js/catalogo-avanzado.js","./js/usuarios-permisos.js","./js/mando.js","./js/reportes.js","./js/nucleo-operativo.js","./js/operacion-humana.js","./js/ciclos.js","./js/comunicacion.js","./js/panel-contextual.js","./js/manifest.json","./favicon.png","./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png","./icons/icon-maskable-512x512.png","./icons/icon.svg"
 ];
 const CDN_FILES=["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
