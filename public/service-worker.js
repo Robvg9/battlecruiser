@@ -1,3 +1,4 @@
+// v52 — estabilización loading global
 // v51 — Login por nombre de usuario + contraseña
 // v50 — Ciclos Operativos V1.1: estructura módulo ciclos.js
 // v49 — Sesión 8: selector almacén al abrir turno (M14)
@@ -5,7 +6,7 @@
 // v47 — Sesión 6: venta-turno-ui.js + restore index
 // v46 — Sesión 6: ventas gobernadas por almacén del turno
 // v45 — post-9.3: fix Ver todos + filtros T9
-const CACHE_NAME = "battlecruiser-shell-v51";
+const CACHE_NAME = "battlecruiser-shell-v52";
 
 const SHELL_FILES = [
   "./index.html",
@@ -14,6 +15,7 @@ const SHELL_FILES = [
   "./js/core.js",
   "./js/auth.js",
   "./js/offline.js",
+  "./js/loading-guard.js",
   "./js/centro-control.js",
   "./js/navegacion.js",
   "./js/productos.js",
