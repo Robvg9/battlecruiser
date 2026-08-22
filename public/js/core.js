@@ -20,9 +20,9 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 (function cargarModuloCompraMultiple(){
   function cargar(){
     if(document.querySelector('script[data-battlecruiser-compra-multiple="1"]')) return;
-    const s=document.createElement('script'); s.src='js/compra-multiple.js?v=58'; s.async=false; s.dataset.battlecruiserCompraMultiple='1'; document.head.appendChild(s);
+    const s=document.createElement('script'); s.src='js/compra-multiple.js?v=59'; s.async=false; s.dataset.battlecruiserCompraMultiple='1'; document.head.appendChild(s);
   }
-  cargar();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cargar,{once:true}); else cargar();
 })();
 
 (function programarLoadingGuard() {
