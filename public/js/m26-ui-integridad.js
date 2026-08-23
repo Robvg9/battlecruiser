@@ -1,5 +1,5 @@
 // BattleCruiser — M26 UI integridad
-// v9.2.23 — Productos: formulario de creación/edición en ventana emergente única
+// v9.2.26 — Productos: modal según diseño (imagen der., presentaciones, Guardar full-width)
 (function () {
   'use strict';
 
@@ -78,25 +78,135 @@
     if (m22Btn) m22Btn.remove();
     var m22Close = document.getElementById('m22-cerrar-form');
     if (m22Close) m22Close.remove();
-    var modalUi = document.getElementById('bc-product-modal');
-    if (modalUi) modalUi.remove();
     var toolbarUi = document.querySelector('.bc-product-toolbar');
     if (toolbarUi) toolbarUi.remove();
+    var legacyModal = document.getElementById('bc-product-modal');
+    if (legacyModal && !legacyModal.querySelector('#bc-product-form-host')) legacyModal.remove();
 
     panel.querySelectorAll('button').forEach(function (btn) {
       var t = (btn.textContent || '').trim().toLowerCase();
-      if ((t === 'cerrar' || t === '×') && !btn.closest('#productos-nomenclatura-modal')) btn.remove();
+      if ((t === 'cerrar' || t === '×') && !btn.closest('#productos-nomenclatura-modal') && btn.id !== 'bc-product-modal-close' && btn.id !== 'bc-product-modal-cancel') btn.remove();
     });
     panel.querySelectorAll('h1,h2,h3,h4,p,small,legend').forEach(function (el) {
       var t = (el.textContent || '').trim().toLowerCase();
       if (t === 'agregar producto' || t === 'productos' || t === 'catálogo operativo' || t === 'catalogo operativo' || t === 'presentaciones comerciales' || t === 'define la presentación obligatoria antes de guardar' || t === 'define la presentacion obligatoria antes de guardar') {
-        if (!el.closest('#form-producto') && !el.closest('#productos-nomenclatura-modal')) el.remove();
+        if (!el.closest('#form-producto') && !el.closest('#productos-nomenclatura-modal') && !el.closest('#bc-product-modal')) el.remove();
       }
     });
     panel.querySelectorAll('button').forEach(function (btn) {
       var t = (btn.textContent || '').trim().toLowerCase().replace(/^＋\s*/, '');
       if ((t === 'agregar producto' || t === '＋ agregar producto') && btn.id !== 'prod-submit-btn' && btn.id !== 'bc-productos-agregar' && btn.type !== 'submit') btn.remove();
     });
+  }
+
+  function ocultarCampoUnidad(form) {
+    if (!form) return;
+    var unidad = document.getElementById('prod-unidad');
+    if (unidad) {
+      unidad.value = '';
+      unidad.removeAttribute('required');
+      unidad.setAttribute('aria-hidden', 'true');
+      unidad.tabIndex = -1;
+      unidad.style.display = 'none';
+      var wrap = unidad.closest('.field');
+      if (wrap) {
+        wrap.style.display = 'none';
+        wrap.setAttribute('aria-hidden', 'true');
+      }
+    }
+    var dl = document.getElementById('unidades-comunes');
+    if (dl) dl.style.display = 'none';
+  }
+
+  function aplicarLayoutFormularioProducto(form) {
+    if (!form) return;
+    ocultarCampoUnidad(form);
+    if (form.dataset.bcLayoutV925 === '1') return;
+
+    var nombre = document.getElementById('prod-nombre');
+    var categoria = document.getElementById('prod-categoria');
+    var normal = document.getElementById('prod-precio-normal');
+    var mayorista = document.getElementById('prod-precio-mayorista');
+    var imageWrap = form.querySelector('.prod-imagen-campo');
+    var presCfg = document.getElementById('prod-presentaciones-config');
+    var submitBtn = document.getElementById('prod-submit-btn');
+    var cancelEdit = document.getElementById('prod-cancelar-edicion');
+    var editId = document.getElementById('prod-editando-id');
+
+    if (!nombre || !categoria || !normal || !mayorista || !imageWrap || !submitBtn) return;
+
+    var top = document.createElement('div');
+    top.className = 'bc-product-form-top';
+    var left = document.createElement('div');
+    left.className = 'bc-product-form-fields';
+    var right = document.createElement('div');
+    right.className = 'bc-product-form-image';
+
+    function fieldBlock(el, labelText) {
+      var box = document.createElement('div');
+      box.className = 'bc-product-field';
+      var lab = document.createElement('label');
+      lab.textContent = labelText;
+      if (el.id) lab.setAttribute('for', el.id);
+      box.appendChild(lab);
+      box.appendChild(el);
+      return box;
+    }
+
+    left.appendChild(fieldBlock(nombre, 'Nombre'));
+    left.appendChild(fieldBlock(categoria, 'Categoría'));
+    left.appendChild(fieldBlock(normal, 'Precio normal'));
+    left.appendChild(fieldBlock(mayorista, 'Precio mayorista'));
+    right.appendChild(imageWrap);
+    top.appendChild(left);
+    top.appendChild(right);
+
+    var presSection = document.createElement('div');
+    presSection.className = 'bc-product-form-pres';
+    if (presCfg) {
+      var presTitle = document.createElement('div');
+      presTitle.className = 'bc-product-form-pres-title';
+      presTitle.textContent = 'Presentación';
+      presSection.appendChild(presTitle);
+      presSection.appendChild(presCfg);
+    }
+
+    var actions = document.createElement('div');
+    actions.className = 'bc-product-form-actions';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.id = 'bc-product-modal-cancel';
+    cancelBtn.className = 'cc-accion';
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      cerrarModalProducto(true);
+    });
+    if (cancelEdit) {
+      cancelEdit.classList.add('hidden');
+      cancelEdit.style.display = 'none';
+    }
+    actions.appendChild(cancelBtn);
+    actions.appendChild(submitBtn);
+
+    // Reordenar sin destruir nodos (conserva listeners de safeInit / catalogos)
+    var unidad = document.getElementById('prod-unidad');
+    var dl = document.getElementById('unidades-comunes');
+    if (editId) form.appendChild(editId);
+    form.appendChild(top);
+    if (unidad) {
+      unidad.style.display = 'none';
+      form.appendChild(unidad);
+    }
+    if (dl) {
+      dl.style.display = 'none';
+      form.appendChild(dl);
+    }
+    form.appendChild(presSection);
+    form.appendChild(actions);
+
+    form.dataset.bcLayoutV925 = '1';
+    form.classList.add('bc-producto-modal-form');
   }
 
   function asegurarModalProducto() {
@@ -108,7 +218,14 @@
       modal.id = 'bc-product-modal';
       modal.className = 'bc-product-modal hidden';
       modal.setAttribute('aria-hidden', 'true');
-      modal.innerHTML = '<div class="bc-product-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-product-modal-title"><div class="bc-product-modal-head"><h3 id="bc-product-modal-title">Agregar producto</h3><button type="button" id="bc-product-modal-close" class="bc-product-modal-close" aria-label="Cerrar">×</button></div><div id="bc-product-form-host"></div></div>';
+      modal.innerHTML =
+        '<div class="bc-product-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-product-modal-title">' +
+        '<div class="bc-product-modal-head">' +
+        '<h3 id="bc-product-modal-title">Agregar producto</h3>' +
+        '<button type="button" id="bc-product-modal-close" class="bc-product-modal-close" aria-label="Cerrar">×</button>' +
+        '</div>' +
+        '<div id="bc-product-form-host"></div>' +
+        '</div>';
       document.body.appendChild(modal);
       modal.addEventListener('click', function (e) {
         if (e.target === modal) cerrarModalProducto(true);
@@ -116,11 +233,15 @@
       var close = modal.querySelector('#bc-product-modal-close');
       if (close) close.addEventListener('click', function () { cerrarModalProducto(true); });
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) cerrarModalProducto(true);
+        if (e.key === 'Escape') {
+          var m = document.getElementById('bc-product-modal');
+          if (m && !m.classList.contains('hidden')) cerrarModalProducto(true);
+        }
       });
     }
     var host = modal.querySelector('#bc-product-form-host');
     if (host && !host.contains(form)) host.appendChild(form);
+    aplicarLayoutFormularioProducto(form);
     form.classList.remove('hidden');
     form.removeAttribute('hidden');
     form.classList.add('bc-producto-modal-form');
@@ -129,14 +250,29 @@
 
   function cerrarModalProducto(cancelar) {
     var modal = document.getElementById('bc-product-modal');
-    if (!modal) return;
     var form = document.getElementById('form-producto');
-    if (cancelar && typeof window.cancelarEdicionProducto === 'function') {
-      try { window.cancelarEdicionProducto(); } catch (e) {}
+    if (cancelar) {
+      if (typeof window.cancelarEdicionProducto === 'function') {
+        try {
+          if (!window.cancelarEdicionProducto.__bcClosing) {
+            window.cancelarEdicionProducto.__bcClosing = true;
+            try { window.cancelarEdicionProducto(); } finally { window.cancelarEdicionProducto.__bcClosing = false; }
+          }
+        } catch (e) {}
+      } else if (form) {
+        try { form.reset(); } catch (e) {}
+        var editando = document.getElementById('prod-editando-id');
+        if (editando) editando.value = '';
+      }
     }
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    if (form) form.classList.add('hidden');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    if (form) {
+      form.classList.add('hidden');
+      form.dataset.bcProductFormOpen = '0';
+    }
   }
 
   function mostrarFormularioProducto() {
@@ -150,6 +286,7 @@
     var edit = !!(editando && editando.value);
     if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
     if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
+    ocultarCampoUnidad(form);
     form.classList.remove('hidden');
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
@@ -159,16 +296,68 @@
   }
 
   function ocultarFormularioProducto() {
-    var form = document.getElementById('form-producto');
-    if (form) {
-      form.classList.add('hidden');
-      form.dataset.bcProductFormOpen = '0';
-    }
-    var modal = document.getElementById('bc-product-modal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.setAttribute('aria-hidden', 'true');
-    }
+    cerrarModalProducto(false);
+  }
+
+  function inyectarEstilosProductos() {
+    if (document.getElementById('bc-productos-simple-style')) return;
+    var style = document.createElement('style');
+    style.id = 'bc-productos-simple-style';
+    style.textContent = [
+      '#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}',
+      '#bc-productos-barra .bc-productos-search{width:100%}',
+      '#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}',
+      '#bc-productos-controles{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
+      '#bc-productos-orden{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 auto}',
+      '#bc-productos-orden button{flex:0 1 auto}',
+      '#bc-productos-orden button.active{border-color:var(--gold);color:var(--gold)}',
+      '#bc-productos-vista{display:flex;gap:6px;margin-left:auto}',
+      '#bc-productos-agregar{flex:0 0 auto;visibility:visible!important;opacity:1!important;display:inline-flex!important}',
+      '#lista-productos{display:block!important}',
+      '#lista-productos.bc-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}',
+      '#lista-productos.bc-grid>.lista-item{box-sizing:border-box;min-width:0;min-height:0;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow:hidden}',
+      '#lista-productos.bc-grid>.lista-item .producto-thumb{display:block;width:100%;height:60%;min-height:0;max-height:none;object-fit:cover;flex:0 0 60%;border-radius:7px}',
+      '#lista-productos.bc-grid>.lista-item .producto-thumb-vacia{height:60%;flex:0 0 60%;background:rgba(255,255,255,.06);border-radius:7px}',
+      '#lista-productos.bc-grid>.lista-item>span:not(.lista-item-acciones){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '#lista-productos.bc-grid>.lista-item .lista-item-acciones{display:flex;gap:4px;margin-top:auto}',
+      '#lista-productos.bc-grid>.lista-item .lista-item-acciones button{flex:1 1 0;min-width:0;padding:5px 4px;font-size:11px}',
+      /* Modal — match screenshot */
+      '#bc-product-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.72);box-sizing:border-box}',
+      '#bc-product-modal.hidden{display:none!important}',
+      '#bc-product-modal .bc-product-modal-dialog{width:min(640px,94vw);max-height:92vh;overflow:auto;background:#0f1f1a;border:1px solid rgba(201,162,77,.28);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:0}',
+      '#bc-product-modal .bc-product-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px 8px;position:sticky;top:0;background:#0f1f1a;z-index:2}',
+      '#bc-product-modal .bc-product-modal-head h3{margin:0;font-family:Cormorant Garamond,serif;font-weight:600;font-size:1.35rem;color:#c9a24d}',
+      '#bc-product-modal .bc-product-modal-close{border:0;background:transparent;color:rgba(255,255,255,.75);font-size:26px;line-height:1;cursor:pointer;padding:2px 8px}',
+      '#bc-product-modal #bc-product-form-host{padding:8px 20px 20px}',
+      '#bc-product-modal #form-producto,#bc-product-modal #form-producto.bc-producto-modal-form{display:flex!important;flex-direction:column;gap:14px}',
+      '#bc-product-modal #form-producto.hidden{display:flex!important}',
+      '#bc-product-modal #prod-unidad,#bc-product-modal #unidades-comunes{display:none!important}',
+      '#bc-product-modal .bc-product-form-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,42%);gap:16px;align-items:stretch}',
+      '#bc-product-modal .bc-product-form-fields{display:flex;flex-direction:column;gap:10px;min-width:0}',
+      '#bc-product-modal .bc-product-field{display:flex;flex-direction:column;gap:0}',
+      '#bc-product-modal .bc-product-field label{display:none}',
+      '#bc-product-modal .bc-product-field input,#bc-product-modal .bc-product-field select{width:100%;box-sizing:border-box;border-radius:10px;padding:12px 14px;background:#0a1612;border:1px solid rgba(255,255,255,.08);color:inherit}',
+      '#bc-product-modal .bc-product-field input:focus,#bc-product-modal .bc-product-field select:focus{outline:none;border-color:#c9a24d;box-shadow:0 0 0 1px rgba(201,162,77,.35)}',
+      '#bc-product-modal .bc-product-form-image{display:flex;align-items:stretch;justify-content:stretch;min-height:100%}',
+      '#bc-product-modal .prod-imagen-campo{width:100%;min-height:180px;box-sizing:border-box;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:#0a1612;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:10px;text-align:left;overflow:hidden}',
+      '#bc-product-modal .prod-imagen-campo .prod-imagen-label{font-size:10px;line-height:1.3;margin:0;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.55)}',
+      '#bc-product-modal .prod-imagen-campo input[type=file]{width:100%;font-size:12px;color:rgba(255,255,255,.7)}',
+      '#bc-product-modal .prod-imagen-preview-wrap{width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:6px}',
+      '#bc-product-modal .prod-imagen-preview{max-width:100%;max-height:110px;object-fit:cover;border-radius:8px}',
+      '#bc-product-modal .btn-quitar-imagen{font-size:11px;padding:4px 8px}',
+      '#bc-product-modal .bc-product-form-pres{margin:0}',
+      '#bc-product-modal .bc-product-form-pres-title{display:none}',
+      '#bc-product-modal .prod-pres-config{margin:0;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(10,22,18,.6)}',
+      '#bc-product-modal .prod-pres-config legend{padding:0 4px;font-weight:600;font-size:14px}',
+      '#bc-product-modal .prod-pres-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}',
+      '#bc-product-modal .bc-product-form-actions{display:flex;flex-direction:column;gap:0;border-top:none;padding-top:4px;margin-top:2px}',
+      '#bc-product-modal .bc-product-form-actions #bc-product-modal-cancel{display:none!important}',
+      '#bc-product-modal .bc-product-form-actions #prod-submit-btn{margin:0;width:100%;border:0;border-radius:12px;padding:14px 16px;font-weight:600;font-size:15px;background:#c9a24d;color:#0c1c18;cursor:pointer}',
+      '#bc-product-modal .bc-product-form-actions #prod-submit-btn:hover{filter:brightness(1.05)}',
+      '#bc-product-modal #prod-cancelar-edicion{display:none!important}',
+      '@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}#bc-product-modal{padding:8px}#bc-product-modal .bc-product-modal-dialog{width:100%;max-height:96vh;border-radius:14px}#bc-product-modal .bc-product-form-top{grid-template-columns:1fr;gap:12px}#bc-product-modal .prod-imagen-campo{min-height:140px}#bc-product-modal .prod-pres-grid{grid-template-columns:1fr}}'
+    ].join('');
+    document.head.appendChild(style);
   }
 
   function simplificarProductos() {
@@ -183,6 +372,7 @@
     form = document.getElementById('form-producto');
     if (!form) return;
     ocultarFormularioProducto();
+    inyectarEstilosProductos();
 
     var barra = document.createElement('div');
     barra.id = 'bc-productos-barra';
@@ -213,21 +403,32 @@
     vista.appendChild(fila); vista.appendChild(cuadricula); orden.appendChild(vista); controles.appendChild(orden);
 
     var agregar = document.createElement('button');
-    agregar.type = 'button'; agregar.id = 'bc-productos-agregar'; agregar.className = 'cc-accion'; agregar.textContent = 'Agregar producto'; agregar.setAttribute('aria-controls', 'form-producto');
+    agregar.type = 'button';
+    agregar.id = 'bc-productos-agregar';
+    agregar.className = 'cc-accion';
+    agregar.textContent = 'Agregar producto';
+    agregar.setAttribute('aria-controls', 'form-producto');
     agregar.addEventListener('click', function (e) {
-      e.preventDefault(); e.stopPropagation();
-      if (typeof cancelarEdicionProducto === 'function') { try { cancelarEdicionProducto(); } catch (err) {} }
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof cancelarEdicionProducto === 'function') {
+        try { cancelarEdicionProducto(); } catch (err) {}
+      }
       mostrarFormularioProducto();
     });
-    controles.appendChild(agregar); barra.appendChild(controles); panel.insertBefore(barra, panel.firstChild);
+    controles.appendChild(agregar);
+    barra.appendChild(controles);
+    panel.insertBefore(barra, panel.firstChild);
 
     if (!panel.contains(lista)) panel.appendChild(lista);
-    if (!panel.contains(form) && !document.getElementById('bc-product-form-host')) panel.appendChild(form);
 
     Array.from(panel.children).forEach(function (el) {
       if (el === barra || el === lista || el === form || el.id === 'msg-productos' || el.id === 'productos-nomenclatura-btn' || el.id === 'productos-tools-nomenclatura') return;
       var tag = (el.tagName || '').toLowerCase();
-      if (tag === 'h3' || el.id === 'form-compra' || el.classList.contains('presentaciones-panel') || el.classList.contains('productos-buscador-controles')) { el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
+      if (tag === 'h3' || el.id === 'form-compra' || el.classList.contains('presentaciones-panel') || el.classList.contains('productos-buscador-controles')) {
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      }
     });
 
     var sortMode = 'nombre-asc';
@@ -242,22 +443,38 @@
         var c = (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
         return sortMode === 'nombre-desc' ? -c : c;
       });
-      _cache.productos = arr; renderProductosLista();
+      _cache.productos = arr;
+      renderProductosLista();
     }
     orden.querySelectorAll('.bc-prod-sort').forEach(function (b) {
-      b.addEventListener('click', function () { sortMode = b.dataset.sort; orden.querySelectorAll('.bc-prod-sort').forEach(function (x) { x.classList.toggle('active', x === b); }); ordenarProductos(); });
+      b.addEventListener('click', function () {
+        sortMode = b.dataset.sort;
+        orden.querySelectorAll('.bc-prod-sort').forEach(function (x) { x.classList.toggle('active', x === b); });
+        ordenarProductos();
+      });
     });
     orden.querySelector('.bc-prod-sort').classList.add('active');
 
-    function setVista(grid) { lista.classList.toggle('bc-grid', grid); fila.classList.toggle('active', !grid); cuadricula.classList.toggle('active', grid); try { localStorage.setItem('bc-productos-vista', grid ? 'grid' : 'lista'); } catch (e) {} }
+    function setVista(grid) {
+      lista.classList.toggle('bc-grid', grid);
+      fila.classList.toggle('active', !grid);
+      cuadricula.classList.toggle('active', grid);
+      try { localStorage.setItem('bc-productos-vista', grid ? 'grid' : 'lista'); } catch (e) {}
+    }
     fila.addEventListener('click', function () { setVista(false); });
     cuadricula.addEventListener('click', function () { setVista(true); });
-    var guardada = 'lista'; try { guardada = localStorage.getItem('bc-productos-vista') || 'lista'; } catch (e) {}
+    var guardada = 'lista';
+    try { guardada = localStorage.getItem('bc-productos-vista') || 'lista'; } catch (e) {}
     setVista(guardada === 'grid');
 
     if (typeof window.cancelarEdicionProducto === 'function' && !window.cancelarEdicionProducto.__bcM26) {
       var originalCancel = window.cancelarEdicionProducto;
-      window.cancelarEdicionProducto = function () { originalCancel.apply(this, arguments); ocultarFormularioProducto(); var submitBtn = document.getElementById('prod-submit-btn'); if (submitBtn) submitBtn.textContent = 'Guardar producto'; };
+      window.cancelarEdicionProducto = function () {
+        originalCancel.apply(this, arguments);
+        var submitBtn = document.getElementById('prod-submit-btn');
+        if (submitBtn) submitBtn.textContent = 'Guardar producto';
+        if (!window.cancelarEdicionProducto.__bcClosing) ocultarFormularioProducto();
+      };
       window.cancelarEdicionProducto.__bcM26 = true;
     }
 
@@ -265,11 +482,9 @@
       form.dataset.bcM26SubmitHook = '1';
       form.addEventListener('submit', function () {
         setTimeout(function () {
-          var editando = document.getElementById('prod-editando-id');
           var msg = document.getElementById('msg-productos');
           if (msg && /creado|actualizado|✓/i.test(msg.textContent || '')) {
-            if (!editando || !editando.value) ocultarFormularioProducto();
-            else ocultarFormularioProducto();
+            ocultarFormularioProducto();
           }
         }, 500);
       });
@@ -278,42 +493,10 @@
     if (lista && !lista.dataset.bcM26EditHook) {
       lista.dataset.bcM26EditHook = '1';
       lista.addEventListener('click', function (e) {
-        if (e.target.closest('.btn-editar-producto')) setTimeout(function () { mostrarFormularioProducto(); }, 0);
+        if (e.target.closest('.btn-editar-producto')) {
+          setTimeout(function () { mostrarFormularioProducto(); }, 0);
+        }
       });
-    }
-
-    if (!document.getElementById('bc-productos-simple-style')) {
-      var style = document.createElement('style'); style.id = 'bc-productos-simple-style';
-      style.textContent = [
-        '#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}',
-        '#bc-productos-barra .bc-productos-search{width:100%}',
-        '#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}',
-        '#bc-productos-controles{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
-        '#bc-productos-orden{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 auto}',
-        '#bc-productos-orden button{flex:0 1 auto}',
-        '#bc-productos-orden button.active{border-color:var(--gold);color:var(--gold)}',
-        '#bc-productos-vista{display:flex;gap:6px;margin-left:auto}',
-        '#bc-productos-agregar{flex:0 0 auto;visibility:visible!important;opacity:1!important;display:inline-flex!important}',
-        '#lista-productos{display:block!important}',
-        '#lista-productos.bc-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}',
-        '#lista-productos.bc-grid>.lista-item{box-sizing:border-box;min-width:0;min-height:0;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow:hidden}',
-        '#lista-productos.bc-grid>.lista-item .producto-thumb{display:block;width:100%;height:60%;min-height:0;max-height:none;object-fit:cover;flex:0 0 60%;border-radius:7px}',
-        '#lista-productos.bc-grid>.lista-item .producto-thumb-vacia{height:60%;flex:0 0 60%;background:rgba(255,255,255,.06);border-radius:7px}',
-        '#lista-productos.bc-grid>.lista-item>span:not(.lista-item-acciones){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-        '#lista-productos.bc-grid>.lista-item .lista-item-acciones{display:flex;gap:4px;margin-top:auto}',
-        '#lista-productos.bc-grid>.lista-item .lista-item-acciones button{flex:1 1 0;min-width:0;padding:5px 4px;font-size:11px}',
-        '#bc-product-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.68);box-sizing:border-box}',
-        '#bc-product-modal.hidden{display:none!important}',
-        '#bc-product-modal .bc-product-modal-dialog{width:min(720px,96vw);max-height:92vh;overflow:auto;background:var(--panel,#111);border:1px solid rgba(255,255,255,.14);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45);padding:0}',
-        '#bc-product-modal .bc-product-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;background:inherit;z-index:2}',
-        '#bc-product-modal .bc-product-modal-head h3{margin:0}',
-        '#bc-product-modal .bc-product-modal-close{border:0;background:transparent;color:inherit;font-size:28px;line-height:1;cursor:pointer;padding:2px 8px}',
-        '#bc-product-modal #bc-product-form-host{padding:16px}',
-        '#bc-product-modal #form-producto{display:block!important}',
-        '#bc-product-modal #form-producto.hidden{display:block!important}',
-        '@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}#bc-product-modal{padding:8px}#bc-product-modal .bc-product-modal-dialog{width:100%;max-height:96vh;border-radius:12px}}'
-      ].join('');
-      document.head.appendChild(style);
     }
   }
 
@@ -324,19 +507,38 @@
     if (!tab || document.getElementById('bc-acceso-gasto')) return;
     var header = tab.querySelector('.pendientes-header');
     if (!header) return;
-    var btn = document.createElement('button'); btn.id = 'bc-acceso-gasto'; btn.type = 'button'; btn.className = 'cc-accion'; btn.textContent = '💸 Registrar gasto';
+    var btn = document.createElement('button');
+    btn.id = 'bc-acceso-gasto';
+    btn.type = 'button';
+    btn.className = 'cc-accion';
+    btn.textContent = '💸 Registrar gasto';
     btn.addEventListener('click', function () {
       var form = document.getElementById('form-gasto-operativo');
-      if (form) { form.scrollIntoView({ behavior: 'smooth', block: 'center' }); var input = document.getElementById('fin-g-concepto'); if (input) input.focus(); }
-      else if (typeof setMsg === 'function') setMsg('msg-operacion', 'No tienes permiso para crear gastos o el módulo todavía está cargando.', false);
+      if (form) {
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var input = document.getElementById('fin-g-concepto');
+        if (input) input.focus();
+      } else if (typeof setMsg === 'function') {
+        setMsg('msg-operacion', 'No tienes permiso para crear gastos o el módulo todavía está cargando.', false);
+      }
     });
     header.appendChild(btn);
   }
 
   function run() {
-    unificarTurnos(); ocultarCompraEnProductos(); prepararNomenclatura(); fijarNomenclaturaSoloProductos(); limpiarInterfazAgregarProducto(); simplificarProductos(); arreglarEdicionProducto(); asegurarAccesoGasto();
+    unificarTurnos();
+    ocultarCompraEnProductos();
+    prepararNomenclatura();
+    fijarNomenclaturaSoloProductos();
+    limpiarInterfazAgregarProducto();
+    simplificarProductos();
+    arreglarEdicionProducto();
+    asegurarAccesoGasto();
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 1000); });
-  else setTimeout(run, 1000);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 1000); });
+  } else {
+    setTimeout(run, 1000);
+  }
 })();
