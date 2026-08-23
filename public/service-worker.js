@@ -1,6 +1,6 @@
-// BattleCruiser Service Worker v116 — app v9.2.53
-const BC_VERSION = "9.2.53";
-const CACHE_NAME = "battlecruiser-shell-v116";
+// BattleCruiser Service Worker v117 — app v9.2.54
+const BC_VERSION = "9.2.54";
+const CACHE_NAME = "battlecruiser-shell-v117";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
@@ -13,11 +13,11 @@ const SHELL_FILES = [
   "./js/usuarios-permisos.js","./js/usuarios-permisos-rest.js","./js/roles-en-usuarios.js","./js/fix-permisos-rol.js",
   "./js/ui-layout-inteligente.js","./js/ui-usuarios-dashboard.js","./js/ui-operaciones-hub.js",
   "./js/ui-ajustes-panel.js","./js/hide-config-tab.js","./js/alta-usuario-sin-email.js",
-  "./js/permisos-navegacion.js",
+  "./js/permisos-navegacion.js","./js/ui-visual-salon.js",
   "./js/mando.js","./js/reportes.js","./js/nucleo-operativo.js","./js/operacion-humana.js",
   "./js/ciclos.js","./js/m18-ciclos-ux.js","./js/comunicacion.js","./js/panel-contextual.js",
   "./js/aprobaciones-admin.js","./js/operaciones-financieras.js",
-  "./js/m26-ui-integridad.js","./js/sesiones-operativas-ui.js","./js/ui-visual-salon.js",
+  "./js/m26-ui-integridad.js","./js/sesiones-operativas-ui.js",
   "./js/manifest.json","./favicon.png",
   "./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png",
   "./icons/icon-maskable-512x512.png","./icons/icon.svg"
