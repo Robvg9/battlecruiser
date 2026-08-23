@@ -1,8 +1,12 @@
 // ==== BattleCruiser · app.js ====
-// Capa de arranque + carga de módulos. VERSION única = cache-bust único.
-(function hotfixV9240(){
-  const VERSION="9.2.40";
+// v9.2.41 — FIX: se elimina location.reload() automático por mensaje del SW.
+// Causa raíz del bucle post-9.2.40: SW activate → BC_SW_ACTIVATED → reload →
+// re-instalación/claim → otro mensaje → reload infinito (o carga permanente).
+// Actualización = solo acción explícita del usuario (Actualizar app).
+(function hotfixV9241(){
+  const VERSION="9.2.41";
   window.__BC_VERSION__=VERSION;
+
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
@@ -24,46 +28,44 @@
             await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")||k.startsWith("battlecruiser")).map(k=>caches.delete(k)));
           }
         }catch(e){console.warn("[BattleCruiser] actualización: limpieza parcial",e);}
+        // NO IndexedDB / cola offline
         const u=new URL(location.href);
         u.searchParams.set("bc_update",`${VERSION}-${Date.now()}`);
         location.replace(u.toString());
       });
     });
   }
-  aplicarVersion();window.addEventListener("pageshow",aplicarVersion);
-  if("serviceWorker"in navigator){
-    navigator.serviceWorker.addEventListener("message",function(ev){
-      if(ev.data&&ev.data.type==="BC_SW_ACTIVATED"&&ev.data.version&&ev.data.version!==VERSION){
-        if(sessionStorage.getItem("bc_sw_reload")===ev.data.version)return;
-        sessionStorage.setItem("bc_sw_reload",ev.data.version);
-        location.reload();
-      }
-    });
-  }
+  aplicarVersion();
+  window.addEventListener("pageshow",aplicarVersion);
+  // SIN listener de BC_SW_ACTIVATED → SIN reload automático
 })();
 
 (function cargarModulosDinamicos(){
-  var V=window.__BC_VERSION__||"9.2.40";
+  var V=window.__BC_VERSION__||"9.2.41";
   function load(src){
     var name=src.split("/").pop().split("?")[0];
     if(document.querySelector('script[src*="'+name+'"]'))return;
     var s=document.createElement("script");
-    s.src=src+(src.indexOf("?")>=0?"":"?v="+V);
+    s.src=src+"?v="+encodeURIComponent(V);
     s.async=false;
+    s.onerror=function(){console.warn("[BattleCruiser] Módulo no cargó (degradado):",src);};
     document.body.appendChild(s);
   }
-  load("js/configuracion.js");
-  load("js/online-offline-guard.js");
-  load("js/operaciones-financieras.js");
-  load("js/aprobaciones-admin.js");
-  load("js/m26-ui-integridad.js");
-  load("js/sesiones-operativas-ui.js");
-  load("js/ui-visual-salon.js");
-  load("js/roles-en-usuarios.js");
-  load("js/ui-layout-inteligente.js");
-  load("js/ui-usuarios-dashboard.js");
-  load("js/ui-operaciones-hub.js");
-  load("js/fix-permisos-rol.js");
-  load("js/ui-ajustes-panel.js");
-  load("js/hide-config-tab.js");
+  // Orden fijo — independiente de viewport (PC = móvil)
+  [
+    "js/configuracion.js",
+    "js/online-offline-guard.js",
+    "js/operaciones-financieras.js",
+    "js/aprobaciones-admin.js",
+    "js/m26-ui-integridad.js",
+    "js/sesiones-operativas-ui.js",
+    "js/ui-visual-salon.js",
+    "js/roles-en-usuarios.js",
+    "js/ui-layout-inteligente.js",
+    "js/ui-usuarios-dashboard.js",
+    "js/ui-operaciones-hub.js",
+    "js/fix-permisos-rol.js",
+    "js/ui-ajustes-panel.js",
+    "js/hide-config-tab.js"
+  ].forEach(load);
 })();
