@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.56 — SW v119: network-first tolerante (evita UI antigua en red inestable)
-(function hotfixV9256(){
-  const VERSION="9.2.56";
+// v9.2.57 — matriz permisos: gastos/mermas/bajas/reinversiones visibles
+(function hotfixV9257(){
+  const VERSION="9.2.57";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -27,9 +27,9 @@
 
 (function cargarModulosDinamicos(){
   const modules=[
-    ["usuarios-permisos-rest.js","53.1"],
+    ["usuarios-permisos-rest.js","57.1"],
     ["permisos-navegacion.js","55.1"],
-    ["fix-permisos-rol.js","50.1"],
+    ["fix-permisos-rol.js","57.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","36.1"],

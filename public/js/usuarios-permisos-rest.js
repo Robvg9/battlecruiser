@@ -1,4 +1,5 @@
 // Continuación B3 admin — se carga tras usuarios-permisos.js
+// v9.2.57 — catálogo de secciones alineado con Operaciones (gastos/mermas/bajas/reinversiones)
 async function usuarioPuedeOperar() {
   if (!_usuarioActual) return false;
   if (!contextoB3Disponible()) return true;
@@ -135,10 +136,15 @@ safeInit("admin-usuarios", () => {
   });
 });
 
-const SECCIONES_PERMISOS = ["productos", "categorias", "almacenes", "stock",
+// Catálogo local de respaldo (si catalogo_permisos_admin no responde).
+// Incluye Operaciones: gastos, mermas, bajas, reinversiones.
+const SECCIONES_PERMISOS = [
+  "productos", "categorias", "almacenes", "stock",
   "transferencias", "vales_salida", "ventas", "reportes", "usuarios",
   "presentaciones", "auditoria", "turnos", "comunicacion", "unidades",
-  "ciclos", "entregas_caja"];
+  "ciclos", "entregas_caja",
+  "gastos", "mermas", "bajas", "reinversiones"
+];
 const ACCIONES_PERMISOS = ["ver", "crear", "editar", "borrar", "editar_any"];
 let _rolExpandidoId = null;
 let _permisosRolActual = [];
@@ -197,6 +203,10 @@ function renderizarRolesAdmin(roles) {
 }
 
 async function cargarYRenderizarPermisosRol(roleId, esDueno) {
+  // Si existe el renderer canónico (fix-permisos-rol), usarlo: lee catalogo_permisos_admin.
+  if (window.__bcFixPermisosRol50 && window.cargarYRenderizarPermisosRolCanonico) {
+    return window.cargarYRenderizarPermisosRolCanonico(roleId, esDueno);
+  }
   const panel = document.getElementById("rol-permisos-panel");
   if (!panel) return;
   try {
@@ -208,14 +218,26 @@ async function cargarYRenderizarPermisosRol(roleId, esDueno) {
     _permisosRolActual = data || [];
     const permitidos = new Set(_permisosRolActual.filter((p) => p.permitido).map((p) => p.seccion + "|" + p.accion));
     const disponibles = new Set(_permisosRolActual.map((p) => p.seccion + "|" + p.accion));
+    // Unir secciones del backend con el catálogo local (por si faltan filas en el rol).
+    const secciones = SECCIONES_PERMISOS.slice();
+    _permisosRolActual.forEach(function (p) {
+      if (p.seccion && secciones.indexOf(p.seccion) < 0) secciones.push(p.seccion);
+    });
     let tabla = '<table class="permisos-tabla"><thead><tr><th>Sección</th>';
     ACCIONES_PERMISOS.forEach((a) => { tabla += "<th>" + a + "</th>"; });
     tabla += "</tr></thead><tbody>";
-    SECCIONES_PERMISOS.forEach((s) => {
+    secciones.forEach((s) => {
       tabla += "<tr><td>" + s + "</td>";
       ACCIONES_PERMISOS.forEach((a) => {
         const key = s + "|" + a;
-        if (!disponibles.has(key)) { tabla += "<td>—</td>"; return; }
+        // Mostrar checkbox si existe en backend O si es una sección conocida del catálogo local
+        // (así se pueden conceder gastos/mermas aunque el rol aún no tenga la fila).
+        const conocida = SECCIONES_PERMISOS.indexOf(s) >= 0;
+        if (!disponibles.has(key) && !conocida) { tabla += "<td>—</td>"; return; }
+        if (!disponibles.has(key) && conocida && ["ver", "crear", "editar", "borrar"].indexOf(a) < 0) {
+          tabla += "<td>—</td>";
+          return;
+        }
         const checked = permitidos.has(key) ? " checked" : "";
         const disabled = esDueno ? " disabled" : "";
         tabla += '<td><input type="checkbox" class="permiso-check" data-seccion="' + s + '" data-accion="' + a + '"' + checked + disabled + '></td>';
