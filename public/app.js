@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.51 — M12-FE.2: contexto entre usuarios + menú por permisos
-(function hotfixV9251(){
-  const VERSION="9.2.51";
+// v9.2.52 — M12-FE.3: rol → permisos → menú (fail-closed, respeta permitido)
+(function hotfixV9252(){
+  const VERSION="9.2.52";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -26,9 +26,11 @@
 })();
 
 (function cargarModulosDinamicos(){
+  // Orden: autoridad de menú → fix de carga → resto
   const modules=[
-    ["permisos-navegacion.js","51.1"],
-    ["sesion-navegacion-reset.js","51.1"],
+    ["permisos-navegacion.js","52.1"],
+    ["fix-permisos-carga.js","52.1"],
+    ["sesion-navegacion-reset.js","52.1"],
     ["fix-permisos-rol.js","50.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
