@@ -1,9 +1,20 @@
 // ==== BattleCruiser · app.js ====
 // Misión de modularización: cargador de módulos + integración mínima.
-(function hotfixV9216(){
-  const VERSION="9.2.16";
+(function hotfixV9217(){
+  const VERSION="9.2.17";
 
   function aplicarVersion(){
+    const input=document.getElementById("email");
+    const label=document.querySelector('label[for="email"]');
+    if(input){
+      input.type="text";
+      input.required=true;
+      input.autocomplete="username";
+      input.placeholder="Tu usuario";
+      input.removeAttribute("pattern");
+      input.removeAttribute("inputmode");
+    }
+    if(label)label.textContent="Usuario";
     document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
     ["update-app-btn-login","update-app-btn"].forEach(id=>{
       const old=document.getElementById(id);
