@@ -1,6 +1,6 @@
-// BattleCruiser v9.2.50 — Menú ↔ permisos (única fuente de navegación)
-// Consume _permisosEfectivos construido desde permisos_usuario_actual.
-// Matriz visual de roles: ver fix-permisos-rol.js (catalogo_permisos_admin).
+// BattleCruiser v9.2.51 — M12-FE.2
+// Menú ↔ permisos (única fuente) + reset de navegación entre usuarios.
+// Consume _permisosEfectivos desde permisos_usuario_actual.
 (function () {
   "use strict";
   if (window.__BC_PERMISOS_CANONICO__) return;
@@ -31,10 +31,63 @@
     usuarios: "usuarios"
   };
 
+  // Preferencia de home al abrir sesión (primera con ver / disponible)
+  var ORDEN_HOME = [
+    "resumen", "pendientes", "ventas", "comunicacion", "productos",
+    "ciclos", "turnos", "operacion", "almacenes", "transferencias",
+    "vales", "reportes", "inventario", "movimientos", "usuarios", "mando"
+  ];
+
   function togglePorPermiso(elId, seccion, accion) {
     var el = document.getElementById(elId);
     if (!el) return;
     el.classList.toggle("hidden", !tienePermiso(seccion, accion));
+  }
+
+  /** Quita active/visible. No abre ninguna sección. */
+  function resetearNavegacionParaNuevaSesion() {
+    document.querySelectorAll(".tab-btn").forEach(function (b) {
+      b.classList.remove("active");
+    });
+    document.querySelectorAll(".tab-panel").forEach(function (p) {
+      p.classList.remove("visible");
+    });
+  }
+
+  function tabBtnDisponible(btn) {
+    if (!btn) return false;
+    if (btn.classList.contains("tab-sin-permiso") || btn.classList.contains("hidden")) return false;
+    if (btn.style.display === "none") return false;
+    if (btn.getAttribute("aria-hidden") === "true") return false;
+    return true;
+  }
+
+  /** Primera pestaña realmente autorizada (resumen si existe). */
+  function seleccionarPrimeraSeccionAutorizada() {
+    var i, tab, btn;
+    for (i = 0; i < ORDEN_HOME.length; i++) {
+      tab = ORDEN_HOME[i];
+      btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+      if (tabBtnDisponible(btn)) {
+        if (typeof irATab === "function") {
+          try { irATab(tab); } catch (e) {}
+        } else {
+          document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+          document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
+          btn.classList.add("active");
+          var panel = document.getElementById("tab-" + tab);
+          if (panel) panel.classList.add("visible");
+        }
+        return tab;
+      }
+    }
+    return null;
+  }
+
+  function panelProhibidoVisible() {
+    var activo = document.querySelector(".tab-btn.active");
+    if (!activo) return true;
+    return !tabBtnDisponible(activo);
   }
 
   function aplicarPermisosAInterfaz() {
@@ -49,9 +102,11 @@
         btn.style.display = "none";
         btn.setAttribute("aria-hidden", "true");
         btn.tabIndex = -1;
+        btn.classList.remove("active");
         return;
       }
 
+      // Home universal mientras haya sesión (no requiere fila en matriz)
       if (tab === "resumen" || tab === "pendientes") {
         if (loggedIn) {
           btn.classList.remove("hidden", "tab-sin-permiso");
@@ -82,6 +137,9 @@
         btn.setAttribute("aria-hidden", "true");
         btn.tabIndex = -1;
         btn.classList.remove("active");
+        // Panel de sección prohibida no puede quedar visible
+        var panel = document.getElementById("tab-" + tab);
+        if (panel) panel.classList.remove("visible");
       }
     });
 
@@ -96,12 +154,13 @@
     togglePorPermiso("form-unidad", "unidades", "crear");
     togglePorPermiso("form-nuevo-usuario", "usuarios", "crear");
 
-    var activo = document.querySelector(".tab-btn.active");
-    if (activo && activo.classList.contains("tab-sin-permiso")) {
-      var home = document.querySelector('.tab-btn[data-tab="resumen"]:not(.tab-sin-permiso)');
-      if (home && typeof irATab === "function") {
-        try { irATab("resumen"); } catch (e) {}
+    // Tras permisos: si no hay pestaña activa válida → home autorizado
+    if (loggedIn && (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa)) {
+      if (panelProhibidoVisible()) {
+        seleccionarPrimeraSeccionAutorizada();
       }
+    } else if (!loggedIn) {
+      resetearNavegacionParaNuevaSesion();
     }
   }
 
@@ -109,10 +168,15 @@
   window.TAB_A_SECCION = TAB_A_SECCION;
   window.aplicarPermisosAInterfaz = aplicarPermisosAInterfaz;
   window.togglePorPermiso = togglePorPermiso;
+  window.resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion;
+  window.seleccionarPrimeraSeccionAutorizada = seleccionarPrimeraSeccionAutorizada;
+
   try { tienePermiso = tienePermiso; } catch (e) {}
   try { TAB_A_SECCION = TAB_A_SECCION; } catch (e) {}
   try { aplicarPermisosAInterfaz = aplicarPermisosAInterfaz; } catch (e) {}
   try { togglePorPermiso = togglePorPermiso; } catch (e) {}
+  try { resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion; } catch (e) {}
+  try { seleccionarPrimeraSeccionAutorizada = seleccionarPrimeraSeccionAutorizada; } catch (e) {}
 
   if (!document.getElementById("bc-tab-sin-permiso-css")) {
     var st = document.createElement("style");
