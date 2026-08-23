@@ -1,5 +1,5 @@
 // BattleCruiser — M26 UI integridad
-// v9.2.27 — Productos: modal compacto (inputs no estirados en móvil)
+// v9.2.44 — Productos: form-producto NUNCA visible en la página (solo modal al pulsar Agregar/Editar)
 (function () {
   'use strict';
 
@@ -189,7 +189,6 @@
     actions.appendChild(cancelBtn);
     actions.appendChild(submitBtn);
 
-    // Reordenar sin destruir nodos (conserva listeners de safeInit / catalogos)
     var unidad = document.getElementById('prod-unidad');
     var dl = document.getElementById('unidades-comunes');
     if (editId) form.appendChild(editId);
@@ -304,6 +303,10 @@
     var style = document.createElement('style');
     style.id = 'bc-productos-simple-style';
     style.textContent = [
+      /* CRÍTICO v9.2.44: el form NUNCA se muestra inline en Productos */
+      '#tab-productos #form-producto{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important}',
+      '#form-producto:not(.bc-producto-modal-form){display:none!important}',
+      '#bc-product-modal.hidden #form-producto{display:none!important}',
       '#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}',
       '#bc-productos-barra .bc-productos-search{width:100%}',
       '#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}',
@@ -321,7 +324,6 @@
       '#lista-productos.bc-grid>.lista-item>span:not(.lista-item-acciones){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '#lista-productos.bc-grid>.lista-item .lista-item-acciones{display:flex;gap:4px;margin-top:auto}',
       '#lista-productos.bc-grid>.lista-item .lista-item-acciones button{flex:1 1 0;min-width:0;padding:5px 4px;font-size:11px}',
-      /* Modal */
       '#bc-product-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:flex-start;justify-content:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));background:rgba(0,0,0,.72);box-sizing:border-box;overflow:auto}',
       '#bc-product-modal.hidden{display:none!important}',
       '#bc-product-modal .bc-product-modal-dialog{width:min(560px,100%);max-height:none;margin:auto 0;overflow:visible;background:#0f1f1a;border:1px solid rgba(201,162,77,.28);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55);padding:0}',
@@ -329,17 +331,15 @@
       '#bc-product-modal .bc-product-modal-head h3{margin:0;font-family:Cormorant Garamond,serif;font-weight:600;font-size:1.25rem;color:#c9a24d}',
       '#bc-product-modal .bc-product-modal-close{border:0;background:transparent;color:rgba(255,255,255,.75);font-size:26px;line-height:1;cursor:pointer;padding:2px 8px}',
       '#bc-product-modal #bc-product-form-host{padding:6px 16px 16px}',
-      '#bc-product-modal #form-producto,#bc-product-modal #form-producto.bc-producto-modal-form{display:flex!important;flex-direction:column;gap:12px}',
+      '#bc-product-modal #form-producto,#bc-product-modal #form-producto.bc-producto-modal-form{display:flex!important;flex-direction:column;gap:12px;visibility:visible!important;height:auto!important;overflow:visible!important}',
       '#bc-product-modal #form-producto.hidden{display:flex!important}',
       '#bc-product-modal #prod-unidad,#bc-product-modal #unidades-comunes{display:none!important}',
-      /* Top: fields + image — NO stretch fields */
       '#bc-product-modal .bc-product-form-top{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:12px;align-items:start}',
       '#bc-product-modal .bc-product-form-fields{display:flex;flex-direction:column;gap:8px;min-width:0;align-self:start}',
       '#bc-product-modal .bc-product-field{display:block;flex:none!important;height:auto!important;min-height:0!important}',
       '#bc-product-modal .bc-product-field label{display:none}',
       '#bc-product-modal .bc-product-field input,#bc-product-modal .bc-product-field select{display:block;width:100%;height:42px!important;min-height:42px!important;max-height:42px!important;box-sizing:border-box;border-radius:10px;padding:0 12px;background:#0a1612;border:1px solid rgba(255,255,255,.1);color:inherit;line-height:42px;flex:none!important}',
       '#bc-product-modal .bc-product-field input:focus,#bc-product-modal .bc-product-field select:focus{outline:none;border-color:#c9a24d;box-shadow:0 0 0 1px rgba(201,162,77,.35)}',
-      /* Image column — fixed size, no stretch of siblings */
       '#bc-product-modal .bc-product-form-image{display:block;width:132px;align-self:start}',
       '#bc-product-modal .prod-imagen-campo{width:132px;box-sizing:border-box;padding:8px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:#0a1612;display:flex;flex-direction:column;align-items:stretch;gap:6px;text-align:left;overflow:hidden}',
       '#bc-product-modal .prod-imagen-campo .prod-imagen-label{font-size:9px;line-height:1.25;margin:0;letter-spacing:.03em;text-transform:uppercase;color:rgba(255,255,255,.5);white-space:normal}',
@@ -348,7 +348,6 @@
       '#bc-product-modal .prod-imagen-preview-wrap.hidden{display:none!important}',
       '#bc-product-modal .prod-imagen-preview{display:block;width:100%;max-width:110px;height:72px;object-fit:cover;border-radius:8px;background:rgba(255,255,255,.04)}',
       '#bc-product-modal .btn-quitar-imagen{width:100%;font-size:11px;padding:6px 8px;margin:0;border-radius:8px;line-height:1.2;white-space:normal}',
-      /* Presentaciones */
       '#bc-product-modal .bc-product-form-pres{margin:0}',
       '#bc-product-modal .bc-product-form-pres-title{display:none}',
       '#bc-product-modal .prod-pres-config{margin:0;padding:12px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(10,22,18,.55)}',
@@ -356,13 +355,11 @@
       '#bc-product-modal .prod-pres-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
       '#bc-product-modal .prod-pres-config .field label,#bc-product-modal .prod-pres-config small{font-size:11px}',
       '#bc-product-modal .prod-pres-config select,#bc-product-modal .prod-pres-config input{height:38px;min-height:38px;box-sizing:border-box}',
-      /* Actions */
       '#bc-product-modal .bc-product-form-actions{display:flex;flex-direction:column;gap:0;border-top:none;padding-top:2px;margin-top:0}',
       '#bc-product-modal .bc-product-form-actions #bc-product-modal-cancel{display:none!important}',
       '#bc-product-modal .bc-product-form-actions #prod-submit-btn{margin:0;width:100%;border:0;border-radius:12px;padding:13px 16px;font-weight:600;font-size:15px;background:#c9a24d;color:#0c1c18;cursor:pointer;height:auto!important;min-height:0!important}',
       '#bc-product-modal .bc-product-form-actions #prod-submit-btn:hover{filter:brightness(1.05)}',
       '#bc-product-modal #prod-cancelar-edicion{display:none!important}',
-      /* Override any global .inline-form rules that stretch children */
       '#bc-product-modal #form-producto.inline-form{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:12px!important}',
       '#bc-product-modal #form-producto.inline-form>*{flex:none!important;width:auto}',
       '#bc-product-modal #form-producto.inline-form input,#bc-product-modal #form-producto.inline-form select{flex:none!important}',
@@ -373,110 +370,118 @@
 
   function simplificarProductos() {
     var panel = document.getElementById('tab-productos');
-    if (!panel || panel.dataset.bcSimple === '1') return;
+    if (!panel) return false;
     var form = document.getElementById('form-producto');
     var lista = document.getElementById('lista-productos');
     var buscar = document.getElementById('productos-buscar');
-    if (!form || !lista || !buscar || typeof renderProductosLista !== 'function') return;
+    if (!form || !lista || !buscar || typeof renderProductosLista !== 'function') return false;
+
+    // Siempre: CSS + ocultar form (idempotente, aunque ya se haya simplificado)
+    inyectarEstilosProductos();
+    asegurarModalProducto();
+    ocultarFormularioProducto();
+
+    if (panel.dataset.bcSimple === '1') return true;
     panel.dataset.bcSimple = '1';
     limpiarInterfazAgregarProducto();
     form = document.getElementById('form-producto');
-    if (!form) return;
+    if (!form) return false;
     ocultarFormularioProducto();
-    inyectarEstilosProductos();
 
-    var barra = document.createElement('div');
-    barra.id = 'bc-productos-barra';
-    barra.className = 'bc-productos-barra';
-    var searchWrap = document.createElement('div');
-    searchWrap.className = 'bc-productos-search';
-    var parent = buscar.parentElement;
-    searchWrap.appendChild(buscar);
-    if (parent && parent !== panel && parent !== searchWrap) parent.style.display = 'none';
-    barra.appendChild(searchWrap);
+    if (!document.getElementById('bc-productos-barra')) {
+      var barra = document.createElement('div');
+      barra.id = 'bc-productos-barra';
+      barra.className = 'bc-productos-barra';
+      var searchWrap = document.createElement('div');
+      searchWrap.className = 'bc-productos-search';
+      var parent = buscar.parentElement;
+      searchWrap.appendChild(buscar);
+      if (parent && parent !== panel && parent !== searchWrap) parent.style.display = 'none';
+      barra.appendChild(searchWrap);
 
-    var controles = document.createElement('div');
-    controles.id = 'bc-productos-controles';
-    controles.className = 'bc-productos-controles';
-    var orden = document.createElement('div');
-    orden.id = 'bc-productos-orden';
-    orden.className = 'bc-productos-orden';
-    [['nombre-asc', 'A–Z'], ['nombre-desc', 'Z–A'], ['categoria', 'Categoría']].forEach(function (pair) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'cc-accion bc-prod-sort'; b.dataset.sort = pair[0]; b.textContent = pair[1]; orden.appendChild(b);
-    });
-    var vista = document.createElement('div');
-    vista.id = 'bc-productos-vista'; vista.className = 'bc-productos-vista';
-    var fila = document.createElement('button');
-    fila.type = 'button'; fila.className = 'cc-accion active'; fila.textContent = '☰'; fila.title = 'Vista en filas';
-    var cuadricula = document.createElement('button');
-    cuadricula.type = 'button'; cuadricula.className = 'cc-accion'; cuadricula.textContent = '■ ■ ■ ■'; cuadricula.title = 'Vista en cuadros';
-    vista.appendChild(fila); vista.appendChild(cuadricula); orden.appendChild(vista); controles.appendChild(orden);
+      var controles = document.createElement('div');
+      controles.id = 'bc-productos-controles';
+      controles.className = 'bc-productos-controles';
+      var orden = document.createElement('div');
+      orden.id = 'bc-productos-orden';
+      orden.className = 'bc-productos-orden';
+      [['nombre-asc', 'A–Z'], ['nombre-desc', 'Z–A'], ['categoria', 'Categoría']].forEach(function (pair) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'cc-accion bc-prod-sort'; b.dataset.sort = pair[0]; b.textContent = pair[1]; orden.appendChild(b);
+      });
+      var vista = document.createElement('div');
+      vista.id = 'bc-productos-vista'; vista.className = 'bc-productos-vista';
+      var fila = document.createElement('button');
+      fila.type = 'button'; fila.className = 'cc-accion active'; fila.textContent = '☰'; fila.title = 'Vista en filas';
+      var cuadricula = document.createElement('button');
+      cuadricula.type = 'button'; cuadricula.className = 'cc-accion'; cuadricula.textContent = '■ ■ ■ ■'; cuadricula.title = 'Vista en cuadros';
+      vista.appendChild(fila); vista.appendChild(cuadricula); orden.appendChild(vista); controles.appendChild(orden);
 
-    var agregar = document.createElement('button');
-    agregar.type = 'button';
-    agregar.id = 'bc-productos-agregar';
-    agregar.className = 'cc-accion';
-    agregar.textContent = 'Agregar producto';
-    agregar.setAttribute('aria-controls', 'form-producto');
-    agregar.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof cancelarEdicionProducto === 'function') {
-        try { cancelarEdicionProducto(); } catch (err) {}
-      }
-      mostrarFormularioProducto();
-    });
-    controles.appendChild(agregar);
-    barra.appendChild(controles);
-    panel.insertBefore(barra, panel.firstChild);
-
-    if (!panel.contains(lista)) panel.appendChild(lista);
-
-    Array.from(panel.children).forEach(function (el) {
-      if (el === barra || el === lista || el === form || el.id === 'msg-productos' || el.id === 'productos-nomenclatura-btn' || el.id === 'productos-tools-nomenclatura') return;
-      var tag = (el.tagName || '').toLowerCase();
-      if (tag === 'h3' || el.id === 'form-compra' || el.classList.contains('presentaciones-panel') || el.classList.contains('productos-buscador-controles')) {
-        el.style.display = 'none';
-        el.setAttribute('aria-hidden', 'true');
-      }
-    });
-
-    var sortMode = 'nombre-asc';
-    function ordenarProductos() {
-      if (typeof _cache === 'undefined' || !Array.isArray(_cache.productos)) return;
-      var arr = _cache.productos.slice();
-      arr.sort(function (a, b) {
-        if (sortMode === 'categoria') {
-          var ca = ((a.categorias && a.categorias.nombre) || '').localeCompare((b.categorias && b.categorias.nombre) || '', 'es', { sensitivity: 'base' });
-          return ca || (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
+      var agregar = document.createElement('button');
+      agregar.type = 'button';
+      agregar.id = 'bc-productos-agregar';
+      agregar.className = 'cc-accion';
+      agregar.textContent = 'Agregar producto';
+      agregar.setAttribute('aria-controls', 'form-producto');
+      agregar.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof cancelarEdicionProducto === 'function') {
+          try { cancelarEdicionProducto(); } catch (err) {}
         }
-        var c = (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
-        return sortMode === 'nombre-desc' ? -c : c;
+        mostrarFormularioProducto();
       });
-      _cache.productos = arr;
-      renderProductosLista();
-    }
-    orden.querySelectorAll('.bc-prod-sort').forEach(function (b) {
-      b.addEventListener('click', function () {
-        sortMode = b.dataset.sort;
-        orden.querySelectorAll('.bc-prod-sort').forEach(function (x) { x.classList.toggle('active', x === b); });
-        ordenarProductos();
-      });
-    });
-    orden.querySelector('.bc-prod-sort').classList.add('active');
+      controles.appendChild(agregar);
+      barra.appendChild(controles);
+      panel.insertBefore(barra, panel.firstChild);
 
-    function setVista(grid) {
-      lista.classList.toggle('bc-grid', grid);
-      fila.classList.toggle('active', !grid);
-      cuadricula.classList.toggle('active', grid);
-      try { localStorage.setItem('bc-productos-vista', grid ? 'grid' : 'lista'); } catch (e) {}
+      if (!panel.contains(lista)) panel.appendChild(lista);
+
+      Array.from(panel.children).forEach(function (el) {
+        if (el === barra || el === lista || el === form || el.id === 'msg-productos' || el.id === 'productos-nomenclatura-btn' || el.id === 'productos-tools-nomenclatura') return;
+        var tag = (el.tagName || '').toLowerCase();
+        if (tag === 'h3' || el.id === 'form-compra' || el.classList.contains('presentaciones-panel') || el.classList.contains('productos-buscador-controles')) {
+          el.style.display = 'none';
+          el.setAttribute('aria-hidden', 'true');
+        }
+      });
+
+      var sortMode = 'nombre-asc';
+      function ordenarProductos() {
+        if (typeof _cache === 'undefined' || !Array.isArray(_cache.productos)) return;
+        var arr = _cache.productos.slice();
+        arr.sort(function (a, b) {
+          if (sortMode === 'categoria') {
+            var ca = ((a.categorias && a.categorias.nombre) || '').localeCompare((b.categorias && b.categorias.nombre) || '', 'es', { sensitivity: 'base' });
+            return ca || (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
+          }
+          var c = (a.nombre || '').localeCompare(b.nombre || '', 'es', { sensitivity: 'base' });
+          return sortMode === 'nombre-desc' ? -c : c;
+        });
+        _cache.productos = arr;
+        renderProductosLista();
+      }
+      orden.querySelectorAll('.bc-prod-sort').forEach(function (b) {
+        b.addEventListener('click', function () {
+          sortMode = b.dataset.sort;
+          orden.querySelectorAll('.bc-prod-sort').forEach(function (x) { x.classList.toggle('active', x === b); });
+          ordenarProductos();
+        });
+      });
+      orden.querySelector('.bc-prod-sort').classList.add('active');
+
+      function setVista(grid) {
+        lista.classList.toggle('bc-grid', grid);
+        fila.classList.toggle('active', !grid);
+        cuadricula.classList.toggle('active', grid);
+        try { localStorage.setItem('bc-productos-vista', grid ? 'grid' : 'lista'); } catch (e) {}
+      }
+      fila.addEventListener('click', function () { setVista(false); });
+      cuadricula.addEventListener('click', function () { setVista(true); });
+      var guardada = 'lista';
+      try { guardada = localStorage.getItem('bc-productos-vista') || 'lista'; } catch (e) {}
+      setVista(guardada === 'grid');
     }
-    fila.addEventListener('click', function () { setVista(false); });
-    cuadricula.addEventListener('click', function () { setVista(true); });
-    var guardada = 'lista';
-    try { guardada = localStorage.getItem('bc-productos-vista') || 'lista'; } catch (e) {}
-    setVista(guardada === 'grid');
 
     if (typeof window.cancelarEdicionProducto === 'function' && !window.cancelarEdicionProducto.__bcM26) {
       var originalCancel = window.cancelarEdicionProducto;
@@ -509,6 +514,8 @@
         }
       });
     }
+
+    return true;
   }
 
   function arreglarEdicionProducto() {}
@@ -547,9 +554,20 @@
     asegurarAccesoGasto();
   }
 
+  // Reintentos: a veces productos.js aún no expuso renderProductosLista
+  function boot() {
+    run();
+    var intentos = 0;
+    var t = setInterval(function () {
+      intentos++;
+      var ok = simplificarProductos();
+      if (ok || intentos >= 12) clearInterval(t);
+    }, 400);
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 1000); });
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 400); });
   } else {
-    setTimeout(run, 1000);
+    setTimeout(boot, 400);
   }
 })();
