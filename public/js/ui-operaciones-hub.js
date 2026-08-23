@@ -1,11 +1,12 @@
-// BattleCruiser — Operaciones Hub (v9.2.36)
+// BattleCruiser — Operaciones Hub (v9.2.37)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
+// M12-FE.2: cards respetan permisos reales; re-render tras carga de permisos.
 (function () {
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '36';
+  var HUB_VER = '37';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v) : String(v == null ? '' : v); }
   function key() { return crypto.randomUUID(); }
@@ -357,35 +358,32 @@
     if (fi) fi.style.display = 'none';
   }
 
-  function buildHub() {
-    var tab = document.getElementById('tab-operacion');
-    if (!tab) return;
-    hideLegacy();
-
-    var existing = document.getElementById(HUB_ID);
-    if (existing && existing.getAttribute('data-ver') === HUB_VER) return;
-    if (existing) existing.remove();
-
-    var hub = document.createElement('div');
-    hub.id = HUB_ID;
-    hub.setAttribute('data-ver', HUB_VER);
-    hub.innerHTML =
-      '<div class="op-hero"><h2>Operaciones</h2><p>Gestioná movimientos de caja, inventario y tareas. Elegí una acción para comenzar.</p></div>' +
-      '<div class="op-grid" id="op-card-grid"></div>' +
-      '<p class="op-hint">Hacé clic en una tarjeta para abrir su formulario</p>';
-    tab.insertBefore(hub, tab.firstChild);
-
+  /** Construye la lista de cards según permisos reales actuales. */
+  function buildCardsList() {
     var cards = [];
-    if (can('gastos', 'crear')) cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
-    if (can('mermas', 'crear') || can('bajas', 'crear')) cards.push({ tone: 'red', icon: '📦', title: 'Registrar merma', desc: 'Productos que salen de inventario por merma o baja.', go: 'Registrar merma', fn: openMerma });
-    if (can('reinversiones', 'crear')) cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
+    if (can('gastos', 'crear')) {
+      cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
+    }
+    if (can('mermas', 'crear') || can('bajas', 'crear')) {
+      cards.push({ tone: 'red', icon: '📦', title: 'Registrar merma', desc: 'Productos que salen de inventario por merma o baja.', go: 'Registrar merma', fn: openMerma });
+    }
+    if (can('reinversiones', 'crear')) {
+      cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
+    }
+    // Sin permiso: siempre visibles
     cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
     cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
     if (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any')) {
       cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, merma y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
     }
+    return cards;
+  }
 
-    var grid = hub.querySelector('#op-card-grid');
+  /** Rellena (o rellena de nuevo) el grid de cards según permisos actuales. */
+  function fillCardsGrid(grid) {
+    if (!grid) return;
+    grid.innerHTML = '';
+    var cards = buildCardsList();
     cards.forEach(function (c) {
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -399,18 +397,67 @@
     });
   }
 
+  function buildHub() {
+    var tab = document.getElementById('tab-operacion');
+    if (!tab) return;
+    hideLegacy();
+
+    var existing = document.getElementById(HUB_ID);
+    if (existing && existing.getAttribute('data-ver') === HUB_VER) {
+      // Hub ya presente: solo refrescar cards según permisos actuales (corrige carrera de carga)
+      var grid = existing.querySelector('#op-card-grid');
+      fillCardsGrid(grid);
+      return;
+    }
+    if (existing) existing.remove();
+
+    var hub = document.createElement('div');
+    hub.id = HUB_ID;
+    hub.setAttribute('data-ver', HUB_VER);
+    hub.innerHTML =
+      '<div class="op-hero"><h2>Operaciones</h2><p>Gestioná movimientos de caja, inventario y tareas. Elegí una acción para comenzar.</p></div>' +
+      '<div class="op-grid" id="op-card-grid"></div>' +
+      '<p class="op-hint">Hacé clic en una tarjeta para abrir su formulario</p>';
+    tab.insertBefore(hub, tab.firstChild);
+
+    fillCardsGrid(hub.querySelector('#op-card-grid'));
+  }
+
   function run() { injectCss(); buildHub(); hideLegacy(); }
 
+  /**
+   * Enganche al flujo real de permisos: cuando aplicarPermisosAInterfaz
+   * termina (tras cargarContextoUsuario), re-renderizamos las cards.
+   * Sin setTimeout artificial como solución.
+   */
+  function hookPermisosRender() {
+    var orig = window.aplicarPermisosAInterfaz;
+    if (typeof orig !== 'function' || orig.__bcOpHubHook) return;
+    var wrapped = function () {
+      var ret = orig.apply(this, arguments);
+      try { run(); } catch (e) {}
+      return ret;
+    };
+    wrapped.__bcOpHubHook = true;
+    window.aplicarPermisosAInterfaz = wrapped;
+    try { aplicarPermisosAInterfaz = wrapped; } catch (e) {}
+  }
+
   function boot() {
+    hookPermisosRender();
     run();
-    setTimeout(run, 600);
-    setTimeout(run, 1600);
-    setTimeout(run, 3500);
+    // Red de seguridad mínima (ya existían en v36): por si el hook aún no está listo
+    // al primer tick. No se introducen setTimeout nuevos como "solución".
+    setTimeout(function () { hookPermisosRender(); run(); }, 600);
+    setTimeout(function () { hookPermisosRender(); run(); }, 1600);
   }
 
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-tab]');
-    if (b && b.dataset.tab === 'operacion') setTimeout(run, 150);
+    if (b && b.dataset.tab === 'operacion') {
+      hookPermisosRender();
+      setTimeout(run, 150);
+    }
   });
 
   if (document.readyState === 'loading') {
