@@ -96,11 +96,6 @@
     form.classList.add('hidden');
     form.style.display = 'none';
 
-    // El único botón público "Agregar producto" de Productos es este.
-    // El submit interno del formulario usa "Guardar producto" para no
-    // presentar dos botones con la misma acción/nombre al usuario.
-    document.querySelectorAll('#bc-productos-agregar').forEach(function (el) { el.remove(); });
-
     var barra = document.createElement('div');
     barra.id = 'bc-productos-barra';
     barra.className = 'bc-productos-barra';
@@ -160,7 +155,9 @@
       form.classList.add('bc-producto-form-visible');
       form.style.setProperty('display', 'block', 'important');
       form.dataset.bcProductFormOpen = '1';
-      agregar.style.display = 'none';
+      // El botón público NO desaparece. Solo se abre el formulario.
+      agregar.style.removeProperty('display');
+      agregar.hidden = false;
       var submitBtn = document.getElementById('prod-submit-btn');
       if (submitBtn) submitBtn.textContent = document.getElementById('prod-editando-id')?.value ? 'Guardar cambios' : 'Guardar producto';
       var primerCampo = document.getElementById('prod-nombre');
@@ -226,7 +223,7 @@
       #bc-productos-orden button{flex:0 1 auto}
       #bc-productos-orden button.active{border-color:var(--gold);color:var(--gold)}
       #bc-productos-vista{display:flex;gap:6px;margin-left:auto}
-      #bc-productos-agregar{flex:0 0 auto}
+      #bc-productos-agregar{flex:0 0 auto;visibility:visible!important;opacity:1!important}
       #lista-productos{display:block!important}
       #lista-productos.bc-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}
       #lista-productos.bc-grid > .lista-item{box-sizing:border-box;min-width:0;min-height:0;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow:hidden}
@@ -240,27 +237,9 @@
       @media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid > .lista-item{padding:7px}}
     `;
     document.head.appendChild(style);
-
-    // Si cancelarEdicionProducto se usa para cerrar el formulario, vuelve a
-    // mostrar el único botón público de Agregar producto.
-    var cancelarOriginal = window.cancelarEdicionProducto;
-    if (typeof cancelarOriginal === 'function' && !cancelarOriginal.__bcM26Wrapped) {
-      var wrapped = function () {
-        cancelarOriginal();
-        form.classList.remove('bc-producto-form-visible');
-        form.style.display = 'none';
-        agregar.style.display = '';
-        agregar.focus({ preventScroll: true });
-      };
-      wrapped.__bcM26Wrapped = true;
-      window.cancelarEdicionProducto = wrapped;
-    }
   }
 
-  function arreglarEdicionProducto() {
-    // No interceptar el submit real de productos. productos.js es el único
-    // responsable de crear/editar y su handler debe recibir el evento nativo.
-  }
+  function arreglarEdicionProducto() {}
 
   function asegurarAccesoGasto() {
     var tab = document.getElementById('tab-operacion');
