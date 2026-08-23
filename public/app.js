@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
 // Capa mínima de arranque/hotfixes. La lógica de Productos vive en js/productos.js.
-(function hotfixV9238(){
-  const VERSION="9.2.38";
+(function hotfixV9239(){
+  const VERSION="9.2.39";
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
@@ -33,3 +33,4 @@
 (function cargarUiOperacionesHub(){if(document.querySelector('script[src*="ui-operaciones-hub"]'))return;var s=document.createElement("script");s.src="js/ui-operaciones-hub.js?v=36.1";s.async=false;document.body.appendChild(s);})();
 (function cargarFixPermisosRol(){if(document.querySelector('script[src*="fix-permisos-rol"]'))return;var s=document.createElement("script");s.src="js/fix-permisos-rol.js?v=37.1";s.async=false;document.body.appendChild(s);})();
 (function cargarUiAjustesPanel(){if(document.querySelector('script[src*="ui-ajustes-panel"]'))return;var s=document.createElement("script");s.src="js/ui-ajustes-panel.js?v=38.1";s.async=false;document.body.appendChild(s);})();
+(function cargarHideConfigTab(){if(document.querySelector('script[src*="hide-config-tab"]'))return;var s=document.createElement("script");s.src="js/hide-config-tab.js?v=39.1";s.async=false;document.body.appendChild(s);})();
