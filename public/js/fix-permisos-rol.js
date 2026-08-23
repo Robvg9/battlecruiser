@@ -1,25 +1,33 @@
-// BattleCruiser v9.2.57 — Matriz de permisos canónica (catálogo backend)
-// UNA fuente preferida: catalogo_permisos_admin() + permisos_por_rol() + actualizar_permisos_rol()
-// Fallback: secciones conocidas incluyendo gastos/mermas/bajas/reinversiones.
+// BattleCruiser v9.2.60 — M12-FE.5 Matriz de permisos canónica
+// Fuente: catalogo_permisos_admin() + permisos_por_rol() + actualizar_permisos_rol()
+// Sin sección "bajas" ni "vales_salida" en UI ni en payload de guardado.
 (function () {
   "use strict";
-  if (window.__bcFixPermisosRol57) return;
+  if (window.__bcFixPermisosRol60) return;
+  window.__bcFixPermisosRol60 = true;
   window.__bcFixPermisosRol57 = true;
-  window.__bcFixPermisosRol50 = true; // compat con rest.js
+  window.__bcFixPermisosRol50 = true;
 
   var _catalogoCache = null;
 
+  // Secciones legadas retiradas de la matriz: bajas, vales_salida
+  var SECCIONES_EXCLUIDAS = { bajas: true, vales_salida: true, vales: true };
+
   var SECCIONES_FALLBACK = [
     "productos", "categorias", "almacenes", "stock",
-    "transferencias", "vales_salida", "ventas", "reportes", "usuarios",
+    "transferencias", "ventas", "reportes", "usuarios",
     "presentaciones", "auditoria", "turnos", "comunicacion", "unidades",
     "ciclos", "entregas_caja",
-    "gastos", "mermas", "bajas", "reinversiones"
+    "gastos", "mermas", "reinversiones"
   ];
   var ACCIONES_FALLBACK = ["ver", "crear", "editar", "borrar", "editar_any"];
 
   function esc(v) {
     return typeof escHtml === "function" ? escHtml(v) : String(v == null ? "" : v);
+  }
+
+  function esSeccionExcluida(sec) {
+    return !!(sec && SECCIONES_EXCLUIDAS[sec]);
   }
 
   async function obtenerCatalogo() {
@@ -36,7 +44,9 @@
         .map(function (r) {
           return { seccion: r.seccion || r.p_seccion, accion: r.accion || r.p_accion };
         })
-        .filter(function (r) { return r.seccion && r.accion; });
+        .filter(function (r) {
+          return r.seccion && r.accion && !esSeccionExcluida(r.seccion);
+        });
       return _catalogoCache;
     } catch (e) {
       console.warn("[BattleCruiser] catalogo_permisos_admin", e);
@@ -48,8 +58,7 @@
     var out = [];
     SECCIONES_FALLBACK.forEach(function (s) {
       ACCIONES_FALLBACK.forEach(function (a) {
-        // editar_any solo donde suele usarse en backend
-        if (a === "editar_any" && ["gastos", "mermas", "bajas", "auditoria", "entregas_caja"].indexOf(s) < 0) return;
+        if (a === "editar_any" && ["gastos", "mermas", "auditoria", "entregas_caja"].indexOf(s) < 0) return;
         out.push({ seccion: s, accion: a });
       });
     });
@@ -60,14 +69,14 @@
     var ordenSec = [];
     var porSec = {};
     catalogo.forEach(function (r) {
+      if (esSeccionExcluida(r.seccion)) return;
       if (!porSec[r.seccion]) {
         porSec[r.seccion] = [];
         ordenSec.push(r.seccion);
       }
       if (porSec[r.seccion].indexOf(r.accion) < 0) porSec[r.seccion].push(r.accion);
     });
-    // Asegurar secciones de Operaciones aunque el RPC no las devuelva
-    ["gastos", "mermas", "bajas", "reinversiones"].forEach(function (s) {
+    ["gastos", "mermas", "reinversiones"].forEach(function (s) {
       if (!porSec[s]) {
         porSec[s] = ["ver", "crear"];
         ordenSec.push(s);
@@ -116,13 +125,12 @@
     filas.forEach(function (p) {
       var sec = p.seccion;
       var acc = p.accion;
-      if (!sec || !acc) return;
+      if (!sec || !acc || esSeccionExcluida(sec)) return;
       mapaPermitido[sec + "|" + acc] = p.permitido === true;
     });
 
-    // Completar catálogo con filas que existan en el rol pero no en el catálogo RPC
     filas.forEach(function (p) {
-      if (!p.seccion || !p.accion) return;
+      if (!p.seccion || !p.accion || esSeccionExcluida(p.seccion)) return;
       var ya = catalogo.some(function (r) { return r.seccion === p.seccion && r.accion === p.accion; });
       if (!ya) catalogo.push({ seccion: p.seccion, accion: p.accion });
     });
@@ -146,15 +154,15 @@
     html += "</tr></thead><tbody>";
 
     grp.ordenSec.forEach(function (sec) {
+      if (esSeccionExcluida(sec)) return;
       html += "<tr><td>" + esc(sec) + "</td>";
       todasAcc.forEach(function (acc) {
         var key = sec + "|" + acc;
         var existeEnCatalogo = catalogo.some(function (r) {
           return r.seccion === sec && r.accion === acc;
         });
-        // Forzar checkboxes para Operaciones aunque el catálogo RPC no liste la acción
         var forzarOp =
-          ["gastos", "mermas", "bajas", "reinversiones"].indexOf(sec) >= 0 &&
+          ["gastos", "mermas", "reinversiones"].indexOf(sec) >= 0 &&
           ["ver", "crear"].indexOf(acc) >= 0;
         if (!existeEnCatalogo && !forzarOp) {
           html += "<td>—</td>";
@@ -210,13 +218,18 @@
       return;
     }
     var checks = panel.querySelectorAll(".permiso-check");
-    var payload = Array.from(checks).map(function (c) {
-      return {
-        seccion: c.getAttribute("data-seccion"),
-        accion: c.getAttribute("data-accion"),
-        permitido: !!c.checked
-      };
-    });
+    // Nunca enviar bajas.* ni vales_salida.* desde el frontend
+    var payload = Array.from(checks)
+      .map(function (c) {
+        return {
+          seccion: c.getAttribute("data-seccion"),
+          accion: c.getAttribute("data-accion"),
+          permitido: !!c.checked
+        };
+      })
+      .filter(function (p) {
+        return p.seccion && p.accion && !esSeccionExcluida(p.seccion);
+      });
 
     var feedback = panel.querySelector(".op-perm-save-msg");
     if (!feedback) {
