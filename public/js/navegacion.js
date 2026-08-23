@@ -4,6 +4,11 @@
 
 function irATab(tab) {
   if (!tab) return;
+  // M18/M26: la pestaña visible "Turnos" usa data-tab="ciclos"; el legado "turnos" está oculto.
+  if (tab === "turnos") {
+    var ciclosBtn = document.querySelector('.tab-btn[data-tab="ciclos"]');
+    if (ciclosBtn) tab = "ciclos";
+  }
   const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
   if (btn) btn.click();
 }

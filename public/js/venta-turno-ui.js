@@ -158,11 +158,15 @@ safeInit("venta-turno-ui", function () {
   }
 
   const btnIr = document.getElementById("venta-ir-turnos-btn");
-  if (btnIr) {
+  if (btnIr && !btnIr.dataset.bcIrTurnos) {
+    btnIr.dataset.bcIrTurnos = "1";
     btnIr.addEventListener("click", function () {
-      if (typeof irATab === "function") irATab("turnos");
-      else {
-        const b = document.querySelector('.tab-btn[data-tab="turnos"]');
+      // M18/M26: sección visible "Turnos" = data-tab="ciclos"
+      if (typeof irATab === "function") {
+        irATab("ciclos");
+      } else {
+        var b = document.querySelector('.tab-btn[data-tab="ciclos"]') ||
+                document.querySelector('.tab-btn[data-tab="turnos"]');
         if (b) b.click();
       }
     });
