@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
 // Capa mínima de arranque/hotfixes. La lógica de Productos vive en js/productos.js.
-(function hotfixV9232(){
-  const VERSION="9.2.32";
+(function hotfixV9233(){
+  const VERSION="9.2.33";
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
@@ -28,3 +28,4 @@
 (function cargarSesionesOperativasUI(){if(document.querySelector('script[src*="sesiones-operativas-ui"]'))return;var s=document.createElement("script");s.src="js/sesiones-operativas-ui.js?v=31.1";s.async=false;document.body.appendChild(s);})();
 (function cargarUiVisualSalon(){if(document.querySelector('script[src*="ui-visual-salon"]'))return;var s=document.createElement("script");s.src="js/ui-visual-salon.js?v=31.1";s.async=false;document.body.appendChild(s);})();
 (function cargarRolesEnUsuarios(){if(document.querySelector('script[src*="roles-en-usuarios"]'))return;var s=document.createElement("script");s.src="js/roles-en-usuarios.js?v=32.1";s.async=false;document.body.appendChild(s);})();
+(function cargarUiLayoutInteligente(){if(document.querySelector('script[src*="ui-layout-inteligente"]'))return;var s=document.createElement("script");s.src="js/ui-layout-inteligente.js?v=33.1";s.async=false;document.body.appendChild(s);})();
