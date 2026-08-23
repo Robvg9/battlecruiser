@@ -9,18 +9,43 @@ function irATab(tab) {
     var ciclosBtn = document.querySelector('.tab-btn[data-tab="ciclos"]');
     if (ciclosBtn) tab = "ciclos";
   }
+  // Defensa: no navegar sin permiso ver (resumen/pendientes = home/cola sin sección backend)
+  if (tab !== "resumen" && tab !== "pendientes") {
+    var seccion = (typeof TAB_A_SECCION !== "undefined" && TAB_A_SECCION) ? TAB_A_SECCION[tab] : null;
+    if (!seccion || typeof tienePermiso !== "function" || !tienePermiso(seccion, "ver")) {
+      console.warn("[BattleCruiser] irATab bloqueado sin permiso ver:", tab);
+      return;
+    }
+  }
   const btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-  if (btn) btn.click();
+  if (!btn || btn.classList.contains("hidden") || btn.style.display === "none") return;
+  btn.click();
 }
 
 safeInit("tabs", () => {
   document.getElementById("tabs").addEventListener("click", (e) => {
     const btn = e.target.closest(".tab-btn");
     if (!btn) return;
+    // No activar tabs ocultos / sin permiso
+    if (btn.classList.contains("hidden") || btn.style.display === "none") {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const tab = btn.dataset.tab;
+    if (tab && tab !== "resumen" && tab !== "pendientes") {
+      const seccion = (typeof TAB_A_SECCION !== "undefined" && TAB_A_SECCION) ? TAB_A_SECCION[tab] : null;
+      if (!seccion || typeof tienePermiso !== "function" || !tienePermiso(seccion, "ver")) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("visible"));
     btn.classList.add("active");
-    document.getElementById("tab-" + btn.dataset.tab).classList.add("visible");
+    const panel = document.getElementById("tab-" + btn.dataset.tab);
+    if (panel) panel.classList.add("visible");
     if (btn.dataset.tab === "pendientes") {
       refrescarPanelPendientes();
     } else if (btn.dataset.tab === "resumen") {
@@ -35,7 +60,6 @@ safeInit("tabs", () => {
     } else if (btn.dataset.tab === "movimientos") {
       if (typeof refrescarMovimientos === "function") refrescarMovimientos();
     } else if (btn.dataset.tab === "turnos") {
-      // M18: legado oculto; se conserva el handler para compatibilidad histórica.
       if (typeof refrescarTurnos === "function") refrescarTurnos();
     } else if (btn.dataset.tab === "ciclos") {
       if (typeof refrescarCiclos === "function") refrescarCiclos();
@@ -103,7 +127,6 @@ safeInit("menu-lateral", () => {
   window._battlecruiserCerrarMenuLateral = cerrarMenu;
 });
 
-// M18: cargar el módulo de unificación después de que todos los scripts del shell hayan cargado.
 window.addEventListener("DOMContentLoaded", () => {
   if (document.querySelector('script[data-bc-m18]')) return;
   const s = document.createElement("script");
