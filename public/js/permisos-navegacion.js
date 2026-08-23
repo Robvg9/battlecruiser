@@ -1,4 +1,5 @@
-// BattleCruiser v9.2.55 — menú solo con seccion.ver === true
+// BattleCruiser v9.2.56 — menú solo con seccion.ver === true
+// Fase 3 FE: vales_salida oculto del menú (histórico se conserva en reportes/RPC)
 (function () {
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
@@ -16,7 +17,7 @@
     ventas: "ventas",
     almacenes: "almacenes",
     transferencias: "transferencias",
-    vales: "vales_salida",
+    // vales: retirado del menú (Fase 3) — no mapear a vales_salida
     reportes: "reportes",
     inventario: "reportes",
     movimientos: "reportes",
@@ -30,7 +31,7 @@
 
   var ORDEN_HOME = [
     "ventas", "comunicacion", "productos", "ciclos", "turnos", "operacion",
-    "almacenes", "transferencias", "vales", "reportes", "inventario",
+    "almacenes", "transferencias", "reportes", "inventario",
     "movimientos", "usuarios", "mando"
   ];
 
@@ -70,8 +71,8 @@
         return;
       }
 
-      if (tab === "config" || tab === "resumen" || tab === "pendientes") {
-        // Sin permiso backend propio: no visibles para roles restringidos
+      // Fase 3: vales de salida no aparece en el menú (ni como tab, ni como sección operativa)
+      if (tab === "config" || tab === "resumen" || tab === "pendientes" || tab === "vales") {
         setTabVisible(btn, false);
         return;
       }
@@ -95,7 +96,9 @@
     toggleForm("form-venta-linea", "ventas", "crear");
     toggleForm("form-almacen", "almacenes", "crear");
     toggleForm("form-transferencia", "transferencias", "crear");
-    toggleForm("form-vale", "vales_salida", "crear");
+    // Fase 3: formulario operativo de vales oculto siempre (histórico no se borra)
+    var formVale = document.getElementById("form-vale");
+    if (formVale) formVale.classList.add("hidden");
     toggleForm("form-categoria", "categorias", "crear");
     toggleForm("form-unidad", "unidades", "crear");
     toggleForm("form-nuevo-usuario", "usuarios", "crear");
