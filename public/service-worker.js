@@ -1,7 +1,7 @@
-// BattleCruiser Service Worker v107 — app v9.2.43
-// hide-config-tab.js ya no tiene MutationObserver (freeze fix).
+// BattleCruiser Service Worker v108 — app v9.2.43
+// Fix v9.2.44: guardar permisos de roles usa el cliente Supabase global real.
 const BC_VERSION = "9.2.43";
-const CACHE_NAME = "battlecruiser-shell-v107";
+const CACHE_NAME = "battlecruiser-shell-v108";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
