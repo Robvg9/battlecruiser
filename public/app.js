@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.53 — M12-FE.3 raíz: p.permitido respetado en usuarios-permisos.js
-(function hotfixV9253(){
-  const VERSION="9.2.53";
+// v9.2.54 — menú respeta permisos (CSS ya no fuerza display en tabs ocultos)
+(function hotfixV9254(){
+  const VERSION="9.2.54";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -28,10 +28,10 @@
 (function cargarModulosDinamicos(){
   const modules=[
     ["usuarios-permisos-rest.js","53.1"],
-    ["permisos-navegacion.js","52.1"],
+    ["permisos-navegacion.js","54.1"],
     ["fix-permisos-rol.js","50.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
-    ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
+    ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","36.1"],
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"]
   ];
