@@ -1,5 +1,5 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.60 — M12-FE.5: Operaciones por crear; sin bajas/vales en matriz; sin permisos panel
+// v9.2.60 — M12-FE.5: Operaciones por crear; sin bajas/vales; panel sin permisos
 (function hotfixV9260(){
   const VERSION="9.2.60";
   window.__BC_VERSION__=VERSION;
@@ -30,6 +30,7 @@
     ["usuarios-permisos-rest.js","60.1"],
     ["permisos-navegacion.js","60.1"],
     ["fix-permisos-rol.js","60.1"],
+    ["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","38.1"],
