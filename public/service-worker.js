@@ -1,7 +1,7 @@
-// BattleCruiser Service Worker v106 — despliega app v9.2.42 estable.
-// Sin postMessage al cliente, sin reload automático y sin tocar IndexedDB.
-const BC_VERSION = "9.2.42";
-const CACHE_NAME = "battlecruiser-shell-v106";
+// BattleCruiser Service Worker v107 — app v9.2.43
+// hide-config-tab.js ya no tiene MutationObserver (freeze fix).
+const BC_VERSION = "9.2.43";
+const CACHE_NAME = "battlecruiser-shell-v107";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
