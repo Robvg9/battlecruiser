@@ -1,12 +1,10 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.41 — FIX: se elimina location.reload() automático por mensaje del SW.
-// Causa raíz del bucle post-9.2.40: SW activate → BC_SW_ACTIVATED → reload →
-// re-instalación/claim → otro mensaje → reload infinito (o carga permanente).
-// Actualización = solo acción explícita del usuario (Actualizar app).
-(function hotfixV9241(){
-  const VERSION="9.2.41";
+// v9.2.42 — RESTORE ESTABLE: se revierte el cargador dinámico al patrón v9.2.39.
+// La lógica de la app vive en los módulos js/*. Este archivo NO reemplaza módulos
+// ni introduce recargas automáticas desde el Service Worker.
+(function hotfixV9242(){
+  const VERSION="9.2.42";
   window.__BC_VERSION__=VERSION;
-
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
@@ -19,53 +17,30 @@
       btn.addEventListener("click",async()=>{
         btn.disabled=true;btn.textContent="Actualizando…";
         try{
-          if("serviceWorker"in navigator){
-            const regs=await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map(r=>r.unregister()));
-          }
-          if("caches"in window){
-            const keys=await caches.keys();
-            await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")||k.startsWith("battlecruiser")).map(k=>caches.delete(k)));
-          }
+          if("serviceWorker"in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()));}
+          if("caches"in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")).map(k=>caches.delete(k)));}
         }catch(e){console.warn("[BattleCruiser] actualización: limpieza parcial",e);}
-        // NO IndexedDB / cola offline
-        const u=new URL(location.href);
-        u.searchParams.set("bc_update",`${VERSION}-${Date.now()}`);
-        location.replace(u.toString());
+        // Nunca borrar IndexedDB / cola offline. Una sola recarga por gesto del usuario.
+        const u=new URL(location.href);u.searchParams.set("bc_update",`${VERSION}-${Date.now()}`);location.replace(u.toString());
       });
     });
   }
-  aplicarVersion();
-  window.addEventListener("pageshow",aplicarVersion);
-  // SIN listener de BC_SW_ACTIVATED → SIN reload automático
+  aplicarVersion();window.addEventListener("pageshow",aplicarVersion);
 })();
 
 (function cargarModulosDinamicos(){
-  var V=window.__BC_VERSION__||"9.2.41";
-  function load(src){
-    var name=src.split("/").pop().split("?")[0];
+  const modules=[
+    ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
+    ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
+    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","34.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","37.1"],
+    ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","39.1"]
+  ];
+  modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
-    var s=document.createElement("script");
-    s.src=src+"?v="+encodeURIComponent(V);
+    const s=document.createElement("script");
+    s.src="js/"+name+(version?"?v="+version:"");
     s.async=false;
-    s.onerror=function(){console.warn("[BattleCruiser] Módulo no cargó (degradado):",src);};
+    s.onerror=()=>console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);
     document.body.appendChild(s);
-  }
-  // Orden fijo — independiente de viewport (PC = móvil)
-  [
-    "js/configuracion.js",
-    "js/online-offline-guard.js",
-    "js/operaciones-financieras.js",
-    "js/aprobaciones-admin.js",
-    "js/m26-ui-integridad.js",
-    "js/sesiones-operativas-ui.js",
-    "js/ui-visual-salon.js",
-    "js/roles-en-usuarios.js",
-    "js/ui-layout-inteligente.js",
-    "js/ui-usuarios-dashboard.js",
-    "js/ui-operaciones-hub.js",
-    "js/fix-permisos-rol.js",
-    "js/ui-ajustes-panel.js",
-    "js/hide-config-tab.js"
-  ].forEach(load);
+  });
 })();
