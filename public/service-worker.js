@@ -1,6 +1,6 @@
-// BattleCruiser Service Worker v117 — app v9.2.54
-const BC_VERSION = "9.2.54";
-const CACHE_NAME = "battlecruiser-shell-v117";
+// BattleCruiser Service Worker v118 — app v9.2.55
+const BC_VERSION = "9.2.55";
+const CACHE_NAME = "battlecruiser-shell-v118";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
