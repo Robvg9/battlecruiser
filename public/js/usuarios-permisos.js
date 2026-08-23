@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.56: construcción estricta de _permisosEfectivos.
-// Fase 3 FE: tab vales oculto; sin mapear vales_salida en menú.
+// B3 — v9.2.60 M12-FE.5: _permisosEfectivos estricto; Operaciones por crear;
+// vales retirado del menú.
 
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
@@ -104,6 +104,8 @@ function limpiarContextoUsuario() {
     b.setAttribute("data-bc-permiso", "0");
   });
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("visible"));
+  var sinPerm = document.getElementById("bc-sin-permisos-panel");
+  if (sinPerm) sinPerm.style.display = "none";
   if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
 }
 
@@ -118,12 +120,20 @@ function contextoB3Disponible() {
   return !!(_usuarioActual && (_usuarioActual.rol !== null || Object.keys(_permisosEfectivos).length > 0));
 }
 
+function puedeVerOperacionesLocal() {
+  return (
+    tienePermiso("gastos", "crear") ||
+    tienePermiso("mermas", "crear") ||
+    tienePermiso("reinversiones", "crear")
+  );
+}
+
 var TAB_A_SECCION = {
   productos: "productos",
   ventas: "ventas",
   almacenes: "almacenes",
   transferencias: "transferencias",
-  // vales: retirado del menú (Fase 3)
+  // vales: eliminado (M12-FE.5)
   usuarios: "usuarios",
   mando: "auditoria",
   reportes: "reportes",
@@ -131,7 +141,7 @@ var TAB_A_SECCION = {
   movimientos: "reportes",
   turnos: "turnos",
   ciclos: "ciclos",
-  operacion: "turnos",
+  // operacion: no usa turnos.ver
   comunicacion: "comunicacion",
 };
 
@@ -143,7 +153,6 @@ function aplicarPermisosAInterfaz() {
   document.querySelectorAll(".tab-btn[data-tab]").forEach((btn) => {
     const tab = btn.dataset.tab;
     if (!tab) return;
-    // Fase 3: vales no visible en menú
     if (tab === "config" || tab === "resumen" || tab === "pendientes" || tab === "vales") {
       btn.classList.add("hidden", "tab-sin-permiso");
       btn.setAttribute("data-bc-permiso", "0");
@@ -151,6 +160,22 @@ function aplicarPermisosAInterfaz() {
       btn.classList.remove("active");
       const panel = document.getElementById("tab-" + tab);
       if (panel) panel.classList.remove("visible");
+      return;
+    }
+    if (tab === "operacion") {
+      const ok = puedeVerOperacionesLocal();
+      if (ok) {
+        btn.classList.remove("hidden", "tab-sin-permiso");
+        btn.setAttribute("data-bc-permiso", "1");
+        btn.style.removeProperty("display");
+      } else {
+        btn.classList.add("hidden", "tab-sin-permiso");
+        btn.setAttribute("data-bc-permiso", "0");
+        btn.style.setProperty("display", "none", "important");
+        btn.classList.remove("active");
+        const panel = document.getElementById("tab-" + tab);
+        if (panel) panel.classList.remove("visible");
+      }
       return;
     }
     const seccion = TAB_A_SECCION[tab];
@@ -175,7 +200,6 @@ function aplicarPermisosAInterfaz() {
   togglePorPermiso("form-venta-linea", "ventas", "crear");
   togglePorPermiso("form-almacen", "almacenes", "crear");
   togglePorPermiso("form-transferencia", "transferencias", "crear");
-  // Fase 3: formulario operativo de vales oculto siempre
   const formVale = document.getElementById("form-vale");
   if (formVale) formVale.classList.add("hidden");
   togglePorPermiso("form-categoria", "categorias", "crear");
