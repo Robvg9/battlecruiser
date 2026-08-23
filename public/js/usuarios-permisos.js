@@ -1,5 +1,6 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.55: construcción estricta de _permisosEfectivos.
+// B3 — v9.2.56: construcción estricta de _permisosEfectivos.
+// Fase 3 FE: tab vales oculto; sin mapear vales_salida en menú.
 
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
@@ -46,8 +47,6 @@ async function cargarContextoUsuario() {
         console.warn("[BattleCruiser] permisos_usuario_actual error", error);
       } else if (Array.isArray(perms)) {
         _permisosCargaExitosa = true;
-        // Si el RPC incluye el campo permitido, SOLO se conceden los true.
-        // Si no trae el campo, se asume que solo envía filas ya autorizadas.
         var usaCampoPermitido = perms.some(function (p) {
           return p && Object.prototype.hasOwnProperty.call(p, "permitido");
         });
@@ -124,7 +123,7 @@ var TAB_A_SECCION = {
   ventas: "ventas",
   almacenes: "almacenes",
   transferencias: "transferencias",
-  vales: "vales_salida",
+  // vales: retirado del menú (Fase 3)
   usuarios: "usuarios",
   mando: "auditoria",
   reportes: "reportes",
@@ -144,7 +143,8 @@ function aplicarPermisosAInterfaz() {
   document.querySelectorAll(".tab-btn[data-tab]").forEach((btn) => {
     const tab = btn.dataset.tab;
     if (!tab) return;
-    if (tab === "config" || tab === "resumen" || tab === "pendientes") {
+    // Fase 3: vales no visible en menú
+    if (tab === "config" || tab === "resumen" || tab === "pendientes" || tab === "vales") {
       btn.classList.add("hidden", "tab-sin-permiso");
       btn.setAttribute("data-bc-permiso", "0");
       btn.style.setProperty("display", "none", "important");
@@ -175,7 +175,9 @@ function aplicarPermisosAInterfaz() {
   togglePorPermiso("form-venta-linea", "ventas", "crear");
   togglePorPermiso("form-almacen", "almacenes", "crear");
   togglePorPermiso("form-transferencia", "transferencias", "crear");
-  togglePorPermiso("form-vale", "vales_salida", "crear");
+  // Fase 3: formulario operativo de vales oculto siempre
+  const formVale = document.getElementById("form-vale");
+  if (formVale) formVale.classList.add("hidden");
   togglePorPermiso("form-categoria", "categorias", "crear");
   togglePorPermiso("form-unidad", "unidades", "crear");
   togglePorPermiso("form-nuevo-usuario", "usuarios", "crear");
