@@ -1,7 +1,6 @@
-// BattleCruiser v9.2.49 — ÚNICA fuente de verdad de navegación por permisos.
-// Carga: app.js (después de usuarios-permisos.js).
-// Sustituye tienePermiso / TAB_A_SECCION / aplicarPermisosAInterfaz UNA sola vez.
-// No captura clicks. No setTimeouts. No wrappers encadenados.
+// BattleCruiser v9.2.50 — Menú ↔ permisos (única fuente de navegación)
+// Consume _permisosEfectivos construido desde permisos_usuario_actual.
+// Matriz visual de roles: ver fix-permisos-rol.js (catalogo_permisos_admin).
 (function () {
   "use strict";
   if (window.__BC_PERMISOS_CANONICO__) return;
@@ -35,8 +34,7 @@
   function togglePorPermiso(elId, seccion, accion) {
     var el = document.getElementById(elId);
     if (!el) return;
-    var ok = tienePermiso(seccion, accion);
-    el.classList.toggle("hidden", !ok);
+    el.classList.toggle("hidden", !tienePermiso(seccion, accion));
   }
 
   function aplicarPermisosAInterfaz() {
@@ -119,7 +117,8 @@
   if (!document.getElementById("bc-tab-sin-permiso-css")) {
     var st = document.createElement("style");
     st.id = "bc-tab-sin-permiso-css";
-    st.textContent = ".tab-btn.tab-sin-permiso,.tab-btn.hidden.tab-sin-permiso{display:none!important;visibility:hidden!important;pointer-events:none!important;}";
+    st.textContent =
+      ".tab-btn.tab-sin-permiso,.tab-btn.hidden.tab-sin-permiso{display:none!important;visibility:hidden!important;pointer-events:none!important;}";
     document.head.appendChild(st);
   }
 
