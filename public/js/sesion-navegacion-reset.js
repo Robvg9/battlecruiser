@@ -1,10 +1,8 @@
-// BattleCruiser v9.2.51 — M12-FE.2
-// Engancha reset de navegación en limpiarContextoUsuario / cargarContextoUsuario
-// sin duplicar el sistema de permisos.
+// BattleCruiser v9.2.52 — reafirma menú tras cargar/limpiar contexto
 (function () {
   "use strict";
-  if (window.__bcSesionNavReset) return;
-  window.__bcSesionNavReset = true;
+  if (window.__bcSesionNavReset52) return;
+  window.__bcSesionNavReset52 = true;
 
   function doReset() {
     if (typeof resetearNavegacionParaNuevaSesion === "function") {
@@ -16,33 +14,38 @@
   }
 
   function wrap() {
-    if (typeof limpiarContextoUsuario === "function" && !limpiarContextoUsuario.__bcNav) {
+    if (typeof limpiarContextoUsuario === "function" && !limpiarContextoUsuario.__bcNav52) {
       var origL = limpiarContextoUsuario;
       var wrappedL = function () {
         doReset();
-        return origL.apply(this, arguments);
+        var r = origL.apply(this, arguments);
+        if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+        return r;
       };
-      wrappedL.__bcNav = true;
+      wrappedL.__bcNav52 = true;
       window.limpiarContextoUsuario = wrappedL;
       try { limpiarContextoUsuario = wrappedL; } catch (e) {}
     }
 
-    if (typeof cargarContextoUsuario === "function" && !cargarContextoUsuario.__bcNav) {
+    if (typeof cargarContextoUsuario === "function" && !cargarContextoUsuario.__bcNav52) {
       var origC = cargarContextoUsuario;
       var wrappedC = function () {
-        // Al iniciar carga de NUEVO usuario: sin panel heredado
         doReset();
-        return origC.apply(this, arguments);
+        var result = origC.apply(this, arguments);
+        Promise.resolve(result).then(function () {
+          if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+        }).catch(function () {
+          if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+        });
+        return result;
       };
-      wrappedC.__bcNav = true;
+      wrappedC.__bcNav52 = true;
       window.cargarContextoUsuario = wrappedC;
       try { cargarContextoUsuario = wrappedC; } catch (e) {}
     }
   }
 
   wrap();
-  // usuarios-permisos puede asignar después vía Object.assign
-  setTimeout(wrap, 0);
-  setTimeout(wrap, 300);
-  setTimeout(wrap, 1000);
+  Promise.resolve().then(wrap);
+  window.addEventListener("load", wrap);
 })();
