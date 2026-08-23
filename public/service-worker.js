@@ -1,7 +1,7 @@
-// BattleCruiser Service Worker v109 — app v9.2.46
-// Alta de usuarios sin correo vía Edge Function crear-usuario-sin-email.
-const BC_VERSION = "9.2.46";
-const CACHE_NAME = "battlecruiser-shell-v109";
+// BattleCruiser Service Worker v110 — app v9.2.47
+// Permisos → visibilidad real de secciones (permisos-navegacion.js).
+const BC_VERSION = "9.2.47";
+const CACHE_NAME = "battlecruiser-shell-v110";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
@@ -14,6 +14,7 @@ const SHELL_FILES = [
   "./js/usuarios-permisos.js","./js/roles-en-usuarios.js","./js/fix-permisos-rol.js",
   "./js/ui-layout-inteligente.js","./js/ui-usuarios-dashboard.js","./js/ui-operaciones-hub.js",
   "./js/ui-ajustes-panel.js","./js/hide-config-tab.js","./js/alta-usuario-sin-email.js",
+  "./js/permisos-navegacion.js",
   "./js/mando.js","./js/reportes.js","./js/nucleo-operativo.js","./js/operacion-humana.js",
   "./js/ciclos.js","./js/m18-ciclos-ux.js","./js/comunicacion.js","./js/panel-contextual.js",
   "./js/aprobaciones-admin.js","./js/operaciones-financieras.js",
