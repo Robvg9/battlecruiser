@@ -1,7 +1,7 @@
-// BattleCruiser Service Worker v110 — app v9.2.47
-// Permisos → visibilidad real de secciones (permisos-navegacion.js).
-const BC_VERSION = "9.2.47";
-const CACHE_NAME = "battlecruiser-shell-v110";
+// BattleCruiser Service Worker v111 — app v9.2.48
+// Productos: form-producto solo en modal (m26).
+const BC_VERSION = "9.2.48";
+const CACHE_NAME = "battlecruiser-shell-v111";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
