@@ -14,7 +14,7 @@
       input.removeAttribute("pattern");
       input.removeAttribute("inputmode");
     }
-    if(label) label.textContent="Usuario";
+    if(label)label.textContent="Usuario";
     document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
 
     ["update-app-btn-login","update-app-btn"].forEach(id=>{
@@ -35,7 +35,7 @@
             const keys=await caches.keys();
             await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")).map(k=>caches.delete(k)));
           }
-        }catch(e){console.warn("[BattleCruiser] actualización: limpieza parcial",e)}
+        }catch(e){console.warn("[BattleCruiser] actualización: limpieza parcial",e);}
         const u=new URL(location.href);
         u.searchParams.set("bc_update",`${VERSION}-${Date.now()}`);
         location.replace(u.toString());
@@ -47,36 +47,8 @@
   window.addEventListener("pageshow",aplicarVersion);
 })();
 
-(function cargarConfiguracion(){
-  if(document.querySelector('script[src*="configuracion"]'))return;
-  var s=document.createElement("script");s.src="js/configuracion.js";s.async=false;document.body.appendChild(s);
-})();
-
-(function cargarGuardiaOnlineOffline(){
-  if(document.querySelector('script[src*="online-offline-guard"]'))return;
-  var s=document.createElement("script");s.src="js/online-offline-guard.js";s.async=false;document.body.appendChild(s);
-})();
-
-(function cargarOperacionesFinancieras(){
-  if(document.querySelector('script[src*="operaciones-financieras"]'))return;
-  var s=document.createElement("script");s.src="js/operaciones-financieras.js";s.async=false;document.body.appendChild(s);
-})();
-
-(function cargarAprobacionesAdmin(){
-  if(document.querySelector('script[src*="aprobaciones-admin"]'))return;
-  var s=document.createElement("script");s.src="js/aprobaciones-admin.js";s.async=false;document.body.appendChild(s);
-})();
-
-(function cargarIntegridadUI(){
-  if(document.querySelector('script[src*="m26-ui-integridad"]'))return;
-  var s=document.createElement("script");s.src="js/m26-ui-integridad.js?v=26.27";s.async=false;document.body.appendChild(s);
-})();
-
-// Misión 9.2.28: estabilización de carga Productos y anti-duplicados.
-(function cargarHardeningCarga(){
-  if(document.querySelector('script[src*="runtime-productos-hardening"]'))return;
-  var s=document.createElement("script");
-  s.src="js/runtime-productos-hardening.js?v=928";
-  s.async=false;
-  document.body.appendChild(s);
-})();
+(function cargarConfiguracion(){if(document.querySelector('script[src*="configuracion"]'))return;var s=document.createElement("script");s.src="js/configuracion.js";s.async=false;document.body.appendChild(s);})();
+(function cargarGuardiaOnlineOffline(){if(document.querySelector('script[src*="online-offline-guard"]'))return;var s=document.createElement("script");s.src="js/online-offline-guard.js";s.async=false;document.body.appendChild(s);})();
+(function cargarOperacionesFinancieras(){if(document.querySelector('script[src*="operaciones-financieras"]'))return;var s=document.createElement("script");s.src="js/operaciones-financieras.js";s.async=false;document.body.appendChild(s);})();
+(function cargarAprobacionesAdmin(){if(document.querySelector('script[src*="aprobaciones-admin"]'))return;var s=document.createElement("script");s.src="js/aprobaciones-admin.js";s.async=false;document.body.appendChild(s);})();
+(function cargarIntegridadUI(){if(document.querySelector('script[src*="m26-ui-integridad"]'))return;var s=document.createElement("script");s.src="js/m26-ui-integridad.js?v=26.28";s.async=false;document.body.appendChild(s);})();
