@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.43 — FIX freeze: hide-config-tab sin MutationObserver; bust ?v=42.2
-(function hotfixV9243(){
-  const VERSION="9.2.43";
+// v9.2.46 — Alta usuarios sin correo (Edge Function) + UI Usuarios
+(function hotfixV9246(){
+  const VERSION="9.2.46";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -29,8 +29,8 @@
   const modules=[
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
-    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","34.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","44.1"],
-    ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"]
+    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","44.1"],
+    ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
