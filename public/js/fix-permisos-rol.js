@@ -1,6 +1,6 @@
-// BattleCruiser — Fix guardar permisos de rol (v9.2.37)
-// Refuerza #rol-permisos-guardar-btn con delegación en document (capture).
-// RPC: actualizar_permisos_rol (B3/M11). No crea tablas ni RPC nuevas.
+// BattleCruiser — Fix guardar permisos de rol (v9.2.44)
+// Un único handler para guardar permisos. Reutiliza el cliente Supabase global
+// real (client). No crea tablas, RPC ni sistemas paralelos.
 (function () {
   'use strict';
   if (window.__bcFixPermisosRol) return;
@@ -43,7 +43,11 @@
     btn.disabled = true;
     if (typeof showLoading === 'function') showLoading();
     try {
-      if (!window.client) throw new Error('Backend no disponible');
+      // client es una declaración global compartida entre los scripts clásicos.
+      // NO usar window.client: una const/let global no vive como propiedad de window.
+      if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
+        throw new Error('Cliente Supabase no inicializado');
+      }
       var res = await client.rpc('actualizar_permisos_rol', {
         p_role_id: roleId,
         p_permisos: payload
@@ -62,7 +66,7 @@
       feedback.textContent = 'No se pudieron guardar: ' + m;
       feedback.style.color = '#e8a0a0';
       if (typeof setMsg === 'function') setMsg('msg-roles', 'No se pudieron guardar los permisos: ' + esc(m), false);
-      console.warn('[Battlecruiser] actualizar_permisos_rol', err);
+      console.warn('[BattleCruiser] actualizar_permisos_rol', err);
     } finally {
       btn.disabled = false;
       if (typeof hideLoading === 'function') hideLoading();
