@@ -1,7 +1,6 @@
 // ==== Battlecruiser · js/auth.js ====
-// Autenticación (login/logout/alta de usuario), sesión, actualizar app (cache-bust), ajustes de cuenta (ojito de contraseña, cambiar contraseña), registro del Service Worker, atajos de teclado y bloqueo de scroll en inputs numéricos.
-// (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
-
+// Autenticación, sesión, actualizar app, ajustes de cuenta, SW, atajos.
+// v9.2.51 — al cambiar de usuario se resetea navegación (no heredar pestaña).
 
 const loginForm = document.getElementById("login-form");
 const loginBtn = document.getElementById("login-btn");
@@ -12,16 +11,21 @@ const logoutBtn = document.getElementById("logout-btn");
 const lanternWrap = document.getElementById("lantern-wrap");
 
 let _usuarioActualId = null;
-// al inicio para evitar TDZ: showLogin/showApp la referencian al arrancar.
 let _novedadesVistas = new Set();
-// para evitar TDZ (showApp/showLogin lo usan durante la carga inicial).
 let _usuarioActual = null;
 let _permisosEfectivos = {};
 let _cargandoUsuario = false;
-let _permisosCargaExitosa = false; // el RPC respondio un array (aunque fuera [])
-let _permisosCargaFallidaRed = false; // la carga fallo por error de red
+let _permisosCargaExitosa = false;
+let _permisosCargaFallidaRed = false;
 
 function showApp(session) {
+  // Nueva sesión: no conservar pestaña/panel del usuario anterior
+  if (typeof resetearNavegacionParaNuevaSesion === "function") {
+    resetearNavegacionParaNuevaSesion();
+  } else {
+    document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
+  }
   loginForm.classList.add("hidden");
   lanternWrap.classList.add("hidden");
   appShell.classList.add("visible");
@@ -31,18 +35,21 @@ function showApp(session) {
 }
 
 function showLogin() {
+  if (typeof resetearNavegacionParaNuevaSesion === "function") {
+    resetearNavegacionParaNuevaSesion();
+  } else {
+    document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
+  }
   loginForm.classList.remove("hidden");
   lanternWrap.classList.remove("hidden");
   appShell.classList.remove("visible");
   _usuarioActualId = null;
-  // un usuario B jamás vea permisos/datos del usuario A anterior.
   if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
-  // Foco directo en "Usuario" al mostrar el login.
   const usuarioInput = document.getElementById("email");
   if (usuarioInput) usuarioInput.focus();
 }
 
-// Por defecto arranca en login hasta confirmar sesión real (evita el parpadeo de ver ambas pantallas)
 showLogin();
 
 client.auth.getSession().then(({ data }) => {
@@ -117,6 +124,7 @@ safeInit("login", () => {
 
 safeInit("logout", () => {
   logoutBtn.addEventListener("click", async () => {
+    if (typeof resetearNavegacionParaNuevaSesion === "function") resetearNavegacionParaNuevaSesion();
     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
     await client.auth.signOut();
   });
@@ -181,15 +189,11 @@ safeInit("nuevo-usuario", () => {
   });
 });
 
-// ---- Actualizar app: borra caché del shell y fuerza traer la última versión ----
 async function actualizarApp(btn) {
   const textoOriginal = btn.textContent;
   btn.disabled = true;
   btn.textContent = "Actualizando...";
   try {
-    // V1.3: borrar SOLO las caches de BattleCruiser (mismo prefijo que usa el
-    // service worker en su activate: "battlecruiser-shell-"). Nunca tocar caches
-    // de otras aplicaciones que compartan este mismo origen.
     if ("caches" in window) {
       const keys = await caches.keys();
       await Promise.all(
@@ -200,9 +204,7 @@ async function actualizarApp(btn) {
       const regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map((r) => r.unregister()));
     }
-  } catch (e) {
-    // Si algo falla igual forzamos el reload de abajo; el navegador va a pedir todo de red.
-  }
+  } catch (e) {}
   location.reload();
 }
 
@@ -250,7 +252,6 @@ safeInit("menu-ajustes", () => {
   });
 });
 
-// ---- Cambiar contraseña (Supabase Auth, no pide la contraseña actual) ----
 safeInit("cambiar-contraseña", () => {
   const changePassBtn = document.getElementById("change-pass-btn");
   const passPanel = document.getElementById("pass-panel");
@@ -284,8 +285,6 @@ safeInit("cambiar-contraseña", () => {
       return;
     }
 
-    // Si por lo que sea la sesión se perdió (token vencido, etc.), antes esto
-    // fallaba con un error genérico de Supabase; ahora se avisa claro.
     const { data: sesionActual } = await client.auth.getSession();
     if (!sesionActual.session) {
       setMsg("msg-pass", "Se perdió la sesión — cerrá sesión y volvé a entrar antes de cambiar la contraseña.", false);
@@ -334,10 +333,8 @@ safeInit("escape-cierra-paneles", () => {
   });
 });
 
-// ---- Evitar que el scroll del mouse/trackpad cambie precios y cantidades ----
 safeInit("bloqueo-scroll-numeros", () => {
   document.querySelectorAll('input[type="number"]').forEach((input) => {
     input.addEventListener("wheel", () => input.blur(), { passive: true });
   });
 });
-
