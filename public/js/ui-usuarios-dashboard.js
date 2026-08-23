@@ -1,6 +1,7 @@
-// BattleCruiser — Usuarios Dashboard (v9.2.34)
+// BattleCruiser — Usuarios Dashboard (v9.2.45)
 // Visual tipo admin moderno (referencia dashboard). Reutiliza IDs/handlers B3.
 // No crea RPC ni segundo sistema de permisos.
+// v9.2.45: formulario "Crear nuevo usuario" solo como modal; sin scrollbar de página en app-shell.
 (function () {
   'use strict';
 
@@ -9,6 +10,13 @@
     var s = document.createElement('style');
     s.id = 'bc-usuarios-dash-css';
     s.textContent = [
+      /* --- Shell: la app se ajusta a la pantalla; solo main scrollea --- */
+      'body:has(.app-shell.visible){overflow:hidden!important;height:100vh;height:100dvh;align-items:flex-start}',
+      '.app-shell.visible{height:100vh;height:100dvh;overflow:hidden;box-sizing:border-box;margin:0!important;max-width:none}',
+      '@media(max-width:1023px){.app-shell.visible{display:flex!important;flex-direction:column;width:100%;max-width:100%}.app-shell.visible .main-content{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}.app-shell.visible .sidebar{overflow-y:auto}}',
+      '@media(min-width:1024px){.app-shell.visible{display:grid!important}.app-shell.visible .main-content{min-height:0;overflow-y:auto}}',
+      'html:has(.app-shell.visible){overflow:hidden;height:100%}',
+
       '#tab-usuarios.bc-udash{max-width:1200px;padding-bottom:24px}',
       '#tab-usuarios.bc-udash > .pendientes-header{display:none!important}',
       '#tab-usuarios.bc-udash > #msg-usuarios{margin:0 0 10px}',
@@ -31,11 +39,22 @@
       '.ud-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}',
       '.ud-card-head h3{margin:0;font-family:Cormorant Garamond,serif;font-size:1.15rem;font-weight:600;color:var(--gold-bright)}',
       '.ud-card-head .muted{margin:0;font-size:12.5px}',
-      '#tab-usuarios.bc-udash #form-nuevo-usuario{display:grid;grid-template-columns:1fr;gap:10px}',
-      '@media(min-width:700px){#tab-usuarios.bc-udash #form-nuevo-usuario{grid-template-columns:1fr 1fr 1fr auto;align-items:end}}',
-      '#tab-usuarios.bc-udash #form-nuevo-usuario input{width:100%;box-sizing:border-box;border-radius:10px;padding:11px 12px}',
-      '#tab-usuarios.bc-udash #form-nuevo-usuario button[type=submit]{grid-column:1/-1;justify-self:end;min-width:140px}',
-      '@media(min-width:700px){#tab-usuarios.bc-udash #form-nuevo-usuario button[type=submit]{grid-column:auto}}',
+
+      /* Modal crear usuario */
+      '#ud-card-crear{display:none}',
+      '#ud-modal-crear{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}',
+      '#ud-modal-crear.open{display:flex}',
+      '#ud-modal-crear .ud-modal-backdrop{position:absolute;inset:0;background:rgba(6,14,11,.72);backdrop-filter:blur(3px)}',
+      '#ud-modal-crear .ud-modal-panel{position:relative;z-index:1;width:100%;max-width:480px;max-height:min(90vh,640px);overflow-y:auto;background:linear-gradient(180deg,var(--stone-2),var(--stone));border:1px solid rgba(201,162,77,.28);border-radius:16px;padding:20px 20px 16px;box-shadow:0 24px 64px rgba(0,0,0,.55)}',
+      '#ud-modal-crear .ud-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}',
+      '#ud-modal-crear .ud-modal-head h3{margin:0;font-family:Cormorant Garamond,serif;font-size:1.35rem;font-weight:600;color:var(--gold-bright)}',
+      '#ud-modal-crear .ud-modal-close{width:36px;height:36px;border-radius:8px;border:1px solid rgba(201,162,77,.28);background:rgba(201,162,77,.08);color:var(--text);cursor:pointer;font-size:20px;line-height:1;display:inline-flex;align-items:center;justify-content:center}',
+      '#ud-modal-crear .ud-modal-close:hover{border-color:var(--gold);color:var(--gold-bright)}',
+      '#ud-modal-crear #form-nuevo-usuario{display:grid;grid-template-columns:1fr;gap:10px;margin:0;background:transparent;border:none;padding:0;box-shadow:none}',
+      '#ud-modal-crear #form-nuevo-usuario input{width:100%;box-sizing:border-box;border-radius:10px;padding:11px 12px}',
+      '#ud-modal-crear #form-nuevo-usuario button[type=submit]{width:100%;margin-top:4px;border-radius:10px;padding:12px;font-weight:600}',
+      '#ud-modal-crear #msg-nuevo-usuario{margin:10px 0 0;min-height:18px}',
+
       '#lista-usuarios.ud-table{display:block;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid rgba(201,162,77,.12)}',
       '#lista-usuarios.ud-table .ud-thead{display:none}',
       '@media(min-width:720px){#lista-usuarios.ud-table .ud-thead{display:grid;grid-template-columns:minmax(160px,2fr) minmax(100px,1fr) 90px minmax(100px,1fr) auto;gap:10px;padding:10px 14px;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--gold-dim);border-bottom:1px solid rgba(201,162,77,.16);background:rgba(6,16,14,.5)}}',
@@ -74,10 +93,75 @@
     document.head.appendChild(s);
   }
 
+  function openCrearModal() {
+    var modal = document.getElementById('ud-modal-crear');
+    if (!modal) return;
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    var n = document.getElementById('nuevo-usuario-nombre');
+    if (n) setTimeout(function () { n.focus(); }, 40);
+  }
+
+  function closeCrearModal() {
+    var modal = document.getElementById('ud-modal-crear');
+    if (!modal) return;
+    modal.classList.remove('open');
+  }
+
+  function ensureModal() {
+    if (document.getElementById('ud-modal-crear')) return;
+
+    var form = document.getElementById('form-nuevo-usuario');
+    var msgN = document.getElementById('msg-nuevo-usuario');
+    if (!form) return;
+
+    var block = form.closest('.cc-bloque') || form.closest('#ud-card-crear') || form.parentNode;
+    if (block && block.id !== 'tab-usuarios') {
+      block.style.display = 'none';
+      block.setAttribute('aria-hidden', 'true');
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'ud-modal-crear';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'ud-modal-crear-title');
+    modal.innerHTML =
+      '<div class="ud-modal-backdrop" data-ud-close="1"></div>' +
+      '<div class="ud-modal-panel">' +
+      '<div class="ud-modal-head"><h3 id="ud-modal-crear-title">Crear nuevo usuario</h3>' +
+      '<button type="button" class="ud-modal-close" data-ud-close="1" aria-label="Cerrar">×</button></div>' +
+      '<div class="ud-modal-body"></div>' +
+      '</div>';
+    document.body.appendChild(modal);
+
+    var body = modal.querySelector('.ud-modal-body');
+    body.appendChild(form);
+    if (msgN) body.appendChild(msgN);
+
+    modal.addEventListener('click', function (e) {
+      if (e.target && e.target.getAttribute('data-ud-close') === '1') closeCrearModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.classList.contains('open')) closeCrearModal();
+    });
+
+    if (msgN) {
+      new MutationObserver(function () {
+        if (msgN.classList.contains('ok') && (msgN.textContent || '').trim()) {
+          setTimeout(closeCrearModal, 900);
+        }
+      }).observe(msgN, { attributes: true, childList: true, characterData: true, subtree: true });
+    }
+  }
+
   function ensureShell() {
     var tab = document.getElementById('tab-usuarios');
     if (!tab) return null;
     tab.classList.add('bc-udash');
+
+    ensureModal();
 
     if (!document.getElementById('ud-hero')) {
       var hero = document.createElement('div');
@@ -88,13 +172,18 @@
         '<div class="ud-hero-actions"><button type="button" class="ud-btn-primary" id="ud-scroll-crear">+ Nuevo usuario</button></div>';
       tab.insertBefore(hero, tab.firstChild);
       hero.querySelector('#ud-scroll-crear').addEventListener('click', function () {
-        var f = document.getElementById('form-nuevo-usuario');
-        if (f) {
-          f.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          var n = document.getElementById('nuevo-usuario-nombre');
-          if (n) n.focus();
-        }
+        ensureModal();
+        openCrearModal();
       });
+    } else {
+      var btn = document.getElementById('ud-scroll-crear');
+      if (btn && !btn.dataset.udModalBound) {
+        btn.dataset.udModalBound = '1';
+        btn.addEventListener('click', function () {
+          ensureModal();
+          openCrearModal();
+        });
+      }
     }
 
     if (!document.getElementById('ud-kpis')) {
@@ -112,15 +201,9 @@
     }
 
     var form = document.getElementById('form-nuevo-usuario');
-    if (form && !form.closest('#ud-card-crear')) {
-      var card = document.createElement('div');
-      card.id = 'ud-card-crear';
-      card.className = 'ud-card';
-      card.innerHTML = '<div class="ud-card-head"><h3>Crear nuevo usuario</h3></div>';
-      form.parentNode.insertBefore(card, form);
-      card.appendChild(form);
-      var msgN = document.getElementById('msg-nuevo-usuario');
-      if (msgN) card.appendChild(msgN);
+    if (form && form.closest('#ud-card-crear') && !form.closest('#ud-modal-crear')) {
+      var oldCard = document.getElementById('ud-card-crear');
+      if (oldCard) oldCard.style.display = 'none';
     }
 
     var lista = document.getElementById('lista-usuarios');
