@@ -1,5 +1,4 @@
 // BattleCruiser Service Worker v111 — app v9.2.48
-// Productos: form-producto solo en modal (m26).
 const BC_VERSION = "9.2.48";
 const CACHE_NAME = "battlecruiser-shell-v111";
 const SHELL_FILES = [

@@ -1,5 +1,5 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.48 — Productos: form oculto fuera del modal (m26 v44.2)
+// v9.2.48 — Navegación por permisos canónica (sin wrappers pesados)
 (function hotfixV9248(){
   const VERSION="9.2.48";
   window.__BC_VERSION__=VERSION;
@@ -28,10 +28,10 @@
 (function cargarModulosDinamicos(){
   const modules=[
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
-    ["m26-ui-integridad.js","44.2"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
+    ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","44.1"],
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],
-    ["permisos-navegacion.js","47.1"]
+    ["permisos-navegacion.js","48.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
