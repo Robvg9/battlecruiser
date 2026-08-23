@@ -1,5 +1,5 @@
 // BattleCruiser — M26 UI integridad
-// v9.2.22 — un solo botón "Agregar producto" y un solo formulario real
+// v9.2.23 — Productos: formulario de creación/edición en ventana emergente única
 (function () {
   'use strict';
 
@@ -72,7 +72,6 @@
   function limpiarInterfazAgregarProducto() {
     var panel = document.getElementById('tab-productos');
     if (!panel) return;
-
     var m22 = document.getElementById('m22-productos-ui');
     if (m22) m22.remove();
     var m22Btn = document.getElementById('m22-agregar-producto');
@@ -80,15 +79,7 @@
     var m22Close = document.getElementById('m22-cerrar-form');
     if (m22Close) m22Close.remove();
     var modalUi = document.getElementById('bc-product-modal');
-    if (modalUi) {
-      var host = document.getElementById('bc-product-form-host');
-      var form = document.getElementById('form-producto');
-      var tab = document.getElementById('tab-productos');
-      if (host && form && tab && host.contains(form)) {
-        tab.insertBefore(form, tab.firstChild);
-      }
-      modalUi.remove();
-    }
+    if (modalUi) modalUi.remove();
     var toolbarUi = document.querySelector('.bc-product-toolbar');
     if (toolbarUi) toolbarUi.remove();
 
@@ -104,42 +95,79 @@
     });
     panel.querySelectorAll('button').forEach(function (btn) {
       var t = (btn.textContent || '').trim().toLowerCase().replace(/^＋\s*/, '');
-      if (
-        (t === 'agregar producto' || t === '＋ agregar producto') &&
-        btn.id !== 'prod-submit-btn' &&
-        btn.id !== 'bc-productos-agregar' &&
-        btn.type !== 'submit'
-      ) {
-        btn.remove();
-      }
+      if ((t === 'agregar producto' || t === '＋ agregar producto') && btn.id !== 'prod-submit-btn' && btn.id !== 'bc-productos-agregar' && btn.type !== 'submit') btn.remove();
     });
   }
 
-  function ocultarFormularioProducto() {
+  function asegurarModalProducto() {
+    var modal = document.getElementById('bc-product-modal');
     var form = document.getElementById('form-producto');
-    if (!form) return;
-    form.classList.remove('bc-producto-form-visible');
-    form.classList.add('hidden');
-    form.style.setProperty('display', 'none', 'important');
-    form.dataset.bcProductFormOpen = '0';
+    if (!form) return null;
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'bc-product-modal';
+      modal.className = 'bc-product-modal hidden';
+      modal.setAttribute('aria-hidden', 'true');
+      modal.innerHTML = '<div class="bc-product-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-product-modal-title"><div class="bc-product-modal-head"><h3 id="bc-product-modal-title">Agregar producto</h3><button type="button" id="bc-product-modal-close" class="bc-product-modal-close" aria-label="Cerrar">×</button></div><div id="bc-product-form-host"></div></div>';
+      document.body.appendChild(modal);
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) cerrarModalProducto(true);
+      });
+      var close = modal.querySelector('#bc-product-modal-close');
+      if (close) close.addEventListener('click', function () { cerrarModalProducto(true); });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) cerrarModalProducto(true);
+      });
+    }
+    var host = modal.querySelector('#bc-product-form-host');
+    if (host && !host.contains(form)) host.appendChild(form);
+    form.classList.remove('hidden');
+    form.removeAttribute('hidden');
+    form.classList.add('bc-producto-modal-form');
+    return modal;
+  }
+
+  function cerrarModalProducto(cancelar) {
+    var modal = document.getElementById('bc-product-modal');
+    if (!modal) return;
+    var form = document.getElementById('form-producto');
+    if (cancelar && typeof window.cancelarEdicionProducto === 'function') {
+      try { window.cancelarEdicionProducto(); } catch (e) {}
+    }
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    if (form) form.classList.add('hidden');
   }
 
   function mostrarFormularioProducto() {
     var form = document.getElementById('form-producto');
     if (!form) return;
-    var tab = document.getElementById('tab-productos');
-    if (tab && !tab.contains(form)) {
-      tab.appendChild(form);
-    }
-    form.classList.remove('hidden');
-    form.removeAttribute('hidden');
-    form.classList.add('bc-producto-form-visible');
-    form.style.setProperty('display', 'block', 'important');
-    form.dataset.bcProductFormOpen = '1';
+    var modal = asegurarModalProducto();
+    if (!modal) return;
+    var editando = document.getElementById('prod-editando-id');
+    var title = modal.querySelector('#bc-product-modal-title');
     var submitBtn = document.getElementById('prod-submit-btn');
-    if (submitBtn) {
-      var editando = document.getElementById('prod-editando-id');
-      submitBtn.textContent = (editando && editando.value) ? 'Guardar cambios' : 'Guardar producto';
+    var edit = !!(editando && editando.value);
+    if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
+    if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
+    form.classList.remove('hidden');
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    form.dataset.bcProductFormOpen = '1';
+    var nombre = document.getElementById('prod-nombre');
+    if (nombre) setTimeout(function () { try { nombre.focus(); } catch (e) {} }, 0);
+  }
+
+  function ocultarFormularioProducto() {
+    var form = document.getElementById('form-producto');
+    if (form) {
+      form.classList.add('hidden');
+      form.dataset.bcProductFormOpen = '0';
+    }
+    var modal = document.getElementById('bc-product-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
     }
   }
 
@@ -151,12 +179,9 @@
     var buscar = document.getElementById('productos-buscar');
     if (!form || !lista || !buscar || typeof renderProductosLista !== 'function') return;
     panel.dataset.bcSimple = '1';
-
     limpiarInterfazAgregarProducto();
-
     form = document.getElementById('form-producto');
     if (!form) return;
-
     ocultarFormularioProducto();
 
     var barra = document.createElement('div');
@@ -177,15 +202,10 @@
     orden.className = 'bc-productos-orden';
     [['nombre-asc', 'A–Z'], ['nombre-desc', 'Z–A'], ['categoria', 'Categoría']].forEach(function (pair) {
       var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'cc-accion bc-prod-sort';
-      b.dataset.sort = pair[0];
-      b.textContent = pair[1];
-      orden.appendChild(b);
+      b.type = 'button'; b.className = 'cc-accion bc-prod-sort'; b.dataset.sort = pair[0]; b.textContent = pair[1]; orden.appendChild(b);
     });
     var vista = document.createElement('div');
-    vista.id = 'bc-productos-vista';
-    vista.className = 'bc-productos-vista';
+    vista.id = 'bc-productos-vista'; vista.className = 'bc-productos-vista';
     var fila = document.createElement('button');
     fila.type = 'button'; fila.className = 'cc-accion active'; fila.textContent = '☰'; fila.title = 'Vista en filas';
     var cuadricula = document.createElement('button');
@@ -193,37 +213,21 @@
     vista.appendChild(fila); vista.appendChild(cuadricula); orden.appendChild(vista); controles.appendChild(orden);
 
     var agregar = document.createElement('button');
-    agregar.type = 'button';
-    agregar.id = 'bc-productos-agregar';
-    agregar.className = 'cc-accion';
-    agregar.textContent = 'Agregar producto';
-    agregar.setAttribute('aria-controls', 'form-producto');
+    agregar.type = 'button'; agregar.id = 'bc-productos-agregar'; agregar.className = 'cc-accion'; agregar.textContent = 'Agregar producto'; agregar.setAttribute('aria-controls', 'form-producto');
     agregar.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof cancelarEdicionProducto === 'function') {
-        try { cancelarEdicionProducto(); } catch (err) { /* ignore */ }
-      }
+      e.preventDefault(); e.stopPropagation();
+      if (typeof cancelarEdicionProducto === 'function') { try { cancelarEdicionProducto(); } catch (err) {} }
       mostrarFormularioProducto();
-      var nombre = document.getElementById('prod-nombre');
-      if (nombre) {
-        try { nombre.focus(); } catch (err) { /* ignore */ }
-      }
     });
-    controles.appendChild(agregar);
-    barra.appendChild(controles);
-    panel.insertBefore(barra, panel.firstChild);
+    controles.appendChild(agregar); barra.appendChild(controles); panel.insertBefore(barra, panel.firstChild);
 
-    if (!panel.contains(form)) panel.appendChild(form);
     if (!panel.contains(lista)) panel.appendChild(lista);
+    if (!panel.contains(form) && !document.getElementById('bc-product-form-host')) panel.appendChild(form);
 
     Array.from(panel.children).forEach(function (el) {
       if (el === barra || el === lista || el === form || el.id === 'msg-productos' || el.id === 'productos-nomenclatura-btn' || el.id === 'productos-tools-nomenclatura') return;
       var tag = (el.tagName || '').toLowerCase();
-      if (tag === 'h3' || el.id === 'form-compra' || el.classList.contains('presentaciones-panel') || el.classList.contains('productos-buscador-controles')) {
-        el.style.display = 'none';
-        el.setAttribute('aria-hidden', 'true');
-      }
+      if (tag === 'h3' || el.id === 'form-compra' || el.classList.contains('presentaciones-panel') || el.classList.contains('productos-buscador-controles')) { el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
     });
 
     var sortMode = 'nombre-asc';
@@ -241,33 +245,19 @@
       _cache.productos = arr; renderProductosLista();
     }
     orden.querySelectorAll('.bc-prod-sort').forEach(function (b) {
-      b.addEventListener('click', function () {
-        sortMode = b.dataset.sort;
-        orden.querySelectorAll('.bc-prod-sort').forEach(function (x) { x.classList.toggle('active', x === b); });
-        ordenarProductos();
-      });
+      b.addEventListener('click', function () { sortMode = b.dataset.sort; orden.querySelectorAll('.bc-prod-sort').forEach(function (x) { x.classList.toggle('active', x === b); }); ordenarProductos(); });
     });
     orden.querySelector('.bc-prod-sort').classList.add('active');
 
-    function setVista(grid) {
-      lista.classList.toggle('bc-grid', grid);
-      fila.classList.toggle('active', !grid);
-      cuadricula.classList.toggle('active', grid);
-      try { localStorage.setItem('bc-productos-vista', grid ? 'grid' : 'lista'); } catch (e) {}
-    }
+    function setVista(grid) { lista.classList.toggle('bc-grid', grid); fila.classList.toggle('active', !grid); cuadricula.classList.toggle('active', grid); try { localStorage.setItem('bc-productos-vista', grid ? 'grid' : 'lista'); } catch (e) {} }
     fila.addEventListener('click', function () { setVista(false); });
     cuadricula.addEventListener('click', function () { setVista(true); });
-    var guardada = 'lista';
-    try { guardada = localStorage.getItem('bc-productos-vista') || 'lista'; } catch (e) {}
+    var guardada = 'lista'; try { guardada = localStorage.getItem('bc-productos-vista') || 'lista'; } catch (e) {}
     setVista(guardada === 'grid');
 
     if (typeof window.cancelarEdicionProducto === 'function' && !window.cancelarEdicionProducto.__bcM26) {
       var originalCancel = window.cancelarEdicionProducto;
-      window.cancelarEdicionProducto = function () {
-        originalCancel.apply(this, arguments);
-        var submitBtn = document.getElementById('prod-submit-btn');
-        if (submitBtn) submitBtn.textContent = 'Guardar producto';
-      };
+      window.cancelarEdicionProducto = function () { originalCancel.apply(this, arguments); ocultarFormularioProducto(); var submitBtn = document.getElementById('prod-submit-btn'); if (submitBtn) submitBtn.textContent = 'Guardar producto'; };
       window.cancelarEdicionProducto.__bcM26 = true;
     }
 
@@ -276,28 +266,24 @@
       form.addEventListener('submit', function () {
         setTimeout(function () {
           var editando = document.getElementById('prod-editando-id');
-          if (editando && !editando.value) {
-            var msg = document.getElementById('msg-productos');
-            if (msg && /creado|actualizado|✓/i.test(msg.textContent || '')) {
-              ocultarFormularioProducto();
-            }
+          var msg = document.getElementById('msg-productos');
+          if (msg && /creado|actualizado|✓/i.test(msg.textContent || '')) {
+            if (!editando || !editando.value) ocultarFormularioProducto();
+            else ocultarFormularioProducto();
           }
-        }, 400);
+        }, 500);
       });
     }
 
     if (lista && !lista.dataset.bcM26EditHook) {
       lista.dataset.bcM26EditHook = '1';
       lista.addEventListener('click', function (e) {
-        if (e.target.closest('.btn-editar-producto')) {
-          setTimeout(function () { mostrarFormularioProducto(); }, 0);
-        }
+        if (e.target.closest('.btn-editar-producto')) setTimeout(function () { mostrarFormularioProducto(); }, 0);
       });
     }
 
     if (!document.getElementById('bc-productos-simple-style')) {
-      var style = document.createElement('style');
-      style.id = 'bc-productos-simple-style';
+      var style = document.createElement('style'); style.id = 'bc-productos-simple-style';
       style.textContent = [
         '#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}',
         '#bc-productos-barra .bc-productos-search{width:100%}',
@@ -316,9 +302,16 @@
         '#lista-productos.bc-grid>.lista-item>span:not(.lista-item-acciones){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
         '#lista-productos.bc-grid>.lista-item .lista-item-acciones{display:flex;gap:4px;margin-top:auto}',
         '#lista-productos.bc-grid>.lista-item .lista-item-acciones button{flex:1 1 0;min-width:0;padding:5px 4px;font-size:11px}',
-        '#form-producto{display:none!important}',
-        '#form-producto.bc-producto-form-visible{display:block!important}',
-        '@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}}'
+        '#bc-product-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.68);box-sizing:border-box}',
+        '#bc-product-modal.hidden{display:none!important}',
+        '#bc-product-modal .bc-product-modal-dialog{width:min(720px,96vw);max-height:92vh;overflow:auto;background:var(--panel,#111);border:1px solid rgba(255,255,255,.14);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45);padding:0}',
+        '#bc-product-modal .bc-product-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;background:inherit;z-index:2}',
+        '#bc-product-modal .bc-product-modal-head h3{margin:0}',
+        '#bc-product-modal .bc-product-modal-close{border:0;background:transparent;color:inherit;font-size:28px;line-height:1;cursor:pointer;padding:2px 8px}',
+        '#bc-product-modal #bc-product-form-host{padding:16px}',
+        '#bc-product-modal #form-producto{display:block!important}',
+        '#bc-product-modal #form-producto.hidden{display:block!important}',
+        '@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}#bc-product-modal{padding:8px}#bc-product-modal .bc-product-modal-dialog{width:100%;max-height:96vh;border-radius:12px}}'
       ].join('');
       document.head.appendChild(style);
     }
@@ -331,38 +324,19 @@
     if (!tab || document.getElementById('bc-acceso-gasto')) return;
     var header = tab.querySelector('.pendientes-header');
     if (!header) return;
-    var btn = document.createElement('button');
-    btn.id = 'bc-acceso-gasto';
-    btn.type = 'button';
-    btn.className = 'cc-accion';
-    btn.textContent = '💸 Registrar gasto';
+    var btn = document.createElement('button'); btn.id = 'bc-acceso-gasto'; btn.type = 'button'; btn.className = 'cc-accion'; btn.textContent = '💸 Registrar gasto';
     btn.addEventListener('click', function () {
       var form = document.getElementById('form-gasto-operativo');
-      if (form) {
-        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        var input = document.getElementById('fin-g-concepto');
-        if (input) input.focus();
-      } else if (typeof setMsg === 'function') {
-        setMsg('msg-operacion', 'No tienes permiso para crear gastos o el módulo todavía está cargando.', false);
-      }
+      if (form) { form.scrollIntoView({ behavior: 'smooth', block: 'center' }); var input = document.getElementById('fin-g-concepto'); if (input) input.focus(); }
+      else if (typeof setMsg === 'function') setMsg('msg-operacion', 'No tienes permiso para crear gastos o el módulo todavía está cargando.', false);
     });
     header.appendChild(btn);
   }
 
   function run() {
-    unificarTurnos();
-    ocultarCompraEnProductos();
-    prepararNomenclatura();
-    fijarNomenclaturaSoloProductos();
-    limpiarInterfazAgregarProducto();
-    simplificarProductos();
-    arreglarEdicionProducto();
-    asegurarAccesoGasto();
+    unificarTurnos(); ocultarCompraEnProductos(); prepararNomenclatura(); fijarNomenclaturaSoloProductos(); limpiarInterfazAgregarProducto(); simplificarProductos(); arreglarEdicionProducto(); asegurarAccesoGasto();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 1000); });
-  } else {
-    setTimeout(run, 1000);
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 1000); });
+  else setTimeout(run, 1000);
 })();
