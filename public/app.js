@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.55 — permisos menú estrictos (permitido===true)
-(function hotfixV9255(){
-  const VERSION="9.2.55";
+// v9.2.56 — SW v119: network-first tolerante (evita UI antigua en red inestable)
+(function hotfixV9256(){
+  const VERSION="9.2.56";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -16,7 +16,7 @@
         btn.disabled=true;btn.textContent="Actualizando…";
         try{
           if("serviceWorker"in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()));}
-          if("caches"in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")).map(k=>caches.delete(k)));}
+          if("caches"in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")||k.startsWith("battlecruiser")).map(k=>caches.delete(k)));}
         }catch(e){console.warn("[BattleCruiser] actualización: limpieza parcial",e);}
         const u=new URL(location.href);u.searchParams.set("bc_update",`${VERSION}-${Date.now()}`);location.replace(u.toString());
       });
