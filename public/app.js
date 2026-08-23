@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.58 — M12-FE.2: cards Operaciones respetan permisos reales
-(function hotfixV9258(){
-  const VERSION="9.2.58";
+// v9.2.59 — Fase 3 FE: merma única; vales fuera del menú
+(function hotfixV9259(){
+  const VERSION="9.2.59";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -28,11 +28,11 @@
 (function cargarModulosDinamicos(){
   const modules=[
     ["usuarios-permisos-rest.js","57.1"],
-    ["permisos-navegacion.js","55.1"],
+    ["permisos-navegacion.js","56.1"],
     ["fix-permisos-rol.js","57.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
-    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","37.1"],
+    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","38.1"],
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"]
   ];
   modules.forEach(([name,version])=>{
