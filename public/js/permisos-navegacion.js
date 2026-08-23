@@ -1,8 +1,7 @@
-// BattleCruiser v9.2.54 — menú por permisos (CSS gana a ui-visual-salon)
+// BattleCruiser v9.2.55 — menú solo con seccion.ver === true
 (function () {
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
-  window.__BC_PERMISOS_FE3__ = true;
 
   function tienePermiso(seccion, accion) {
     if (typeof _usuarioActual === "undefined" || !_usuarioActual) return false;
@@ -32,18 +31,20 @@
   var ORDEN_HOME = [
     "ventas", "comunicacion", "productos", "ciclos", "turnos", "operacion",
     "almacenes", "transferencias", "vales", "reportes", "inventario",
-    "movimientos", "resumen", "pendientes", "usuarios", "mando"
+    "movimientos", "usuarios", "mando"
   ];
 
   function setTabVisible(btn, visible) {
     if (!btn) return;
     if (visible) {
       btn.classList.remove("hidden", "tab-sin-permiso");
-      btn.style.setProperty("display", "");
+      btn.setAttribute("data-bc-permiso", "1");
+      btn.style.removeProperty("display");
       btn.removeAttribute("aria-hidden");
       btn.tabIndex = 0;
     } else {
       btn.classList.add("hidden", "tab-sin-permiso");
+      btn.setAttribute("data-bc-permiso", "0");
       btn.style.setProperty("display", "none", "important");
       btn.setAttribute("aria-hidden", "true");
       btn.tabIndex = -1;
@@ -54,15 +55,6 @@
         if (panel) panel.classList.remove("visible");
       }
     }
-  }
-
-  function tieneAlgunaVista() {
-    if (typeof _permisosEfectivos === "undefined" || !_permisosEfectivos) return false;
-    var k = Object.keys(_permisosEfectivos);
-    for (var i = 0; i < k.length; i++) {
-      if (_permisosEfectivos[k[i]] && _permisosEfectivos[k[i]].ver === true) return true;
-    }
-    return false;
   }
 
   function aplicarPermisosAInterfaz() {
@@ -78,18 +70,9 @@
         return;
       }
 
-      if (tab === "config") {
+      if (tab === "config" || tab === "resumen" || tab === "pendientes") {
+        // Sin permiso backend propio: no visibles para roles restringidos
         setTabVisible(btn, false);
-        return;
-      }
-
-      if (tab === "resumen") {
-        setTabVisible(btn, tieneAlgunaVista());
-        return;
-      }
-
-      if (tab === "pendientes") {
-        setTabVisible(btn, tienePermiso("turnos", "ver") || tienePermiso("ciclos", "ver"));
         return;
       }
 
@@ -119,12 +102,12 @@
 
     if (loggedIn && cargaOk) {
       var activo = document.querySelector(".tab-btn.active");
-      var okActivo = activo && !activo.classList.contains("tab-sin-permiso") && activo.style.display !== "none";
+      var okActivo = activo && activo.getAttribute("data-bc-permiso") === "1";
       if (!okActivo) {
         for (var i = 0; i < ORDEN_HOME.length; i++) {
           var t = ORDEN_HOME[i];
           var b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
-          if (b && !b.classList.contains("tab-sin-permiso") && !b.classList.contains("hidden")) {
+          if (b && b.getAttribute("data-bc-permiso") === "1") {
             if (typeof irATab === "function") {
               try { irATab(t); } catch (e) {}
             }
@@ -132,21 +115,12 @@
           }
         }
       }
-    } else if (!loggedIn) {
-      document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-      document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
     }
-  }
-
-  function resetearNavegacionParaNuevaSesion() {
-    document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
   }
 
   window.tienePermiso = tienePermiso;
   window.aplicarPermisosAInterfaz = aplicarPermisosAInterfaz;
   window.TAB_A_SECCION = TAB_A_SECCION;
-  window.resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion;
   try { tienePermiso = tienePermiso; } catch (e) {}
   try { aplicarPermisosAInterfaz = aplicarPermisosAInterfaz; } catch (e) {}
   try { TAB_A_SECCION = TAB_A_SECCION; } catch (e) {}
@@ -156,9 +130,12 @@
   var st = document.createElement("style");
   st.id = "bc-tab-sin-permiso-css";
   st.textContent =
-    "#tabs .tab-btn.tab-sin-permiso,#tabs .tab-btn.hidden," +
-    ".sidebar-nav .tab-btn.tab-sin-permiso,.sidebar-nav .tab-btn.hidden," +
-    ".tab-btn.tab-sin-permiso.hidden{" +
+    "#tabs .tab-btn[data-bc-permiso=\"0\"]," +
+    "#tabs .tab-btn.tab-sin-permiso," +
+    "#tabs .tab-btn.hidden," +
+    ".sidebar-nav .tab-btn[data-bc-permiso=\"0\"]," +
+    ".sidebar-nav .tab-btn.tab-sin-permiso," +
+    ".sidebar-nav .tab-btn.hidden{" +
     "display:none!important;visibility:hidden!important;pointer-events:none!important;" +
     "height:0!important;max-height:0!important;overflow:hidden!important;" +
     "padding:0!important;margin:0!important;border:none!important;}";
