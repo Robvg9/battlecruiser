@@ -26,11 +26,10 @@
 })();
 
 (function cargarModulosDinamicos(){
-  // hide-config-tab DEBE ir con bust nuevo (42.2) — la v39.1 tenía MutationObserver infinito
   const modules=[
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
-    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","34.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","37.1"],
+    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","34.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","44.1"],
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"]
   ];
   modules.forEach(([name,version])=>{
