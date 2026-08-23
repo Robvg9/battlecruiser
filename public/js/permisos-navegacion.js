@@ -1,10 +1,11 @@
-// BattleCruiser v9.2.51 — M12-FE.2
-// Menú ↔ permisos (única fuente) + reset de navegación entre usuarios.
-// Consume _permisosEfectivos desde permisos_usuario_actual.
+// BattleCruiser v9.2.52 — M12-FE.3
+// ÚNICA autoridad de menú. Fail-closed. Sin pestañas "siempre visibles".
+// Fuente: permisos_usuario_actual → _permisosEfectivos → tienePermiso → menú.
 (function () {
   "use strict";
-  if (window.__BC_PERMISOS_CANONICO__) return;
+  // Esta versión siempre gana sobre definiciones previas de usuarios-permisos.js
   window.__BC_PERMISOS_CANONICO__ = true;
+  window.__BC_PERMISOS_FE3__ = true;
 
   function tienePermiso(seccion, accion) {
     if (typeof _usuarioActual === "undefined" || !_usuarioActual) return false;
@@ -14,6 +15,7 @@
     return !!(sec && sec[accion] === true);
   }
 
+  // Claves = data-tab del menú. Valores = seccion del backend / matriz.
   var TAB_A_SECCION = {
     productos: "productos",
     ventas: "ventas",
@@ -31,152 +33,162 @@
     usuarios: "usuarios"
   };
 
-  // Preferencia de home al abrir sesión (primera con ver / disponible)
   var ORDEN_HOME = [
-    "resumen", "pendientes", "ventas", "comunicacion", "productos",
-    "ciclos", "turnos", "operacion", "almacenes", "transferencias",
-    "vales", "reportes", "inventario", "movimientos", "usuarios", "mando"
+    "ventas", "comunicacion", "productos", "ciclos", "turnos", "operacion",
+    "almacenes", "transferencias", "vales", "reportes", "inventario",
+    "movimientos", "resumen", "pendientes", "usuarios", "mando"
   ];
 
-  function togglePorPermiso(elId, seccion, accion) {
-    var el = document.getElementById(elId);
-    if (!el) return;
-    el.classList.toggle("hidden", !tienePermiso(seccion, accion));
-  }
-
-  /** Quita active/visible. No abre ninguna sección. */
-  function resetearNavegacionParaNuevaSesion() {
-    document.querySelectorAll(".tab-btn").forEach(function (b) {
-      b.classList.remove("active");
-    });
-    document.querySelectorAll(".tab-panel").forEach(function (p) {
-      p.classList.remove("visible");
-    });
-  }
-
-  function tabBtnDisponible(btn) {
-    if (!btn) return false;
-    if (btn.classList.contains("tab-sin-permiso") || btn.classList.contains("hidden")) return false;
-    if (btn.style.display === "none") return false;
-    if (btn.getAttribute("aria-hidden") === "true") return false;
-    return true;
-  }
-
-  /** Primera pestaña realmente autorizada (resumen si existe). */
-  function seleccionarPrimeraSeccionAutorizada() {
-    var i, tab, btn;
-    for (i = 0; i < ORDEN_HOME.length; i++) {
-      tab = ORDEN_HOME[i];
-      btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-      if (tabBtnDisponible(btn)) {
-        if (typeof irATab === "function") {
-          try { irATab(tab); } catch (e) {}
-        } else {
-          document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-          document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
-          btn.classList.add("active");
-          var panel = document.getElementById("tab-" + tab);
-          if (panel) panel.classList.add("visible");
-        }
-        return tab;
+  function setTabVisible(btn, visible) {
+    if (!btn) return;
+    if (visible) {
+      btn.classList.remove("hidden", "tab-sin-permiso");
+      btn.style.display = "";
+      btn.removeAttribute("aria-hidden");
+      btn.tabIndex = 0;
+    } else {
+      btn.classList.add("hidden", "tab-sin-permiso");
+      btn.style.display = "none";
+      btn.setAttribute("aria-hidden", "true");
+      btn.tabIndex = -1;
+      btn.classList.remove("active");
+      var tab = btn.dataset.tab;
+      if (tab) {
+        var panel = document.getElementById("tab-" + tab);
+        if (panel) panel.classList.remove("visible");
       }
     }
-    return null;
   }
 
-  function panelProhibidoVisible() {
-    var activo = document.querySelector(".tab-btn.active");
-    if (!activo) return true;
-    return !tabBtnDisponible(activo);
+  function tieneAlgunaVista() {
+    if (typeof _permisosEfectivos === "undefined" || !_permisosEfectivos) return false;
+    var k = Object.keys(_permisosEfectivos);
+    for (var i = 0; i < k.length; i++) {
+      if (_permisosEfectivos[k[i]] && _permisosEfectivos[k[i]].ver === true) return true;
+    }
+    return false;
   }
 
   function aplicarPermisosAInterfaz() {
     var loggedIn = !!(typeof _usuarioActual !== "undefined" && _usuarioActual);
+    var cargaOk = !!(typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa);
 
     document.querySelectorAll(".tab-btn[data-tab]").forEach(function (btn) {
       var tab = btn.dataset.tab;
       if (!tab) return;
 
-      if (tab === "config") {
-        btn.classList.add("hidden", "tab-sin-permiso");
-        btn.style.display = "none";
-        btn.setAttribute("aria-hidden", "true");
-        btn.tabIndex = -1;
-        btn.classList.remove("active");
+      // Sin sesión o sin carga exitosa: ocultar TODO (sin flash de menú completo)
+      if (!loggedIn || !cargaOk) {
+        setTabVisible(btn, false);
         return;
       }
 
-      // Home universal mientras haya sesión (no requiere fila en matriz)
-      if (tab === "resumen" || tab === "pendientes") {
-        if (loggedIn) {
-          btn.classList.remove("hidden", "tab-sin-permiso");
-          btn.style.display = "";
-          btn.removeAttribute("aria-hidden");
-          btn.tabIndex = 0;
-        } else {
-          btn.classList.add("hidden", "tab-sin-permiso");
-          btn.style.display = "none";
-          btn.setAttribute("aria-hidden", "true");
-          btn.tabIndex = -1;
-          btn.classList.remove("active");
-        }
+      // config: no es sección de menú operativa
+      if (tab === "config") {
+        setTabVisible(btn, false);
+        return;
+      }
+
+      // Centro de control: solo si el usuario tiene al menos un ver (no permanente)
+      if (tab === "resumen") {
+        setTabVisible(btn, tieneAlgunaVista());
+        return;
+      }
+
+      // Pendientes: ligado a turnos/ciclos, no permanente
+      if (tab === "pendientes") {
+        setTabVisible(btn, tienePermiso("turnos", "ver") || tienePermiso("ciclos", "ver"));
         return;
       }
 
       var seccion = TAB_A_SECCION[tab];
-      var permitido = !!(loggedIn && seccion && tienePermiso(seccion, "ver"));
-
-      if (permitido) {
-        btn.classList.remove("hidden", "tab-sin-permiso");
-        btn.style.display = "";
-        btn.removeAttribute("aria-hidden");
-        btn.tabIndex = 0;
-      } else {
-        btn.classList.add("hidden", "tab-sin-permiso");
-        btn.style.display = "none";
-        btn.setAttribute("aria-hidden", "true");
-        btn.tabIndex = -1;
-        btn.classList.remove("active");
-        // Panel de sección prohibida no puede quedar visible
-        var panel = document.getElementById("tab-" + tab);
-        if (panel) panel.classList.remove("visible");
+      if (!seccion) {
+        setTabVisible(btn, false);
+        return;
       }
+      setTabVisible(btn, tienePermiso(seccion, "ver"));
     });
 
-    togglePorPermiso("form-producto", "productos", "crear");
-    togglePorPermiso("form-compra", "stock", "crear");
-    if (!tienePermiso("stock", "crear")) togglePorPermiso("form-compra", "productos", "crear");
-    togglePorPermiso("form-venta-linea", "ventas", "crear");
-    togglePorPermiso("form-almacen", "almacenes", "crear");
-    togglePorPermiso("form-transferencia", "transferencias", "crear");
-    togglePorPermiso("form-vale", "vales_salida", "crear");
-    togglePorPermiso("form-categoria", "categorias", "crear");
-    togglePorPermiso("form-unidad", "unidades", "crear");
-    togglePorPermiso("form-nuevo-usuario", "usuarios", "crear");
+    function toggleForm(id, sec, act) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.toggle("hidden", !tienePermiso(sec, act));
+    }
+    toggleForm("form-producto", "productos", "crear");
+    toggleForm("form-compra", "stock", "crear");
+    if (!tienePermiso("stock", "crear")) toggleForm("form-compra", "productos", "crear");
+    toggleForm("form-venta-linea", "ventas", "crear");
+    toggleForm("form-almacen", "almacenes", "crear");
+    toggleForm("form-transferencia", "transferencias", "crear");
+    toggleForm("form-vale", "vales_salida", "crear");
+    toggleForm("form-categoria", "categorias", "crear");
+    toggleForm("form-unidad", "unidades", "crear");
+    toggleForm("form-nuevo-usuario", "usuarios", "crear");
 
-    // Tras permisos: si no hay pestaña activa válida → home autorizado
-    if (loggedIn && (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa)) {
-      if (panelProhibidoVisible()) {
-        seleccionarPrimeraSeccionAutorizada();
+    if (loggedIn && cargaOk) {
+      var activo = document.querySelector(".tab-btn.active");
+      var okActivo = activo && !activo.classList.contains("tab-sin-permiso") && activo.style.display !== "none";
+      if (!okActivo) {
+        for (var i = 0; i < ORDEN_HOME.length; i++) {
+          var t = ORDEN_HOME[i];
+          var b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
+          if (b && !b.classList.contains("tab-sin-permiso") && b.style.display !== "none") {
+            if (typeof irATab === "function") {
+              try { irATab(t); } catch (e) {}
+            } else {
+              document.querySelectorAll(".tab-btn").forEach(function (x) { x.classList.remove("active"); });
+              document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
+              b.classList.add("active");
+              var p = document.getElementById("tab-" + t);
+              if (p) p.classList.add("visible");
+            }
+            break;
+          }
+        }
       }
     } else if (!loggedIn) {
-      resetearNavegacionParaNuevaSesion();
+      document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+      document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
     }
   }
 
+  function resetearNavegacionParaNuevaSesion() {
+    document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
+  }
+
+  function seleccionarPrimeraSeccionAutorizada() {
+    for (var i = 0; i < ORDEN_HOME.length; i++) {
+      var t = ORDEN_HOME[i];
+      var b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
+      if (b && !b.classList.contains("tab-sin-permiso") && b.style.display !== "none") {
+        if (typeof irATab === "function") {
+          try { irATab(t); } catch (e) {}
+        }
+        return t;
+      }
+    }
+    return null;
+  }
+
+  // Sobrescribe definiciones de usuarios-permisos.js (fail-open)
   window.tienePermiso = tienePermiso;
-  window.TAB_A_SECCION = TAB_A_SECCION;
   window.aplicarPermisosAInterfaz = aplicarPermisosAInterfaz;
-  window.togglePorPermiso = togglePorPermiso;
+  window.TAB_A_SECCION = TAB_A_SECCION;
   window.resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion;
   window.seleccionarPrimeraSeccionAutorizada = seleccionarPrimeraSeccionAutorizada;
+  window.togglePorPermiso = function (elId, seccion, accion) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.classList.toggle("hidden", !tienePermiso(seccion, accion));
+  };
 
   try { tienePermiso = tienePermiso; } catch (e) {}
-  try { TAB_A_SECCION = TAB_A_SECCION; } catch (e) {}
   try { aplicarPermisosAInterfaz = aplicarPermisosAInterfaz; } catch (e) {}
-  try { togglePorPermiso = togglePorPermiso; } catch (e) {}
+  try { TAB_A_SECCION = TAB_A_SECCION; } catch (e) {}
   try { resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion; } catch (e) {}
   try { seleccionarPrimeraSeccionAutorizada = seleccionarPrimeraSeccionAutorizada; } catch (e) {}
+  try { togglePorPermiso = window.togglePorPermiso; } catch (e) {}
 
   if (!document.getElementById("bc-tab-sin-permiso-css")) {
     var st = document.createElement("style");
