@@ -1,9 +1,6 @@
-// BattleCruiser v9.2.52 — M12-FE.3
-// ÚNICA autoridad de menú. Fail-closed. Sin pestañas "siempre visibles".
-// Fuente: permisos_usuario_actual → _permisosEfectivos → tienePermiso → menú.
+// BattleCruiser v9.2.54 — menú por permisos (CSS gana a ui-visual-salon)
 (function () {
   "use strict";
-  // Esta versión siempre gana sobre definiciones previas de usuarios-permisos.js
   window.__BC_PERMISOS_CANONICO__ = true;
   window.__BC_PERMISOS_FE3__ = true;
 
@@ -15,7 +12,6 @@
     return !!(sec && sec[accion] === true);
   }
 
-  // Claves = data-tab del menú. Valores = seccion del backend / matriz.
   var TAB_A_SECCION = {
     productos: "productos",
     ventas: "ventas",
@@ -43,12 +39,12 @@
     if (!btn) return;
     if (visible) {
       btn.classList.remove("hidden", "tab-sin-permiso");
-      btn.style.display = "";
+      btn.style.setProperty("display", "");
       btn.removeAttribute("aria-hidden");
       btn.tabIndex = 0;
     } else {
       btn.classList.add("hidden", "tab-sin-permiso");
-      btn.style.display = "none";
+      btn.style.setProperty("display", "none", "important");
       btn.setAttribute("aria-hidden", "true");
       btn.tabIndex = -1;
       btn.classList.remove("active");
@@ -77,25 +73,21 @@
       var tab = btn.dataset.tab;
       if (!tab) return;
 
-      // Sin sesión o sin carga exitosa: ocultar TODO (sin flash de menú completo)
       if (!loggedIn || !cargaOk) {
         setTabVisible(btn, false);
         return;
       }
 
-      // config: no es sección de menú operativa
       if (tab === "config") {
         setTabVisible(btn, false);
         return;
       }
 
-      // Centro de control: solo si el usuario tiene al menos un ver (no permanente)
       if (tab === "resumen") {
         setTabVisible(btn, tieneAlgunaVista());
         return;
       }
 
-      // Pendientes: ligado a turnos/ciclos, no permanente
       if (tab === "pendientes") {
         setTabVisible(btn, tienePermiso("turnos", "ver") || tienePermiso("ciclos", "ver"));
         return;
@@ -132,15 +124,9 @@
         for (var i = 0; i < ORDEN_HOME.length; i++) {
           var t = ORDEN_HOME[i];
           var b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
-          if (b && !b.classList.contains("tab-sin-permiso") && b.style.display !== "none") {
+          if (b && !b.classList.contains("tab-sin-permiso") && !b.classList.contains("hidden")) {
             if (typeof irATab === "function") {
               try { irATab(t); } catch (e) {}
-            } else {
-              document.querySelectorAll(".tab-btn").forEach(function (x) { x.classList.remove("active"); });
-              document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
-              b.classList.add("active");
-              var p = document.getElementById("tab-" + t);
-              if (p) p.classList.add("visible");
             }
             break;
           }
@@ -157,46 +143,26 @@
     document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
   }
 
-  function seleccionarPrimeraSeccionAutorizada() {
-    for (var i = 0; i < ORDEN_HOME.length; i++) {
-      var t = ORDEN_HOME[i];
-      var b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
-      if (b && !b.classList.contains("tab-sin-permiso") && b.style.display !== "none") {
-        if (typeof irATab === "function") {
-          try { irATab(t); } catch (e) {}
-        }
-        return t;
-      }
-    }
-    return null;
-  }
-
-  // Sobrescribe definiciones de usuarios-permisos.js (fail-open)
   window.tienePermiso = tienePermiso;
   window.aplicarPermisosAInterfaz = aplicarPermisosAInterfaz;
   window.TAB_A_SECCION = TAB_A_SECCION;
   window.resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion;
-  window.seleccionarPrimeraSeccionAutorizada = seleccionarPrimeraSeccionAutorizada;
-  window.togglePorPermiso = function (elId, seccion, accion) {
-    var el = document.getElementById(elId);
-    if (!el) return;
-    el.classList.toggle("hidden", !tienePermiso(seccion, accion));
-  };
-
   try { tienePermiso = tienePermiso; } catch (e) {}
   try { aplicarPermisosAInterfaz = aplicarPermisosAInterfaz; } catch (e) {}
   try { TAB_A_SECCION = TAB_A_SECCION; } catch (e) {}
-  try { resetearNavegacionParaNuevaSesion = resetearNavegacionParaNuevaSesion; } catch (e) {}
-  try { seleccionarPrimeraSeccionAutorizada = seleccionarPrimeraSeccionAutorizada; } catch (e) {}
-  try { togglePorPermiso = window.togglePorPermiso; } catch (e) {}
 
-  if (!document.getElementById("bc-tab-sin-permiso-css")) {
-    var st = document.createElement("style");
-    st.id = "bc-tab-sin-permiso-css";
-    st.textContent =
-      ".tab-btn.tab-sin-permiso,.tab-btn.hidden.tab-sin-permiso{display:none!important;visibility:hidden!important;pointer-events:none!important;}";
-    document.head.appendChild(st);
-  }
+  var css = document.getElementById("bc-tab-sin-permiso-css");
+  if (css) css.remove();
+  var st = document.createElement("style");
+  st.id = "bc-tab-sin-permiso-css";
+  st.textContent =
+    "#tabs .tab-btn.tab-sin-permiso,#tabs .tab-btn.hidden," +
+    ".sidebar-nav .tab-btn.tab-sin-permiso,.sidebar-nav .tab-btn.hidden," +
+    ".tab-btn.tab-sin-permiso.hidden{" +
+    "display:none!important;visibility:hidden!important;pointer-events:none!important;" +
+    "height:0!important;max-height:0!important;overflow:hidden!important;" +
+    "padding:0!important;margin:0!important;border:none!important;}";
+  document.head.appendChild(st);
 
   if (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa) {
     aplicarPermisosAInterfaz();
