@@ -1,5 +1,5 @@
 // Continuación B3 admin — se carga tras usuarios-permisos.js
-// v9.2.57 — catálogo de secciones alineado con Operaciones (gastos/mermas/bajas/reinversiones)
+// v9.2.60 — M12-FE.5: catálogo sin bajas ni vales_salida
 async function usuarioPuedeOperar() {
   if (!_usuarioActual) return false;
   if (!contextoB3Disponible()) return true;
@@ -136,16 +136,16 @@ safeInit("admin-usuarios", () => {
   });
 });
 
-// Catálogo local de respaldo (si catalogo_permisos_admin no responde).
-// Incluye Operaciones: gastos, mermas, bajas, reinversiones.
+// Catálogo local de respaldo (sin bajas ni vales_salida — M12-FE.5)
 const SECCIONES_PERMISOS = [
   "productos", "categorias", "almacenes", "stock",
-  "transferencias", "vales_salida", "ventas", "reportes", "usuarios",
+  "transferencias", "ventas", "reportes", "usuarios",
   "presentaciones", "auditoria", "turnos", "comunicacion", "unidades",
   "ciclos", "entregas_caja",
-  "gastos", "mermas", "bajas", "reinversiones"
+  "gastos", "mermas", "reinversiones"
 ];
 const ACCIONES_PERMISOS = ["ver", "crear", "editar", "borrar", "editar_any"];
+const SECCIONES_EXCLUIDAS_FE = { bajas: true, vales_salida: true, vales: true };
 let _rolExpandidoId = null;
 let _permisosRolActual = [];
 
@@ -203,7 +203,6 @@ function renderizarRolesAdmin(roles) {
 }
 
 async function cargarYRenderizarPermisosRol(roleId, esDueno) {
-  // Si existe el renderer canónico (fix-permisos-rol), usarlo: lee catalogo_permisos_admin.
   if (window.__bcFixPermisosRol50 && window.cargarYRenderizarPermisosRolCanonico) {
     return window.cargarYRenderizarPermisosRolCanonico(roleId, esDueno);
   }
@@ -216,22 +215,20 @@ async function cargarYRenderizarPermisosRol(roleId, esDueno) {
       return;
     }
     _permisosRolActual = data || [];
-    const permitidos = new Set(_permisosRolActual.filter((p) => p.permitido).map((p) => p.seccion + "|" + p.accion));
-    const disponibles = new Set(_permisosRolActual.map((p) => p.seccion + "|" + p.accion));
-    // Unir secciones del backend con el catálogo local (por si faltan filas en el rol).
+    const permitidos = new Set(_permisosRolActual.filter((p) => p.permitido && !SECCIONES_EXCLUIDAS_FE[p.seccion]).map((p) => p.seccion + "|" + p.accion));
+    const disponibles = new Set(_permisosRolActual.filter((p) => !SECCIONES_EXCLUIDAS_FE[p.seccion]).map((p) => p.seccion + "|" + p.accion));
     const secciones = SECCIONES_PERMISOS.slice();
     _permisosRolActual.forEach(function (p) {
-      if (p.seccion && secciones.indexOf(p.seccion) < 0) secciones.push(p.seccion);
+      if (p.seccion && !SECCIONES_EXCLUIDAS_FE[p.seccion] && secciones.indexOf(p.seccion) < 0) secciones.push(p.seccion);
     });
     let tabla = '<table class="permisos-tabla"><thead><tr><th>Sección</th>';
     ACCIONES_PERMISOS.forEach((a) => { tabla += "<th>" + a + "</th>"; });
     tabla += "</tr></thead><tbody>";
     secciones.forEach((s) => {
+      if (SECCIONES_EXCLUIDAS_FE[s]) return;
       tabla += "<tr><td>" + s + "</td>";
       ACCIONES_PERMISOS.forEach((a) => {
         const key = s + "|" + a;
-        // Mostrar checkbox si existe en backend O si es una sección conocida del catálogo local
-        // (así se pueden conceder gastos/mermas aunque el rol aún no tenga la fila).
         const conocida = SECCIONES_PERMISOS.indexOf(s) >= 0;
         if (!disponibles.has(key) && !conocida) { tabla += "<td>—</td>"; return; }
         if (!disponibles.has(key) && conocida && ["ver", "crear", "editar", "borrar"].indexOf(a) < 0) {
@@ -333,11 +330,15 @@ safeInit("admin-roles", () => {
     const guardarBtn = e.target.closest("#rol-permisos-guardar-btn");
     if (guardarBtn) {
       e.stopPropagation();
+      // Si el canónico intercepta, no duplicar (usa capture en fix-permisos-rol)
+      if (window.__bcFixPermisosRol50) return;
       const panel = document.getElementById("rol-permisos-panel");
       if (!panel) return;
-      const payload = Array.from(panel.querySelectorAll(".permiso-check")).map((c) => ({
-        seccion: c.dataset.seccion, accion: c.dataset.accion, permitido: c.checked
-      }));
+      const payload = Array.from(panel.querySelectorAll(".permiso-check"))
+        .map((c) => ({
+          seccion: c.dataset.seccion, accion: c.dataset.accion, permitido: c.checked
+        }))
+        .filter((p) => p.seccion && !SECCIONES_EXCLUIDAS_FE[p.seccion]);
       showLoading();
       try {
         const { error } = await client.rpc("actualizar_permisos_rol", { p_role_id: guardarBtn.dataset.id, p_permisos: payload });
