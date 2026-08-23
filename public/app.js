@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.49 — Saneamiento permisos: una sola fuente de verdad
-(function hotfixV9249(){
-  const VERSION="9.2.49";
+// v9.2.50 — Unificación menú ↔ matriz ↔ catálogo backend
+(function hotfixV9250(){
+  const VERSION="9.2.50";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -27,10 +27,11 @@
 
 (function cargarModulosDinamicos(){
   const modules=[
-    ["permisos-navegacion.js","49.1"],
+    ["permisos-navegacion.js","50.1"],
+    ["fix-permisos-rol.js","50.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","31.1"],["roles-en-usuarios.js","32.1"],
-    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","36.1"],["fix-permisos-rol.js","44.1"],
+    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","36.1"],
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"]
   ];
   modules.forEach(([name,version])=>{
