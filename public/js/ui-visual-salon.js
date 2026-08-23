@@ -1,5 +1,5 @@
-// BattleCruiser — UI Visual Salón (v9.2.31)
-// Iconos menú (incluye Compras/Turnos por etiqueta) + empty states Comunicación.
+// BattleCruiser — UI Visual Salón (v9.2.54)
+// Iconos menú. NO forzar display en tabs ocultos por permisos (.hidden / .tab-sin-permiso).
 (function () {
   'use strict';
 
@@ -66,11 +66,14 @@
   }
 
   function injectStyles() {
-    if (document.getElementById('bc-ui-visual-salon')) return;
+    var existing = document.getElementById('bc-ui-visual-salon');
+    if (existing) existing.remove();
     var s = document.createElement('style');
     s.id = 'bc-ui-visual-salon';
     s.textContent = [
-      '.sidebar-nav .tab-btn{display:flex!important;align-items:center;gap:12px;padding:11px 14px!important;font-family:Inter,system-ui,sans-serif!important;font-size:13.5px!important;font-weight:500!important;letter-spacing:.01em;color:var(--mist);border-radius:10px!important;border-left:none!important;margin:2px 0!important;transition:background .15s ease,color .15s ease,box-shadow .15s ease}',
+      /* CRÍTICO: no forzar display en tabs ocultos por permisos */
+      '.sidebar-nav .tab-btn:not(.hidden):not(.tab-sin-permiso){display:flex!important;align-items:center;gap:12px;padding:11px 14px!important;font-family:Inter,system-ui,sans-serif!important;font-size:13.5px!important;font-weight:500!important;letter-spacing:.01em;color:var(--mist);border-radius:10px!important;border-left:none!important;margin:2px 0!important;transition:background .15s ease,color .15s ease,box-shadow .15s ease}',
+      '.sidebar-nav .tab-btn.hidden,.sidebar-nav .tab-btn.tab-sin-permiso,#tabs .tab-btn.hidden,#tabs .tab-btn.tab-sin-permiso{display:none!important;visibility:hidden!important;pointer-events:none!important;height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;border:none!important}',
       '.sidebar-nav .tab-btn .bc-nav-icon{width:20px;height:20px;flex:0 0 20px;display:inline-flex;align-items:center;justify-content:center;opacity:.88}',
       '.sidebar-nav .tab-btn .bc-nav-icon svg{width:18px;height:18px;display:block}',
       '.sidebar-nav .tab-btn .bc-nav-label{flex:1;min-width:0;text-align:left}',
@@ -196,6 +199,9 @@
     decorateSidebar();
     decorateHeaderLogo();
     enhanceComunicacion();
+    if (typeof aplicarPermisosAInterfaz === 'function') {
+      try { aplicarPermisosAInterfaz(); } catch (e) {}
+    }
   }
 
   function watchSidebar() {
@@ -205,7 +211,12 @@
     var t = null;
     new MutationObserver(function () {
       if (t) clearTimeout(t);
-      t = setTimeout(decorateSidebar, 50);
+      t = setTimeout(function () {
+        decorateSidebar();
+        if (typeof aplicarPermisosAInterfaz === 'function') {
+          try { aplicarPermisosAInterfaz(); } catch (e) {}
+        }
+      }, 50);
     }).observe(nav, { childList: true, subtree: true, characterData: true });
   }
 
@@ -214,14 +225,12 @@
       run();
       setTimeout(run, 500);
       setTimeout(run, 1200);
-      setTimeout(run, 2000);
       setTimeout(watchSidebar, 600);
     });
   } else {
     run();
     setTimeout(run, 500);
     setTimeout(run, 1200);
-    setTimeout(run, 2000);
     setTimeout(watchSidebar, 600);
   }
 })();
