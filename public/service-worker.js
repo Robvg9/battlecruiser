@@ -1,8 +1,8 @@
-// BattleCruiser Service Worker v119 — app v9.2.56
-// Objetivo: no servir pantallas/versiones antiguas cuando la red es lenta o intermitente.
-// Estrategia: Network-First con timeout más generoso; caché solo como último recurso real.
-const BC_VERSION = "9.2.56";
-const CACHE_NAME = "battlecruiser-shell-v119";
+// BattleCruiser Service Worker v120 — app v9.2.57
+// Objetivo: evitar ERR_FAILED por un fallback vacío del Service Worker.
+// Estrategia: network-first; caché como fallback; si no existe caché, respuesta offline válida.
+const BC_VERSION = "9.2.57";
+const CACHE_NAME = "battlecruiser-shell-v120";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
@@ -20,125 +20,111 @@ const SHELL_FILES = [
   "./js/ciclos.js","./js/m18-ciclos-ux.js","./js/comunicacion.js","./js/panel-contextual.js",
   "./js/aprobaciones-admin.js","./js/operaciones-financieras.js",
   "./js/m26-ui-integridad.js","./js/sesiones-operativas-ui.js",
-  "./js/manifest.json","./favicon.png",
+  "./favicon.png","./manifest.json",
   "./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png",
   "./icons/icon-maskable-512x512.png","./icons/icon.svg"
 ];
 const CDN_FILES = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
-
-// Timeouts más generosos: 3s provocaba fallback a caché en redes intermitentes.
-const TIMEOUT_DOC = 8000;
-const TIMEOUT_ASSET = 7000;
+const TIMEOUT_DOC = 10000;
+const TIMEOUT_ASSET = 8000;
 const TIMEOUT_API = 6000;
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(async (c) => {
-      for (const u of [...SHELL_FILES, ...CDN_FILES]) {
-        try {
-          await c.add(u);
-        } catch (err) {
-          console.warn("[BattleCruiser SW] precache omitido", u, err);
-        }
-      }
-    }).then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches.keys().then((names) =>
-      Promise.all(
-        names.map((n) => {
-          // Borrar cualquier caché antigua de BattleCruiser (no solo shell-)
-          if (n !== CACHE_NAME && (n.startsWith("battlecruiser-shell-") || n.startsWith("battlecruiser"))) {
-            return caches.delete(n);
-          }
-          return undefined;
-        })
-      )
-    ).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener("fetch", (e) => {
-  const req = e.request;
-  const url = req.url;
-
-  // CDN: cache-first (estable)
-  if (CDN_FILES.includes(url)) {
-    e.respondWith(caches.match(req).then((c) => c || fetch(req)));
-    return;
-  }
-
-  // API Supabase: solo red (sin caché de respuestas)
-  if (url.includes("supabase.co")) {
-    e.respondWith(
-      req.method === "GET"
-        ? fetchWithTimeout(req, TIMEOUT_API).catch(() => fetch(req))
-        : fetch(req)
-    );
-    return;
-  }
-
-  const isDoc =
-    req.destination === "document" ||
-    req.mode === "navigate" ||
-    url.includes("/index.html") ||
-    /\/public\/?(\?|$)/.test(url);
-
-  if (isDoc) {
-    // Navegación: Network-First con timeout generoso.
-    // Solo usar caché si la red falla de verdad (no por un timeout corto).
-    e.respondWith(
-      networkFirst(req, TIMEOUT_DOC, async () => {
-        const cached = await caches.match("./index.html");
-        return cached || caches.match(req);
+self.addEventListener("install", (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.allSettled([...SHELL_FILES, ...CDN_FILES].map((url) =>
+      withTimeout(cache.add(url), 10000).catch((err) => {
+        console.warn("[BattleCruiser SW] precache omitido", url, err);
       })
+    ));
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.map((name) => {
+      if (name !== CACHE_NAME && (name.startsWith("battlecruiser-shell-") || name.startsWith("battlecruiser"))) {
+        return caches.delete(name);
+      }
+      return undefined;
+    }));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener("fetch", (event) => {
+  // Nunca permitir que una excepción no controlada del SW convierta la navegación en ERR_FAILED.
+  if (typeof event.passThroughOnException === "function") event.passThroughOnException();
+
+  const request = event.request;
+  const url = request.url;
+
+  if (CDN_FILES.includes(url)) {
+    event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+    return;
+  }
+
+  if (url.includes("supabase.co")) {
+    event.respondWith(
+      request.method === "GET"
+        ? fetchWithTimeout(request, TIMEOUT_API).catch(() => fetch(request))
+        : fetch(request)
     );
     return;
   }
 
-  // Assets estáticos (JS/CSS/img): Network-First, actualizar caché si llega bien.
-  e.respondWith(
-    networkFirst(req, TIMEOUT_ASSET, async () => {
-      const cache = await caches.open(CACHE_NAME);
-      return cache.match(req);
-    }).then(async (res) => {
-      if (res && res.ok && req.method === "GET") {
-        const cache = await caches.open(CACHE_NAME);
-        cache.put(req, res.clone()).catch(() => {});
-      }
-      return res;
-    })
+  const isDocument = request.destination === "document" || request.mode === "navigate" || url.includes("/index.html");
+
+  if (isDocument) {
+    event.respondWith(networkFirstDocument(request));
+    return;
+  }
+
+  event.respondWith(
+    networkFirstAsset(request).catch(() => caches.match(request))
   );
 });
 
-/**
- * Intenta red con timeout. Si falla, usa el fallback (caché).
- * Evita que un timeout de 3s en red lenta sirva UI antigua.
- */
-function networkFirst(request, ms, fallbackFn) {
-  return fetchWithTimeout(request, ms)
-    .then((res) => {
-      if (res && res.ok) return res;
-      // Respuesta no OK → intentar fallback
-      return fallbackFn().then((c) => c || res);
-    })
-    .catch(() => fallbackFn().then((c) => c || Response.error()));
+async function networkFirstDocument(request) {
+  try {
+    const response = await fetchWithTimeout(request, TIMEOUT_DOC);
+    if (response && response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put("./index.html", response.clone()).catch(() => {});
+      return response;
+    }
+  } catch (_) {}
+
+  const cached = await caches.match("./index.html") || await caches.match(request);
+  if (cached) return cached;
+
+  return new Response(
+    "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>BattleCruiser</title><body style=\"font-family:system-ui;padding:24px\"><h2>BattleCruiser</h2><p>Sin conexión temporal. Vuelve a cargar cuando haya conexión.</p></body>",
+    { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } }
+  );
+}
+
+async function networkFirstAsset(request) {
+  const response = await fetchWithTimeout(request, TIMEOUT_ASSET);
+  if (response && response.ok && request.method === "GET") {
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, response.clone()).catch(() => {});
+  }
+  return response;
 }
 
 function fetchWithTimeout(request, ms) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("timeout")), ms);
-    fetch(request)
-      .then((x) => {
-        clearTimeout(t);
-        resolve(x);
-      })
-      .catch((err) => {
-        clearTimeout(t);
-        reject(err);
-      });
-  });
+  return Promise.race([
+    fetch(request),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+  ]);
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+  ]);
 }
