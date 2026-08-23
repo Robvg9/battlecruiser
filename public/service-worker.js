@@ -1,6 +1,8 @@
-// BattleCruiser Service Worker v104 — alineado con app v9.2.40
-const BC_VERSION = "9.2.40";
-const CACHE_NAME = "battlecruiser-shell-v104";
+// BattleCruiser Service Worker v105 — alineado con app v9.2.41
+// FIX bucle: NO postMessage BC_SW_ACTIVATED (provocaba reload en clientes).
+// activate: claim + borrar solo battlecruiser-shell-* antiguas. NO IndexedDB.
+const BC_VERSION = "9.2.41";
+const CACHE_NAME = "battlecruiser-shell-v105";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
@@ -26,8 +28,15 @@ const CDN_FILES = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/di
 self.addEventListener("install", function (e) {
   e.waitUntil(
     caches.open(CACHE_NAME).then(async function (c) {
-      for (const url of SHELL_FILES.concat(CDN_FILES)) {
-        try { await c.add(url); } catch (err) { console.warn("[Battlecruiser SW] No se pudo precachear", url, err); }
+      for (var i = 0; i < SHELL_FILES.length; i++) {
+        try { await c.add(SHELL_FILES[i]); } catch (err) {
+          console.warn("[Battlecruiser SW] precache omitido", SHELL_FILES[i], err);
+        }
+      }
+      for (var j = 0; j < CDN_FILES.length; j++) {
+        try { await c.add(CDN_FILES[j]); } catch (err2) {
+          console.warn("[Battlecruiser SW] CDN omitido", CDN_FILES[j], err2);
+        }
       }
     }).then(function () { return self.skipWaiting(); })
   );
@@ -37,22 +46,18 @@ self.addEventListener("activate", function (e) {
   e.waitUntil(
     caches.keys().then(function (names) {
       return Promise.all(names.map(function (n) {
-        if (n.startsWith("battlecruiser-shell-") && n !== CACHE_NAME) return caches.delete(n);
+        if (n.indexOf("battlecruiser-shell-") === 0 && n !== CACHE_NAME) return caches.delete(n);
         return undefined;
       }));
     }).then(function () { return self.clients.claim(); })
-      .then(function () { return self.clients.matchAll({ type: "window" }); })
-      .then(function (clients) {
-        clients.forEach(function (client) {
-          try { client.postMessage({ type: "BC_SW_ACTIVATED", version: BC_VERSION, cache: CACHE_NAME }); } catch (err) {}
-        });
-      })
+    // SIN postMessage → SIN reload forzado en clientes
   );
 });
 
 self.addEventListener("fetch", function (e) {
   var request = e.request;
   var url = request.url;
+
   if (CDN_FILES.indexOf(url) !== -1) {
     e.respondWith(caches.match(request).then(function (c) { return c || fetch(request); }));
     return;
@@ -61,18 +66,26 @@ self.addEventListener("fetch", function (e) {
     e.respondWith(request.method === "GET" ? fetchWithTimeout(request, 4000) : fetch(request));
     return;
   }
-  var isDoc = request.destination === "document" || url.indexOf("/index.html") !== -1 || /\/public\/?$/.test(url) || request.mode === "navigate";
+
+  var isDoc = request.destination === "document" || request.mode === "navigate" ||
+    url.indexOf("/index.html") !== -1 || /\/public\/?(\?|$)/.test(url);
+
   if (isDoc) {
-    e.respondWith(fetchWithTimeout(request, 2500).catch(function () {
-      return caches.match(request).then(function (c) { return c || caches.match("./index.html"); });
-    }));
+    e.respondWith(
+      fetchWithTimeout(request, 3000).catch(function () {
+        return caches.match("./index.html").then(function (c) { return c || caches.match(request); });
+      })
+    );
     return;
   }
+
   e.respondWith(
-    fetchWithTimeout(request, 2500).then(function (r) {
-      if (r && r.ok) {
+    fetchWithTimeout(request, 3000).then(function (r) {
+      if (r && r.ok && request.method === "GET") {
         var clone = r.clone();
-        caches.open(CACHE_NAME).then(function (c) { try { c.put(request, clone); } catch (err) {} });
+        caches.open(CACHE_NAME).then(function (c) {
+          try { c.put(request, clone); } catch (err) {}
+        });
       }
       return r;
     }).catch(function () {
@@ -84,6 +97,7 @@ self.addEventListener("fetch", function (e) {
 function fetchWithTimeout(request, ms) {
   return new Promise(function (resolve, reject) {
     var t = setTimeout(function () { reject(new Error("timeout")); }, ms);
-    fetch(request).then(function (r) { clearTimeout(t); resolve(r); }).catch(function (e) { clearTimeout(t); reject(e); });
+    fetch(request).then(function (r) { clearTimeout(t); resolve(r); })
+      .catch(function (e) { clearTimeout(t); reject(e); });
   });
 }
