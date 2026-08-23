@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// Misión de modularización: cargador de módulos + integración mínima.
-(function hotfixV9217(){
-  const VERSION="9.2.17";
+// Capa mínima de arranque/hotfixes. La lógica de Productos vive en js/productos.js.
+(function hotfixV9218(){
+  const VERSION="9.2.18";
 
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -16,6 +16,7 @@
     }
     if(label)label.textContent="Usuario";
     document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
+
     ["update-app-btn-login","update-app-btn"].forEach(id=>{
       const old=document.getElementById(id);
       if(!old||old.dataset.bcVersion===VERSION)return;
@@ -42,66 +43,8 @@
     });
   }
 
-  function abrirFormularioProducto(form){
-    if(!form)return;
-    form.classList.remove("hidden");
-    form.removeAttribute("hidden");
-    form.classList.add("bc-producto-form-visible");
-    form.style.setProperty("display","block","important");
-    form.dataset.bcProductFormOpen="1";
-    const campo=document.getElementById("prod-nombre");
-    if(campo)campo.focus();
-    form.scrollIntoView({behavior:"smooth",block:"start"});
-  }
-
-  // Delegación: el botón de Productos puede ser creado/reemplazado después
-  // de cargar app.js por la capa de UI. No dependemos de que exista en el
-  // instante de inicialización.
-  function instalarDelegacionProductos(){
-    if(document.documentElement.dataset.bcProductosDelegado===VERSION)return;
-    document.documentElement.dataset.bcProductosDelegado=VERSION;
-    document.addEventListener("click",e=>{
-      const agregar=e.target.closest("#bc-productos-agregar");
-      if(agregar){
-        const panel=document.getElementById("tab-productos");
-        const form=panel&&panel.querySelector("#form-producto");
-        if(!form)return;
-        e.preventDefault();
-        e.stopPropagation();
-        abrirFormularioProducto(form);
-        return;
-      }
-
-      const guardar=e.target.closest("#tab-productos #prod-submit-btn");
-      if(!guardar)return;
-      const form=guardar.closest("#form-producto");
-      if(!form)return;
-
-      if(!form.checkValidity()){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        const invalido=form.querySelector(":invalid");
-        if(typeof setMsg==="function")setMsg("msg-productos","Completa los campos obligatorios del producto.",false);
-        if(invalido)invalido.scrollIntoView({behavior:"smooth",block:"center"});
-        return;
-      }
-
-      // El submit real ya está implementado en productos.js. requestSubmit()
-      // lo ejecuta de forma estándar y deja que ese handler sea el único
-      // responsable de ejecutar ejecutarOperacion("producto").
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      form.requestSubmit(guardar);
-    },true);
-  }
-
-  const aplicar=()=>{
-    aplicarVersion();
-    instalarDelegacionProductos();
-  };
-
-  aplicar();
-  window.addEventListener("pageshow",aplicar);
+  aplicarVersion();
+  window.addEventListener("pageshow",aplicarVersion);
 })();
 
 (function cargarConfiguracion(){if(document.querySelector('script[src*="configuracion"]'))return;var s=document.createElement("script");s.src="js/configuracion.js";s.async=false;document.body.appendChild(s);})();
