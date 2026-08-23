@@ -1,12 +1,12 @@
 // BattleCruiser — Operaciones Hub (v9.2.37)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
-// M12-FE.2: cards respetan permisos reales; re-render tras carga de permisos.
+// M12-FE.2 + Fase 3: merma única (sin bajas); cards respetan permisos reales.
 (function () {
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '37';
+  var HUB_VER = '38';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v) : String(v == null ? '' : v); }
   function key() { return crypto.randomUUID(); }
@@ -153,23 +153,21 @@
 
   function openMerma() {
     openModal({
-      icon: '📦', title: 'Registrar merma / baja', submitText: 'Enviar a revisión',
+      icon: '📦', title: 'Registrar merma', submitText: 'Enviar a revisión',
       submitBg: 'rgba(180,60,60,.9)', submitColor: '#fff',
       bodyHtml:
-        '<div class="field"><span>Tipo</span><select id="op-m-tipo"><option value="merma">Merma</option><option value="baja">Baja</option></select></div>' +
         '<div class="field"><span>Almacén</span><select id="op-m-alm" required>' + storeOpts(false) + '</select></div>' +
         '<div class="field"><span>Producto</span><select id="op-m-prod" required>' + productOpts() + '</select></div>' +
         '<div class="field"><span>Cantidad</span><input id="op-m-cant" type="number" min="0.001" step="any" placeholder="0" required></div>' +
-        '<div class="field"><span>Motivo</span><input id="op-m-motivo" placeholder="Motivo de la salida" required></div>' +
+        '<div class="field"><span>Motivo</span><input id="op-m-motivo" placeholder="Motivo de la merma" required></div>' +
         '<p class="muted" style="margin:0;font-size:12px">El stock no cambia hasta aprobación administrativa.</p>',
       onSubmit: async function (setMsg) {
-        var tipo = document.getElementById('op-m-tipo').value;
         var alm = document.getElementById('op-m-alm').value;
         var prod = document.getElementById('op-m-prod').value;
         var cant = Number(document.getElementById('op-m-cant').value);
         var motivo = document.getElementById('op-m-motivo').value.trim();
         if (!alm || !prod || !(cant > 0) || !motivo) { setMsg('Completá todos los campos.', false); throw new Error('validación'); }
-        await rpc(tipo === 'merma' ? 'crear_merma' : 'crear_baja', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
+        await rpc('crear_merma', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
         setMsg('✓ Solicitud enviada a revisión.', true);
         if (typeof refrescarAprobacionesAdmin === 'function') refrescarAprobacionesAdmin();
         if (typeof refrescarFinanzas === 'function') refrescarFinanzas();
@@ -364,8 +362,8 @@
     if (can('gastos', 'crear')) {
       cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
     }
-    if (can('mermas', 'crear') || can('bajas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Registrar merma', desc: 'Productos que salen de inventario por merma o baja.', go: 'Registrar merma', fn: openMerma });
+    if (can('mermas', 'crear')) {
+      cards.push({ tone: 'red', icon: '📦', title: 'Registrar merma', desc: 'Productos que salen de inventario por merma.', go: 'Registrar merma', fn: openMerma });
     }
     if (can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
