@@ -84,8 +84,6 @@
     });
   }
 
-  // SOLO Productos: barra, orden y cambio de presentación.
-  // No crea un CRUD nuevo: reutiliza _cache.productos y renderProductosLista().
   function simplificarProductos() {
     var panel = document.getElementById('tab-productos');
     if (!panel || panel.dataset.bcSimple === '1') return;
@@ -97,6 +95,11 @@
     panel.dataset.bcSimple = '1';
     form.classList.add('hidden');
     form.style.display = 'none';
+
+    // El único botón público "Agregar producto" de Productos es este.
+    // El submit interno del formulario usa "Guardar producto" para no
+    // presentar dos botones con la misma acción/nombre al usuario.
+    document.querySelectorAll('#bc-productos-agregar').forEach(function (el) { el.remove(); });
 
     var barra = document.createElement('div');
     barra.id = 'bc-productos-barra';
@@ -157,6 +160,9 @@
       form.classList.add('bc-producto-form-visible');
       form.style.setProperty('display', 'block', 'important');
       form.dataset.bcProductFormOpen = '1';
+      agregar.style.display = 'none';
+      var submitBtn = document.getElementById('prod-submit-btn');
+      if (submitBtn) submitBtn.textContent = document.getElementById('prod-editando-id')?.value ? 'Guardar cambios' : 'Guardar producto';
       var primerCampo = document.getElementById('prod-nombre');
       if (primerCampo) primerCampo.focus();
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -234,33 +240,26 @@
       @media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid > .lista-item{padding:7px}}
     `;
     document.head.appendChild(style);
-  }
 
-  function arreglarAgregarProducto() {
-    var form = document.getElementById('form-producto'), btn = document.getElementById('prod-submit-btn');
-    if (!form || !btn || btn.dataset.bcM26 === '1') return;
-    btn.dataset.bcM26 = '1';
-    btn.addEventListener('click', function (e) {
-      if (form.checkValidity()) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      var invalido = form.querySelector(':invalid');
-      if (typeof setMsg === 'function') setMsg('msg-productos', 'Completa los campos obligatorios del producto.', false);
-      if (invalido) invalido.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, true);
+    // Si cancelarEdicionProducto se usa para cerrar el formulario, vuelve a
+    // mostrar el único botón público de Agregar producto.
+    var cancelarOriginal = window.cancelarEdicionProducto;
+    if (typeof cancelarOriginal === 'function' && !cancelarOriginal.__bcM26Wrapped) {
+      var wrapped = function () {
+        cancelarOriginal();
+        form.classList.remove('bc-producto-form-visible');
+        form.style.display = 'none';
+        agregar.style.display = '';
+        agregar.focus({ preventScroll: true });
+      };
+      wrapped.__bcM26Wrapped = true;
+      window.cancelarEdicionProducto = wrapped;
+    }
   }
 
   function arreglarEdicionProducto() {
-    var form = document.getElementById('form-producto');
-    if (!form || form.dataset.bcM26Edit === '1') return;
-    form.dataset.bcM26Edit = '1';
-    form.addEventListener('submit', function () {
-      var editando = document.getElementById('prod-editando-id');
-      if (!editando || !editando.value) return;
-      setTimeout(function () {
-        if (typeof cancelarEdicionProducto === 'function') cancelarEdicionProducto();
-      }, 100);
-    });
+    // No interceptar el submit real de productos. productos.js es el único
+    // responsable de crear/editar y su handler debe recibir el evento nativo.
   }
 
   function asegurarAccesoGasto() {
@@ -293,7 +292,6 @@
     fijarNomenclaturaSoloProductos();
     limpiarInterfazAgregarProducto();
     simplificarProductos();
-    arreglarAgregarProducto();
     arreglarEdicionProducto();
     asegurarAccesoGasto();
   }
