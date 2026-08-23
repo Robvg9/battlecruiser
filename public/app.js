@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
 // Capa mínima de arranque/hotfixes. La lógica de Productos vive en js/productos.js.
-(function hotfixV9235(){
-  const VERSION="9.2.35";
+(function hotfixV9236(){
+  const VERSION="9.2.36";
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
@@ -30,4 +30,4 @@
 (function cargarRolesEnUsuarios(){if(document.querySelector('script[src*="roles-en-usuarios"]'))return;var s=document.createElement("script");s.src="js/roles-en-usuarios.js?v=32.1";s.async=false;document.body.appendChild(s);})();
 (function cargarUiLayoutInteligente(){if(document.querySelector('script[src*="ui-layout-inteligente"]'))return;var s=document.createElement("script");s.src="js/ui-layout-inteligente.js?v=33.1";s.async=false;document.body.appendChild(s);})();
 (function cargarUiUsuariosDashboard(){if(document.querySelector('script[src*="ui-usuarios-dashboard"]'))return;var s=document.createElement("script");s.src="js/ui-usuarios-dashboard.js?v=34.1";s.async=false;document.body.appendChild(s);})();
-(function cargarUiOperacionesHub(){if(document.querySelector('script[src*="ui-operaciones-hub"]'))return;var s=document.createElement("script");s.src="js/ui-operaciones-hub.js?v=35.1";s.async=false;document.body.appendChild(s);})();
+(function cargarUiOperacionesHub(){if(document.querySelector('script[src*="ui-operaciones-hub"]'))return;var s=document.createElement("script");s.src="js/ui-operaciones-hub.js?v=36.1";s.async=false;document.body.appendChild(s);})();
