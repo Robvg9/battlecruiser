@@ -1,6 +1,7 @@
 // BattleCruiser — Sesiones Operativas UI
 // Extiende la UI existente de Ciclos sin crear un segundo sistema de turnos.
 // Fuente de verdad backend: iniciar_sesion_operativa / cerrar_sesion_operativa.
+// v9.2.31: tras abrir/cerrar sesión, refrescar turno para que Ventas reconozca el estado.
 (function(){
   'use strict';
   const RPC_INICIAR='iniciar_sesion_operativa';
@@ -15,8 +16,49 @@
   function yaProcesado(det){const lis=Array.from(det.querySelectorAll('li.muted'));return lis.length>0&&lis.every(li=>li.dataset.bcSesionUi==='1');}
   async function cargarSesiones(cicloId){if(!cicloId||!navigator.onLine)return [];const r=await client.rpc('listar_sesiones_operativas',{p_ciclo_id:cicloId,p_almacen_id:null,p_fecha:null,p_estado:null});if(r&&r.error)throw r.error;const d=r?r.data:[];return Array.isArray(d)?d:(d?[d]:[]);}
   async function mutar(rpc,sesionId){if(!navigator.onLine)throw new Error('Las sesiones operativas requieren Internet.');const r=await client.rpc(rpc,{p_sesion_id:sesionId,p_idempotency_key:key(),p_observacion:null});if(r&&r.error)throw r.error;return r?r.data:null;}
-  async function abrirSesion(id,btn){if(!permisosCrear()){msg('No tenés permiso para abrir sesiones.',false);return;}if(btn)btn.disabled=true;try{await mutar(RPC_INICIAR,id);msg('✓ Sesión abierta. Ya podés trabajar y registrar ventas.',true);const cid=cicloIdActual();if(cid&&typeof mostrarDetalleCiclo==='function')await mostrarDetalleCiclo(cid);}catch(e){msg('No se pudo abrir la sesión: '+String(e&&(e.message||e.details||e.code)||e),false);}finally{if(btn)btn.disabled=false;}}
-  async function cerrarSesion(id,btn){if(!permisosEditar()){msg('No tenés permiso para cerrar sesiones.',false);return;}if(!window.confirm('¿Cerrar esta sesión de trabajo? Al cerrarla ya no quedará disponible para registrar nuevas ventas en esta sesión.'))return;if(btn)btn.disabled=true;try{await mutar(RPC_CERRAR,id);msg('✓ Sesión cerrada.',true);const cid=cicloIdActual();if(cid&&typeof mostrarDetalleCiclo==='function')await mostrarDetalleCiclo(cid);}catch(e){msg('No se pudo cerrar la sesión: '+String(e&&(e.message||e.details||e.code)||e),false);}finally{if(btn)btn.disabled=false;}}
+
+  async function sincronizarTurnoParaVentas(){
+    try{
+      if(typeof refrescarTurnoActual==='function') await refrescarTurnoActual();
+    }catch(e){console.warn('[BattleCruiser] refrescarTurnoActual post-sesión:',e);}
+    try{
+      if(typeof actualizarPanelAlmacenVenta==='function') actualizarPanelAlmacenVenta();
+    }catch(e){}
+  }
+
+  async function abrirSesion(id,btn){
+    if(!permisosCrear()){msg('No tenés permiso para abrir sesiones.',false);return;}
+    if(btn){if(btn.dataset.bcBusy==='1')return;btn.dataset.bcBusy='1';btn.disabled=true;}
+    try{
+      await mutar(RPC_INICIAR,id);
+      msg('✓ Sesión abierta. Ya podés trabajar y registrar ventas.',true);
+      const cid=cicloIdActual();
+      if(cid&&typeof mostrarDetalleCiclo==='function')await mostrarDetalleCiclo(cid);
+      await sincronizarTurnoParaVentas();
+    }catch(e){
+      msg('No se pudo abrir la sesión: '+String(e&&(e.message||e.details||e.code)||e),false);
+    }finally{
+      if(btn){btn.disabled=false;btn.dataset.bcBusy='0';}
+    }
+  }
+
+  async function cerrarSesion(id,btn){
+    if(!permisosEditar()){msg('No tenés permiso para cerrar sesiones.',false);return;}
+    if(!window.confirm('¿Cerrar esta sesión de trabajo? Al cerrarla ya no quedará disponible para registrar nuevas ventas en esta sesión.'))return;
+    if(btn){if(btn.dataset.bcBusy==='1')return;btn.dataset.bcBusy='1';btn.disabled=true;}
+    try{
+      await mutar(RPC_CERRAR,id);
+      msg('✓ Sesión cerrada.',true);
+      const cid=cicloIdActual();
+      if(cid&&typeof mostrarDetalleCiclo==='function')await mostrarDetalleCiclo(cid);
+      await sincronizarTurnoParaVentas();
+    }catch(e){
+      msg('No se pudo cerrar la sesión: '+String(e&&(e.message||e.details||e.code)||e),false);
+    }finally{
+      if(btn){btn.disabled=false;btn.dataset.bcBusy='0';}
+    }
+  }
+
   async function mejorarDetalle(){
     if(procesando)return;const det=document.getElementById('ciclo-detalle');if(!det||yaProcesado(det))return;
     const cicloId=cicloIdActual();if(!cicloId)return;procesando=true;
