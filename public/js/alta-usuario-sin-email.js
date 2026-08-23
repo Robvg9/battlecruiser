@@ -16,6 +16,19 @@
     el.classList.toggle('error', !ok && !!text);
   }
 
+  function injectCss() {
+    if (document.getElementById('bc-alta-extra-css')) return;
+    var s = document.createElement('style');
+    s.id = 'bc-alta-extra-css';
+    s.textContent = [
+      '#ud-resumen{display:none!important}',
+      '#ud-card-crear{display:none!important}',
+      '#tab-usuarios > .cc-bloque:has(#form-nuevo-usuario){display:none!important}',
+      '#form-nuevo-usuario input[type=email]{display:none!important}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
   function ensureFormFields() {
     var form = document.getElementById(FORM_ID);
     if (!form) return null;
@@ -216,6 +229,7 @@
   }
 
   function run() {
+    injectCss();
     var form = ensureFormFields();
     if (!form) return;
     bindHandler(form);
