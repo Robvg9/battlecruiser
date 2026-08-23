@@ -1,6 +1,5 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — Sistema operacional de usuarios, roles y permisos.
-// v9.2.53 — M12-FE.3: _permisosEfectivos respeta p.permitido; tienePermiso fail-closed.
+// B3 — v9.2.55: construcción estricta de _permisosEfectivos.
 
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
@@ -44,22 +43,35 @@ async function cargarContextoUsuario() {
       const { data: perms, error } = await client.rpc("permisos_usuario_actual", {});
       if (error) {
         if (esErrorDeRed(error)) _permisosCargaFallidaRed = true;
+        console.warn("[BattleCruiser] permisos_usuario_actual error", error);
       } else if (Array.isArray(perms)) {
         _permisosCargaExitosa = true;
-        perms.forEach((p) => {
+        // Si el RPC incluye el campo permitido, SOLO se conceden los true.
+        // Si no trae el campo, se asume que solo envía filas ya autorizadas.
+        var usaCampoPermitido = perms.some(function (p) {
+          return p && Object.prototype.hasOwnProperty.call(p, "permitido");
+        });
+        perms.forEach(function (p) {
           if (!p || !p.seccion || !p.accion) return;
-          // permitido === false → denegado. Sin campo (RPC solo envía autorizados) → concedido.
-          if (p.permitido === false || p.permitido === 0 || p.permitido === "false") return;
+          if (usaCampoPermitido) {
+            if (p.permitido !== true && p.permitido !== 1 && p.permitido !== "true") return;
+          }
           if (!_permisosEfectivos[p.seccion]) _permisosEfectivos[p.seccion] = {};
           _permisosEfectivos[p.seccion][p.accion] = true;
         });
+        try {
+          console.info("[BattleCruiser] permisos efectivos",
+            Object.keys(_permisosEfectivos),
+            "filas RPC:", perms.length,
+            "usaCampoPermitido:", usaCampoPermitido);
+        } catch (e) {}
       }
     } catch (e) {
       if (esErrorDeRed(e)) _permisosCargaFallidaRed = true;
     }
 
-    aplicarPermisosAInterfaz();
-    mostrarInfoUsuarioEnHeader();
+    if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+    if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
   } catch (e) {
     console.warn("[Battlecruiser] No se pudo cargar el contexto de usuario:", e);
   } finally {
@@ -87,9 +99,13 @@ function limpiarContextoUsuario() {
   try { _comConvActual = null; _comConvActualTipo = null; } catch (_) {}
   const badge = document.getElementById("resumen-tab-badge");
   if (badge) { badge.classList.add("hidden"); badge.textContent = ""; }
-  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach((b) => {
+    b.classList.remove("active");
+    b.classList.add("hidden", "tab-sin-permiso");
+    b.setAttribute("data-bc-permiso", "0");
+  });
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("visible"));
-  aplicarPermisosAInterfaz();
+  if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
 }
 
 function tienePermiso(seccion, accion) {
@@ -130,7 +146,8 @@ function aplicarPermisosAInterfaz() {
     if (!tab) return;
     if (tab === "config" || tab === "resumen" || tab === "pendientes") {
       btn.classList.add("hidden", "tab-sin-permiso");
-      btn.style.display = "none";
+      btn.setAttribute("data-bc-permiso", "0");
+      btn.style.setProperty("display", "none", "important");
       btn.classList.remove("active");
       const panel = document.getElementById("tab-" + tab);
       if (panel) panel.classList.remove("visible");
@@ -140,10 +157,12 @@ function aplicarPermisosAInterfaz() {
     const permitido = !!(seccion && tienePermiso(seccion, "ver"));
     if (permitido) {
       btn.classList.remove("hidden", "tab-sin-permiso");
-      btn.style.display = "";
+      btn.setAttribute("data-bc-permiso", "1");
+      btn.style.removeProperty("display");
     } else {
       btn.classList.add("hidden", "tab-sin-permiso");
-      btn.style.display = "none";
+      btn.setAttribute("data-bc-permiso", "0");
+      btn.style.setProperty("display", "none", "important");
       btn.classList.remove("active");
       const panel = document.getElementById("tab-" + tab);
       if (panel) panel.classList.remove("visible");
