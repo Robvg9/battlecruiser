@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
 // Capa mínima de arranque/hotfixes. La lógica de Productos vive en js/productos.js.
-(function hotfixV9218(){
-  const VERSION="9.2.18";
+(function hotfixV9219(){
+  const VERSION="9.2.19";
 
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -51,4 +51,4 @@
 (function cargarGuardiaOnlineOffline(){if(document.querySelector('script[src*="online-offline-guard"]'))return;var s=document.createElement("script");s.src="js/online-offline-guard.js";s.async=false;document.body.appendChild(s);})();
 (function cargarOperacionesFinancieras(){if(document.querySelector('script[src*="operaciones-financieras"]'))return;var s=document.createElement("script");s.src="js/operaciones-financieras.js";s.async=false;document.body.appendChild(s);})();
 (function cargarAprobacionesAdmin(){if(document.querySelector('script[src*="aprobaciones-admin"]'))return;var s=document.createElement("script");s.src="js/aprobaciones-admin.js";s.async=false;document.body.appendChild(s);})();
-(function cargarIntegridadUI(){if(document.querySelector('script[src*="m26-ui-integridad"]'))return;var s=document.createElement("script");s.src="js/m26-ui-integridad.js?v=26.9";s.async=false;document.body.appendChild(s);})();
+(function cargarIntegridadUI(){if(document.querySelector('script[src*="m26-ui-integridad"]'))return;var s=document.createElement("script");s.src="js/m26-ui-integridad.js?v=26.10";s.async=false;document.body.appendChild(s);})();
