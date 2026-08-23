@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
 // Capa mínima de arranque/hotfixes. La lógica de Productos vive en js/productos.js.
-(function hotfixV9229(){
-  const VERSION="9.2.29";
+(function hotfixV9230(){
+  const VERSION="9.2.30";
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
@@ -26,3 +26,4 @@
 (function cargarAprobacionesAdmin(){if(document.querySelector('script[src*="aprobaciones-admin"]'))return;var s=document.createElement("script");s.src="js/aprobaciones-admin.js";s.async=false;document.body.appendChild(s);})();
 (function cargarIntegridadUI(){if(document.querySelector('script[src*="m26-ui-integridad"]'))return;var s=document.createElement("script");s.src="js/m26-ui-integridad.js?v=26.29";s.async=false;document.body.appendChild(s);})();
 (function cargarSesionesOperativasUI(){if(document.querySelector('script[src*="sesiones-operativas-ui"]'))return;var s=document.createElement("script");s.src="js/sesiones-operativas-ui.js?v=29.2";s.async=false;document.body.appendChild(s);})();
+(function cargarUiVisualSalon(){if(document.querySelector('script[src*="ui-visual-salon"]'))return;var s=document.createElement("script");s.src="js/ui-visual-salon.js?v=30.1";s.async=false;document.body.appendChild(s);})();
