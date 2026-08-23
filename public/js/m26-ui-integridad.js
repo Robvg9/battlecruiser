@@ -18,8 +18,6 @@
     if (!form) return;
     var h = form.previousElementSibling;
     if (h && /^Registrar compra/i.test((h.textContent || '').trim())) h.style.display = 'none';
-    // No eliminar el DOM: productos.js refresca sus selectores durante la carga.
-    // Se mantiene fuera de la experiencia visual, pero sus dependencias siguen vivas.
     form.style.display = 'none';
     form.setAttribute('aria-hidden', 'true');
   }
@@ -133,16 +131,21 @@
 
     var agregar = document.createElement('button');
     agregar.type = 'button'; agregar.id = 'bc-productos-agregar'; agregar.className = 'cc-accion'; agregar.textContent = 'Agregar producto';
+    agregar.setAttribute('aria-controls', 'form-producto');
     agregar.addEventListener('click', function (e) {
-      e.preventDefault(); e.stopPropagation();
-      form.classList.remove('hidden'); form.removeAttribute('hidden'); form.classList.add('bc-producto-form-visible'); form.style.setProperty('display', 'block', 'important'); form.dataset.bcProductFormOpen = '1';
-      // Nunca ocultar el botón público al abrir el formulario.
-      agregar.style.removeProperty('display'); agregar.hidden = false;
+      e.preventDefault();
+      e.stopPropagation();
+      form.classList.remove('hidden');
+      form.removeAttribute('hidden');
+      form.classList.add('bc-producto-form-visible');
+      form.style.setProperty('display', 'block', 'important');
+      form.dataset.bcProductFormOpen = '1';
+      agregar.style.removeProperty('display');
+      agregar.hidden = false;
+      agregar.disabled = false;
       var submitBtn = document.getElementById('prod-submit-btn');
       if (submitBtn) submitBtn.textContent = document.getElementById('prod-editando-id')?.value ? 'Guardar cambios' : 'Guardar producto';
-      var primerCampo = document.getElementById('prod-nombre');
-      if (primerCampo) primerCampo.focus();
-      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // No hacer scroll ni mover el viewport: el botón público debe permanecer visible.
     });
     controles.appendChild(agregar); barra.appendChild(controles); panel.insertBefore(barra, panel.firstChild);
 
@@ -173,7 +176,7 @@
 
     var style = document.createElement('style');
     style.id = 'bc-productos-simple-style';
-    style.textContent = `#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}#bc-productos-barra .bc-productos-search{width:100%}#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}#bc-productos-controles{display:flex;flex-wrap:wrap;gap:8px;align-items:center}#bc-productos-orden{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 auto}#bc-productos-orden button{flex:0 1 auto}#bc-productos-orden button.active{border-color:var(--gold);color:var(--gold)}#bc-productos-vista{display:flex;gap:6px;margin-left:auto}#bc-productos-agregar{flex:0 0 auto;visibility:visible!important;opacity:1!important}#lista-productos{display:block!important}#lista-productos.bc-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}#lista-productos.bc-grid>.lista-item{box-sizing:border-box;min-width:0;min-height:0;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow:hidden}#lista-productos.bc-grid>.lista-item .producto-thumb{display:block;width:100%;height:60%;min-height:0;max-height:none;object-fit:cover;flex:0 0 60%;border-radius:7px}#lista-productos.bc-grid>.lista-item .producto-thumb-vacia{height:60%;flex:0 0 60%;background:rgba(255,255,255,.06);border-radius:7px}#lista-productos.bc-grid>.lista-item>span:not(.lista-item-acciones){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#lista-productos.bc-grid>.lista-item .lista-item-acciones{display:flex;gap:4px;margin-top:auto}#lista-productos.bc-grid>.lista-item .lista-item-acciones button{flex:1 1 0;min-width:0;padding:5px 4px;font-size:11px}#form-producto{display:none!important}#form-producto.bc-producto-form-visible{display:block!important}@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}}`;
+    style.textContent = `#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}#bc-productos-barra .bc-productos-search{width:100%}#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}#bc-productos-controles{display:flex;flex-wrap:wrap;gap:8px;align-items:center}#bc-productos-orden{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 auto}#bc-productos-orden button{flex:0 1 auto}#bc-productos-orden button.active{border-color:var(--gold);color:var(--gold)}#bc-productos-vista{display:flex;gap:6px;margin-left:auto}#bc-productos-agregar{flex:0 0 auto;visibility:visible!important;opacity:1!important;display:inline-flex!important}#lista-productos{display:block!important}#lista-productos.bc-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch}#lista-productos.bc-grid>.lista-item{box-sizing:border-box;min-width:0;min-height:0;aspect-ratio:1/1;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px;padding:8px;overflow:hidden}#lista-productos.bc-grid>.lista-item .producto-thumb{display:block;width:100%;height:60%;min-height:0;max-height:none;object-fit:cover;flex:0 0 60%;border-radius:7px}#lista-productos.bc-grid>.lista-item .producto-thumb-vacia{height:60%;flex:0 0 60%;background:rgba(255,255,255,.06);border-radius:7px}#lista-productos.bc-grid>.lista-item>span:not(.lista-item-acciones){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#lista-productos.bc-grid>.lista-item .lista-item-acciones{display:flex;gap:4px;margin-top:auto}#lista-productos.bc-grid>.lista-item .lista-item-acciones button{flex:1 1 0;min-width:0;padding:5px 4px;font-size:11px}#form-producto{display:none!important}#form-producto.bc-producto-form-visible{display:block!important}@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}}`;
     document.head.appendChild(style);
   }
 
