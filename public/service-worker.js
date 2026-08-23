@@ -1,8 +1,7 @@
-// BattleCruiser Service Worker v105 — alineado con app v9.2.41
-// FIX bucle: NO postMessage BC_SW_ACTIVATED (provocaba reload en clientes).
-// activate: claim + borrar solo battlecruiser-shell-* antiguas. NO IndexedDB.
-const BC_VERSION = "9.2.41";
-const CACHE_NAME = "battlecruiser-shell-v105";
+// BattleCruiser Service Worker v106 — despliega app v9.2.42 estable.
+// Sin postMessage al cliente, sin reload automático y sin tocar IndexedDB.
+const BC_VERSION = "9.2.42";
+const CACHE_NAME = "battlecruiser-shell-v106";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
@@ -24,80 +23,7 @@ const SHELL_FILES = [
   "./icons/icon-maskable-512x512.png","./icons/icon.svg"
 ];
 const CDN_FILES = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
-
-self.addEventListener("install", function (e) {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(async function (c) {
-      for (var i = 0; i < SHELL_FILES.length; i++) {
-        try { await c.add(SHELL_FILES[i]); } catch (err) {
-          console.warn("[Battlecruiser SW] precache omitido", SHELL_FILES[i], err);
-        }
-      }
-      for (var j = 0; j < CDN_FILES.length; j++) {
-        try { await c.add(CDN_FILES[j]); } catch (err2) {
-          console.warn("[Battlecruiser SW] CDN omitido", CDN_FILES[j], err2);
-        }
-      }
-    }).then(function () { return self.skipWaiting(); })
-  );
-});
-
-self.addEventListener("activate", function (e) {
-  e.waitUntil(
-    caches.keys().then(function (names) {
-      return Promise.all(names.map(function (n) {
-        if (n.indexOf("battlecruiser-shell-") === 0 && n !== CACHE_NAME) return caches.delete(n);
-        return undefined;
-      }));
-    }).then(function () { return self.clients.claim(); })
-    // SIN postMessage → SIN reload forzado en clientes
-  );
-});
-
-self.addEventListener("fetch", function (e) {
-  var request = e.request;
-  var url = request.url;
-
-  if (CDN_FILES.indexOf(url) !== -1) {
-    e.respondWith(caches.match(request).then(function (c) { return c || fetch(request); }));
-    return;
-  }
-  if (url.indexOf("supabase.co") !== -1) {
-    e.respondWith(request.method === "GET" ? fetchWithTimeout(request, 4000) : fetch(request));
-    return;
-  }
-
-  var isDoc = request.destination === "document" || request.mode === "navigate" ||
-    url.indexOf("/index.html") !== -1 || /\/public\/?(\?|$)/.test(url);
-
-  if (isDoc) {
-    e.respondWith(
-      fetchWithTimeout(request, 3000).catch(function () {
-        return caches.match("./index.html").then(function (c) { return c || caches.match(request); });
-      })
-    );
-    return;
-  }
-
-  e.respondWith(
-    fetchWithTimeout(request, 3000).then(function (r) {
-      if (r && r.ok && request.method === "GET") {
-        var clone = r.clone();
-        caches.open(CACHE_NAME).then(function (c) {
-          try { c.put(request, clone); } catch (err) {}
-        });
-      }
-      return r;
-    }).catch(function () {
-      return caches.open(CACHE_NAME).then(function (c) { return c.match(request); });
-    })
-  );
-});
-
-function fetchWithTimeout(request, ms) {
-  return new Promise(function (resolve, reject) {
-    var t = setTimeout(function () { reject(new Error("timeout")); }, ms);
-    fetch(request).then(function (r) { clearTimeout(t); resolve(r); })
-      .catch(function (e) { clearTimeout(t); reject(e); });
-  });
-}
+self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE_NAME).then(async c=>{for(const u of [...SHELL_FILES,...CDN_FILES]){try{await c.add(u)}catch(err){console.warn("[Battlecruiser SW] precache omitido",u,err)}}}).then(()=>self.skipWaiting()))});
+self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ns=>Promise.all(ns.map(n=>n.startsWith("battlecruiser-shell-")&&n!==CACHE_NAME?caches.delete(n):undefined))).then(()=>self.clients.claim()))});
+self.addEventListener("fetch",e=>{const r=e.request,u=r.url;if(CDN_FILES.includes(u)){e.respondWith(caches.match(r).then(c=>c||fetch(r)));return}if(u.includes("supabase.co")){e.respondWith(r.method==="GET"?fetchWithTimeout(r,4000):fetch(r));return}const doc=r.destination==="document"||r.mode==="navigate"||u.includes("/index.html")||/\/public\/?(\?|$)/.test(u);if(doc){e.respondWith(fetchWithTimeout(r,3000).catch(()=>caches.match("./index.html").then(c=>c||caches.match(r))));return}e.respondWith(fetchWithTimeout(r,3000).then(x=>{if(x&&x.ok&&r.method==="GET")caches.open(CACHE_NAME).then(c=>c.put(r,x.clone()));return x}).catch(()=>caches.open(CACHE_NAME).then(c=>c.match(r))))});
+function fetchWithTimeout(r,ms){return new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(new Error("timeout")),ms);fetch(r).then(x=>{clearTimeout(t);resolve(x)}).catch(e=>{clearTimeout(t);reject(e)})})}
