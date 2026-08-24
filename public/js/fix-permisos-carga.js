@@ -1,5 +1,5 @@
-// BattleCruiser v9.2.78 — corrige construcción de _permisosEfectivos + paralelo M26.2
-// Causa raíz FE: se ignoraba p.permitido y se marcaba TODA fila del RPC como true.
+// BattleCruiser v9.2.79 — no sobrescribir cargarContextoUsuario de M26.3 (timeouts + recovery).
+// Solo envuelve si la función base aún no tiene timeout (versiones antiguas cacheadas).
 (function () {
   "use strict";
   if (window.__bcPermisosCargaFix) return;
@@ -17,7 +17,15 @@
   }
 
   function wrapCargar() {
-    if (typeof cargarContextoUsuario !== "function" || cargarContextoUsuario.__bcPermitidoFix) return;
+    if (typeof cargarContextoUsuario !== "function") return;
+    // M26.3: usuarios-permisos.js ya tiene timeout + fail-closed + Reintentar
+    if (cargarContextoUsuario.__bcM263Timeout || cargarContextoUsuario.__bcPermitidoFix) return;
+    // Si existe bcConTimeout global, la versión canónica ya está cargada
+    if (typeof bcConTimeout === "function" && typeof BC_CONTEXTO_TIMEOUT_MS === "number") {
+      cargarContextoUsuario.__bcM263Timeout = true;
+      return;
+    }
+
     var wrapped = async function () {
       if (_cargandoUsuario) return;
       _cargandoUsuario = true;
@@ -98,7 +106,6 @@
     try { cargarContextoUsuario = wrapped; } catch (e) {}
   }
 
-  // Una sola pasada + reintento en load (antes: 3 llamadas wrapCargar)
   wrapCargar();
   window.addEventListener("load", wrapCargar, { once: true });
 })();
