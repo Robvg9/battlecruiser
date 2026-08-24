@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/auth.js ====
 // Autenticación, sesión, actualizar app, ajustes de cuenta, SW, atajos.
-// v9.2.78 — M26.2: no re-ejecutar showApp si la sesión ya está activa.
+// v9.2.80 — M26.4: boot sin flash de login; sesión pendiente hasta que exista cargarContextoUsuario.
 
 const loginForm = document.getElementById("login-form");
 const loginBtn = document.getElementById("login-btn");
@@ -18,20 +18,41 @@ let _cargandoUsuario = false;
 let _permisosCargaExitosa = false;
 let _permisosCargaFallidaRed = false;
 let _bcSesionActivaId = null;
+/** Sesión descubierta antes de que usuarios-permisos.js defina cargarContextoUsuario. */
+let _bcPendingSession = null;
+let _bcAuthBootResolved = false;
+
+function bcIntentarCargarContexto() {
+  if (typeof cargarContextoUsuario !== "function") return false;
+  if (_cargandoUsuario) return true;
+  if (_usuarioActual && _permisosCargaExitosa) return true;
+  cargarContextoUsuario();
+  return true;
+}
+
+/** Llamado al final de usuarios-permisos.js cuando la función ya existe. */
+window.__bcOnContextoLoaderReady = function () {
+  if (_bcPendingSession || (_bcSesionActivaId && appShell && appShell.classList.contains("visible"))) {
+    _bcPendingSession = null;
+    bcIntentarCargarContexto();
+  }
+};
 
 function showApp(session) {
   if (!session || !session.user) return;
-  // M26.2: getSession() + onAuthStateChange(INITIAL_SESSION/SIGNED_IN) disparan
-  // showApp dos veces seguidas → doble cargarContextoUsuario y "Cargando usuario…" largo.
+
+  // Idempotencia: misma sesión y shell ya visible → solo asegurar contexto
   if (_bcSesionActivaId === session.user.id && appShell && appShell.classList.contains("visible")) {
-    if (!_usuarioActual && typeof cargarContextoUsuario === "function" && !_cargandoUsuario) {
-      cargarContextoUsuario();
+    if (!_usuarioActual || !_permisosCargaExitosa) {
+      if (!bcIntentarCargarContexto()) {
+        _bcPendingSession = session;
+      }
     }
     return;
   }
   _bcSesionActivaId = session.user.id;
+  _bcAuthBootResolved = true;
 
-  // Nueva sesión: no conservar pestaña/panel del usuario anterior
   if (typeof resetearNavegacionParaNuevaSesion === "function") {
     resetearNavegacionParaNuevaSesion();
   } else {
@@ -39,16 +60,21 @@ function showApp(session) {
     document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
   }
   loginForm.classList.add("hidden");
-  lanternWrap.classList.add("hidden");
+  if (lanternWrap) lanternWrap.classList.add("hidden");
   appShell.classList.add("visible");
-  // M12-FE.6: nunca mostrar session.user.email aquí (puede ser @internal.battlecruiser.local)
   if (userEmailEl) userEmailEl.textContent = "Cargando usuario…";
   _usuarioActualId = session.user.id;
-  if (typeof cargarContextoUsuario === "function") cargarContextoUsuario();
+
+  if (!bcIntentarCargarContexto()) {
+    // usuarios-permisos.js aún no cargó (orden de scripts / red lenta tras Actualizar app)
+    _bcPendingSession = session;
+  }
 }
 
 function showLogin() {
   _bcSesionActivaId = null;
+  _bcPendingSession = null;
+  _bcAuthBootResolved = true;
   if (typeof resetearNavegacionParaNuevaSesion === "function") {
     resetearNavegacionParaNuevaSesion();
   } else {
@@ -56,7 +82,7 @@ function showLogin() {
     document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
   }
   loginForm.classList.remove("hidden");
-  lanternWrap.classList.remove("hidden");
+  if (lanternWrap) lanternWrap.classList.remove("hidden");
   appShell.classList.remove("visible");
   _usuarioActualId = null;
   if (userEmailEl) userEmailEl.textContent = "";
@@ -65,15 +91,51 @@ function showLogin() {
   if (usuarioInput) usuarioInput.focus();
 }
 
-showLogin();
+// M26.4: NO llamar showLogin() de inmediato → evita flash de login con sesión válida.
+// Ocultar login visualmente hasta saber si hay sesión (el form puede verse un instante
+// por CSS por defecto; lo minimizamos marcando estado de boot).
+document.documentElement.classList.add("bc-auth-booting");
+if (loginForm) loginForm.setAttribute("aria-busy", "true");
 
-client.auth.getSession().then(({ data }) => {
-  if (data.session) showApp(data.session);
+function bcResolverBootSinSesion() {
+  document.documentElement.classList.remove("bc-auth-booting");
+  if (loginForm) loginForm.removeAttribute("aria-busy");
+  showLogin();
+}
+
+function bcResolverBootConSesion(session) {
+  document.documentElement.classList.remove("bc-auth-booting");
+  if (loginForm) loginForm.removeAttribute("aria-busy");
+  showApp(session);
+}
+
+client.auth.getSession().then(function (res) {
+  var data = res && res.data;
+  if (data && data.session) bcResolverBootConSesion(data.session);
+  else if (!_bcAuthBootResolved) bcResolverBootSinSesion();
+}).catch(function () {
+  if (!_bcAuthBootResolved) bcResolverBootSinSesion();
 });
 
-client.auth.onAuthStateChange((_event, session) => {
-  if (session) showApp(session);
-  else showLogin();
+// Red de seguridad: si getSession cuelga, no dejar la UI en limbo
+setTimeout(function () {
+  if (!_bcAuthBootResolved) {
+    console.warn("[BattleCruiser] getSession lento — mostrando login (fail-safe)");
+    bcResolverBootSinSesion();
+  }
+}, 8000);
+
+client.auth.onAuthStateChange(function (event, session) {
+  // TOKEN_REFRESHED / INITIAL_SESSION con misma sesión: showApp es idempotente
+  if (session) {
+    if (event === "SIGNED_OUT") {
+      showLogin();
+      return;
+    }
+    showApp(session);
+  } else if (event === "SIGNED_OUT" || _bcAuthBootResolved) {
+    showLogin();
+  }
 });
 
 safeInit("login", () => {
@@ -143,6 +205,7 @@ safeInit("logout", () => {
     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
     if (userEmailEl) userEmailEl.textContent = "";
     _bcSesionActivaId = null;
+    _bcPendingSession = null;
     await client.auth.signOut();
   });
 });
@@ -206,33 +269,42 @@ safeInit("nuevo-usuario", () => {
   });
 });
 
+/** M26.4: una sola ruta de actualización — limpia SW + caches y fuerza URL nueva. */
 async function actualizarApp(btn) {
-  const textoOriginal = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "Actualizando...";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Actualizando...";
+  }
   try {
+    if ("serviceWorker" in navigator) {
+      var regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(function (r) { return r.unregister(); }));
+    }
     if ("caches" in window) {
-      const keys = await caches.keys();
+      var keys = await caches.keys();
       await Promise.all(
-        keys.filter((k) => k.startsWith("battlecruiser-shell-")).map((k) => caches.delete(k))
+        keys.filter(function (k) {
+          return k.startsWith("battlecruiser-shell-") || k.startsWith("battlecruiser");
+        }).map(function (k) { return caches.delete(k); })
       );
     }
-    if ("serviceWorker" in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    }
-  } catch (e) {}
-  location.reload();
+  } catch (e) {
+    console.warn("[BattleCruiser] actualización: limpieza parcial", e);
+  }
+  var ver = (typeof window.__BC_VERSION__ === "string" && window.__BC_VERSION__) || "9.2.80";
+  var u = new URL(location.href);
+  u.searchParams.set("bc_update", ver + "-" + Date.now());
+  location.replace(u.toString());
 }
 
 safeInit("actualizar-app-login", () => {
   const btn = document.getElementById("update-app-btn-login");
-  btn.addEventListener("click", () => actualizarApp(btn));
+  if (btn) btn.addEventListener("click", () => actualizarApp(btn));
 });
 
 safeInit("actualizar-app", () => {
   const updateAppBtn = document.getElementById("update-app-btn");
-  updateAppBtn.addEventListener("click", () => actualizarApp(updateAppBtn));
+  if (updateAppBtn) updateAppBtn.addEventListener("click", () => actualizarApp(updateAppBtn));
 });
 
 const OJO_ABIERTO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
