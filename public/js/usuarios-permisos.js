@@ -1,5 +1,5 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.79 M26.3: timeout en RPC de arranque + recuperación explícita (fail-closed).
+// B3 — v9.2.80 M26.4: timeout + recovery + señal a auth cuando el loader está listo.
 
 var BC_CONTEXTO_TIMEOUT_MS = 12000;
 
@@ -124,7 +124,6 @@ async function cargarContextoUsuario() {
       huboTimeout = !!(eParallel && eParallel.bcTimeout);
       huboErrorRed = true;
       console.warn("[BattleCruiser] RPC perfil/permisos falló o timeout", eParallel);
-      // Fallback secuencial con timeout (red mediocre: una puede vivir)
       try {
         perfilRes = await bcConTimeout(client.rpc("perfil_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "perfil2");
       } catch (e1) {
@@ -163,7 +162,6 @@ async function cargarContextoUsuario() {
       };
     }
 
-    // FAIL CLOSED: permisos solo si RPC respondió OK con array
     _permisosEfectivos = {};
     _permisosCargaExitosa = false;
     _permisosCargaFallidaRed = false;
@@ -213,6 +211,7 @@ async function cargarContextoUsuario() {
     if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
   }
 }
+cargarContextoUsuario.__bcM263Timeout = true;
 
 function limpiarContextoUsuario() {
   _usuarioActual = null;
@@ -402,7 +401,16 @@ function mostrarInfoUsuarioEnHeader() {
     el.textContent = "Sin permisos cargados — reintentá";
     return;
   }
-  // Sesión OK, permisos OK, pero sin nombre legible
   var rolSolo = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
   el.textContent = rolSolo;
+}
+
+// M26.4: auth.js puede haber descubierto la sesión ANTES de este archivo.
+// Reanudar carga de contexto ahora que la función existe.
+try {
+  if (typeof window.__bcOnContextoLoaderReady === "function") {
+    window.__bcOnContextoLoaderReady();
+  }
+} catch (eReady) {
+  console.warn("[BattleCruiser] __bcOnContextoLoaderReady", eReady);
 }
