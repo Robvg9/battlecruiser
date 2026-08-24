@@ -1,13 +1,18 @@
 // BattleCruiser — Operaciones Hub (v9.2.37)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
-// M12-FE.6: cards solo con *.crear; resp/incidencia con turnos.crear.
+// M12-FE.7: cards + guards RPC solo con *.crear (ver no ejecuta).
 (function () {
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '39';
+  var HUB_VER = '40';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
+  /** Defensa en profundidad: ver NUNCA basta para crear. */
+  function requireCrear(seccion) {
+    if (can(seccion, 'crear')) return true;
+    return false;
+  }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v) : String(v == null ? '' : v); }
   function key() { return crypto.randomUUID(); }
   function products() { return Array.isArray(window._cache && window._cache.productos) ? window._cache.productos.filter(function (p) { return p.activo !== false; }) : []; }
@@ -130,6 +135,7 @@
   }
 
   function openGasto() {
+    if (!requireCrear('gastos')) return;
     openModal({
       icon: '💸', title: 'Registrar gasto', submitText: 'Enviar a aprobación',
       bodyHtml:
@@ -139,6 +145,7 @@
         '<div class="field"><span>Almacén (opcional)</span><select id="op-g-alm">' + storeOpts(true) + '</select></div>' +
         '<p class="muted" style="margin:0;font-size:12px">No descuenta caja hasta ser aprobado.</p>',
       onSubmit: async function (setMsg) {
+        if (!requireCrear('gastos')) { setMsg('Sin permiso para registrar gastos.', false); throw new Error('permiso'); }
         var concepto = document.getElementById('op-g-concepto').value.trim();
         var monto = Number(document.getElementById('op-g-monto').value);
         if (!concepto || !(monto > 0)) { setMsg('Completá concepto y monto válido.', false); throw new Error('validación'); }
@@ -152,6 +159,7 @@
   }
 
   function openMerma() {
+    if (!requireCrear('mermas')) return;
     openModal({
       icon: '📦', title: 'Registrar merma', submitText: 'Enviar a revisión',
       submitBg: 'rgba(180,60,60,.9)', submitColor: '#fff',
@@ -162,6 +170,7 @@
         '<div class="field"><span>Motivo</span><input id="op-m-motivo" placeholder="Motivo de la merma" required></div>' +
         '<p class="muted" style="margin:0;font-size:12px">El stock no cambia hasta aprobación administrativa.</p>',
       onSubmit: async function (setMsg) {
+        if (!requireCrear('mermas')) { setMsg('Sin permiso para registrar mermas.', false); throw new Error('permiso'); }
         var alm = document.getElementById('op-m-alm').value;
         var prod = document.getElementById('op-m-prod').value;
         var cant = Number(document.getElementById('op-m-cant').value);
@@ -177,6 +186,7 @@
   }
 
   function openReinversion() {
+    if (!requireCrear('reinversiones')) return;
     openModal({
       icon: '🔄', title: 'Registrar reinversión', submitText: 'Registrar reinversión',
       submitBg: 'rgba(50,140,90,.95)', submitColor: '#fff',
@@ -190,6 +200,7 @@
         '<div class="field"><span>Proveedor (opcional)</span><input id="op-r-prov" placeholder="Nombre del proveedor"></div>' +
         '<p class="muted" style="margin:0;font-size:12px">Inventario ↑ · costo unitario · caja ↓</p>',
       onSubmit: async function (setMsg) {
+        if (!requireCrear('reinversiones')) { setMsg('Sin permiso para registrar reinversiones.', false); throw new Error('permiso'); }
         var alm = document.getElementById('op-r-alm').value;
         var prod = document.getElementById('op-r-prod').value;
         var cant = Number(document.getElementById('op-r-cant').value);
@@ -221,6 +232,7 @@
   }
 
   function openResponsabilidad() {
+    if (!requireCrear('turnos')) return;
     openModal({
       icon: '📋', title: 'Responsabilidades', submitText: 'Crear',
       submitBg: 'rgba(50,90,160,.95)', submitColor: '#fff',
@@ -259,6 +271,7 @@
         });
       },
       onSubmit: async function (setMsg) {
+        if (!requireCrear('turnos')) { setMsg('Sin permiso para crear responsabilidades.', false); throw new Error('permiso'); }
         var form = document.getElementById('form-responsabilidad');
         if (!form) { setMsg('Formulario base no disponible.', false); throw new Error('no form'); }
         var t = document.getElementById('op-resp-t').value.trim();
@@ -277,6 +290,7 @@
   }
 
   function openIncidencia() {
+    if (!requireCrear('turnos')) return;
     openModal({
       icon: '⚠️', title: 'Incidencias', submitText: 'Reportar',
       submitBg: 'rgba(100,60,160,.95)', submitColor: '#fff',
@@ -314,6 +328,7 @@
         });
       },
       onSubmit: async function (setMsg) {
+        if (!requireCrear('turnos')) { setMsg('Sin permiso para reportar incidencias.', false); throw new Error('permiso'); }
         var form = document.getElementById('form-incidencia');
         if (!form) { setMsg('Formulario base no disponible.', false); throw new Error('no form'); }
         var d = document.getElementById('op-inc-d').value.trim();
