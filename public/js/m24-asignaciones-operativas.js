@@ -1,10 +1,11 @@
 // BattleCruiser M24-FE — Asignación operativa de Turnos
 // Admin asigna · Dependienta ejecuta · Backend verifica
-// Fix: selects conservan valor al refresh (MutationObserver no resetea).
+// M25.4: observer ignora #m22-sesiones-panel (rompe bucle M22↔M24).
 (function () {
   'use strict';
 
   var PANEL_ID = 'm24-asig-panel';
+  var M22_PANEL_ID = 'm22-sesiones-panel';
   var cacheAsig = [];
   var cacheUsers = [];
   var lastUserOpts = '';
@@ -180,10 +181,7 @@
     var sb = document.getElementById('m24-bloque');
     var ac = document.getElementById('m24-activo');
     if (!su || !sa) return;
-
-    // Conservar selección actual del DOM antes de reconstruir opciones
     captureForm();
-
     var userHtml = cacheUsers.map(function (u) {
       return '<option value="' + esc(u.id) + '">' + esc(u.nombre || u.id) + '</option>';
     }).join('') || '<option value="">—</option>';
@@ -191,8 +189,6 @@
     var almHtml = alms.map(function (a) {
       return '<option value="' + esc(a.id) + '">' + esc(a.nombre || a.id) + '</option>';
     }).join('') || '<option value="">—</option>';
-
-    // Solo reescribir innerHTML si el catálogo cambió (evita reset al primer item)
     if (userHtml !== lastUserOpts) {
       su.innerHTML = userHtml;
       lastUserOpts = userHtml;
@@ -201,7 +197,6 @@
       sa.innerHTML = almHtml;
       lastAlmOpts = almHtml;
     }
-
     applySaved(su, savedSel.user);
     applySaved(sa, savedSel.alm);
     if (sb) applySaved(sb, savedSel.bloque || 'MANANA');
@@ -247,13 +242,11 @@
 
     refreshing = true;
     try {
-      // Si el panel ya existe y no pedimos force, solo asegurar lista sin tocar selects
       var panelExiste = !!document.getElementById(PANEL_ID);
       if (panelExiste && !opts.force) {
         captureForm();
         try { await listarAsignaciones({}); } catch (e) {}
         renderLista();
-        // Reaplicar valores por si algo externo tocó el form
         applySaved(document.getElementById('m24-user'), savedSel.user);
         applySaved(document.getElementById('m24-alm'), savedSel.alm);
         applySaved(document.getElementById('m24-bloque'), savedSel.bloque);
@@ -293,7 +286,6 @@
       setMsg('✓ Asignación guardada.', true);
       await listarAsignaciones({});
       renderLista();
-      // Mantener selección tras guardar
       applySaved(document.getElementById('m24-user'), userId);
       applySaved(document.getElementById('m24-alm'), almId);
       applySaved(document.getElementById('m24-bloque'), bloque);
@@ -344,7 +336,6 @@
         revocar(rev.dataset.m24Revocar, rev.dataset.alm, rev.dataset.bloque);
       }
     });
-    // Persistir selección en memoria en cada change (antes de cualquier re-render)
     document.addEventListener('change', function (e) {
       var t = e.target;
       if (!t || !t.id) return;
@@ -355,23 +346,33 @@
     });
   }
 
+  function nodeInSelfOrM22(node) {
+    if (!node) return false;
+    if (node.nodeType === 3) node = node.parentNode;
+    if (!node || node.nodeType !== 1) return false;
+    if (node.id === PANEL_ID || (node.closest && node.closest('#' + PANEL_ID))) return true;
+    if (node.id === M22_PANEL_ID || (node.closest && node.closest('#' + M22_PANEL_ID))) return true;
+    return false;
+  }
+
   function observe() {
     var root = document.getElementById('ciclos-m18-root');
     if (!root || root.dataset.m24Obs === '1') return;
     root.dataset.m24Obs = '1';
     var t = null;
+    var mountedOnce = false;
     new MutationObserver(function (mutations) {
-      // Ignorar mutaciones dentro del propio panel (lista, selects)
-      var onlySelf = mutations.every(function (m) {
-        var n = m.target;
-        return n && (n.id === PANEL_ID || (n.closest && n.closest('#' + PANEL_ID)));
+      var onlyInternal = mutations.every(function (m) {
+        return nodeInSelfOrM22(m.target);
       });
-      if (onlySelf) return;
+      if (onlyInternal) return;
       if (t) clearTimeout(t);
       t = setTimeout(function () {
-        // Panel ya montado → soft refresh (no reset selects)
-        refreshPanel({ force: !document.getElementById(PANEL_ID) });
-      }, 150);
+        var exists = !!document.getElementById(PANEL_ID);
+        if (exists && mountedOnce) return;
+        refreshPanel({ force: !exists });
+        if (document.getElementById(PANEL_ID)) mountedOnce = true;
+      }, 200);
     }).observe(root, { childList: true, subtree: true });
   }
 
@@ -391,7 +392,6 @@
     bind();
     observe();
     setTimeout(function () { refreshPanel({ force: true }); }, 600);
-    setTimeout(function () { refreshPanel({ force: !document.getElementById(PANEL_ID) }); }, 1600);
   }
 
   if (document.readyState === 'loading') {
