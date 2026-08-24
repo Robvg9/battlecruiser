@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.65 — M22-FE.1: Turnos visible con turnos.ver (no hideLegacy)
-(function hotfixV9265(){
-  const VERSION="9.2.65";
+// v9.2.66 — M23-FE: un TURNOS (ciclos+turnos.ver); almacenes_para_turnos
+(function hotfixV9266(){
+  const VERSION="9.2.66";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -28,7 +28,7 @@
 (function cargarModulosDinamicos(){
   const modules=[
     ["usuarios-permisos-rest.js","60.1"],
-    ["permisos-navegacion.js","63.1"],
+    ["permisos-navegacion.js","66.1"],
     ["fix-permisos-rol.js","60.1"],
     ["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
@@ -36,7 +36,7 @@
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","41.1"],
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],
     ["m22-sesiones-en-m21.js","22.1"],["m22-fe-patches-m21.js","22.1"],
-    ["m22-fe1-turnos-visibilidad.js","22.2"]
+    ["m23-fe-almacenes-turnos.js","23.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
