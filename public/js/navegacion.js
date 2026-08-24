@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/navegacion.js ====
 // Navegación por tabs y menú lateral. Visibilidad = autoridad de aplicarPermisosAInterfaz.
-// v9.2.78 — M26.2: no re-refrescar si se re-selecciona la misma pestaña activa.
+// v9.2.80 — M26.5-FE: almacenes carga stock; ventas sincroniza turno del usuario.
 
 function irATab(tab) {
   if (!tab) return;
@@ -38,7 +38,6 @@ safeInit("tabs", function () {
     if (panel) panel.classList.add("visible");
     ultimaTab = t;
 
-    // M26.2: re-click en la misma sección → no re-lanzar refrescos de red
     if (mismoTab) {
       if (t !== "pendientes" && typeof cerrarDetalleOperacion === "function") cerrarDetalleOperacion();
       return;
@@ -51,6 +50,32 @@ safeInit("tabs", function () {
     } else if (t === "productos") {
       if (typeof renderProductosLista === "function" && typeof _cache !== "undefined" && (_cache.productos || []).length) renderProductosLista();
       else if (typeof refrescarProductos === "function") refrescarProductos();
+    } else if (t === "almacenes") {
+      // M26.5-FE: almacenes + stock juntos (evita falso "sin productos")
+      if (typeof refrescarAlmacenes === "function") {
+        Promise.resolve(refrescarAlmacenes()).then(function () {
+          if (typeof refrescarStockYSelects === "function") return refrescarStockYSelects();
+        }).catch(function (err) {
+          console.warn("[BattleCruiser] refresco almacenes/stock", err);
+        });
+      } else if (typeof refrescarStockYSelects === "function") {
+        refrescarStockYSelects();
+      }
+    } else if (t === "ventas") {
+      // M26.5-FE: turno del usuario actual → UI de venta coherente
+      var afterTurno = function () {
+        if (typeof actualizarPanelAlmacenVenta === "function") actualizarPanelAlmacenVenta();
+        if (typeof refrescarVentas === "function") refrescarVentas();
+      };
+      if (typeof window.__BC_M25_refrescarTurno === "function") {
+        Promise.resolve(window.__BC_M25_refrescarTurno()).then(afterTurno).catch(afterTurno);
+      } else if (typeof refrescarTurnoActual === "function") {
+        Promise.resolve(refrescarTurnoActual()).then(afterTurno).catch(afterTurno);
+      } else {
+        afterTurno();
+      }
+    } else if (t === "transferencias") {
+      if (typeof refrescarTransferencias === "function") refrescarTransferencias();
     } else if (t === "reportes") {
       if (typeof refrescarReportes === "function") refrescarReportes();
     } else if (t === "inventario") {
