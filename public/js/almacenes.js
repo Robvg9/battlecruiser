@@ -1,15 +1,19 @@
 // ==== Battlecruiser · js/almacenes.js ====
-// Selector y gestión de almacenes, panel de almacén seleccionado, refresco de stock y selects.
-// M26.5-FE: comparación de IDs normalizada + recarga de stock si la caché está vacía al seleccionar.
+// Selector y gestión de almacenes + stock del panel.
+// M26.6-FE: estados explícitos de carga de stock (nunca "Cargando…" infinito).
 
 let _almacenSeleccionadoId = null;
-let _stockAlmacenesCargando = false;
+/** idle | loading | ok | error */
+let _stockCargaEstado = "idle";
+let _stockCargaError = null;
+let _stockCargaPromise = null;
+
+var BC_STOCK_TIMEOUT_MS = 15000;
 
 function etiquetaTipoAlmacen(tipo) {
   return tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista";
 }
 
-/** Comparación estable de UUIDs / ids (evita fallos string vs valor crudo). */
 function mismoIdAlmacen(a, b) {
   if (a == null || b == null) return false;
   return String(a) === String(b);
@@ -19,6 +23,33 @@ function stockDelAlmacen(almacenId) {
   if (!almacenId) return [];
   return (_cache.stock || []).filter(function (s) {
     return s && mismoIdAlmacen(s.almacen_id, almacenId);
+  });
+}
+
+function bcConTimeoutLocal(promesa, ms, etiqueta) {
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var t = setTimeout(function () {
+      if (done) return;
+      done = true;
+      var err = new Error("timeout:" + (etiqueta || "op"));
+      err.bcTimeout = true;
+      reject(err);
+    }, ms || BC_STOCK_TIMEOUT_MS);
+    Promise.resolve(promesa).then(
+      function (v) {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve(v);
+      },
+      function (e) {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        reject(e);
+      }
+    );
   });
 }
 
@@ -113,17 +144,40 @@ function renderProductosDelAlmacen(almacen_id) {
     lista.innerHTML = '<p class="lista-estado">Elegí un almacén para ver sus productos.</p>';
     return;
   }
-  const stock = stockDelAlmacen(almacen_id);
-  if (stock.length === 0) {
-    // Si la caché global de stock está vacía, es probable que aún no se haya cargado
-    // (no afirmar vacío real hasta tener datos).
-    if (!(_cache.stock && _cache.stock.length)) {
-      lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
-      return;
-    }
-    lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos con stock registrado.</p>';
+
+  if (_stockCargaEstado === "loading") {
+    lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
     return;
   }
+  if (_stockCargaEstado === "error") {
+    lista.innerHTML =
+      '<p class="lista-estado">No se pudo cargar el stock' +
+      (_stockCargaError ? ": " + escHtml(String(_stockCargaError).slice(0, 120)) : ".") +
+      "</p>" +
+      '<button type="button" class="cc-accion" id="bc-alm-stock-reintentar">Reintentar</button>';
+    var btn = document.getElementById("bc-alm-stock-reintentar");
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", function () {
+        cargarStockAlmacenes(true);
+      });
+    }
+    return;
+  }
+
+  const stock = stockDelAlmacen(almacen_id);
+  if (stock.length === 0) {
+    // Solo vacío real tras carga ok
+    if (_stockCargaEstado === "ok") {
+      lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos con stock registrado.</p>';
+    } else {
+      // idle: disparar carga sin afirmar vacío
+      lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
+      cargarStockAlmacenes(false);
+    }
+    return;
+  }
+
   const productosById = {};
   (_cache.productos || []).forEach((p) => { productosById[p.id] = p; });
   lista.innerHTML = "";
@@ -162,25 +216,68 @@ function seleccionarAlmacen(id) {
   const sel = document.getElementById("alm-selector");
   if (sel) sel.value = id || "";
   renderPanelAlmacenSeleccionado();
-  // M26.5-FE: si no hay stock en caché, cargar y re-renderizar (evita falso vacío)
-  if (id && (!(_cache.stock && _cache.stock.length)) && !_stockAlmacenesCargando) {
-    asegurarStockAlmacenesYRender();
+  if (id && _stockCargaEstado !== "ok" && _stockCargaEstado !== "loading") {
+    cargarStockAlmacenes(false);
   }
 }
 
-async function asegurarStockAlmacenesYRender() {
-  if (_stockAlmacenesCargando) return;
-  _stockAlmacenesCargando = true;
-  try {
-    if (typeof refrescarStockYSelects === "function") {
-      await refrescarStockYSelects();
-    }
-  } catch (e) {
-    console.warn("[BattleCruiser] asegurarStockAlmacenesYRender", e);
-  } finally {
-    _stockAlmacenesCargando = false;
-    if (_almacenSeleccionadoId) renderPanelAlmacenSeleccionado();
+/**
+ * Carga única de stock (deduplicada). force=true reinicia tras error.
+ */
+function cargarStockAlmacenes(force) {
+  if (_stockCargaEstado === "loading" && _stockCargaPromise) {
+    return _stockCargaPromise;
   }
+  if (_stockCargaEstado === "ok" && !force && (_cache.stock || []).length >= 0) {
+    // ok incluso con array vacío (vacío real)
+    if (!force) {
+      renderPanelAlmacenSeleccionado();
+      return Promise.resolve(_cache.stock || []);
+    }
+  }
+  _stockCargaEstado = "loading";
+  _stockCargaError = null;
+  renderPanelAlmacenSeleccionado();
+
+  _stockCargaPromise = (async function () {
+    try {
+      // Productos en paralelo (nombres); no bloquear stock si fallan
+      var productosP = Promise.resolve();
+      if (typeof cargarProductos === "function") {
+        productosP = bcConTimeoutLocal(cargarProductos(), BC_STOCK_TIMEOUT_MS, "productos").then(function (p) {
+          if (Array.isArray(p)) _cache.productos = p;
+        }).catch(function () {});
+      }
+
+      var stockP = bcConTimeoutLocal(
+        withCache("stock", function () {
+          return client
+            .from("stock")
+            .select("producto_id, almacen_id, cantidad, minimo, productos(nombre), almacenes(nombre)");
+        }),
+        BC_STOCK_TIMEOUT_MS,
+        "stock"
+      );
+
+      var pair = await Promise.all([stockP, productosP]);
+      var stock = pair[0];
+      _cache.stock = Array.isArray(stock) ? stock : [];
+      _stockCargaEstado = "ok";
+      _stockCargaError = null;
+      try { if (typeof renderResumen === "function") renderResumen(); } catch (e) {}
+      return _cache.stock;
+    } catch (e) {
+      console.warn("[BattleCruiser] cargarStockAlmacenes", e);
+      _stockCargaEstado = "error";
+      _stockCargaError = (e && e.message) ? e.message : "Error de red";
+      return [];
+    } finally {
+      _stockCargaPromise = null;
+      renderPanelAlmacenSeleccionado();
+    }
+  })();
+
+  return _stockCargaPromise;
 }
 
 function cerrarFormAlmacen() {
@@ -239,13 +336,9 @@ async function refrescarAlmacenes() {
   }
 
   llenarSelectorAlmacenes(almacenes);
-  // No afirmar vacío de productos hasta tener stock; si falta, cargarlo
-  if (!(_cache.stock && _cache.stock.length)) {
-    renderPanelAlmacenSeleccionado();
-    await asegurarStockAlmacenesYRender();
-  } else {
-    renderPanelAlmacenSeleccionado();
-  }
+  renderPanelAlmacenSeleccionado();
+  // Cargar stock en paralelo sin bloquear el retorno de almacenes
+  cargarStockAlmacenes(false);
 
   fillSelect(document.getElementById("trf-origen"), almacenes, "id", (a) => a.nombre);
   fillSelect(document.getElementById("trf-destino"), almacenes, "id", (a) => a.nombre);
@@ -254,39 +347,14 @@ async function refrescarAlmacenes() {
 }
 
 async function refrescarStockYSelects() {
-  const { productos, almacenes } = await refrescarProductos();
-  fillSelect(document.getElementById("trf-producto"), productos, "id", (p) => p.nombre);
-  fillSelect(document.getElementById("vale-producto"), productos, "id", (p) => p.nombre);
-
-  setLoading("lista-stock", "Cargando stock…");
-  const stock = await withCache("stock", () => client
-    .from("stock")
-    .select("producto_id, almacen_id, cantidad, minimo, productos(nombre), almacenes(nombre)"));
-
-  _cache.stock = stock || [];
-  renderResumen();
-  if (typeof renderProductosDelAlmacen === "function") {
-    renderProductosDelAlmacen(_almacenSeleccionadoId);
-  } else {
-    const lista = document.getElementById("lista-stock");
-    if (!lista) return;
-    if (!_cache.stock.length) {
-      setEmpty("lista-stock", mensajeListaVacia("stock", "Todavía no hay stock cargado."));
-      return;
-    }
-    lista.innerHTML = "";
-    _cache.stock.forEach((s) => {
-      const div = document.createElement("div");
-      div.className = "lista-item";
-      const bajo = s.minimo != null && s.cantidad <= s.minimo;
-      div.innerHTML = `<span>${escHtml(s.productos.nombre)} <span class="muted">· ${escHtml(s.almacenes.nombre)}</span></span>
-        <span class="muted" style="${bajo ? "color:var(--ember)" : ""}">${money(s.cantidad)}${bajo ? " ⚠ bajo mínimo" : ""}</span>`;
-      lista.appendChild(div);
-    });
+  try {
+    const { productos } = await refrescarProductos();
+    fillSelect(document.getElementById("trf-producto"), productos, "id", (p) => p.nombre);
+    fillSelect(document.getElementById("vale-producto"), productos, "id", (p) => p.nombre);
+  } catch (e) {
+    console.warn("[BattleCruiser] refrescarStockYSelects productos", e);
   }
-  if (typeof renderPanelAlmacenSeleccionado === "function" && _almacenSeleccionadoId) {
-    renderPanelAlmacenSeleccionado();
-  }
+  await cargarStockAlmacenes(true);
 }
 
 safeInit("form-almacen", () => {
@@ -327,7 +395,7 @@ safeInit("form-almacen", () => {
       setMsg("msg-almacenes", editandoId ? "Almacén actualizado." : "Almacén creado.", true);
       cerrarFormAlmacen();
       await refrescarAlmacenes();
-      await refrescarStockYSelects();
+      await cargarStockAlmacenes(true);
       if (editandoId) seleccionarAlmacen(editandoId);
       else if (resultado.data && resultado.data.id) seleccionarAlmacen(resultado.data.id);
     }
@@ -390,7 +458,7 @@ safeInit("almacenes-ui", () => {
         : (nuevoActivo ? "Almacén activado." : "Almacén desactivado."), true);
       if (!resultado.offline) {
         await refrescarAlmacenes();
-        await refrescarStockYSelects();
+        await cargarStockAlmacenes(true);
         seleccionarAlmacen(a.id);
       }
     });
@@ -404,7 +472,7 @@ async function editarAlmacen(almacen_id, cambios) {
   const resultado = await ejecutarOperacion("almacen_actualizar", payload);
   if (resultado.ok && !resultado.offline) {
     await refrescarAlmacenes();
-    await refrescarStockYSelects();
+    await cargarStockAlmacenes(true);
   }
   return resultado;
 }
@@ -416,7 +484,7 @@ async function activarDesactivarAlmacen(almacen_id, activo) {
   });
   if (resultado.ok && !resultado.offline) {
     await refrescarAlmacenes();
-    await refrescarStockYSelects();
+    await cargarStockAlmacenes(true);
   }
   return resultado;
 }
