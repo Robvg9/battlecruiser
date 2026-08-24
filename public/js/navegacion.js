@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/navegacion.js ====
 // Navegación por tabs y menú lateral. Visibilidad = autoridad de aplicarPermisosAInterfaz.
-// (v9.2.49 — sin re-chequeo de permisos en click que provoque botones muertos)
+// v9.2.78 — M26.2: no re-refrescar si se re-selecciona la misma pestaña activa.
 
 function irATab(tab) {
   if (!tab) return;
@@ -20,6 +20,7 @@ function irATab(tab) {
 safeInit("tabs", function () {
   var tabsEl = document.getElementById("tabs");
   if (!tabsEl) return;
+  var ultimaTab = null;
   tabsEl.addEventListener("click", function (e) {
     var btn = e.target.closest(".tab-btn");
     if (!btn) return;
@@ -27,13 +28,22 @@ safeInit("tabs", function () {
       e.preventDefault();
       return;
     }
+    var t = btn.dataset.tab;
+    var mismoTab = (t === ultimaTab && btn.classList.contains("active"));
+
     document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
     document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("visible"); });
     btn.classList.add("active");
-    var panel = document.getElementById("tab-" + btn.dataset.tab);
+    var panel = document.getElementById("tab-" + t);
     if (panel) panel.classList.add("visible");
+    ultimaTab = t;
 
-    var t = btn.dataset.tab;
+    // M26.2: re-click en la misma sección → no re-lanzar refrescos de red
+    if (mismoTab) {
+      if (t !== "pendientes" && typeof cerrarDetalleOperacion === "function") cerrarDetalleOperacion();
+      return;
+    }
+
     if (t === "pendientes") {
       if (typeof refrescarPanelPendientes === "function") refrescarPanelPendientes();
     } else if (t === "resumen") {
