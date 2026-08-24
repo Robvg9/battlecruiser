@@ -1,13 +1,16 @@
 // BattleCruiser M24-FE — Asignación operativa de Turnos
 // Admin asigna · Dependienta ejecuta · Backend verifica
-// RPCs: asignar/revocar/listar_asignaciones_operativas, asignar_sesion_operativa
-// NO toca m18, ventas, offline, backend.
+// Fix: selects conservan valor al refresh (MutationObserver no resetea).
 (function () {
   'use strict';
 
   var PANEL_ID = 'm24-asig-panel';
   var cacheAsig = [];
   var cacheUsers = [];
+  var lastUserOpts = '';
+  var lastAlmOpts = '';
+  var savedSel = { user: '', alm: '', bloque: 'MANANA', activo: true };
+  var refreshing = false;
 
   function can(s, a) {
     return typeof tienePermiso === 'function' && tienePermiso(s, a);
@@ -118,6 +121,25 @@
     });
   }
 
+  function captureForm() {
+    var su = document.getElementById('m24-user');
+    var sa = document.getElementById('m24-alm');
+    var sb = document.getElementById('m24-bloque');
+    var ac = document.getElementById('m24-activo');
+    if (su && su.value) savedSel.user = su.value;
+    if (sa && sa.value) savedSel.alm = sa.value;
+    if (sb && sb.value) savedSel.bloque = normBloque(sb.value);
+    if (ac) savedSel.activo = !!ac.checked;
+  }
+
+  function applySaved(selectEl, value) {
+    if (!selectEl || value == null || value === '') return;
+    var ok = Array.prototype.some.call(selectEl.options, function (o) {
+      return String(o.value) === String(value);
+    });
+    if (ok) selectEl.value = String(value);
+  }
+
   function ensurePanel() {
     if (!isAdminAsig()) return null;
     var root = document.getElementById('ciclos-m18-root');
@@ -155,14 +177,35 @@
   function fillSelects() {
     var su = document.getElementById('m24-user');
     var sa = document.getElementById('m24-alm');
+    var sb = document.getElementById('m24-bloque');
+    var ac = document.getElementById('m24-activo');
     if (!su || !sa) return;
-    su.innerHTML = cacheUsers.map(function (u) {
+
+    // Conservar selección actual del DOM antes de reconstruir opciones
+    captureForm();
+
+    var userHtml = cacheUsers.map(function (u) {
       return '<option value="' + esc(u.id) + '">' + esc(u.nombre || u.id) + '</option>';
     }).join('') || '<option value="">—</option>';
     var alms = almacenesActivos();
-    sa.innerHTML = alms.map(function (a) {
+    var almHtml = alms.map(function (a) {
       return '<option value="' + esc(a.id) + '">' + esc(a.nombre || a.id) + '</option>';
     }).join('') || '<option value="">—</option>';
+
+    // Solo reescribir innerHTML si el catálogo cambió (evita reset al primer item)
+    if (userHtml !== lastUserOpts) {
+      su.innerHTML = userHtml;
+      lastUserOpts = userHtml;
+    }
+    if (almHtml !== lastAlmOpts) {
+      sa.innerHTML = almHtml;
+      lastAlmOpts = almHtml;
+    }
+
+    applySaved(su, savedSel.user);
+    applySaved(sa, savedSel.alm);
+    if (sb) applySaved(sb, savedSel.bloque || 'MANANA');
+    if (ac) ac.checked = savedSel.activo !== false;
   }
 
   function renderLista() {
@@ -190,7 +233,9 @@
     }).join('');
   }
 
-  async function refreshPanel() {
+  async function refreshPanel(opts) {
+    opts = opts || {};
+    if (refreshing) return;
     if (!isAdminAsig()) {
       var old = document.getElementById(PANEL_ID);
       if (old) old.remove();
@@ -200,21 +245,40 @@
     if (!root) return;
     if (root.querySelector('[data-m21-declare], [data-m21-accept], [data-m21-final]')) return;
 
-    await ensureAlmacenes();
-    try { await listarAsignaciones({}); } catch (e) { console.warn('[M24] listar_asignaciones', e); }
-    await cargarUsuarios();
-    var panel = ensurePanel();
-    if (!panel) return;
-    fillSelects();
-    renderLista();
+    refreshing = true;
+    try {
+      // Si el panel ya existe y no pedimos force, solo asegurar lista sin tocar selects
+      var panelExiste = !!document.getElementById(PANEL_ID);
+      if (panelExiste && !opts.force) {
+        captureForm();
+        try { await listarAsignaciones({}); } catch (e) {}
+        renderLista();
+        // Reaplicar valores por si algo externo tocó el form
+        applySaved(document.getElementById('m24-user'), savedSel.user);
+        applySaved(document.getElementById('m24-alm'), savedSel.alm);
+        applySaved(document.getElementById('m24-bloque'), savedSel.bloque);
+        return;
+      }
+
+      await ensureAlmacenes();
+      try { await listarAsignaciones({}); } catch (e) { console.warn('[M24] listar_asignaciones', e); }
+      await cargarUsuarios();
+      var panel = ensurePanel();
+      if (!panel) return;
+      fillSelects();
+      renderLista();
+    } finally {
+      refreshing = false;
+    }
   }
 
   async function guardar() {
     if (!isAdminAsig()) return;
-    var userId = (document.getElementById('m24-user') || {}).value;
-    var almId = (document.getElementById('m24-alm') || {}).value;
-    var bloque = (document.getElementById('m24-bloque') || {}).value || 'MANANA';
-    var activo = !!(document.getElementById('m24-activo') || { checked: true }).checked;
+    captureForm();
+    var userId = savedSel.user || (document.getElementById('m24-user') || {}).value;
+    var almId = savedSel.alm || (document.getElementById('m24-alm') || {}).value;
+    var bloque = savedSel.bloque || (document.getElementById('m24-bloque') || {}).value || 'MANANA';
+    var activo = savedSel.activo;
     if (!userId || !almId) {
       setMsg('Seleccioná usuario y almacén.', false);
       return;
@@ -229,6 +293,10 @@
       setMsg('✓ Asignación guardada.', true);
       await listarAsignaciones({});
       renderLista();
+      // Mantener selección tras guardar
+      applySaved(document.getElementById('m24-user'), userId);
+      applySaved(document.getElementById('m24-alm'), almId);
+      applySaved(document.getElementById('m24-bloque'), bloque);
     } catch (e) {
       setMsg('No se pudo guardar: ' + String(e && (e.message || e.details) || e), false);
     }
@@ -237,6 +305,7 @@
   async function revocar(userId, almId, bloque) {
     if (!isAdminAsig()) return;
     if (!window.confirm('¿Revocar esta asignación operativa?')) return;
+    captureForm();
     try {
       await rpc('revocar_usuario_operativo', {
         p_usuario_id: userId,
@@ -246,6 +315,9 @@
       setMsg('✓ Asignación revocada.', true);
       await listarAsignaciones({});
       renderLista();
+      applySaved(document.getElementById('m24-user'), savedSel.user);
+      applySaved(document.getElementById('m24-alm'), savedSel.alm);
+      applySaved(document.getElementById('m24-bloque'), savedSel.bloque);
     } catch (e) {
       setMsg('No se pudo revocar: ' + String(e && (e.message || e.details) || e), false);
     }
@@ -272,6 +344,15 @@
         revocar(rev.dataset.m24Revocar, rev.dataset.alm, rev.dataset.bloque);
       }
     });
+    // Persistir selección en memoria en cada change (antes de cualquier re-render)
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || !t.id) return;
+      if (t.id === 'm24-user') savedSel.user = t.value;
+      if (t.id === 'm24-alm') savedSel.alm = t.value;
+      if (t.id === 'm24-bloque') savedSel.bloque = normBloque(t.value);
+      if (t.id === 'm24-activo') savedSel.activo = !!t.checked;
+    });
   }
 
   function observe() {
@@ -279,9 +360,18 @@
     if (!root || root.dataset.m24Obs === '1') return;
     root.dataset.m24Obs = '1';
     var t = null;
-    new MutationObserver(function () {
+    new MutationObserver(function (mutations) {
+      // Ignorar mutaciones dentro del propio panel (lista, selects)
+      var onlySelf = mutations.every(function (m) {
+        var n = m.target;
+        return n && (n.id === PANEL_ID || (n.closest && n.closest('#' + PANEL_ID)));
+      });
+      if (onlySelf) return;
       if (t) clearTimeout(t);
-      t = setTimeout(function () { refreshPanel(); }, 120);
+      t = setTimeout(function () {
+        // Panel ya montado → soft refresh (no reset selects)
+        refreshPanel({ force: !document.getElementById(PANEL_ID) });
+      }, 150);
     }).observe(root, { childList: true, subtree: true });
   }
 
@@ -300,8 +390,8 @@
   function boot() {
     bind();
     observe();
-    setTimeout(refreshPanel, 600);
-    setTimeout(refreshPanel, 1600);
+    setTimeout(function () { refreshPanel({ force: true }); }, 600);
+    setTimeout(function () { refreshPanel({ force: !document.getElementById(PANEL_ID) }); }, 1600);
   }
 
   if (document.readyState === 'loading') {
