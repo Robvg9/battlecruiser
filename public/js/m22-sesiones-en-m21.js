@@ -1,6 +1,5 @@
-// BattleCruiser M22-FE — Sesiones operativas dentro de Turnos (M21).
-// No reemplaza m18-ciclos-ux.js: lo complementa.
-// RPCs: listar_sesiones_operativas, iniciar_sesion_operativa, cerrar_sesion_operativa.
+// BattleCruiser M22-FE + M24-FE — Sesiones en Turnos con asignación operativa.
+// RPCs: listar_sesiones_operativas, iniciar/cerrar_sesion_operativa, asignar_sesion_operativa (vía M24).
 // NO toca offline, legacy turnos físicos ni backend.
 (function () {
   'use strict';
@@ -9,9 +8,16 @@
   var RPC_CERRAR = 'cerrar_sesion_operativa';
   var PANEL_ID = 'm22-sesiones-panel';
   var busy = false;
+  var lastSesiones = [];
 
   function can(s, a) {
     return typeof tienePermiso === 'function' && tienePermiso(s, a);
+  }
+  function isAdmin() {
+    return can('ciclos', 'editar_any');
+  }
+  function uid() {
+    return (typeof _usuarioActual !== 'undefined' && _usuarioActual && _usuarioActual.id) || null;
   }
   function esc(v) {
     return typeof escHtml === 'function' ? escHtml(v == null ? '' : v) : String(v == null ? '' : v);
@@ -35,6 +41,29 @@
   }
   function labelEstado(e) {
     return ({ PENDIENTE: 'Pendiente', EN_CURSO: 'En curso', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' })[e] || e || '—';
+  }
+  function sesionUsuarioId(s) {
+    return s.usuario_id || s.trabajador_id || s.responsable_id || null;
+  }
+  function sesionUsuarioNombre(s) {
+    return s.usuario_nombre || s.trabajador_nombre || s.responsable_nombre || null;
+  }
+  function puedeAbrirSesion(s) {
+    if (String(s.estado) !== 'PENDIENTE') return false;
+    var assigned = sesionUsuarioId(s);
+    if (!assigned) return false;
+    if (isAdmin()) return can('ciclos', 'crear') || can('turnos', 'crear');
+    var me = uid();
+    if (!me || String(assigned) !== String(me)) return false;
+    return can('turnos', 'crear') || can('ciclos', 'crear');
+  }
+  function puedeCerrarSesion(s) {
+    if (String(s.estado) !== 'EN_CURSO') return false;
+    if (isAdmin()) return can('ciclos', 'editar') || can('turnos', 'editar');
+    var me = uid();
+    var assigned = sesionUsuarioId(s);
+    if (assigned && me && String(assigned) !== String(me)) return false;
+    return can('turnos', 'editar') || can('ciclos', 'editar');
   }
 
   function cicloIdDesdeUi() {
@@ -97,7 +126,7 @@
     var panel = document.createElement('div');
     panel.id = PANEL_ID;
     panel.className = 'm21-card';
-    panel.innerHTML = '<h4>Sesiones de trabajo</h4><p class="muted">Mañana / tarde · trabajador · abrir y cerrar.</p><div id="m22-sesiones-lista" class="m22-ses-lista"><p class="muted">Cargando sesiones…</p></div><p id="m22-sesiones-msg" class="m21-msg"></p>';
+    panel.innerHTML = '<h4>Sesiones de trabajo</h4><p class="muted">Mañana / tarde · trabajador asignado · abrir y cerrar.</p><div id="m22-sesiones-lista" class="m22-ses-lista"><p class="muted">Cargando sesiones…</p></div><p id="m22-sesiones-msg" class="m21-msg"></p>';
     var wrap = root.querySelector('.m21-wrap') || root;
     var firstCard = wrap.querySelector('.m21-card');
     if (firstCard && firstCard.parentNode) {
@@ -115,9 +144,67 @@
     el.className = 'm21-msg ' + (ok ? 'ok' : 'error');
   }
 
+  function actionsHtml(s, cicloActivo) {
+    var estado = String(s.estado || '');
+    var assigned = sesionUsuarioId(s);
+    var nombre = sesionUsuarioNombre(s);
+    var me = uid();
+    var admin = isAdmin();
+
+    if (estado === 'COMPLETADA' || estado === 'CANCELADA') {
+      return '<span class="muted">' + esc(labelEstado(estado)) + '</span>';
+    }
+
+    if (estado === 'EN_CURSO') {
+      if (puedeCerrarSesion(s) && cicloActivo) {
+        return '<button type="button" class="cc-accion" data-m22-cerrar="' + esc(s.id) + '">Cerrar sesión</button>';
+      }
+      return '<span class="muted">En curso</span>';
+    }
+
+    if (!cicloActivo) {
+      return '<span class="muted">Ciclo no activo</span>';
+    }
+
+    if (!assigned) {
+      if (admin) {
+        return '<button type="button" class="cc-accion" data-m24-asignar-sesion="' + esc(s.id) +
+          '" data-alm="' + esc(s.almacen_id || '') +
+          '" data-bloque="' + esc(s.bloque || '') +
+          '">Asignar trabajador</button>' +
+          '<span class="muted">Sesión pendiente de asignación</span>';
+      }
+      return '<span class="muted">Sesión pendiente de asignación</span>';
+    }
+
+    if (admin && estado === 'PENDIENTE') {
+      var openBtn = puedeAbrirSesion(s)
+        ? '<button type="button" class="cc-accion" data-m22-abrir="' + esc(s.id) + '">Abrir sesión</button>'
+        : '';
+      return openBtn +
+        '<button type="button" class="cc-accion" data-m24-asignar-sesion="' + esc(s.id) +
+        '" data-alm="' + esc(s.almacen_id || '') +
+        '" data-bloque="' + esc(s.bloque || '') +
+        '" data-user="' + esc(assigned) +
+        '">Cambiar trabajador</button>';
+    }
+
+    if (String(assigned) !== String(me) && !admin) {
+      return '<span class="muted">Sesión asignada a otro trabajador' +
+        (nombre ? ' (' + esc(nombre) + ')' : '') + '.</span>';
+    }
+
+    if (puedeAbrirSesion(s)) {
+      return '<button type="button" class="cc-accion" data-m22-abrir="' + esc(s.id) + '">Abrir sesión</button>';
+    }
+
+    return '<span class="muted">Sin permiso para abrir</span>';
+  }
+
   function renderLista(sesiones, cicloEstado) {
     var el = document.getElementById('m22-sesiones-lista');
     if (!el) return;
+    lastSesiones = sesiones || [];
     if (!sesiones || !sesiones.length) {
       el.innerHTML = '<p class="muted">Sin sesiones en este turno.</p>';
       return;
@@ -125,26 +212,21 @@
     var cicloActivo = cicloEstado === 'ACTIVO' || cicloEstado === 'EN_VALIDACION';
     el.innerHTML = sesiones.map(function (s) {
       var estado = String(s.estado || '');
-      var trabajador = s.usuario_nombre || s.trabajador_nombre || s.responsable_nombre || '—';
+      var trabajador = sesionUsuarioNombre(s) || (sesionUsuarioId(s) ? '—' : 'Sin asignar');
+      var alm = s.almacen_nombre || s.nombre_almacen || '';
       var apertura = s.apertura_real || s.iniciado_en || s.hora_apertura || null;
       var cierre = s.cierre_real || s.cerrado_en || s.hora_cierre || null;
-      var actions = '';
-      if (estado === 'PENDIENTE' && cicloActivo && can('ciclos', 'crear')) {
-        actions = '<button type="button" class="cc-accion" data-m22-abrir="' + esc(s.id) + '">Abrir sesión</button>';
-      } else if (estado === 'EN_CURSO' && can('ciclos', 'editar')) {
-        actions = '<button type="button" class="cc-accion" data-m22-cerrar="' + esc(s.id) + '">Cerrar sesión</button>';
-      } else if (estado === 'COMPLETADA') {
-        actions = '<span class="muted">Finalizada</span>';
-      }
       return (
         '<div class="m21-row">' +
         '<div><b>Día ' + esc(s.dia_n) + ' · ' + esc(labelBloque(s.bloque)) + '</b>' +
-        '<small>' + esc(fmtFecha(s.fecha)) + ' · ' + esc(trabajador) + '</small>' +
+        '<small>' + esc(fmtFecha(s.fecha)) +
+        (alm ? ' · ' + esc(alm) : '') +
+        ' · Asignada a: ' + esc(trabajador) + '</small>' +
         '<span class="m21-status">' + esc(labelEstado(estado)) +
         (apertura ? ' · abre ' + esc(fmtHora(apertura)) : '') +
         (cierre ? ' · cierra ' + esc(fmtHora(cierre)) : '') +
         '</span></div>' +
-        '<div class="m21-actions">' + actions + '</div></div>'
+        '<div class="m21-actions">' + actionsHtml(s, cicloActivo) + '</div></div>'
       );
     }).join('');
   }
@@ -158,6 +240,9 @@
     panel.dataset.cicloId = cicloId;
     busy = true;
     try {
+      if (window.__BC_M24__ && typeof window.__BC_M24__.listarAsignaciones === 'function') {
+        try { await window.__BC_M24__.listarAsignaciones({}); } catch (e) {}
+      }
       var sesiones = await listarSesiones(cicloId);
       var estado = 'ACTIVO';
       var root = document.getElementById('ciclos-m18-root');
@@ -172,7 +257,11 @@
   }
 
   async function abrir(id, btn) {
-    if (!can('ciclos', 'crear')) { setMsg('Sin permiso para abrir sesiones.', false); return; }
+    var s = lastSesiones.find(function (x) { return String(x.id) === String(id); });
+    if (s && !puedeAbrirSesion(s)) {
+      setMsg('No podés abrir esta sesión (asignación o permiso).', false);
+      return;
+    }
     if (btn) { btn.disabled = true; }
     try {
       await mutar(RPC_INICIAR, id, null);
@@ -187,7 +276,11 @@
   }
 
   async function cerrar(id, btn) {
-    if (!can('ciclos', 'editar')) { setMsg('Sin permiso para cerrar sesiones.', false); return; }
+    var s = lastSesiones.find(function (x) { return String(x.id) === String(id); });
+    if (s && !puedeCerrarSesion(s)) {
+      setMsg('No podés cerrar esta sesión.', false);
+      return;
+    }
     if (!window.confirm('¿Cerrar esta sesión de trabajo?')) return;
     if (btn) { btn.disabled = true; }
     try {
@@ -202,6 +295,48 @@
     }
   }
 
+  async function promptAsignar(sesionId, almId, bloque) {
+    if (!isAdmin()) {
+      setMsg('Sin permiso para asignar sesiones.', false);
+      return;
+    }
+    var M = window.__BC_M24__;
+    if (!M) {
+      setMsg('Módulo de asignaciones no cargado.', false);
+      return;
+    }
+    try {
+      await M.listarAsignaciones({});
+      await M.cargarUsuarios();
+    } catch (e) {}
+    var cands = M.candidatosParaSesion(almId, bloque);
+    if (!cands.length) {
+      setMsg('No hay trabajadores autorizados para este almacén y bloque. Creá primero una asignación operativa.', false);
+      return;
+    }
+    var options = cands.map(function (c, i) {
+      return (i + 1) + ') ' + (c.nombre || c.id);
+    }).join('\n');
+    var pick = window.prompt(
+      'Asignar trabajador a la sesión\n' + options + '\n\nEscribí el número:',
+      '1'
+    );
+    if (pick == null) return;
+    var idx = parseInt(pick, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= cands.length) {
+      setMsg('Selección inválida.', false);
+      return;
+    }
+    var chosen = cands[idx];
+    try {
+      await M.asignarSesion(sesionId, chosen.id);
+      setMsg('✓ Sesión asignada a ' + (chosen.nombre || chosen.id) + '.', true);
+      await refresh();
+    } catch (e) {
+      setMsg('No se pudo asignar: ' + String(e && (e.message || e.details) || e), false);
+    }
+  }
+
   function bind() {
     var root = document.getElementById('ciclos-m18-root');
     if (!root) return;
@@ -212,6 +347,11 @@
       if (a) { e.stopPropagation(); abrir(a.dataset.m22Abrir, a); return; }
       var c = e.target.closest('[data-m22-cerrar]');
       if (c) { e.stopPropagation(); cerrar(c.dataset.m22Cerrar, c); return; }
+      var asg = e.target.closest('[data-m24-asignar-sesion]');
+      if (asg) {
+        e.stopPropagation();
+        promptAsignar(asg.dataset.m24AsignarSesion, asg.dataset.alm, asg.dataset.bloque);
+      }
     });
   }
 
