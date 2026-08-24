@@ -1,6 +1,7 @@
 // ==== Battlecruiser · js/venta-turno-ui.js ====
-// Sesión 6/30 — Almacén de venta = turno abierto (_turnoActual).
+// Sesión 6/30 — Almacén de venta = turno abierto (_turnoActual del usuario).
 // No hay selector libre. Backend (m14) es la autoridad final.
+// M26.5-FE: ocultar carrito/total/confirmar/catálogo si no hay turno propio.
 
 function obtenerAlmacenIdOperativoVenta() {
   if (typeof _turnoActual === "undefined" || !_turnoActual) return null;
@@ -21,14 +22,49 @@ function nombreAlmacenOperativoVenta(id) {
 
 function actualizarPanelAlmacenVenta() {
   const almId = obtenerAlmacenIdOperativoVenta();
+  const puedeVender = !!almId;
   const sinTurno = document.getElementById("venta-sin-turno");
   const bloque = document.getElementById("venta-operativa-bloque");
   const nombreEl = document.getElementById("venta-almacen-nombre");
   if (nombreEl) nombreEl.textContent = almId ? nombreAlmacenOperativoVenta(almId) : "—";
-  if (sinTurno) sinTurno.classList.toggle("hidden", !!almId);
-  if (bloque) bloque.classList.toggle("hidden", !almId);
+  if (sinTurno) sinTurno.classList.toggle("hidden", puedeVender);
+  if (bloque) bloque.classList.toggle("hidden", !puedeVender);
 
-  // Compatibilidad: si aún existiera un select residual, dejarlo no usable.
+  // M26.5-FE: elementos que m26-ventas-ux puede haber sacado del bloque
+  var extraIds = [
+    "bc-venta-carrito-bar",
+    "venta-modo-buscador",
+    "venta-modo-catalogo",
+    "form-venta-linea",
+    "venta-lineas",
+    "venta-total-wrap",
+    "btn-confirmar-venta",
+    "msg-venta",
+    "msg-venta-linea",
+    "venta-stock-disponible",
+    "venta-vista-toggle",
+    "catalogo-categorias",
+    "catalogo-grid"
+  ];
+  extraIds.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    // No ocultar si ya está dentro del bloque (el bloque gobierna)
+    if (bloque && bloque.contains(el)) return;
+    el.classList.toggle("hidden", !puedeVender);
+    if (!puedeVender) {
+      el.setAttribute("aria-hidden", "true");
+      el.style.setProperty("display", "none", "important");
+    } else {
+      el.removeAttribute("aria-hidden");
+      el.style.removeProperty("display");
+    }
+  });
+
+  var tab = document.getElementById("tab-ventas");
+  if (tab) tab.classList.toggle("bc-venta-sin-turno", !puedeVender);
+
+  // Compatibilidad: select residual no usable
   const sel = document.getElementById("venta-almacen");
   if (sel) {
     sel.disabled = true;
@@ -52,11 +88,12 @@ function actualizarPanelAlmacenVenta() {
     if (typeof renderVentaLineas === "function") renderVentaLineas();
   }
 
-  if (typeof renderCatalogoGrid === "function") renderCatalogoGrid();
-  if (typeof actualizarStockDisponibleUI === "function") actualizarStockDisponibleUI();
+  if (puedeVender) {
+    if (typeof renderCatalogoGrid === "function") renderCatalogoGrid();
+    if (typeof actualizarStockDisponibleUI === "function") actualizarStockDisponibleUI();
+  }
 }
 
-// Envuelve refrescarVentas para pintar el panel tras cargar almacenes/productos.
 (function parchearRefrescarVentas() {
   if (typeof refrescarVentas !== "function") return;
   const _orig = refrescarVentas;
@@ -66,7 +103,6 @@ function actualizarPanelAlmacenVenta() {
   };
 })();
 
-// Envuelve refrescarTurnoActual para sincronizar Ventas al abrir/cerrar turno.
 (function parchearRefrescarTurnoActual() {
   if (typeof refrescarTurnoActual !== "function") return;
   const _orig = refrescarTurnoActual;
@@ -76,9 +112,6 @@ function actualizarPanelAlmacenVenta() {
   };
 })();
 
-// Lectura de almacén: cualquier código que aún lea #venta-almacen debe
-// recibir el id del turno. Parchea getters usados en listeners ya registrados
-// reescribiendo las funciones públicas que dependen del select.
 (function parchearLectoresAlmacen() {
   if (typeof actualizarStockDisponibleUI === "function") {
     const _orig = actualizarStockDisponibleUI;
@@ -101,7 +134,6 @@ function actualizarPanelAlmacenVenta() {
 })();
 
 safeInit("venta-turno-ui", function () {
-  // Transformar markup: quitar selector libre y montar panel de solo lectura.
   const wrap = document.querySelector(".venta-almacen-wrap");
   const tab = document.getElementById("tab-ventas");
   if (tab && !document.getElementById("venta-sin-turno")) {
@@ -109,9 +141,10 @@ safeInit("venta-turno-ui", function () {
     sin.id = "venta-sin-turno";
     sin.className = "venta-sin-turno";
     sin.innerHTML =
-      '<p class="lista-estado">⚠️ No puedes realizar ventas porque no tienes un turno abierto.</p>' +
-      '<p class="muted">Abrí un turno en la sección Turnos. El almacén del turno será el único punto desde el que podés vender.</p>' +
-      '<button type="button" id="venta-ir-turnos-btn" class="cc-accion">Ir a Turnos</button>';
+      '<p class="lista-estado" style="font-size:1.05rem;margin-bottom:8px"><strong>Ventas no disponibles</strong></p>' +
+      '<p class="lista-estado">Necesitas tener un turno abierto para realizar ventas.</p>' +
+      '<p class="muted">El almacén del turno será el único punto desde el que podés vender. Un turno de otro usuario no habilita ventas.</p>' +
+      '<button type="button" id="venta-ir-turnos-btn" class="cc-accion">Ver Turnos</button>';
 
     const panel = document.createElement("div");
     panel.className = "venta-almacen-operativo";
@@ -122,7 +155,6 @@ safeInit("venta-turno-ui", function () {
       '<strong class="venta-almacen-nombre" id="venta-almacen-nombre">—</strong>' +
       '<span class="muted venta-almacen-hint">Definido por tu turno abierto (no se puede cambiar aquí)</span>';
 
-    // Envolver el contenido operativo (todo menos historial) en un bloque.
     if (wrap) {
       wrap.replaceWith(panel);
     } else {
@@ -130,7 +162,6 @@ safeInit("venta-turno-ui", function () {
     }
     tab.insertBefore(sin, panel);
 
-    // Agrupar controles de venta (hasta msg-venta) en venta-operativa-bloque.
     const bloque = document.createElement("div");
     bloque.id = "venta-operativa-bloque";
     bloque.className = "hidden";
@@ -149,7 +180,6 @@ safeInit("venta-turno-ui", function () {
       node = next;
     }
   } else if (wrap) {
-    // Fallback: solo ocultar el select si el panel ya existiera.
     const sel = document.getElementById("venta-almacen");
     if (sel) {
       sel.disabled = true;
@@ -157,11 +187,21 @@ safeInit("venta-turno-ui", function () {
     }
   }
 
+  // Mensaje actualizado si el nodo ya existía de una sesión previa
+  var sinExist = document.getElementById("venta-sin-turno");
+  if (sinExist && !sinExist.dataset.bcM265) {
+    sinExist.dataset.bcM265 = "1";
+    sinExist.innerHTML =
+      '<p class="lista-estado" style="font-size:1.05rem;margin-bottom:8px"><strong>Ventas no disponibles</strong></p>' +
+      '<p class="lista-estado">Necesitas tener un turno abierto para realizar ventas.</p>' +
+      '<p class="muted">El almacén del turno será el único punto desde el que podés vender. Un turno de otro usuario no habilita ventas.</p>' +
+      '<button type="button" id="venta-ir-turnos-btn" class="cc-accion">Ver Turnos</button>';
+  }
+
   const btnIr = document.getElementById("venta-ir-turnos-btn");
   if (btnIr && !btnIr.dataset.bcIrTurnos) {
     btnIr.dataset.bcIrTurnos = "1";
     btnIr.addEventListener("click", function () {
-      // M18/M26: sección visible "Turnos" = data-tab="ciclos"
       if (typeof irATab === "function") {
         irATab("ciclos");
       } else {
@@ -172,7 +212,6 @@ safeInit("venta-turno-ui", function () {
     });
   }
 
-  // Interceptar confirmación: forzar almacén del turno en el payload.
   const btnConf = document.getElementById("btn-confirmar-venta");
   if (btnConf) {
     btnConf.addEventListener(
@@ -195,7 +234,6 @@ safeInit("venta-turno-ui", function () {
     );
   }
 
-  // Interceptar alta de línea / catálogo: sin turno no agregar.
   const formLinea = document.getElementById("form-venta-linea");
   if (formLinea) {
     formLinea.addEventListener(
