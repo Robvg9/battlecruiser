@@ -2,8 +2,7 @@
 // Rediseño de experiencia: BUSCAR → ELEGIR → CANTIDAD → AGREGAR → CONFIRMAR
 // Reutiliza 100%: ventaLineas, agregarLineaVenta, renderVentaLineas,
 // actualizarCantidadLinea, ejecutarOperacion("venta"), venta-turno-ui (M14).
-// No crea cola, IndexedDB, RPC ni cambia contratos.
-// v26.3 — display:flex solo cuando .visible (evita bloquear navegación de tabs)
+// v26.4 — M26.5-FE: carrito dentro de venta-operativa-bloque; CSS respeta sin turno
 (function () {
   'use strict';
 
@@ -16,13 +15,19 @@
     var s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent = [
-      /* CRÍTICO: display solo con .visible — sin esto #tab-ventas.bc-pos gana a .tab-panel y Ventas queda permanente */
       '#tab-ventas.bc-pos:not(.visible){display:none!important}',
       '#tab-ventas.bc-pos.visible{display:flex;flex-direction:column;gap:0;min-height:0}',
-      '#tab-ventas.bc-pos .venta-vista-toggle{display:none!important}',
-      '#tab-ventas.bc-pos #venta-modo-buscador{margin-bottom:8px}',
-      '#tab-ventas.bc-pos #venta-modo-catalogo{display:block!important}',
-      '#tab-ventas.bc-pos #venta-modo-catalogo.hidden{display:block!important}',
+      /* Sin turno propio: no forzar catálogo/carrito visibles */
+      '#tab-ventas.bc-venta-sin-turno #venta-operativa-bloque,',
+      '#tab-ventas.bc-venta-sin-turno #bc-venta-carrito-bar,',
+      '#tab-ventas.bc-venta-sin-turno #venta-modo-buscador,',
+      '#tab-ventas.bc-venta-sin-turno #venta-modo-catalogo,',
+      '#tab-ventas.bc-venta-sin-turno #form-venta-linea,',
+      '#tab-ventas.bc-venta-sin-turno .venta-vista-toggle{display:none!important}',
+      '#tab-ventas.bc-pos:not(.bc-venta-sin-turno) .venta-vista-toggle{display:none!important}',
+      '#tab-ventas.bc-pos:not(.bc-venta-sin-turno) #venta-modo-buscador{margin-bottom:8px}',
+      '#tab-ventas.bc-pos:not(.bc-venta-sin-turno) #venta-modo-catalogo{display:block!important}',
+      '#tab-ventas.bc-pos:not(.bc-venta-sin-turno) #venta-modo-catalogo.hidden{display:block!important}',
       '#tab-ventas.bc-pos #form-venta-linea{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:10px 12px}',
       '#tab-ventas.bc-pos #form-venta-linea .venta-buscar-wrap{flex:1 1 100%;min-width:0}',
       '#tab-ventas.bc-pos #venta-producto{display:none!important}',
@@ -157,7 +162,9 @@
     }
 
     var modoCat = document.getElementById('venta-modo-catalogo');
-    if (modoCat) modoCat.classList.remove('hidden');
+    if (modoCat && !tab.classList.contains('bc-venta-sin-turno')) {
+      modoCat.classList.remove('hidden');
+    }
 
     var lineas = document.getElementById('venta-lineas');
     var totalWrap = document.getElementById('venta-total-wrap');
@@ -167,16 +174,23 @@
       var bar = document.createElement('div');
       bar.id = 'bc-venta-carrito-bar';
       bar.className = 'bc-venta-carrito-bar';
-      var hist = null;
-      var nodes = tab.children;
-      for (var i = 0; i < nodes.length; i++) {
-        if (nodes[i].tagName === 'H3' && /Historial/i.test(nodes[i].textContent || '')) {
-          hist = nodes[i];
-          break;
+      // M26.5-FE: insertar DENTRO del bloque operativo si existe
+      var bloque = document.getElementById('venta-operativa-bloque');
+      var host = bloque || tab;
+      if (bloque) {
+        bloque.appendChild(bar);
+      } else {
+        var hist = null;
+        var nodes = tab.children;
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i].tagName === 'H3' && /Historial/i.test(nodes[i].textContent || '')) {
+            hist = nodes[i];
+            break;
+          }
         }
+        if (hist) tab.insertBefore(bar, hist);
+        else tab.appendChild(bar);
       }
-      if (hist) tab.insertBefore(bar, hist);
-      else tab.appendChild(bar);
       bar.appendChild(lineas);
       bar.appendChild(totalWrap);
       bar.appendChild(btn);
@@ -185,6 +199,10 @@
 
     var buscar = document.getElementById('venta-producto-buscar');
     if (buscar) buscar.placeholder = 'Buscar producto por nombre…';
+
+    if (typeof actualizarPanelAlmacenVenta === 'function') {
+      try { actualizarPanelAlmacenVenta(); } catch (e) {}
+    }
   }
 
   function wireSearchToCatalog() {
@@ -251,7 +269,6 @@
     }, true);
   }
 
-  // Refuerza mensaje offline cuando ventas.js usa setMsg con resultado.offline
   function patchOfflineMessage() {
     if (typeof setMsg !== 'function' || setMsg.__bcM26Offline) return;
     var orig = setMsg;
@@ -274,6 +291,9 @@
     ensureConfirmModal();
     if (typeof renderCatalogoGrid === 'function') {
       try { renderCatalogoGrid(); } catch (e) {}
+    }
+    if (typeof actualizarPanelAlmacenVenta === 'function') {
+      try { actualizarPanelAlmacenVenta(); } catch (e) {}
     }
   }
 
