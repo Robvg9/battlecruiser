@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.76 — M26: rediseño UX Ventas (búsqueda+catálogo unificados, carrito sticky, confirmación clara)
-(function hotfixV9276(){
-  const VERSION="9.2.76";
+// v9.2.77 — M26.1: fix navegación (Ventas ya no bloquea otros paneles)
+(function hotfixV9277(){
+  const VERSION="9.2.77";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -39,7 +39,7 @@
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],
     ["m24-asignaciones-operativas.js","25.4"],["m24-2-asignar-sesion-ui.js","24.3"],
     ["m25-fe-sync-turno-ventas.js","25.1"],
-    ["m26-ventas-ux.js","26.2"]
+    ["m26-ventas-ux.js","26.3"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
