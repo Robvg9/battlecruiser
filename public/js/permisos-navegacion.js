@@ -1,7 +1,7 @@
-// BattleCruiser v9.2.61 — M12-FE.6
+// BattleCruiser v9.2.63 — M12-FE.8
 // Menú: seccion.ver === true
-// Operaciones: gastos.crear || mermas.crear || reinversiones.crear || turnos.crear
-// Sin vales en menú. Panel informativo si no hay ninguna sección.
+// Operaciones: gastos|mermas|reinversiones|responsabilidades|incidencias .crear
+// Sin vales. Panel sin permisos.
 (function () {
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
@@ -20,7 +20,8 @@
       tienePermiso("gastos", "crear") ||
       tienePermiso("mermas", "crear") ||
       tienePermiso("reinversiones", "crear") ||
-      tienePermiso("turnos", "crear")
+      tienePermiso("responsabilidades", "crear") ||
+      tienePermiso("incidencias", "crear")
     );
   }
 
