@@ -1,7 +1,6 @@
-// BattleCruiser M22-FE + M24-FE + M24.2-FE.1 — Sesiones en Turnos con asignación operativa.
-// RPCs: listar_sesiones_operativas, iniciar/cerrar_sesion_operativa, asignar_sesion_operativa (vía M24).
-// Fix M24.2-FE.1: Asignar/Cambiar trabajador visible para admin aunque el ciclo esté PLANIFICADO.
-// NO toca offline, legacy turnos físicos ni backend.
+// BattleCruiser M22-FE + M24 + M25 — Sesiones en Turnos.
+// M25: tras abrir/cerrar sesión refresca turno_actual_usuario (vía __BC_M25_refrescarTurno).
+// Fix M24.2-FE.1: Asignar trabajador visible aunque ciclo PLANIFICADO.
 (function () {
   'use strict';
   var RPC_LIST = 'listar_sesiones_operativas';
@@ -41,8 +40,11 @@
     return b || '—';
   }
   function labelEstado(e) {
+    if (typeof window.__BC_M25_labelEstadoSesion === 'function') {
+      return window.__BC_M25_labelEstadoSesion(e);
+    }
     var k = String(e || '').toUpperCase();
-    return ({ PENDIENTE: 'Pendiente', EN_CURSO: 'En curso', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' })[k] || e || '—';
+    return ({ PENDIENTE: 'Sin comenzar', EN_CURSO: 'En proceso', COMPLETADA: 'Completada', CANCELADA: 'Cancelada' })[k] || e || '—';
   }
   function normEstado(e) {
     return String(e || '').toUpperCase().trim();
@@ -115,8 +117,14 @@
 
   async function syncVentas() {
     try {
-      if (typeof refrescarTurnoActual === 'function') await refrescarTurnoActual();
-    } catch (e) {}
+      if (typeof window.__BC_M25_refrescarTurno === 'function') {
+        await window.__BC_M25_refrescarTurno();
+      } else if (typeof refrescarTurnoActual === 'function') {
+        await refrescarTurnoActual();
+      }
+    } catch (e) {
+      try { console.warn('[M22] syncVentas turno', e); } catch (x) {}
+    }
     try {
       if (typeof actualizarPanelAlmacenVenta === 'function') actualizarPanelAlmacenVenta();
     } catch (e) {}
@@ -224,7 +232,7 @@
       var apertura = s.apertura_real || s.iniciado_en || s.hora_apertura || null;
       var cierre = s.cierre_real || s.cerrado_en || s.hora_cierre || null;
       return (
-        '<div class="m21-row">' +
+        '<div class="m21-row" data-sesion-estado="' + esc(estado) + '">' +
         '<div><b>Día ' + esc(s.dia_n) + ' · ' + esc(labelBloque(s.bloque)) + '</b>' +
         '<small>' + esc(fmtFecha(s.fecha)) +
         (alm ? ' · ' + esc(alm) : '') +
@@ -270,11 +278,6 @@
       var sesiones = await listarSesiones(cicloId);
       var root = document.getElementById('ciclos-m18-root');
       var estado = detectarEstadoCiclo(root);
-      try {
-        console.info('[M22] sesiones', sesiones.length, 'cicloEstado', estado,
-          'admin', isAdmin(),
-          'editar_any', can('ciclos', 'editar_any'));
-      } catch (e) {}
       renderLista(sesiones, estado);
     } catch (e) {
       setMsg('No se pudieron cargar las sesiones: ' + String(e && (e.message || e.details) || e), false);
@@ -351,7 +354,7 @@
     } catch (e) {}
     var cands = M.candidatosParaSesion(almId, bloque);
     if (!cands.length) {
-      setMsg('No hay trabajadores autorizados para este almacén y bloque. Creá primero una asignación operativa.', false);
+      setMsg('No hay trabajadores autorizados para este almacén y bloque.', false);
       return;
     }
     try {
