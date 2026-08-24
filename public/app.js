@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.78 — M26.2: arranque y navegación más rápidos (sin tocar backend)
-(function hotfixV9278(){
-  const VERSION="9.2.78";
+// v9.2.79 — M26.3: timeout + recuperación de "Cargando usuario…" (fail-closed)
+(function hotfixV9279(){
+  const VERSION="9.2.79";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -40,7 +40,7 @@
     ["m24-asignaciones-operativas.js","25.4"],["m24-2-asignar-sesion-ui.js","24.3"],
     ["m25-fe-sync-turno-ventas.js","25.1"],
     ["m26-ventas-ux.js","26.3"],
-    ["fix-permisos-carga.js","78.1"]
+    ["fix-permisos-carga.js","79.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
