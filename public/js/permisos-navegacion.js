@@ -1,7 +1,8 @@
-// BattleCruiser v9.2.63 — M12-FE.8
+// BattleCruiser v9.2.66 — M23-FE
 // Menú: seccion.ver === true
+// TURNOS visible = data-tab="ciclos" gated por turnos.ver (panel M21).
+// data-tab="turnos" (legacy) siempre oculto.
 // Operaciones: gastos|mermas|reinversiones|responsabilidades|incidencias .crear
-// Sin vales. Panel sin permisos.
 (function () {
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
@@ -14,7 +15,6 @@
     return !!(sec && sec[accion] === true);
   }
 
-  /** Visible si puede ejecutar al menos una card operativa. */
   function puedeVerOperaciones() {
     return (
       tienePermiso("gastos", "crear") ||
@@ -25,6 +25,8 @@
     );
   }
 
+  // ciclos (panel M21) se navega como TURNOS → permiso turnos.ver
+  // turnos (legacy) permanece en el mapa por compatibilidad, pero el botón se fuerza oculto.
   var TAB_A_SECCION = {
     productos: "productos",
     ventas: "ventas",
@@ -34,14 +36,14 @@
     inventario: "reportes",
     movimientos: "reportes",
     turnos: "turnos",
-    ciclos: "ciclos",
+    ciclos: "turnos",
     comunicacion: "comunicacion",
     mando: "auditoria",
     usuarios: "usuarios"
   };
 
   var ORDEN_HOME = [
-    "ventas", "comunicacion", "productos", "ciclos", "turnos", "operacion",
+    "ventas", "comunicacion", "productos", "ciclos", "operacion",
     "almacenes", "transferencias", "reportes", "inventario",
     "movimientos", "usuarios", "mando"
   ];
@@ -130,8 +132,22 @@
         return;
       }
 
+      // Legacy B7: siempre oculto. La UX TURNOS es data-tab="ciclos" (M21).
+      if (tab === "turnos") {
+        setTabVisible(btn, false);
+        return;
+      }
+
       if (tab === "operacion") {
         setTabVisible(btn, puedeVerOperaciones());
+        return;
+      }
+
+      // Panel M21: etiqueta TURNOS, permiso turnos.ver (mapeado en TAB_A_SECCION.ciclos)
+      if (tab === "ciclos") {
+        var verTurnos = tienePermiso("turnos", "ver");
+        setTabVisible(btn, verTurnos);
+        if (verTurnos) btn.textContent = "Turnos";
         return;
       }
 
