@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.69 — M24: fix persistencia selects asignaciones operativas
-(function hotfixV9269(){
-  const VERSION="9.2.69";
+// v9.2.70 — M24.2: modal Asignar trabajador en Sesiones de trabajo
+(function hotfixV9270(){
+  const VERSION="9.2.70";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -37,7 +37,7 @@
     ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],
     ["m22-sesiones-en-m21.js","24.1"],["m22-fe-patches-m21.js","22.1"],
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],
-    ["m24-asignaciones-operativas.js","24.2"]
+    ["m24-asignaciones-operativas.js","24.2"],["m24-2-asignar-sesion-ui.js","24.3"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
