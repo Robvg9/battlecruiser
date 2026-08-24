@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.80 — M26.4: boot sin carrera de scripts; Actualizar app unificado
-(function hotfixV9280(){
-  const VERSION="9.2.80";
+// v9.2.81 — M26.5-FE: ventas UI sin turno + almacenes stock real
+(function hotfixV9281(){
+  const VERSION="9.2.81";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -17,7 +17,6 @@
           actualizarApp(btn);
           return;
         }
-        // Fallback si auth.js aún no expuso actualizarApp
         (async function(){
           btn.disabled=true;btn.textContent="Actualizando…";
           try{
@@ -46,7 +45,7 @@
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],
     ["m24-asignaciones-operativas.js","25.4"],["m24-2-asignar-sesion-ui.js","24.3"],
     ["m25-fe-sync-turno-ventas.js","25.1"],
-    ["m26-ventas-ux.js","26.3"],
+    ["m26-ventas-ux.js","26.4"],
     ["fix-permisos-carga.js","80.1"]
   ];
   modules.forEach(([name,version])=>{
