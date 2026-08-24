@@ -1,4 +1,5 @@
-// BattleCruiser M22-FE + M24 + M25 — Sesiones en Turnos.
+// BattleCruiser M22-FE + M24 + M25 + M25.1 — Sesiones en Turnos.
+// M25.1: MutationObserver ignora mutaciones del propio #m22-sesiones-panel (rompe loop re-render).
 // M25: tras abrir/cerrar sesión refresca turno_actual_usuario (vía __BC_M25_refrescarTurno).
 // Fix M24.2-FE.1: Asignar trabajador visible aunque ciclo PLANIFICADO.
 (function () {
@@ -8,6 +9,7 @@
   var RPC_CERRAR = 'cerrar_sesion_operativa';
   var PANEL_ID = 'm22-sesiones-panel';
   var busy = false;
+  var suppressObs = false;
   var lastSesiones = [];
 
   function can(s, a) {
@@ -138,6 +140,7 @@
     var hasStart = !!root.querySelector('[data-m21-start]');
     var hasStep2 = !!root.querySelector('[data-m21-step2]');
     if (!hasStart && !hasStep2) return null;
+    suppressObs = true;
     var panel = document.createElement('div');
     panel.id = PANEL_ID;
     panel.className = 'm21-card';
@@ -149,14 +152,17 @@
     } else {
       wrap.appendChild(panel);
     }
+    setTimeout(function () { suppressObs = false; }, 0);
     return panel;
   }
 
   function setMsg(text, ok) {
     var el = document.getElementById('m22-sesiones-msg');
     if (!el) return;
+    suppressObs = true;
     el.textContent = text || '';
     el.className = 'm21-msg ' + (ok ? 'ok' : 'error');
+    setTimeout(function () { suppressObs = false; }, 0);
   }
 
   function actionsHtml(s, cicloOperable) {
@@ -220,8 +226,10 @@
     var el = document.getElementById('m22-sesiones-lista');
     if (!el) return;
     lastSesiones = sesiones || [];
+    suppressObs = true;
     if (!sesiones || !sesiones.length) {
       el.innerHTML = '<p class="muted">Sin sesiones en este turno.</p>';
+      setTimeout(function () { suppressObs = false; }, 0);
       return;
     }
     var cicloOperable = cicloEstado === 'ACTIVO' || cicloEstado === 'EN_VALIDACION';
@@ -244,6 +252,7 @@
         '<div class="m21-actions">' + actionsHtml(s, cicloOperable) + '</div></div>'
       );
     }).join('');
+    setTimeout(function () { suppressObs = false; }, 0);
   }
 
   function detectarEstadoCiclo(root) {
@@ -385,18 +394,46 @@
     });
   }
 
+  function mutacionSoloPanelM22(mutations) {
+    var panel = document.getElementById(PANEL_ID);
+    if (!panel) return false;
+    for (var i = 0; i < mutations.length; i++) {
+      var m = mutations[i];
+      var targets = [m.target];
+      var lists = [m.addedNodes, m.removedNodes];
+      for (var L = 0; L < lists.length; L++) {
+        var list = lists[L];
+        if (!list) continue;
+        for (var j = 0; j < list.length; j++) targets.push(list[j]);
+      }
+      for (var t = 0; t < targets.length; t++) {
+        var node = targets[t];
+        if (!node) continue;
+        if (node.nodeType === 3) node = node.parentNode;
+        if (!node || node.nodeType !== 1) continue;
+        if (node === panel || panel.contains(node)) continue;
+        return false;
+      }
+    }
+    return true;
+  }
+
   function observe() {
     var root = document.getElementById('ciclos-m18-root');
     if (!root || root.dataset.m22Obs === '1') return;
     root.dataset.m22Obs = '1';
     var t = null;
-    var obs = new MutationObserver(function () {
+    var obs = new MutationObserver(function (mutations) {
+      if (suppressObs) return;
+      if (busy) return;
+      if (mutacionSoloPanelM22(mutations)) return;
       if (t) clearTimeout(t);
       t = setTimeout(function () {
+        if (suppressObs || busy) return;
         trackCicloFromClicks();
         bind();
         refresh();
-      }, 80);
+      }, 120);
     });
     obs.observe(root, { childList: true, subtree: true });
   }
