@@ -1,7 +1,6 @@
 // ==== Battlecruiser · js/venta-turno-ui.js ====
-// Sesión 6/30 — Almacén de venta = turno abierto (_turnoActual del usuario).
-// No hay selector libre. Backend (m14) es la autoridad final.
-// M26.5-FE: ocultar carrito/total/confirmar/catálogo si no hay turno propio.
+// Almacén de venta = turno abierto del usuario (_turnoActual).
+// M26.6-FE: agregar al carrito usando almacén del turno (no el select oculto vacío).
 
 function obtenerAlmacenIdOperativoVenta() {
   if (typeof _turnoActual === "undefined" || !_turnoActual) return null;
@@ -13,11 +12,63 @@ function nombreAlmacenOperativoVenta(id) {
   if (!id) return "—";
   try {
     if (typeof _cache !== "undefined" && Array.isArray(_cache.almacenes)) {
-      const a = _cache.almacenes.find(function (x) { return x.id === id; });
+      const a = _cache.almacenes.find(function (x) { return String(x.id) === String(id); });
       if (a && a.nombre) return a.nombre;
     }
   } catch (e) {}
   return "Almacén del turno";
+}
+
+/** Asegura precios/nombre en ventaProductosPrecios desde _cache si faltan. */
+function bcAsegurarPrecioProductoVenta(productoId) {
+  if (!productoId) return false;
+  try {
+    if (typeof ventaProductosPrecios !== "undefined" && ventaProductosPrecios[productoId]) return true;
+  } catch (e) {}
+  var p = null;
+  try {
+    p = (_cache.productos || []).find(function (x) { return String(x.id) === String(productoId); });
+  } catch (e2) {}
+  if (!p) return false;
+  try {
+    if (typeof ventaProductosPrecios === "undefined") window.ventaProductosPrecios = {};
+    ventaProductosPrecios[productoId] = {
+      nombre: p.nombre,
+      precio_normal: p.precio_normal,
+      precio_mayorista: p.precio_mayorista,
+    };
+  } catch (e3) {}
+  try {
+    if (typeof ventaAlmacenesTipo !== "undefined") {
+      var almId = obtenerAlmacenIdOperativoVenta();
+      if (almId && !ventaAlmacenesTipo[almId]) {
+        var alm = (_cache.almacenes || []).find(function (a) { return String(a.id) === String(almId); });
+        if (alm) ventaAlmacenesTipo[almId] = alm.tipo || "venta";
+        else ventaAlmacenesTipo[almId] = "venta";
+      }
+    }
+  } catch (e4) {}
+  return true;
+}
+
+function bcSincronizarSelectAlmacenTurno() {
+  var almId = obtenerAlmacenIdOperativoVenta();
+  var sel = document.getElementById("venta-almacen");
+  if (!sel || !almId) return almId;
+  if (![].some.call(sel.options, function (o) { return o.value === almId; })) {
+    var opt = document.createElement("option");
+    opt.value = almId;
+    opt.textContent = nombreAlmacenOperativoVenta(almId);
+    sel.appendChild(opt);
+  }
+  sel.value = almId;
+  try {
+    if (typeof ventaAlmacenesTipo !== "undefined" && !ventaAlmacenesTipo[almId]) {
+      var alm = (_cache.almacenes || []).find(function (a) { return String(a.id) === String(almId); });
+      ventaAlmacenesTipo[almId] = (alm && alm.tipo) || "venta";
+    }
+  } catch (e) {}
+  return almId;
 }
 
 function actualizarPanelAlmacenVenta() {
@@ -30,9 +81,9 @@ function actualizarPanelAlmacenVenta() {
   if (sinTurno) sinTurno.classList.toggle("hidden", puedeVender);
   if (bloque) bloque.classList.toggle("hidden", !puedeVender);
 
-  // M26.5-FE: elementos que m26-ventas-ux puede haber sacado del bloque
   var extraIds = [
     "bc-venta-carrito-bar",
+    "bc-venta-pos-layout",
     "venta-modo-buscador",
     "venta-modo-catalogo",
     "form-venta-linea",
@@ -49,7 +100,6 @@ function actualizarPanelAlmacenVenta() {
   extraIds.forEach(function (id) {
     var el = document.getElementById(id);
     if (!el) return;
-    // No ocultar si ya está dentro del bloque (el bloque gobierna)
     if (bloque && bloque.contains(el)) return;
     el.classList.toggle("hidden", !puedeVender);
     if (!puedeVender) {
@@ -64,23 +114,13 @@ function actualizarPanelAlmacenVenta() {
   var tab = document.getElementById("tab-ventas");
   if (tab) tab.classList.toggle("bc-venta-sin-turno", !puedeVender);
 
-  // Compatibilidad: select residual no usable
   const sel = document.getElementById("venta-almacen");
   if (sel) {
     sel.disabled = true;
     sel.classList.add("hidden");
     sel.setAttribute("aria-hidden", "true");
-    if (almId) {
-      if (![].some.call(sel.options, function (o) { return o.value === almId; })) {
-        const opt = document.createElement("option");
-        opt.value = almId;
-        opt.textContent = nombreAlmacenOperativoVenta(almId);
-        sel.appendChild(opt);
-      }
-      sel.value = almId;
-    } else {
-      sel.value = "";
-    }
+    if (almId) bcSincronizarSelectAlmacenTurno();
+    else sel.value = "";
   }
 
   if (!almId && typeof ventaLineas !== "undefined" && ventaLineas.length > 0) {
@@ -89,6 +129,9 @@ function actualizarPanelAlmacenVenta() {
   }
 
   if (puedeVender) {
+    if (typeof cargarStockAlmacenes === "function" && !(_cache.stock && _cache.stock.length)) {
+      try { cargarStockAlmacenes(false); } catch (e) {}
+    }
     if (typeof renderCatalogoGrid === "function") renderCatalogoGrid();
     if (typeof actualizarStockDisponibleUI === "function") actualizarStockDisponibleUI();
   }
@@ -116,18 +159,14 @@ function actualizarPanelAlmacenVenta() {
   if (typeof actualizarStockDisponibleUI === "function") {
     const _orig = actualizarStockDisponibleUI;
     window.actualizarStockDisponibleUI = function () {
-      const sel = document.getElementById("venta-almacen");
-      const almId = obtenerAlmacenIdOperativoVenta();
-      if (sel && almId) sel.value = almId;
+      bcSincronizarSelectAlmacenTurno();
       return _orig.apply(this, arguments);
     };
   }
   if (typeof renderCatalogoGrid === "function") {
     const _orig = renderCatalogoGrid;
     window.renderCatalogoGrid = function () {
-      const sel = document.getElementById("venta-almacen");
-      const almId = obtenerAlmacenIdOperativoVenta();
-      if (sel && almId) sel.value = almId;
+      bcSincronizarSelectAlmacenTurno();
       return _orig.apply(this, arguments);
     };
   }
@@ -187,7 +226,6 @@ safeInit("venta-turno-ui", function () {
     }
   }
 
-  // Mensaje actualizado si el nodo ya existía de una sesión previa
   var sinExist = document.getElementById("venta-sin-turno");
   if (sinExist && !sinExist.dataset.bcM265) {
     sinExist.dataset.bcM265 = "1";
@@ -202,9 +240,8 @@ safeInit("venta-turno-ui", function () {
   if (btnIr && !btnIr.dataset.bcIrTurnos) {
     btnIr.dataset.bcIrTurnos = "1";
     btnIr.addEventListener("click", function () {
-      if (typeof irATab === "function") {
-        irATab("ciclos");
-      } else {
+      if (typeof irATab === "function") irATab("ciclos");
+      else {
         var b = document.querySelector('.tab-btn[data-tab="ciclos"]') ||
                 document.querySelector('.tab-btn[data-tab="turnos"]');
         if (b) b.click();
@@ -217,7 +254,7 @@ safeInit("venta-turno-ui", function () {
     btnConf.addEventListener(
       "click",
       function (e) {
-        const almId = obtenerAlmacenIdOperativoVenta();
+        const almId = bcSincronizarSelectAlmacenTurno();
         if (!almId) {
           e.stopImmediatePropagation();
           e.preventDefault();
@@ -225,10 +262,7 @@ safeInit("venta-turno-ui", function () {
             setMsg("msg-venta", "No puedes vender sin un turno abierto con almacén.", false);
           }
           actualizarPanelAlmacenVenta();
-          return;
         }
-        const sel = document.getElementById("venta-almacen");
-        if (sel) sel.value = almId;
       },
       true
     );
@@ -239,7 +273,7 @@ safeInit("venta-turno-ui", function () {
     formLinea.addEventListener(
       "submit",
       function (e) {
-        const almId = obtenerAlmacenIdOperativoVenta();
+        const almId = bcSincronizarSelectAlmacenTurno();
         if (!almId) {
           e.stopImmediatePropagation();
           e.preventDefault();
@@ -249,20 +283,25 @@ safeInit("venta-turno-ui", function () {
           actualizarPanelAlmacenVenta();
           return;
         }
-        const sel = document.getElementById("venta-almacen");
-        if (sel) sel.value = almId;
+        // Asegurar producto en mapa de precios antes del handler original
+        var prodSel = document.getElementById("venta-producto");
+        if (prodSel && prodSel.value) bcAsegurarPrecioProductoVenta(prodSel.value);
       },
       true
     );
   }
 
+  // M26.6-FE: click en tarjeta → agregarLineaVenta con almacén del turno
+  // (el handler original lee #venta-almacen que puede estar vacío).
   const grid = document.getElementById("catalogo-grid");
-  if (grid) {
+  if (grid && !grid.dataset.bcM266Cart) {
+    grid.dataset.bcM266Cart = "1";
     grid.addEventListener(
       "click",
       function (e) {
-        if (!e.target.closest(".catalogo-card")) return;
-        const almId = obtenerAlmacenIdOperativoVenta();
+        var card = e.target.closest(".catalogo-card");
+        if (!card) return;
+        var almId = bcSincronizarSelectAlmacenTurno();
         if (!almId) {
           e.stopImmediatePropagation();
           e.preventDefault();
@@ -272,8 +311,22 @@ safeInit("venta-turno-ui", function () {
           actualizarPanelAlmacenVenta();
           return;
         }
-        const sel = document.getElementById("venta-almacen");
-        if (sel) sel.value = almId;
+        var productoId = card.dataset.productoId;
+        if (!productoId) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        bcAsegurarPrecioProductoVenta(productoId);
+        function doAdd() {
+          if (typeof agregarLineaVenta === "function") {
+            agregarLineaVenta(productoId, 1, almId);
+          }
+          if (typeof renderCatalogoGrid === "function") renderCatalogoGrid();
+        }
+        if (typeof cargarStockAlmacenes === "function" && !(_cache.stock && _cache.stock.length)) {
+          Promise.resolve(cargarStockAlmacenes(false)).then(doAdd).catch(doAdd);
+        } else {
+          doAdd();
+        }
       },
       true
     );
