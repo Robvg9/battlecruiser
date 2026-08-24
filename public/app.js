@@ -39,7 +39,7 @@
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],
     ["m24-asignaciones-operativas.js","25.4"],["m24-2-asignar-sesion-ui.js","24.3"],
     ["m25-fe-sync-turno-ventas.js","25.1"],
-    ["m26-ventas-ux.js","26.1"]
+    ["m26-ventas-ux.js","26.2"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
