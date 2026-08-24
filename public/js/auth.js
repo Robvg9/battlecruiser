@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/auth.js ====
 // Autenticación, sesión, actualizar app, ajustes de cuenta, SW, atajos.
-// v9.2.51 — al cambiar de usuario se resetea navegación (no heredar pestaña).
+// v9.2.61 — M12-FE.6: no pintar email Auth (internal) como identidad.
 
 const loginForm = document.getElementById("login-form");
 const loginBtn = document.getElementById("login-btn");
@@ -29,7 +29,8 @@ function showApp(session) {
   loginForm.classList.add("hidden");
   lanternWrap.classList.add("hidden");
   appShell.classList.add("visible");
-  userEmailEl.textContent = session.user.email;
+  // M12-FE.6: nunca mostrar session.user.email aquí (puede ser @internal.battlecruiser.local)
+  if (userEmailEl) userEmailEl.textContent = "Cargando usuario…";
   _usuarioActualId = session.user.id;
   if (typeof cargarContextoUsuario === "function") cargarContextoUsuario();
 }
@@ -45,6 +46,7 @@ function showLogin() {
   lanternWrap.classList.remove("hidden");
   appShell.classList.remove("visible");
   _usuarioActualId = null;
+  if (userEmailEl) userEmailEl.textContent = "";
   if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
   const usuarioInput = document.getElementById("email");
   if (usuarioInput) usuarioInput.focus();
@@ -126,6 +128,7 @@ safeInit("logout", () => {
   logoutBtn.addEventListener("click", async () => {
     if (typeof resetearNavegacionParaNuevaSesion === "function") resetearNavegacionParaNuevaSesion();
     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
+    if (userEmailEl) userEmailEl.textContent = "";
     await client.auth.signOut();
   });
 });
