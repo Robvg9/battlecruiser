@@ -1,10 +1,25 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.60 M12-FE.5: _permisosEfectivos estricto; Operaciones por crear;
-// vales retirado del menú.
+// B3 — v9.2.61 M12-FE.6: identidad neutra en carga; sin email internal como nombre.
+
+function esIdentidadInternaOTemporal(valor) {
+  if (!valor) return true;
+  var s = String(valor).trim();
+  if (!s) return true;
+  if (/@internal\.battlecruiser\.local$/i.test(s)) return true;
+  if (/^bc_[a-f0-9]+@/i.test(s)) return true;
+  return false;
+}
+
+function mostrarEstadoIdentidadEnHeader(texto) {
+  var el = document.getElementById("user-email");
+  if (el) el.textContent = texto || "";
+}
 
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
   _cargandoUsuario = true;
+  // No heredar identidad anterior ni email de Auth mientras carga el perfil
+  mostrarEstadoIdentidadEnHeader("Cargando usuario…");
   try {
     const { data: sesion } = await client.auth.getSession();
     if (!sesion || !sesion.session) {
@@ -20,17 +35,20 @@ async function cargarContextoUsuario() {
     } catch (e) { }
 
     if (perfil) {
+      var nombrePerfil = perfil.nombre ? String(perfil.nombre).trim() : "";
+      if (esIdentidadInternaOTemporal(nombrePerfil)) nombrePerfil = "";
       _usuarioActual = {
         id: perfil.id || authUser.id,
-        nombre: perfil.nombre || authUser.email,
+        nombre: nombrePerfil || null,
         activo: perfil.activo !== false,
         role_id: perfil.role_id || null,
         rol: perfil.rol || null,
       };
     } else {
+      // Sin perfil confirmado: no usar authUser.email (evita @internal.battlecruiser.local)
       _usuarioActual = {
         id: authUser.id,
-        nombre: authUser.email,
+        nombre: null,
         activo: true,
         role_id: null,
         rol: null,
@@ -73,8 +91,10 @@ async function cargarContextoUsuario() {
     if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
   } catch (e) {
     console.warn("[Battlecruiser] No se pudo cargar el contexto de usuario:", e);
+    mostrarEstadoIdentidadEnHeader("Sincronizando usuario…");
   } finally {
     _cargandoUsuario = false;
+    if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
   }
 }
 
@@ -84,6 +104,7 @@ function limpiarContextoUsuario() {
   _permisosCargaExitosa = false;
   _permisosCargaFallidaRed = false;
   _novedadesVistas = new Set();
+  mostrarEstadoIdentidadEnHeader("");
   try {
     _cache.productos = []; _cache.almacenes = []; _cache.stock = [];
     _cache.transferencias = []; _cache.vales = []; _cache.ventas = [];
@@ -124,7 +145,8 @@ function puedeVerOperacionesLocal() {
   return (
     tienePermiso("gastos", "crear") ||
     tienePermiso("mermas", "crear") ||
-    tienePermiso("reinversiones", "crear")
+    tienePermiso("reinversiones", "crear") ||
+    tienePermiso("turnos", "crear")
   );
 }
 
@@ -133,7 +155,6 @@ var TAB_A_SECCION = {
   ventas: "ventas",
   almacenes: "almacenes",
   transferencias: "transferencias",
-  // vales: eliminado (M12-FE.5)
   usuarios: "usuarios",
   mando: "auditoria",
   reportes: "reportes",
@@ -141,7 +162,6 @@ var TAB_A_SECCION = {
   movimientos: "reportes",
   turnos: "turnos",
   ciclos: "ciclos",
-  // operacion: no usa turnos.ver
   comunicacion: "comunicacion",
 };
 
@@ -216,8 +236,23 @@ function togglePorPermiso(elId, seccion, accion) {
 function mostrarInfoUsuarioEnHeader() {
   const el = document.getElementById("user-email");
   if (!el) return;
-  if (!_usuarioActual) { el.textContent = ""; return; }
-  const nombre = _usuarioActual.nombre || "";
-  const rol = _usuarioActual.rol ? " · " + _usuarioActual.rol : "";
-  el.textContent = nombre + rol;
+  if (!_usuarioActual) {
+    el.textContent = "";
+    return;
+  }
+  if (typeof _cargandoUsuario !== "undefined" && _cargandoUsuario) {
+    el.textContent = "Cargando usuario…";
+    return;
+  }
+  var nombre = _usuarioActual.nombre ? String(_usuarioActual.nombre).trim() : "";
+  if (nombre && !esIdentidadInternaOTemporal(nombre)) {
+    var rol = _usuarioActual.rol ? " · " + _usuarioActual.rol : "";
+    el.textContent = nombre + rol;
+    return;
+  }
+  if (typeof _permisosCargaFallidaRed !== "undefined" && _permisosCargaFallidaRed) {
+    el.textContent = "Sincronizando…";
+    return;
+  }
+  el.textContent = "Sincronizando usuario…";
 }
