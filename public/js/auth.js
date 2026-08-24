@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/auth.js ====
 // Autenticación, sesión, actualizar app, ajustes de cuenta, SW, atajos.
-// v9.2.61 — M12-FE.6: no pintar email Auth (internal) como identidad.
+// v9.2.78 — M26.2: no re-ejecutar showApp si la sesión ya está activa.
 
 const loginForm = document.getElementById("login-form");
 const loginBtn = document.getElementById("login-btn");
@@ -17,8 +17,20 @@ let _permisosEfectivos = {};
 let _cargandoUsuario = false;
 let _permisosCargaExitosa = false;
 let _permisosCargaFallidaRed = false;
+let _bcSesionActivaId = null;
 
 function showApp(session) {
+  if (!session || !session.user) return;
+  // M26.2: getSession() + onAuthStateChange(INITIAL_SESSION/SIGNED_IN) disparan
+  // showApp dos veces seguidas → doble cargarContextoUsuario y "Cargando usuario…" largo.
+  if (_bcSesionActivaId === session.user.id && appShell && appShell.classList.contains("visible")) {
+    if (!_usuarioActual && typeof cargarContextoUsuario === "function" && !_cargandoUsuario) {
+      cargarContextoUsuario();
+    }
+    return;
+  }
+  _bcSesionActivaId = session.user.id;
+
   // Nueva sesión: no conservar pestaña/panel del usuario anterior
   if (typeof resetearNavegacionParaNuevaSesion === "function") {
     resetearNavegacionParaNuevaSesion();
@@ -36,6 +48,7 @@ function showApp(session) {
 }
 
 function showLogin() {
+  _bcSesionActivaId = null;
   if (typeof resetearNavegacionParaNuevaSesion === "function") {
     resetearNavegacionParaNuevaSesion();
   } else {
@@ -129,6 +142,7 @@ safeInit("logout", () => {
     if (typeof resetearNavegacionParaNuevaSesion === "function") resetearNavegacionParaNuevaSesion();
     if (typeof limpiarContextoUsuario === "function") limpiarContextoUsuario();
     if (userEmailEl) userEmailEl.textContent = "";
+    _bcSesionActivaId = null;
     await client.auth.signOut();
   });
 });
