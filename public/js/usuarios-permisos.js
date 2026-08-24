@@ -1,5 +1,5 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.63 M12-FE.8: Operación con resp/inc independientes; identidad neutra.
+// B3 — v9.2.66 M23-FE: TURNOS = data-tab ciclos + turnos.ver; identidad neutra.
 
 function esIdentidadInternaOTemporal(valor) {
   if (!valor) return true;
@@ -160,7 +160,7 @@ var TAB_A_SECCION = {
   inventario: "reportes",
   movimientos: "reportes",
   turnos: "turnos",
-  ciclos: "ciclos",
+  ciclos: "turnos",
   comunicacion: "comunicacion",
 };
 
@@ -181,12 +181,39 @@ function aplicarPermisosAInterfaz() {
       if (panel) panel.classList.remove("visible");
       return;
     }
+    // Legacy B7 siempre oculto
+    if (tab === "turnos") {
+      btn.classList.add("hidden", "tab-sin-permiso");
+      btn.setAttribute("data-bc-permiso", "0");
+      btn.style.setProperty("display", "none", "important");
+      btn.classList.remove("active");
+      const panel = document.getElementById("tab-" + tab);
+      if (panel) panel.classList.remove("visible");
+      return;
+    }
     if (tab === "operacion") {
       const ok = puedeVerOperacionesLocal();
       if (ok) {
         btn.classList.remove("hidden", "tab-sin-permiso");
         btn.setAttribute("data-bc-permiso", "1");
         btn.style.removeProperty("display");
+      } else {
+        btn.classList.add("hidden", "tab-sin-permiso");
+        btn.setAttribute("data-bc-permiso", "0");
+        btn.style.setProperty("display", "none", "important");
+        btn.classList.remove("active");
+        const panel = document.getElementById("tab-" + tab);
+        if (panel) panel.classList.remove("visible");
+      }
+      return;
+    }
+    if (tab === "ciclos") {
+      const ok = tienePermiso("turnos", "ver");
+      if (ok) {
+        btn.classList.remove("hidden", "tab-sin-permiso");
+        btn.setAttribute("data-bc-permiso", "1");
+        btn.style.removeProperty("display");
+        btn.textContent = "Turnos";
       } else {
         btn.classList.add("hidden", "tab-sin-permiso");
         btn.setAttribute("data-bc-permiso", "0");
