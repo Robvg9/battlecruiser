@@ -1,4 +1,5 @@
-// BattleCruiser M24.2-FE — Modal "Asignar trabajador" en Sesiones de trabajo
+// BattleCruiser M24.2-FE — Modal Asignar trabajador en Sesiones de trabajo
+// Intercepta [data-m24-asignar-sesion] (evita prompt de m22).
 // Reutiliza __BC_M24__.candidatosParaSesion + asignarSesion
 // Admin: ciclos.editar_any
 (function () {
@@ -107,8 +108,7 @@
         ? 'Cambiar trabajador'
         : 'Asignar trabajador';
       document.getElementById('m24-2-meta').textContent =
-        'Bloque: ' + labelBloque(opts.bloque) +
-        (opts.almLabel ? ' · ' + opts.almLabel : '');
+        'Bloque: ' + labelBloque(opts.bloque);
       document.getElementById('m24-2-err').style.display = 'none';
       document.getElementById('m24-2-err').textContent = '';
 
@@ -141,6 +141,56 @@
       document.getElementById(MODAL_ID).style.display = 'flex';
     });
   }
+
+  function setSesionesMsg(text, ok) {
+    var el = document.getElementById('m22-sesiones-msg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'm21-msg ' + (ok ? 'ok' : 'error');
+  }
+
+  function forceSesionesRefresh() {
+    // El MutationObserver de m22 reacciona a cambios en el panel
+    var panel = document.getElementById('m22-sesiones-panel');
+    var lista = document.getElementById('m22-sesiones-lista');
+    if (lista) {
+      lista.setAttribute('data-m24-2-refresh', String(Date.now()));
+    }
+    if (panel) {
+      var tick = document.createElement('span');
+      tick.style.display = 'none';
+      tick.setAttribute('data-m24-2-tick', '1');
+      panel.appendChild(tick);
+      setTimeout(function () {
+        if (tick.parentNode) tick.parentNode.removeChild(tick);
+      }, 30);
+    }
+  }
+
+  // Capture: sustituye el prompt() de m22 sin reescribir el archivo grande
+  document.addEventListener('click', function (e) {
+    var asg = e.target.closest && e.target.closest('[data-m24-asignar-sesion]');
+    if (!asg) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    if (!isAdmin()) {
+      setSesionesMsg('Sin permiso para asignar sesiones.', false);
+      return;
+    }
+    var isChange = /cambiar/i.test(asg.textContent || '');
+    openAsignarModal({
+      sesionId: asg.dataset.m24AsignarSesion,
+      almId: asg.dataset.alm,
+      bloque: asg.dataset.bloque,
+      isChange: isChange,
+      currentUserId: asg.dataset.user || null
+    }).then(function (result) {
+      if (!result) return;
+      setSesionesMsg('✓ Sesión asignada' + (result.nombre ? ' a ' + result.nombre : '') + '.', true);
+      forceSesionesRefresh();
+    });
+  }, true);
 
   window.__BC_M24_2_openAsignar = openAsignarModal;
 })();
