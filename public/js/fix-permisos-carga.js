@@ -1,4 +1,4 @@
-// BattleCruiser v9.2.52 — corrige construcción de _permisosEfectivos
+// BattleCruiser v9.2.78 — corrige construcción de _permisosEfectivos + paralelo M26.2
 // Causa raíz FE: se ignoraba p.permitido y se marcaba TODA fila del RPC como true.
 (function () {
   "use strict";
@@ -21,6 +21,9 @@
     var wrapped = async function () {
       if (_cargandoUsuario) return;
       _cargandoUsuario = true;
+      if (typeof mostrarEstadoIdentidadEnHeader === "function") {
+        mostrarEstadoIdentidadEnHeader("Cargando usuario…");
+      }
       try {
         var ses = await client.auth.getSession();
         var sesion = ses && ses.data;
@@ -29,11 +32,27 @@
           return;
         }
         var authUser = sesion.session.user;
-        var perfil = null;
+
+        var perfilRes = null;
+        var permsRes = null;
         try {
-          var pr = await client.rpc("perfil_usuario_actual", {});
-          if (!pr.error && pr.data) perfil = Array.isArray(pr.data) ? pr.data[0] : pr.data;
-        } catch (e) {}
+          var pair = await Promise.all([
+            client.rpc("perfil_usuario_actual", {}),
+            client.rpc("permisos_usuario_actual", {})
+          ]);
+          perfilRes = pair[0];
+          permsRes = pair[1];
+        } catch (eParallel) {
+          try { perfilRes = await client.rpc("perfil_usuario_actual", {}); } catch (e1) {}
+          try { permsRes = await client.rpc("permisos_usuario_actual", {}); } catch (e2) {
+            if (typeof esErrorDeRed === "function" && esErrorDeRed(e2)) _permisosCargaFallidaRed = true;
+          }
+        }
+
+        var perfil = null;
+        if (perfilRes && !perfilRes.error && perfilRes.data) {
+          perfil = Array.isArray(perfilRes.data) ? perfilRes.data[0] : perfilRes.data;
+        }
 
         if (perfil) {
           _usuarioActual = {
@@ -56,16 +75,13 @@
         _permisosEfectivos = {};
         _permisosCargaExitosa = false;
         _permisosCargaFallidaRed = false;
-        try {
-          var res = await client.rpc("permisos_usuario_actual", {});
-          if (res.error) {
-            if (typeof esErrorDeRed === "function" && esErrorDeRed(res.error)) _permisosCargaFallidaRed = true;
-          } else if (Array.isArray(res.data)) {
+        if (permsRes) {
+          if (permsRes.error) {
+            if (typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) _permisosCargaFallidaRed = true;
+          } else if (Array.isArray(permsRes.data)) {
             _permisosCargaExitosa = true;
-            rebuildFromRpcRows(res.data);
+            rebuildFromRpcRows(permsRes.data);
           }
-        } catch (e) {
-          if (typeof esErrorDeRed === "function" && esErrorDeRed(e)) _permisosCargaFallidaRed = true;
         }
 
         if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
@@ -74,6 +90,7 @@
         console.warn("[Battlecruiser] No se pudo cargar el contexto de usuario:", e);
       } finally {
         _cargandoUsuario = false;
+        if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
       }
     };
     wrapped.__bcPermitidoFix = true;
@@ -81,7 +98,7 @@
     try { cargarContextoUsuario = wrapped; } catch (e) {}
   }
 
+  // Una sola pasada + reintento en load (antes: 3 llamadas wrapCargar)
   wrapCargar();
-  Promise.resolve().then(wrapCargar);
-  window.addEventListener("load", wrapCargar);
+  window.addEventListener("load", wrapCargar, { once: true });
 })();
