@@ -1,5 +1,7 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.78 M26.2: perfil + permisos en paralelo (Promise.all).
+// B3 — v9.2.79 M26.3: timeout en RPC de arranque + recuperación explícita (fail-closed).
+
+var BC_CONTEXTO_TIMEOUT_MS = 12000;
 
 function esIdentidadInternaOTemporal(valor) {
   if (!valor) return true;
@@ -15,36 +17,123 @@ function mostrarEstadoIdentidadEnHeader(texto) {
   if (el) el.textContent = texto || "";
 }
 
+function bcConTimeout(promesa, ms, etiqueta) {
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var t = setTimeout(function () {
+      if (done) return;
+      done = true;
+      var err = new Error("timeout:" + (etiqueta || "rpc"));
+      err.bcTimeout = true;
+      reject(err);
+    }, ms || BC_CONTEXTO_TIMEOUT_MS);
+    Promise.resolve(promesa).then(
+      function (v) {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve(v);
+      },
+      function (e) {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
+function asegurarBotonReintentarContexto() {
+  var el = document.getElementById("user-email");
+  if (!el) return;
+  var wrap = el.parentElement;
+  if (!wrap) return;
+  var btn = document.getElementById("bc-reintentar-contexto");
+  if (btn) {
+    btn.classList.remove("hidden");
+    btn.style.display = "";
+    return btn;
+  }
+  btn = document.createElement("button");
+  btn.id = "bc-reintentar-contexto";
+  btn.type = "button";
+  btn.className = "cc-accion";
+  btn.textContent = "Reintentar";
+  btn.style.marginLeft = "8px";
+  btn.style.fontSize = "11px";
+  btn.style.padding = "4px 10px";
+  btn.addEventListener("click", function () {
+    btn.disabled = true;
+    btn.textContent = "…";
+    if (typeof cargarContextoUsuario === "function") {
+      cargarContextoUsuario().finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Reintentar";
+      });
+    }
+  });
+  wrap.appendChild(btn);
+  return btn;
+}
+
+function ocultarBotonReintentarContexto() {
+  var btn = document.getElementById("bc-reintentar-contexto");
+  if (btn) {
+    btn.classList.add("hidden");
+    btn.style.display = "none";
+  }
+}
+
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
   _cargandoUsuario = true;
   mostrarEstadoIdentidadEnHeader("Cargando usuario…");
+  ocultarBotonReintentarContexto();
+  var huboTimeout = false;
+  var huboErrorRed = false;
   try {
-    const { data: sesion } = await client.auth.getSession();
-    if (!sesion || !sesion.session) {
-      limpiarContextoUsuario();
-      _cargandoUsuario = false;
+    var sesionPack;
+    try {
+      sesionPack = await bcConTimeout(client.auth.getSession(), BC_CONTEXTO_TIMEOUT_MS, "getSession");
+    } catch (eSes) {
+      huboTimeout = !!(eSes && eSes.bcTimeout);
+      huboErrorRed = true;
+      console.warn("[BattleCruiser] getSession falló o timeout", eSes);
+      mostrarEstadoIdentidadEnHeader(huboTimeout ? "Tiempo agotado — reintentá" : "Sin conexión — reintentá");
+      asegurarBotonReintentarContexto();
       return;
     }
-    const authUser = sesion.session.user;
+    var sesion = sesionPack && sesionPack.data;
+    if (!sesion || !sesion.session) {
+      limpiarContextoUsuario();
+      return;
+    }
+    var authUser = sesion.session.user;
 
-    // M26.2: perfil y permisos son independientes → en paralelo (antes secuencial).
     var perfilRes = null;
     var permsRes = null;
     try {
       var pair = await Promise.all([
-        client.rpc("perfil_usuario_actual", {}),
-        client.rpc("permisos_usuario_actual", {})
+        bcConTimeout(client.rpc("perfil_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "perfil"),
+        bcConTimeout(client.rpc("permisos_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "permisos")
       ]);
       perfilRes = pair[0];
       permsRes = pair[1];
     } catch (eParallel) {
+      huboTimeout = !!(eParallel && eParallel.bcTimeout);
+      huboErrorRed = true;
+      console.warn("[BattleCruiser] RPC perfil/permisos falló o timeout", eParallel);
+      // Fallback secuencial con timeout (red mediocre: una puede vivir)
       try {
-        perfilRes = await client.rpc("perfil_usuario_actual", {});
-      } catch (e1) {}
+        perfilRes = await bcConTimeout(client.rpc("perfil_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "perfil2");
+      } catch (e1) {
+        if (e1 && e1.bcTimeout) huboTimeout = true;
+      }
       try {
-        permsRes = await client.rpc("permisos_usuario_actual", {});
+        permsRes = await bcConTimeout(client.rpc("permisos_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "permisos2");
       } catch (e2) {
+        if (e2 && e2.bcTimeout) huboTimeout = true;
         if (typeof esErrorDeRed === "function" && esErrorDeRed(e2)) _permisosCargaFallidaRed = true;
       }
     }
@@ -74,6 +163,7 @@ async function cargarContextoUsuario() {
       };
     }
 
+    // FAIL CLOSED: permisos solo si RPC respondió OK con array
     _permisosEfectivos = {};
     _permisosCargaExitosa = false;
     _permisosCargaFallidaRed = false;
@@ -102,13 +192,22 @@ async function cargarContextoUsuario() {
             "usaCampoPermitido:", usaCampoPermitido);
         } catch (e) {}
       }
+    } else {
+      _permisosCargaFallidaRed = true;
     }
 
     if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
     if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
+
+    if (!_permisosCargaExitosa || huboTimeout || huboErrorRed) {
+      asegurarBotonReintentarContexto();
+    } else {
+      ocultarBotonReintentarContexto();
+    }
   } catch (e) {
     console.warn("[Battlecruiser] No se pudo cargar el contexto de usuario:", e);
-    mostrarEstadoIdentidadEnHeader("Sincronizando usuario…");
+    mostrarEstadoIdentidadEnHeader("Error al cargar — reintentá");
+    asegurarBotonReintentarContexto();
   } finally {
     _cargandoUsuario = false;
     if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
@@ -122,6 +221,7 @@ function limpiarContextoUsuario() {
   _permisosCargaFallidaRed = false;
   _novedadesVistas = new Set();
   mostrarEstadoIdentidadEnHeader("");
+  ocultarBotonReintentarContexto();
   try {
     _cache.productos = []; _cache.almacenes = []; _cache.stock = [];
     _cache.transferencias = []; _cache.vales = []; _cache.ventas = [];
@@ -200,7 +300,6 @@ function aplicarPermisosAInterfaz() {
       if (panel) panel.classList.remove("visible");
       return;
     }
-    // Legacy B7 siempre oculto
     if (tab === "turnos") {
       btn.classList.add("hidden", "tab-sin-permiso");
       btn.setAttribute("data-bc-permiso", "0");
@@ -296,8 +395,14 @@ function mostrarInfoUsuarioEnHeader() {
     return;
   }
   if (typeof _permisosCargaFallidaRed !== "undefined" && _permisosCargaFallidaRed) {
-    el.textContent = "Sincronizando…";
+    el.textContent = "Sin permisos (red) — reintentá";
     return;
   }
-  el.textContent = "Sincronizando usuario…";
+  if (typeof _permisosCargaExitosa !== "undefined" && !_permisosCargaExitosa) {
+    el.textContent = "Sin permisos cargados — reintentá";
+    return;
+  }
+  // Sesión OK, permisos OK, pero sin nombre legible
+  var rolSolo = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
+  el.textContent = rolSolo;
 }
