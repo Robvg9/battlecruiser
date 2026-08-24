@@ -1,5 +1,5 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.66 M23-FE: TURNOS = data-tab ciclos + turnos.ver; identidad neutra.
+// B3 — v9.2.78 M26.2: perfil + permisos en paralelo (Promise.all).
 
 function esIdentidadInternaOTemporal(valor) {
   if (!valor) return true;
@@ -27,11 +27,32 @@ async function cargarContextoUsuario() {
       return;
     }
     const authUser = sesion.session.user;
-    let perfil = null;
+
+    // M26.2: perfil y permisos son independientes → en paralelo (antes secuencial).
+    var perfilRes = null;
+    var permsRes = null;
     try {
-      const { data, error } = await client.rpc("perfil_usuario_actual", {});
-      if (!error && data) perfil = Array.isArray(data) ? data[0] : data;
-    } catch (e) { }
+      var pair = await Promise.all([
+        client.rpc("perfil_usuario_actual", {}),
+        client.rpc("permisos_usuario_actual", {})
+      ]);
+      perfilRes = pair[0];
+      permsRes = pair[1];
+    } catch (eParallel) {
+      try {
+        perfilRes = await client.rpc("perfil_usuario_actual", {});
+      } catch (e1) {}
+      try {
+        permsRes = await client.rpc("permisos_usuario_actual", {});
+      } catch (e2) {
+        if (typeof esErrorDeRed === "function" && esErrorDeRed(e2)) _permisosCargaFallidaRed = true;
+      }
+    }
+
+    var perfil = null;
+    if (perfilRes && !perfilRes.error && perfilRes.data) {
+      perfil = Array.isArray(perfilRes.data) ? perfilRes.data[0] : perfilRes.data;
+    }
 
     if (perfil) {
       var nombrePerfil = perfil.nombre ? String(perfil.nombre).trim() : "";
@@ -56,12 +77,12 @@ async function cargarContextoUsuario() {
     _permisosEfectivos = {};
     _permisosCargaExitosa = false;
     _permisosCargaFallidaRed = false;
-    try {
-      const { data: perms, error } = await client.rpc("permisos_usuario_actual", {});
-      if (error) {
-        if (esErrorDeRed(error)) _permisosCargaFallidaRed = true;
-        console.warn("[BattleCruiser] permisos_usuario_actual error", error);
-      } else if (Array.isArray(perms)) {
+    if (permsRes) {
+      if (permsRes.error) {
+        if (typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) _permisosCargaFallidaRed = true;
+        console.warn("[BattleCruiser] permisos_usuario_actual error", permsRes.error);
+      } else if (Array.isArray(permsRes.data)) {
+        var perms = permsRes.data;
         _permisosCargaExitosa = true;
         var usaCampoPermitido = perms.some(function (p) {
           return p && Object.prototype.hasOwnProperty.call(p, "permitido");
@@ -81,8 +102,6 @@ async function cargarContextoUsuario() {
             "usaCampoPermitido:", usaCampoPermitido);
         } catch (e) {}
       }
-    } catch (e) {
-      if (esErrorDeRed(e)) _permisosCargaFallidaRed = true;
     }
 
     if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
