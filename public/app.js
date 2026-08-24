@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.63 — M12-FE.8: responsabilidades/incidencias independientes
-(function hotfixV9263(){
-  const VERSION="9.2.63";
+// v9.2.64 — M22-FE: sesiones en Turnos + ciclo_destino_id
+(function hotfixV9264(){
+  const VERSION="9.2.64";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -34,7 +34,8 @@
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.29"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","41.1"],
-    ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"]
+    ["ui-ajustes-panel.js","38.1"],["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],
+    ["m22-sesiones-en-m21.js","22.1"],["m22-fe-patches-m21.js","22.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
