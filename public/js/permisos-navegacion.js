@@ -1,7 +1,6 @@
-// BattleCruiser v9.2.60 — M12-FE.5
+// BattleCruiser v9.2.61 — M12-FE.6
 // Menú: seccion.ver === true
-// Operaciones: visible si gastos.crear || mermas.crear || reinversiones.crear
-// (no exige turnos.ver)
+// Operaciones: gastos.crear || mermas.crear || reinversiones.crear || turnos.crear
 // Sin vales en menú. Panel informativo si no hay ninguna sección.
 (function () {
   "use strict";
@@ -15,12 +14,13 @@
     return !!(sec && sec[accion] === true);
   }
 
-  /** Visible si puede ejecutar al menos una operación con card de permiso. */
+  /** Visible si puede ejecutar al menos una card operativa. */
   function puedeVerOperaciones() {
     return (
       tienePermiso("gastos", "crear") ||
       tienePermiso("mermas", "crear") ||
-      tienePermiso("reinversiones", "crear")
+      tienePermiso("reinversiones", "crear") ||
+      tienePermiso("turnos", "crear")
     );
   }
 
@@ -29,13 +29,11 @@
     ventas: "ventas",
     almacenes: "almacenes",
     transferencias: "transferencias",
-    // vales: eliminado (M12-FE.5)
     reportes: "reportes",
     inventario: "reportes",
     movimientos: "reportes",
     turnos: "turnos",
     ciclos: "ciclos",
-    // operacion: NO usa turnos.ver — ver puedeVerOperaciones()
     comunicacion: "comunicacion",
     mando: "auditoria",
     usuarios: "usuarios"
