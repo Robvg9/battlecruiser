@@ -1,12 +1,12 @@
 // BattleCruiser — Operaciones Hub (v9.2.37)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
-// M12-FE.2 + Fase 3: merma única (sin bajas); cards respetan permisos reales.
+// M12-FE.6: cards solo con *.crear; resp/incidencia con turnos.crear.
 (function () {
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '38';
+  var HUB_VER = '39';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v) : String(v == null ? '' : v); }
   function key() { return crypto.randomUUID(); }
@@ -368,9 +368,11 @@
     if (can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
     }
-    // Sin permiso: siempre visibles
-    cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
-    cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
+    // Backend: crear_responsabilidad / crear_incidencia exigen turnos.crear
+    if (can('turnos', 'crear')) {
+      cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
+      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
+    }
     if (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any')) {
       cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, merma y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
     }
