@@ -1,16 +1,16 @@
-// BattleCruiser M22-FE + M24 + M25 + M25.1 + M25.3 — Sesiones en Turnos.
-// M25.3: Cerrar sesión visible para el trabajador asignado (EN_CURSO), sin exigir cicloOperable ni solo editar.
-// M25.1: MutationObserver ignora mutaciones del propio #m22-sesiones-panel.
-// M25: sync turno_actual_usuario vía __BC_M25_refrescarTurno.
+// BattleCruiser M22 + M24 + M25 + M25.1 + M25.3 + M25.4 — Sesiones en Turnos.
+// M25.4: romper bucle M22↔M24. refresh solo si falta panel o cambió ciclo; ignora paneles internos.
 (function () {
   'use strict';
   var RPC_LIST = 'listar_sesiones_operativas';
   var RPC_INICIAR = 'iniciar_sesion_operativa';
   var RPC_CERRAR = 'cerrar_sesion_operativa';
   var PANEL_ID = 'm22-sesiones-panel';
+  var M24_PANEL_ID = 'm24-asig-panel';
   var busy = false;
   var suppressObs = false;
   var lastSesiones = [];
+  var lastRefreshKey = '';
 
   function can(s, a) {
     return typeof tienePermiso === 'function' && tienePermiso(s, a);
@@ -90,7 +90,11 @@
     root.dataset.m22Track = '1';
     root.addEventListener('click', function (e) {
       var b = e.target.closest('[data-m21-enter]');
-      if (b && b.dataset.m21Enter) window.__BC_M22_CICLO_ID = b.dataset.m21Enter;
+      if (b && b.dataset.m21Enter) {
+        window.__BC_M22_CICLO_ID = b.dataset.m21Enter;
+        lastRefreshKey = '';
+        setTimeout(function () { refresh(true); }, 80);
+      }
     }, true);
   }
 
@@ -277,22 +281,30 @@
     return 'ACTIVO';
   }
 
-  async function refresh() {
+  async function refresh(force) {
     if (busy) return;
     var cicloId = cicloIdDesdeUi();
     if (!cicloId) return;
+    var root = document.getElementById('ciclos-m18-root');
+    if (!root) return;
+    var hasSurface = !!(root.querySelector('[data-m21-start], [data-m21-step2]'));
+    if (!hasSurface) return;
+
     var panel = ensurePanel();
     if (!panel) return;
     panel.dataset.cicloId = cicloId;
+
+    var key = String(cicloId);
+    if (!force && key === lastRefreshKey && document.getElementById('m22-sesiones-lista')) {
+      return;
+    }
+
     busy = true;
     try {
-      if (window.__BC_M24__ && typeof window.__BC_M24__.listarAsignaciones === 'function') {
-        try { await window.__BC_M24__.listarAsignaciones({}); } catch (e) {}
-      }
       var sesiones = await listarSesiones(cicloId);
-      var root = document.getElementById('ciclos-m18-root');
       var estado = detectarEstadoCiclo(root);
       renderLista(sesiones, estado);
+      lastRefreshKey = key;
     } catch (e) {
       setMsg('No se pudieron cargar las sesiones: ' + String(e && (e.message || e.details) || e), false);
     } finally {
@@ -311,7 +323,8 @@
       await mutar(RPC_INICIAR, id, null);
       setMsg('✓ Sesión abierta. Ya podés trabajar y registrar ventas.', true);
       await syncVentas();
-      await refresh();
+      lastRefreshKey = '';
+      await refresh(true);
     } catch (e) {
       setMsg('No se pudo abrir: ' + String(e && (e.message || e.details) || e), false);
     } finally {
@@ -331,7 +344,8 @@
       await mutar(RPC_CERRAR, id, null);
       setMsg('✓ Sesión cerrada.', true);
       await syncVentas();
-      await refresh();
+      lastRefreshKey = '';
+      await refresh(true);
     } catch (e) {
       setMsg('No se pudo cerrar: ' + String(e && (e.message || e.details) || e), false);
     } finally {
@@ -354,7 +368,8 @@
       });
       if (!result) return;
       setMsg('✓ Sesión asignada' + (result.nombre ? ' a ' + result.nombre : '') + '.', true);
-      await refresh();
+      lastRefreshKey = '';
+      await refresh(true);
       return;
     }
     var M = window.__BC_M24__;
@@ -374,7 +389,8 @@
     try {
       await M.asignarSesion(sesionId, cands[0].id);
       setMsg('✓ Sesión asignada a ' + (cands[0].nombre || cands[0].id) + '.', true);
-      await refresh();
+      lastRefreshKey = '';
+      await refresh(true);
     } catch (e) {
       setMsg('No se pudo asignar: ' + String(e && (e.message || e.details) || e), false);
     }
@@ -399,9 +415,19 @@
     });
   }
 
-  function mutacionSoloPanelM22(mutations) {
-    var panel = document.getElementById(PANEL_ID);
-    if (!panel) return false;
+  function nodeInInternalPanel(node) {
+    if (!node) return false;
+    if (node.nodeType === 3) node = node.parentNode;
+    if (!node || node.nodeType !== 1) return false;
+    var p22 = document.getElementById(PANEL_ID);
+    var p24 = document.getElementById(M24_PANEL_ID);
+    if (p22 && (node === p22 || p22.contains(node))) return true;
+    if (p24 && (node === p24 || p24.contains(node))) return true;
+    return false;
+  }
+
+  function mutacionSoloPanelesInternos(mutations) {
+    if (!mutations || !mutations.length) return true;
     for (var i = 0; i < mutations.length; i++) {
       var m = mutations[i];
       var targets = [m.target];
@@ -412,12 +438,7 @@
         for (var j = 0; j < list.length; j++) targets.push(list[j]);
       }
       for (var t = 0; t < targets.length; t++) {
-        var node = targets[t];
-        if (!node) continue;
-        if (node.nodeType === 3) node = node.parentNode;
-        if (!node || node.nodeType !== 1) continue;
-        if (node === panel || panel.contains(node)) continue;
-        return false;
+        if (!nodeInInternalPanel(targets[t])) return false;
       }
     }
     return true;
@@ -428,26 +449,32 @@
     if (!root || root.dataset.m22Obs === '1') return;
     root.dataset.m22Obs = '1';
     var t = null;
-    var obs = new MutationObserver(function (mutations) {
-      if (suppressObs) return;
-      if (busy) return;
-      if (mutacionSoloPanelM22(mutations)) return;
+    new MutationObserver(function (mutations) {
+      if (suppressObs || busy) return;
+      if (mutacionSoloPanelesInternos(mutations)) return;
       if (t) clearTimeout(t);
       t = setTimeout(function () {
         if (suppressObs || busy) return;
-        trackCicloFromClicks();
+        var hasSurface = !!(root.querySelector('[data-m21-start], [data-m21-step2]'));
+        if (!hasSurface) {
+          lastRefreshKey = '';
+          return;
+        }
         bind();
-        refresh();
-      }, 120);
-    });
-    obs.observe(root, { childList: true, subtree: true });
+        var cid = cicloIdDesdeUi();
+        var panel = document.getElementById(PANEL_ID);
+        if (panel && cid && String(cid) === lastRefreshKey) return;
+        if (!cid) return;
+        refresh(false);
+      }, 250);
+    }).observe(root, { childList: true, subtree: true });
   }
 
   function init() {
     trackCicloFromClicks();
     bind();
     observe();
-    refresh();
+    setTimeout(function () { refresh(false); }, 600);
   }
 
   if (document.readyState === 'loading') {
