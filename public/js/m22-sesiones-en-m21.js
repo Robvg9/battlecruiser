@@ -1,7 +1,7 @@
-// BattleCruiser M22-FE + M24 + M25 + M25.1 — Sesiones en Turnos.
-// M25.1: MutationObserver ignora mutaciones del propio #m22-sesiones-panel (rompe loop re-render).
-// M25: tras abrir/cerrar sesión refresca turno_actual_usuario (vía __BC_M25_refrescarTurno).
-// Fix M24.2-FE.1: Asignar trabajador visible aunque ciclo PLANIFICADO.
+// BattleCruiser M22-FE + M24 + M25 + M25.1 + M25.3 — Sesiones en Turnos.
+// M25.3: Cerrar sesión visible para el trabajador asignado (EN_CURSO), sin exigir cicloOperable ni solo editar.
+// M25.1: MutationObserver ignora mutaciones del propio #m22-sesiones-panel.
+// M25: sync turno_actual_usuario vía __BC_M25_refrescarTurno.
 (function () {
   'use strict';
   var RPC_LIST = 'listar_sesiones_operativas';
@@ -70,11 +70,12 @@
   }
   function puedeCerrarSesion(s) {
     if (normEstado(s.estado) !== 'EN_CURSO') return false;
-    if (isAdmin()) return can('ciclos', 'editar') || can('turnos', 'editar');
+    if (isAdmin()) return true;
     var me = uid();
     var assigned = sesionUsuarioId(s);
-    if (assigned && me && String(assigned) !== String(me)) return false;
-    return can('turnos', 'editar') || can('ciclos', 'editar');
+    if (!me || !assigned || String(assigned) !== String(me)) return false;
+    return can('turnos', 'crear') || can('turnos', 'editar') ||
+           can('ciclos', 'crear') || can('ciclos', 'editar');
   }
 
   function cicloIdDesdeUi() {
@@ -177,10 +178,14 @@
     }
 
     if (estado === 'EN_CURSO') {
-      if (puedeCerrarSesion(s) && cicloOperable) {
+      if (puedeCerrarSesion(s)) {
         return '<button type="button" class="cc-accion" data-m22-cerrar="' + esc(s.id) + '">Cerrar sesión</button>';
       }
-      return '<span class="muted">En curso</span>';
+      if (assigned && me && String(assigned) !== String(me)) {
+        return '<span class="muted">En proceso · asignada a otro trabajador' +
+          (nombre ? ' (' + esc(nombre) + ')' : '') + '</span>';
+      }
+      return '<span class="muted">En proceso</span>';
     }
 
     if (!assigned) {
@@ -320,7 +325,7 @@
       setMsg('No podés cerrar esta sesión.', false);
       return;
     }
-    if (!window.confirm('¿Cerrar esta sesión de trabajo?')) return;
+    if (!window.confirm('¿Estás seguro de que terminaste esta sesión?\n\nAceptar = Sí, cerrar sesión.')) return;
     if (btn) { btn.disabled = true; }
     try {
       await mutar(RPC_CERRAR, id, null);
