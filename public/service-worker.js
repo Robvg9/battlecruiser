@@ -1,8 +1,8 @@
-// BattleCruiser Service Worker v122 — app v9.2.79
+// BattleCruiser Service Worker v123 — app v9.2.80
 // Objetivo: evitar ERR_FAILED por un fallback vacío del Service Worker.
 // Estrategia: network-first; caché como fallback; si no existe caché, respuesta offline válida.
-const BC_VERSION = "9.2.79";
-const CACHE_NAME = "battlecruiser-shell-v122";
+const BC_VERSION = "9.2.80";
+const CACHE_NAME = "battlecruiser-shell-v123";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
