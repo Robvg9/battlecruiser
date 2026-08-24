@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.75 — M25.4-FE: fix definitivo parpadeo Turnos (bucle M22↔M24)
-(function hotfixV9275(){
-  const VERSION="9.2.75";
+// v9.2.76 — M26: rediseño UX Ventas (búsqueda+catálogo unificados, carrito sticky, confirmación clara)
+(function hotfixV9276(){
+  const VERSION="9.2.76";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -38,7 +38,8 @@
     ["m22-sesiones-en-m21.js","25.4"],["m22-fe-patches-m21.js","22.1"],
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],
     ["m24-asignaciones-operativas.js","25.4"],["m24-2-asignar-sesion-ui.js","24.3"],
-    ["m25-fe-sync-turno-ventas.js","25.1"]
+    ["m25-fe-sync-turno-ventas.js","25.1"],
+    ["m26-ventas-ux.js","26.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
