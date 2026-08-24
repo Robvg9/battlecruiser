@@ -1,5 +1,5 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.61 M12-FE.6: identidad neutra en carga; sin email internal como nombre.
+// B3 — v9.2.63 M12-FE.8: Operación con resp/inc independientes; identidad neutra.
 
 function esIdentidadInternaOTemporal(valor) {
   if (!valor) return true;
@@ -18,7 +18,6 @@ function mostrarEstadoIdentidadEnHeader(texto) {
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
   _cargandoUsuario = true;
-  // No heredar identidad anterior ni email de Auth mientras carga el perfil
   mostrarEstadoIdentidadEnHeader("Cargando usuario…");
   try {
     const { data: sesion } = await client.auth.getSession();
@@ -45,7 +44,6 @@ async function cargarContextoUsuario() {
         rol: perfil.rol || null,
       };
     } else {
-      // Sin perfil confirmado: no usar authUser.email (evita @internal.battlecruiser.local)
       _usuarioActual = {
         id: authUser.id,
         nombre: null,
@@ -146,7 +144,8 @@ function puedeVerOperacionesLocal() {
     tienePermiso("gastos", "crear") ||
     tienePermiso("mermas", "crear") ||
     tienePermiso("reinversiones", "crear") ||
-    tienePermiso("turnos", "crear")
+    tienePermiso("responsabilidades", "crear") ||
+    tienePermiso("incidencias", "crear")
   );
 }
 
