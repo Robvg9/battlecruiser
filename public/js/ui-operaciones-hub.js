@@ -1,12 +1,12 @@
 // BattleCruiser — Operaciones Hub (v9.2.37)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
-// M12-FE.7: cards + guards RPC solo con *.crear (ver no ejecuta).
+// M12-FE.8: resp→responsabilidades.crear; inc→incidencias.crear (no turnos.crear).
 (function () {
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '40';
+  var HUB_VER = '41';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
@@ -232,7 +232,7 @@
   }
 
   function openResponsabilidad() {
-    if (!requireCrear('turnos')) return;
+    if (!requireCrear('responsabilidades')) return;
     openModal({
       icon: '📋', title: 'Responsabilidades', submitText: 'Crear',
       submitBg: 'rgba(50,90,160,.95)', submitColor: '#fff',
@@ -271,7 +271,7 @@
         });
       },
       onSubmit: async function (setMsg) {
-        if (!requireCrear('turnos')) { setMsg('Sin permiso para crear responsabilidades.', false); throw new Error('permiso'); }
+        if (!requireCrear('responsabilidades')) { setMsg('Sin permiso para crear responsabilidades.', false); throw new Error('permiso'); }
         var form = document.getElementById('form-responsabilidad');
         if (!form) { setMsg('Formulario base no disponible.', false); throw new Error('no form'); }
         var t = document.getElementById('op-resp-t').value.trim();
@@ -290,7 +290,7 @@
   }
 
   function openIncidencia() {
-    if (!requireCrear('turnos')) return;
+    if (!requireCrear('incidencias')) return;
     openModal({
       icon: '⚠️', title: 'Incidencias', submitText: 'Reportar',
       submitBg: 'rgba(100,60,160,.95)', submitColor: '#fff',
@@ -328,7 +328,7 @@
         });
       },
       onSubmit: async function (setMsg) {
-        if (!requireCrear('turnos')) { setMsg('Sin permiso para reportar incidencias.', false); throw new Error('permiso'); }
+        if (!requireCrear('incidencias')) { setMsg('Sin permiso para reportar incidencias.', false); throw new Error('permiso'); }
         var form = document.getElementById('form-incidencia');
         if (!form) { setMsg('Formulario base no disponible.', false); throw new Error('no form'); }
         var d = document.getElementById('op-inc-d').value.trim();
@@ -383,9 +383,11 @@
     if (can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
     }
-    // Backend: crear_responsabilidad / crear_incidencia exigen turnos.crear
-    if (can('turnos', 'crear')) {
+    // Backend: responsabilidades.crear / incidencias.crear (no turnos.crear)
+    if (can('responsabilidades', 'crear')) {
       cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
+    }
+    if (can('incidencias', 'crear')) {
       cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
     }
     if (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any')) {
