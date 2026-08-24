@@ -3,6 +3,7 @@
 // Reutiliza 100%: ventaLineas, agregarLineaVenta, renderVentaLineas,
 // actualizarCantidadLinea, ejecutarOperacion("venta"), venta-turno-ui (M14).
 // No crea cola, IndexedDB, RPC ni cambia contratos.
+// v26.3 — display:flex solo cuando .visible (evita bloquear navegación de tabs)
 (function () {
   'use strict';
 
@@ -15,7 +16,9 @@
     var s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent = [
-      '#tab-ventas.bc-pos{display:flex;flex-direction:column;gap:0;min-height:0}',
+      /* CRÍTICO: display solo con .visible — sin esto #tab-ventas.bc-pos gana a .tab-panel y Ventas queda permanente */
+      '#tab-ventas.bc-pos:not(.visible){display:none!important}',
+      '#tab-ventas.bc-pos.visible{display:flex;flex-direction:column;gap:0;min-height:0}',
       '#tab-ventas.bc-pos .venta-vista-toggle{display:none!important}',
       '#tab-ventas.bc-pos #venta-modo-buscador{margin-bottom:8px}',
       '#tab-ventas.bc-pos #venta-modo-catalogo{display:block!important}',
