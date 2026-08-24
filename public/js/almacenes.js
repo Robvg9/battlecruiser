@@ -1,11 +1,25 @@
 // ==== Battlecruiser · js/almacenes.js ====
 // Selector y gestión de almacenes, panel de almacén seleccionado, refresco de stock y selects.
-// (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
+// M26.5-FE: comparación de IDs normalizada + recarga de stock si la caché está vacía al seleccionar.
 
 let _almacenSeleccionadoId = null;
+let _stockAlmacenesCargando = false;
 
 function etiquetaTipoAlmacen(tipo) {
   return tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista";
+}
+
+/** Comparación estable de UUIDs / ids (evita fallos string vs valor crudo). */
+function mismoIdAlmacen(a, b) {
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
+function stockDelAlmacen(almacenId) {
+  if (!almacenId) return [];
+  return (_cache.stock || []).filter(function (s) {
+    return s && mismoIdAlmacen(s.almacen_id, almacenId);
+  });
 }
 
 function llenarSelectorAlmacenes(almacenes) {
@@ -21,7 +35,7 @@ function llenarSelectorAlmacenes(almacenes) {
     if (a.activo === false) o.className = "alm-option-inactivo";
     sel.appendChild(o);
   });
-  if (prev && (almacenes || []).some((a) => a.id === prev)) {
+  if (prev && (almacenes || []).some((a) => mismoIdAlmacen(a.id, prev))) {
     sel.value = prev;
     _almacenSeleccionadoId = prev;
   } else {
@@ -39,7 +53,7 @@ function actualizarBotonesAccionesAlmacen() {
   if (toggle) {
     toggle.disabled = !tiene;
     if (tiene) {
-      const a = (_cache.almacenes || []).find((x) => x.id === _almacenSeleccionadoId);
+      const a = (_cache.almacenes || []).find((x) => mismoIdAlmacen(x.id, _almacenSeleccionadoId));
       toggle.textContent = a && a.activo === false ? "Activar almacén" : "Desactivar almacén";
     } else {
       toggle.textContent = "Activar / desactivar";
@@ -57,13 +71,13 @@ function renderPanelAlmacenSeleccionado() {
     actualizarBotonesAccionesAlmacen();
     return;
   }
-  const a = (_cache.almacenes || []).find((x) => x.id === id);
+  const a = (_cache.almacenes || []).find((x) => mismoIdAlmacen(x.id, id));
   if (!a) {
     panel.innerHTML = '<p class="lista-estado">Almacén no encontrado.</p>';
     renderProductosDelAlmacen(null);
     return;
   }
-  const stock = (_cache.stock || []).filter((s) => s.almacen_id === id);
+  const stock = stockDelAlmacen(id);
   const productosCount = stock.length;
   let unidades = 0;
   let bajoMin = 0;
@@ -99,8 +113,14 @@ function renderProductosDelAlmacen(almacen_id) {
     lista.innerHTML = '<p class="lista-estado">Elegí un almacén para ver sus productos.</p>';
     return;
   }
-  const stock = (_cache.stock || []).filter((s) => s.almacen_id === almacen_id);
+  const stock = stockDelAlmacen(almacen_id);
   if (stock.length === 0) {
+    // Si la caché global de stock está vacía, es probable que aún no se haya cargado
+    // (no afirmar vacío real hasta tener datos).
+    if (!(_cache.stock && _cache.stock.length)) {
+      lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
+      return;
+    }
     lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos con stock registrado.</p>';
     return;
   }
@@ -142,6 +162,25 @@ function seleccionarAlmacen(id) {
   const sel = document.getElementById("alm-selector");
   if (sel) sel.value = id || "";
   renderPanelAlmacenSeleccionado();
+  // M26.5-FE: si no hay stock en caché, cargar y re-renderizar (evita falso vacío)
+  if (id && (!(_cache.stock && _cache.stock.length)) && !_stockAlmacenesCargando) {
+    asegurarStockAlmacenesYRender();
+  }
+}
+
+async function asegurarStockAlmacenesYRender() {
+  if (_stockAlmacenesCargando) return;
+  _stockAlmacenesCargando = true;
+  try {
+    if (typeof refrescarStockYSelects === "function") {
+      await refrescarStockYSelects();
+    }
+  } catch (e) {
+    console.warn("[BattleCruiser] asegurarStockAlmacenesYRender", e);
+  } finally {
+    _stockAlmacenesCargando = false;
+    if (_almacenSeleccionadoId) renderPanelAlmacenSeleccionado();
+  }
 }
 
 function cerrarFormAlmacen() {
@@ -166,7 +205,7 @@ function abrirFormCrearAlmacen() {
 
 function abrirFormEditarAlmacen() {
   if (!_almacenSeleccionadoId) return;
-  const a = (_cache.almacenes || []).find((x) => x.id === _almacenSeleccionadoId);
+  const a = (_cache.almacenes || []).find((x) => mismoIdAlmacen(x.id, _almacenSeleccionadoId));
   if (!a) return;
   const form = document.getElementById("form-almacen");
   if (!form) return;
@@ -183,7 +222,6 @@ async function refrescarAlmacenes() {
   const almacenes = await cargarAlmacenes();
   _cache.almacenes = almacenes;
   renderResumen();
-  // Compatibilidad: lista oculta sigue existiendo (otros flujos no dependen de su contenido visual).
   const lista = document.getElementById("lista-almacenes");
   if (lista) {
     if (almacenes.length === 0) {
@@ -201,7 +239,13 @@ async function refrescarAlmacenes() {
   }
 
   llenarSelectorAlmacenes(almacenes);
-  renderPanelAlmacenSeleccionado();
+  // No afirmar vacío de productos hasta tener stock; si falta, cargarlo
+  if (!(_cache.stock && _cache.stock.length)) {
+    renderPanelAlmacenSeleccionado();
+    await asegurarStockAlmacenesYRender();
+  } else {
+    renderPanelAlmacenSeleccionado();
+  }
 
   fillSelect(document.getElementById("trf-origen"), almacenes, "id", (a) => a.nombre);
   fillSelect(document.getElementById("trf-destino"), almacenes, "id", (a) => a.nombre);
@@ -219,20 +263,19 @@ async function refrescarStockYSelects() {
     .from("stock")
     .select("producto_id, almacen_id, cantidad, minimo, productos(nombre), almacenes(nombre)"));
 
-  _cache.stock = stock;
+  _cache.stock = stock || [];
   renderResumen();
-  // seleccionado (no el listado global). Si no hay selección, mensaje guía.
   if (typeof renderProductosDelAlmacen === "function") {
     renderProductosDelAlmacen(_almacenSeleccionadoId);
   } else {
     const lista = document.getElementById("lista-stock");
     if (!lista) return;
-    if (!stock || stock.length === 0) {
+    if (!_cache.stock.length) {
       setEmpty("lista-stock", mensajeListaVacia("stock", "Todavía no hay stock cargado."));
       return;
     }
     lista.innerHTML = "";
-    stock.forEach((s) => {
+    _cache.stock.forEach((s) => {
       const div = document.createElement("div");
       div.className = "lista-item";
       const bajo = s.minimo != null && s.cantidad <= s.minimo;
@@ -332,7 +375,7 @@ safeInit("almacenes-ui", () => {
     btnToggle.addEventListener("click", async () => {
       if (menu) menu.classList.add("hidden");
       if (!_almacenSeleccionadoId) return;
-      const a = (_cache.almacenes || []).find((x) => x.id === _almacenSeleccionadoId);
+      const a = (_cache.almacenes || []).find((x) => mismoIdAlmacen(x.id, _almacenSeleccionadoId));
       if (!a) return;
       const nuevoActivo = a.activo === false;
       btnToggle.disabled = true;
