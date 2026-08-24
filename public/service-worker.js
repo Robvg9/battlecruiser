@@ -1,8 +1,8 @@
-// BattleCruiser Service Worker v121 — app v9.2.64
+// BattleCruiser Service Worker v122 — app v9.2.79
 // Objetivo: evitar ERR_FAILED por un fallback vacío del Service Worker.
 // Estrategia: network-first; caché como fallback; si no existe caché, respuesta offline válida.
-const BC_VERSION = "9.2.64";
-const CACHE_NAME = "battlecruiser-shell-v121";
+const BC_VERSION = "9.2.79";
+const CACHE_NAME = "battlecruiser-shell-v122";
 const SHELL_FILES = [
   "./index.html","./style.css","./app.js",
   "./js/core.js","./js/auth.js","./js/offline.js","./js/online-offline-guard.js","./js/loading-guard.js",
@@ -13,6 +13,7 @@ const SHELL_FILES = [
   "./js/ventas.js","./js/venta-turno-ui.js","./js/catalogos.js","./js/catalogos-core.js",
   "./js/configuracion.js","./js/ui-revision-2026-08.js","./js/catalogo-avanzado.js",
   "./js/usuarios-permisos.js","./js/usuarios-permisos-rest.js","./js/roles-en-usuarios.js","./js/fix-permisos-rol.js",
+  "./js/fix-permisos-carga.js",
   "./js/ui-layout-inteligente.js","./js/ui-usuarios-dashboard.js","./js/ui-operaciones-hub.js",
   "./js/ui-ajustes-panel.js","./js/hide-config-tab.js","./js/alta-usuario-sin-email.js",
   "./js/permisos-navegacion.js","./js/ui-visual-salon.js",
@@ -20,7 +21,7 @@ const SHELL_FILES = [
   "./js/ciclos.js","./js/m18-ciclos-ux.js","./js/m22-sesiones-en-m21.js","./js/m22-fe-patches-m21.js",
   "./js/comunicacion.js","./js/panel-contextual.js",
   "./js/aprobaciones-admin.js","./js/operaciones-financieras.js",
-  "./js/m26-ui-integridad.js","./js/sesiones-operativas-ui.js",
+  "./js/m26-ui-integridad.js","./js/m26-ventas-ux.js","./js/sesiones-operativas-ui.js",
   "./favicon.png","./manifest.json",
   "./icons/favicon-48x48.png","./icons/icon-192x192.png","./icons/icon-512x512.png",
   "./icons/icon-maskable-512x512.png","./icons/icon.svg"
