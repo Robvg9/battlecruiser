@@ -1,8 +1,7 @@
-// BattleCruiser v9.2.66 — M23-FE
+// BattleCruiser v9.2.67 — M23.1-FE
 // Menú: seccion.ver === true
-// TURNOS visible = data-tab="ciclos" gated por turnos.ver (panel M21).
-// data-tab="turnos" (legacy) siempre oculto.
-// Operaciones: gastos|mermas|reinversiones|responsabilidades|incidencias .crear
+// TURNOS = data-tab="ciclos" + turnos.ver. Legacy turnos oculto.
+// Etiqueta Turnos no usa textContent (preserva .bc-nav-icon).
 (function () {
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
@@ -25,8 +24,6 @@
     );
   }
 
-  // ciclos (panel M21) se navega como TURNOS → permiso turnos.ver
-  // turnos (legacy) permanece en el mapa por compatibilidad, pero el botón se fuerza oculto.
   var TAB_A_SECCION = {
     productos: "productos",
     ventas: "ventas",
@@ -69,6 +66,24 @@
         if (panel) panel.classList.remove("visible");
       }
     }
+  }
+
+  /** Actualiza el texto visible sin borrar .bc-nav-icon de ui-visual-salon. */
+  function setTabLabel(btn, text) {
+    if (!btn) return;
+    var lab = btn.querySelector(".bc-nav-label");
+    if (lab) {
+      lab.textContent = text;
+      return;
+    }
+    if (btn.querySelector(".bc-nav-icon")) {
+      var span = document.createElement("span");
+      span.className = "bc-nav-label";
+      span.textContent = text;
+      btn.appendChild(span);
+      return;
+    }
+    btn.textContent = text;
   }
 
   function asegurarPanelSinPermisos() {
@@ -132,7 +147,6 @@
         return;
       }
 
-      // Legacy B7: siempre oculto. La UX TURNOS es data-tab="ciclos" (M21).
       if (tab === "turnos") {
         setTabVisible(btn, false);
         return;
@@ -143,11 +157,10 @@
         return;
       }
 
-      // Panel M21: etiqueta TURNOS, permiso turnos.ver (mapeado en TAB_A_SECCION.ciclos)
       if (tab === "ciclos") {
         var verTurnos = tienePermiso("turnos", "ver");
         setTabVisible(btn, verTurnos);
-        if (verTurnos) btn.textContent = "Turnos";
+        if (verTurnos) setTabLabel(btn, "Turnos");
         return;
       }
 
