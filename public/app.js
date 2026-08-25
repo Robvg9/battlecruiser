@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.90 — M26.14: Comunicación UX estable + permisos offline
-(function hotfixV9290(){
-  const VERSION="9.2.90";
+// v9.2.91 — M26.15: layout chat (empty overlay + compositor)
+(function hotfixV9291(){
+  const VERSION="9.2.91";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -55,6 +55,7 @@
     ["m26-12-comunicacion-whatsapp.js","26.12"],
     ["m26-13-comunicacion-ux.js","26.13"],
     ["m26-14-comunicacion-estabilidad.js","26.14"],
+    ["m26-15-comunicacion-layout.js","26.15"],
     ["fix-permisos-carga.js","80.1"],
     ["sesion-navegacion-reset.js","26.11"]
   ];
