@@ -1,5 +1,5 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.83 — M26.7-FE: form agregar + +/- + confirmar + POS 2 col + drawer
+// v9.2.83 — M26.7-FE: ventas carrito + confirmar + drawer layering
 (function hotfixV9283(){
   const VERSION="9.2.83";
   window.__BC_VERSION__=VERSION;
@@ -47,7 +47,7 @@
     ["m25-fe-sync-turno-ventas.js","25.1"],
     ["m26-ventas-ux.js","26.5"],
     ["m26-6-stock-cart-patch.js","26.6"],
-    ["m26-7-ventas-fix.js","26.7"],
+    ["m26-7-ventas-repair.js","26.7"],
     ["fix-permisos-carga.js","80.1"]
   ];
   modules.forEach(([name,version])=>{
