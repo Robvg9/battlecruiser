@@ -1,5 +1,6 @@
 // ==== Battlecruiser · js/usuarios-permisos.js ====
-// B3 — v9.2.80 M26.4: timeout + recovery + señal a auth cuando el loader está listo.
+// B3 — v9.2.93 M26.17: no vaciar permisos/perfil ante fallo de red.
+// Conserva el último estado validado de la sesión activa.
 
 var BC_CONTEXTO_TIMEOUT_MS = 12000;
 
@@ -85,6 +86,81 @@ function ocultarBotonReintentarContexto() {
   }
 }
 
+function clonarPermisosEfectivos(src) {
+  var out = {};
+  if (!src || typeof src !== "object") return out;
+  Object.keys(src).forEach(function (sec) {
+    out[sec] = {};
+    var row = src[sec];
+    if (row && typeof row === "object") {
+      Object.keys(row).forEach(function (act) {
+        out[sec][act] = row[act] === true;
+      });
+    }
+  });
+  return out;
+}
+
+function clonarUsuarioActual(u) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    nombre: u.nombre,
+    activo: u.activo,
+    role_id: u.role_id,
+    rol: u.rol
+  };
+}
+
+var _bcPermisosSnapshot = null;
+
+function bcGuardarSnapshotPermisos() {
+  if (typeof _permisosCargaExitosa === "undefined" || !_permisosCargaExitosa) return;
+  if (!_permisosEfectivos || Object.keys(_permisosEfectivos).length === 0) return;
+  _bcPermisosSnapshot = {
+    userId: _usuarioActual && _usuarioActual.id ? _usuarioActual.id : null,
+    usuario: clonarUsuarioActual(_usuarioActual),
+    efectivos: clonarPermisosEfectivos(_permisosEfectivos),
+    exitosa: true
+  };
+}
+
+function bcRestaurarSnapshotPermisos(motivo) {
+  var snap = _bcPermisosSnapshot;
+  if (!snap || !snap.exitosa || !snap.efectivos) return false;
+  if (_usuarioActual && snap.userId && _usuarioActual.id && String(_usuarioActual.id) !== String(snap.userId)) {
+    return false;
+  }
+  _permisosEfectivos = clonarPermisosEfectivos(snap.efectivos);
+  _permisosCargaExitosa = true;
+  if (snap.usuario) {
+    if (!_usuarioActual) {
+      _usuarioActual = clonarUsuarioActual(snap.usuario);
+    } else {
+      if (!_usuarioActual.nombre && snap.usuario.nombre) _usuarioActual.nombre = snap.usuario.nombre;
+      if (_usuarioActual.rol == null && snap.usuario.rol != null) _usuarioActual.rol = snap.usuario.rol;
+      if (_usuarioActual.role_id == null && snap.usuario.role_id != null) _usuarioActual.role_id = snap.usuario.role_id;
+      if (_usuarioActual.activo == null && snap.usuario.activo != null) _usuarioActual.activo = snap.usuario.activo;
+    }
+  }
+  try { console.info("[BattleCruiser] M26.17 permisos conservados:", motivo); } catch (e) {}
+  return true;
+}
+
+function bcErrorEsRedOTimeout(err, huboTimeoutFlag) {
+  if (huboTimeoutFlag) return true;
+  try {
+    if (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado()) return true;
+  } catch (e0) {}
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  if (err && err.bcTimeout) return true;
+  try {
+    if (typeof esErrorDeRed === "function" && err && esErrorDeRed(err)) return true;
+  } catch (e1) {}
+  var msg = String((err && (err.message || err.code || err.name)) || err || "").toLowerCase();
+  return /timeout|failed to fetch|network|offline|err_internet|connection|load failed/.test(msg);
+}
+
 async function cargarContextoUsuario() {
   if (_cargandoUsuario) return;
   _cargandoUsuario = true;
@@ -102,6 +178,11 @@ async function cargarContextoUsuario() {
       console.warn("[BattleCruiser] getSession falló o timeout", eSes);
       mostrarEstadoIdentidadEnHeader(huboTimeout ? "Tiempo agotado — reintentá" : "Sin conexión — reintentá");
       asegurarBotonReintentarContexto();
+      if (bcRestaurarSnapshotPermisos("getSession red/timeout")) {
+        _permisosCargaFallidaRed = true;
+        if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+        if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
+      }
       return;
     }
     var sesion = sesionPack && sesionPack.data;
@@ -128,18 +209,24 @@ async function cargarContextoUsuario() {
         perfilRes = await bcConTimeout(client.rpc("perfil_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "perfil2");
       } catch (e1) {
         if (e1 && e1.bcTimeout) huboTimeout = true;
+        if (bcErrorEsRedOTimeout(e1, huboTimeout)) huboErrorRed = true;
       }
       try {
         permsRes = await bcConTimeout(client.rpc("permisos_usuario_actual", {}), BC_CONTEXTO_TIMEOUT_MS, "permisos2");
       } catch (e2) {
         if (e2 && e2.bcTimeout) huboTimeout = true;
-        if (typeof esErrorDeRed === "function" && esErrorDeRed(e2)) _permisosCargaFallidaRed = true;
+        if (bcErrorEsRedOTimeout(e2, huboTimeout)) {
+          huboErrorRed = true;
+          _permisosCargaFallidaRed = true;
+        }
       }
     }
 
     var perfil = null;
     if (perfilRes && !perfilRes.error && perfilRes.data) {
       perfil = Array.isArray(perfilRes.data) ? perfilRes.data[0] : perfilRes.data;
+    } else if (perfilRes && perfilRes.error && bcErrorEsRedOTimeout(perfilRes.error, huboTimeout)) {
+      huboErrorRed = true;
     }
 
     if (perfil) {
@@ -152,6 +239,11 @@ async function cargarContextoUsuario() {
         role_id: perfil.role_id || null,
         rol: perfil.rol || null,
       };
+    } else if (_usuarioActual && _usuarioActual.id && String(_usuarioActual.id) === String(authUser.id)) {
+      // Perfil no llegó (red): conservar el perfil ya validado de esta sesión.
+    } else if (_bcPermisosSnapshot && _bcPermisosSnapshot.usuario &&
+               String(_bcPermisosSnapshot.userId) === String(authUser.id)) {
+      _usuarioActual = clonarUsuarioActual(_bcPermisosSnapshot.usuario);
     } else {
       _usuarioActual = {
         id: authUser.id,
@@ -162,16 +254,19 @@ async function cargarContextoUsuario() {
       };
     }
 
-    _permisosEfectivos = {};
-    _permisosCargaExitosa = false;
-    _permisosCargaFallidaRed = false;
+    var permsOk = false;
+    var permsErrorRed = false;
     if (permsRes) {
       if (permsRes.error) {
-        if (typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) _permisosCargaFallidaRed = true;
+        if (bcErrorEsRedOTimeout(permsRes.error, huboTimeout)) {
+          permsErrorRed = true;
+          huboErrorRed = true;
+          _permisosCargaFallidaRed = true;
+        }
         console.warn("[BattleCruiser] permisos_usuario_actual error", permsRes.error);
       } else if (Array.isArray(permsRes.data)) {
         var perms = permsRes.data;
-        _permisosCargaExitosa = true;
+        var rebuilt = {};
         var usaCampoPermitido = perms.some(function (p) {
           return p && Object.prototype.hasOwnProperty.call(p, "permitido");
         });
@@ -180,9 +275,14 @@ async function cargarContextoUsuario() {
           if (usaCampoPermitido) {
             if (p.permitido !== true && p.permitido !== 1 && p.permitido !== "true") return;
           }
-          if (!_permisosEfectivos[p.seccion]) _permisosEfectivos[p.seccion] = {};
-          _permisosEfectivos[p.seccion][p.accion] = true;
+          if (!rebuilt[p.seccion]) rebuilt[p.seccion] = {};
+          rebuilt[p.seccion][p.accion] = true;
         });
+        _permisosEfectivos = rebuilt;
+        _permisosCargaExitosa = true;
+        _permisosCargaFallidaRed = false;
+        permsOk = true;
+        bcGuardarSnapshotPermisos();
         try {
           console.info("[BattleCruiser] permisos efectivos",
             Object.keys(_permisosEfectivos),
@@ -191,7 +291,23 @@ async function cargarContextoUsuario() {
         } catch (e) {}
       }
     } else {
-      _permisosCargaFallidaRed = true;
+      permsErrorRed = true;
+      huboErrorRed = true;
+    }
+
+    if (!permsOk) {
+      var conservado = false;
+      if (permsErrorRed || huboErrorRed || huboTimeout) {
+        conservado = bcRestaurarSnapshotPermisos("permisos RPC red/timeout");
+        _permisosCargaFallidaRed = true;
+      }
+      if (!conservado) {
+        // Primera carga o error no-red sin snapshot: fail-closed (no inventar).
+        if (!(_permisosCargaExitosa && _permisosEfectivos && Object.keys(_permisosEfectivos).length > 0)) {
+          _permisosEfectivos = {};
+          _permisosCargaExitosa = false;
+        }
+      }
     }
 
     if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
@@ -206,18 +322,24 @@ async function cargarContextoUsuario() {
     console.warn("[Battlecruiser] No se pudo cargar el contexto de usuario:", e);
     mostrarEstadoIdentidadEnHeader("Error al cargar — reintentá");
     asegurarBotonReintentarContexto();
+    if (bcErrorEsRedOTimeout(e, false) && bcRestaurarSnapshotPermisos("excepción red")) {
+      _permisosCargaFallidaRed = true;
+      if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+    }
   } finally {
     _cargandoUsuario = false;
     if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
   }
 }
 cargarContextoUsuario.__bcM263Timeout = true;
+cargarContextoUsuario.__bcM2617 = true;
 
 function limpiarContextoUsuario() {
   _usuarioActual = null;
   _permisosEfectivos = {};
   _permisosCargaExitosa = false;
   _permisosCargaFallidaRed = false;
+  _bcPermisosSnapshot = null;
   _novedadesVistas = new Set();
   mostrarEstadoIdentidadEnHeader("");
   ocultarBotonReintentarContexto();
@@ -393,20 +515,23 @@ function mostrarInfoUsuarioEnHeader() {
     el.textContent = nombre + rol;
     return;
   }
+  if (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa) {
+    var rolSolo = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
+    el.textContent = rolSolo;
+    return;
+  }
   if (typeof _permisosCargaFallidaRed !== "undefined" && _permisosCargaFallidaRed) {
-    el.textContent = "Sin permisos (red) — reintentá";
+    el.textContent = "Sin conexión — reintentá";
     return;
   }
   if (typeof _permisosCargaExitosa !== "undefined" && !_permisosCargaExitosa) {
     el.textContent = "Sin permisos cargados — reintentá";
     return;
   }
-  var rolSolo = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
-  el.textContent = rolSolo;
+  var rolFallback = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
+  el.textContent = rolFallback;
 }
 
-// M26.4: auth.js puede haber descubierto la sesión ANTES de este archivo.
-// Reanudar carga de contexto ahora que la función existe.
 try {
   if (typeof window.__bcOnContextoLoaderReady === "function") {
     window.__bcOnContextoLoaderReady();

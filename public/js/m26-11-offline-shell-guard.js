@@ -1,4 +1,5 @@
-// BattleCruiser — M26.11-FE: estabilización crítica post-venta offline
+// BattleCruiser — M26.11-FE + M26.17: shell post-offline
+// M26.17: el fail-safe NO fabrica permisos (no fuerza Ventas).
 // Problema real: tras venta offline (ok + offline=true, "1 pendiente") la UI
 // quedaba sin secciones (0 tab-btn.active / 0 tab-panel.visible).
 //
@@ -121,24 +122,12 @@
         }
       }
 
-      // Si aún no hay botones permitidos pero hay sesión: mostrar al menos ventas/resumen
-      // sin tocar permisos (solo recuperación visual de shell vacío).
+      // M26.17: NO fabricar permisos (data-bc-permiso=1) para Ventas/otras.
+      // Si no hay tab permitida, el origen (cargarContextoUsuario) debe
+      // conservar el último estado válido. Este fail-safe solo restaura
+      // visibilidad de una tab YA permitida.
       if (!elegido) {
-        var fallbacks = ["ventas", "resumen", "productos"];
-        for (var k = 0; k < fallbacks.length; k++) {
-          var fb = document.querySelector('.tab-btn[data-tab="' + fallbacks[k] + '"]');
-          if (fb) {
-            fb.classList.remove("hidden", "tab-sin-permiso");
-            fb.style.removeProperty("display");
-            fb.setAttribute("data-bc-permiso", "1");
-            elegido = fallbacks[k];
-            break;
-          }
-        }
-      }
-
-      if (!elegido) {
-        logWarn("fail-safe: no se encontró tab restaurable");
+        logWarn("fail-safe: no hay tab permitida — no se fabrican permisos");
         return false;
       }
 

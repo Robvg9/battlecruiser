@@ -1,5 +1,6 @@
-// BattleCruiser v9.2.79 — no sobrescribir cargarContextoUsuario de M26.3 (timeouts + recovery).
-// Solo envuelve si la función base aún no tiene timeout (versiones antiguas cacheadas).
+// BattleCruiser v9.2.93 — M26.17: no sobrescribir cargarContextoUsuario de M26.3
+// (timeouts + recovery). Solo envuelve versiones antiguas cacheadas.
+// Si envuelve: NO vaciar permisos antes de una respuesta RPC válida.
 (function () {
   "use strict";
   if (window.__bcPermisosCargaFix) return;
@@ -18,9 +19,7 @@
 
   function wrapCargar() {
     if (typeof cargarContextoUsuario !== "function") return;
-    // M26.3: usuarios-permisos.js ya tiene timeout + fail-closed + Reintentar
-    if (cargarContextoUsuario.__bcM263Timeout || cargarContextoUsuario.__bcPermitidoFix) return;
-    // Si existe bcConTimeout global, la versión canónica ya está cargada
+    if (cargarContextoUsuario.__bcM263Timeout || cargarContextoUsuario.__bcPermitidoFix || cargarContextoUsuario.__bcM2617) return;
     if (typeof bcConTimeout === "function" && typeof BC_CONTEXTO_TIMEOUT_MS === "number") {
       cargarContextoUsuario.__bcM263Timeout = true;
       return;
@@ -70,7 +69,7 @@
             role_id: perfil.role_id || null,
             rol: perfil.rol || null
           };
-        } else {
+        } else if (!(_usuarioActual && _usuarioActual.id)) {
           _usuarioActual = {
             id: authUser.id,
             nombre: authUser.email,
@@ -80,15 +79,14 @@
           };
         }
 
-        _permisosEfectivos = {};
-        _permisosCargaExitosa = false;
-        _permisosCargaFallidaRed = false;
-        if (permsRes) {
-          if (permsRes.error) {
-            if (typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) _permisosCargaFallidaRed = true;
-          } else if (Array.isArray(permsRes.data)) {
-            _permisosCargaExitosa = true;
-            rebuildFromRpcRows(permsRes.data);
+        // M26.17: no vaciar permisos hasta respuesta válida
+        if (permsRes && !permsRes.error && Array.isArray(permsRes.data)) {
+          _permisosCargaFallidaRed = false;
+          _permisosCargaExitosa = true;
+          rebuildFromRpcRows(permsRes.data);
+        } else {
+          if (permsRes && permsRes.error && typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) {
+            _permisosCargaFallidaRed = true;
           }
         }
 
