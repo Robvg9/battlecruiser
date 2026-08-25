@@ -1,6 +1,7 @@
-// BattleCruiser — Panel Ajustes lateral (v9.2.38)
+// BattleCruiser — Panel Ajustes lateral (v9.2.96 — M27.3 logout global)
 // Estructura proporcional al mock: drawer derecho, Rápido / Apariencia / Sync / Preferencias.
 // Un solo botón: borrar caché SW + recargar última versión (Cloudflare/origen).
+// M27.3: "Cerrar sesión" (logout auth) vive aquí; NO confundir con cerrar sesión operativa.
 (function () {
   'use strict';
   if (window.__bcAjustesPanel) return;
@@ -36,13 +37,10 @@
     var s = document.createElement('style');
     s.id = 'bc-ajustes-panel-css';
     s.textContent = [
-      /* Ocultar menú dropdown viejo; el panel es el sistema de ajustes */
       '#ajustes-menu.bc-legacy-hidden{display:none!important}',
       '.ajustes-wrap{position:relative}',
-
       '#bc-aj-backdrop{position:fixed;inset:0;background:rgba(4,12,10,.55);z-index:9500;opacity:0;pointer-events:none;transition:opacity .2s ease}',
       '#bc-aj-backdrop.open{opacity:1;pointer-events:auto}',
-
       '#bc-aj-panel{position:fixed;top:0;right:0;height:100%;height:100dvh;z-index:9501;',
       'width:min(420px,92vw);max-width:100%;',
       'background:linear-gradient(180deg,rgba(14,32,28,.98),rgba(8,20,17,.99));',
@@ -53,16 +51,13 @@
       '#bc-aj-panel.open{transform:translateX(0)}',
       '@media(min-width:1100px){#bc-aj-panel{width:min(400px,38vw)}}',
       '@media(max-width:480px){#bc-aj-panel{width:100%;max-width:100%;border-left:none;border-radius:0}}',
-
       '.bc-aj-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid rgba(201,162,77,.14);flex:0 0 auto}',
       '.bc-aj-head h2{margin:0;font-family:Cormorant Garamond,serif;font-size:1.35rem;font-weight:600;color:var(--gold-bright);display:flex;align-items:center;gap:8px}',
       '.bc-aj-x{background:transparent;border:none;color:var(--mist);font-size:22px;cursor:pointer;padding:4px 8px;border-radius:8px;line-height:1}',
       '.bc-aj-x:hover{color:var(--text);background:rgba(255,255,255,.06)}',
-
       '.bc-aj-body{flex:1 1 auto;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 28px}',
       '.bc-aj-sec{margin-bottom:18px}',
       '.bc-aj-sec-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold-dim);font-weight:600}',
-
       '.bc-aj-quick{display:grid;grid-template-columns:1fr;gap:10px}',
       '.bc-aj-quick-btn{display:flex;align-items:flex-start;gap:12px;padding:14px 14px;border-radius:12px;border:1px solid rgba(201,162,77,.2);background:rgba(12,28,24,.55);cursor:pointer;text-align:left;color:var(--text);transition:border-color .15s,transform .15s}',
       '.bc-aj-quick-btn:hover{border-color:rgba(201,162,77,.4);transform:translateY(-1px)}',
@@ -70,36 +65,29 @@
       '.bc-aj-quick-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(201,162,77,.12);flex:0 0 auto}',
       '.bc-aj-quick-btn strong{display:block;font-size:14px;font-weight:600;margin-bottom:2px}',
       '.bc-aj-quick-btn span{display:block;font-size:12px;color:var(--mist);line-height:1.35}',
-
       '.bc-aj-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}',
       '.bc-aj-row:last-child{border-bottom:none}',
       '.bc-aj-row-text strong{display:block;font-size:13.5px;font-weight:600;color:var(--text)}',
       '.bc-aj-row-text small{display:block;font-size:11.5px;color:var(--mist);margin-top:2px;line-height:1.35}',
-
-      /* Toggle */
       '.bc-aj-toggle{position:relative;width:46px;height:26px;flex:0 0 auto}',
       '.bc-aj-toggle input{opacity:0;width:0;height:0}',
       '.bc-aj-slider{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;cursor:pointer;transition:.2s}',
       '.bc-aj-slider:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}',
       '.bc-aj-toggle input:checked + .bc-aj-slider{background:rgba(201,162,77,.55)}',
       '.bc-aj-toggle input:checked + .bc-aj-slider:before{transform:translateX(20px);background:#f0d78c}',
-
       '.bc-aj-appearance{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
       '.bc-aj-app-btn{padding:12px 10px;border-radius:12px;border:1px solid rgba(201,162,77,.18);background:rgba(12,28,24,.4);color:var(--mist);cursor:pointer;font-size:13px;font-weight:500}',
       '.bc-aj-app-btn.active{border-color:rgba(201,162,77,.45);background:rgba(201,162,77,.12);color:var(--gold-bright)}',
-
       '.bc-aj-select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(201,162,77,.2);background:var(--void);color:var(--text);font-size:13px;margin-top:6px}',
-
       '.bc-aj-link{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 0;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text);cursor:pointer;font-size:13.5px;text-align:left}',
       '.bc-aj-link span{color:var(--mist);font-size:12px}',
-
       '.bc-aj-danger{width:100%;margin-top:8px;padding:12px;border-radius:12px;border:1px solid rgba(200,80,80,.35);background:rgba(80,20,20,.25);color:#e8a0a0;font-weight:600;cursor:pointer;font-size:13.5px}',
       '.bc-aj-danger:hover{background:rgba(100,30,30,.35)}',
-
+      '.bc-aj-logout{width:100%;margin-top:14px;padding:14px;border-radius:12px;border:1px solid rgba(200,80,80,.5);background:rgba(100,24,24,.45);color:#f0c0c0;font-weight:700;cursor:pointer;font-size:14px}',
+      '.bc-aj-logout:hover{background:rgba(120,30,30,.55)}',
       '.bc-aj-status{margin-top:10px;font-size:12.5px;color:var(--mist);min-height:1.2em}',
       '.bc-aj-status.ok{color:#9dcc9a}',
       '.bc-aj-status.err{color:#e8a0a0}',
-
       'body.bc-aj-open{overflow:hidden}'
     ].join('');
     document.head.appendChild(s);
@@ -137,10 +125,30 @@
     } catch (e) {
       console.warn('[BattleCruiser] limpieza caché parcial', e);
     }
-    // Recarga con cache-bust → origen (Cloudflare/GitHub Pages) entrega la última build
     var u = new URL(location.href);
     u.searchParams.set('bc_update', String(Date.now()));
     location.replace(u.toString());
+  }
+
+  async function logoutGlobal() {
+    close();
+    if (typeof window.__BC_M273_logout === 'function') {
+      await window.__BC_M273_logout();
+      return;
+    }
+    try {
+      if (typeof resetearNavegacionParaNuevaSesion === 'function') resetearNavegacionParaNuevaSesion();
+    } catch (e) {}
+    try {
+      if (typeof limpiarContextoUsuario === 'function') limpiarContextoUsuario();
+    } catch (e2) {}
+    var ue = document.getElementById('user-email');
+    if (ue) ue.textContent = '';
+    try {
+      await client.auth.signOut();
+    } catch (e3) {
+      console.warn('[BattleCruiser] signOut', e3);
+    }
   }
 
   function ensurePanel() {
@@ -202,6 +210,7 @@
       '</div>' +
 
       '<button type="button" class="bc-aj-danger" id="bc-aj-reset">↻ Restaurar ajustes</button>' +
+      '<button type="button" class="bc-aj-logout" id="bc-aj-logout">Cerrar sesión</button>' +
       '<p class="bc-aj-status" id="bc-aj-status"></p>' +
       '</div>';
 
@@ -262,6 +271,11 @@
       applyAppearance();
       syncUi();
       statusOk('Ajustes restaurados.');
+    };
+
+    document.getElementById('bc-aj-logout').onclick = function () {
+      if (!window.confirm('¿Cerrar sesión y volver al login?')) return;
+      logoutGlobal();
     };
 
     syncUi();
@@ -335,7 +349,6 @@
     var btn = document.getElementById('ajustes-btn');
     if (!btn || btn.dataset.bcAj === '1') return;
     btn.dataset.bcAj = '1';
-    // Reemplazar comportamiento del dropdown
     btn.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
