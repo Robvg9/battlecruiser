@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.03 — Almacenes crear/editar modal (M27.7)
-(function hotfixV9303(){
-  const VERSION="9.3.03";
+// v9.3.04 — Compras (B8) + stock reposición (B9)
+(function hotfixV9304(){
+  const VERSION="9.3.04";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -43,7 +43,7 @@
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6"],
     ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2"],["m27-7-almacenes-modal.js","27.7"],
-    ["mision-d-stock-reposicion.js","D.1"]
+    ["mision-d-stock-reposicion.js","D.9"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
