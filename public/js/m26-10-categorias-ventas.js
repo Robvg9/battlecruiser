@@ -5,7 +5,6 @@
   if (window[FLAG]) return;
   window[FLAG] = true;
 
-  function esc(v) { return typeof escHtml === 'function' ? escHtml(v == null ? '' : v) : String(v == null ? '' : v); }
   function sameId(a,b){ return a != null && b != null && String(a) === String(b); }
 
   function injectTheme() {
@@ -33,8 +32,7 @@
       '#tab-ventas.bc-pos .venta-total{background:#fbf7ee!important;border:1px solid #e7dcc8!important}',
       '#tab-ventas.bc-pos .venta-total-valor{font-size:22px!important;color:#7d612e!important}',
       '#tab-ventas.bc-pos .btn-confirmar-venta{min-height:44px!important;font-size:14px!important;border-radius:10px!important}',
-      '[data-m27-3-cerrar],#m27-3-cerrar,.m27-3-cerrar{max-width:240px!important;width:auto!important;min-height:42px!important;height:42px!important;padding:0 16px!important;font-size:13px!important;border-radius:10px!important}',
-      '#venta-operativa-bloque button[data-m27-3-close],#venta-operativa-bloque [data-close-session]{max-width:240px!important;width:auto!important;min-height:40px!important;height:40px!important;padding:0 16px!important;font-size:13px!important;border-radius:10px!important}',
+      '#bc-m273-cerrar-sesion-btn{display:inline-flex!important;width:auto!important;max-width:240px!important;min-height:40px!important;height:40px!important;margin:10px 0 8px!important;padding:0 16px!important;align-items:center!important;justify-content:center!important;font-size:13px!important;border-radius:10px!important}',
       '.tab-panel{background:transparent!important}',
       '.tabs,.tab-buttons{gap:6px!important}',
       '.tab-btn{font-size:13px!important;padding:9px 12px!important}',
@@ -46,52 +44,32 @@
   function activeCategories(rows){ return (Array.isArray(rows) ? rows : []).filter(function(c){ return c && c.id != null && c.nombre && c.activo !== false; }); }
 
   async function ensureCategories(){
-    var rows = [];
-    try { if (typeof cargarCategorias === 'function') rows = await Promise.resolve(cargarCategorias()); } catch(e) {}
-    rows = activeCategories(rows);
-    window.ventaCategoriasLista = rows;
-    if (typeof catalogoCategoriaActiva === 'undefined' || catalogoCategoriaActiva == null) window.catalogoCategoriaActiva = '';
-    return rows;
+    var rows=[];
+    try{ if(typeof cargarCategorias==='function') rows=await Promise.resolve(cargarCategorias()); }catch(e){}
+    window.ventaCategoriasLista=activeCategories(rows);
+    if(typeof catalogoCategoriaActiva==='undefined' || catalogoCategoriaActiva==null) window.catalogoCategoriaActiva='';
   }
 
   function renderCategories(){
-    var cont = document.getElementById('catalogo-categorias');
-    if (!cont) return;
-    var cats = Array.isArray(window.ventaCategoriasLista) ? activeCategories(window.ventaCategoriasLista) : [];
-    var active = String(window.catalogoCategoriaActiva || '');
-    cont.innerHTML = '';
+    var cont=document.getElementById('catalogo-categorias');
+    if(!cont) return;
+    var cats=activeCategories(window.ventaCategoriasLista || []);
+    var active=String(window.catalogoCategoriaActiva || '');
+    cont.innerHTML='';
     [{id:'',nombre:'Todos'}].concat(cats).forEach(function(c){
-      var b = document.createElement('button');
-      b.type='button';
-      b.className='catalogo-chip' + (String(c.id || '') === active ? ' activo' : '');
-      b.dataset.categoriaId = c.id != null ? String(c.id) : '';
-      b.textContent = c.nombre;
-      cont.appendChild(b);
-    });
-  }
-
-  function filterGridByCategory(){
-    var grid = document.getElementById('catalogo-grid');
-    if (!grid) return;
-    var cat = String(window.catalogoCategoriaActiva || '');
-    var cards = Array.from(grid.querySelectorAll('.catalogo-card'));
-    if (!cat) { cards.forEach(function(c){ c.style.display=''; }); return; }
-    cards.forEach(function(card){
-      var id = card.dataset.categoriaId || card.getAttribute('data-categoria-id') || '';
-      card.style.display = sameId(id,cat) ? '' : 'none';
+      var b=document.createElement('button'); b.type='button'; b.className='catalogo-chip'+(String(c.id||'')===active?' activo':'');
+      b.dataset.categoriaId=c.id != null ? String(c.id) : ''; b.textContent=c.nombre; cont.appendChild(b);
     });
   }
 
   function patchCategoryClick(){
-    var cont = document.getElementById('catalogo-categorias');
-    if (!cont || cont.dataset.bcCatClick==='1') return;
+    var cont=document.getElementById('catalogo-categorias'); if(!cont||cont.dataset.bcCatClick==='1') return;
     cont.dataset.bcCatClick='1';
     cont.addEventListener('click',function(e){
       var b=e.target.closest('.catalogo-chip'); if(!b) return;
-      window.catalogoCategoriaActiva = b.dataset.categoriaId || '';
+      window.catalogoCategoriaActiva=b.dataset.categoriaId||'';
       renderCategories();
-      if (typeof renderCatalogoGrid==='function') { try{ renderCatalogoGrid(); }catch(x){} }
-      filterGridByCategory();
+      try{ if(typeof renderCatalogoGrid==='function') renderCatalogoGrid(); }catch(x){}
     });
   }
 
@@ -99,23 +77,17 @@
     await ensureCategories();
     renderCategories();
     patchCategoryClick();
-    try { if (typeof renderCatalogoGrid==='function') renderCatalogoGrid(); } catch(e) {}
-    filterGridByCategory();
+    try{ if(typeof renderCatalogoGrid==='function') renderCatalogoGrid(); }catch(e){}
   }
 
   function bind(){
     var tabs=document.getElementById('tabs');
-    if(!tabs || tabs.dataset.bcM2610stable==='1') return;
+    if(!tabs||tabs.dataset.bcM2610stable==='1') return;
     tabs.dataset.bcM2610stable='1';
-    tabs.addEventListener('click',function(e){
-      var b=e.target.closest('.tab-btn[data-tab="ventas"]');
-      if(b) enterVentas().catch(function(){});
-    },true);
-    var tab=document.getElementById('tab-ventas');
-    if(tab && tab.classList.contains('visible')) enterVentas().catch(function(){});
+    tabs.addEventListener('click',function(e){ var b=e.target.closest('.tab-btn[data-tab="ventas"]'); if(b) enterVentas().catch(function(){}); },true);
+    var tab=document.getElementById('tab-ventas'); if(tab&&tab.classList.contains('visible')) enterVentas().catch(function(){});
   }
 
   function boot(){ injectTheme(); bind(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(boot,450); });
-  else setTimeout(boot,450);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(boot,450); }); else setTimeout(boot,450);
 })();
