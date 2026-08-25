@@ -1,347 +1,121 @@
-// BattleCruiser — M26.10-FE: categorías reales en filtro de Ventas
-// Causa raíz: ventaCategoriasLista no se pobla de forma fiable al entrar a Ventas
-// (ensureVentasDataReady de M26.9 carga productos/stock pero no categorías) y
-// renderCatalogoCategorias queda solo con "Todos". Además cargarCategorias no
-// filtraba activo=true ni el grid distinguía CARGANDO vs sin productos en categoría.
-//
-// Reutiliza: cargarCategorias, withCache, ventaCategoriasLista, catalogoCategoriaActiva,
-// renderCatalogoCategorias, renderCatalogoGrid, refrescarVentas.
-// NO toca Supabase/RLS/datos. NO asigna categoría a productos.
-// NO reescribe ventas.js ni m26-9-data-truth.js.
+// BattleCruiser — M26.10-FE estable: categorías + tema visual elegante
 (function () {
-  "use strict";
+  'use strict';
+  var FLAG = '__bcM2610stable';
+  if (window[FLAG]) return;
+  window[FLAG] = true;
 
-  var FLAG = "__bcM2610";
-  var STYLE_ID = "bc-m2610-cat-style";
+  function esc(v) { return typeof escHtml === 'function' ? escHtml(v == null ? '' : v) : String(v == null ? '' : v); }
+  function sameId(a,b){ return a != null && b != null && String(a) === String(b); }
 
-  function sameId(a, b) {
-    if (a == null || b == null) return false;
-    return String(a) === String(b);
-  }
-
-  function injectStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement("style");
-    s.id = STYLE_ID;
+  function injectTheme() {
+    if (document.getElementById('bc-elegant-theme')) return;
+    var s = document.createElement('style');
+    s.id = 'bc-elegant-theme';
     s.textContent = [
-      "#catalogo-categorias.catalogo-categorias{",
-      "display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;",
-      "-webkit-overflow-scrolling:touch;padding:2px 0 6px;margin-bottom:8px;",
-      "scrollbar-width:thin}",
-      "#catalogo-categorias .catalogo-chip{",
-      "flex:0 0 auto;min-height:36px;padding:8px 14px;font-size:13px;",
-      "border-radius:999px;border:1px solid var(--gold-dim,#c9a24d55);",
-      "background:var(--void,#0c1c18);color:var(--mist,#b8c4bc);",
-      "cursor:pointer;touch-action:manipulation;white-space:nowrap}",
-      "#catalogo-categorias .catalogo-chip.activo{",
-      "background:linear-gradient(180deg,var(--gold-bright,#e0c078),var(--gold,#c9a24d));",
-      "color:#211605;border-color:transparent;font-weight:600}",
-      "#catalogo-categorias .catalogo-chip:focus-visible{outline:2px solid var(--gold);outline-offset:2px}",
-      "#catalogo-categorias .catalogo-cat-loading{",
-      "font-size:12px;color:var(--mist,#b8c4bc);padding:6px 4px}"
-    ].join("");
+      ':root{--bc-ink:#17211f;--bc-paper:#f7f4ee;--bc-card:rgba(255,255,255,.94);--bc-line:#ded7ca;--bc-gold:#b89245;--bc-gold-soft:#efe4cb;--bc-text:#26322f;--bc-muted:#74807b}',
+      'body{background:radial-gradient(circle at top left,#fbfaf7 0,#f4f0e8 42%,#eee9df 100%)!important;color:var(--bc-text)}',
+      '.app-header,.topbar,.header-bar{background:rgba(255,255,255,.88)!important;border-bottom:1px solid var(--bc-line)!important;box-shadow:0 6px 24px rgba(44,39,30,.06)!important;backdrop-filter:blur(12px)}',
+      '.card,.m21-card,.panel,.section-card,.dashboard-card,.lista-item{background:var(--bc-card)!important;border:1px solid var(--bc-line)!important;border-radius:16px!important;box-shadow:0 10px 30px rgba(44,39,30,.06)!important}',
+      'button,.cc-accion,.tab-btn{border-radius:10px!important}',
+      'input,select,textarea{border:1px solid var(--bc-line)!important;border-radius:10px!important;background:#fffdf9!important;color:var(--bc-text)!important;box-shadow:none!important}',
+      'h1,h2,h3,h4{letter-spacing:.01em;color:#25302d!important}',
+      '.muted,.lista-estado,.msg{color:var(--bc-muted)!important}',
+      '#tab-ventas.bc-pos{background:transparent!important}',
+      '#tab-ventas.bc-pos .venta-operativa-bloque{background:transparent!important}',
+      '#tab-ventas.bc-pos #venta-modo-catalogo{padding:0!important}',
+      '#tab-ventas.bc-pos .catalogo-grid{gap:12px!important}',
+      '#tab-ventas.bc-pos .catalogo-card{background:rgba(255,255,255,.94)!important;border:1px solid var(--bc-line)!important;border-radius:14px!important;box-shadow:0 8px 22px rgba(44,39,30,.05)!important;padding:12px!important}',
+      '#tab-ventas.bc-pos .catalogo-card-precio{color:#9a7737!important}',
+      '#tab-ventas.bc-pos .catalogo-chip{background:#fffdf9!important;color:#59645f!important;border:1px solid var(--bc-line)!important;min-height:34px!important;padding:7px 12px!important}',
+      '#tab-ventas.bc-pos .catalogo-chip.activo{background:linear-gradient(180deg,#cfb06c,#b89245)!important;color:#fff!important;border-color:transparent!important}',
+      '#tab-ventas.bc-pos .bc-venta-carrito-bar{background:rgba(255,255,255,.96)!important;border:1px solid var(--bc-line)!important;border-radius:16px!important;box-shadow:0 12px 32px rgba(44,39,30,.08)!important;padding:10px!important}',
+      '#tab-ventas.bc-pos .venta-total{background:#fbf7ee!important;border:1px solid #e7dcc8!important}',
+      '#tab-ventas.bc-pos .venta-total-valor{font-size:22px!important;color:#7d612e!important}',
+      '#tab-ventas.bc-pos .btn-confirmar-venta{min-height:44px!important;font-size:14px!important;border-radius:10px!important}',
+      '[data-m27-3-cerrar],#m27-3-cerrar,.m27-3-cerrar{max-width:240px!important;width:auto!important;min-height:42px!important;height:42px!important;padding:0 16px!important;font-size:13px!important;border-radius:10px!important}',
+      '#venta-operativa-bloque button[data-m27-3-close],#venta-operativa-bloque [data-close-session]{max-width:240px!important;width:auto!important;min-height:40px!important;height:40px!important;padding:0 16px!important;font-size:13px!important;border-radius:10px!important}',
+      '.tab-panel{background:transparent!important}',
+      '.tabs,.tab-buttons{gap:6px!important}',
+      '.tab-btn{font-size:13px!important;padding:9px 12px!important}',
+      '@media(max-width:700px){.card,.m21-card,.panel,.section-card,.dashboard-card{border-radius:14px!important}.catalogo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}'
+    ].join('');
     document.head.appendChild(s);
   }
 
-  /** Solo categorías activas (activo !== false). No inventa nombres. */
-  function filtrarActivas(rows) {
-    if (!Array.isArray(rows)) return [];
-    return rows.filter(function (c) {
-      return c && c.id != null && c.nombre && c.activo !== false;
-    });
+  function activeCategories(rows){ return (Array.isArray(rows) ? rows : []).filter(function(c){ return c && c.id != null && c.nombre && c.activo !== false; }); }
+
+  async function ensureCategories(){
+    var rows = [];
+    try { if (typeof cargarCategorias === 'function') rows = await Promise.resolve(cargarCategorias()); } catch(e) {}
+    rows = activeCategories(rows);
+    window.ventaCategoriasLista = rows;
+    if (typeof catalogoCategoriaActiva === 'undefined' || catalogoCategoriaActiva == null) window.catalogoCategoriaActiva = '';
+    return rows;
   }
 
-  /**
-   * Carga categorías vía infraestructura existente (cargarCategorias → withCache).
-   * Si la función base no filtra activo, filtramos en memoria.
-   * Nunca escribe en productos ni en Supabase.
-   */
-  async function asegurarCategoriasVentas() {
-    var lista = [];
-    try {
-      if (typeof cargarCategorias === "function") {
-        lista = await Promise.resolve(cargarCategorias());
-      }
-    } catch (e) {
-      console.warn("[BattleCruiser M26.10] cargarCategorias falló:", e);
-      lista = [];
-    }
-    lista = filtrarActivas(lista || []);
-
-    try {
-      if (typeof ventaCategoriasLista !== "undefined") {
-        ventaCategoriasLista = lista;
-      } else {
-        window.ventaCategoriasLista = lista;
-      }
-    } catch (e2) {
-      window.ventaCategoriasLista = lista;
-    }
-
-    try {
-      if (typeof catalogoCategoriaActiva === "undefined" || catalogoCategoriaActiva == null) {
-        catalogoCategoriaActiva = "";
-      }
-    } catch (e3) {
-      window.catalogoCategoriaActiva = "";
-    }
-
-    return lista;
-  }
-
-  function renderChipsConLoading(loading) {
-    var cont = document.getElementById("catalogo-categorias");
+  function renderCategories(){
+    var cont = document.getElementById('catalogo-categorias');
     if (!cont) return;
-    if (loading) {
-      cont.innerHTML =
-        '<span class="catalogo-cat-loading">Cargando categorías…</span>';
-      return;
-    }
-    if (typeof renderCatalogoCategorias === "function") {
-      try {
-        renderCatalogoCategorias();
-        return;
-      } catch (e) {}
-    }
-    // Fallback mínimo si renderCatalogoCategorias no está
-    var cats =
-      typeof ventaCategoriasLista !== "undefined" && Array.isArray(ventaCategoriasLista)
-        ? ventaCategoriasLista
-        : [];
-    var activa =
-      typeof catalogoCategoriaActiva !== "undefined" && catalogoCategoriaActiva != null
-        ? String(catalogoCategoriaActiva)
-        : "";
-    cont.innerHTML = "";
-    [{ id: "", nombre: "Todos" }].concat(cats).forEach(function (c) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className =
-        "catalogo-chip" + (String(c.id || "") === activa ? " activo" : "");
-      btn.textContent = c.nombre;
-      btn.dataset.categoriaId = c.id != null ? String(c.id) : "";
-      cont.appendChild(btn);
+    var cats = Array.isArray(window.ventaCategoriasLista) ? activeCategories(window.ventaCategoriasLista) : [];
+    var active = String(window.catalogoCategoriaActiva || '');
+    cont.innerHTML = '';
+    [{id:'',nombre:'Todos'}].concat(cats).forEach(function(c){
+      var b = document.createElement('button');
+      b.type='button';
+      b.className='catalogo-chip' + (String(c.id || '') === active ? ' activo' : '');
+      b.dataset.categoriaId = c.id != null ? String(c.id) : '';
+      b.textContent = c.nombre;
+      cont.appendChild(b);
     });
   }
 
-  /** Comparación robusta producto.categoria_id ↔ categoría (UUID / string). */
-  function productoEnCategoria(p, catId) {
-    if (!catId) return true; // "Todos"
-    if (!p) return false;
-    if (p.categoria_id == null || p.categoria_id === "") return false;
-    return sameId(p.categoria_id, catId);
-  }
-
-  function patchRenderCatalogoCategorias() {
-    if (typeof renderCatalogoCategorias !== "function") return;
-    if (renderCatalogoCategorias[FLAG]) return;
-    var orig = renderCatalogoCategorias;
-    window.renderCatalogoCategorias = function () {
-      var cont = document.getElementById("catalogo-categorias");
-      if (!cont) return orig.apply(this, arguments);
-
-      var lista = [];
-      try {
-        if (typeof ventaCategoriasLista !== "undefined" && Array.isArray(ventaCategoriasLista)) {
-          lista = filtrarActivas(ventaCategoriasLista);
-          ventaCategoriasLista = lista;
-        }
-      } catch (e) {}
-
-      var activa = "";
-      try {
-        if (typeof catalogoCategoriaActiva !== "undefined" && catalogoCategoriaActiva != null) {
-          activa = String(catalogoCategoriaActiva);
-        }
-      } catch (e2) {}
-
-      var chips = [{ id: "", nombre: "Todos" }].concat(lista);
-      cont.innerHTML = "";
-      chips.forEach(function (c) {
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className =
-          "catalogo-chip" + (String(c.id || "") === activa ? " activo" : "");
-        btn.textContent = c.nombre;
-        btn.dataset.categoriaId = c.id != null ? String(c.id) : "";
-        cont.appendChild(btn);
-      });
-    };
-    window.renderCatalogoCategorias[FLAG] = true;
-  }
-
-  function patchRenderCatalogoGrid() {
-    if (typeof renderCatalogoGrid !== "function") return;
-    if (renderCatalogoGrid[FLAG]) return;
-    var orig = renderCatalogoGrid;
-    window.renderCatalogoGrid = function () {
-      var grid = document.getElementById("catalogo-grid");
-      var lista =
-        typeof ventaProductosLista !== "undefined" && Array.isArray(ventaProductosLista)
-          ? ventaProductosLista
-          : typeof _cache !== "undefined" && _cache.productos
-            ? _cache.productos
-            : [];
-
-      // Estado CARGANDO: no confundir con "sin productos en categoría"
-      if (!lista || lista.length === 0) {
-        return orig.apply(this, arguments);
-      }
-
-      var catActiva = "";
-      try {
-        if (typeof catalogoCategoriaActiva !== "undefined" && catalogoCategoriaActiva != null) {
-          catActiva = String(catalogoCategoriaActiva);
-        }
-      } catch (e) {}
-
-      // Si hay categoría concreta y ningún producto pertenece, mensaje limpio
-      if (catActiva) {
-        var enCat = lista.filter(function (p) {
-          if (p.activo === false) return false;
-          return productoEnCategoria(p, catActiva);
-        });
-        // Búsqueda por nombre (M26 ventas UX) se aplica después en DOM; aquí
-        // solo evitamos el mensaje genérico engañoso.
-        if (enCat.length === 0 && grid) {
-          grid.innerHTML =
-            '<p class="lista-estado">No hay productos en esta categoría.</p>';
-          // Aún así dejar que el patch de búsqueda de m26-ventas-ux no rompa
-          return;
-        }
-      }
-
-      // Delegar al original; luego corregir mensaje vacío si el original usó el texto largo
-      var r = orig.apply(this, arguments);
-      if (grid && catActiva) {
-        var p = grid.querySelector(".lista-estado");
-        if (
-          p &&
-          /No hay productos activos para mostrar en esta categor/i.test(p.textContent || "")
-        ) {
-          p.textContent = "No hay productos en esta categoría.";
-        }
-      }
-      return r;
-    };
-    window.renderCatalogoGrid[FLAG] = true;
-  }
-
-  function patchRefrescarVentas() {
-    if (typeof refrescarVentas !== "function") return;
-    if (refrescarVentas[FLAG]) return;
-    var orig = refrescarVentas;
-    window.refrescarVentas = async function () {
-      var r = await orig.apply(this, arguments);
-      try {
-        var lista = filtrarActivas(
-          typeof ventaCategoriasLista !== "undefined" ? ventaCategoriasLista : []
-        );
-        if (!lista.length) {
-          lista = await asegurarCategoriasVentas();
-        } else {
-          try {
-            ventaCategoriasLista = lista;
-          } catch (e) {
-            window.ventaCategoriasLista = lista;
-          }
-        }
-        if (typeof renderCatalogoCategorias === "function") renderCatalogoCategorias();
-        if (typeof renderCatalogoGrid === "function") renderCatalogoGrid();
-      } catch (e2) {
-        console.warn("[BattleCruiser M26.10] post-refrescarVentas:", e2);
-      }
-      return r;
-    };
-    window.refrescarVentas[FLAG] = true;
-  }
-
-  function patchCargarCategorias() {
-    if (typeof cargarCategorias !== "function") return;
-    if (cargarCategorias[FLAG]) return;
-    var orig = cargarCategorias;
-    window.cargarCategorias = async function () {
-      var rows = await orig.apply(this, arguments);
-      return filtrarActivas(rows || []);
-    };
-    window.cargarCategorias[FLAG] = true;
-  }
-
-  var _cargandoCats = false;
-  async function onEnterVentas() {
-    if (_cargandoCats) return;
-    _cargandoCats = true;
-    try {
-      var needs =
-        typeof ventaCategoriasLista === "undefined" ||
-        !Array.isArray(ventaCategoriasLista) ||
-        ventaCategoriasLista.length === 0;
-      if (needs) {
-        renderChipsConLoading(true);
-      }
-      await asegurarCategoriasVentas();
-      if (typeof renderCatalogoCategorias === "function") {
-        renderCatalogoCategorias();
-      } else {
-        renderChipsConLoading(false);
-      }
-      if (typeof renderCatalogoGrid === "function") {
-        try {
-          renderCatalogoGrid();
-        } catch (e) {}
-      }
-    } finally {
-      _cargandoCats = false;
-    }
-  }
-
-  function wireTabVentas() {
-    if (document.documentElement.dataset[FLAG + "Tab"] === "1") return;
-    document.documentElement.dataset[FLAG + "Tab"] = "1";
-    var tabs = document.getElementById("tabs");
-    if (!tabs) return;
-    tabs.addEventListener(
-      "click",
-      function (e) {
-        var btn = e.target.closest('.tab-btn[data-tab="ventas"]');
-        if (!btn) return;
-        setTimeout(function () {
-          onEnterVentas().catch(function () {});
-        }, 40);
-      },
-      true
-    );
-  }
-
-  function boot() {
-    injectStyles();
-    patchCargarCategorias();
-    patchRenderCatalogoCategorias();
-    patchRenderCatalogoGrid();
-    patchRefrescarVentas();
-    wireTabVentas();
-
-    var tab = document.getElementById("tab-ventas");
-    if (tab && tab.classList.contains("visible")) {
-      onEnterVentas().catch(function () {});
-    }
-  }
-
-  function start() {
-    boot();
-    var n = 0;
-    var t = setInterval(function () {
-      n++;
-      boot();
-      if (n >= 24) clearInterval(t);
-    }, 280);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(start, 550);
+  function filterGridByCategory(){
+    var grid = document.getElementById('catalogo-grid');
+    if (!grid) return;
+    var cat = String(window.catalogoCategoriaActiva || '');
+    var cards = Array.from(grid.querySelectorAll('.catalogo-card'));
+    if (!cat) { cards.forEach(function(c){ c.style.display=''; }); return; }
+    cards.forEach(function(card){
+      var id = card.dataset.categoriaId || card.getAttribute('data-categoria-id') || '';
+      card.style.display = sameId(id,cat) ? '' : 'none';
     });
-  } else {
-    setTimeout(start, 550);
   }
+
+  function patchCategoryClick(){
+    var cont = document.getElementById('catalogo-categorias');
+    if (!cont || cont.dataset.bcCatClick==='1') return;
+    cont.dataset.bcCatClick='1';
+    cont.addEventListener('click',function(e){
+      var b=e.target.closest('.catalogo-chip'); if(!b) return;
+      window.catalogoCategoriaActiva = b.dataset.categoriaId || '';
+      renderCategories();
+      if (typeof renderCatalogoGrid==='function') { try{ renderCatalogoGrid(); }catch(x){} }
+      filterGridByCategory();
+    });
+  }
+
+  async function enterVentas(){
+    await ensureCategories();
+    renderCategories();
+    patchCategoryClick();
+    try { if (typeof renderCatalogoGrid==='function') renderCatalogoGrid(); } catch(e) {}
+    filterGridByCategory();
+  }
+
+  function bind(){
+    var tabs=document.getElementById('tabs');
+    if(!tabs || tabs.dataset.bcM2610stable==='1') return;
+    tabs.dataset.bcM2610stable='1';
+    tabs.addEventListener('click',function(e){
+      var b=e.target.closest('.tab-btn[data-tab="ventas"]');
+      if(b) enterVentas().catch(function(){});
+    },true);
+    var tab=document.getElementById('tab-ventas');
+    if(tab && tab.classList.contains('visible')) enterVentas().catch(function(){});
+  }
+
+  function boot(){ injectTheme(); bind(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(boot,450); });
+  else setTimeout(boot,450);
 })();
