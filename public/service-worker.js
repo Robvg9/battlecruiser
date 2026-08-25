@@ -1,6 +1,6 @@
 /* BattleCruiser Service Worker — v9.2.99 / stable shell
  * M27.2 disabled after regression; M24.3 multi-day session assignment + immediate refresh.
- * Network-first for app shell assets; cache only static assets.
+ * Network-first for app shell assets; JS/CSS/HTML fetched with no-store to avoid stale modules.
  */
 var BC_SW_VERSION = "9.2.99";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
@@ -45,7 +45,10 @@ self.addEventListener("fetch", function (event) {
   if (url.origin !== self.location.origin) return;
 
   if (isAppShellRequest(url)) {
-    event.respondWith(fetch(req).catch(function () {
+    // Force a fresh network read for app shell code so an updated module is not
+    // hidden behind the browser's HTTP cache when its query string is unchanged.
+    var freshReq = new Request(req, { cache: "no-store" });
+    event.respondWith(fetch(freshReq).catch(function () {
       return caches.match(req).then(function (cached) { return cached || Response.error(); });
     }));
     return;
