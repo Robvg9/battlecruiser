@@ -1,10 +1,10 @@
 // BattleCruiser M24.2-FE — Asignación de trabajadores por días dentro de una sesión/ciclo
 // M24.3: permite asignar un mismo trabajador a varios días del mismo ciclo + almacén + bloque.
-// Reutiliza las RPC existentes; no crea otra fuente de verdad.
+// M24.3.1: refresco inmediato de sesiones tras asignar/cambiar trabajador.
 (function () {
   'use strict';
-  if (window.__BC_M24_3__) return;
-  window.__BC_M24_3__ = true;
+  if (window.__BC_M24_3_1__) return;
+  window.__BC_M24_3_1__ = true;
 
   var MODAL_ID = 'm24-2-asig-modal';
   var pending = null;
@@ -46,8 +46,7 @@
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-modal', 'true');
     el.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px;box-sizing:border-box;';
-    el.innerHTML =
-      '<div class="m21-card" style="max-width:520px;width:100%;max-height:90vh;overflow:auto;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.45)">' +
+    el.innerHTML = '<div class="m21-card" style="max-width:520px;width:100%;max-height:90vh;overflow:auto;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.45)">' +
       '<h4 id="m24-2-title" style="margin-top:0">Asignar trabajador</h4>' +
       '<p id="m24-2-meta" class="muted" style="margin:0 0 12px"></p>' +
       '<label style="display:block;margin-bottom:12px"><b>Trabajador</b>' +
@@ -61,9 +60,7 @@
       '<button type="button" class="cc-accion" id="m24-2-cancel" style="opacity:.85">Cancelar</button>' +
       '</div></div>';
     document.body.appendChild(el);
-    el.addEventListener('click', function (e) {
-      if (e.target === el) closeModal(null);
-    });
+    el.addEventListener('click', function (e) { if (e.target === el) closeModal(null); });
     document.getElementById('m24-2-cancel').addEventListener('click', function () { closeModal(null); });
     document.getElementById('m24-2-confirm').addEventListener('click', onConfirm);
     return el;
@@ -78,19 +75,13 @@
   }
 
   async function cargarSesionesContexto(sesionId, almId, bloque) {
-    var rows = await rpc('listar_sesiones_operativas', {
-      p_ciclo_id: null,
-      p_almacen_id: almId || null,
-      p_fecha: null,
-      p_estado: null
-    });
+    var rows = await rpc('listar_sesiones_operativas', { p_ciclo_id: null, p_almacen_id: almId || null, p_fecha: null, p_estado: null });
     rows = Array.isArray(rows) ? rows : [];
     var current = rows.find(function (s) { return normId(s.id) === normId(sesionId); });
     if (!current) throw new Error('No se pudo identificar el ciclo de la sesión.');
     var cicloId = current.ciclo_id;
     var filtered = rows.filter(function (s) {
-      return normId(s.ciclo_id) === normId(cicloId) &&
-        normId(s.almacen_id) === normId(almId) &&
+      return normId(s.ciclo_id) === normId(cicloId) && normId(s.almacen_id) === normId(almId) &&
         String(s.bloque || '').toUpperCase() === String(bloque || '').toUpperCase();
     }).sort(function (a, b) { return Number(a.dia_n || 0) - Number(b.dia_n || 0); });
     return { current: current, cicloId: cicloId, sessions: filtered };
@@ -117,8 +108,7 @@
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid rgba(127,127,127,.25);border-radius:10px;cursor:pointer;';
       var checked = normId(s.id) === normId(pending && pending.sesionId);
       row.innerHTML = '<input type="checkbox" class="m24-2-day" value="' + esc(s.id) + '" ' + (checked ? 'checked' : '') + '>' +
-        '<span><b>Día ' + esc(s.dia_n || '—') + '</b> · ' + esc(s.fecha || '') +
-        ' · ' + esc(labelBloque(s.bloque)) + '</span>';
+        '<span><b>Día ' + esc(s.dia_n || '—') + '</b> · ' + esc(s.fecha || '') + ' · ' + esc(labelBloque(s.bloque)) + '</span>';
       wrap.appendChild(row);
     });
   }
@@ -132,17 +122,11 @@
     var userId = sel && sel.value;
     var selected = Array.from(document.querySelectorAll('#m24-2-days-wrap .m24-2-day:checked')).map(function (x) { return x.value; });
     if (!userId || !M) return;
-    if (!selected.length) {
-      err.style.display = 'block';
-      err.textContent = 'Selecciona al menos un día.';
-      return;
-    }
+    if (!selected.length) { err.style.display = 'block'; err.textContent = 'Selecciona al menos un día.'; return; }
     conf.disabled = true;
     err.style.display = 'none';
     try {
-      for (var i = 0; i < selected.length; i++) {
-        await M.asignarSesion(selected[i], userId);
-      }
+      for (var i = 0; i < selected.length; i++) await M.asignarSesion(selected[i], userId);
       var name = formatNombre((sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '');
       closeModal({ usuarioId: userId, nombre: name, count: selected.length });
     } catch (e) {
@@ -172,18 +156,12 @@
         var empty = document.getElementById('m24-2-empty');
         var conf = document.getElementById('m24-2-confirm');
         if (!cands.length) {
-          sel.innerHTML = '';
-          sel.style.display = 'none';
-          empty.style.display = 'block';
+          sel.innerHTML = ''; sel.style.display = 'none'; empty.style.display = 'block';
           empty.textContent = 'No hay trabajadores autorizados para este almacén y bloque. Crea primero una asignación operativa.';
           conf.disabled = true;
         } else {
-          sel.style.display = 'block';
-          empty.style.display = 'none';
-          conf.disabled = false;
-          sel.innerHTML = cands.map(function (c) {
-            return '<option value="' + esc(c.id) + '">' + esc(formatNombre(c.nombre || c.id)) + '</option>';
-          }).join('');
+          sel.style.display = 'block'; empty.style.display = 'none'; conf.disabled = false;
+          sel.innerHTML = cands.map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(formatNombre(c.nombre || c.id)) + '</option>'; }).join('');
           if (opts.currentUserId) {
             var ok = cands.some(function (c) { return normId(c.id) === normId(opts.currentUserId); });
             if (ok) sel.value = String(opts.currentUserId);
@@ -208,28 +186,22 @@
   }
 
   function forceSesionesRefresh() {
+    var root = document.getElementById('ciclos-m18-root');
     var panel = document.getElementById('m22-sesiones-panel');
-    var lista = document.getElementById('m22-sesiones-lista');
-    if (lista) lista.setAttribute('data-m24-2-refresh', String(Date.now()));
-    if (panel) {
-      var tick = document.createElement('span');
-      tick.style.display = 'none';
-      tick.setAttribute('data-m24-2-tick', '1');
-      panel.appendChild(tick);
-      setTimeout(function () { if (tick.parentNode) tick.parentNode.removeChild(tick); }, 30);
-    }
+    if (!root) return;
+    var tick = document.createElement('span');
+    tick.style.display = 'none';
+    tick.setAttribute('data-m24-3-refresh', String(Date.now()));
+    root.appendChild(tick);
+    setTimeout(function () { if (tick.parentNode) tick.parentNode.removeChild(tick); }, 40);
+    if (panel) panel.setAttribute('data-m24-3-last-refresh', String(Date.now()));
   }
 
   document.addEventListener('click', function (e) {
     var asg = e.target.closest && e.target.closest('[data-m24-asignar-sesion]');
     if (!asg) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    if (!isAdmin()) {
-      setSesionesMsg('Sin permiso para asignar sesiones.', false);
-      return;
-    }
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    if (!isAdmin()) { setSesionesMsg('Sin permiso para asignar sesiones.', false); return; }
     var isChange = /cambiar/i.test(asg.textContent || '');
     openAsignarModal({
       sesionId: asg.dataset.m24AsignarSesion,
