@@ -1,6 +1,5 @@
--- M27.5 — Venta con tipo de precio explícito por línea
+-- M27.5 + Misión B — Venta con tipo de precio explícito por línea y presentación mayorista obligatoria
 -- Aplicado en producción sobre public.registrar_venta(uuid,jsonb,uuid,text).
--- Mantiene intacta la firma legacy de 3 argumentos.
 CREATE OR REPLACE FUNCTION public.registrar_venta(
   p_almacen_id uuid,
   p_lineas jsonb,
@@ -19,6 +18,7 @@ declare
   v_subtotal numeric; v_total numeric:=0; v_stock_actual numeric; v_restante numeric;
   v_lote record; v_tomar numeric; v_idempotente uuid; v_costo_total_linea numeric;
   v_costo_unitario_fifo numeric; v_uid uuid; v_turno record; v_almacen_real uuid;
+  v_presentacion_producto uuid;
 begin
   if not public.tiene_permiso('ventas','crear') then raise exception 'Sin permiso para registrar ventas'; end if;
   if p_lineas is null or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto'; end if;
@@ -43,12 +43,16 @@ begin
       if v_cantidad is null or v_cantidad<=0 then raise exception 'Cantidad inválida en línea de venta'; end if; v_cantidad_final:=v_cantidad;
     end if;
     if v_cantidad_final<=0 then raise exception 'Cantidad inválida en línea de venta'; end if;
-    select precio_normal,precio_mayorista into v_precio_normal,v_precio_mayorista from public.productos where id=v_producto_id;
+    select precio_normal,precio_mayorista,presentacion_id into v_precio_normal,v_precio_mayorista,v_presentacion_producto from public.productos where id=v_producto_id;
     if v_precio_normal is null then raise exception 'Producto no encontrado'; end if;
     v_tipo_precio_linea:=coalesce(nullif(v_linea->>'tipo_precio',''),p_tipo_precio);
     if v_tipo_precio_linea not in ('normal','mayorista') then raise exception 'Tipo de precio inválido en línea'; end if;
     if v_tipo_precio_linea='mayorista' then
-      if v_precio_mayorista is null then raise exception 'El producto no tiene precio mayorista configurado'; end if; v_precio:=v_precio_mayorista;
+      if v_precio_mayorista is null then raise exception 'El producto no tiene precio mayorista configurado'; end if;
+      if v_presentacion_producto is null then raise exception 'No se puede vender mayorista el producto % sin presentación mayorista definida',v_producto_id; end if;
+      if v_presentacion_id is null then v_presentacion_id:=v_presentacion_producto; end if;
+      if v_presentacion_id<>v_presentacion_producto then raise exception 'La presentación mayorista indicada no coincide con la presentación definida del producto'; end if;
+      v_precio:=v_precio_mayorista;
     else
       v_precio:=v_precio_normal;
     end if;
@@ -67,7 +71,6 @@ begin
   return v_venta_id;
 end;
 $function$;
-
 REVOKE EXECUTE ON FUNCTION public.registrar_venta(uuid,jsonb,uuid,text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.registrar_venta(uuid,jsonb,uuid,text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.registrar_venta(uuid,jsonb,uuid,text) TO authenticated;
