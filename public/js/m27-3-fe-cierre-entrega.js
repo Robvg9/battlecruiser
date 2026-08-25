@@ -1,5 +1,5 @@
 // BattleCruiser M27.3-FE — Cierre de sesión operativa + entrega de caja + recepción
-// v9.2.96
+// v9.3.05 — Bloque 10: monto declarado >= 0 (incluye $0)
 // Fuente de verdad: declarar_entrega_caja → cerrar_sesion_operativa
 // Recepción: registrar_recepcion_entrega_caja (una sola acción de usuario).
 // Si el backend deja CONTADA, se completa APROBADA/RECHAZADA con revisar_entrega_caja
@@ -138,14 +138,39 @@
     return panel;
   }
 
+  /**
+   * Bloque 10 — Validación de monto declarado / contado.
+   * Acepta: 0 y números >= 0 finitos.
+   * Rechaza: vacío, null/undefined, texto no numérico, NaN, negativos.
+   * NO usar `if (!monto)` — 0 es falsy en JS pero es un monto válido.
+   */
   function parseMonto(raw) {
-    if (raw == null) return null;
-    var s = String(raw).trim().replace(/\s/g, '').replace(/,/g, '');
+    if (raw === null || raw === undefined) return null;
+    var s = String(raw).trim().replace(/\s/g, '');
     if (s === '') return null;
-    if (!/^\d+(\.\d{1,2})?$/.test(s) && !/^\d+(\.\d+)?$/.test(s)) return null;
+    // Un solo separador decimal: coma o punto
+    s = s.replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(s)) return null;
     var n = Number(s);
-    if (!isFinite(n) || n < 0) return null;
-    return n;
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n; // incluye 0
+  }
+
+  function parseMontoFromInput(inp) {
+    if (!inp) return null;
+    // Preferir string del input para no confundir 0 con vacío
+    var fromStr = parseMonto(inp.value);
+    if (fromStr !== null) return fromStr;
+    // valueAsNumber: vacío → NaN; 0 → 0
+    if (typeof inp.valueAsNumber === 'number' && Number.isFinite(inp.valueAsNumber)) {
+      if (inp.valueAsNumber < 0) return null;
+      return inp.valueAsNumber;
+    }
+    return null;
+  }
+
+  function esMontoValido(n) {
+    return typeof n === 'number' && Number.isFinite(n) && n >= 0;
   }
 
   function sesionIdsFromTurno(t) {
@@ -211,6 +236,13 @@
 
   async function declararYCerrar(monto, msgEl, btnOk) {
     if (busy) return;
+    if (!esMontoValido(monto)) {
+      if (msgEl) {
+        msgEl.className = 'bc-m273-msg err';
+        msgEl.textContent = 'Ingresá un monto válido (número ≥ 0).';
+      }
+      return;
+    }
     if (!online()) {
       if (msgEl) {
         msgEl.className = 'bc-m273-msg err';
@@ -229,6 +261,7 @@
     busy = true;
     if (btnOk) btnOk.disabled = true;
     try {
+      // p_monto_declarado debe recibir 0 numérico cuando no hubo ventas / no se entrega dinero
       var rDecl = await client.rpc('declarar_entrega_caja', {
         p_ciclo_id: ctx.cicloId,
         p_monto_declarado: monto,
@@ -291,7 +324,7 @@
     }
     openModal(
       '<h3>Cerrar sesión actual</h3>' +
-      '<p class="bc-m273-lead">Antes de cerrar debes declarar cuánto dinero entregas. El monto es obligatorio.</p>' +
+      '<p class="bc-m273-lead">Declará cuánto dinero entregás. Podés poner <strong>0</strong> si no hubo ventas o no entregás efectivo.</p>' +
       '<label for="bc-m273-monto">Dinero entregado</label>' +
       '<input id="bc-m273-monto" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" autocomplete="off">' +
       '<div class="bc-m273-actions">' +
@@ -304,8 +337,9 @@
     document.getElementById('bc-m273-ok').onclick = function () {
       var msgEl = document.getElementById('bc-m273-msg');
       var inp = document.getElementById('bc-m273-monto');
-      var monto = parseMonto(inp && inp.value);
-      if (monto === null) {
+      var monto = parseMontoFromInput(inp);
+      // Crítico: NO usar `if (!monto)` — rechazaría el 0 válido
+      if (!esMontoValido(monto)) {
         if (msgEl) {
           msgEl.className = 'bc-m273-msg err';
           msgEl.textContent = 'Ingresá un monto válido (número ≥ 0).';
@@ -400,7 +434,6 @@
     var ciclo = entrega.ciclo_id;
     var alm = entrega.almacen_id;
     if (!misSesiones || !misSesiones.length) {
-      // sin asignaciones propias: solo admin/editar entregas puede ver (no inventar)
       return can('entregas_caja', 'editar') || can('entregas_caja', 'editar_any');
     }
     return misSesiones.some(function (s) {
@@ -421,7 +454,6 @@
     var list = await listarDeclaradas();
     var mis = await sesionesUsuarioActual();
     var visible = list.filter(function (e) { return entregaVisibleParaMi(e, mis); });
-    // también notificaciones al emisor (diferencias ya recibidas)
     tryShowEmisorNotif();
     if (!visible.length) {
       host.innerHTML = '<p class="lista-estado">Sin entregas de caja pendientes para vos.</p>';
@@ -472,7 +504,6 @@
   }
 
   async function completarEstadoBackend(entregaId, contado, declarado) {
-    // Una sola decisión de usuario; si el backend quedó en CONTADA, cerrar a APROBADA/RECHAZADA sin UI extra.
     var diff = Number(contado) - Number(declarado);
     try {
       if (Math.abs(diff) < 0.0001) {
@@ -492,7 +523,6 @@
         pushNotifEmisor(entregaId, declarado, contado, diff);
       }
     } catch (e) {
-      // Si revisar falla (permisos editar_any), la recepción ya quedó CONTADA con diferencia registrada.
       try { console.warn('[M27.3] completar estado', e); } catch (x) {}
       if (Math.abs(diff) >= 0.0001) pushNotifEmisor(entregaId, declarado, contado, diff);
     }
@@ -523,7 +553,6 @@
       if (!Array.isArray(arr)) return;
       var pending = arr.filter(function (n) { return !n.visto; });
       if (!pending.length) return;
-      // Solo mostrar si el usuario actual fue el emisor de alguna; se verifica al abrir con listado propio
       listarMisDeclaradasRecientes().then(function (mis) {
         var ids = {};
         (mis || []).forEach(function (e) { ids[String(e.id)] = true; });
@@ -585,7 +614,8 @@
         document.getElementById('bc-m273-cancel').onclick = closeModal;
         return;
       }
-      var declarado = Number(e.monto_declarado) || 0;
+      var declarado = Number(e.monto_declarado);
+      if (!Number.isFinite(declarado) || declarado < 0) declarado = 0;
       openModal(
         '<h3>Entrega de caja</h3>' +
         '<p class="bc-m273-lead">Declarado por: <strong>' + esc(e.declarado_nombre || '—') + '</strong><br>' +
@@ -602,8 +632,8 @@
       document.getElementById('bc-m273-recv').onclick = function () {
         var msgEl = document.getElementById('bc-m273-msg');
         var inp = document.getElementById('bc-m273-contado');
-        var contado = parseMonto(inp && inp.value);
-        if (contado === null) {
+        var contado = parseMontoFromInput(inp);
+        if (!esMontoValido(contado)) {
           if (msgEl) {
             msgEl.className = 'bc-m273-msg err';
             msgEl.textContent = 'Ingresá cuánto recibiste (número ≥ 0).';
@@ -623,9 +653,17 @@
 
   async function confirmarRecepcion(entrega, contado, msgEl, btn) {
     if (busy) return;
+    if (!esMontoValido(contado)) {
+      if (msgEl) {
+        msgEl.className = 'bc-m273-msg err';
+        msgEl.textContent = 'Ingresá cuánto recibiste (número ≥ 0).';
+      }
+      return;
+    }
     busy = true;
     if (btn) btn.disabled = true;
-    var declarado = Number(entrega.monto_declarado) || 0;
+    var declarado = Number(entrega.monto_declarado);
+    if (!Number.isFinite(declarado) || declarado < 0) declarado = 0;
     var diff = contado - declarado;
     try {
       var r = await client.rpc('registrar_recepcion_entrega_caja', {
@@ -713,7 +751,6 @@
   }
 
   function wireAjustesLogout() {
-    // Asegura que el botón de Ajustes exista; ui-ajustes-panel se parchea aparte.
     document.addEventListener('click', function (e) {
       var t = e.target && e.target.closest && e.target.closest('#bc-aj-logout');
       if (!t) return;
@@ -743,7 +780,6 @@
     }
   }
 
-  // Exponer para el panel de Ajustes
   window.__BC_M273_logout = doLogoutGlobal;
 
   function boot() {
