@@ -11,9 +11,12 @@
   ];
   let bound=false;
 
-  function esc(v){
-    if(typeof escHtml==='function') return escHtml(v==null?'':String(v));
-    return String(v==null?'':v).replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[m]));
+  function selectedId(){
+    const sel=document.getElementById('alm-selector');
+    return sel && sel.value ? sel.value : null;
+  }
+  function cacheAlmacenes(){
+    return (typeof _cache!=='undefined' && Array.isArray(_cache.almacenes)) ? _cache.almacenes : [];
   }
   function inject(){
     if(document.getElementById(STYLE)) return;
@@ -39,26 +42,23 @@
   }
   function close(){const r=document.getElementById(ROOT);if(r)r.classList.add('hidden');}
   function open(){
-    if(!window._almacenSeleccionadoId)return;
-    const almacenes=window._cache && Array.isArray(window._cache.almacenes)?window._cache.almacenes:[];
-    const a=almacenes.find(x=>String(x.id)===String(window._almacenSeleccionadoId));if(!a)return;
+    const id=selectedId();if(!id)return;
+    const a=cacheAlmacenes().find(x=>String(x.id)===String(id));if(!a)return;
     const r=ensure();r.querySelector('#bc-alm-modal-nombre').textContent=a.nombre||'Almacén';r.querySelector('#bc-alm-modal-status').textContent='';
     r.querySelectorAll('.bc-alm-tipo').forEach(b=>{const sel=b.dataset.tipo===a.tipo || (a.tipo==='venta'&&b.dataset.tipo==='minorista');b.classList.toggle('selected',sel);b.querySelector('input').checked=sel;});
     r.classList.remove('hidden');
   }
   async function save(){
-    const r=document.getElementById(ROOT);if(!r||!window._almacenSeleccionadoId)return;
+    const r=document.getElementById(ROOT),id=selectedId();if(!r||!id)return;
     const tipo=r.querySelector('input[name="bc-alm-tipo"]:checked');const status=r.querySelector('#bc-alm-modal-status');const btn=r.querySelector('#bc-alm-modal-guardar');
     if(!tipo){status.textContent='Seleccioná un tipo de almacén.';return;}
     btn.disabled=true;status.textContent='Guardando…';
     try{
       if(typeof editarAlmacen!=='function')throw new Error('Función de actualización no disponible');
-      const resultado=await editarAlmacen(window._almacenSeleccionadoId,{p_tipo:tipo.value});
+      const resultado=await editarAlmacen(id,{p_tipo:tipo.value});
       if(!resultado || !resultado.ok)throw new Error(typeof explicarError==='function'?explicarError(resultado&&resultado.error,'editar almacén'):'No se pudo actualizar');
       status.textContent=resultado.offline?'Cambio guardado; se sincronizará al volver la conexión.':'Tipo de almacén actualizado.';
-      if(!resultado.offline){
-        setTimeout(close,250);
-      }
+      if(!resultado.offline)setTimeout(close,250);
     }catch(e){status.textContent=e&&e.message?e.message:'No se pudo actualizar el tipo.';}
     finally{btn.disabled=false;}
   }
@@ -66,9 +66,9 @@
     if(bound)return;bound=true;
     document.addEventListener('click',function(e){
       const btn=e.target.closest('#alm-editar-btn');
-      if(btn){e.preventDefault();e.stopImmediatePropagation();open();}
+      if(btn){e.preventDefault();e.stopImmediatePropagation();open();return;}
       const tipo=e.target.closest('.bc-alm-tipo');
-      if(tipo){e.preventDefault();const r=ensure();r.querySelectorAll('.bc-alm-tipo').forEach(b=>b.classList.remove('selected'));tipo.classList.add('selected');tipo.querySelector('input').checked=true;}
+      if(tipo){e.preventDefault();const r=ensure();r.querySelectorAll('.bc-alm-tipo').forEach(b=>b.classList.remove('selected'));tipo.classList.add('selected');tipo.querySelector('input').checked=true;return;}
       if(e.target.id==='bc-alm-modal-cancelar')close();
       if(e.target.id==='bc-alm-modal-guardar')save();
       if(e.target.id===ROOT)close();
