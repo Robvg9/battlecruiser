@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.87 — M26.11-FE: estabilización shell post-venta offline
-(function hotfixV9287(){
-  const VERSION="9.2.87";
+// v9.2.88 — M26.12-FE: Comunicación estilo WhatsApp
+(function hotfixV9288(){
+  const VERSION="9.2.88";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -52,6 +52,7 @@
     ["m26-9-data-truth.js","26.9"],
     ["m26-10-categorias-ventas.js","26.10"],
     ["m26-11-offline-shell-guard.js","26.11"],
+    ["m26-12-comunicacion-whatsapp.js","26.12"],
     ["fix-permisos-carga.js","80.1"],
     ["sesion-navegacion-reset.js","26.11"]
   ];
