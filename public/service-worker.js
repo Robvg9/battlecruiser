@@ -1,9 +1,9 @@
-/* BattleCruiser Service Worker — v9.2.85 / M26.9
+/* BattleCruiser Service Worker — v9.2.86 / M26.10
  * Estrategia: network-first para JS/CSS/HTML (evita mezclar módulos viejos).
  * Cache solo de assets estáticos (iconos, manifest).
  * Al actualizar versión: skipWaiting + clientsClaim + borra caches viejos.
  */
-var BC_SW_VERSION = "9.2.85";
+var BC_SW_VERSION = "9.2.86";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 

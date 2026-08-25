@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.85 — M26.9-FE: estabilización productos + stock + catálogo (NOT_LOADED ≠ 0)
-(function hotfixV9285(){
-  const VERSION="9.2.85";
+// v9.2.86 — M26.10-FE: categorías reales en filtro de Ventas (carga + chips dinámicos)
+(function hotfixV9286(){
+  const VERSION="9.2.86";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -50,6 +50,7 @@
     ["m26-7-ventas-repair.js","26.7"],
     ["m26-8-ventas-cart-confirm.js","26.8"],
     ["m26-9-data-truth.js","26.9"],
+    ["m26-10-categorias-ventas.js","26.10"],
     ["fix-permisos-carga.js","80.1"]
   ];
   modules.forEach(([name,version])=>{
