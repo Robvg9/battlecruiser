@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.98 — M27.3-FE + M24.3 multi-day session assignment
-(function hotfixV9298(){
-  const VERSION="9.2.98";
+// v9.2.99 — M27 theme elegant light + stable app shell
+(function hotfixV9299(){
+  const VERSION="9.2.99";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -40,7 +40,7 @@
     ["m26-ventas-ux.js","26.5"],["m26-6-stock-cart-patch.js","26.6"],["m26-7-ventas-repair.js","26.7"],["m26-8-ventas-cart-confirm.js","26.8"],
     ["m26-9-data-truth.js","26.9"],["m26-10-categorias-ventas.js","26.10"],["m26-11-offline-shell-guard.js","26.17"],
     ["m26-12-comunicacion-whatsapp.js","26.12"],["m26-13-comunicacion-ux.js","26.13"],["fix-permisos-carga.js","26.17"],
-    ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3"]
+    ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3"],["m27-theme-elegant-light.js","1.0"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
