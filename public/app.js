@@ -1,12 +1,12 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.93 — M26.17: conservar permisos/navegación ante fallo de red
-(function hotfixV9293(){
-  const VERSION="9.2.93";
+// v9.2.95 — stable shell; M27.2 disabled after regression
+(function hotfixV9295(){
+  const VERSION="9.2.95";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
-    if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Tu usuario";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
+    if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
     if(label)label.textContent="Usuario";
     document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
     ["update-app-btn-login","update-app-btn"].forEach(id=>{
@@ -35,7 +35,7 @@
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","41.1"],["ui-ajustes-panel.js","38.1"],
     ["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],["m22-sesiones-en-m21.js","25.4"],["m22-fe-patches-m21.js","22.1"],
-    ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],["m24-asignaciones-operativas.js","25.4"],
+    ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],["m24-asignaciones-operativas.js","24.3"],
     ["m24-2-asignar-sesion-ui.js","24.3"],["m25-fe-sync-turno-ventas.js","25.1"],
     ["m26-ventas-ux.js","26.5"],["m26-6-stock-cart-patch.js","26.6"],["m26-7-ventas-repair.js","26.7"],
     ["m26-8-ventas-cart-confirm.js","26.8"],["m26-9-data-truth.js","26.9"],["m26-10-categorias-ventas.js","26.10"],
