@@ -1,8 +1,8 @@
-/* BattleCruiser Service Worker — v9.2.97 / stable shell
- * M27.2 disabled after regression; M24.2 repairs Turnos selects.
+/* BattleCruiser Service Worker — v9.2.98 / stable shell
+ * M27.2 disabled after regression; M24.3 multi-day session assignment.
  * Network-first for app shell assets; cache only static assets.
  */
-var BC_SW_VERSION = "9.2.97";
+var BC_SW_VERSION = "9.2.98";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 
