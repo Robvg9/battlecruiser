@@ -1,367 +1,150 @@
-// BattleCruiser — M26.9-FE: fuente única productos/stock + estados NOT_LOADED
-// Reutiliza: _cache, withCache, cargarProductos, cargarStockAlmacenes,
-// obtenerStockDisponible, renderCatalogoGrid, refrescarVentas, ventaLineas.
-// NO reescribe ventas.js/almacenes.js. NO toca Supabase/RLS.
+// BattleCruiser — M26.9-FE estable: datos de Ventas sin polling
 (function () {
-  "use strict";
+  'use strict';
+  var FLAG = '__bcM269stable';
+  if (window[FLAG]) return;
+  window[FLAG] = true;
 
-  var FLAG = "__bcM269";
-
-  function sameId(a, b) {
-    if (a == null || b == null) return false;
-    return String(a) === String(b);
-  }
-
-  function stockEstadoGlobal() {
-    if (typeof _stockCargaEstado === "string") return _stockCargaEstado;
-    return "idle";
-  }
-
+  function sameId(a, b) { return a != null && b != null && String(a) === String(b); }
+  function stockState() { return typeof _stockCargaEstado === 'string' ? _stockCargaEstado : 'idle'; }
   function ensureCache() {
-    if (typeof _cache === "undefined") {
-      try {
-        window._cache = { productos: [], almacenes: [], stock: [], ventas: [], transferencias: [], vales: [] };
-      } catch (e) {}
+    if (typeof _cache === 'undefined') window._cache = { productos: [], almacenes: [], stock: [], ventas: [], transferencias: [], vales: [] };
+    _cache.productos = _cache.productos || [];
+    _cache.almacenes = _cache.almacenes || [];
+    _cache.stock = _cache.stock || [];
+  }
+
+  function patchStock() {
+    if (typeof obtenerStockDisponible !== 'function' || obtenerStockDisponible.__bcM269stable) return;
+    var original = obtenerStockDisponible;
+    window.obtenerStockDisponible = function (productoId, almacenId) {
+      ensureCache();
+      var st = stockState();
+      if (st === 'idle' || st === 'loading') return { valor: 0, ajuste: 0, noCalculable: true, loaded: false, unknown: true, estado: st };
+      var row = (_cache.stock || []).find(function (s) { return s && sameId(s.producto_id, productoId) && sameId(s.almacen_id, almacenId); });
+      var real = row ? Number(row.cantidad) || 0 : 0;
+      var adj = { ajuste: 0, noCalculable: false };
+      try { if (typeof ajustePendiente === 'function') adj = ajustePendiente(productoId, almacenId) || adj; } catch (e) {}
+      return { valor: Math.max(real + (Number(adj.ajuste) || 0), 0), ajuste: Number(adj.ajuste) || 0, noCalculable: !!adj.noCalculable, loaded: true, unknown: false, estado: st, hasRow: !!row };
+    };
+    window.obtenerStockDisponible.__bcM269stable = true;
+    
+    if (typeof stockTotalProducto === 'function' && !stockTotalProducto.__bcM269stable) {
+      window.stockTotalProducto = function (productoId) {
+        return (_cache.stock || []).filter(function (s) { return sameId(s.producto_id, productoId); }).reduce(function (n, s) { return n + (Number(s.cantidad) || 0); }, 0);
+      };
+      window.stockTotalProducto.__bcM269stable = true;
     }
-    if (!_cache.stock) _cache.stock = [];
-    if (!_cache.productos) _cache.productos = [];
-    if (!_cache.almacenes) _cache.almacenes = [];
   }
 
-  function patchObtenerStock() {
-    if (typeof obtenerStockDisponible !== "function") return;
-    if (obtenerStockDisponible[FLAG]) return;
-
-    var orig = obtenerStockDisponible;
-    window.obtenerStockDisponible = function (producto_id, almacen_id) {
-      ensureCache();
-      var st = stockEstadoGlobal();
-
-      if (st === "idle" || st === "loading") {
-        return {
-          valor: 0,
-          ajuste: 0,
-          noCalculable: true,
-          loaded: false,
-          unknown: true,
-          estado: st,
-        };
-      }
-
-      try {
-        var fila = (_cache.stock || []).find(function (s) {
-          return s && sameId(s.producto_id, producto_id) && sameId(s.almacen_id, almacen_id);
-        });
-        var real = fila ? Number(fila.cantidad) : 0;
-        var adj = { ajuste: 0, noCalculable: false };
-        if (typeof ajustePendiente === "function") {
-          try {
-            adj = ajustePendiente(producto_id, almacen_id) || adj;
-          } catch (e) {}
+  function patchAddAndQty() {
+    if (typeof agregarLineaVenta === 'function' && !agregarLineaVenta.__bcM269stable) {
+      var add = agregarLineaVenta;
+      window.agregarLineaVenta = function () {
+        if (stockState() === 'idle' || stockState() === 'loading') {
+          if (typeof cargarStockAlmacenes === 'function') cargarStockAlmacenes(false).catch(function () {});
+          if (typeof setMsg === 'function') setMsg('msg-venta-linea', 'Cargando stock del almacén…', false);
+          return false;
         }
-        return {
-          valor: Math.max(real + (adj.ajuste || 0), 0),
-          ajuste: adj.ajuste || 0,
-          noCalculable: !!adj.noCalculable,
-          loaded: true,
-          unknown: false,
-          estado: st,
-          hasRow: !!fila,
-        };
-      } catch (e2) {
-        return orig.apply(this, arguments);
-      }
-    };
-    window.obtenerStockDisponible[FLAG] = true;
+        return add.apply(this, arguments);
+      };
+      window.agregarLineaVenta.__bcM269stable = true;
+    }
+    if (typeof actualizarCantidadLinea === 'function' && !actualizarCantidadLinea.__bcM269stable) {
+      var qty = actualizarCantidadLinea;
+      window.actualizarCantidadLinea = function (idx, cantidad) {
+        if ((stockState() === 'idle' || stockState() === 'loading') && Number(cantidad) > 0) {
+          if (typeof cargarStockAlmacenes === 'function') cargarStockAlmacenes(false).catch(function () {});
+          if (typeof setMsg === 'function') setMsg('msg-venta-linea', 'Cargando stock…', false);
+          return;
+        }
+        return qty.apply(this, arguments);
+      };
+      window.actualizarCantidadLinea.__bcM269stable = true;
+    }
   }
 
-  function patchAgregarLinea() {
-    if (typeof agregarLineaVenta !== "function" || agregarLineaVenta[FLAG]) return;
-    var orig = agregarLineaVenta;
-    window.agregarLineaVenta = function (producto_id, cantidad, almacen_id) {
-      ensureCache();
-      var st = stockEstadoGlobal();
-      if (st === "idle" || st === "loading") {
-        if (typeof cargarStockAlmacenes === "function") {
-          try {
-            cargarStockAlmacenes(false);
-          } catch (e) {}
-        }
-        if (typeof setMsg === "function") {
-          setMsg(
-            "msg-venta-linea",
-            "Cargando stock del almacén… esperá un momento e intentá de nuevo.",
-            false
-          );
-        }
-        return false;
-      }
-      return orig.apply(this, arguments);
-    };
-    window.agregarLineaVenta[FLAG] = true;
+  function syncProductsIntoVenta() {
+    ensureCache();
+    if (!Array.isArray(window.ventaProductosLista) || !window.ventaProductosLista.length) window.ventaProductosLista = _cache.productos.slice();
+    if (window.ventaProductosPrecios && Array.isArray(_cache.productos)) {
+      _cache.productos.forEach(function (p) {
+        window.ventaProductosPrecios[p.id] = { nombre: p.nombre, precio_normal: p.precio_normal, precio_mayorista: p.precio_mayorista };
+      });
+    }
   }
 
-  function patchActualizarCantidad() {
-    if (typeof actualizarCantidadLinea !== "function") return;
-    if (actualizarCantidadLinea[FLAG]) return;
-    var prev = actualizarCantidadLinea;
-    window.actualizarCantidadLinea = function (idx, nuevaCantidad) {
-      var st = stockEstadoGlobal();
-      if ((st === "idle" || st === "loading") && nuevaCantidad > 0) {
-        if (typeof cargarStockAlmacenes === "function") {
-          try {
-            cargarStockAlmacenes(false);
-          } catch (e) {}
-        }
-        if (typeof setMsg === "function") {
-          setMsg(
-            "msg-venta-linea",
-            "Cargando stock… no se puede validar cantidad todavía.",
-            false
-          );
-        }
-        if (typeof renderVentaLineas === "function") renderVentaLineas();
-        return;
-      }
-      return prev.apply(this, arguments);
-    };
-    window.actualizarCantidadLinea[FLAG] = true;
+  function renderVentasSafe() {
+    try { if (typeof renderCatalogoGrid === 'function') renderCatalogoGrid(); } catch (e) {}
+    try { if (typeof renderCatalogoCategorias === 'function') renderCatalogoCategorias(); } catch (e) {}
+    try { if (typeof actualizarStockDisponibleUI === 'function') actualizarStockDisponibleUI(); } catch (e) {}
   }
 
-  function patchRenderCatalogo() {
-    if (typeof renderCatalogoGrid !== "function" || renderCatalogoGrid[FLAG]) return;
-    var orig = renderCatalogoGrid;
-    window.renderCatalogoGrid = function () {
-      ensureCache();
-      var grid = document.getElementById("catalogo-grid");
-      var lista =
-        typeof ventaProductosLista !== "undefined" && Array.isArray(ventaProductosLista)
-          ? ventaProductosLista
-          : _cache.productos || [];
-
-      if ((!lista || lista.length === 0) && (_cache.productos || []).length > 0) {
-        try {
-          if (typeof ventaProductosLista !== "undefined") {
-            ventaProductosLista = _cache.productos.slice();
-            lista = ventaProductosLista;
-          }
-        } catch (e) {}
-        lista = _cache.productos || [];
-      }
-
-      if (!lista || lista.length === 0) {
-        if (grid) {
-          grid.innerHTML = '<p class="lista-estado">Cargando productos…</p>';
-        }
-        if (typeof cargarProductos === "function") {
-          Promise.resolve(cargarProductos())
-            .then(function (p) {
-              if (Array.isArray(p) && p.length) {
-                _cache.productos = p;
-                try {
-                  if (typeof ventaProductosLista !== "undefined") ventaProductosLista = p;
-                } catch (e2) {}
-                try {
-                  orig.apply(this, arguments);
-                } catch (e3) {}
-              } else if (grid) {
-                grid.innerHTML =
-                  '<p class="lista-estado">No hay productos activos cargados todavía.</p>';
-              }
-            })
-            .catch(function () {
-              if (grid)
-                grid.innerHTML =
-                  '<p class="lista-estado">No se pudieron cargar los productos.</p>';
-            });
-        }
-        return;
-      }
-
-      try {
-        if (typeof catalogoCategoriaActiva === "undefined" || catalogoCategoriaActiva == null) {
-          catalogoCategoriaActiva = "";
-        }
-      } catch (e4) {}
-
-      return orig.apply(this, arguments);
-    };
-    window.renderCatalogoGrid[FLAG] = true;
+  async function ensureVentasDataReady() {
+    ensureCache();
+    var tasks = [];
+    if (!_cache.productos.length && typeof cargarProductos === 'function') {
+      tasks.push(Promise.resolve(cargarProductos()).then(function (rows) {
+        if (Array.isArray(rows)) { _cache.productos = rows; syncProductsIntoVenta(); }
+      }));
+    } else {
+      syncProductsIntoVenta();
+    }
+    if (stockState() !== 'ok' && typeof cargarStockAlmacenes === 'function') {
+      tasks.push(Promise.resolve(cargarStockAlmacenes(stockState() === 'error')).catch(function () {}));
+    }
+    if ((typeof ventaCategoriasLista === 'undefined' || !Array.isArray(ventaCategoriasLista) || !ventaCategoriasLista.length) && typeof cargarCategorias === 'function') {
+      tasks.push(Promise.resolve(cargarCategorias()).then(function (rows) {
+        window.ventaCategoriasLista = (Array.isArray(rows) ? rows : []).filter(function (c) { return c && c.id != null && c.nombre && c.activo !== false; });
+      }).catch(function () {}));
+    }
+    await Promise.all(tasks);
+    syncProductsIntoVenta();
+    renderVentasSafe();
   }
 
-  function patchRefrescarVentas() {
-    if (typeof refrescarVentas !== "function" || refrescarVentas[FLAG]) return;
-    var orig = refrescarVentas;
+  function patchRefreshVentas() {
+    if (typeof refrescarVentas !== 'function' || refrescarVentas.__bcM269stable) return;
+    var original = refrescarVentas;
     window.refrescarVentas = async function () {
-      var r = await orig.apply(this, arguments);
-      ensureCache();
-      try {
-        if (typeof ventaProductosPrecios !== "undefined") {
-          (_cache.productos || []).forEach(function (p) {
-            if (!ventaProductosPrecios[p.id]) {
-              ventaProductosPrecios[p.id] = {
-                nombre: p.nombre,
-                precio_normal: p.precio_normal,
-                precio_mayorista: p.precio_mayorista,
-              };
-            }
-          });
-        }
-        if (typeof ventaProductosLista !== "undefined") {
-          if (!ventaProductosLista || !ventaProductosLista.length) {
-            ventaProductosLista = (_cache.productos || []).slice();
-          }
-        }
-      } catch (e) {}
-
-      var st = stockEstadoGlobal();
-      if (st !== "ok" && typeof cargarStockAlmacenes === "function") {
-        try {
-          await cargarStockAlmacenes(st === "error");
-        } catch (e2) {}
-      }
-      if (typeof renderCatalogoGrid === "function") {
-        try {
-          renderCatalogoGrid();
-        } catch (e3) {}
-      }
-      if (typeof actualizarStockDisponibleUI === "function") {
-        try {
-          actualizarStockDisponibleUI();
-        } catch (e4) {}
-      }
+      var r = await original.apply(this, arguments);
+      await ensureVentasDataReady();
       return r;
     };
-    window.refrescarVentas[FLAG] = true;
+    window.refrescarVentas.__bcM269stable = true;
   }
 
-  function patchStockUI() {
-    if (typeof actualizarStockDisponibleUI !== "function" || actualizarStockDisponibleUI[FLAG])
-      return;
-    var orig = actualizarStockDisponibleUI;
-    window.actualizarStockDisponibleUI = function () {
-      var infoEl = document.getElementById("venta-stock-disponible");
-      var st = stockEstadoGlobal();
-      if (st === "idle" || st === "loading") {
-        if (infoEl) {
-          infoEl.textContent = "Stock: cargando…";
-          infoEl.className = "msg";
-        }
-        if (typeof cargarStockAlmacenes === "function" && st === "idle") {
-          try {
-            cargarStockAlmacenes(false);
-          } catch (e) {}
-        }
-      }
-      return orig.apply(this, arguments);
-    };
-    window.actualizarStockDisponibleUI[FLAG] = true;
-  }
-
-  function ensureVentasDataReady() {
-    ensureCache();
-    var needsProductos = !(_cache.productos && _cache.productos.length);
-    var st = stockEstadoGlobal();
-    var needsStock = st !== "ok";
-
-    var tasks = [];
-    if (needsProductos && typeof cargarProductos === "function") {
-      tasks.push(
-        Promise.resolve(cargarProductos()).then(function (p) {
-          if (Array.isArray(p)) {
-            _cache.productos = p;
-            try {
-              if (typeof ventaProductosLista !== "undefined") ventaProductosLista = p;
-              if (typeof ventaProductosPrecios !== "undefined") {
-                p.forEach(function (x) {
-                  ventaProductosPrecios[x.id] = {
-                    nombre: x.nombre,
-                    precio_normal: x.precio_normal,
-                    precio_mayorista: x.precio_mayorista,
-                  };
-                });
-              }
-            } catch (e) {}
-          }
-        })
-      );
-    }
-    if (needsStock && typeof cargarStockAlmacenes === "function") {
-      tasks.push(Promise.resolve(cargarStockAlmacenes(st === "error")));
-    }
-    return Promise.all(tasks).then(function () {
-      if (typeof renderCatalogoGrid === "function") {
-        try {
-          renderCatalogoGrid();
-        } catch (e) {}
-      }
-      if (typeof renderCatalogoCategorias === "function") {
-        try {
-          renderCatalogoCategorias();
-        } catch (e2) {}
-      }
-    });
-  }
-
-  function wireTabVentas() {
-    if (document.documentElement.dataset[FLAG + "Tab"] === "1") return;
-    document.documentElement.dataset[FLAG + "Tab"] = "1";
-    var tabs = document.getElementById("tabs");
-    if (!tabs) return;
-    tabs.addEventListener(
-      "click",
-      function (e) {
-        var btn = e.target.closest('.tab-btn[data-tab="ventas"]');
-        if (!btn) return;
-        setTimeout(function () {
-          ensureVentasDataReady().catch(function () {});
-        }, 50);
-      },
-      true
-    );
-  }
-
-  function patchStockTotalProducto() {
-    if (typeof stockTotalProducto !== "function" || stockTotalProducto[FLAG]) return;
-    window.stockTotalProducto = function (productoId) {
-      return (_cache.stock || [])
-        .filter(function (s) {
-          return sameId(s.producto_id, productoId);
-        })
-        .reduce(function (acc, s) {
-          return acc + (Number(s.cantidad) || 0);
-        }, 0);
-    };
-    window.stockTotalProducto[FLAG] = true;
+  function bindVentasTab() {
+    var tabs = document.getElementById('tabs');
+    if (!tabs || tabs.dataset.bcM269stable === '1') return;
+    tabs.dataset.bcM269stable = '1';
+    tabs.addEventListener('click', function (e) {
+      var btn = e.target.closest('.tab-btn[data-tab="ventas"]');
+      if (!btn) return;
+      ensureVentasDataReady().catch(function () {});
+    }, true);
+    var tab = document.getElementById('tab-ventas');
+    if (tab && tab.classList.contains('visible')) ensureVentasDataReady().catch(function () {});
   }
 
   function boot() {
     ensureCache();
-    patchObtenerStock();
-    patchAgregarLinea();
-    patchActualizarCantidad();
-    patchRenderCatalogo();
-    patchRefrescarVentas();
-    patchStockUI();
-    patchStockTotalProducto();
-    wireTabVentas();
+    patchStock();
+    patchAddAndQty();
+    patchRefreshVentas();
+    bindVentasTab();
+    if (typeof window.actualizarStockDisponibleUI === 'function' && !window.actualizarStockDisponibleUI.__bcM269stable) {
+      var original = window.actualizarStockDisponibleUI;
+      window.actualizarStockDisponibleUI = function () {
+        var info = document.getElementById('venta-stock-disponible');
+        var st = stockState();
+        if (info && (st === 'idle' || st === 'loading')) info.textContent = 'Stock: cargando…';
+        return original.apply(this, arguments);
+      };
+      window.actualizarStockDisponibleUI.__bcM269stable = true;
+    }
   }
 
-  function start() {
-    boot();
-    var n = 0;
-    var t = setInterval(function () {
-      n++;
-      boot();
-      if (n >= 30) clearInterval(t);
-    }, 250);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(start, 400);
-    });
-  } else {
-    setTimeout(start, 400);
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 350); });
+  else setTimeout(boot, 350);
 })();
