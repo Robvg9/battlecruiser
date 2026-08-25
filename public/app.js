@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.2.84 — M26.8-FE: corrección definitiva carrito (+/−) + confirmar venta
-(function hotfixV9284(){
-  const VERSION="9.2.84";
+// v9.2.85 — M26.9-FE: estabilización productos + stock + catálogo (NOT_LOADED ≠ 0)
+(function hotfixV9285(){
+  const VERSION="9.2.85";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -49,6 +49,7 @@
     ["m26-6-stock-cart-patch.js","26.6"],
     ["m26-7-ventas-repair.js","26.7"],
     ["m26-8-ventas-cart-confirm.js","26.8"],
+    ["m26-9-data-truth.js","26.9"],
     ["fix-permisos-carga.js","80.1"]
   ];
   modules.forEach(([name,version])=>{
