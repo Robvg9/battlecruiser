@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.04 — Compras (B8) + stock reposición (B9)
-(function hotfixV9304(){
-  const VERSION="9.3.04";
+// v9.3.05 — Declaración $0 (B10) + limpieza tipos almacén
+(function hotfixV9305(){
+  const VERSION="9.3.05";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -40,7 +40,7 @@
     ["m26-ventas-ux.js","26.5"],["m26-6-stock-cart-patch.js","26.6"],["m26-7-ventas-repair.js","26.7"],["m26-8-ventas-cart-confirm.js","26.8"],
     ["m26-9-data-truth.js","26.9b5"],["m26-10-categorias-ventas.js","26.10"],["m26-11-offline-shell-guard.js","26.17"],
     ["m26-12-comunicacion-whatsapp.js","26.12"],["m26-13-comunicacion-ux.js","26.13"],["fix-permisos-carga.js","26.17"],
-    ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3"],["m27-4-restriccion-turnos-asignados.js","27.4"],
+    ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6"],
     ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2"],["m27-7-almacenes-modal.js","27.7"],
     ["mision-d-stock-reposicion.js","D.9"]
