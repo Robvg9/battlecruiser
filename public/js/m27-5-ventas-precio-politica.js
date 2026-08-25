@@ -1,4 +1,5 @@
 // BattleCruiser M27.5 — Política de precio por almacén + opción de precio alternativo
+// Bloque 5: actualización inmediata del catálogo en Ventas (sin polling).
 (function(){
   'use strict';
   if(window.__BC_M275__) return;
@@ -7,13 +8,52 @@
   const LS='bc-ventas-precio-alternativo-v1';
   let allowAlt=false;
 
+  function normalizeType(t){
+    const s=String(t||'').toLowerCase();
+    if(s==='venta') return 'minorista';
+    if(s==='minorista'||s==='mayorista'||s==='almacenamiento') return s;
+    return s||null;
+  }
   function getWarehouseId(){ const s=document.getElementById('venta-almacen'); return s?s.value:''; }
-  function getWarehouseType(){ const id=getWarehouseId(); try{return (typeof ventaAlmacenesTipo!=='undefined'&&id)?ventaAlmacenesTipo[id]:null;}catch(e){return null;} }
-  function getProducts(){ try{return Array.isArray(ventaProductosLista)?ventaProductosLista:[];}catch(e){return [];} }
-  function hasBase(p,t){ return t==='mayorista' ? p.precio_mayorista!=null : p.precio_normal!=null; }
-  function hasAlt(p,t){ return t==='mayorista' ? p.precio_normal!=null : p.precio_mayorista!=null; }
-  function priceFor(p,t){ if(t==='mayorista') return p.precio_mayorista!=null?p.precio_mayorista:p.precio_normal; return p.precio_normal!=null?p.precio_normal:p.precio_mayorista; }
-  function typeFor(p,t){ if(t==='mayorista') return p.precio_mayorista!=null?'mayorista':'normal'; return p.precio_normal!=null?'normal':'mayorista'; }
+  function getWarehouseType(){
+    const id=getWarehouseId();
+    try{
+      if(typeof ventaAlmacenesTipo!=='undefined'&&id&&ventaAlmacenesTipo[id]!=null)
+        return normalizeType(ventaAlmacenesTipo[id]);
+    }catch(e){}
+    try{
+      const a=(_cache&&_cache.almacenes||[]).find(x=>String(x.id)===String(id));
+      return a?normalizeType(a.tipo):null;
+    }catch(e2){return null;}
+  }
+  function getProducts(){
+    try{
+      if(Array.isArray(ventaProductosLista)&&ventaProductosLista.length)
+        return ventaProductosLista;
+    }catch(e){}
+    try{
+      if(typeof _cache!=='undefined'&&Array.isArray(_cache.productos)&&_cache.productos.length)
+        return _cache.productos;
+    }catch(e2){}
+    return [];
+  }
+  function isSellType(t){ return t==='mayorista'||t==='minorista'; }
+  function hasBase(p,t){
+    if(!isSellType(t)) return p.precio_normal!=null||p.precio_mayorista!=null;
+    return t==='mayorista' ? p.precio_mayorista!=null : p.precio_normal!=null;
+  }
+  function hasAlt(p,t){
+    if(!isSellType(t)) return false;
+    return t==='mayorista' ? p.precio_normal!=null : p.precio_mayorista!=null;
+  }
+  function priceFor(p,t){
+    if(t==='mayorista') return p.precio_mayorista!=null?p.precio_mayorista:p.precio_normal;
+    return p.precio_normal!=null?p.precio_normal:p.precio_mayorista;
+  }
+  function typeFor(p,t){
+    if(t==='mayorista') return p.precio_mayorista!=null?'mayorista':'normal';
+    return p.precio_normal!=null?'normal':'mayorista';
+  }
 
   function injectStyles(){
     if(document.getElementById('bc-m275-style')) return;
@@ -36,10 +76,31 @@
     const cb=document.getElementById('bc-m275-alt');
     if(cb){cb.checked=allowAlt;cb.addEventListener('change',()=>{allowAlt=cb.checked;try{localStorage.setItem(LS,allowAlt?'1':'0');}catch(e){};render();});}
   }
-  function updateLabel(){const b=document.getElementById('bc-m275-badge');const t=getWarehouseType();if(b)b.textContent=t==='mayorista'?'Almacén mayorista':(t==='venta'?'Almacén minorista':'');}
+  function updateLabel(){
+    const b=document.getElementById('bc-m275-badge');
+    const t=getWarehouseType();
+    if(!b)return;
+    if(t==='mayorista') b.textContent='Almacén mayorista';
+    else if(t==='minorista') b.textContent='Almacén minorista';
+    else if(t==='almacenamiento') b.textContent='Almacén de almacenamiento';
+    else b.textContent='';
+  }
   function visibleProducts(){
     const t=getWarehouseType();
-    return getProducts().filter(p=>{if(!p||p.activo===false)return false;if(!t)return true;return hasBase(p,t)||(allowAlt&&hasAlt(p,t));});
+    return getProducts().filter(p=>{
+      if(!p||p.activo===false)return false;
+      if(!t||t==='almacenamiento')return true;
+      return hasBase(p,t)||(allowAlt&&hasAlt(p,t));
+    });
+  }
+  function emptyCatalogMessage(allActive,listLen){
+    if(!allActive.length){
+      return '<p class="lista-estado">Cargando productos…</p>';
+    }
+    if(!listLen){
+      return '<p class="lista-estado">No hay productos compatibles con este tipo de almacén.</p>';
+    }
+    return '<p class="lista-estado">No hay productos activos para mostrar en esta categoría.</p>';
   }
   function patchGrid(){
     if(typeof renderCatalogoGrid!=='function'||renderCatalogoGrid.__bcM275)return;
@@ -47,9 +108,14 @@
     window.renderCatalogoGrid=function(){
       ensureControl();updateLabel();
       const grid=document.getElementById('catalogo-grid');if(!grid)return orig.apply(this,arguments);
-      const t=getWarehouseType();let cat='';try{cat=String(catalogoCategoriaActiva||'');}catch(e){}
+      const t=getWarehouseType();
+      let cat='';try{cat=String(catalogoCategoriaActiva||'');}catch(e){}
+      const allActive=getProducts().filter(p=>p&&p.activo!==false);
       const list=visibleProducts().filter(p=>!cat||String(p.categoria_id)===cat);
-      if(!list.length){grid.innerHTML='<p class="lista-estado">No hay productos compatibles con este tipo de almacén.</p>';return;}
+      if(!list.length){
+        grid.innerHTML=emptyCatalogMessage(allActive,0);
+        return;
+      }
       grid.innerHTML='';
       list.forEach(p=>{
         const price=priceFor(p,t);const ptype=typeFor(p,t);let stockTxt=null;
@@ -68,7 +134,7 @@
     window.agregarLineaVenta=function(pid,cantidad,almacen){
       const t=getWarehouseType();const p=getProducts().find(x=>String(x.id)===String(pid));if(!p)return false;
       const effectiveType=typeFor(p,t);
-      const isAltOnly=allowAlt&&t&&((t==='mayorista'&&p.precio_mayorista==null&&p.precio_normal!=null)||(t!=='mayorista'&&p.precio_normal==null&&p.precio_mayorista!=null));
+      const isAltOnly=allowAlt&&t&&((t==='mayorista'&&p.precio_mayorista==null&&p.precio_normal!=null)||(t==='minorista'&&p.precio_normal==null&&p.precio_mayorista!=null));
       if(isAltOnly){
         const price=priceFor(p,t);const lines=ventaLineas;if(!Array.isArray(lines))return orig.apply(this,arguments);
         const stock=typeof obtenerStockDisponible==='function'?obtenerStockDisponible(pid,almacen):{valor:Infinity};
@@ -96,8 +162,23 @@
     };
     window.ejecutarOperacion.__bcM275=true;
   }
-  function patchAlmacenChange(){const s=document.getElementById('venta-almacen');if(!s||s.dataset.bcM275==='1')return;s.dataset.bcM275='1';s.addEventListener('change',render);}
+  function patchAlmacenChange(){
+    const s=document.getElementById('venta-almacen');
+    if(!s||s.dataset.bcM275==='1')return;
+    s.dataset.bcM275='1';
+    s.addEventListener('change',function(){
+      try{
+        if(typeof ventaAlmacenesTipo!=='undefined'&&s.value){
+          const a=(_cache&&_cache.almacenes||[]).find(x=>String(x.id)===String(s.value));
+          if(a&&a.tipo) ventaAlmacenesTipo[s.value]=normalizeType(a.tipo);
+        }
+      }catch(e){}
+      render();
+    });
+  }
   function render(){ensureControl();updateLabel();if(typeof renderCatalogoGrid==='function')try{renderCatalogoGrid();}catch(e){}}
+  // API para que otros módulos (m26-9, refrescarProductos) invaliden el catálogo sin reload.
+  window.__BC_M275_refreshCatalog=function(){try{render();}catch(e){}};
   function boot(){injectStyles();try{allowAlt=localStorage.getItem(LS)==='1';}catch(e){allowAlt=false;}ensureControl();patchGrid();patchAdd();patchOperation();patchAlmacenChange();render();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700));else setTimeout(boot,700);
 })();
