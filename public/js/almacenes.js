@@ -2,6 +2,7 @@
 // Selector y gestión de almacenes + stock del panel.
 // M26.6-FE: estados explícitos de carga de stock (nunca "Cargando…" infinito).
 // Query stock sin embeds + safety timeout.
+// Bloque 6/7: tipos almacenamiento | minorista | mayorista (legacy venta → Minorista).
 
 let _almacenSeleccionadoId = null;
 /** idle | loading | ok | error */
@@ -12,7 +13,11 @@ let _stockCargaPromise = null;
 var BC_STOCK_TIMEOUT_MS = 12000;
 
 function etiquetaTipoAlmacen(tipo) {
-  return tipo === "venta" ? "Venta (precio normal)" : "Almacén / mayorista";
+  const t = String(tipo || "").toLowerCase();
+  if (t === "almacenamiento") return "Almacenamiento";
+  if (t === "minorista" || t === "venta") return "Minorista";
+  if (t === "mayorista") return "Mayorista";
+  return t ? String(tipo) : "Almacenamiento";
 }
 
 function mismoIdAlmacen(a, b) {
@@ -306,6 +311,11 @@ function cerrarFormAlmacen() {
 }
 
 function abrirFormCrearAlmacen() {
+  // Bloque 6: preferir modal si está disponible
+  if (typeof window.__BC_M277_openCreateAlmacen === "function") {
+    window.__BC_M277_openCreateAlmacen();
+    return;
+  }
   cerrarFormAlmacen();
   const form = document.getElementById("form-almacen");
   if (form) form.classList.remove("hidden");
@@ -314,6 +324,11 @@ function abrirFormCrearAlmacen() {
 }
 
 function abrirFormEditarAlmacen() {
+  // Bloque 7: preferir modal si está disponible
+  if (typeof window.__BC_M277_openEditAlmacen === "function") {
+    window.__BC_M277_openEditAlmacen();
+    return;
+  }
   if (!_almacenSeleccionadoId) return;
   const a = (_cache.almacenes || []).find((x) => mismoIdAlmacen(x.id, _almacenSeleccionadoId));
   if (!a) return;
@@ -322,7 +337,8 @@ function abrirFormEditarAlmacen() {
   form.classList.remove("hidden");
   document.getElementById("alm-editando-id").value = a.id;
   document.getElementById("alm-nombre").value = a.nombre || "";
-  document.getElementById("alm-tipo").value = a.tipo || "";
+  var tipo = a.tipo === "venta" ? "minorista" : (a.tipo || "");
+  document.getElementById("alm-tipo").value = tipo;
   document.getElementById("alm-submit-btn").textContent = "Guardar cambios";
   document.getElementById("alm-nombre").focus();
 }
@@ -377,7 +393,8 @@ safeInit("form-almacen", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const nombre = document.getElementById("alm-nombre").value.trim();
-    const tipo = document.getElementById("alm-tipo").value;
+    let tipo = document.getElementById("alm-tipo").value;
+    if (tipo === "venta") tipo = "minorista";
     const editandoId = (document.getElementById("alm-editando-id") || {}).value || "";
     const submitBtn = document.getElementById("alm-submit-btn") || e.target.querySelector("button[type='submit']");
 
@@ -412,6 +429,7 @@ safeInit("form-almacen", () => {
       await cargarStockAlmacenes(true);
       if (editandoId) seleccionarAlmacen(editandoId);
       else if (resultado.data && resultado.data.id) seleccionarAlmacen(resultado.data.id);
+      else if (typeof resultado.data === "string") seleccionarAlmacen(resultado.data);
     }
   });
 });
@@ -483,6 +501,7 @@ safeInit("almacenes-ui", () => {
 
 async function editarAlmacen(almacen_id, cambios) {
   const payload = Object.assign({ p_almacen_id: almacen_id }, cambios || {});
+  if (payload.p_tipo === "venta") payload.p_tipo = "minorista";
   const resultado = await ejecutarOperacion("almacen_actualizar", payload);
   if (resultado.ok && !resultado.offline) {
     await refrescarAlmacenes();
