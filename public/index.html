@@ -323,7 +323,7 @@
         <p class="msg" id="venta-stock-disponible"></p>
       </div>
       <div id="venta-modo-catalogo" class="hidden">
-        <div id="catalogo-categorias" class="catalogo-categorias"></div>
+        <div id="catalogo-categorias" class="catalogo-grid"></div>
         <div id="catalogo-grid" class="catalogo-grid"></div>
       </div>
       <p class="msg" id="msg-venta-linea"></p>
@@ -365,9 +365,10 @@
         <input type="hidden" id="alm-editando-id" value="">
         <input id="alm-nombre" placeholder="Nombre del almacén" required>
         <select id="alm-tipo" required>
-          <option value="">Tipo</option>
-          <option value="venta">Venta (precio normal)</option>
-          <option value="mayorista">Almacén / mayorista (precio mayorista)</option>
+          <option value="">Tipo de almacén</option>
+          <option value="almacenamiento">Almacenamiento — reserva interna</option>
+          <option value="minorista">Minorista — punto de venta</option>
+          <option value="mayorista">Mayorista — punto de venta mayorista</option>
         </select>
         <button type="submit" id="alm-submit-btn">Crear almacén</button>
         <button type="button" id="alm-cancelar-btn" class="cc-accion">Cancelar</button>
