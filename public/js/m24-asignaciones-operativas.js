@@ -1,6 +1,7 @@
 // BattleCruiser M24-FE — Asignación operativa de Turnos
 // Admin asigna · Dependienta ejecuta · Backend verifica
 // M25.4: observer ignora #m22-sesiones-panel (rompe bucle M22↔M24).
+// M24.1-FE: refreshPanel hidrata siempre #m24-user / #m24-alm (no return antes de fillSelects).
 (function () {
   'use strict';
 
@@ -54,8 +55,8 @@
     return cacheAsig;
   }
 
-  async function cargarUsuarios() {
-    if (cacheUsers.length) return cacheUsers;
+  async function cargarUsuarios(force) {
+    if (cacheUsers.length && !force) return cacheUsers;
     try {
       var r = await client.rpc('listar_usuarios_admin', {});
       if (r && !r.error && Array.isArray(r.data)) {
@@ -139,6 +140,15 @@
       return String(o.value) === String(value);
     });
     if (ok) selectEl.value = String(value);
+  }
+
+  function selectsNecesitanHidratacion() {
+    var su = document.getElementById('m24-user');
+    var sa = document.getElementById('m24-alm');
+    if (!su || !sa) return true;
+    var userOpts = su.querySelectorAll('option[value]:not([value=""])').length;
+    var almOpts = sa.querySelectorAll('option[value]:not([value=""])').length;
+    return userOpts === 0 || almOpts === 0 || !cacheUsers.length || !almacenesActivos().length;
   }
 
   function ensurePanel() {
@@ -228,6 +238,11 @@
     }).join('');
   }
 
+  /**
+   * M24.1-FE: si el panel ya existe, NO retornar antes de hidratar selects.
+   * Secuencia: captureForm → ensureAlmacenes → cargarUsuarios → fillSelects
+   *             → listarAsignaciones → renderLista → restaurar selección.
+   */
   async function refreshPanel(opts) {
     opts = opts || {};
     if (refreshing) return;
@@ -242,24 +257,26 @@
 
     refreshing = true;
     try {
-      var panelExiste = !!document.getElementById(PANEL_ID);
-      if (panelExiste && !opts.force) {
-        captureForm();
-        try { await listarAsignaciones({}); } catch (e) {}
-        renderLista();
-        applySaved(document.getElementById('m24-user'), savedSel.user);
-        applySaved(document.getElementById('m24-alm'), savedSel.alm);
-        applySaved(document.getElementById('m24-bloque'), savedSel.bloque);
-        return;
-      }
-
-      await ensureAlmacenes();
-      try { await listarAsignaciones({}); } catch (e) { console.warn('[M24] listar_asignaciones', e); }
-      await cargarUsuarios();
       var panel = ensurePanel();
       if (!panel) return;
+
+      captureForm();
+
+      await ensureAlmacenes();
+
+      // Hidratar usuarios siempre que el cache esté vacío o los selects no tengan opciones
+      await cargarUsuarios(!cacheUsers.length || selectsNecesitanHidratacion());
+
       fillSelects();
+
+      try {
+        await listarAsignaciones({});
+      } catch (e) {
+        console.warn('[M24] listar_asignaciones', e);
+      }
+
       renderLista();
+      fillSelects(); // re-aplicar selección tras posibles cambios de opciones
     } finally {
       refreshing = false;
     }
@@ -369,8 +386,10 @@
       if (t) clearTimeout(t);
       t = setTimeout(function () {
         var exists = !!document.getElementById(PANEL_ID);
-        if (exists && mountedOnce) return;
-        refreshPanel({ force: !exists });
+        // Si panel existe pero selects vacíos, forzar hidratación
+        var need = !exists || selectsNecesitanHidratacion();
+        if (exists && mountedOnce && !need) return;
+        refreshPanel({ force: need });
         if (document.getElementById(PANEL_ID)) mountedOnce = true;
       }, 200);
     }).observe(root, { childList: true, subtree: true });
