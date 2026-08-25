@@ -1,4 +1,4 @@
-// BattleCruiser M27.5 — Restauración de tema oscuro
+// BattleCruiser M27.5 — Restauración de tema oscuro + cierre operativo compacto
 (function(){
   'use strict';
   if(window.__BC_M275_THEME__) return;
@@ -26,16 +26,12 @@
       .tab-btn.active,.catalogo-chip.activo{background:rgba(184,160,106,.14)!important;color:var(--gold-bright)!important;border-color:var(--gold-dim)!important;}
       .catalogo-card,.lista-item,.resumen-card,.cc-bloque{border-color:rgba(184,160,106,.18)!important;box-shadow:0 8px 24px rgba(0,0,0,.16)!important;}
       .bc-aj-app-btn[data-app="light"]{display:none!important;}
+      #bc-m273-cerrar-sesion-btn{display:inline-flex!important;width:auto!important;max-width:max-content!important;margin:10px 0 8px!important;padding:7px 11px!important;border-radius:8px!important;font-size:12px!important;line-height:1.2!important;font-weight:600!important;letter-spacing:.01em!important;box-shadow:none!important;}
+      #bc-m273-cerrar-sesion-btn.hidden{display:none!important;}
+      #bc-m273-cerrar-sesion-btn:hover{transform:translateY(-1px);}
     `;document.head.appendChild(s);
   }
-  function hideLightOption(){
-    const btn=document.querySelector('.bc-aj-app-btn[data-app="light"]');
-    if(btn)btn.style.display='none';
-  }
-  function init(){inject();forceDark();hideLightOption();
-    const obs=new MutationObserver(()=>{hideLightOption();forceDark();});
-    obs.observe(document.body,{childList:true,subtree:true});
-    setTimeout(()=>obs.disconnect(),15000);
-  }
+  function hideLightOption(){const btn=document.querySelector('.bc-aj-app-btn[data-app="light"]');if(btn)btn.style.display='none';}
+  function init(){inject();forceDark();hideLightOption();const obs=new MutationObserver(()=>{hideLightOption();forceDark();});obs.observe(document.body,{childList:true,subtree:true});setTimeout(()=>obs.disconnect(),15000);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,300));else setTimeout(init,300);
 })();
