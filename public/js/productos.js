@@ -25,7 +25,7 @@ async function cargarAlmacenes() {
 async function cargarProductos() {
   return withCache("productos", () => client
     .from("productos")
-    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, categorias(nombre), presentaciones(nombre)")
+    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, categorias(nombre), presentaciones(nombre)")
     .order("nombre"));
 }
 
