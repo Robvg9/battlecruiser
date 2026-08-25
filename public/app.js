@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.00 — M27.4/M27.5: turnos asignados, política de precios y tema oscuro estable
-(function hotfixV9300(){
-  const VERSION="9.3.00";
+// v9.3.01 — Misión Frontend A1: contraste + Dark/Light consolidado
+(function hotfixV9301(){
+  const VERSION="9.3.01";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -41,7 +41,7 @@
     ["m26-9-data-truth.js","26.9"],["m26-10-categorias-ventas.js","26.10"],["m26-11-offline-shell-guard.js","26.17"],
     ["m26-12-comunicacion-whatsapp.js","26.12"],["m26-13-comunicacion-ux.js","26.13"],["fix-permisos-carga.js","26.17"],
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3"],["m27-4-restriccion-turnos-asignados.js","27.4"],
-    ["m27-5-ventas-precio-politica.js","27.5"],["m27-5-theme-dark-reset.js","27.5"],["mision-c-tipos-almacen.js","C.1"],
+    ["m27-5-ventas-precio-politica.js","27.5"],["m27-5-theme-dark-reset.js","27.5a1"],["mision-c-tipos-almacen.js","C.1"],
     ["mision-c-editar-tipo-almacen-modal.js","C.2"],["mision-d-stock-reposicion.js","D.1"]
   ];
   modules.forEach(([name,version])=>{
