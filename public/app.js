@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.09 — Super Misión F3/F4: ventas mayorista + presentación + payload + catálogo
-(function hotfixV9309(){
-  const VERSION="9.3.09";
+// v9.3.10 — Super Misión F8: transferencias harden + preserve selects
+(function hotfixV9310(){
+  const VERSION="9.3.10";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -45,6 +45,7 @@
     ["m27-6b-venta-payload-pres.js","27.6b1"],
     ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7b"],
     ["mision-d-stock-reposicion.js","D.10"],
+    ["m-f8-trf-selects-preserve.js","F8.1"],
     ["compra-multiple.js","27.8"]
   ];
   modules.forEach(([name,version])=>{
