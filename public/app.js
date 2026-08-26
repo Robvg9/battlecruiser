@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.07 — Super Misión Maestra F2: Almacenes modal + Acciones dropdown + sin Crear redundante
-(function hotfixV9307(){
-  const VERSION="9.3.07";
+// v9.3.08 — Super Misión F6/F7: Stock bajo → modal desde botón (sin bloque permanente)
+(function hotfixV9308(){
+  const VERSION="9.3.08";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -43,7 +43,7 @@
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6"],
     ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7b"],
-    ["mision-d-stock-reposicion.js","D.9"],
+    ["mision-d-stock-reposicion.js","D.10"],
     ["compra-multiple.js","27.8"]
   ];
   modules.forEach(([name,version])=>{
