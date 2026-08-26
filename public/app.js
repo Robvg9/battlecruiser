@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.16 — controlled recovery test: reintroduce inventario-detalle + m26-15 communication layout
-(function hotfixV9316(){
-  const VERSION="9.3.16";
+// v9.3.17 — recovery: disable M26.15 communication layout after loading regression
+(function hotfixV9317(){
+  const VERSION="9.3.17";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -49,9 +49,8 @@
     ["m-f8-trf-selects-preserve.js","F8.1"],
     ["m-f9-turnos-integrity.js","F9.1"],
     ["m-f12-f17-ui-layout.js","F12.1"],
-    ["compra-multiple.js","27.8"],
-    ["inventario-detalle.js","inv.2"],
-    ["m26-15-comunicacion-layout.js","26.15"]
+    ["inventario-detalle.js","inv.1"],
+    ["compra-multiple.js","27.8"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
