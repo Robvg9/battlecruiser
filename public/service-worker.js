@@ -1,8 +1,8 @@
-/* BattleCruiser Service Worker — v9.3.00 / stable shell
- * M27.4/M27.5: restricciones de turnos, politica de precios y tema oscuro estable.
- * Network-first para app shell assets; JS/CSS/HTML fetched con no-store para evitar stale modules.
+/* BattleCruiser Service Worker — v9.3.13 / stable shell
+ * Network-first para app shell (JS/CSS/HTML) con cache:no-store.
+ * Precache solo estáticos (manifest/icons). Activate limpia caches battlecruiser antiguas.
  */
-var BC_SW_VERSION = "9.3.00";
+var BC_SW_VERSION = "9.3.13";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_STATIC=["./manifest.json","./favicon.png","./icons/icon-192x192.png","./icons/icon-512x512.png"];
