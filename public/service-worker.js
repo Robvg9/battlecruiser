@@ -1,8 +1,8 @@
-/* BattleCruiser Service Worker — v9.3.14 / recovery boot
+/* BattleCruiser Service Worker — v9.3.18 / aligned with app
  * Network-first para app shell (JS/CSS/HTML) con cache:no-store.
  * Precache solo estáticos (manifest/icons). Activate limpia caches battlecruiser antiguas.
  */
-var BC_SW_VERSION = "9.3.14";
+var BC_SW_VERSION = "9.3.18";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_STATIC=["./manifest.json","./favicon.png","./icons/icon-192x192.png","./icons/icon-512x512.png"];
