@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.05 — Declaración $0 (B10) + limpieza tipos almacén
-(function hotfixV9305(){
-  const VERSION="9.3.05";
+// v9.3.06 — Super Misión Maestra: recovery navegación + Compras + Centro Control
+(function hotfixV9306(){
+  const VERSION="9.3.06";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -30,7 +30,7 @@
 
 (function cargarModulosDinamicos(){
   const modules=[
-    ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.1"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
+    ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.1"],["ui-operaciones-hub.js","41.1"],["ui-ajustes-panel.js","96.1"],
@@ -43,7 +43,8 @@
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6"],
     ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2"],["m27-7-almacenes-modal.js","27.7"],
-    ["mision-d-stock-reposicion.js","D.9"]
+    ["mision-d-stock-reposicion.js","D.9"],
+    ["compra-multiple.js","27.8"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;

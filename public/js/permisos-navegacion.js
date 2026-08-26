@@ -1,4 +1,4 @@
-// BattleCruiser v9.2.67 — M23.1-FE
+// BattleCruiser v9.3.06 — Super Misión: recuperar Centro de Control (resumen) y Compras
 // Menú: seccion.ver === true
 // TURNOS = data-tab="ciclos" + turnos.ver. Legacy turnos oculto.
 // Etiqueta Turnos no usa textContent (preserva .bc-nav-icon).
@@ -25,10 +25,12 @@
   }
 
   var TAB_A_SECCION = {
+    resumen: "reportes",
     productos: "productos",
     ventas: "ventas",
     almacenes: "almacenes",
     transferencias: "transferencias",
+    compras: "stock",
     reportes: "reportes",
     inventario: "reportes",
     movimientos: "reportes",
@@ -40,8 +42,8 @@
   };
 
   var ORDEN_HOME = [
-    "ventas", "comunicacion", "productos", "ciclos", "operacion",
-    "almacenes", "transferencias", "reportes", "inventario",
+    "resumen", "ventas", "comunicacion", "productos", "ciclos", "operacion",
+    "almacenes", "transferencias", "compras", "reportes", "inventario",
     "movimientos", "usuarios", "mando"
   ];
 
@@ -68,7 +70,6 @@
     }
   }
 
-  /** Actualiza el texto visible sin borrar .bc-nav-icon de ui-visual-salon. */
   function setTabLabel(btn, text) {
     if (!btn) return;
     var lab = btn.querySelector(".bc-nav-label");
@@ -142,8 +143,13 @@
         return;
       }
 
-      if (tab === "config" || tab === "resumen" || tab === "pendientes" || tab === "vales") {
+      if (tab === "config" || tab === "vales") {
         setTabVisible(btn, false);
+        return;
+      }
+
+      if (tab === "pendientes") {
+        setTabVisible(btn, true);
         return;
       }
 
@@ -164,8 +170,19 @@
         return;
       }
 
+      if (tab === "resumen") {
+        var verResumen = tienePermiso("reportes", "ver") || tienePermiso("auditoria", "ver") || tienePermiso("productos", "ver");
+        setTabVisible(btn, verResumen);
+        if (verResumen) setTabLabel(btn, "Centro de Control");
+        return;
+      }
+
       var seccion = TAB_A_SECCION[tab];
       if (!seccion) {
+        if (tab === "compras") {
+          setTabVisible(btn, tienePermiso("stock", "crear") || tienePermiso("productos", "crear") || tienePermiso("almacenes", "ver"));
+          return;
+        }
         setTabVisible(btn, false);
         return;
       }
