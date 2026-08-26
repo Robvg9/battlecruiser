@@ -1,12 +1,11 @@
 // ==== Battlecruiser · js/transferencias.js ====
 // Transferencias entre almacenes: listado, render y detalle accionable.
-// (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
+// F8: mutex anti doble-submit, stock disponible en UI, try/finally.
 //
 // Modelo de negocio (backend registrar_transferencia):
-//   La transferencia es ATÓMICA: al crearse se mueve stock origen→destino
-//   con FIFO y se registran transferencias + transferencias_lineas.
-//   No existe flujo de "recepción" ni "cancelación" posterior en el contrato
-//   actual. El estado visible es el que devuelve la tabla (si tiene columna).
+//   Operación ATÓMICA origen→destino (FIFO). Sin recepción/cancelación posterior.
+// Owner: este módulo. RPC: registrar_transferencia vía ejecutarOperacion("transferencia").
+// Offline: cola + ajustePendiente (origen − / destino +).
 
 async function refrescarTransferencias() {
   setLoading("lista-transferencias", "Cargando transferencias…");
@@ -15,13 +14,11 @@ async function refrescarTransferencias() {
     .select("id, fecha, estado, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
     .order("fecha", { ascending: false })
     .limit(20);
-
   _cache.transferencias = data || [];
   renderResumen();
   renderTransferenciasLista();
 }
 
-// R10+R11: render accionable del historial de transferencias. Filtra
 let _trfBusqueda = "";
 function renderTransferenciasLista() {
   const lista = document.getElementById("lista-transferencias");
@@ -52,7 +49,6 @@ function renderTransferenciasLista() {
   lista.innerHTML = "";
   filtradas.forEach((t) => {
     const div = document.createElement("div");
-    // R11: accionable. data-trf-id permite abrir el detalle real.
     div.className = "lista-item lista-item-accion trf-item";
     div.setAttribute("data-trf-id", t.id || "");
     div.setAttribute("role", "button");
@@ -65,30 +61,89 @@ function renderTransferenciasLista() {
   actualizarContador("trf-contador", filtradas.length, todas.length);
 }
 
-/** Stock disponible del producto en el almacén origen (caché local + proyección offline). */
 function stockDisponibleOrigen(producto_id, origen_id) {
   if (!producto_id || !origen_id) return null;
   const fila = (_cache.stock || []).find(
-    (s) => s.producto_id === producto_id && s.almacen_id === origen_id
+    (s) => String(s.producto_id) === String(producto_id) && String(s.almacen_id) === String(origen_id)
   );
   let base = fila ? Number(fila.cantidad) || 0 : 0;
-  // Proyección de operaciones pendientes (misma lógica que ajustePendiente).
   if (typeof ajustePendiente === "function") {
     const { ajuste, noCalculable } = ajustePendiente(producto_id, origen_id);
     if (noCalculable) return { cantidad: base, aproximado: true };
-    return { cantidad: base + ajuste, aproximado: false };
+    return { cantidad: Math.max(base + ajuste, 0), aproximado: false };
   }
   return { cantidad: base, aproximado: false };
 }
+
+function actualizarStockTransferenciaUI() {
+  let el = document.getElementById("trf-stock-disponible");
+  const form = document.getElementById("form-transferencia");
+  if (!el && form) {
+    el = document.createElement("p");
+    el.id = "trf-stock-disponible";
+    el.className = "msg";
+    const msg = document.getElementById("msg-transferencias");
+    if (msg && msg.parentNode) msg.parentNode.insertBefore(el, msg);
+    else form.appendChild(el);
+  }
+  if (!el) return;
+  const origen = (document.getElementById("trf-origen") || {}).value || "";
+  const producto_id = (document.getElementById("trf-producto") || {}).value || "";
+  const cantInput = document.getElementById("trf-cantidad");
+  if (!origen || !producto_id) {
+    el.textContent = "";
+    el.className = "msg";
+    if (cantInput) cantInput.removeAttribute("max");
+    return;
+  }
+  const info = stockDisponibleOrigen(producto_id, origen);
+  if (!info) { el.textContent = ""; return; }
+  const disp = info.cantidad;
+  el.textContent =
+    "Stock disponible en origen: " +
+    (typeof money === "function" ? money(disp) : disp) +
+    (info.aproximado ? " (estimado con operaciones pendientes)" : "");
+  el.className = "msg" + (disp <= 0 ? " error" : "");
+  if (cantInput) {
+    if (disp > 0) cantInput.setAttribute("max", String(disp));
+    else cantInput.removeAttribute("max");
+  }
+}
+
+let _enviandoTransferencia = false;
 
 safeInit("form-transferencia", () => {
   const form = document.getElementById("form-transferencia");
   if (!form) return;
 
+  ["trf-origen", "trf-producto"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.bcTrfStock) {
+      el.dataset.bcTrfStock = "1";
+      el.addEventListener("change", actualizarStockTransferenciaUI);
+    }
+  });
+  const cantEl = document.getElementById("trf-cantidad");
+  if (cantEl && !cantEl.dataset.bcTrfStock) {
+    cantEl.dataset.bcTrfStock = "1";
+    cantEl.addEventListener("input", () => {
+      const max = cantEl.getAttribute("max");
+      const val = parseFloat(cantEl.value);
+      if (max != null && Number.isFinite(val) && val > parseFloat(max)) {
+        setMsg("msg-transferencias", "Esa cantidad supera el stock disponible en origen (" +
+          (typeof money === "function" ? money(parseFloat(max)) : max) + ").", false);
+      } else if (val < 0 || (cantEl.value !== "" && !Number.isFinite(val))) {
+        setMsg("msg-transferencias", "La cantidad debe ser un número mayor a 0.", false);
+      } else {
+        setMsg("msg-transferencias", "", true);
+      }
+    });
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (_enviandoTransferencia) return;
 
-    // Permisos: Usuario → Rol → Permisos del rol (sin permisos individuales).
     if (typeof tienePermiso === "function" && !tienePermiso("transferencias", "crear")) {
       setMsg("msg-transferencias", "No tenés permiso para registrar transferencias.", false);
       return;
@@ -104,7 +159,7 @@ safeInit("form-transferencia", () => {
       setMsg("msg-transferencias", "Completá origen, destino y producto.", false);
       return;
     }
-    if (origen === destino) {
+    if (String(origen) === String(destino)) {
       setMsg("msg-transferencias", "El origen y el destino no pueden ser el mismo almacén.", false);
       return;
     }
@@ -113,16 +168,11 @@ safeInit("form-transferencia", () => {
       return;
     }
 
-    // Validación de stock en origen (cliente). El backend vuelve a validar.
     const stockInfo = stockDisponibleOrigen(producto_id, origen);
     if (stockInfo && stockInfo.cantidad < cantidad) {
-      const disp = money(stockInfo.cantidad);
-      setMsg(
-        "msg-transferencias",
-        "Stock insuficiente en el almacén origen (disponible: " + disp +
-          (stockInfo.aproximado ? " · estimado con pendientes" : "") + ").",
-        false
-      );
+      const disp = typeof money === "function" ? money(stockInfo.cantidad) : stockInfo.cantidad;
+      setMsg("msg-transferencias", "Stock insuficiente en el almacén origen (disponible: " + disp +
+        (stockInfo.aproximado ? " · estimado con pendientes" : "") + ").", false);
       return;
     }
 
@@ -130,34 +180,45 @@ safeInit("form-transferencia", () => {
       return;
     }
 
-    submitBtn.disabled = true;
-    const resultado = await ejecutarOperacion("transferencia", {
-      p_origen_id: origen,
-      p_destino_id: destino,
-      p_lineas: [{ producto_id, cantidad }],
-    });
-    submitBtn.disabled = false;
+    _enviandoTransferencia = true;
+    var textoOriginal = submitBtn ? submitBtn.textContent : "";
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Procesando…"; }
 
-    if (!resultado.ok) {
-      setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(resultado.error, "transferencia"), false);
-      return;
-    }
-    e.target.reset();
-    if (resultado.offline) {
-      setMsg("msg-transferencias", "✓ Guardada localmente — se sincronizará al recuperar conexión.", true);
-      // Proyección local ya actualiza stock vía ajustePendiente en siguientes renders.
-      if (typeof refrescarOperacionesPendientesCache === "function") {
-        await refrescarOperacionesPendientesCache();
+    try {
+      const resultado = await ejecutarOperacion("transferencia", {
+        p_origen_id: origen,
+        p_destino_id: destino,
+        p_lineas: [{ producto_id: producto_id, cantidad: cantidad }],
+      });
+
+      if (!resultado.ok) {
+        setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(resultado.error, "transferencia"), false);
+        return;
       }
-      return;
+      e.target.reset();
+      actualizarStockTransferenciaUI();
+      if (resultado.offline) {
+        setMsg("msg-transferencias", "✓ Guardada localmente — se sincronizará al recuperar conexión.", true);
+        if (typeof refrescarOperacionesPendientesCache === "function") {
+          await refrescarOperacionesPendientesCache();
+        }
+        actualizarStockTransferenciaUI();
+        return;
+      }
+      setMsg("msg-transferencias", "Transferencia registrada. El stock se movió de origen a destino.", true);
+      await refrescarTransferencias();
+      await refrescarStockYSelects();
+      actualizarStockTransferenciaUI();
+    } finally {
+      _enviandoTransferencia = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        if (textoOriginal) submitBtn.textContent = textoOriginal;
+      }
     }
-    setMsg("msg-transferencias", "Transferencia registrada. El stock se movió de origen a destino.", true);
-    await refrescarTransferencias();
-    await refrescarStockYSelects();
   });
 });
 
-// ---- Detalle accionable de transferencia (incluye líneas si están disponibles)
 async function mostrarDetalleTransferencia(trfId) {
   const cont = document.getElementById("transferencia-detalle");
   if (!cont) return;
@@ -169,11 +230,8 @@ async function mostrarDetalleTransferencia(trfId) {
     _enlazarCerrarTrfDetalle();
     return;
   }
-
   const fechaHora = trf.fecha ? fechaHoraCompleta(trf.fecha) : "—";
   const estadoTxt = trf.estado ? escHtml(trf.estado) : "Registrada";
-
-  // Intentar cargar líneas reales (no inventar). Si falla o no hay datos, se omite.
   let lineasHtml = "";
   try {
     if (navigator.onLine && trf.id) {
@@ -192,10 +250,8 @@ async function mostrarDetalleTransferencia(trfId) {
       }
     }
   } catch (e) {
-    // Silencioso: el detalle de cabecera sigue siendo útil sin líneas.
     console.warn("[Battlecruiser] No se pudieron cargar líneas de transferencia:", e);
   }
-
   cont.innerHTML = '<div class="detalle-cabecera">'
     + '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + '</span>'
     + '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
@@ -227,7 +283,6 @@ function cerrarDetalleTransferencia() {
   if (cont) { cont.classList.add("hidden"); cont.innerHTML = ""; }
 }
 
-// Vales: listado y refresh viven aquí por extracción histórica; el detalle está en vales.js.
 async function refrescarVales() {
   setLoading("lista-vales", "Cargando vales…");
   const { data } = await client
@@ -235,7 +290,6 @@ async function refrescarVales() {
     .select("id, fecha, tipo, cantidad, productos(nombre), almacenes(nombre)")
     .order("fecha", { ascending: false })
     .limit(20);
-
   _cache.vales = data || [];
   renderResumen();
   renderValesLista();
