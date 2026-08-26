@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.15 — controlled recovery test: reintroduce inventario-detalle only
-(function hotfixV9315(){
-  const VERSION="9.3.15";
+// v9.3.16 — controlled recovery test: reintroduce inventario-detalle + m26-15 communication layout
+(function hotfixV9316(){
+  const VERSION="9.3.16";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -50,7 +50,8 @@
     ["m-f9-turnos-integrity.js","F9.1"],
     ["m-f12-f17-ui-layout.js","F12.1"],
     ["compra-multiple.js","27.8"],
-    ["inventario-detalle.js","inv.2"]
+    ["inventario-detalle.js","inv.2"],
+    ["m26-15-comunicacion-layout.js","26.15"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
