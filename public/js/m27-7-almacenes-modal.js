@@ -1,6 +1,8 @@
 // BattleCruiser M27.7 — Almacenes: crear y editar mediante modal (Bloques 6 y 7)
 // Reutiliza: ejecutarOperacion("almacen"), editarAlmacen, refrescarAlmacenes,
 // etiquetaTipoAlmacen (parcheada), mision-c tipos. NO crea RPC nuevas.
+// v27.7b — Super Misión F2: dropdown Acciones hacia abajo; sin botón Crear redundante;
+//           Editar siempre abre modal completo (nombre+tipo).
 (function () {
   'use strict';
   if (window.__BC_M277_ALM__) return;
@@ -51,6 +53,16 @@
       '#tab-almacenes .alm-hero p{margin:4px 0 0;font-size:13px;color:var(--mist);max-width:420px;line-height:1.4}',
       '#tab-almacenes .alm-btn-nuevo{background:linear-gradient(180deg,var(--gold-bright,#e8d48b),var(--gold,#c9a24d))!important;color:#211605!important;border:none!important;font-weight:600;padding:10px 16px!important;border-radius:10px!important;cursor:pointer;box-shadow:0 4px 14px rgba(201,162,77,.22)}',
       '#tab-almacenes .alm-btn-nuevo:hover{filter:brightness(1.05)}',
+      '#tab-almacenes .alm-acciones-wrap{position:relative;display:inline-block}',
+      '#tab-almacenes .alm-acciones-menu{position:absolute;top:100%;left:0;margin-top:4px;min-width:180px;z-index:40;',
+      'background:var(--stone-2,var(--stone));border:1px solid rgba(201,162,77,.28);border-radius:10px;',
+      'box-shadow:0 12px 28px rgba(0,0,0,.45);padding:6px;display:flex;flex-direction:column;gap:2px}',
+      '#tab-almacenes .alm-acciones-menu.hidden{display:none!important}',
+      '#tab-almacenes .alm-acciones-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:none;border-radius:8px;',
+      'background:transparent;color:var(--text);font-size:13px;cursor:pointer}',
+      '#tab-almacenes .alm-acciones-menu button:hover:not(:disabled){background:rgba(201,162,77,.12);color:var(--gold)}',
+      '#tab-almacenes .alm-acciones-menu button:disabled{opacity:.45;cursor:not-allowed}',
+      '#tab-almacenes #alm-crear-btn{display:none!important}',
       '#bc-alm-modal{position:fixed;inset:0;z-index:10020;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}',
       '#bc-alm-modal.open{display:flex}',
       '#bc-alm-modal .bc-alm-backdrop{position:absolute;inset:0;background:rgba(6,14,11,.72);backdrop-filter:blur(3px)}',
@@ -72,7 +84,6 @@
       '#bc-alm-modal .bc-alm-status{min-height:20px;margin-top:8px;font-size:13px;font-weight:600}',
       '#bc-alm-modal .bc-alm-status.err{color:var(--wine,#c45)}',
       '#bc-alm-modal .bc-alm-status.ok{color:#9dcc9a}',
-      /* Ocultar modal legacy solo-tipo para evitar doble UI */
       '#bc-almacen-tipo-modal{display:none!important}'
     ].join('');
     document.head.appendChild(s);
@@ -256,7 +267,6 @@
         try { await cargarStockAlmacenes(true); } catch (e) {}
       }
 
-      // Seleccionar el almacén creado/editado
       var newId = id;
       if (!newId && resultado.data) {
         newId = typeof resultado.data === 'string' ? resultado.data : (resultado.data.id || null);
@@ -279,7 +289,6 @@
       form.classList.add('hidden');
       form.style.display = 'none';
     }
-    // Normalizar opciones del select oculto por si otro código lo lee
     var sel = document.getElementById('alm-tipo');
     if (sel && !sel.dataset.bcM277) {
       sel.dataset.bcM277 = '1';
@@ -298,14 +307,12 @@
     document.documentElement.dataset.bcM277Bound = '1';
 
     document.addEventListener('click', function (e) {
-      // Nuevo almacén (hero)
       if (e.target.closest('#bc-alm-btn-nuevo')) {
         e.preventDefault();
         e.stopPropagation();
         openCreate();
         return;
       }
-      // Menú Acciones → Crear
       if (e.target.closest('#alm-crear-btn')) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -314,7 +321,6 @@
         openCreate();
         return;
       }
-      // Menú Acciones → Editar (sustituye modal solo-tipo de misión C)
       if (e.target.closest('#alm-editar-btn')) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -323,19 +329,16 @@
         openEdit();
         return;
       }
-      // Modal: tipo
       var tipoBtn = e.target.closest('#bc-alm-modal .bc-alm-tipo');
       if (tipoBtn) {
         e.preventDefault();
         selectTipo(tipoBtn.getAttribute('data-tipo'));
         return;
       }
-      // Modal: cerrar
       if (e.target.closest('[data-bc-alm-close="1"]')) {
         closeModal();
         return;
       }
-      // Modal: guardar
       if (e.target.closest('#bc-alm-modal-guardar')) {
         e.preventDefault();
         save();
@@ -350,7 +353,6 @@
     });
   }
 
-  // Anular abrirForm* legacy para que no muestren el form inline
   function patchLegacyOpeners() {
     try {
       if (typeof window.abrirFormCrearAlmacen === 'function') {

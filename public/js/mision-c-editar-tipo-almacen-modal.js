@@ -1,5 +1,6 @@
 // BattleCruiser — Misión C extensión
 // Edición del tipo de almacén mediante ventana modal.
+// vC.2b — Super Misión F2: no interceptar #alm-editar-btn si el modal completo M27.7 está activo.
 (function(){
   'use strict';
   const STYLE='bc-mision-c-modal-style';
@@ -42,6 +43,12 @@
   }
   function close(){const r=document.getElementById(ROOT);if(r)r.classList.add('hidden');}
   function open(){
+    if (window.__BC_M277_ALM__ || typeof window.__BC_M277_openEditAlmacen === 'function') {
+      if (typeof window.__BC_M277_openEditAlmacen === 'function') {
+        window.__BC_M277_openEditAlmacen();
+      }
+      return;
+    }
     const id=selectedId();if(!id)return;
     const a=cacheAlmacenes().find(x=>String(x.id)===String(id));if(!a)return;
     const r=ensure();r.querySelector('#bc-alm-modal-nombre').textContent=a.nombre||'Almacén';r.querySelector('#bc-alm-modal-status').textContent='';
@@ -65,6 +72,14 @@
   function bind(){
     if(bound)return;bound=true;
     document.addEventListener('click',function(e){
+      if (window.__BC_M277_ALM__ || typeof window.__BC_M277_openEditAlmacen === 'function') {
+        const tipo=e.target.closest('#'+ROOT+' .bc-alm-tipo');
+        if(tipo){e.preventDefault();const r=ensure();r.querySelectorAll('.bc-alm-tipo').forEach(b=>b.classList.remove('selected'));tipo.classList.add('selected');tipo.querySelector('input').checked=true;return;}
+        if(e.target.id==='bc-alm-modal-cancelar')close();
+        if(e.target.id==='bc-alm-modal-guardar')save();
+        if(e.target.id===ROOT)close();
+        return;
+      }
       const btn=e.target.closest('#alm-editar-btn');
       if(btn){e.preventDefault();e.stopImmediatePropagation();open();return;}
       const tipo=e.target.closest('.bc-alm-tipo');
