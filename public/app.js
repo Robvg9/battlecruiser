@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.10 — Super Misión F8: transferencias harden + preserve selects
-(function hotfixV9310(){
-  const VERSION="9.3.10";
+// v9.3.11 — Super Misión F9: integridad turnos (1 sesión/almacén, continuar cuadre)
+(function hotfixV9311(){
+  const VERSION="9.3.11";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -46,6 +46,7 @@
     ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7b"],
     ["mision-d-stock-reposicion.js","D.10"],
     ["m-f8-trf-selects-preserve.js","F8.1"],
+    ["m-f9-turnos-integrity.js","F9.1"],
     ["compra-multiple.js","27.8"]
   ];
   modules.forEach(([name,version])=>{
