@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.18 — M26.15b re-enabled: communication layout without MutationObserver loop
-(function hotfixV9318(){
-  const VERSION="9.3.18";
+// v9.3.19 — DAP-0: loading-guard + almacenes modal refresh hygiene
+(function hotfixV9319(){
+  const VERSION="9.3.19";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -45,7 +45,7 @@
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6b"],
     ["m27-6b-venta-payload-pres.js","27.6b1"],
-    ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7b"],
+    ["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7c"],
     ["mision-d-stock-reposicion.js","D.10"],
     ["m-f8-trf-selects-preserve.js","F8.1"],
     ["m-f9-turnos-integrity.js","F9.1"],
