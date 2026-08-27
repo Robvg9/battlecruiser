@@ -2,7 +2,7 @@
 // Selector y gestión de almacenes + stock del panel.
 // M26.6-FE: estados explícitos de carga de stock (nunca "Cargando…" infinito).
 // Query stock sin embeds + safety timeout.
-// Bloque 6/7: tipos almacenamiento | minorista | mayorista (legacy venta → Minorista).
+// Bloque 6/7 + DAP-1: tipos UI almacenamiento|minorista|mayorista → RPC venta|mayorista|almacenamiento.
 
 let _almacenSeleccionadoId = null;
 /** idle | loading | ok | error */
@@ -18,6 +18,18 @@ function etiquetaTipoAlmacen(tipo) {
   if (t === "minorista" || t === "venta") return "Minorista";
   if (t === "mayorista") return "Mayorista";
   return t ? String(tipo) : "Almacenamiento";
+}
+
+/** UI / form value → contrato RPC crear_almacen / editar_almacen */
+function tipoAlmacenUiARpc(tipo) {
+  if (typeof window.__BC_M277_tipoUiARpc === "function") {
+    return window.__BC_M277_tipoUiARpc(tipo);
+  }
+  const t = String(tipo || "").toLowerCase();
+  if (t === "minorista" || t === "venta") return "venta";
+  if (t === "mayorista") return "mayorista";
+  if (t === "almacenamiento") return "almacenamiento";
+  return t;
 }
 
 function mismoIdAlmacen(a, b) {
@@ -177,7 +189,6 @@ function renderProductosDelAlmacen(almacen_id) {
       lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos con stock registrado.</p>';
     } else if (_stockCargaEstado === "idle") {
       lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
-      // Solo disparar una vez desde idle
       cargarStockAlmacenes(false);
     } else {
       lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
@@ -230,10 +241,6 @@ function seleccionarAlmacen(id) {
   }
 }
 
-/**
- * Carga única de stock (deduplicada). force=true reinicia tras error.
- * M26.6-FE: select plano (sin embeds) + safety timer → nunca "Cargando…" eterno.
- */
 function cargarStockAlmacenes(force) {
   if (_stockCargaEstado === "loading" && _stockCargaPromise) {
     return _stockCargaPromise;
@@ -265,7 +272,6 @@ function cargarStockAlmacenes(force) {
         }).catch(function () {});
       }
 
-      // Sin embeds: evita hang/RLS en joins; nombres desde _cache.productos
       var stockP = bcConTimeoutLocal(
         withCache("stock", function () {
           return client
@@ -311,7 +317,6 @@ function cerrarFormAlmacen() {
 }
 
 function abrirFormCrearAlmacen() {
-  // Bloque 6: preferir modal si está disponible
   if (typeof window.__BC_M277_openCreateAlmacen === "function") {
     window.__BC_M277_openCreateAlmacen();
     return;
@@ -324,7 +329,6 @@ function abrirFormCrearAlmacen() {
 }
 
 function abrirFormEditarAlmacen() {
-  // Bloque 7: preferir modal si está disponible
   if (typeof window.__BC_M277_openEditAlmacen === "function") {
     window.__BC_M277_openEditAlmacen();
     return;
@@ -366,7 +370,6 @@ async function refrescarAlmacenes() {
 
   llenarSelectorAlmacenes(almacenes);
   renderPanelAlmacenSeleccionado();
-  // Cargar stock en paralelo sin bloquear el retorno de almacenes
   cargarStockAlmacenes(false);
 
   fillSelect(document.getElementById("trf-origen"), almacenes, "id", (a) => a.nombre);
@@ -383,7 +386,6 @@ async function refrescarStockYSelects() {
   } catch (e) {
     console.warn("[BattleCruiser] refrescarStockYSelects productos", e);
   }
-  // force solo si aún no hay ok (evita carreras con refrescarAlmacenes)
   await cargarStockAlmacenes(_stockCargaEstado !== "ok");
 }
 
@@ -393,12 +395,12 @@ safeInit("form-almacen", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const nombre = document.getElementById("alm-nombre").value.trim();
-    let tipo = document.getElementById("alm-tipo").value;
-    if (tipo === "venta") tipo = "minorista";
+    let tipoUi = document.getElementById("alm-tipo").value;
+    const tipoRpc = tipoAlmacenUiARpc(tipoUi);
     const editandoId = (document.getElementById("alm-editando-id") || {}).value || "";
     const submitBtn = document.getElementById("alm-submit-btn") || e.target.querySelector("button[type='submit']");
 
-    if (!nombre || !tipo) {
+    if (!nombre || !tipoRpc) {
       setMsg("msg-almacenes", "Completá nombre y tipo.", false);
       return;
     }
@@ -406,11 +408,11 @@ safeInit("form-almacen", () => {
     submitBtn.disabled = true;
     let resultado;
     if (editandoId) {
-      resultado = await editarAlmacen(editandoId, { p_nombre: nombre, p_tipo: tipo });
+      resultado = await editarAlmacen(editandoId, { p_nombre: nombre, p_tipo: tipoRpc });
     } else {
       resultado = await ejecutarOperacion("almacen", {
         p_nombre: nombre,
-        p_tipo: tipo,
+        p_tipo: tipoRpc,
       });
     }
     submitBtn.disabled = false;
@@ -501,7 +503,9 @@ safeInit("almacenes-ui", () => {
 
 async function editarAlmacen(almacen_id, cambios) {
   const payload = Object.assign({ p_almacen_id: almacen_id }, cambios || {});
-  if (payload.p_tipo === "venta") payload.p_tipo = "minorista";
+  if (payload.p_tipo != null && payload.p_tipo !== "") {
+    payload.p_tipo = tipoAlmacenUiARpc(payload.p_tipo);
+  }
   const resultado = await ejecutarOperacion("almacen_actualizar", payload);
   if (resultado.ok && !resultado.offline) {
     await refrescarAlmacenes();
