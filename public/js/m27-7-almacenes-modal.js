@@ -1,8 +1,6 @@
 // BattleCruiser M27.7 — Almacenes: crear y editar mediante modal (Bloques 6 y 7)
-// Reutiliza: ejecutarOperacion("almacen"), editarAlmacen, refrescarAlmacenes,
-// etiquetaTipoAlmacen (parcheada), mision-c tipos. NO crea RPC nuevas.
-// v27.7b — Super Misión F2: dropdown Acciones hacia abajo; sin botón Crear redundante;
-//           Editar siempre abre modal completo (nombre+tipo).
+// Reutiliza: ejecutarOperacion("almacen"), editarAlmacen, refrescarAlmacenes.
+// v27.7d — DAP-1: mapear tipos UI→contrato RPC (minorista→venta; almacenamiento permitido tras m13b).
 (function () {
   'use strict';
   if (window.__BC_M277_ALM__) return;
@@ -20,6 +18,15 @@
     mayorista: 'Mayorista',
     venta: 'Minorista'
   };
+
+  /** UI → valor aceptado por crear_almacen / editar_almacen (contrato m13 + m13b). */
+  function tipoUiARpc(t) {
+    var s = String(t || '').toLowerCase();
+    if (s === 'minorista' || s === 'venta') return 'venta';
+    if (s === 'mayorista') return 'mayorista';
+    if (s === 'almacenamiento') return 'almacenamiento';
+    return s;
+  }
 
   function normTipo(t) {
     var s = String(t || '').toLowerCase();
@@ -208,20 +215,38 @@
     }, 40);
   }
 
+  function mensajeErrorReal(resultado, accion) {
+    var err = resultado && resultado.error;
+    var raw = (err && (err.message || err.details || err.hint)) || '';
+    if (!raw && err) raw = String(err);
+    if (typeof explicarError === 'function') {
+      var explained = explicarError(err, accion);
+      if (explained && explained !== 'Error desconocido') return 'Error al ' + accion + ': ' + explained;
+    }
+    if (raw) return 'Error al ' + accion + ': ' + raw;
+    return 'Error al ' + accion + ': respuesta inválida del servidor.';
+  }
+
   async function save() {
     var id = (document.getElementById('bc-alm-modal-id') || {}).value || '';
     var nombreEl = document.getElementById('bc-alm-modal-nombre');
     var nombre = nombreEl ? nombreEl.value.trim() : '';
-    var tipo = getSelectedTipo();
+    var tipoUi = getSelectedTipo();
+    var tipoRpc = tipoUiARpc(tipoUi);
     var btn = document.getElementById('bc-alm-modal-guardar');
+    var accion = id ? 'editar almacén' : 'crear almacén';
 
     if (!nombre) {
       setStatus('Completá el nombre del almacén.', false);
       if (nombreEl) nombreEl.focus();
       return;
     }
-    if (!tipo || !TIPOS.some(function (t) { return t.value === tipo; })) {
+    if (!tipoUi || !TIPOS.some(function (t) { return t.value === tipoUi; })) {
       setStatus('Seleccioná un tipo válido (almacenamiento, minorista o mayorista).', false);
+      return;
+    }
+    if (!tipoRpc) {
+      setStatus('Tipo de almacén no mapeable al backend.', false);
       return;
     }
 
@@ -232,17 +257,14 @@
       var resultado;
       if (id) {
         if (typeof editarAlmacen !== 'function') throw new Error('Función de edición no disponible');
-        resultado = await editarAlmacen(id, { p_nombre: nombre, p_tipo: tipo });
+        resultado = await editarAlmacen(id, { p_nombre: nombre, p_tipo: tipoRpc });
       } else {
         if (typeof ejecutarOperacion !== 'function') throw new Error('Operación no disponible');
-        resultado = await ejecutarOperacion('almacen', { p_nombre: nombre, p_tipo: tipo });
+        resultado = await ejecutarOperacion('almacen', { p_nombre: nombre, p_tipo: tipoRpc });
       }
 
       if (!resultado || !resultado.ok) {
-        var errMsg = typeof explicarError === 'function'
-          ? explicarError(resultado && resultado.error, id ? 'editar almacén' : 'crear almacén')
-          : ((resultado && resultado.error && resultado.error.message) || 'No se pudo guardar');
-        setStatus(errMsg, false);
+        setStatus(mensajeErrorReal(resultado, accion), false);
         return;
       }
 
@@ -260,10 +282,15 @@
         setMsg('msg-almacenes', id ? 'Almacén actualizado.' : 'Almacén creado.', true);
       }
 
-      if (typeof refrescarAlmacenes === 'function') {
+      if (!id && typeof refrescarAlmacenes === 'function') {
         await refrescarAlmacenes();
+      } else if (!id) {
+        /* editarAlmacen ya refresca online */
+      } else if (typeof refrescarAlmacenes === 'function') {
+        /* edit path: editarAlmacen refreshes when online; offline already returned */
       }
-      if (typeof cargarStockAlmacenes === 'function') {
+
+      if (typeof cargarStockAlmacenes === 'function' && !id) {
         try { await cargarStockAlmacenes(true); } catch (e) {}
       }
 
@@ -277,7 +304,7 @@
 
       setTimeout(closeModal, 280);
     } catch (e) {
-      setStatus((e && e.message) || 'No se pudo guardar el almacén.', false);
+      setStatus('Error al ' + accion + ': ' + ((e && e.message) || 'fallo inesperado'), false);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -388,4 +415,5 @@
 
   window.__BC_M277_openCreateAlmacen = openCreate;
   window.__BC_M277_openEditAlmacen = openEdit;
+  window.__BC_M277_tipoUiARpc = tipoUiARpc;
 })();
