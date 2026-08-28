@@ -15,7 +15,8 @@
     recibirEntregaInv: 'bc_recibir_entrega_inventario', recibirYCrearSucesor: 'bc_recibir_entrega_inventario_y_crear_sucesor',
     prepararSucesor: 'bc_preparar_turno_sucesor', crearSucesor: 'bc_crear_sucesor_turno', turnoEstado: 'bc_turno_estado',
     turnoTransition: 'bc_turno_transition', actorIsAdmin: 'bc_actor_is_admin', listarTurnos: 'listar_turnos',
-    configObtener: 'bc_obtener_configuracion_turnos', configDuracion: 'bc_configurar_duracion_turnos', editarDias: 'bc_editar_dias_turno'
+    configObtener: 'bc_obtener_configuracion_turnos', configDuracion: 'bc_configurar_duracion_turnos', editarDias: 'bc_editar_dias_turno',
+    registrarLlegadaCompra: 'bc_registrar_llegada_compra', confirmarRecepcionCompra: 'bc_confirmar_recepcion_compra'
   };
 
   function uuid() { return crypto.randomUUID(); }
@@ -59,8 +60,6 @@
     asignarSesion: function (s,u) { return callRpc(RPC.asignarSesion,{p_turno_sesion_id:s,p_usuario_id:u}); },
     iniciarSesion: function (s) { return callRpc(RPC.iniciarSesion,{p_turno_sesion_id:s}); },
     cerrarSesion: function (s) { return callRpc(RPC.cerrarSesion,{p_turno_sesion_id:s}); },
-    // La UX entrega un sesionId. La RPC exige el tramo ACTIVO; resolvemos aquí
-    // para mantener un único contrato API y evitar que el frontend envíe IDs equivocados.
     interrumpirYRelevar: async function (sesionId, sustitutoId, motivo) {
       const tramos = await selectTable('turno_tramos','*','turno_sesion_id',sesionId,'inicio_at');
       const activo = (tramos || []).find(function (t) { return String(t.estado || '').toUpperCase() === 'ACTIVO'; });
@@ -77,6 +76,8 @@
     recibirEntregaInventario: function (e,o) { return callRpc(RPC.recibirEntregaInv,{p_entrega_id:e,p_comentario:o||null}); },
     recibirEntregaInventarioConDiferencias: function (e,c,o) { return callRpc(RPC.recibirEntregaInv,{p_entrega_id:e,p_con_diferencias:!!c,p_comentario:o||null}); },
     recibirYCrearSucesor: function (e,d,c,o) { return callRpc(RPC.recibirYCrearSucesor,{p_entrega_id:e,p_dias_sucesor:d!=null?Number(d):null,p_con_diferencias:!!c,p_comentario:o||null}); },
+    registrarLlegadaCompra: function (compraId, almacenId, observacion) { return callRpc(RPC.registrarLlegadaCompra,{p_compra_id:compraId,p_almacen_id:almacenId,p_observacion:observacion||null}); },
+    confirmarRecepcionCompra: function (recepcionId, aceptar, observacion) { return callRpc(RPC.confirmarRecepcionCompra,{p_recepcion_id:recepcionId,p_aceptar:!!aceptar,p_observacion:observacion||null}); },
     prepararSucesor: function (t) { return callRpc(RPC.prepararSucesor,{p_turno_id:t}); },
     crearSucesor: function (t,d) { return callRpc(RPC.crearSucesor,{p_turno_anterior_id:t,p_dias:d!=null?Number(d):null}); },
     turnoEstado: function (t) { return callRpc(RPC.turnoEstado,{p_turno_id:t}); },
