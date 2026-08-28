@@ -1,6 +1,6 @@
 // BattleCruiser — turno-api.js
 // Capa única de acceso al contrato backend TURNO (RPC bc_*).
-// Fuente de verdad: Documento Maestro Notion 2026-08-28 + introspección live documentada.
+// Fuente de verdad: Documento Maestro Notion 2026-08-28 + introspección live.
 // NO inventa firmas. Si el backend rechaza argumentos, se propaga el error real.
 // Mutaciones: online-only. No encola ni simula éxito offline.
 (function (global) {
@@ -34,9 +34,7 @@
     editarDias: 'bc_editar_dias_turno'
   };
 
-  function uuid() {
-    return crypto.randomUUID();
-  }
+  function uuid() { return crypto.randomUUID(); }
 
   function onlineRequired() {
     if (!navigator.onLine) {
@@ -103,36 +101,44 @@
       opts = opts || {};
       return callRpc(RPC.crearTurno, {
         p_almacen_id: opts.almacenId,
-        p_inicio_plan: opts.inicioPlan,
-        p_cantidad_dias: opts.cantidadDias,
-        p_asignaciones: opts.asignaciones || null,
-        p_idempotency_key: opts.idempotencyKey || uuid(),
-        p_observacion: opts.observacion || null
+        p_fecha_inicio: opts.inicioPlan,
+        p_dias: opts.cantidadDias,
+        p_asignaciones: opts.asignaciones || []
+      });
+    },
+
+    crearSesion: function (turnoId, numeroDia, bloque, fecha, almacenId) {
+      return callRpc(RPC.crearSesion, {
+        p_turno_id: turnoId,
+        p_numero_dia: Number(numeroDia),
+        p_bloque: bloque,
+        p_fecha: fecha,
+        p_almacen_id: almacenId
       });
     },
 
     asignarSesion: function (sesionId, usuarioId) {
-      return callRpc(RPC.asignarSesion, { p_sesion_id: sesionId, p_usuario_id: usuarioId });
+      return callRpc(RPC.asignarSesion, { p_turno_sesion_id: sesionId, p_usuario_id: usuarioId });
     },
 
     iniciarSesion: function (sesionId) {
-      return callRpc(RPC.iniciarSesion, { p_sesion_id: sesionId });
+      return callRpc(RPC.iniciarSesion, { p_turno_sesion_id: sesionId });
     },
 
     cerrarSesion: function (sesionId) {
-      return callRpc(RPC.cerrarSesion, { p_sesion_id: sesionId });
+      return callRpc(RPC.cerrarSesion, { p_turno_sesion_id: sesionId });
     },
 
-    interrumpirYRelevar: function (sesionId, sustitutoId, motivo) {
+    interrumpirYRelevar: function (tramoId, sustitutoId, motivo) {
       return callRpc(RPC.interrumpirRelevar, {
-        p_sesion_id: sesionId,
-        p_usuario_sustituto: sustitutoId,
+        p_turno_tramo_id: tramoId,
+        p_sustituto_id: sustitutoId,
         p_motivo: motivo || 'Emergencia'
       });
     },
 
     declararDinero: function (tramoId, monto) {
-      return callRpc(RPC.declararDinero, { p_tramo_id: tramoId, p_monto: Number(monto) });
+      return callRpc(RPC.declararDinero, { p_turno_tramo_id: tramoId, p_monto: Number(monto) });
     },
 
     enviarAprobacion: function (turnoId) {
@@ -140,11 +146,11 @@
     },
 
     aprobarTurno: function (turnoId, observacion) {
-      return callRpc(RPC.aprobarTurno, { p_turno_id: turnoId, p_observacion: observacion || null });
+      return callRpc(RPC.aprobarTurno, { p_turno_id: turnoId, p_comentario: observacion || null });
     },
 
     aprobarDiferencia: function (diferenciaId, observacion) {
-      return callRpc(RPC.aprobarDiferencia, { p_diferencia_id: diferenciaId, p_observacion: observacion || null });
+      return callRpc(RPC.aprobarDiferencia, { p_diferencia_id: diferenciaId, p_comentario: observacion || null });
     },
 
     crearDescuento: function (opts) {
@@ -154,8 +160,8 @@
         p_usuario_id: opts.usuarioId,
         p_monto: Number(opts.monto),
         p_motivo: opts.motivo || '',
-        p_diferencia_id: opts.diferenciaId || null,
-        p_sesion_id: opts.sesionId || null
+        p_turno_sesion_id: opts.sesionId || null,
+        p_turno_tramo_id: opts.tramoId || null
       });
     },
 
@@ -163,22 +169,23 @@
       return callRpc(RPC.registrarEntregaInv, {
         p_turno_id: turnoId,
         p_usuario_receptor: null,
-        p_observacion: observacion || null
+        p_comentario: observacion || null
       });
     },
 
     recibirEntregaInventario: function (entregaId, observacion) {
       return callRpc(RPC.recibirEntregaInv, {
         p_entrega_id: entregaId,
-        p_observacion: observacion || null
+        p_comentario: observacion || null
       });
     },
 
-    recibirYCrearSucesor: function (entregaId, dias, observacion) {
+    recibirYCrearSucesor: function (entregaId, dias, conDiferencias, observacion) {
       return callRpc(RPC.recibirYCrearSucesor, {
         p_entrega_id: entregaId,
-        p_cantidad_dias: dias != null ? Number(dias) : null,
-        p_observacion: observacion || null
+        p_dias_sucesor: dias != null ? Number(dias) : null,
+        p_con_diferencias: !!conDiferencias,
+        p_comentario: observacion || null
       });
     },
 
@@ -189,12 +196,16 @@
     crearSucesor: function (turnoAnteriorId, dias) {
       return callRpc(RPC.crearSucesor, {
         p_turno_anterior_id: turnoAnteriorId,
-        p_cantidad_dias: dias != null ? Number(dias) : null
+        p_dias: dias != null ? Number(dias) : null
       });
     },
 
     turnoEstado: function (turnoId) {
       return callRpc(RPC.turnoEstado, { p_turno_id: turnoId });
+    },
+
+    turnoTransition: function (turnoId, nuevoEstado) {
+      return callRpc(RPC.turnoTransition, { p_turno_id: turnoId, p_new_estado: nuevoEstado });
     },
 
     actorIsAdmin: function () {
@@ -204,21 +215,18 @@
     listarTurnos: function (opts) {
       opts = opts || {};
       return callRpc(RPC.listarTurnos, {
-        p_almacen_id: opts.almacenId || null,
-        p_estado: opts.estado || null,
         p_usuario_id: opts.usuarioId || null,
-        p_limit: opts.limit != null ? opts.limit : 50,
+        p_estado: opts.estado || null,
+        p_almacen_id: opts.almacenId || null,
+        p_limite: opts.limit != null ? opts.limit : 50,
         p_offset: opts.offset != null ? opts.offset : 0
       });
     },
 
-    turnoActualUsuario: function () {
-      return callRpc(RPC.turnoActualUsuario, {});
-    },
+    turnoActualUsuario: function () { return callRpc(RPC.turnoActualUsuario, {}); },
 
-    configObtener: function () {
-      return callRpc(RPC.configObtener, {});
-    },
+    configObtener: function () { return callRpc(RPC.configObtener, {}); },
+    obtenerConfiguracion: function () { return callRpc(RPC.configObtener, {}); },
 
     configDuracion: function (habilitada, diasFijos) {
       return callRpc(RPC.configDuracion, {
@@ -234,11 +242,6 @@
       });
     },
 
-    /**
-     * Autenticación del sustituto para relevo de emergencia.
-     * Usa Supabase Auth (signInWithPassword). NO envía contraseñas a RPC propia.
-     * Restaura la sesión del operador original después de validar al sustituto.
-     */
     autenticarSustituto: async function (usuarioOEmail, password) {
       clientOk();
       onlineRequired();
@@ -252,28 +255,22 @@
           try {
             const r = await client.rpc('obtener_email_por_nombre_usuario', { p_nombre_usuario: usuarioOEmail });
             if (!r.error && r.data) email = typeof r.data === 'string' ? r.data : (r.data.email || email);
-          } catch (e) { /* continuar con valor original */ }
+          } catch (e) {}
         }
         const sign = await client.auth.signInWithPassword({ email: email, password: password });
         if (sign.error) throw sign.error;
         const sustituto = sign.data && sign.data.user;
         if (!sustituto) throw new Error('No se pudo autenticar al sustituto.');
         if (prevSession && prevSession.refresh_token) {
-          await client.auth.setSession({
-            access_token: prevSession.access_token,
-            refresh_token: prevSession.refresh_token
-          });
+          await client.auth.setSession({ access_token: prevSession.access_token, refresh_token: prevSession.refresh_token });
         }
         return { id: sustituto.id, email: sustituto.email };
       } catch (e) {
         try {
           if (prevSession && prevSession.refresh_token) {
-            await client.auth.setSession({
-              access_token: prevSession.access_token,
-              refresh_token: prevSession.refresh_token
-            });
+            await client.auth.setSession({ access_token: prevSession.access_token, refresh_token: prevSession.refresh_token });
           }
-        } catch (x) { /* ignore */ }
+        } catch (x) {}
         throw e;
       }
     },
@@ -281,18 +278,10 @@
     labelEstado: function (e) {
       const k = String(e || '').toUpperCase();
       return ({
-        PROGRAMADO: 'Programado',
-        EN_CURSO: 'En curso',
-        PENDIENTE_APROBACION: 'Pendiente de aprobación',
-        CERRADO: 'Cerrado',
-        CANCELADO: 'Cancelado',
-        PENDIENTE: 'Pendiente',
-        COMPLETADA: 'Completada',
-        EN_CURSO_SESION: 'En curso',
-        ACTIVO: 'Activo',
-        PLANIFICADO: 'Programado',
-        EN_VALIDACION: 'Pendiente de aprobación',
-        VALIDADO: 'Cerrado'
+        PROGRAMADO: 'Programado', EN_CURSO: 'En curso', PENDIENTE_APROBACION: 'Pendiente de aprobación',
+        CERRADO: 'Cerrado', CANCELADO: 'Cancelado', PENDIENTE: 'Pendiente', COMPLETADA: 'Completada',
+        EN_CURSO_SESION: 'En curso', ACTIVO: 'Activo', PLANIFICADO: 'Programado',
+        EN_VALIDACION: 'Pendiente de aprobación', VALIDADO: 'Cerrado'
       })[k] || e || '—';
     },
 
