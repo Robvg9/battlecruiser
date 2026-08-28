@@ -1,6 +1,6 @@
 # BATTLECRUISER — CEREBRO (única fuente de verdad)
 
-**Actualizado:** 2026-08-22  
+**Actualizado:** 2026-08-28  
 **Repositorio:** `Robvg9/battlecruiser` · rama `main`  
 **Proyecto Supabase:** `papxnkkjtkxsitcsvcme` (battlecruiser)
 
@@ -8,11 +8,55 @@
 
 ---
 
+## 0. MODELO OPERATIVO DEFINITIVO — TURNO (2026-08-28)
+
+**TURNO** es el único concepto operativo de negocio visible y consumido por la UX nueva.
+
+| Capa | Estado |
+|------|--------|
+| Notion / Documento Maestro | Contrato TURNO vigente |
+| Supabase LIVE | Tablas `turno_*` + RPC `bc_*` (migración aditiva); legacy ciclo presente |
+| GitHub FE | v9.4.0 · `turno-api.js` + `turnos-maestro.js` · label **Turnos** |
+| GitHub SQL `supabase/` | **GAP:** SQL `bc_*` / `turno_*` aún no versionado 1:1 desde live |
+
+### Estados maestro
+`PROGRAMADO → EN_CURSO → PENDIENTE_APROBACION → CERRADO` (+ `CANCELADO`).
+
+### Sesiones
+N días × 2 bloques (MANANA/TARDE) = **2N** sesiones.
+
+### FE nuevo (no destruye legacy)
+- `public/js/turno-api.js` — capa RPC `bc_*`, online-only, errores reales.
+- `public/js/turnos-maestro.js` — UX home por almacén, crear Turno, declaración, relevo, revisión ADMIN, descuentos.
+- `public/app.js` / `service-worker.js` — **v9.4.0**.
+
+### Ciclo = LEGACY
+`ciclos_operativos`, `sesiones_ciclo`, SQL M15–M17, `ciclos.js`, `m18-ciclos-ux.js`, M22/M24/M27 relacionados: **conservados**. No DROP. No presentar “Ciclo” como concepto operativo nuevo en UI.
+
+### Reglas clave (backend es autoridad)
+1. ADMIN crea Turno (almacén + días + asignaciones opcionales).
+2. Sesión sin asignar no inicia; solo la asignada inicia.
+3. Declaración de dinero obligatoria (incluido $0) para cerrar sesión.
+4. Cerrar sesión ≠ cerrar Turno.
+5. Turno pasa a `PENDIENTE_APROBACION` antes de `CERRADO`.
+6. Interrupción/relevo con Auth del sustituto (sin logout general).
+7. Receptor de mercancía en punto de venta = responsable de sesión activa (backend).
+8. Duración fija/variable vía `bc_obtener_configuracion_turnos` / `bc_configurar_duracion_turnos`.
+
+### Extensión futura (NO implementar parcialmente)
+Rol **TRANSPORTISTA / ENTREGADOR**: transporta mercancía; no es Dependiente por defecto.
+
+Detalle FE: `docs/BATTLECRUISER_TURNO_MODELO_V1.md`.
+
+---
+
 ## 1. IDENTIDAD
 
 **BattleCruiser** = Centro de Mando Digital del Negocio (no solo POS).
 
-Cubre: ventas, catálogo, inventario/FIFO/costos, productos/presentaciones/imágenes, almacenes, transferencias, vales, empleados/roles/permisos, turnos/cuadres/incidencias, **ciclos operativos + sesiones + entregas de caja + cierre de ciclo**, comunicación, auditoría, reportes.
+Cubre: ventas, catálogo, inventario/FIFO/costos, productos/presentaciones/imágenes, almacenes, transferencias, vales, empleados/roles/permisos, **turnos (concepto operativo definitivo)** / cuadres / incidencias, sesiones, entregas de caja, comunicación, auditoría, reportes.
+
+Legacy documentado: ciclos operativos (M15–M17) como compatibilidad histórica.
 
 **Objetivo:** digitalizar por completo la operación diaria.
 
@@ -28,18 +72,9 @@ Sistema operativo interno del negocio: tiempo real, menos errores humanos, contr
 
 **Estado:** 🔵 SOLO VISIÓN.
 
-**Concepto:** dispositivos BattleCruiser (teléfonos, tablets, PCs) sincronizan entre sí sin depender siempre de Internet.
+**Concepto:** dispositivos BattleCruiser sincronizan entre sí sin depender siempre de Internet.
 
-**Ejemplo:** Dispositivo A (online, datos frescos) → Dispositivo B (offline/atrasado) vía QR, código temporal, Bluetooth, WiFi local u otro método seguro.
-
-**Objetivos a investigar:**
-- Sincronización P2P entre teléfonos/tablets/PCs
-- Transferencia segura de cambios pendientes
-- Resolución de conflictos e identificación de versión más reciente
-- Integración con IndexedDB / cola offline actual (sin duplicarla)
-- Mantener auditoría y trazabilidad
-- Nunca sobrescribir datos críticos sin validación
-- Seguridad antes que velocidad
+**Objetivos a investigar:** P2P, resolución de conflictos, integración con IndexedDB/cola offline actual (sin duplicarla), auditoría, seguridad antes que velocidad.
 
 ---
 
@@ -50,24 +85,25 @@ PWA offline-first (Cloudflare Pages · `public/`).
 
 ```text
 public/
-├── index.html · style.css · app.js (stub) · service-worker.js (v50)
+├── index.html · style.css · app.js (v9.4.0) · service-worker.js (v9.4.0)
 ├── manifest.json · icons/
 └── js/
+    turno-api · turnos-maestro   ← modelo TURNO (nuevo)
     core · auth · offline · centro-control · navegacion
     productos · presentaciones · almacenes · transferencias · vales
-    ventas · venta-turno-ui · catalogos · configuracion · catalogo-avanzado
+    ventas · venta-turno-ui · catalogos · configuracion
     usuarios-permisos · mando · reportes · nucleo-operativo
-    operacion-humana · ciclos · comunicacion · panel-contextual
+    operacion-humana · ciclos (LEGACY) · comunicacion · panel-contextual
 ```
 
-Módulos cargados en orden histórico; funciones globales. **No** volver a monolito `app.js`.
+Módulos cargados en orden; funciones globales. **No** volver a monolito `app.js`.
 
 ### Backend
 Supabase (PostgreSQL, RPC, RLS, Storage, Auth, auditoría).  
 SQL versionado en `supabase/`. **Antes de crear backend nuevo: introspección de producción.**
 
 ### Tests
-`npm test` → `node --test test/*.test.js` (histórico 242 PASS en Misión 9.1).
+`npm test` → `node --test test/*.test.js`.
 
 ---
 
@@ -75,7 +111,7 @@ SQL versionado en `supabase/`. **Antes de crear backend nuevo: introspección de
 
 ### NO romper
 - `ejecutarOperacion()` · IndexedDB · cola FIFO · `sincronizarCola()`
-- Idempotencia (`idempotency_key` + `private.operaciones_idempotencia`)
+- Idempotencia (`idempotency_key`)
 - Permisos (Usuario → Rol → Permisos del Rol)
 - RLS / Auth / Service Worker / PWA
 - **M14:** `usuario → turno ABIERTO → almacen_id → venta`
@@ -83,14 +119,15 @@ SQL versionado en `supabase/`. **Antes de crear backend nuevo: introspección de
 ### NO crear
 - Colas u offline duplicados · permisos individuales por usuario
 - RPC/tablas paralelas innecesarias · `app.js` monolítico
+- Segunda máquina de estados en FE para Turno (backend manda)
 
 ### Método de trabajo
 1. Código real > memoria > promesas de IA.
 2. Escrito ≠ commit ≠ push ≠ deploy ≠ prueba real.
 3. Buscar lo existente antes de inventar.
 4. Sin contrato Supabase → documentar; no inventar en FE.
-5. Trabajar en `main` (sin ramas/PR salvo petición).
-6. Tras cambios: `node --check`, tests, commit, push, reportar SHA.
+5. Trabajar en `main`.
+6. Triangular Notion ↔ Supabase ↔ GitHub tras cada bloque.
 
 ### Roles
 | Rol | Responsabilidad |
@@ -108,12 +145,9 @@ SQL versionado en `supabase/`. **Antes de crear backend nuevo: introspección de
 ejecutarOperacion(tipo, payload)
   → online: client.rpc inmediato
   → offline/error red: cola IndexedDB FIFO → sincronizarCola()
-     · idempotency_key estable
-     · reconciliación + proyección stock local
 ```
 
-Tipos: `venta`, `turno`, `turno_cerrar`, `cuadre`, etc.  
-Payload de venta conserva `p_almacen_id`. **No duplicar esta arquitectura.**
+**Turno (bc_*):** mutaciones **online-only** por contrato actual. No inventar cola offline de Turno. No mostrar éxito falso si falla la red.
 
 ---
 
@@ -123,9 +157,7 @@ Payload de venta conserva `p_almacen_id`. **No duplicar esta arquitectura.**
 Usuario → Rol → Permisos del Rol
 ```
 
-FE: `tienePermiso(recurso, accion)` · BE: `tiene_permiso(...)` en RPC.  
-Hardening: `REVOKE EXECUTE ON public._validar_usuario_operacion FROM authenticated`.  
-`obtener_conversion_presentacion` existe en prod — **NO TOCAR**.
+FE: `tienePermiso(recurso, accion)` · BE: `tiene_permiso(...)` en RPC.
 
 ---
 
@@ -135,112 +167,38 @@ Hardening: `REVOKE EXECUTE ON public._validar_usuario_operacion FROM authenticat
 USUARIO → TURNO ABIERTO (1 por usuario) → ALMACÉN DEL TURNO → VENTA
 ```
 
-| Pieza | Estado |
-|-------|--------|
-| `abrir_turno` exige `p_almacen_id` activo | ✅ |
-| CHECK `turnos_abierto_requiere_almacen` | ✅ |
-| `registrar_venta` exige turno ABIERTO | ✅ |
-| Rechazo si `p_almacen_id` ≠ almacén del turno | ✅ |
-| NULL → usa almacén del turno | ✅ |
-| Fix M14b (variable `nombre`) | ✅ |
-| FE: `venta-turno-ui.js`, `#turno-almacen-abrir`, SW v50 | ✅ |
-
-**Riesgo residual:** `ventas.js` aún lee `#venta-almacen`; interceptores fuerzan el del turno. Validación Android real pendiente.
+No debilitar M14 al migrar el modelo operativo TURNO.
 
 ---
 
-## 8. CICLOS + ENTREGAS + CIERRE (M15 · M16 · M17 · M17.1) — IMPLEMENTADOS
+## 8. CICLOS + ENTREGAS + CIERRE (M15 · M16 · M17) — LEGACY CONSERVADO
 
-### Modelo
+Implementados históricamente. Siguen en repo y en producción como compatibilidad.
 
-```text
-ciclo (1–31 días) → 2 sesiones/día (MANANA|TARDE)
-  → turnos.ciclo_id / sesion_id (nullable; no rompen M14)
-    → operaciones bajo turno ABIERTO
-      → entregas de caja (declarar → contar → revisar)
-        → finalizar ciclo (solo EN_VALIDACION, sin pendientes)
-```
+UI legacy: `ciclos.js` / `m18-ciclos-ux.js` (label visible ya orientado a “Turnos” en m18).
 
-### Estados del ciclo
-`PLANIFICADO` → `ACTIVO` → `EN_VALIDACION` → `VALIDADO` / `ARCHIVADO`
+**Dirección:** nueva UX y nuevas operaciones → `turno-api` / `turnos-maestro` / `bc_*`.
 
-### M15 — Ciclos operativos ✅
-- Tablas: `ciclos_operativos`, `sesiones_ciclo`
-- RPC: `crear_ciclo_operativo`, `iniciar_ciclo_operativo`, `iniciar_validacion_ciclo_operativo`, `listar_*`, `obtener_*`, `_ciclo_operativo_json`
-- `fin_plan` es columna **GENERATED** (no escribirla)
-- Archivos: `m15_ciclos_operativos.sql` (+ `m15_1_completar_versionado.sql`, agrega `iniciar_ciclo_operativo`/`iniciar_validacion_ciclo_operativo` que existían en producción pero no en el archivo original), `m15_ciclos_permisos_roles.sql`
-- Grants: hardeneados en `m15_2_m16_1_hardening_grants_rpc.sql` (2026-08-21)
-
-### M16 — Entregas de caja ✅
-- Flujo: DECLARADA → CONTADA → APROBADA | RECHAZADA
-- RPC vigentes: `declarar_entrega_caja`, `registrar_recepcion_entrega_caja` (paso DECLARADA→CONTADA), `revisar_entrega_caja`, `listar_entregas_caja`, `obtener_entrega_caja`, `obtener_pendientes_cierre_ciclo`
-- `registrar_conteo_entrega_caja` = **legado/huérfana**, coexiste en prod sin uso (ver `docs/BATTLECRUISER_M16_FUNCION_HUERFANA.md`); NO usarla en frontend, no eliminada aún
-- **Nota permanente:** `registrar_conteo_entrega_caja` es función legado/histórica. **NO usar en nuevas implementaciones.** El flujo vigente utiliza `registrar_recepcion_entrega_caja`.
-- Archivo: `m16_entregas_caja.sql`
-- **RECHAZADA no bloquea** el cierre del ciclo (ya está resuelta)
-- Grants: hardeneados en `m15_2_m16_1_hardening_grants_rpc.sql` (2026-08-21)
-
-### M17 — Cierre de ciclo operativo ✅
-- RPC: `finalizar_ciclo_operativo(p_ciclo_id, p_idempotency_key)`
-- Solo desde `EN_VALIDACION`
-- Bloquea si hay entregas en DECLARADA/CONTADA o cuadres no APROBADO/RECHAZADO
-- Idempotencia + auditoría
-- Archivo: `m17_cierre_ciclo_operativo.sql`
-
-### M17.1 — Hardening grants ✅
-- REVOKE EXECUTE de PUBLIC/anon sobre `finalizar_ciclo_operativo` y `obtener_pendientes_cierre_ciclo`
-- GRANT solo a `authenticated`
-- Archivo: `m17_1_hardening_grants_rpc.sql`
-
-### Distinción crítica
-| Acción | Significado |
-|--------|-------------|
-| Cerrar turno | Operador deja de vender (→ CERRADO + cuadre) |
-| Finalizar ciclo | Cierre administrativo de N días tras validaciones |
-
-**UI frontend de ciclos/entregas/cierre:** 🟢 V1 implementada (online-only).
-
-- Tab **Ciclos Operativos** creado (`data-tab="ciclos"`, `#tab-ciclos`).
-- `public/js/ciclos.js` implementa lecturas y mutaciones V1.
-- Las operaciones de ciclos, entregas y cierre funcionan actualmente **solo online**.
-- Offline para ciclos **NO** está implementado todavía (no usa `ejecutarOperacion` / cola IndexedDB).
+Detalle histórico de M15–M17 se mantiene en secciones de migraciones y `docs/`.
 
 ---
 
-## 9. ESTADO REAL DE MÓDULOS
+## 9. ESTADO REAL DE MÓDULOS (resumen)
 
 | Módulo | Estado |
 |--------|--------|
-| Productos / presentaciones / imágenes | ✅ Base completa |
-| Ventas (gobernadas por turno M14) | ✅ |
-| Almacenes + UX móvil | ✅ |
-| Transferencias / Vales / Centro de Mando / Comunicación | ✅ |
-| Turnos + cuadres (B7 + M14) | ✅ |
-| Ciclos (M15) backend | ✅ |
-| Entregas de caja (M16) backend | ✅ |
-| Cierre de ciclo (M17 + M17.1) backend | ✅ |
-| UI ciclos / entregas / cierre | 🟢 V1 implementada (online-only) |
-| Aceptación Android E2E multiusuario | 🟡 Pendiente Roberto |
+| TURNO FE (api + maestro) | 🟢 Implementado técnicamente v9.4.0 — pendiente prueba Robert |
+| Productos / presentaciones | ✅ |
+| Ventas (M14) | ✅ base; UX mejoras pendientes según auditoría Robert |
+| Almacenes / Transferencias / Comunicación | ✅ con bugs UX documentados |
+| Ciclos backend M15–M17 | ✅ LEGACY |
+| SQL bc_* en repo | 🟡 GAP vs live |
 
 ---
 
 ## 10. MAPA DE MIGRACIONES (`supabase/`)
 
-| Archivo | Tema |
-|---------|------|
-| m0_* | Esquema base + triggers auditoría |
-| m3–m7 | Productos, seguridad, auditoría, mutaciones críticas, reportes |
-| m8_3 / m8_4 | Catálogos categorías/unidades/presentaciones |
-| m10–m13 | Usuario interno, roles CRUD, imagen, almacenes |
-| **m14 / m14b** | Turno gobierna venta + fix variable |
-| **m15_*** | Ciclos operativos + permisos |
-| **m16_entregas_caja.sql** | Entregas de caja |
-| **m17_cierre_ciclo_operativo.sql** | Finalizar ciclo |
-| **m17_1_hardening_grants_rpc.sql** | Grants RPC M17 |
-| **m15_1_completar_versionado.sql** | Versionado M15: `iniciar_ciclo_operativo`/`iniciar_validacion_ciclo_operativo` |
-| **m15_2_m16_1_hardening_grants_rpc.sql** | Grants RPC M15/M16 |
-| b3–b8 | Históricos (b6 = DEPRECATED) |
-| revoke_* | Hardening permisos |
+Incluye M0–M27 legacy y endurecimientos. **Falta volcar** migraciones live del dominio `turno_*` / `bc_*` cuando se estabilice el contrato 100%.
 
 Regla: introspección producción antes de aplicar cualquier cambio SQL.
 
@@ -248,21 +206,21 @@ Regla: introspección producción antes de aplicar cualquier cambio SQL.
 
 ## 11. SERVICE WORKER / PWA
 
-**Cache:** `battlecruiser-shell-v50`  
-`SHELL_FILES` incluye `./js/ciclos.js`.  
-Al añadir/renombrar módulos JS: actualizar `SHELL_FILES` y subir versión de cache.  
-`actualizarApp()` en `auth.js` — no modificar sin necesidad explícita.
+**Versión vigente documentada FE TURNO:** v9.4.0 (`battlecruiser-shell-9.4.0`).
+
+Al añadir/renombrar módulos JS: alinear `app.js` + SW.
 
 ---
 
 ## 12. DEFINITION OF DONE
 
-- Cambio en `main` (commit + push) cuando aplique
+- Cambio en `main` cuando aplique
 - Tests / `node --check` OK
 - Sin duplicar offline / permisos / RPC
 - M14 no debilitado
 - Cerebro refleja estado real
-- Aceptación real de Roberto cuando corresponda
+- Triangulación Notion ↔ Supabase ↔ GitHub
+- **IMPLEMENTADO ≠ VERIFICADO ≠ PROBADO ≠ VALIDADO POR ROBERT**
 
 **Evidencia > palabras de una IA.**
 
@@ -272,15 +230,13 @@ Al añadir/renombrar módulos JS: actualizar `SHELL_FILES` y subir versión de c
 
 ```text
 /
-├── BATTLECRUISER_CEREBRO.md     ← ÚNICA fuente de verdad
+├── BATTLECRUISER_CEREBRO.md
 ├── package.json · wrangler.jsonc
 ├── public/                      ← app desplegable
-├── supabase/                    ← SQL versionado (M0–M17.1)
+├── supabase/                    ← SQL versionado (legacy + futuro turno)
 ├── test/
 ├── docs/
-│   ├── archive/                 ← informes e investigaciones históricas
-│   └── …
+│   ├── BATTLECRUISER_TURNO_MODELO_V1.md
+│   └── archive/
 └── .github/workflows/
 ```
-
-No dejar handoffs temporales ni Cerebros duplicados en la raíz.
