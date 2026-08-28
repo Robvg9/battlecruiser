@@ -1,7 +1,7 @@
-/* BattleCruiser Service Worker — v9.3.20 / aligned with app
+/* BattleCruiser Service Worker — v9.4.0 / modelo TURNO
  * Network-first para app shell (JS/CSS/HTML) con cache:no-store.
  */
-var BC_SW_VERSION = "9.3.20";
+var BC_SW_VERSION = "9.4.0";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_STATIC=["./manifest.json","./favicon.png","./icons/icon-192x192.png","./icons/icon-512x512.png"];

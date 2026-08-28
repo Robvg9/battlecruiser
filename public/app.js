@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.3.20 — DAP-1: crear almacén — map tipos UI→RPC + errores reales
-(function hotfixV9320(){
-  const VERSION="9.3.20";
+// v9.4.0 — Misión Maestra V2: modelo TURNO (bc_* API + UX maestro)
+(function hotfixV940(){
+  const VERSION="9.4.0";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -30,6 +30,7 @@
 
 (function cargarModulosDinamicos(){
   const modules=[
+    ["turno-api.js","9.4.0"],["turnos-maestro.js","9.4.0"],
     ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
