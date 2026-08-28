@@ -59,7 +59,14 @@
     asignarSesion: function (s,u) { return callRpc(RPC.asignarSesion,{p_turno_sesion_id:s,p_usuario_id:u}); },
     iniciarSesion: function (s) { return callRpc(RPC.iniciarSesion,{p_turno_sesion_id:s}); },
     cerrarSesion: function (s) { return callRpc(RPC.cerrarSesion,{p_turno_sesion_id:s}); },
-    interrumpirYRelevar: function (t,s,m) { return callRpc(RPC.interrumpirRelevar,{p_turno_tramo_id:t,p_sustituto_id:s,p_motivo:m||'Emergencia'}); },
+    // La UX entrega un sesionId. La RPC exige el tramo ACTIVO; resolvemos aquí
+    // para mantener un único contrato API y evitar que el frontend envíe IDs equivocados.
+    interrumpirYRelevar: async function (sesionId, sustitutoId, motivo) {
+      const tramos = await selectTable('turno_tramos','*','turno_sesion_id',sesionId,'inicio_at');
+      const activo = (tramos || []).find(function (t) { return String(t.estado || '').toUpperCase() === 'ACTIVO'; });
+      if (!activo || !activo.id) throw new Error('No hay un tramo activo para interrumpir.');
+      return callRpc(RPC.interrumpirRelevar,{p_turno_tramo_id:activo.id,p_sustituto_id:sustitutoId,p_motivo:motivo||'Emergencia'});
+    },
     declararDinero: function (t,m) { return callRpc(RPC.declararDinero,{p_turno_tramo_id:t,p_monto:Number(m)}); },
     enviarAprobacion: function (t) { return callRpc(RPC.enviarAprobacion,{p_turno_id:t}); },
     enviarAAprobacion: function (t) { return callRpc(RPC.enviarAprobacion,{p_turno_id:t}); },
@@ -68,6 +75,7 @@
     crearDescuento: function (o) { o=o||{}; return callRpc(RPC.crearDescuento,{p_turno_id:o.turnoId,p_usuario_id:o.usuarioId,p_monto:Number(o.monto),p_motivo:o.motivo||'',p_turno_sesion_id:o.sesionId||null,p_turno_tramo_id:o.tramoId||null}); },
     registrarEntregaInventario: function (t,o) { return callRpc(RPC.registrarEntregaInv,{p_turno_id:t,p_usuario_receptor:null,p_comentario:o||null}); },
     recibirEntregaInventario: function (e,o) { return callRpc(RPC.recibirEntregaInv,{p_entrega_id:e,p_comentario:o||null}); },
+    recibirEntregaInventarioConDiferencias: function (e,c,o) { return callRpc(RPC.recibirEntregaInv,{p_entrega_id:e,p_con_diferencias:!!c,p_comentario:o||null}); },
     recibirYCrearSucesor: function (e,d,c,o) { return callRpc(RPC.recibirYCrearSucesor,{p_entrega_id:e,p_dias_sucesor:d!=null?Number(d):null,p_con_diferencias:!!c,p_comentario:o||null}); },
     prepararSucesor: function (t) { return callRpc(RPC.prepararSucesor,{p_turno_id:t}); },
     crearSucesor: function (t,d) { return callRpc(RPC.crearSucesor,{p_turno_anterior_id:t,p_dias:d!=null?Number(d):null}); },
