@@ -30,7 +30,7 @@
 
 (function cargarModulosDinamicos(){
   const modules=[
-    ["turno-api.js","9.4.0"],["turnos-maestro.js","9.4.0"],
+    ["turno-api.js","9.4.0"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.1"],
     ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","32.1"],
