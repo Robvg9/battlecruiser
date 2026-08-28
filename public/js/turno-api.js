@@ -93,11 +93,35 @@
     configurarDuracion: function (h,d) { return callRpc(RPC.configDuracion,{p_habilitada:!!h,p_dias_fijos:d!=null?Number(d):null}); },
     editarDiasTurno: function (t,d) { return callRpc(RPC.editarDias,{p_turno_id:t,p_nuevos_dias:Number(d)}); },
     autenticarSustituto: async function (usuarioOEmail,password) {
-      clientOk(); onlineRequired(); if(!usuarioOEmail||!password) throw new Error('Usuario y contraseña del sustituto son obligatorios.');
+      clientOk(); onlineRequired();
+      if(!usuarioOEmail||!password) throw new Error('Usuario y contraseña del sustituto son obligatorios.');
       let email=String(usuarioOEmail).trim();
-      if(email&&email.indexOf('@')===-1&&typeof client.rpc==='function'){try{const r=await client.rpc('obtener_email_por_nombre_usuario',{p_nombre_usuario:usuarioOEmail});if(!r.error&&r.data)email=typeof r.data==='string'?r.data:(r.data.email||email);}catch(e){}}
-      const sign=await client.auth.signInWithPassword({email:email,password:password}); if(sign.error)throw sign.error; const sustituto=sign.data&&sign.data.user; if(!sustituto)throw new Error('No se pudo autenticar al sustituto.');
-      return {id:sustituto.id,email:sustituto.email};
+      if(email&&email.indexOf('@')===-1&&typeof client.rpc==='function'){
+        try{
+          const r=await client.rpc('obtener_email_por_nombre_usuario',{p_nombre_usuario:usuarioOEmail});
+          if(!r.error&&r.data)email=typeof r.data==='string'?r.data:(r.data.email||email);
+        }catch(e){}
+      }
+      // IMPORTANTE: nunca usar el cliente principal para validar al sustituto.
+      // signInWithPassword en el cliente principal reemplazaría auth.uid() y
+      // rompería la identidad operativa del actor actual. Usamos un cliente
+      // efímero sin persistencia; el RPC de relevo sigue ejecutándose con la
+      // sesión principal y registra al sustituto explícitamente.
+      const supabaseGlobal = global.supabase || (typeof window!=='undefined' ? window.supabase : null);
+      const createClient = supabaseGlobal && typeof supabaseGlobal.createClient === 'function' ? supabaseGlobal.createClient : null;
+      const url = client.supabaseUrl || client.rest && client.rest.url ? String(client.supabaseUrl || client.rest.url).replace(/\/rest\/v1\/?$/,'') : null;
+      const key = client.supabaseKey || client.headers && (client.headers.apikey || client.headers['apikey']);
+      if(!createClient || !url || !key) throw new Error('No se pudo preparar autenticación aislada del sustituto.');
+      const secondary = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'bc-substitute-validation'}});
+      try {
+        const sign=await secondary.auth.signInWithPassword({email:email,password:password});
+        if(sign.error)throw sign.error;
+        const sustituto=sign.data&&sign.data.user;
+        if(!sustituto)throw new Error('No se pudo autenticar al sustituto.');
+        return {id:sustituto.id,email:sustituto.email};
+      } finally {
+        try { await secondary.auth.signOut(); } catch(e) {}
+      }
     },
     labelEstado: function (e) { const k=String(e||'').toUpperCase(); return ({PROGRAMADO:'Programado',EN_CURSO:'En curso',PENDIENTE_APROBACION:'Pendiente de aprobación',CERRADO:'Cerrado',CANCELADO:'Cancelado',PENDIENTE:'Pendiente',COMPLETADA:'Completada',EN_CURSO_SESION:'En curso',ACTIVO:'Activo',PLANIFICADO:'Programado',EN_VALIDACION:'Pendiente de aprobación',VALIDADO:'Cerrado'})[k]||e||'—'; },
     mapEstadoLegacy: function (e) { const k=String(e||'').toUpperCase(); if(k==='PLANIFICADO')return'PROGRAMADO';if(k==='ACTIVO')return'EN_CURSO';if(k==='EN_VALIDACION')return'PENDIENTE_APROBACION';if(k==='VALIDADO'||k==='ARCHIVADO')return'CERRADO';return k; }
