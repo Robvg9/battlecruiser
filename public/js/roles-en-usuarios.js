@@ -37,17 +37,17 @@
       '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol button[type=submit]{width:100%;border-radius:10px;padding:12px;font-weight:600}',
       '#' + MODAL_NUEVO_ROL_ID + ' #msg-roles-nuevo{margin:10px 0 0;min-height:18px}',
       '#tab-usuarios > #bc-roles-en-usuarios{display:none!important}',
-      '#tab-usuarios .cc-bloque:has(#form-nuevo-rol):not(.bc-roles-panel){display:none!important}'
+      '#bc-roles-en-usuarios{display:none!important}',
+      '#tab-usuarios .cc-bloque:has(#form-nuevo-rol):not(.bc-roles-panel){display:none!important}',
+      '.ud-btn-secondary{background:rgba(201,162,77,.1)!important;color:var(--gold-bright)!important;border:1px solid rgba(201,162,77,.35)!important;font-weight:600;padding:10px 16px!important;border-radius:10px!important;cursor:pointer}',
+      '.ud-btn-secondary:hover{border-color:var(--gold);background:rgba(201,162,77,.16)!important}'
     ].join('');
     document.head.appendChild(s);
   }
 
   function openRolesModal() {
     var modal = document.getElementById(MODAL_ROLES_ID);
-    if (!modal) {
-      unificar();
-      modal = document.getElementById(MODAL_ROLES_ID);
-    }
+    if (!modal) { unificar(); modal = document.getElementById(MODAL_ROLES_ID); }
     if (!modal) return;
     modal.classList.add('open');
     if (typeof refrescarRolesAdmin === 'function') refrescarRolesAdmin();
@@ -60,10 +60,7 @@
 
   function openNuevoRolModal() {
     var modal = document.getElementById(MODAL_NUEVO_ROL_ID);
-    if (!modal) {
-      unificar();
-      modal = document.getElementById(MODAL_NUEVO_ROL_ID);
-    }
+    if (!modal) { unificar(); modal = document.getElementById(MODAL_NUEVO_ROL_ID); }
     if (!modal) return;
     modal.classList.add('open');
     var input = document.getElementById('rol-nombre');
@@ -99,25 +96,17 @@
         '<div class="bc-roles-body" id="bc-roles-lista-wrap"></div>' +
         '</div>';
       document.body.appendChild(modal);
-
       modal.addEventListener('click', function (e) {
         if (e.target && e.target.getAttribute('data-bc-roles-close') === '1') closeRolesModal();
       });
       document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         var nr = document.getElementById(MODAL_NUEVO_ROL_ID);
-        if (nr && nr.classList.contains('open')) {
-          closeNuevoRolModal();
-          return;
-        }
+        if (nr && nr.classList.contains('open')) { closeNuevoRolModal(); return; }
         if (modal.classList.contains('open')) closeRolesModal();
       });
       var btnNuevo = modal.querySelector('#bc-btn-abrir-nuevo-rol');
-      if (btnNuevo) {
-        btnNuevo.addEventListener('click', function () {
-          openNuevoRolModal();
-        });
-      }
+      if (btnNuevo) btnNuevo.addEventListener('click', function () { openNuevoRolModal(); });
     }
 
     var bodyWrap = document.getElementById('bc-roles-lista-wrap');
@@ -142,16 +131,13 @@
         '<p class="msg" id="msg-roles-nuevo"></p>' +
         '</div>';
       document.body.appendChild(modalNuevo);
-
       modalNuevo.addEventListener('click', function (e) {
         if (e.target && e.target.getAttribute('data-bc-nuevo-rol-close') === '1') closeNuevoRolModal();
       });
     }
 
     var nuevoBody = document.getElementById('bc-nuevo-rol-body');
-    if (nuevoBody && form.parentElement !== nuevoBody) {
-      nuevoBody.appendChild(form);
-    }
+    if (nuevoBody && form.parentElement !== nuevoBody) nuevoBody.appendChild(form);
 
     var input = document.getElementById('rol-nombre');
     if (input) input.placeholder = 'Nombre del rol (ej. Encargado, Dependienta)';
@@ -167,14 +153,9 @@
         if (/Roles y permisos/i.test(el.textContent || '')) {
           var bloque = el.closest('.cc-bloque');
           if (bloque && !bloque.querySelector('#lista-categorias') && !bloque.querySelector('#form-categoria')) {
-            if (!bloque.contains(form) && !bloque.contains(lista)) {
-              bloque.style.display = 'none';
-            } else {
-              el.remove();
-            }
-          } else {
-            el.remove();
-          }
+            if (!bloque.contains(form) && !bloque.contains(lista)) bloque.style.display = 'none';
+            else el.remove();
+          } else el.remove();
         }
       });
     }
@@ -189,17 +170,13 @@
       new MutationObserver(function () {
         if (msg.classList.contains('ok') && (msg.textContent || '').trim()) {
           var texto = (msg.textContent || '').toLowerCase();
-          if (/rol creado|creado/.test(texto)) {
-            setTimeout(closeNuevoRolModal, 600);
-          }
+          if (/rol creado|creado/.test(texto)) setTimeout(closeNuevoRolModal, 600);
         }
       }).observe(msg, { attributes: true, childList: true, characterData: true, subtree: true });
     }
   }
 
-  function onUsuariosTab() {
-    unificar();
-  }
+  function onUsuariosTab() { unificar(); injectRolesButton(); wireHeroRolesButton(); }
 
   function wireNav() {
     var tabs = document.getElementById('tabs');
@@ -211,7 +188,45 @@
     });
   }
 
+  function injectRolesButton() {
+    ensureRolesCss();
+    var actions = document.querySelector('#ud-hero .ud-hero-actions');
+    if (!actions) {
+      var tab = document.getElementById('tab-usuarios');
+      if (!tab) return;
+      var hero = document.getElementById('ud-hero');
+      if (!hero) {
+        hero = document.createElement('div');
+        hero.id = 'ud-hero';
+        hero.className = 'ud-hero';
+        hero.innerHTML = '<div><h2>Usuarios</h2><p>Gestioná usuarios, roles y permisos del sistema.</p></div><div class="ud-hero-actions"></div>';
+        tab.insertBefore(hero, tab.firstChild);
+        actions = hero.querySelector('.ud-hero-actions');
+      } else {
+        actions = hero.querySelector('.ud-hero-actions');
+        if (!actions) {
+          actions = document.createElement('div');
+          actions.className = 'ud-hero-actions';
+          hero.appendChild(actions);
+        }
+      }
+    }
+    if (!document.getElementById('ud-btn-roles')) {
+      var rolesBtn = document.createElement('button');
+      rolesBtn.type = 'button';
+      rolesBtn.className = 'ud-btn-secondary';
+      rolesBtn.id = 'ud-btn-roles';
+      rolesBtn.textContent = 'Roles';
+      actions.appendChild(rolesBtn);
+    }
+    var nuevo = document.getElementById('ud-scroll-crear');
+    if (nuevo && /nuevo usuario/i.test(nuevo.textContent || '')) {
+      nuevo.textContent = '+ Nuevo Usuario';
+    }
+  }
+
   function wireHeroRolesButton() {
+    injectRolesButton();
     var btn = document.getElementById('ud-btn-roles');
     if (btn && !btn.dataset.bcRolesBound) {
       btn.dataset.bcRolesBound = '1';
@@ -225,6 +240,7 @@
   function boot() {
     unificar();
     wireNav();
+    injectRolesButton();
     wireHeroRolesButton();
     var panel = document.getElementById('tab-usuarios');
     if (panel && panel.classList.contains('visible')) onUsuariosTab();
