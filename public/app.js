@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.30 — M52: sincronización de sesión para Movimientos
-(function hotfixV9430(){
-  const VERSION="9.4.30";
+// v9.4.31 — M52.2: fix client scope + movimientos retry
+(function hotfixV9431(){
+  const VERSION="9.4.31";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -34,7 +34,7 @@
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],
     ["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.1"],["m43-productos-layout-fix.js","43.2"],["m44-productos-vistas.js","44.1"],["m45-reportes-ux-final.js","45.2"],
     ["m47-productos-vista-final.js","47.1"],["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],
-    ["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.1"]
+    ["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
