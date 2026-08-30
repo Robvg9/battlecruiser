@@ -1,25 +1,38 @@
-// BattleCruiser — M51: orden determinista de la Parte 1 del expediente
-(function(){'use strict';if(window.__bcM51TurnoOrder)return;window.__bcM51TurnoOrder=true;
-function reorder(){
-  const body=document.querySelector('.m33-modal .m33-body[data-m33-step="1"]');
-  if(!body)return;
-  const grid=body.querySelector(':scope > .m49-session-grid, :scope > .bc-m48-grid, :scope > .m46-session-columns');
-  if(!grid)return;
-  const summaries=[...body.querySelectorAll(':scope > .m33-summary')];
-  const heading=[...body.children].find(x=>x.tagName==='H4'&&String(x.textContent||'').trim()==='Sesiones');
-  if(!summaries.length || !heading)return;
-  // Preserve every existing information block, but force the intended order.
-  const frag=document.createDocumentFragment();
-  summaries.forEach(el=>frag.appendChild(el));
-  frag.appendChild(heading);
-  frag.appendChild(grid);
-  body.appendChild(frag);
-}
-function boot(){
-  const obs=new MutationObserver(()=>reorder());
-  obs.observe(document.body,{childList:true,subtree:true});
-  window.__BC_M51_OBS=obs;
-  reorder();
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+// BattleCruiser — M50.3: orden determinista de la Parte 1 del expediente
+(function(){
+  'use strict';
+  if(window.__bcM50TurnoOrderV3)return;
+  window.__bcM50TurnoOrderV3=true;
+
+  function findStep1(){
+    return document.querySelector('.m33-modal .m33-body[data-m33-step="1"]');
+  }
+  function findSessionsGrid(body){
+    return body && body.querySelector(':scope > .m49-session-grid, :scope > .bc-m48-grid, :scope > .m46-session-columns');
+  }
+  function findSessionsHeading(body){
+    if(!body)return null;
+    const els=[...body.querySelectorAll('h1,h2,h3,h4,h5,h6')];
+    return els.find(el=>String(el.textContent||'').trim().toLowerCase()==='sesiones')||null;
+  }
+  function reorder(){
+    const body=findStep1();
+    if(!body)return false;
+    const grid=findSessionsGrid(body);
+    const heading=findSessionsHeading(body);
+    if(!grid||!heading)return false;
+    if(heading.nextElementSibling!==grid){
+      heading.insertAdjacentElement('afterend',grid);
+    }
+    return heading.nextElementSibling===grid;
+  }
+  function boot(){
+    const run=()=>reorder();
+    const obs=new MutationObserver(run);
+    obs.observe(document.body,{childList:true,subtree:true});
+    window.__BC_M50_OBS_V3=obs;
+    run();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
 })();
