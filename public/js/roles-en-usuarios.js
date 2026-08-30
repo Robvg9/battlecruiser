@@ -1,7 +1,8 @@
-// BattleCruiser — Roles dentro de Usuarios (v9.2.33 · Micro-misión 001)
+// BattleCruiser — Roles dentro de Usuarios (v9.2.33.1 · Micro-misión 001-CORRECCIÓN)
 // Gestión de Roles y Permisos vía modal (no card inferior permanente).
 // Reutiliza IDs, handlers y RPCs de usuarios-permisos-rest.js (B3/M11).
 // Flujo: Usuarios → botón Roles → modal Roles y Permisos → Nuevo Rol → modal Nuevo Rol
+// v9.2.33.1: restaurar + Nuevo Usuario (race con dashboard) + input rol compacto
 (function () {
   'use strict';
 
@@ -28,19 +29,21 @@
       '#' + MODAL_NUEVO_ROL_ID + '{position:fixed;inset:0;z-index:1300;display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}',
       '#' + MODAL_NUEVO_ROL_ID + '.open{display:flex}',
       '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-backdrop{position:absolute;inset:0;background:rgba(6,14,11,.6);backdrop-filter:blur(2px)}',
-      '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-panel{position:relative;z-index:1;width:100%;max-width:420px;max-height:min(90vh,480px);overflow-y:auto;background:linear-gradient(180deg,var(--stone-2),var(--stone));border:1px solid rgba(201,162,77,.28);border-radius:16px;padding:20px 20px 16px;box-shadow:0 24px 64px rgba(0,0,0,.55)}',
+      '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-panel{position:relative;z-index:1;width:100%;max-width:360px;max-height:min(90vh,420px);overflow-y:auto;background:linear-gradient(180deg,var(--stone-2),var(--stone));border:1px solid rgba(201,162,77,.28);border-radius:16px;padding:20px 20px 16px;box-shadow:0 24px 64px rgba(0,0,0,.55)}',
       '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}',
       '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-head h3{margin:0;font-family:Cormorant Garamond,serif;font-size:1.25rem;font-weight:600;color:var(--gold-bright)}',
       '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-close{width:36px;height:36px;border-radius:8px;border:1px solid rgba(201,162,77,.28);background:rgba(201,162,77,.08);color:var(--text);cursor:pointer;font-size:20px;line-height:1;display:inline-flex;align-items:center;justify-content:center}',
       '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol{display:flex;flex-direction:column;gap:10px;margin:0}',
-      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol #rol-nombre{width:100%;box-sizing:border-box;border-radius:10px;padding:11px 12px}',
-      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol button[type=submit]{width:100%;border-radius:10px;padding:12px;font-weight:600}',
+      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol #rol-nombre{display:block;width:100%;max-width:100%;box-sizing:border-box;height:40px;min-height:40px;max-height:40px;line-height:1.3;border-radius:10px;padding:8px 12px;font-size:14px;resize:none;overflow:hidden}',
+      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol button[type=submit]{width:100%;border-radius:10px;padding:10px 12px;font-weight:600}',
       '#' + MODAL_NUEVO_ROL_ID + ' #msg-roles-nuevo{margin:10px 0 0;min-height:18px}',
       '#tab-usuarios > #bc-roles-en-usuarios{display:none!important}',
       '#bc-roles-en-usuarios{display:none!important}',
       '#tab-usuarios .cc-bloque:has(#form-nuevo-rol):not(.bc-roles-panel){display:none!important}',
       '.ud-btn-secondary{background:rgba(201,162,77,.1)!important;color:var(--gold-bright)!important;border:1px solid rgba(201,162,77,.35)!important;font-weight:600;padding:10px 16px!important;border-radius:10px!important;cursor:pointer}',
-      '.ud-btn-secondary:hover{border-color:var(--gold);background:rgba(201,162,77,.16)!important}'
+      '.ud-btn-secondary:hover{border-color:var(--gold);background:rgba(201,162,77,.16)!important}',
+      '#ud-hero .ud-hero-actions{display:flex!important;gap:8px;flex-wrap:wrap;align-items:center}',
+      '#ud-scroll-crear{display:inline-flex!important}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -64,12 +67,67 @@
     if (!modal) return;
     modal.classList.add('open');
     var input = document.getElementById('rol-nombre');
-    if (input) setTimeout(function () { input.focus(); }, 40);
+    if (input) {
+      if (input.tagName === 'TEXTAREA') {
+        var replacement = document.createElement('input');
+        replacement.type = 'text';
+        replacement.id = input.id;
+        replacement.name = input.name || '';
+        replacement.placeholder = input.placeholder || 'Nombre del rol';
+        replacement.required = input.required;
+        replacement.value = input.value || '';
+        replacement.className = input.className || '';
+        input.parentNode.replaceChild(replacement, input);
+        input = replacement;
+      }
+      input.setAttribute('type', 'text');
+      input.setAttribute('rows', '1');
+      setTimeout(function () { input.focus(); }, 40);
+    }
   }
 
   function closeNuevoRolModal() {
     var modal = document.getElementById(MODAL_NUEVO_ROL_ID);
     if (modal) modal.classList.remove('open');
+  }
+
+  function openNuevoUsuarioModal() {
+    var form = document.getElementById('form-nuevo-usuario');
+    var msgN = document.getElementById('msg-nuevo-usuario');
+    if (!form) return;
+
+    var modal = document.getElementById('ud-modal-crear');
+    if (!modal) {
+      var block = form.closest('.cc-bloque') || form.closest('#ud-card-crear') || form.parentNode;
+      if (block && block.id !== 'tab-usuarios' && !block.id.startsWith('ud-modal')) {
+        block.style.display = 'none';
+        block.setAttribute('aria-hidden', 'true');
+      }
+      modal = document.createElement('div');
+      modal.id = 'ud-modal-crear';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'ud-modal-crear-title');
+      modal.innerHTML =
+        '<div class="ud-modal-backdrop" data-ud-close="1"></div>' +
+        '<div class="ud-modal-panel">' +
+        '<div class="ud-modal-head"><h3 id="ud-modal-crear-title">Crear nuevo usuario</h3>' +
+        '<button type="button" class="ud-modal-close" data-ud-close="1" aria-label="Cerrar">×</button></div>' +
+        '<div class="ud-modal-body"></div>' +
+        '</div>';
+      document.body.appendChild(modal);
+      var body = modal.querySelector('.ud-modal-body');
+      body.appendChild(form);
+      if (msgN) body.appendChild(msgN);
+      modal.addEventListener('click', function (e) {
+        if (e.target && e.target.getAttribute('data-ud-close') === '1') {
+          modal.classList.remove('open');
+        }
+      });
+    }
+    modal.classList.add('open');
+    var n = document.getElementById('nuevo-usuario-nombre');
+    if (n) setTimeout(function () { n.focus(); }, 40);
   }
 
   function unificar() {
@@ -140,7 +198,21 @@
     if (nuevoBody && form.parentElement !== nuevoBody) nuevoBody.appendChild(form);
 
     var input = document.getElementById('rol-nombre');
-    if (input) input.placeholder = 'Nombre del rol (ej. Encargado, Dependienta)';
+    if (input) {
+      if (input.tagName === 'TEXTAREA') {
+        var replacement = document.createElement('input');
+        replacement.type = 'text';
+        replacement.id = input.id;
+        replacement.name = input.name || '';
+        replacement.placeholder = 'Nombre del rol';
+        replacement.required = true;
+        replacement.value = input.value || '';
+        input.parentNode.replaceChild(replacement, input);
+        input = replacement;
+      }
+      input.placeholder = 'Nombre del rol';
+      input.setAttribute('type', 'text');
+    }
     var submit = form.querySelector('button[type="submit"]');
     if (submit) {
       var t = (submit.textContent || '').trim();
@@ -176,7 +248,7 @@
     }
   }
 
-  function onUsuariosTab() { unificar(); injectRolesButton(); wireHeroRolesButton(); }
+  function onUsuariosTab() { unificar(); injectHeroButtons(); wireHeroButtons(); }
 
   function wireNav() {
     var tabs = document.getElementById('tabs');
@@ -188,45 +260,75 @@
     });
   }
 
-  function injectRolesButton() {
+  function injectHeroButtons() {
     ensureRolesCss();
-    var actions = document.querySelector('#ud-hero .ud-hero-actions');
+    var tab = document.getElementById('tab-usuarios');
+    if (!tab) return;
+
+    var hero = document.getElementById('ud-hero');
+    if (!hero) {
+      hero = document.createElement('div');
+      hero.id = 'ud-hero';
+      hero.className = 'ud-hero';
+      hero.innerHTML =
+        '<div><h2>Usuarios</h2><p>Gestioná usuarios, roles y permisos del sistema.</p></div>' +
+        '<div class="ud-hero-actions"></div>';
+      tab.insertBefore(hero, tab.firstChild);
+    }
+
+    var actions = hero.querySelector('.ud-hero-actions');
     if (!actions) {
-      var tab = document.getElementById('tab-usuarios');
-      if (!tab) return;
-      var hero = document.getElementById('ud-hero');
-      if (!hero) {
-        hero = document.createElement('div');
-        hero.id = 'ud-hero';
-        hero.className = 'ud-hero';
-        hero.innerHTML = '<div><h2>Usuarios</h2><p>Gestioná usuarios, roles y permisos del sistema.</p></div><div class="ud-hero-actions"></div>';
-        tab.insertBefore(hero, tab.firstChild);
-        actions = hero.querySelector('.ud-hero-actions');
-      } else {
-        actions = hero.querySelector('.ud-hero-actions');
-        if (!actions) {
-          actions = document.createElement('div');
-          actions.className = 'ud-hero-actions';
-          hero.appendChild(actions);
-        }
+      actions = document.createElement('div');
+      actions.className = 'ud-hero-actions';
+      hero.appendChild(actions);
+    }
+
+    var nuevo = document.getElementById('ud-scroll-crear');
+    if (!nuevo) {
+      nuevo = document.createElement('button');
+      nuevo.type = 'button';
+      nuevo.className = 'ud-btn-primary';
+      nuevo.id = 'ud-scroll-crear';
+      nuevo.textContent = '+ Nuevo Usuario';
+      actions.insertBefore(nuevo, actions.firstChild);
+    } else {
+      nuevo.textContent = '+ Nuevo Usuario';
+      nuevo.classList.add('ud-btn-primary');
+      nuevo.style.display = '';
+      nuevo.removeAttribute('hidden');
+      if (nuevo.parentElement !== actions) {
+        actions.insertBefore(nuevo, actions.firstChild);
+      } else if (actions.firstChild !== nuevo) {
+        actions.insertBefore(nuevo, actions.firstChild);
       }
     }
-    if (!document.getElementById('ud-btn-roles')) {
-      var rolesBtn = document.createElement('button');
+
+    var rolesBtn = document.getElementById('ud-btn-roles');
+    if (!rolesBtn) {
+      rolesBtn = document.createElement('button');
       rolesBtn.type = 'button';
       rolesBtn.className = 'ud-btn-secondary';
       rolesBtn.id = 'ud-btn-roles';
       rolesBtn.textContent = 'Roles';
       actions.appendChild(rolesBtn);
-    }
-    var nuevo = document.getElementById('ud-scroll-crear');
-    if (nuevo && /nuevo usuario/i.test(nuevo.textContent || '')) {
-      nuevo.textContent = '+ Nuevo Usuario';
+    } else {
+      rolesBtn.textContent = 'Roles';
+      if (rolesBtn.parentElement !== actions) actions.appendChild(rolesBtn);
     }
   }
 
-  function wireHeroRolesButton() {
-    injectRolesButton();
+  function wireHeroButtons() {
+    injectHeroButtons();
+
+    var nuevo = document.getElementById('ud-scroll-crear');
+    if (nuevo && !nuevo.dataset.bcNuevoBound) {
+      nuevo.dataset.bcNuevoBound = '1';
+      nuevo.addEventListener('click', function (e) {
+        e.preventDefault();
+        openNuevoUsuarioModal();
+      });
+    }
+
     var btn = document.getElementById('ud-btn-roles');
     if (btn && !btn.dataset.bcRolesBound) {
       btn.dataset.bcRolesBound = '1';
@@ -240,12 +342,13 @@
   function boot() {
     unificar();
     wireNav();
-    injectRolesButton();
-    wireHeroRolesButton();
+    injectHeroButtons();
+    wireHeroButtons();
     var panel = document.getElementById('tab-usuarios');
     if (panel && panel.classList.contains('visible')) onUsuariosTab();
-    setTimeout(wireHeroRolesButton, 400);
-    setTimeout(wireHeroRolesButton, 1200);
+    setTimeout(wireHeroButtons, 400);
+    setTimeout(wireHeroButtons, 1200);
+    setTimeout(wireHeroButtons, 2500);
   }
 
   window.bcOpenRolesModal = openRolesModal;
