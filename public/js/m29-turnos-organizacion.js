@@ -7,7 +7,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.5';
+  var VERSION = '29.6';
   var HOME_MARK = 'data-m29-home';
   function API() { return window.BattleCruiserTurnoAPI; }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v == null ? '' : v) : String(v == null ? '' : v).replace(/[&<>\"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' })[c]; }); }
@@ -16,22 +16,12 @@
   function can(recurso, accion) { return typeof tienePermiso === 'function' ? tienePermiso(recurso, accion) : false; }
   function warehouses() { return ((_cache && _cache.almacenes) || []).filter(function (a) { return a.activo !== false; }); }
   function root() { return document.getElementById(ROOT_ID); }
-  function asArray(data) { if (!data) return []; if (Array.isArray(data)) return data; if (Array.isArray(data.turnos)) return data.turnos; if (Array.isArray(data.items)) return data.items; if (Array.isArray(data.ciclos)) return data.ciclos; return [data]; }
+  function asArray(data) { if (!data) return []; if (Array.isArray(data)) return data; if (Array.isArray(data.turnos)) return data.turnos; if (Array.isArray(data.items)) return data.items; return [data]; }
   function isTurnoReal(t) {
     if (!t || typeof t !== 'object') return false;
-    if (t._placeholder_almacen === true) return false;
     var id = t.id || t.turno_id;
     if (!id) return false;
-    // listar_turnos comparte la tabla legacy `turnos` con el modelo TURNO.
-    // Las filas ligadas a ciclo/sesión son legacy y NO deben aparecer en la HOME.
-    if (t.ciclo_id != null || t.cicloId != null || t.sesion_id != null || t.sesionId != null) return false;
-    // Un TURNO maestro creado por bc_crear_turno tiene días configurados.
-    if (t.dias_turno != null || t.cantidad_dias != null || t.fecha_inicio != null || t.inicio_plan != null) return true;
-    // Compatibilidad con respuestas futuras: solo aceptar una fila con señal
-    // explícita de estado maestro + almacen, nunca una fila de almacén genérica.
-    var tieneEstadoMaestro = !!(t.estado_maestro || t.estado_turno);
-    var tieneAlmacen = !!(t.almacen_id || t.almacen_nombre);
-    return tieneEstadoMaestro && tieneAlmacen;
+    return t.dias_turno != null && t.almacen_id != null;
   }
   var state = { isAdmin: false, turnos: [], busy: false, errorMsg: '' };
   function injectCss() {
@@ -85,13 +75,16 @@
     state.isAdmin = can('turnos','crear') || can('turnos','admin') || can('turnos','editar_any') || can('ciclos','crear') || can('ciclos','editar_any') || isDueñoRole();
   }
   async function loadTurnos() {
-    state.errorMsg = ''; var api = API(); if (!api || typeof api.listarTurnos !== 'function') { state.turnos=[]; state.errorMsg='API de turnos no disponible.'; return; }
-    try { var data = await api.listarTurnos({limit:100}); var raw=asArray(data); state.turnos=raw.filter(isTurnoReal); if(raw.length&&!state.turnos.length){console.warn('[M29] listarTurnos devolvió objetos incompatibles con Turno:',raw.slice(0,3)); state.errorMsg='';} }
-    catch(e){ console.warn('[M29] listarTurnos',e); state.turnos=[]; state.errorMsg=String(e&&e.message||e); }
+    state.errorMsg = ''; var api = API(); if (!api) { state.turnos=[]; state.errorMsg='API de turnos no disponible.'; return; }
+    try {
+      var data = await api.listarTurnosMaestros({limit:100});
+      var raw=asArray(data);
+      state.turnos=raw.filter(isTurnoReal);
+    } catch(e){ console.warn('[M29] listarTurnosMaestros',e); state.turnos=[]; state.errorMsg=String(e&&e.message||e); }
   }
   function cardHtml(t) {
-    var id=t.id||t.turno_id, alm=t.almacen_nombre||t.almacen||t.nombre_almacen||'Almacén', estRaw=t.estado_maestro||t.estado||t.status||'', est=labelEstado(estRaw), estKey=String(estRaw).toLowerCase().replace(/\s+/g,'_'), inicio=fmtDate(t.inicio_plan||t.fecha_inicio||t.inicio||t.fecha), dias=t.cantidad_dias!=null?t.cantidad_dias:(t.dias_turno!=null?t.dias_turno:(t.dias||'—')), fin=fmtDate(t.fin_plan||t.fecha_fin||t.final), resp=t.responsable_nombre||t.responsable||t.admin_nombre||'';
-    return '<article class="m29-card" data-turno-id="'+esc(id)+'"><div class="m29-card-top"><div class="m29-card-alm">'+esc(alm)+'</div><span class="m29-badge '+esc(estKey)+'">'+esc(est)+'</span></div><div class="m29-meta"><div><span>Inicio</span><br>'+esc(inicio)+'</div><div><span>Días</span><br>'+esc(dias)+'</div><div><span>Final</span><br>'+esc(fin)+'</div>'+(resp?'<div><span>Responsable</span><br>'+esc(resp)+'</div>':'')+'</div></article>';
+    var id=t.id||t.turno_id, alm=t.almacen_nombre||t.almacen||t.nombre_almacen||'Almacén', estRaw=t.estado_maestro||t.estado||t.status||'', est=labelEstado(estRaw), estKey=String(estRaw).toLowerCase().replace(/\s+/g,'_'), inicio=fmtDate(t.fecha_inicio||t.inicio_plan||t.inicio||t.fecha), dias=t.dias_turno!=null?t.dias_turno:'—', fin=fmtDate(t.fecha_fin||t.fin_plan||t.final), assigned=t.sesiones_asignadas!=null?t.sesiones_asignadas:null,total=t.sesiones_total!=null?t.sesiones_total:null;
+    return '<article class="m29-card" data-turno-id="'+esc(id)+'"><div class="m29-card-top"><div class="m29-card-alm">'+esc(alm)+'</div><span class="m29-badge '+esc(estKey)+'">'+esc(est)+'</span></div><div class="m29-meta"><div><span>Inicio</span><br>'+esc(inicio)+'</div><div><span>Días</span><br>'+esc(dias)+'</div><div><span>Final</span><br>'+esc(fin)+'</div><div><span>Dependientas</span><br>'+esc(assigned!=null&&total!=null?(assigned+'/'+total):'Ver detalle')+'</div></div></article>';
   }
   async function renderHome() {
     var el=root(); if(!el) return; if(window.__BC_M29_RENDERING) return; window.__BC_M29_RENDERING=true;
@@ -107,8 +100,8 @@
   }
   function openDetalle(id,isLegacy){ window.__BC_M29_VIEW='detalle'; var el=root(); if(el)el.removeAttribute(HOME_MARK); if(window.BattleCruiserTurnosMaestro&&typeof window.BattleCruiserTurnosMaestro.open==='function'){window.BattleCruiserTurnosMaestro.open(id,isLegacy);return;} if(window.BattleCruiserM21&&typeof window.BattleCruiserM21.enter==='function'){window.BattleCruiserM21.enter(id);return;} if(typeof abrirDetalleTurno==='function')abrirDetalleTurno(id); }
   function closeCrearModal(){var ov=document.getElementById('m29-crear-overlay');if(ov)ov.remove();}
-  function openCrearModal(){if(!state.isAdmin)return;closeCrearModal();var alms=warehouses(),opts=alms.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.nombre||a.name||a.id)+'</option>';}).join('');if(!opts)opts='<option value="">(sin almacenes)</option>';var today=new Date(),yyyy=today.getFullYear(),mm=String(today.getMonth()+1).padStart(2,'0'),dd=String(today.getDate()).padStart(2,'0'),hoy=yyyy+'-'+mm+'-'+dd;var ov=document.createElement('div');ov.id='m29-crear-overlay';ov.className='m29-overlay';ov.innerHTML='<div class="m29-modal" role="dialog"><h3>Crear Turno</h3><div class="m29-field"><label for="m29-almacen">Almacén / punto</label><select id="m29-almacen">'+opts+'</select></div><div class="m29-field"><label for="m29-inicio">Fecha de inicio</label><input type="date" id="m29-inicio" value="'+hoy+'"></div><div class="m29-field"><label for="m29-dias">Cantidad de días (1–7)</label><input type="number" id="m29-dias" min="1" max="7" value="7"></div><p class="muted" style="font-size:.8rem;opacity:.7;margin:0 0 8px">Las trabajadoras y sesiones se configuran después, en el detalle del turno.</p><div class="m29-msg" id="m29-modal-msg"></div><div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear">Crear</button></div></div>';document.body.appendChild(ov);ov.addEventListener('click',function(e){if(e.target===ov)closeCrearModal();});document.getElementById('m29-cancel-crear').addEventListener('click',closeCrearModal);document.getElementById('m29-confirm-crear').addEventListener('click',confirmCrear);}
-  async function confirmCrear(){var api=API();if(!api||typeof api.crearTurno!=='function'){setModalMsg('API de turnos no disponible.',false);return;}var alm=(document.getElementById('m29-almacen')||{}).value,inicio=(document.getElementById('m29-inicio')||{}).value,dias=parseInt((document.getElementById('m29-dias')||{}).value,10);if(!alm){setModalMsg('Elegí un almacén.',false);return;}if(!inicio){setModalMsg('Indicá la fecha de inicio.',false);return;}if(!Number.isFinite(dias)||dias<1||dias>31){setModalMsg('Días inválidos (1–31).',false);return;}var btn=document.getElementById('m29-confirm-crear');if(btn)btn.disabled=true;try{var data=await api.crearTurno({almacenId:alm,inicioPlan:inicio,cantidadDias:dias,asignaciones:[]}),id=data&&(data.id||data.turno_id||(data.turno&&data.turno.id));closeCrearModal();if(id)openDetalle(id,false);else await renderHome();}catch(e){setModalMsg('No se pudo crear: '+String(e&&e.message||e),false);if(btn)btn.disabled=false;}}
+  function openCrearModal(){if(!state.isAdmin)return;closeCrearModal();var alms=warehouses(),opts=alms.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.nombre||a.name||a.id)+'</option>';}).join('');if(!opts)opts='<option value="">(sin almacenes)</option>';var today=new Date(),yyyy=today.getFullYear(),mm=String(today.getMonth()+1).padStart(2,'0'),dd=String(today.getDate()).padStart(2,'0'),hoy=yyyy+'-'+mm+'-'+dd;var ov=document.createElement('div');ov.id='m29-crear-overlay';ov.className='m29-overlay';ov.innerHTML='<div class="m29-modal" role="dialog"><h3>Crear Turno</h3><div class="m29-field"><label for="m29-almacen">Almacén / punto</label><select id="m29-almacen">'+opts+'</select></div><div class="m29-field"><label for="m29-inicio">Fecha de inicio</label><input type="date" id="m29-inicio" value="'+hoy+'"></div><div class="m29-field"><label for="m29-dias">Cantidad de días (1–31)</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div><p class="muted" style="font-size:.8rem;opacity:.7;margin:0 0 8px">Las trabajadoras y sesiones se configuran después, en el detalle del turno.</p><div class="m29-msg" id="m29-modal-msg"></div><div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear">Crear</button></div></div>';document.body.appendChild(ov);ov.addEventListener('click',function(e){if(e.target===ov)closeCrearModal();});document.getElementById('m29-cancel-crear').addEventListener('click',closeCrearModal);document.getElementById('m29-confirm-crear').addEventListener('click',confirmCrear);}
+  async function confirmCrear(){var api=API();if(!api||typeof api.crearTurno!=='function'){setModalMsg('API de turnos no disponible.',false);return;}var alm=(document.getElementById('m29-almacen')||{}).value,inicio=(document.getElementById('m29-inicio')||{}).value,dias=parseInt((document.getElementById('m29-dias')||{}).value,10);if(!alm){setModalMsg('Elegí un almacén.',false);return;}if(!inicio){setModalMsg('Indicá la fecha de inicio.',false);return;}if(!Number.isFinite(dias)||dias<1||dias>31){setModalMsg('Días inválidos (1–31).',false);return;}var btn=document.getElementById('m29-confirm-crear');if(btn)btn.disabled=true;try{await api.crearTurno({almacenId:alm,inicioPlan:inicio,cantidadDias:dias,asignaciones:[]});closeCrearModal();await renderHome();}catch(e){setModalMsg('No se pudo crear: '+String(e&&e.message||e),false);if(btn)btn.disabled=false;}}
   function setModalMsg(t,ok){var m=document.getElementById('m29-modal-msg');if(!m)return;m.textContent=t||'';m.className='m29-msg '+(ok?'ok':'error');}
   function claimHomeOwnership(){window.__BC_TURNOS_HOME_OWNER='m29';window.refrescarCiclos=renderHome;window.refrescarTurnos=renderHome;if(!window.BattleCruiserTurnosMaestro)window.BattleCruiserTurnosMaestro={};var prevOpen=window.BattleCruiserTurnosMaestro.open;window.BattleCruiserTurnosMaestro.home=renderHome;window.BattleCruiserTurnosMaestro.version=VERSION;if(typeof prevOpen==='function'){window.BattleCruiserTurnosMaestro.open=function(id,legacy){window.__BC_M29_VIEW='detalle';var el=root();if(el)el.removeAttribute(HOME_MARK);return prevOpen.call(window.BattleCruiserTurnosMaestro,id,legacy);};}if(window.BattleCruiserM21)window.BattleCruiserM21.home=renderHome;}
   function relabelTabs(){var tab=document.querySelector('.tab-btn[data-tab="ciclos"]');if(tab)tab.textContent='Turnos';var old=document.querySelector('.tab-btn[data-tab="turnos"]');if(old){old.style.display='none';old.classList.add('hidden','tab-sin-permiso');}}
