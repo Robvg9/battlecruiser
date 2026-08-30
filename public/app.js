@@ -28,7 +28,7 @@
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6b"],
     ["m27-6b-venta-payload-pres.js","27.6b1"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7d"],
-    ["mision-d-stock-reposicion.js","D.10"],["m-f8-turns-integrity.js","F9.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
+    ["mision-d-stock-reposicion.js","D.10"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],["compra-multiple.js","27.8"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
     ["m29-turnos-organizacion.js","29.7"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.1"],["m34-turnos-filter-final.js","34.3"],
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],
