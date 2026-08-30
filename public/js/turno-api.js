@@ -14,7 +14,7 @@
     aprobarDiferencia: 'bc_aprobar_diferencia', crearDescuento: 'bc_crear_descuento', registrarEntregaInv: 'bc_registrar_entrega_inventario',
     recibirEntregaInv: 'bc_recibir_entrega_inventario', recibirYCrearSucesor: 'bc_recibir_entrega_inventario_y_crear_sucesor',
     prepararSucesor: 'bc_preparar_turno_sucesor', crearSucesor: 'bc_crear_sucesor_turno', turnoEstado: 'bc_turno_estado',
-    turnoTransition: 'bc_turno_transition', actorIsAdmin: 'bc_actor_is_admin', listarTurnos: 'listar_turnos',
+    turnoTransition: 'bc_turno_transition', actorIsAdmin: 'bc_actor_is_admin', listarTurnos: 'listar_turnos', listarTurnosMaestros: 'bc_listar_turnos_maestros_home',
     configObtener: 'bc_obtener_configuracion_turnos', configDuracion: 'bc_configurar_duracion_turnos', editarDias: 'bc_editar_dias_turno',
     registrarLlegadaCompra: 'bc_registrar_llegada_compra', confirmarRecepcionCompra: 'bc_confirmar_recepcion_compra'
   };
@@ -85,6 +85,7 @@
     turnoTransition: function (t,e) { return callRpc(RPC.turnoTransition,{p_turno_id:t,p_new_estado:e}); },
     actorIsAdmin: function () { return callRpc(RPC.actorIsAdmin,{}); },
     listarTurnos: function (o) { o=o||{}; return callRpc(RPC.listarTurnos,{p_usuario_id:o.usuarioId||null,p_estado:o.estado||null,p_almacen_id:o.almacenId||null,p_limite:o.limit!=null?o.limit:50,p_offset:o.offset!=null?o.offset:0}); },
+    listarTurnosMaestros: function (o) { o=o||{}; return callRpc(RPC.listarTurnosMaestros,{p_limite:o.limit!=null?o.limit:100,p_offset:o.offset!=null?o.offset:0}); },
     listarSesionesTurno: function (turnoId) { return selectTable('turno_sesiones','*','turno_id',turnoId,'numero_dia'); },
     listarTramosSesion: function (sesionId) { return selectTable('turno_tramos','*','turno_sesion_id',sesionId,'inicio_at'); },
     configObtener: function () { return callRpc(RPC.configObtener,{}); },
@@ -102,13 +103,8 @@
           if(!r.error&&r.data)email=typeof r.data==='string'?r.data:(r.data.email||email);
         }catch(e){}
       }
-      // IMPORTANTE: nunca usar el cliente principal para validar al sustituto.
-      // signInWithPassword en el cliente principal reemplazaría auth.uid() y
-      // rompería la identidad operativa del actor actual. Usamos un cliente
-      // efímero sin persistencia; el RPC de relevo sigue ejecutándose con la
-      // sesión principal y registra al sustituto explícitamente.
       const supabaseGlobal = global.supabase || (typeof window!=='undefined' ? window.supabase : null);
-      const createClient = supabaseGlobal && typeof supabaseGlobal.createClient === 'function' ? supabaseGlobal.createClient : null;
+      const createClient = supabaseGlobal && typeof supabaseGlobal.createClient==='function' ? supabaseGlobal.createClient : null;
       const url = client.supabaseUrl || client.rest && client.rest.url ? String(client.supabaseUrl || client.rest.url).replace(/\/rest\/v1\/?$/,'') : null;
       const key = client.supabaseKey || client.headers && (client.headers.apikey || client.headers['apikey']);
       if(!createClient || !url || !key) throw new Error('No se pudo preparar autenticación aislada del sustituto.');
@@ -119,9 +115,7 @@
         const sustituto=sign.data&&sign.data.user;
         if(!sustituto)throw new Error('No se pudo autenticar al sustituto.');
         return {id:sustituto.id,email:sustituto.email};
-      } finally {
-        try { await secondary.auth.signOut(); } catch(e) {}
-      }
+      } finally { try { await secondary.auth.signOut(); } catch(e) {} }
     },
     labelEstado: function (e) { const k=String(e||'').toUpperCase(); return ({PROGRAMADO:'Programado',EN_CURSO:'En curso',PENDIENTE_APROBACION:'Pendiente de aprobación',CERRADO:'Cerrado',CANCELADO:'Cancelado',PENDIENTE:'Pendiente',COMPLETADA:'Completada',EN_CURSO_SESION:'En curso',ACTIVO:'Activo',PLANIFICADO:'Programado',EN_VALIDACION:'Pendiente de aprobación',VALIDADO:'Cerrado'})[k]||e||'—'; },
     mapEstadoLegacy: function (e) { const k=String(e||'').toUpperCase(); if(k==='PLANIFICADO')return'PROGRAMADO';if(k==='ACTIVO')return'EN_CURSO';if(k==='EN_VALIDACION')return'PENDIENTE_APROBACION';if(k==='VALIDADO'||k==='ARCHIVADO')return'CERRADO';return k; }
