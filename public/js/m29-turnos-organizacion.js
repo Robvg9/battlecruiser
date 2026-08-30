@@ -1,14 +1,20 @@
-// BattleCruiser — M29 Organización Turnos (Micro-misión 003)
-// Home: [+ Crear Turno] + cards de turnos existentes (sin cards vacías de almacén).
-// Crear Turno = modal. Detalle y RPC existentes vía TurnoAPI / turnos-maestro.
-// No inventa backend. No toca Usuarios/Roles/Ventas.
+// BattleCruiser — M29 Organización Turnos (Micro-misión 003-CORRECCIÓN)
+// ÚNICO dueño de la HOME de Turnos.
+// HOME = [+ Crear Turno] + cards de turnos REALES (listar_turnos / TurnoAPI).
+// Detalle / sesiones / asignaciones = turnos-maestro (y m24 solo en detalle).
+// No inventa backend. No toca Usuarios/Roles/Ventas. Sin setTimeout-race.
 (function () {
   'use strict';
   if (window.__bcM29TurnosOrg) return;
   window.__bcM29TurnosOrg = true;
 
+  // Flag de ownership: otros módulos (maestro, m18, m24) deben respetarlo.
+  window.__BC_TURNOS_HOME_OWNER = 'm29';
+  window.__BC_M29_VIEW = 'home'; // 'home' | 'detalle'
+
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.1';
+  var VERSION = '29.2';
+  var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
 
@@ -46,25 +52,33 @@
     if (Array.isArray(data)) return data;
     if (Array.isArray(data.turnos)) return data.turnos;
     if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.ciclos)) return data.ciclos;
     return [data];
   }
 
-  var state = { isAdmin: false, turnos: [], busy: false };
+  /** Solo objetos que parecen un Turno real (tienen id de turno). */
+  function isTurnoReal(t) {
+    if (!t || typeof t !== 'object') return false;
+    var id = t.id || t.turno_id;
+    if (!id) return false;
+    if (t._placeholder_almacen) return false;
+    return true;
+  }
+
+  var state = { isAdmin: false, turnos: [], busy: false, errorMsg: '' };
 
   function injectCss() {
     if (document.getElementById('bc-m29-turnos-css')) return;
     var s = document.createElement('style');
     s.id = 'bc-m29-turnos-css';
     s.textContent = [
-      /* Ocultar UI legacy de ciclos en la pantalla principal de Turnos */
+      '#tab-turnos{display:none!important}',
       '#tab-ciclos > .pendientes-header,',
       '#tab-ciclos > p.muted:not(.tm-keep),',
       '#tab-ciclos > .mando-filtros,',
       '#tab-ciclos > .cc-bloque,',
       '#tab-ciclos > #ciclo-detalle,',
       '#tab-ciclos > #msg-ciclos{display:none!important}',
-      '#tab-turnos{display:none!important}',
-      /* Hero + botón crear */
       '.m29-wrap{max-width:900px;margin:0 auto;padding:0 0 24px}',
       '.m29-hero{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}',
       '.m29-hero h2{margin:0;font-size:1.35rem;font-weight:700}',
@@ -72,7 +86,6 @@
       '.m29-btn-crear{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:600;font-size:.95rem;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,.35)}',
       '.m29-btn-crear:hover{filter:brightness(1.08)}',
       '.m29-btn-crear:disabled{opacity:.5;cursor:not-allowed}',
-      /* Cards */
       '.m29-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}',
       '.m29-card{background:var(--card-bg,rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s}',
       '.m29-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.25)}',
@@ -80,13 +93,12 @@
       '.m29-card-alm{font-weight:700;font-size:1.05rem}',
       '.m29-badge{font-size:.72rem;padding:3px 8px;border-radius:999px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}',
       '.m29-badge.activo,.m29-badge.en_curso{background:rgba(34,197,94,.2);color:#4ade80}',
-      '.m29-badge.planificado,.m29-badge.borrador{background:rgba(59,130,246,.2);color:#93c5fd}',
-      '.m29-badge.cerrado,.m29-badge.finalizado{background:rgba(148,163,184,.2);color:#cbd5e1}',
-      '.m29-badge.suspendido{background:rgba(251,191,36,.2);color:#fbbf24}',
+      '.m29-badge.planificado,.m29-badge.borrador,.m29-badge.programado{background:rgba(59,130,246,.2);color:#93c5fd}',
+      '.m29-badge.cerrado,.m29-badge.finalizado,.m29-badge.validado{background:rgba(148,163,184,.2);color:#cbd5e1}',
+      '.m29-badge.suspendido,.m29-badge.pendiente_aprobacion,.m29-badge.en_validacion{background:rgba(251,191,36,.2);color:#fbbf24}',
       '.m29-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:.85rem;opacity:.85}',
       '.m29-meta span{opacity:.65}',
       '.m29-empty{text-align:center;padding:40px 16px;opacity:.65}',
-      /* Modal */
       '.m29-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}',
       '.m29-modal{background:var(--panel-bg,#1e293b);border-radius:16px;width:100%;max-width:420px;padding:20px 22px;box-shadow:0 20px 50px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08)}',
       '.m29-modal h3{margin:0 0 14px;font-size:1.15rem}',
@@ -99,7 +111,9 @@
       '.m29-actions .ok{background:#2563eb;color:#fff}',
       '.m29-msg{font-size:.85rem;margin-top:8px;min-height:1.2em}',
       '.m29-msg.error{color:#f87171}',
-      '.m29-msg.ok{color:#4ade80}'
+      '.m29-msg.ok{color:#4ade80}',
+      '[' + HOME_MARK + '="1"] #m24-asig-panel,',
+      '[' + HOME_MARK + '="1"] #m22-sesiones-panel{display:none!important}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -107,38 +121,74 @@
   async function resolveAdmin() {
     var api = API();
     if (api && typeof api.actorIsAdmin === 'function') {
-      try { state.isAdmin = !!(await api.actorIsAdmin()); return; } catch (_) {}
+      try {
+        var r = await api.actorIsAdmin();
+        state.isAdmin = r === true || (r && (r.is_admin === true || r === 'true'));
+        if (state.isAdmin) return;
+      } catch (_) {}
     }
     state.isAdmin = can('turnos', 'crear') || can('turnos', 'admin') || can('ciclos', 'crear') ||
+      can('ciclos', 'editar_any') || can('turnos', 'editar_any') ||
       (window.__bcUser && (window.__bcUser.rol === 'admin' || window.__bcUser.is_admin));
   }
 
   async function loadTurnos() {
+    state.errorMsg = '';
     var api = API();
     if (!api || typeof api.listarTurnos !== 'function') {
       state.turnos = [];
+      state.errorMsg = 'API de turnos no disponible.';
       return;
     }
     try {
-      var data = await api.listarTurnos({});
-      state.turnos = asArray(data).filter(function (t) { return t && (t.id || t.turno_id); });
+      var data = await api.listarTurnos({ limit: 100 });
+      var raw = asArray(data);
+      state.turnos = raw.filter(isTurnoReal);
+      if (raw.length && !state.turnos.length) {
+        console.warn('[M29] listarTurnos devolvió objetos incompatibles con Turno:', raw.slice(0, 3));
+        state.errorMsg = 'Respuesta de turnos incompatible (sin ids de turno).';
+      }
     } catch (e) {
       console.warn('[M29] listarTurnos', e);
+      try {
+        if (typeof client !== 'undefined' && client.rpc) {
+          var r = await client.rpc('listar_ciclos_operativos', { p_almacen_id: null, p_estado: null });
+          if (!r.error) {
+            state.turnos = asArray(r.data).filter(isTurnoReal).map(function (c) {
+              return {
+                id: c.id,
+                almacen_id: c.almacen_id,
+                almacen_nombre: c.almacen_nombre,
+                cantidad_dias: c.cantidad_dias,
+                inicio_plan: c.inicio_plan,
+                fin_plan: c.fin_plan,
+                estado: c.estado,
+                estado_maestro: api.mapEstadoLegacy ? api.mapEstadoLegacy(c.estado) : c.estado,
+                _legacy_ciclo: true
+              };
+            });
+            state.errorMsg = '';
+            return;
+          }
+        }
+      } catch (x) { /* keep error */ }
       state.turnos = [];
+      state.errorMsg = String(e && e.message || e);
     }
   }
 
   function cardHtml(t) {
     var id = t.id || t.turno_id;
     var alm = t.almacen_nombre || t.almacen || t.nombre_almacen || 'Almacén';
-    var est = labelEstado(t.estado || t.status);
-    var estKey = String(t.estado || t.status || '').toLowerCase();
+    var estRaw = t.estado_maestro || t.estado || t.status || '';
+    var est = labelEstado(estRaw);
+    var estKey = String(estRaw).toLowerCase().replace(/\s+/g, '_');
     var inicio = fmtDate(t.inicio_plan || t.fecha_inicio || t.inicio);
-    var dias = t.cantidad_dias || t.dias || t.duracion_dias || '—';
+    var dias = t.cantidad_dias != null ? t.cantidad_dias : (t.dias_turno != null ? t.dias_turno : (t.dias || '—'));
     var fin = fmtDate(t.fin_plan || t.fecha_fin || t.final);
     var resp = t.responsable_nombre || t.responsable || t.admin_nombre || '';
     return [
-      '<article class="m29-card" data-turno-id="' + esc(id) + '">',
+      '<article class="m29-card" data-turno-id="' + esc(id) + '" data-legacy="' + (t._legacy_ciclo ? '1' : '0') + '">',
       '<div class="m29-card-top">',
       '<div class="m29-card-alm">' + esc(alm) + '</div>',
       '<span class="m29-badge ' + esc(estKey) + '">' + esc(est) + '</span>',
@@ -156,16 +206,23 @@
   async function renderHome() {
     var el = root();
     if (!el) return;
+
+    window.__BC_M29_VIEW = 'home';
     injectCss();
     await resolveAdmin();
     await loadTurnos();
+
+    var stray = el.querySelector('#m24-asig-panel, #m22-sesiones-panel');
+    if (stray) stray.remove();
 
     var btnHtml = state.isAdmin
       ? '<button type="button" class="m29-btn-crear" id="m29-btn-crear">+ Crear Turno</button>'
       : '';
 
     var body;
-    if (!state.turnos.length) {
+    if (state.errorMsg && !state.turnos.length) {
+      body = '<div class="m29-empty"><p>' + esc(state.errorMsg) + '</p></div>';
+    } else if (!state.turnos.length) {
       body = '<div class="m29-empty"><p>No hay turnos creados todavía.</p>' +
         (state.isAdmin ? '<p>Usá <strong>+ Crear Turno</strong> para empezar.</p>' : '') +
         '</div>';
@@ -173,6 +230,7 @@
       body = '<div class="m29-grid">' + state.turnos.map(cardHtml).join('') + '</div>';
     }
 
+    el.setAttribute(HOME_MARK, '1');
     el.innerHTML = [
       '<div class="m29-wrap">',
       '<div class="m29-hero">',
@@ -189,14 +247,23 @@
     el.querySelectorAll('.m29-card').forEach(function (card) {
       card.addEventListener('click', function () {
         var id = card.getAttribute('data-turno-id');
-        if (id) openDetalle(id, false);
+        var legacy = card.getAttribute('data-legacy') === '1';
+        if (id) openDetalle(id, legacy);
       });
     });
   }
 
-  function openDetalle(id, force) {
+  function openDetalle(id, isLegacy) {
+    window.__BC_M29_VIEW = 'detalle';
+    var el = root();
+    if (el) el.removeAttribute(HOME_MARK);
+
     if (window.BattleCruiserTurnosMaestro && typeof window.BattleCruiserTurnosMaestro.open === 'function') {
-      window.BattleCruiserTurnosMaestro.open(id, force);
+      window.BattleCruiserTurnosMaestro.open(id, isLegacy);
+      return;
+    }
+    if (window.BattleCruiserM21 && typeof window.BattleCruiserM21.enter === 'function') {
+      window.BattleCruiserM21.enter(id);
       return;
     }
     if (typeof abrirDetalleTurno === 'function') {
@@ -238,6 +305,7 @@
       '<input type="date" id="m29-inicio" value="' + hoy + '"></div>',
       '<div class="m29-field"><label for="m29-dias">Cantidad de días (1–7)</label>',
       '<input type="number" id="m29-dias" min="1" max="7" value="7"></div>',
+      '<p class="muted" style="font-size:.8rem;opacity:.7;margin:0 0 8px">Las trabajadoras y sesiones se configuran después, en el detalle del turno.</p>',
       '<div class="m29-msg" id="m29-modal-msg"></div>',
       '<div class="m29-actions">',
       '<button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button>',
@@ -289,14 +357,31 @@
     m.className = 'm29-msg ' + (ok ? 'ok' : 'error');
   }
 
-  function patchMaestro() {
-    if (!window.BattleCruiserTurnosMaestro) window.BattleCruiserTurnosMaestro = {};
-    window.BattleCruiserTurnosMaestro.home = renderHome;
+  function claimHomeOwnership() {
     window.refrescarCiclos = renderHome;
     window.refrescarTurnos = renderHome;
+
+    if (!window.BattleCruiserTurnosMaestro) {
+      window.BattleCruiserTurnosMaestro = {};
+    }
+    var prevOpen = window.BattleCruiserTurnosMaestro.open;
+    window.BattleCruiserTurnosMaestro.home = renderHome;
+    window.BattleCruiserTurnosMaestro.version = VERSION;
+    if (typeof prevOpen === 'function') {
+      window.BattleCruiserTurnosMaestro.open = function (id, legacy) {
+        window.__BC_M29_VIEW = 'detalle';
+        var el = root();
+        if (el) el.removeAttribute(HOME_MARK);
+        return prevOpen.call(window.BattleCruiserTurnosMaestro, id, legacy);
+      };
+    }
+
+    if (window.BattleCruiserM21) {
+      window.BattleCruiserM21.home = renderHome;
+    }
   }
 
-  function relabelTab() {
+  function relabelTabs() {
     var tab = document.querySelector('.tab-btn[data-tab="ciclos"]');
     if (tab) tab.textContent = 'Turnos';
     var old = document.querySelector('.tab-btn[data-tab="turnos"]');
@@ -306,28 +391,85 @@
     }
   }
 
-  function onTab() {
+  function hookNavigation() {
     var tabs = document.getElementById('tabs');
     if (!tabs || tabs.dataset.m29Nav === '1') return;
     tabs.dataset.m29Nav = '1';
     tabs.addEventListener('click', function (e) {
-      var b = e.target.closest('.tab-btn[data-tab="ciclos"]');
-      if (b) setTimeout(renderHome, 40);
+      var b = e.target.closest('.tab-btn');
+      if (!b) return;
+      var t = b.dataset.tab;
+      if (t === 'ciclos' || t === 'turnos') {
+        queueMicrotask(function () {
+          claimHomeOwnership();
+          renderHome();
+        });
+      }
     });
+  }
+
+  function guardAgainstLegacyHome() {
+    var el = root();
+    if (!el || el.dataset.m29Guard === '1') return;
+    el.dataset.m29Guard = '1';
+    var scheduled = false;
+    new MutationObserver(function () {
+      if (window.__BC_M29_VIEW !== 'home') return;
+      if (el.getAttribute(HOME_MARK) === '1') return;
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(function () {
+        scheduled = false;
+        if (window.__BC_M29_VIEW !== 'home') return;
+        if (el.getAttribute(HOME_MARK) === '1') return;
+        var hasM29 = !!el.querySelector('.m29-wrap');
+        if (!hasM29) {
+          claimHomeOwnership();
+          renderHome();
+        }
+      });
+    }).observe(el, { childList: true });
   }
 
   function boot() {
     injectCss();
-    relabelTab();
-    patchMaestro();
-    onTab();
-    if (root()) setTimeout(renderHome, 500);
-    setTimeout(function () { patchMaestro(); if (root() && document.getElementById('tab-ciclos') && document.getElementById('tab-ciclos').classList.contains('visible')) renderHome(); }, 1500);
+    relabelTabs();
+    claimHomeOwnership();
+    hookNavigation();
+    guardAgainstLegacyHome();
+
+    var panel = document.getElementById('tab-ciclos');
+    if (panel && panel.classList.contains('visible') && root()) {
+      renderHome();
+    }
   }
 
+  window.__BC_M29__ = {
+    version: VERSION,
+    renderHome: renderHome,
+    openDetalle: openDetalle,
+    claimHomeOwnership: claimHomeOwnership
+  };
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 500); });
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    setTimeout(boot, 500);
+    boot();
   }
+
+  // Re-claim ownership mientras los scripts dinámicos de app.js terminan de cargar.
+  // Acotado (8 × 200ms ≈ 1.6s), no es la solución principal (claim + nav + guard).
+  var reclaimTries = 0;
+  var reclaimTimer = setInterval(function () {
+    reclaimTries++;
+    claimHomeOwnership();
+    if (window.__BC_M29_VIEW === 'home') {
+      var el = root();
+      if (el) {
+        var stray = el.querySelector('#m24-asig-panel, #m22-sesiones-panel');
+        if (stray) stray.remove();
+      }
+    }
+    if (reclaimTries >= 8) clearInterval(reclaimTimer);
+  }, 200);
 })();
