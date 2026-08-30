@@ -54,7 +54,8 @@
     ["inventario-detalle.js","inv.1"],
     ["compra-multiple.js","27.8"],
     ["m28-usuarios-archivado.js","28.2"],
-    ["m28-ajustes-archivados.js","28.2"]
+    ["m28-ajustes-archivados.js","28.2"],
+    ["m29-turnos-organizacion.js","29.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
