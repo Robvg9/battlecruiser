@@ -1,14 +1,18 @@
-// BattleCruiser — M44.1: selector de vista Productos (filas / cuadros)
+// BattleCruiser — M44.2: selector de vista Productos (filas / cuadros)
+// Solo toolbar + localStorage + toggle de clases.
+// La geometría pertenece EXCLUSIVAMENTE a M47.
 (function(){
   'use strict';
-  if(window.__bcM44ProductosVistas)return;
-  window.__bcM44ProductosVistas=true;
+  if(window.__bcM44ProductosVistasV2)return;
+  window.__bcM44ProductosVistasV2=true;
 
   const PREF='bc_productos_vista_v1';
   const STYLE_ID='bc-m44-vistas-css';
 
   function injectCss(){
-    if(document.getElementById(STYLE_ID))return;
+    // Reemplazar CSS legacy que forzaba flex-column en Filas
+    const existing=document.getElementById(STYLE_ID);
+    if(existing)existing.remove();
     const s=document.createElement('style');
     s.id=STYLE_ID;
     s.textContent=`
@@ -17,7 +21,6 @@
       #tab-productos .bc-m44-view-btn{border:1px solid rgba(212,176,92,.17)!important;background:rgba(18,42,36,.72)!important;color:var(--mist)!important;border-radius:8px!important;padding:7px 10px!important;font-size:.72rem!important;line-height:1!important;cursor:pointer!important}
       #tab-productos .bc-m44-view-btn.active{color:var(--gold-bright)!important;border-color:rgba(212,176,92,.42)!important;background:rgba(212,176,92,.09)!important}
       #tab-productos .bc-m44-view-btn:hover{border-color:rgba(212,176,92,.32)!important;color:var(--text)!important}
-      #tab-productos #lista-productos.bc-productos-filas{display:flex!important;flex-direction:column!important;gap:8px!important}
     `;
     document.head.appendChild(s);
   }
@@ -29,7 +32,10 @@
     list.classList.toggle('bc-productos-filas',isRows);
     list.classList.toggle('bc-productos-cards',!isRows);
     localStorage.setItem(PREF,isRows?'rows':'cards');
-    document.querySelectorAll('#tab-productos .bc-m44-view-btn').forEach(function(b){b.classList.toggle('active',b.dataset.view===view);b.setAttribute('aria-pressed',b.dataset.view===view?'true':'false')});
+    document.querySelectorAll('#tab-productos .bc-m44-view-btn').forEach(function(b){
+      b.classList.toggle('active',b.dataset.view===view);
+      b.setAttribute('aria-pressed',b.dataset.view===view?'true':'false');
+    });
   }
   function ensureTools(){
     const tab=document.getElementById('tab-productos');const list=document.getElementById('lista-productos');const search=document.getElementById('productos-buscar');
