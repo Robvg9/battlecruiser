@@ -16,10 +16,10 @@
     if(!turnoId)return;
     let sessions=[];try{sessions=await API().listarSesionesTurno(turnoId)}catch(e){return alert('No se pudieron cargar las sesiones: '+(e.message||e))}
     const us=users();
-    const opts='<option value="">No asignada</option>'+us.map(u=>'<option value="'+esc(u.id)+'">'+esc(u.nombre||u.email||u.id)+'</option>').join('');
     const html='<p class="muted">Asigna una trabajadora a cada sesión. Las sesiones sin asignar no pueden iniciarse.</p>'+sessions.map(s=>{
-      const uid=s.usuario_id||s.asignado_id||'';const selected=uid?' value="'+esc(uid)+'" selected':'';
-      return '<div class="field m31-session"><label>Día '+esc(s.dia_n)+' · '+esc(s.bloque||'')+' · '+esc(s.fecha||'')+'</label><select data-sid="'+esc(s.id)+'">'+opts.replace(' value="'+esc(uid)+'"',' value="'+esc(uid)+'"')+'</select></div>'
+      const uid=s.usuario_id||s.asignado_id||'';
+      const opts='<option value="">No asignada</option>'+us.map(u=>'<option value="'+esc(u.id)+'"'+(String(u.id)===String(uid)?' selected':'')+'>'+esc(u.nombre||u.email||u.id)+'</option>').join('');
+      return '<div class="field m31-session"><label>Día '+esc(s.dia_n)+' · '+esc(s.bloque||'')+' · '+esc(s.fecha||'')+'</label><select data-sid="'+esc(s.id)+'">'+opts+'</select></div>'
     }).join('');
     open('Asignar trabajadoras a las sesiones',html,async function(bg){
       const selects=[...bg.querySelectorAll('select[data-sid]')];const m=bg.querySelector('#m31-msg');
