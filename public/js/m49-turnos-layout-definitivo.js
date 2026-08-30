@@ -1,5 +1,5 @@
 // BattleCruiser — M49: layout definitivo de Turnos (Partes 1 y 2)
-// v49.2 — orden determinista Step1: info general → Sesiones → grid
+// v49.3 — Step2 cards más densas/ocupan espacio; Step1 orden intacto
 (function(){
   'use strict';
   if(window.__BC_M49_TURNOS_LAYOUT)return;
@@ -12,21 +12,28 @@
     if(document.getElementById(STYLE_ID))return;
     const s=document.createElement('style'); s.id=STYLE_ID;
     s.textContent=`
-      .m49-session-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:14px!important;align-items:start!important;margin-top:12px!important}
-      .m49-session-col{display:flex!important;flex-direction:column!important;gap:9px!important;min-width:0!important}
-      .m49-session-heading{padding:9px 11px!important;border:1px solid rgba(212,176,92,.16)!important;border-radius:10px!important;background:rgba(212,176,92,.045)!important;color:var(--gold-bright)!important;font-size:.75rem!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.06em!important;text-align:center!important}
-      .m49-session-card{width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:11px 12px!important;border:1px solid rgba(255,255,255,.075)!important;border-radius:11px!important;background:rgba(255,255,255,.018)!important;overflow:hidden!important}
+      .m49-session-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:16px!important;align-items:stretch!important;margin-top:12px!important;width:100%!important}
+      .m49-session-col{display:flex!important;flex-direction:column!important;gap:12px!important;min-width:0!important;height:100%!important}
+      .m49-session-heading{padding:10px 12px!important;border:1px solid rgba(212,176,92,.16)!important;border-radius:10px!important;background:rgba(212,176,92,.045)!important;color:var(--gold-bright)!important;font-size:.78rem!important;font-weight:700!important;text-transform:uppercase!important;letter-spacing:.06em!important;text-align:center!important}
+      .m49-session-card{width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:12px 14px!important;border:1px solid rgba(255,255,255,.075)!important;border-radius:11px!important;background:rgba(255,255,255,.018)!important;overflow:hidden!important}
       .m49-session-card .m33-session-row{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:10px!important;min-width:0!important}
       .m49-session-card .m33-session-row>div{min-width:0!important;max-width:100%!important}
       .m49-session-card .m33-session-row>div:last-child{display:flex!important;flex-wrap:wrap!important;justify-content:flex-end!important;gap:5px!important}
       .m49-session-card .m33-pill{max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
-      .m49-step2-control{grid-column:1/-1!important;margin:0 0 2px!important;padding:10px 12px!important;border:1px solid rgba(212,176,92,.16)!important;border-radius:10px!important;background:rgba(212,176,92,.05)!important}
-      .m49-step2-label{display:flex!important;align-items:center!important;gap:8px!important;margin:0!important;font-size:.83rem!important;cursor:pointer!important}
+      .m49-step2-control{grid-column:1/-1!important;margin:0 0 4px!important;padding:12px 14px!important;border:1px solid rgba(212,176,92,.16)!important;border-radius:10px!important;background:rgba(212,176,92,.05)!important}
+      .m49-step2-label{display:flex!important;align-items:center!important;gap:8px!important;margin:0!important;font-size:.85rem!important;cursor:pointer!important}
       .m49-step2-label input{width:16px!important;height:16px!important;flex:0 0 auto!important}
-      .m49-step2-hint{margin:4px 0 0 24px!important;font-size:.7rem!important;line-height:1.35!important;color:var(--mist)!important}
-      .m49-step2-card label{display:block!important;margin:0 0 6px!important;line-height:1.3!important}
-      .m49-step2-card select{width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important}
-      @media(max-width:720px){.m49-session-grid{grid-template-columns:1fr!important}}
+      .m49-step2-hint{margin:6px 0 0 24px!important;font-size:.72rem!important;line-height:1.4!important;color:var(--mist)!important}
+      /* Step 2: cards de asignación más generosas */
+      .m49-step2-card{padding:16px 16px!important;min-height:88px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:8px!important;border:1px solid rgba(255,255,255,.1)!important;background:rgba(255,255,255,.03)!important}
+      .m49-step2-card label{display:block!important;margin:0!important;line-height:1.35!important;font-size:.9rem!important;font-weight:600!important;color:var(--text,#fff)!important}
+      .m49-step2-card select{width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:12px 14px!important;min-height:44px!important;font-size:.9rem!important;border-radius:9px!important;border:1px solid rgba(255,255,255,.14)!important;background:var(--void,#0c1c18)!important;color:inherit!important;cursor:pointer!important}
+      .m49-step2-card select:focus{outline:none!important;border-color:rgba(59,130,246,.65)!important;box-shadow:0 0 0 2px rgba(59,130,246,.2)!important}
+      .m33-body > .m33-muted:first-child{margin-bottom:10px!important;font-size:.85rem!important;line-height:1.4!important}
+      @media(max-width:720px){
+        .m49-session-grid{grid-template-columns:1fr!important}
+        .m49-step2-card{min-height:76px!important;padding:14px!important}
+      }
     `;
     document.head.appendChild(s);
   }
