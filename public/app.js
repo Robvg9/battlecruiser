@@ -52,7 +52,8 @@
     ["m-f9-turnos-integrity.js","F9.1"],
     ["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],
-    ["compra-multiple.js","27.8"]
+    ["compra-multiple.js","27.8"],
+    ["m28-usuarios-archivado.js","28.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
