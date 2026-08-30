@@ -1,4 +1,4 @@
-// BattleCruiser — M29 Organización Turnos (Micro-misión 004 HOTFIX)
+// BattleCruiser — M29 Organización Turnos (Micro-misión 005)
 // ÚNICO dueño de la HOME de Turnos.
 (function () {
   'use strict';
@@ -7,7 +7,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.4';
+  var VERSION = '29.5';
   var HOME_MARK = 'data-m29-home';
   function API() { return window.BattleCruiserTurnoAPI; }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v == null ? '' : v) : String(v == null ? '' : v).replace(/[&<>\"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' })[c]; }); }
@@ -22,11 +22,16 @@
     if (t._placeholder_almacen === true) return false;
     var id = t.id || t.turno_id;
     if (!id) return false;
-    if (t.nombre && !t.estado_maestro && !t.estado && !t.estado_turno && !t.inicio_plan && !t.fecha_inicio && !t.cantidad_dias && !t.dias_turno) return false;
-    var tieneEstado = !!(t.estado_maestro || t.estado_turno || t.estado || t.status);
-    var tienePlan = !!(t.inicio_plan || t.fecha_inicio || t.inicio || t.cantidad_dias != null || t.dias_turno != null || t.dias != null);
-    var tieneAlmacenTurno = !!(t.almacen_id || t.almacen_nombre);
-    return tieneEstado || tienePlan || tieneAlmacenTurno;
+    // listar_turnos comparte la tabla legacy `turnos` con el modelo TURNO.
+    // Las filas ligadas a ciclo/sesión son legacy y NO deben aparecer en la HOME.
+    if (t.ciclo_id != null || t.cicloId != null || t.sesion_id != null || t.sesionId != null) return false;
+    // Un TURNO maestro creado por bc_crear_turno tiene días configurados.
+    if (t.dias_turno != null || t.cantidad_dias != null || t.fecha_inicio != null || t.inicio_plan != null) return true;
+    // Compatibilidad con respuestas futuras: solo aceptar una fila con señal
+    // explícita de estado maestro + almacen, nunca una fila de almacén genérica.
+    var tieneEstadoMaestro = !!(t.estado_maestro || t.estado_turno);
+    var tieneAlmacen = !!(t.almacen_id || t.almacen_nombre);
+    return tieneEstadoMaestro && tieneAlmacen;
   }
   var state = { isAdmin: false, turnos: [], busy: false, errorMsg: '' };
   function injectCss() {
@@ -85,7 +90,7 @@
     catch(e){ console.warn('[M29] listarTurnos',e); state.turnos=[]; state.errorMsg=String(e&&e.message||e); }
   }
   function cardHtml(t) {
-    var id=t.id||t.turno_id, alm=t.almacen_nombre||t.almacen||t.nombre_almacen||'Almacén', estRaw=t.estado_maestro||t.estado||t.status||'', est=labelEstado(estRaw), estKey=String(estRaw).toLowerCase().replace(/\s+/g,'_'), inicio=fmtDate(t.inicio_plan||t.fecha_inicio||t.inicio), dias=t.cantidad_dias!=null?t.cantidad_dias:(t.dias_turno!=null?t.dias_turno:(t.dias||'—')), fin=fmtDate(t.fin_plan||t.fecha_fin||t.final), resp=t.responsable_nombre||t.responsable||t.admin_nombre||'';
+    var id=t.id||t.turno_id, alm=t.almacen_nombre||t.almacen||t.nombre_almacen||'Almacén', estRaw=t.estado_maestro||t.estado||t.status||'', est=labelEstado(estRaw), estKey=String(estRaw).toLowerCase().replace(/\s+/g,'_'), inicio=fmtDate(t.inicio_plan||t.fecha_inicio||t.inicio||t.fecha), dias=t.cantidad_dias!=null?t.cantidad_dias:(t.dias_turno!=null?t.dias_turno:(t.dias||'—')), fin=fmtDate(t.fin_plan||t.fecha_fin||t.final), resp=t.responsable_nombre||t.responsable||t.admin_nombre||'';
     return '<article class="m29-card" data-turno-id="'+esc(id)+'"><div class="m29-card-top"><div class="m29-card-alm">'+esc(alm)+'</div><span class="m29-badge '+esc(estKey)+'">'+esc(est)+'</span></div><div class="m29-meta"><div><span>Inicio</span><br>'+esc(inicio)+'</div><div><span>Días</span><br>'+esc(dias)+'</div><div><span>Final</span><br>'+esc(fin)+'</div>'+(resp?'<div><span>Responsable</span><br>'+esc(resp)+'</div>':'')+'</div></article>';
   }
   async function renderHome() {
