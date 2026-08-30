@@ -15,7 +15,7 @@
     recibirEntregaInv: 'bc_recibir_entrega_inventario', recibirYCrearSucesor: 'bc_recibir_entrega_inventario_y_crear_sucesor',
     prepararSucesor: 'bc_preparar_turno_sucesor', crearSucesor: 'bc_crear_sucesor_turno', turnoEstado: 'bc_turno_estado',
     turnoTransition: 'bc_turno_transition', actorIsAdmin: 'bc_actor_is_admin', listarTurnos: 'listar_turnos', listarTurnosMaestros: 'bc_listar_turnos_maestros_home',
-    configObtener: 'bc_obtener_configuracion_turnos', configDuracion: 'bc_configurar_duracion_turnos', editarDias: 'bc_editar_dias_turno',
+    anularTurno: 'bc_anular_turno', configObtener: 'bc_obtener_configuracion_turnos', configDuracion: 'bc_configurar_duracion_turnos', editarDias: 'bc_editar_dias_turno',
     registrarLlegadaCompra: 'bc_registrar_llegada_compra', confirmarRecepcionCompra: 'bc_confirmar_recepcion_compra'
   };
 
@@ -60,6 +60,7 @@
     asignarSesion: function (s,u) { return callRpc(RPC.asignarSesion,{p_turno_sesion_id:s,p_usuario_id:u}); },
     iniciarSesion: function (s) { return callRpc(RPC.iniciarSesion,{p_turno_sesion_id:s}); },
     cerrarSesion: function (s) { return callRpc(RPC.cerrarSesion,{p_turno_sesion_id:s}); },
+    anularTurno: function (t,m) { return callRpc(RPC.anularTurno,{p_turno_id:t,p_motivo:m||null}); },
     interrumpirYRelevar: async function (sesionId, sustitutoId, motivo) {
       const tramos = await selectTable('turno_tramos','*','turno_sesion_id',sesionId,'inicio_at');
       const activo = (tramos || []).find(function (t) { return String(t.estado || '').toUpperCase() === 'ACTIVO'; });
