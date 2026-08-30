@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.10 — Misión Maestra V2: modelo TURNO
-(function hotfixV9410(){
-  const VERSION="9.4.10";
+// v9.4.11 — Misión Maestra V2: modelo TURNO
+(function hotfixV9411(){
+  const VERSION="9.4.11";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -9,21 +9,6 @@
     if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
     if(label)label.textContent="Usuario";
     document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
-    ["update-app-btn-login","update-app-btn"].forEach(id=>{
-      const old=document.getElementById(id);if(!old||old.dataset.bcVersion===VERSION)return;
-      const btn=old.cloneNode(true);old.replaceWith(btn);btn.dataset.bcVersion=VERSION;
-      btn.addEventListener("click",function(){
-        if(typeof actualizarApp==="function"){actualizarApp(btn);return;}
-        (async function(){
-          btn.disabled=true;btn.textContent="Actualizando…";
-          try{
-            if("serviceWorker"in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()));}
-            if("caches"in window){const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith("battlecruiser-shell-")||k.startsWith("battlecruiser")).map(k=>caches.delete(k)));}
-          }catch(e){console.warn("[BattleCruiser] actualización: limpieza parcial",e);}
-          const u=new URL(location.href);u.searchParams.set("bc_update",VERSION+"-"+Date.now());location.replace(u.toString());
-        })();
-      });
-    });
   }
   aplicarVersion();window.addEventListener("pageshow",aplicarVersion);
 })();
@@ -45,7 +30,8 @@
     ["m27-6b-venta-payload-pres.js","27.6b1"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7d"],
     ["mision-d-stock-reposicion.js","D.10"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],["compra-multiple.js","27.8"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
-    ["m29-turnos-organizacion.js","29.7"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.1"],["m34-turnos-filter-final.js","34.3"]
+    ["m29-turnos-organizacion.js","29.7"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.1"],["m34-turnos-filter-final.js","34.3"],
+    ["m35-turno-asignaciones-fix.js","35.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
