@@ -1,4 +1,5 @@
 // BattleCruiser — M49: layout definitivo de Turnos (Partes 1 y 2)
+// v49.2 — orden determinista Step1: info general → Sesiones → grid
 (function(){
   'use strict';
   if(window.__BC_M49_TURNOS_LAYOUT)return;
@@ -52,6 +53,28 @@
     body.dataset.bcM46=''; body.dataset.bcM41Ready=''; body.dataset.bcM48='';
   }
 
+  function findSesionesHeading(body){
+    return [...body.children].find(el=>{
+      const t=String(el.tagName||'').toUpperCase();
+      if(t!=='H1'&&t!=='H2'&&t!=='H3'&&t!=='H4'&&t!=='H5'&&t!=='H6')return false;
+      return String(el.textContent||'').trim().toLowerCase()==='sesiones';
+    })||null;
+  }
+
+  function placeGridAfterInfo(body,grid){
+    const heading=findSesionesHeading(body);
+    if(heading){
+      heading.insertAdjacentElement('afterend',grid);
+      return;
+    }
+    const summaries=[...body.querySelectorAll(':scope > .m33-summary')];
+    if(summaries.length){
+      summaries[summaries.length-1].insertAdjacentElement('afterend',grid);
+      return;
+    }
+    body.appendChild(grid);
+  }
+
   function organizeStep1(){
     const body=stepBody(1); if(!body||body.dataset.bcM49Step1==='1')return;
     const nodes=sessionNodes(body); if(!nodes.length)return;
@@ -64,9 +87,8 @@
       left.innerHTML='<div class="m49-session-heading">☀️ Mañana</div>';
       right.innerHTML='<div class="m49-session-heading">🌙 Tarde</div>';
       nodes.forEach(n=>{n.classList.add('m49-session-card');(isTarde(n)?right:left).appendChild(n)});
-      const first=body.firstElementChild;
-      body.insertBefore(grid,first);
       grid.append(left,right);
+      placeGridAfterInfo(body,grid);
       body.dataset.bcM49Step1='1';
     }finally{busy=false}
   }
