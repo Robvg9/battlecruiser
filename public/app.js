@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.22 — Misión Maestra V2: modelo TURNO
-(function hotfixV9422(){
-  const VERSION="9.4.22";
+// v9.4.23 — Misión Maestra V2: modelo TURNO
+(function hotfixV9423(){
+  const VERSION="9.4.23";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -33,7 +33,7 @@
     ["m29-turnos-organizacion.js","29.7"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.1"],["m34-turnos-filter-final.js","34.3"],
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],
     ["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.1"],["m43-productos-layout-fix.js","43.2"],["m44-productos-vistas.js","44.1"],["m45-reportes-ux-final.js","45.2"],
-    ["m47-productos-vista-final.js","47.1"],["m49-turnos-layout-definitivo.js","49.1"]
+    ["m47-productos-vista-final.js","47.1"],["m49-turnos-layout-definitivo.js","49.1"],["m50-turno-step1-order.js","50.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
