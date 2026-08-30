@@ -47,7 +47,7 @@
     ["m27-6b-venta-payload-pres.js","27.6b1"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7d"],
     ["mision-d-stock-reposicion.js","D.10"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],["compra-multiple.js","27.8"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
-    ["m29-turnos-organizacion.js","29.4"]
+    ["m29-turnos-organizacion.js","29.4"],["m30-turnos-expediente.js","30.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
