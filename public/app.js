@@ -30,7 +30,7 @@
 
 (function cargarModulosDinamicos(){
   const modules=[
-    ["turno-api.js","9.4.0"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.1"],
+    ["turno-api.js","9.4.2"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.1"],
     ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","33.2"],
@@ -47,7 +47,7 @@
     ["m27-6b-venta-payload-pres.js","27.6b1"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7d"],
     ["mision-d-stock-reposicion.js","D.10"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],["compra-multiple.js","27.8"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
-    ["m29-turnos-organizacion.js","29.4"],["m30-turnos-expediente.js","30.1"]
+    ["m29-turnos-organizacion.js","29.6"],["m30-turnos-expediente.js","30.2"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
