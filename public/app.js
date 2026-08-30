@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.11 — Misión Maestra V2: modelo TURNO
-(function hotfixV9411(){
-  const VERSION="9.4.11";
+// v9.4.12 — Misión Maestra V2: modelo TURNO
+(function hotfixV9412(){
+  const VERSION="9.4.12";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
