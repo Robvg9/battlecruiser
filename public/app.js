@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.37 — M47.5: Productos Filas/Cuadros — única autoridad geométrica
-(function hotfixV9437(){
-  const VERSION="9.4.37";
+// v9.4.38 — M55: importación masiva de productos CSV/XLSX
+(function hotfixV9438(){
+  const VERSION="9.4.38";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -35,7 +35,7 @@
     ["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.1"],["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.2"],["m45-reportes-ux-final.js","45.2"],
     ["m47-productos-vista-final.js","47.5"],["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
-    ["m53-inventario-centro.js","53.1"]
+    ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
