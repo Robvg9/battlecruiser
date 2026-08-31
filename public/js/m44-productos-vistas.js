@@ -1,16 +1,15 @@
-// BattleCruiser — M44.2: selector de vista Productos (filas / cuadros)
-// Solo toolbar + localStorage + toggle de clases.
+// BattleCruiser — M44.3: selector único de vista Productos (filas / cuadros)
+// Owner exclusivo: selección de vista + persistencia.
 // La geometría pertenece EXCLUSIVAMENTE a M47.
 (function(){
   'use strict';
-  if(window.__bcM44ProductosVistasV2)return;
-  window.__bcM44ProductosVistasV2=true;
+  if(window.__bcM44ProductosVistasV3)return;
+  window.__bcM44ProductosVistasV3=true;
 
   const PREF='bc_productos_vista_v1';
   const STYLE_ID='bc-m44-vistas-css';
 
   function injectCss(){
-    // Reemplazar CSS legacy que forzaba flex-column en Filas
     const existing=document.getElementById(STYLE_ID);
     if(existing)existing.remove();
     const s=document.createElement('style');
@@ -26,6 +25,7 @@
   }
 
   function getView(){return localStorage.getItem(PREF)==='rows'?'rows':'cards'}
+
   function setView(view){
     const list=document.getElementById('lista-productos');if(!list)return;
     const isRows=view==='rows';
@@ -33,23 +33,48 @@
     list.classList.toggle('bc-productos-cards',!isRows);
     localStorage.setItem(PREF,isRows?'rows':'cards');
     document.querySelectorAll('#tab-productos .bc-m44-view-btn').forEach(function(b){
-      b.classList.toggle('active',b.dataset.view===view);
-      b.setAttribute('aria-pressed',b.dataset.view===view?'true':'false');
+      const active=b.dataset.view===view;
+      b.classList.toggle('active',active);
+      b.setAttribute('aria-pressed',active?'true':'false');
     });
   }
+
   function ensureTools(){
-    const tab=document.getElementById('tab-productos');const list=document.getElementById('lista-productos');const search=document.getElementById('productos-buscar');
+    const tab=document.getElementById('tab-productos');
+    const list=document.getElementById('lista-productos');
+    const search=document.getElementById('productos-buscar');
     if(!tab||!list)return;
-    let tools=tab.querySelector('.bc-m44-view-tools');
+
+    // Normaliza cualquier duplicado preexistente y deja una sola barra de vista.
+    const toolbars=[...tab.querySelectorAll('.bc-m44-view-tools')];
+    let tools=toolbars[0]||null;
+    toolbars.slice(1).forEach(function(extra){extra.remove()});
+
     if(!tools){
-      tools=document.createElement('div');tools.className='bc-m44-view-tools';
+      tools=document.createElement('div');
+      tools.className='bc-m44-view-tools';
       tools.innerHTML='<span class="bc-m44-view-label">Vista</span><button type="button" class="bc-m44-view-btn" data-view="rows" aria-pressed="false">☷ Filas</button><button type="button" class="bc-m44-view-btn" data-view="cards" aria-pressed="false">▦ Cuadros</button>';
       if(search&&search.parentElement)search.parentElement.after(tools);else list.before(tools);
       tools.querySelectorAll('.bc-m44-view-btn').forEach(function(b){b.addEventListener('click',function(){setView(b.dataset.view)})});
     }
+
+    // Limpia duplicados de botones dentro de la barra superviviente.
+    const seen={rows:false,cards:false};
+    tools.querySelectorAll('.bc-m44-view-btn').forEach(function(btn){
+      const v=btn.dataset.view;
+      if((v==='rows'||v==='cards')&&!seen[v]){seen[v]=true;return}
+      btn.remove();
+    });
+
     setView(getView());
   }
 
-  function boot(){injectCss();ensureTools();setTimeout(ensureTools,600)}
+  function boot(){
+    injectCss();
+    ensureTools();
+    setTimeout(ensureTools,600);
+    setTimeout(ensureTools,1200);
+  }
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
