@@ -1,7 +1,7 @@
-/* BattleCruiser Service Worker — v9.4.1 / modelo TURNO
+/* BattleCruiser Service Worker — v9.4.2 / modelo TURNO
  * App shell: network-first + no-store. Cambio de versión fuerza actualización del SW.
  */
-var BC_SW_VERSION = "9.4.1";
+var BC_SW_VERSION = "9.4.2";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_STATIC = ["./manifest.json","./favicon.png","./icons/icon-192x192.png","./icons/icon-512x512.png"];
