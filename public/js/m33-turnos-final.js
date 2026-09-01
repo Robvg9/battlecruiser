@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.5 — ADMIN: wizard completo · DEPENDIENTA: vista operativa (secuencia + abrir)
+// v33.6 — ADMIN: wizard completo · DEPENDIENTA: vista operativa (secuencia + abrir) · fechas civiles sin desfase UTC
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -11,7 +11,13 @@
   const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false };
   const root = () => document.getElementById(ROOT_ID);
   const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
-  const date = v => !v ? '-' : (typeof fechaCorta === 'function' ? fechaCorta(v) : String(v).split('T')[0].split('-').reverse().join('/'));
+  const date = v => {
+    if (!v) return '-';
+    const s = String(v);
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (m) return m[3] + '/' + m[2] + '/' + m[1];
+    return typeof fechaCorta === 'function' ? fechaCorta(v) : s.split('T')[0].split('-').reverse().join('/');
+  };
   const users = () => ((_cache && _cache.usuarios) || []).filter(u => u.activo !== false && !u.archivado);
   const field = v => (v == null || v === '') ? '-' : v;
 
@@ -235,6 +241,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.5-dep', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.6-dep', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
