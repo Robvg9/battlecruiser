@@ -1,4 +1,4 @@
-// BattleCruiser — M56.2 · UI secuencia estricta para Dependienta
+// BattleCruiser — M56.3 · UI secuencia estricta para Dependienta
 // Regla visual: solo la primera sesión elegible muestra ABRIR SESIÓN.
 // Las demás sesiones pendientes/programadas muestran 🔒 hasta que corresponda.
 // Regla de seguridad real: el backend iniciar_sesion_operativa también valida fecha + secuencia.
@@ -9,6 +9,8 @@
 
   var TODAY_CACHE = null;
   var redirected = false;
+  var observer = null;
+  var rendering = false;
 
   function hoy() {
     if (TODAY_CACHE) return TODAY_CACHE;
@@ -17,10 +19,7 @@
     return TODAY_CACHE;
   }
 
-  function norm(s) {
-    return String(s || '').trim().toUpperCase();
-  }
-
+  function norm(s) { return String(s || '').trim().toUpperCase(); }
   function terminal(st) {
     st = norm(st);
     return st === 'COMPLETADA' || st === 'CANCELADA' || st === 'CANCELLED' || st === 'ANULADA';
@@ -48,16 +47,12 @@
   }
 
   function fechaIsoDeFila(row) {
-    // M33 muestra fechas como DD/MM/YYYY en la línea secundaria.
     var m = String(row.textContent || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (!m) return null;
     return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
   }
 
-  function claveFila(row) {
-    return [diaDeFila(row), bloqueDeFila(row)];
-  }
-
+  function claveFila(row) { return [diaDeFila(row), bloqueDeFila(row)]; }
   function anterior(a, b) {
     var ka = claveFila(a), kb = claveFila(b);
     return ka[0] < kb[0] || (ka[0] === kb[0] && ka[1] < kb[1]);
@@ -96,17 +91,14 @@
   }
 
   function renderSequence() {
+    if (rendering) return;
     if (!esMiaVistaDependienta()) return;
-    css();
-
     var modal = document.querySelector('#m33-bg .m33-modal');
     if (!modal) return;
+    css();
 
-    // Tomamos TODAS las filas, incluidas COMPLETADA y EN_CURSO, porque
-    // también son necesarias para decidir si una sesión posterior está bloqueada.
     var rows = Array.prototype.slice.call(modal.querySelectorAll('.m33-session'));
     if (!rows.length) return;
-
     rows.sort(function (a, b) {
       var ka = claveFila(a), kb = claveFila(b);
       return ka[0] - kb[0] || ka[1] - kb[1];
@@ -117,17 +109,13 @@
       var row = rows[i];
       var st = estadoDeFila(row);
       if (terminal(st) || st === 'EN_CURSO') continue;
-      var fecha = fechaIsoDeFila(row);
-      if (fecha !== hoy()) continue;
+      if (fechaIsoDeFila(row) !== hoy()) continue;
 
       var prevIncomplete = false;
       for (var j = 0; j < rows.length; j++) {
         if (!anterior(rows[j], row)) continue;
         var prevSt = estadoDeFila(rows[j]);
-        if (!terminal(prevSt)) {
-          prevIncomplete = true;
-          break;
-        }
+        if (!terminal(prevSt)) { prevIncomplete = true; break; }
       }
       if (!prevIncomplete) {
         var candidate = row.querySelector('[data-m33-abrir-sesion]');
@@ -136,73 +124,75 @@
       }
     }
 
-    rows.forEach(function (row) {
-      var btn = row.querySelector('[data-m33-abrir-sesion]');
-      if (!btn) return;
-      var id = btn.getAttribute('data-m33-abrir-sesion');
-      var st = estadoDeFila(row);
-      if (!eligibleId || id !== eligibleId) bloquear(btn);
-      else desbloquear(btn);
+    rendering = true;
+    try {
+      rows.forEach(function (row) {
+        var btn = row.querySelector('[data-m33-abrir-sesion]');
+        if (!btn) return;
+        var id = btn.getAttribute('data-m33-abrir-sesion');
+        var st = estadoDeFila(row);
+        if (!eligibleId || id !== eligibleId) bloquear(btn);
+        else desbloquear(btn);
 
-      var fecha = fechaIsoDeFila(row);
-      if (fecha && fecha !== hoy() && st === 'PENDIENTE') {
-        var sub = row.querySelector('.m33-muted');
-        if (sub && !row.querySelector('.m56-when')) {
-          var when = document.createElement('span');
-          when.className = 'm56-when';
-          when.textContent = fecha > hoy() ? 'Disponible en su fecha programada' : 'Fecha ya pasada';
-          sub.appendChild(when);
+        var fecha = fechaIsoDeFila(row);
+        if (fecha && fecha !== hoy() && st === 'PENDIENTE') {
+          var sub = row.querySelector('.m33-muted');
+          if (sub && !row.querySelector('.m56-when')) {
+            var when = document.createElement('span');
+            when.className = 'm56-when';
+            when.textContent = fecha > hoy() ? 'Disponible en su fecha programada' : 'Fecha ya pasada';
+            sub.appendChild(when);
+          }
         }
-      }
-    });
+      });
+    } finally {
+      rendering = false;
+    }
   }
 
   function volverAVentas() {
     if (redirected) return;
     redirected = true;
+    var bg = document.getElementById('m33-bg');
+    if (bg) bg.remove();
     try {
-      var bg = document.getElementById('m33-bg');
-      if (bg) bg.remove();
+      if (typeof window.bcRefrescarTurnoYPanelVenta === 'function') window.bcRefrescarTurnoYPanelVenta();
+      else if (typeof window.__BC_M25_refrescarTurno === 'function') window.__BC_M25_refrescarTurno();
+      else if (typeof refrescarTurnoActual === 'function') refrescarTurnoActual();
     } catch (e) {}
-    try {
-      if (typeof window.bcRefrescarTurnoYPanelVenta === 'function') {
-        window.bcRefrescarTurnoYPanelVenta();
-      } else if (typeof window.__BC_M25_refrescarTurno === 'function') {
-        window.__BC_M25_refrescarTurno();
-      } else if (typeof refrescarTurnoActual === 'function') {
-        refrescarTurnoActual();
-      }
-    } catch (e2) {}
     setTimeout(function () {
       try {
-        if (typeof irATab === 'function') {
-          irATab('ventas');
-        } else {
+        if (typeof irATab === 'function') irATab('ventas');
+        else {
           var b = document.querySelector('.tab-btn[data-tab="ventas"]');
           if (b) b.click();
         }
-      } catch (e3) {}
+      } catch (e2) {}
       setTimeout(function () {
         try {
           if (typeof window.bcRefrescarTurnoYPanelVenta === 'function') window.bcRefrescarTurnoYPanelVenta();
           else if (typeof actualizarPanelAlmacenVenta === 'function') actualizarPanelAlmacenVenta();
-        } catch (e4) {}
+        } catch (e3) {}
       }, 180);
     }, 120);
   }
 
   function watchSuccess() {
     var msg = document.getElementById('m33-dep-msg');
-    if (!msg) return;
-    var text = norm(msg.textContent);
-    if (text.indexOf('SESION ABIERTA') >= 0) volverAVentas();
+    if (msg && norm(msg.textContent).indexOf('SESION ABIERTA') >= 0) volverAVentas();
   }
 
   function bind() {
-    if (window.__bcM56Observer) return;
-    var observer = new MutationObserver(function () {
-      renderSequence();
-      watchSuccess();
+    if (observer) return;
+    observer = new MutationObserver(function () {
+      if (rendering) return;
+      observer.disconnect();
+      try {
+        renderSequence();
+        watchSuccess();
+      } finally {
+        if (document.body) observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     window.__bcM56Observer = observer;
