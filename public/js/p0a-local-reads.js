@@ -1,6 +1,7 @@
 // ==== BattleCruiser · js/p0a-local-reads.js ====
-// P0-A Local-first reads: inventario proyectado, movimientos snapshot, reportes stock local.
-// No segunda cola. Reutiliza withCache / leerDeCache / ajustePendiente.
+// P0-A + P0-B residual: inventario proyectado (offline y online+pendientes),
+// movimientos snapshot, reportes stock local.
+// Una sola fuente de proyección: ajustePendiente(). No segunda cola.
 (function () {
   "use strict";
   if (window.__bcP0ALocalReads) return;
@@ -12,6 +13,17 @@
     if (typeof refrescarOperacionesPendientesCache === "function") {
       try { await refrescarOperacionesPendientesCache(); } catch (e) {}
     }
+  }
+
+  function opsActivas() {
+    var ops = (typeof _operacionesPendientesCache !== "undefined" && _operacionesPendientesCache) || [];
+    return ops.filter(function (op) {
+      return op && (op.estado === "PENDIENTE" || op.estado === "SINCRONIZANDO");
+    });
+  }
+
+  function hayPendientesActivos() {
+    return opsActivas().length > 0;
   }
 
   function notaLocal(el, texto) {
@@ -50,12 +62,13 @@
       if (!s) return;
       if (almacenFiltro && String(s.almacen_id) !== String(almacenFiltro)) return;
       var base = Number(s.cantidad) || 0;
-      var ajuste = 0, proyectado = false;
+      var ajuste = 0, proyectado = false, noCalc = false;
       if (typeof ajustePendiente === "function") {
         var r = ajustePendiente(s.producto_id, s.almacen_id);
         if (r) {
-          if (!r.noCalculable) ajuste = Number(r.ajuste) || 0;
-          if (ajuste !== 0 || r.noCalculable) proyectado = true;
+          noCalc = !!r.noCalculable;
+          if (!noCalc) ajuste = Number(r.ajuste) || 0;
+          if (ajuste !== 0 || noCalc) proyectado = true;
         }
       }
       var cant = base + ajuste;
@@ -69,30 +82,44 @@
         producto: (pr && pr.nombre) || "—",
         almacen: (al && al.nombre) || "—",
         cantidad: cant,
+        cantidad_confirmada: base,
+        ajuste_local: ajuste,
         minimo: minimo,
         estado: estado,
         valor_inventario: null,
-        _local_proyectado: proyectado
+        _local_proyectado: proyectado,
+        _no_calculable: noCalc
       });
     });
     return filas;
   }
 
-  async function inventarioDesdeLocal() {
+  async function inventarioDesdeLocal(opts) {
+    opts = opts || {};
     await ensureOpsCache();
     var sel = document.getElementById("inv-filtro-almacen");
     var almacen = sel && sel.value ? sel.value : null;
     var filas = await construirProyeccionLocal(almacen);
+    var nPend = opsActivas().length;
+    var hayProy = filas.some(function (f) { return f._local_proyectado; });
     var conn = document.getElementById("inv-conn-info");
-    notaLocal(conn, filas.length
-      ? "⚪ Datos locales · stock proyectado (puede estar desactualizado)"
-      : "⚪ Sin conexión — sin stock guardado en este dispositivo");
+    if (!navigator.onLine) {
+      notaLocal(conn, filas.length
+        ? (hayProy
+          ? "⚪ Offline · stock proyectado localmente (" + nPend + " op. pendiente" + (nPend === 1 ? "" : "s") + ")"
+          : "⚪ Datos locales · sin operaciones pendientes")
+        : "⚪ Sin conexión — sin stock guardado en este dispositivo");
+    } else if (hayProy) {
+      notaLocal(conn, "⚡ Stock proyectado localmente · " + nPend + " operación" + (nPend === 1 ? "" : "es") + " pendiente(s) de sincronización");
+    } else {
+      notaLocal(conn, filas.length ? "🟢 Stock confirmado (sin pendientes locales)" : "⚪ Sin filas de stock");
+    }
     if (typeof window.renderInventario === "function") {
       window.renderInventario(filas);
     }
     try {
-      if (filas.some(function (f) { return f._local_proyectado; })) {
-        var note = document.getElementById("inv-p0a-note");
+      var note = document.getElementById("inv-p0a-note");
+      if (hayProy) {
         if (!note) {
           note = document.createElement("p");
           note.id = "inv-p0a-note";
@@ -100,15 +127,22 @@
           note.style.cssText = "margin:0 0 10px;font-size:12px";
           var metrics = document.getElementById("inv-resumen");
           if (metrics && metrics.parentNode) metrics.parentNode.insertBefore(note, metrics.nextSibling);
+          else if (conn && conn.parentNode) conn.parentNode.insertBefore(note, conn.nextSibling);
         }
-        note.textContent = "Algunas cantidades incluyen operaciones pendientes (proyección local, no confirmada por servidor).";
+        note.textContent = "Proyectado localmente: cantidades = stock confirmado + deltas de operaciones PENDIENTE/SINCRONIZANDO (no confirmado por servidor).";
+        note.style.display = "";
+      } else if (note) {
+        note.style.display = "none";
       }
     } catch (e) {}
     return filas;
   }
 
+  window.__bcInventarioProyectado = inventarioDesdeLocal;
+  window.__bcHayPendientesActivos = hayPendientesActivos;
+
   function opsPendientesComoMovimientos() {
-    var ops = (typeof _operacionesPendientesCache !== "undefined" && _operacionesPendientesCache) || [];
+    var ops = opsActivas();
     var out = [];
     var productos = (window._cache && _cache.productos) || [];
     var almacenes = (window._cache && _cache.almacenes) || [];
@@ -121,7 +155,7 @@
       return (a && a.nombre) || id || "—";
     }
     ops.forEach(function (op) {
-      if (!op || (op.estado !== "PENDIENTE" && op.estado !== "SINCRONIZANDO")) return;
+      if (!op) return;
       var p = op.payload || {};
       var base = { fecha: op.creado_en, usuario: "Local · pendiente", operacion_id: op.id, _local_pendiente: true };
       if (op.tipo === "compra") {
@@ -167,12 +201,25 @@
     var orig = window.refrescarInventario;
     if (typeof orig !== "function" || orig.__p0aWrapped) return;
     window.refrescarInventario = async function () {
+      await ensureOpsCache();
       if (!navigator.onLine) return inventarioDesdeLocal();
-      try { return await orig.apply(this, arguments); }
-      catch (e) {
-        console.warn("[P0-A] inventario online falló → local", e);
+      try {
+        await orig.apply(this, arguments);
+      } catch (e) {
+        console.warn("[P0-A/B] inventario online falló → local", e);
         return inventarioDesdeLocal();
       }
+      if (hayPendientesActivos()) {
+        return inventarioDesdeLocal({ afterOnline: true });
+      }
+      try {
+        var note = document.getElementById("inv-p0a-note");
+        if (note) note.style.display = "none";
+        var conn = document.getElementById("inv-conn-info");
+        if (conn && /proyectado localmente/i.test(conn.textContent || "")) {
+          conn.textContent = "";
+        }
+      } catch (e2) {}
     };
     window.refrescarInventario.__p0aWrapped = true;
   }
@@ -227,7 +274,7 @@
             renderResumenEjecutivo({
               ventas: { cantidad: 0, ingresos: 0, ticket_promedio: 0, unidades: 0 },
               transferencias: { cantidad: 0, unidades: 0 },
-              vales: { cantidad: 0, unidades: 0 },
+              vales: { cantidad: 0, cantidad: 0 },
               inventario: { productos: lineas, unidades: unidades, stock_bajo: bajos, stock_agotado: agotados },
               compras: { disponible: false, nota: "Offline — sin datos de compras locales" },
               margen: { disponible: false, nota: "Offline — margen requiere servidor" }
@@ -250,27 +297,19 @@
           if (!el) return;
           var sub = typeof _repSubreporte !== "undefined" ? _repSubreporte : "ventas";
           if (sub === "stock") {
-            var stock = (window._cache && _cache.stock) || [];
-            if ((!stock || !stock.length) && typeof leerDeCache === "function") {
-              try { stock = await leerDeCache("stock"); } catch (e) { stock = []; }
-            }
-            var productos = (window._cache && _cache.productos) || [];
-            var almacenes = (window._cache && _cache.almacenes) || [];
-            var filas = (stock || []).map(function (s) {
-              var pr = productos.find(function (p) { return String(p.id) === String(s.producto_id); });
-              var al = almacenes.find(function (a) { return String(a.id) === String(s.almacen_id); });
-              var c = Number(s.cantidad) || 0;
-              return {
-                producto: (pr && pr.nombre) || "—",
-                almacen: (al && al.nombre) || "—",
-                categoria: pr && pr.categorias && pr.categorias.nombre ? pr.categorias.nombre : "",
-                cantidad: c,
-                minimo: s.minimo,
-                estado: c <= 0 ? "agotado" : (s.minimo != null && c <= Number(s.minimo) ? "bajo" : "normal")
-              };
-            });
-            if (typeof renderStockReporte === "function") renderStockReporte(filas);
-            else el.innerHTML = '<p class="lista-estado">Stock local: ' + filas.length + " filas.</p>";
+            var filas = await construirProyeccionLocal(null);
+            if (typeof renderStockReporte === "function") {
+              renderStockReporte(filas.map(function (f) {
+                return {
+                  producto: f.producto,
+                  almacen: f.almacen,
+                  categoria: "",
+                  cantidad: f.cantidad,
+                  minimo: f.minimo,
+                  estado: f.estado
+                };
+              }));
+            } else el.innerHTML = '<p class="lista-estado">Stock local: ' + filas.length + " filas.</p>";
             return;
           }
           el.innerHTML = '<p class="lista-estado">Sin datos locales suficientes para este reporte. Usá sub-reporte Stock offline o abrilo con Internet.</p>';
@@ -283,7 +322,15 @@
   }
 
   function watchdogBloqueosOffline() {
-    if (navigator.onLine) return;
+    if (navigator.onLine) {
+      if (hayPendientesActivos()) {
+        var inv = document.getElementById("inv-detalle");
+        if (inv && /inventario enriquecido requiere|datos de Supabase/i.test(inv.innerHTML || "")) {
+          inventarioDesdeLocal();
+        }
+      }
+      return;
+    }
     var inv = document.getElementById("inv-detalle");
     if (inv && /inventario enriquecido requiere|datos de Supabase/i.test(inv.innerHTML || "")) inventarioDesdeLocal();
     var mov = document.getElementById("mov-detalle");
@@ -304,5 +351,5 @@
   setTimeout(installAll, 2000);
   setTimeout(installAll, 5000);
   setInterval(function () { installAll(); watchdogBloqueosOffline(); }, 2000);
-  console.info("[BattleCruiser] P0-A local reads activo");
+  console.info("[BattleCruiser] P0-A/B local reads + proyección online con pendientes");
 })();
