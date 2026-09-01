@@ -1,17 +1,16 @@
 // BattleCruiser — turnos-maestro.js
-// UX operativa del modelo TURNO (contrato Documento Maestro 2026-08-28).
-// Reemplaza conceptualmente la UX de Ciclo: home por almacén, crear Turno, sesiones, declaración,
-// interrupción/relevo, revisión ADMIN, descuentos.
-// Autoridad: backend (TurnoAPI / bc_*). Online-only. Sin segunda máquina de estados local.
+// UX operativa del modelo TURNO (expediente / detalle / acciones).
+// HOME listado = ÚNICAMENTE M29. Este módulo NO compite por #ciclos-m18-root.
+// API: BattleCruiserTurnoAPI (bc_*). Online-only.
 (function () {
   'use strict';
 
   const API = function () { return window.BattleCruiserTurnoAPI; };
   const ROOT_ID = 'ciclos-m18-root';
-  const VERSION = '9.4.0-turno';
+  const VERSION = '9.4.3-turno';
 
   let state = {
-    view: 'home',
+    view: 'detalle',
     turno: null,
     sesiones: [],
     config: null,
@@ -23,7 +22,7 @@
     return typeof escHtml === 'function'
       ? escHtml(v == null ? '' : v)
       : String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
-          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+          return ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' })[c];
         });
   }
 
@@ -69,10 +68,6 @@
     s.id = 'tm-turnos-style';
     s.textContent = [
       '#tab-turnos{display:none!important}',
-      '#tab-ciclos .mando-filtros,#tab-ciclos>.cc-bloque,#tab-ciclos>#ciclo-detalle,#tab-ciclos>#msg-ciclos{display:none!important}',
-      '#tab-ciclos .pendientes-header h3{font-size:0}',
-      '#tab-ciclos .pendientes-header h3:after{content:\"Turnos\";font-size:18px}',
-      '#tab-ciclos .pendientes-header + p.muted{display:none}',
       '.tm-wrap{max-width:860px;margin:auto}',
       '.tm-card{border:1px solid var(--gold-dim);background:var(--stone);border-radius:10px;padding:16px;margin:10px 0}',
       '.tm-card h4{margin:0 0 10px}',
@@ -152,104 +147,24 @@
   }
 
   // ---------------------------------------------------------------------------
-  // HOME — solo tarjetas de almacén / turnos
+  // HOME — DELEGADO a M29 (único owner). Nunca pintar lista propia aquí.
   // ---------------------------------------------------------------------------
-  async function home() {
+  function home() {
     state.view = 'home';
     state.turno = null;
-    await refreshAdminFlag();
-    await loadConfig();
-    const api = API();
-    let turnos = [];
-    let errorMsg = '';
-    if (api) {
-      try {
-        turnos = asArray(await api.listarTurnos({ limit: 100 }));
-      } catch (e) {
-        errorMsg = String(e && e.message || e);
-        // Fallback legacy: listar ciclos y presentarlos como turnos (compatibilidad).
-        try {
-          if (typeof client !== 'undefined' && client.rpc) {
-            const r = await client.rpc('listar_ciclos_operativos', { p_almacen_id: null, p_estado: null });
-            if (!r.error) {
-              turnos = asArray(r.data).map(function (c) {
-                return {
-                  id: c.id,
-                  almacen_id: c.almacen_id,
-                  almacen_nombre: c.almacen_nombre,
-                  cantidad_dias: c.cantidad_dias,
-                  dias_turno: c.cantidad_dias,
-                  inicio_plan: c.inicio_plan,
-                  fin_plan: c.fin_plan,
-                  estado_maestro: API().mapEstadoLegacy(c.estado),
-                  estado: c.estado,
-                  _legacy_ciclo: true
-                };
-              });
-              errorMsg = '';
-            }
-          }
-        } catch (x) { /* keep errorMsg */ }
-      }
+    if (window.__BC_M29__ && typeof window.__BC_M29__.renderHome === 'function') {
+      if (window.__BC_M29__.claimHomeOwnership) window.__BC_M29__.claimHomeOwnership();
+      return window.__BC_M29__.renderHome();
     }
-
-    const byAlm = {};
-    turnos.forEach(function (t) {
-      const aid = t.almacen_id || '_';
-      if (!byAlm[aid]) byAlm[aid] = [];
-      byAlm[aid].push(t);
-    });
-
-    const cards = warehouses().map(function (a) {
-      const list = byAlm[a.id] || [];
-      const active = list.find(function (t) {
-        const e = String(t.estado_maestro || t.estado || '').toUpperCase();
-        return e === 'EN_CURSO' || e === 'PROGRAMADO' || e === 'PENDIENTE_APROBACION' || e === 'ACTIVO' || e === 'PLANIFICADO' || e === 'EN_VALIDACION';
-      }) || list[0] || null;
-      if (!active) {
-        return (
-          '<div class="tm-card"><h4>🏪 ' + esc(a.nombre || a.id) + '</h4>' +
-          '<p class="muted">No hay turno creado.</p>' +
-          (state.isAdmin
-            ? '<div class="tm-actions"><button type="button" class="cc-accion" data-tm-create="' + esc(a.id) + '">Nuevo turno</button></div>'
-            : '') +
-          '</div>'
-        );
-      }
-      const est = active.estado_maestro || active.estado;
-      const dias = active.dias_turno != null ? active.dias_turno : active.cantidad_dias;
-      return (
-        '<div class="tm-card"><h4>🏪 ' + esc(a.nombre || a.id) + '</h4>' +
-        '<div class="tm-grid">' +
-        '<div class="tm-meta">Estado<br><b>' + esc(labelEstado(est)) + '</b></div>' +
-        '<div class="tm-meta">Duración<br><b>' + esc(dias) + ' día(s)</b></div>' +
-        '<div class="tm-meta">Inicio<br><b>' + esc(fmtDate(active.inicio_plan || active.fecha_inicio)) + '</b></div>' +
-        '<div class="tm-meta">Final<br><b>' + esc(fmtDate(active.fin_plan || active.fecha_fin)) + '</b></div>' +
-        '</div>' +
-        '<div class="tm-actions">' +
-        '<button type="button" class="cc-accion" data-tm-open="' + esc(active.id) + '" data-legacy="' + (active._legacy_ciclo ? '1' : '0') + '">Abrir turno</button>' +
-        (state.isAdmin ? '<button type="button" class="cc-accion" data-tm-create="' + esc(a.id) + '">Nuevo turno</button>' : '') +
-        '</div></div>'
-      );
-    }).join('');
-
-    setHtml(
-      '<div class="tm-wrap">' +
-      '<div class="tm-card"><h4>Turnos</h4>' +
-      '<p class="muted">Seleccioná un almacén. El administrador crea turnos y asigna dependientes a las sesiones. Solo la persona asignada inicia su sesión.</p>' +
-      (state.isAdmin
-        ? '<div class="tm-actions"><button type="button" class="cc-accion" data-tm-config>⚙ Duración de turnos</button>' +
-          '<button type="button" class="cc-accion" data-tm-revision>Revisión administrativa</button></div>'
-        : '') +
-      '</div>' +
-      (errorMsg ? '<p class="tm-msg error" id="tm-msg">' + esc(errorMsg) + '</p>' : '<p id="tm-msg" class="tm-msg"></p>') +
-      (cards || '<div class="tm-empty">No hay almacenes disponibles.</div>') +
-      '</div>'
-    );
+    // Fallback mínimo si M29 aún no cargó: no inventar cards por almacén.
+    const r = root();
+    if (r && !r.querySelector('.m29-wrap')) {
+      r.innerHTML = '<div class="tm-wrap"><div class="tm-empty">Cargando Turnos…</div></div>';
+    }
   }
 
   // ---------------------------------------------------------------------------
-  // CREAR TURNO
+  // CREAR TURNO (form interno; preferir modal M29)
   // ---------------------------------------------------------------------------
   function createForm(almacenId) {
     const a = warehouses().find(function (x) { return x.id === almacenId; });
@@ -259,7 +174,7 @@
     const hoy = new Date().toISOString().slice(0, 10);
     let diasBtns = '';
     if (fija) {
-      diasBtns = '<p class="muted">Duración fija activa: <b>' + esc(diasFijos) + ' día(s)</b>. No se puede cambiar al crear.</p>' +
+      diasBtns = '<p class="muted">Duración fija activa: <b>' + esc(diasFijos) + ' día(s)</b>.</p>' +
         '<input type="hidden" id="tm-dias" value="' + esc(diasFijos) + '">';
     } else {
       diasBtns = '<div class="tm-duration" id="tm-duration">';
@@ -308,7 +223,7 @@
       const id = data && (data.id || data.turno_id || (data.turno && data.turno.id));
       msg('✓ Turno creado.', true);
       if (id) await openTurno(id, false);
-      else await home();
+      else home();
     } catch (e) {
       msg('No se pudo crear el turno: ' + String(e && e.message || e), false);
     }
@@ -323,7 +238,6 @@
     if (!api) { msg('API Turno no cargada.', false); return; }
 
     if (isLegacy) {
-      // Compatibilidad: abrir flujo legacy M21 si el registro es ciclo.
       if (window.BattleCruiserM21 && typeof window.BattleCruiserM21.enter === 'function') {
         return window.BattleCruiserM21.enter(turnoId);
       }
@@ -333,7 +247,6 @@
     try {
       detalle = await api.estado(turnoId);
     } catch (e) {
-      // intentar listar y filtrar
       try {
         const list = asArray(await api.listarTurnos({ limit: 100 }));
         detalle = list.find(function (t) { return String(t.id) === String(turnoId); }) || null;
@@ -395,7 +308,7 @@
         }
         return (
           '<div class="tm-row" data-sesion-id="' + esc(s.id) + '">' +
-          '<div><b>Día ' + esc(s.dia_n) + ' · ' + esc(labelBloque(s.bloque)) + '</b>' +
+          '<div><b>Día ' + esc(s.dia_n || s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) + '</b>' +
           '<small>' + esc(fmtDate(s.fecha)) + ' · ' + esc(nombre) + '</small>' +
           '<span class="tm-status">' + esc(labelEstado(se)) + '</span></div>' +
           '<div class="tm-actions">' + actions + '</div></div>'
@@ -508,7 +421,6 @@
   }
 
   async function doDeclarar(sesionId) {
-    // Necesitamos tramo activo de la sesión.
     let tramos = [];
     try {
       tramos = await API().listarTramosSesion(sesionId);
@@ -597,7 +509,7 @@
 
   async function doEnviarAprobacion(turnoId) {
     try {
-      await API().enviarAAprobacion(turnoId);
+      await API().enviarAprobacion(turnoId);
       msg('✓ Turno enviado a pendiente de aprobación.', true);
       await openTurno(turnoId, false);
     } catch (e) {
@@ -608,7 +520,7 @@
   async function doAprobar(turnoId) {
     openModal(
       'Aprobar turno',
-      '<div class="field"><label>Observación (opcional; obligatoria si hay diferencias explicadas)</label>' +
+      '<div class="field"><label>Observación (opcional)</label>' +
       '<textarea id="tm-apr-obs" rows="3"></textarea></div>',
       async function () {
         const obs = (document.getElementById('tm-apr-obs') || {}).value || null;
@@ -781,21 +693,13 @@
     styles();
     hideLegacyTab();
     bind();
-    // Preferir este módulo sobre M21 cuando el root existe.
-    if (typeof safeInit === 'function') {
-      safeInit('turnos-maestro', home);
-    } else {
-      home();
-    }
-    // Exponer API de refresco para navegación.
+    // NO llamar home() aquí — M29 es el único owner de HOME.
+    // NO rebindear refrescarCiclos / refrescarTurnos.
     window.BattleCruiserTurnosMaestro = {
       home: home,
       open: openTurno,
       version: VERSION
     };
-    // Bridge: M21 home → maestro si está disponible.
-    window.refrescarCiclos = home;
-    window.refrescarTurnos = home;
   }
 
   if (document.readyState === 'loading') {
