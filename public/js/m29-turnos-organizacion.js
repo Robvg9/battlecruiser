@@ -1,7 +1,7 @@
 // BattleCruiser - M29 Organización Turnos
 // ÚNICO OWNER de la HOME de Turnos (contrato congelado).
 // RPC: bc_listar_turnos_maestros_home vía TurnoAPI.listarTurnosMaestros
-// v29.10 — CREAR TURNO solo ADMIN real (no ciclos.crear de dependienta)
+// v29.11 — CREAR TURNO solo ADMIN real (no ciclos.crear de dependienta)
 (function () {
   'use strict';
   if (window.__bcM29TurnosOrg) return;
@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.10';
+  var VERSION = '29.11';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -17,13 +17,16 @@
     return typeof escHtml === 'function'
       ? escHtml(v == null ? '' : v)
       : String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
-          return ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' })[c];
+          return ({ '&': '&amp;', '<': '<', '>': '>', '"': '"', "'": '&#39;' })[c];
         });
   }
   function fmtDate(v) {
     if (!v) return '-';
+    var s = String(v);
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (m) return m[3] + '/' + m[2] + '/' + m[1];
     if (typeof fechaCorta === 'function') return fechaCorta(v);
-    return String(v).split('T')[0].split('-').reverse().join('/');
+    return s.split('T')[0].split('-').reverse().join('/');
   }
   function labelEstado(e) {
     var api = API();
@@ -123,11 +126,6 @@
     var rol = String(u.rol || u.role || u.nombre_rol || '').toLowerCase();
     return rol.indexOf('due') === 0 || rol === 'admin' || rol === 'administrador' || !!u.is_admin;
   }
-  /**
-   * isAdmin = puede CREAR/EDITAR turno maestro.
-   * NO usar ciclos.crear ni turnos.crear solos: las dependientas necesitan
-   * ciclos.crear para iniciar_sesion_operativa y no deben ver CREAR TURNO.
-   */
   async function resolveAdmin() {
     var api = API();
     if (api && api.actorIsAdmin) {
