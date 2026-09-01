@@ -1,30 +1,24 @@
 // ==== BattleCruiser · js/loading-guard.js ====
-// Control global del overlay de carga + recuperación ante estados residuales.
+// FASE 1 Offline Core: capa de compatibilidad.
+// NO es owner del loading. Owner único: offline.js (showLoading/hideLoading/withLoading/resetLoadingOverlay).
+// Este módulo solo:
+// 1) asegura que window.* apunta al owner de offline.js si ya existe;
+// 2) recovery de Auth (SIGNED_IN / sesión) que resetea overlay;
+// 3) fail-safe último recurso (watchdog) si el contador queda >0 demasiado tiempo.
 (function instalarLoadingGuard() {
   "use strict";
 
-  var overlay = null;
-  var activos = 0;
+  var MAX_LOADING_MS = 45000;
   var timer = null;
-  var MAX_LOADING_MS = 35000;
 
-  function obtenerOverlay() {
-    overlay = document.getElementById("global-loading-overlay");
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "global-loading-overlay";
-      overlay.className = "loading-overlay";
-      overlay.innerHTML = '<div class="spinner"></div>';
-      document.body.appendChild(overlay);
+  function delegarSiExiste() {
+    if (typeof window.showLoading === "function" && typeof window.hideLoading === "function") {
+      return true;
     }
-    return overlay;
+    return false;
   }
 
-  function ocultar() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
+  function asegurarOverlayHidden() {
     var el = document.getElementById("global-loading-overlay");
     if (el) {
       el.classList.remove("visible");
@@ -32,64 +26,49 @@
     }
   }
 
-  function mostrar() {
-    var el = obtenerOverlay();
-    el.style.display = "flex";
-    el.classList.add("visible");
-  }
-
-  function vigilar() {
+  function failSafeWatchdog() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(function () {
-      if (activos > 0) {
-        console.error("[BattleCruiser] Loading global excedió 35s; se fuerza recuperación de UI.", {
-          operaciones_activas: activos,
-        });
-        activos = 0;
-        ocultar();
+      try {
+        var count = typeof window.__bcLoadingCount === "function" ? window.__bcLoadingCount() : null;
+        if (count === null || count > 0) {
+          console.error("[BattleCruiser] Loading fail-safe: overlay residual > " + MAX_LOADING_MS + "ms. Se fuerza reset.", {
+            operaciones_activas: count,
+          });
+          if (typeof window.resetLoadingOverlay === "function") {
+            window.resetLoadingOverlay();
+          } else {
+            asegurarOverlayHidden();
+          }
+        }
+      } catch (e) {
+        asegurarOverlayHidden();
       }
     }, MAX_LOADING_MS);
   }
 
-  window.showLoading = function () {
-    activos += 1;
-    mostrar();
-    if (activos === 1) vigilar();
-  };
+  function envolverFailSafeSobreOwner() {
+    if (typeof window.showLoading !== "function") return;
+    if (window.showLoading.__bcFailSafeWrapped) return;
+    var originalShow = window.showLoading;
+    window.showLoading = function () {
+      originalShow.apply(this, arguments);
+      failSafeWatchdog();
+    };
+    window.showLoading.__bcFailSafeWrapped = true;
+  }
 
-  window.hideLoading = function () {
-    activos = Math.max(0, activos - 1);
-    if (activos === 0) ocultar();
-  };
-
-  window.resetLoadingOverlay = function () {
-    activos = 0;
-    ocultar();
-  };
-
-  window.withLoading = async function (fn) {
-    window.showLoading();
-    try {
-      return await fn();
-    } finally {
-      window.hideLoading();
-    }
-  };
-
-  // La autenticación puede emitir SIGNED_IN antes de que la promesa de
-  // signInWithPassword termine. Si eso ocurre, el loading iniciado por el
-  // formulario no debe bloquear la aplicación aunque esa promesa se demore.
   function instalarRecuperacionAuth() {
-    if (typeof client === "undefined" || !client.auth) return;
+    if (typeof client === "undefined" || !client || !client.auth) return;
     try {
       client.auth.onAuthStateChange(function (event, session) {
         if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
-          window.resetLoadingOverlay();
+          if (typeof window.resetLoadingOverlay === "function") window.resetLoadingOverlay();
         }
       });
       client.auth.getSession().then(function (resultado) {
         if (resultado && resultado.data && resultado.data.session) {
-          window.resetLoadingOverlay();
+          if (typeof window.resetLoadingOverlay === "function") window.resetLoadingOverlay();
         }
       }).catch(function () {});
     } catch (e) {
@@ -97,13 +76,45 @@
     }
   }
 
-  // Limpia cualquier overlay residual que pudiera existir antes de instalar el guard.
-  var viejo = document.getElementById("global-loading-overlay");
-  if (viejo) {
-    viejo.classList.remove("visible");
-    viejo.style.display = "none";
+  asegurarOverlayHidden();
+
+  if (!delegarSiExiste()) {
+    var stubCount = 0;
+    window.showLoading = function () {
+      stubCount++;
+      var el = document.getElementById("global-loading-overlay");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "global-loading-overlay";
+        el.className = "loading-overlay";
+        el.innerHTML = '<div class="spinner"></div>';
+        document.body.appendChild(el);
+      }
+      el.style.display = "flex";
+      el.classList.add("visible");
+      failSafeWatchdog();
+    };
+    window.hideLoading = function () {
+      stubCount = Math.max(0, stubCount - 1);
+      if (stubCount === 0) asegurarOverlayHidden();
+    };
+    window.resetLoadingOverlay = function () {
+      stubCount = 0;
+      asegurarOverlayHidden();
+    };
+    window.withLoading = async function (fn) {
+      window.showLoading();
+      try {
+        return await fn();
+      } finally {
+        window.hideLoading();
+      }
+    };
+    console.warn("[BattleCruiser] loading-guard: offline.js no estaba cargado; stubs temporales activos.");
+  } else {
+    envolverFailSafeSobreOwner();
   }
 
   instalarRecuperacionAuth();
-  console.info("[BattleCruiser] Loading guard activo.");
+  console.info("[BattleCruiser] Loading guard (compat) activo — owner: offline.js");
 })();
