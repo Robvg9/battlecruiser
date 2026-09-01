@@ -55,7 +55,7 @@
     if(isAdmin())return true;
     if(normBloque(s.bloque)!=='MANANA'||!exp)return false;
     var me=usuarioId();if(!me)return false;
-    return (exp.sesiones||[]).some(function(x){return normBloque(x.bloque)==='TARDE'&&String(x.usuario_id||'')===String(me)});
+    return (exp.sesiones||[]).some(function(x){return normBloque(x.bloque)==='TARDE'&&Number(x.numero_dia||x.dia_n)===Number(s.numero_dia||s.dia_n)&&String(x.usuario_id||'')===String(me)});
   }
   async function approve(id,btn){
     if(!id)return;if(btn)btn.disabled=true;
@@ -71,9 +71,8 @@
   }
   function findSessionForRow(row){
     if(!exp||!Array.isArray(exp.sesiones))return null;
-    var mt=String(row.textContent||'').match(/Día\s+(\d+)\s*·\s*([^·]+)/i);
-    if(!mt)return null;
-    var dia=Number(mt[1]), b=normBloque(mt[2]);
+    var mt=String(row.textContent||'').match(/Día\s+(\d+)\s*·\s*([^·]+)/i);if(!mt)return null;
+    var dia=Number(mt[1]),b=normBloque(mt[2]);
     return exp.sesiones.find(function(x){return Number(x.numero_dia||x.dia_n)===dia&&normBloque(x.bloque)===b})||null;
   }
   function renderStep1(){
@@ -84,15 +83,12 @@
       var s=findSessionForRow(row);if(!s){var mt=String(row.textContent||'').match(/Día\s+(\d+)/i);if(mt){var dia=Number(mt[1]);s=(exp.sesiones||[]).find(function(x){return Number(x.numero_dia||x.dia_n)===dia&&!row.dataset.bcM60Done})}}if(!s)return;
       row.dataset.bcM60Done=s.id;
       var old=row.querySelector('.bc-m60-details');
-      if(old){
-        var sig=s.id+'|'+String(s.estado)+'|'+String(s.dinero_id||'')+'|'+String(s.dinero_estado_aprobacion||'');
-        if(old.dataset.sig===sig)return;
-        old.remove();
-      }
+      var sig=s.id+'|'+String(s.estado)+'|'+String(s.dinero_id||'')+'|'+String(s.dinero_estado_aprobacion||'');
+      if(old&&old.dataset.sig===sig)return;
+      if(old)old.remove();
       var box=document.createElement('div');box.className='bc-m60-details';
       var moneyLine=s.dinero_declarado?('Dinero declarado: $'+moneyFmt(s.dinero_monto)+' · '+labelAprob(s)):'Dinero: sin declaración';
-      box.innerHTML='<div>Sesión: <strong>'+esc(labelSesion(s))+'</strong></div><div>'+esc(moneyLine)+'</div>';
-      box.dataset.sig=s.id+'|'+String(s.estado)+'|'+String(s.dinero_id||'')+'|'+String(s.dinero_estado_aprobacion||'');
+      box.innerHTML='<div>Sesión: <strong>'+esc(labelSesion(s))+'</strong></div><div>'+esc(moneyLine)+'</div>';box.dataset.sig=sig;
       if(canApprove(s)){var b=document.createElement('button');b.type='button';b.className='cc-accion bc-m60-approve';b.textContent='Aprobar dinero';b.dataset.declaracionId=s.dinero_id||'';box.appendChild(b)}
       row.appendChild(box);
     });
