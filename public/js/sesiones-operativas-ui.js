@@ -1,7 +1,7 @@
 // BattleCruiser — Sesiones Operativas UI
 // Extiende la UI existente de Ciclos sin crear un segundo sistema de turnos.
 // Fuente de verdad backend: iniciar_sesion_operativa / cerrar_sesion_operativa.
-// v9.2.31: tras abrir/cerrar sesión, refrescar turno para que Ventas reconozca el estado.
+// v9.4.45: abrir sesión NO depende de ciclos.crear (dependienta puede abrir su sesión asignada).
 (function(){
   'use strict';
   const RPC_INICIAR='iniciar_sesion_operativa';
@@ -10,8 +10,7 @@
   function key(){return crypto.randomUUID();}
   function esc(v){return typeof escHtml==='function'?escHtml(v==null?'':v):String(v==null?'':v);}
   function msg(text,ok){const el=document.getElementById('msg-sesiones-operativas');if(!el)return;el.textContent=text;el.className='msg '+(ok?'ok':'error');}
-  function permisosCrear(){return typeof tienePermiso==='function'&&tienePermiso('ciclos','crear');}
-  function permisosEditar(){return typeof tienePermiso==='function'&&tienePermiso('ciclos','editar');}
+  function permisosCerrar(){return typeof tienePermiso==='function'&&(tienePermiso('ciclos','editar')||tienePermiso('turnos','editar_any')||tienePermiso('ciclos','editar_any'));}
   function cicloIdActual(){const det=document.getElementById('ciclo-detalle');if(!det)return null;const el=det.querySelector('[data-id]');return el?el.getAttribute('data-id'):null;}
   function yaProcesado(det){const lis=Array.from(det.querySelectorAll('li.muted'));return lis.length>0&&lis.every(li=>li.dataset.bcSesionUi==='1');}
   async function cargarSesiones(cicloId){if(!cicloId||!navigator.onLine)return [];const r=await client.rpc('listar_sesiones_operativas',{p_ciclo_id:cicloId,p_almacen_id:null,p_fecha:null,p_estado:null});if(r&&r.error)throw r.error;const d=r?r.data:[];return Array.isArray(d)?d:(d?[d]:[]);}
@@ -26,8 +25,8 @@
     }catch(e){}
   }
 
+  /** Abrir sesión: autoridad = backend (asignación + secuencia). NO gate por ciclos.crear. */
   async function abrirSesion(id,btn){
-    if(!permisosCrear()){msg('No tenés permiso para abrir sesiones.',false);return;}
     if(btn){if(btn.dataset.bcBusy==='1')return;btn.dataset.bcBusy='1';btn.disabled=true;}
     try{
       await mutar(RPC_INICIAR,id);
@@ -43,7 +42,7 @@
   }
 
   async function cerrarSesion(id,btn){
-    if(!permisosEditar()){msg('No tenés permiso para cerrar sesiones.',false);return;}
+    if(!permisosCerrar()){msg('No tenés permiso para cerrar sesiones.',false);return;}
     if(!window.confirm('¿Cerrar esta sesión de trabajo? Al cerrarla ya no quedará disponible para registrar nuevas ventas en esta sesión.'))return;
     if(btn){if(btn.dataset.bcBusy==='1')return;btn.dataset.bcBusy='1';btn.disabled=true;}
     try{
@@ -71,8 +70,9 @@
         const s=byKey.get(m[1].trim()+'|'+m[2].trim());if(!s||!s.id)return;const estado=String(s.estado||m[4].trim());
         li.dataset.bcSesionUi='1';li.dataset.sesionId=s.id;li.innerHTML='<span>Día '+esc(s.dia_n)+' · '+esc(s.bloque)+' · '+esc(s.fecha||'')+' · <strong>'+esc(estado)+'</strong></span>';
         const actions=document.createElement('span');actions.className='btn-row bc-sesion-acciones';actions.style.cssText='display:inline-flex;gap:6px;margin-left:8px;flex-wrap:wrap;';
-        if(estado==='PENDIENTE'&&cicloActivo&&permisosCrear()){const b=document.createElement('button');b.type='button';b.className='cc-accion';b.dataset.bcSesionAbrir=s.id;b.textContent='Abrir sesión';actions.appendChild(b);}
-        else if(estado==='EN_CURSO'&&permisosEditar()){const b=document.createElement('button');b.type='button';b.className='cc-accion';b.dataset.bcSesionCerrar=s.id;b.textContent='Cerrar sesión';actions.appendChild(b);}
+        // Abrir: sin gate FE de ciclos.crear — backend valida asignación + secuencia
+        if(estado==='PENDIENTE'&&cicloActivo){const b=document.createElement('button');b.type='button';b.className='cc-accion';b.dataset.bcSesionAbrir=s.id;b.textContent='Abrir sesión';actions.appendChild(b);}
+        else if(estado==='EN_CURSO'&&permisosCerrar()){const b=document.createElement('button');b.type='button';b.className='cc-accion';b.dataset.bcSesionCerrar=s.id;b.textContent='Cerrar sesión';actions.appendChild(b);}
         else if(estado==='COMPLETADA'){const span=document.createElement('span');span.className='muted';span.textContent='Sesión finalizada';actions.appendChild(span);}
         if(actions.childNodes.length)li.appendChild(actions);
       });
