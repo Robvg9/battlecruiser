@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.54 — M33.5 + M56.6 + M57.4 + M58.2 + M59.2 + M60.3 · Turnos por bloque + dinero
-(function hotfixV9454(){
-  const VERSION="9.4.54";
+// v9.4.55 — M33.5 + M56.6 + M57.4 + M58.2 + M59.2 + M60.3 · Turnos por bloque + dinero
+(function hotfixV9455(){
+  const VERSION="9.4.55";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
