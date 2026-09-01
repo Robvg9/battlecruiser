@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.58 — M33.7 + M56.6 + M57.4 + M58.2 + M59.2 + M60.4 · Turnos por bloque + dinero
-(function hotfixV9458(){
-  const VERSION="9.4.58";
+// v9.4.59 — M33.7 + M56.6 + M57.4 + M58.2 + M59.2 + M60.4 + M61 · Turnos + limpieza de sesión
+(function hotfixV9459(){
+  const VERSION="9.4.59";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -19,7 +19,7 @@
     ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","9.4.45"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","33.2"],
-    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.2"],["ui-operaciones-hub.js","41.1"],["ui-ajustes-panel.js","96.1"],
+    ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.2"],["ui-operaciones-hub.js","41.1"],["ui-ajustes-panel.js","96.2"],["m61-auth-ui-cleanup.js","61.1"],
     ["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],["m22-sesiones-en-m21.js","25.4"],["m22-fe-patches-m21.js","22.1"],
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],["m24-asignaciones-operativas.js","24.4"],
     ["m24-2-asignar-sesion-ui.js","24.6"],["m24-2-asignaciones-selects-repair.js","24.5"],["m25-fe-sync-turno-ventas.js","25.1"],
