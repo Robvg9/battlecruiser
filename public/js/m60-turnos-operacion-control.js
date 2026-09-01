@@ -1,10 +1,10 @@
-// BattleCruiser M60 — Turnos: bloques, dinero declarado/aprobacion y cierre forzado
+// BattleCruiser M60.4 — Turnos: bloques, dinero declarado/aprobacion y cierre forzado
 (function(){
   'use strict';
   if(window.__BC_M60__) return;
   window.__BC_M60__=true;
 
-  var turnId=null, exp=null, loading=false, loadedTurnId=null, adminCache=null;
+  var turnId=null, exp=null, loading=false, loadedTurnId=null, adminCache=null, forceCloseCache=null;
   var PHRASE='LaCuevaDeleteSesion';
 
   function esc(v){return typeof escHtml==='function'?escHtml(v==null?'':v):String(v==null?'':v).replace(/[&<>\"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','\'':'&#39;'})[c]})}
@@ -26,13 +26,23 @@
     try{var r=await client.rpc('bc_actor_is_admin',{});var d=r&&r.data;if(d===true||(d&&d.is_admin===true)){adminCache=true;return true}}catch(e){}
     return isAdmin();
   }
+  async function resolveForceClose(){
+    if(forceCloseCache!==null)return forceCloseCache;
+    try{
+      if(typeof client==='undefined'||!client.rpc){forceCloseCache=false;return false}
+      var r=await client.rpc('bc_puede_forzar_cierre_turno',{});
+      var d=r&&r.data;
+      forceCloseCache=(d===true||d==='true'||d===1||d==='1');
+    }catch(e){forceCloseCache=false}
+    return forceCloseCache;
+  }
   async function loadExp(force){
     if(!turnId||loading||typeof client==='undefined'||!client.rpc)return exp;
     if(!force&&exp&&loadedTurnId===turnId)return exp;
     loading=true;
     try{var r=await client.rpc('bc_obtener_expediente_turno',{p_turno_id:turnId});if(r&&r.error)throw r.error;exp=r&&r.data;loadedTurnId=turnId;return exp}catch(e){console.warn('[M60] expediente',e);return null}finally{loading=false}
   }
-  function captureTurnId(e){var card=e.target&&e.target.closest?e.target.closest('.m29-card[data-turno-id]'):null;if(card){var id=card.getAttribute('data-turno-id');if(id!==turnId){turnId=id;exp=null;loadedTurnId=null;}setTimeout(function(){enrichModal(false)},30)}}
+  function captureTurnId(e){var card=e.target&&e.target.closest?e.target.closest('.m29-card[data-turno-id]'):null;if(card){var id=card.getAttribute('data-turno-id');if(id!==turnId){turnId=id;exp=null;loadedTurnId=null;forceCloseCache=null}setTimeout(function(){enrichModal(false)},30)}}
   function decorateStep2(body){
     var sels=[].slice.call(body.querySelectorAll('select[data-m33-sid]'));if(!sels.length||!exp)return;
     var byId={};(exp.sesiones||[]).forEach(function(s){byId[String(s.id)]=s});
@@ -63,7 +73,7 @@
     catch(e){alert('No se pudo aprobar: '+String(e&&(e.message||e.details||e.code)||e));if(btn)btn.disabled=false}
   }
   async function forceClose(){
-    if(!await resolveAdmin())return alert('Solo ADMIN puede forzar el cierre de un turno.');
+    if(!(await resolveForceClose()))return alert('Solo ADMIN/Dueño puede forzar el cierre de un turno.');
     var typed=window.prompt('Para forzar el cierre del turno escribe exactamente: '+PHRASE);if(typed!==PHRASE)return;
     if(!turnId)return;
     try{var r=await client.rpc('bc_forzar_cierre_turno',{p_turno_id:turnId});if(r&&r.error)throw r.error;var bg=document.getElementById('m33-bg');if(bg)bg.remove();if(window.__BC_M29__&&typeof window.__BC_M29__.renderHome==='function')await window.__BC_M29__.renderHome();else if(typeof refrescarTurnos==='function')await refrescarTurnos();}
@@ -92,7 +102,7 @@
       if(canApprove(s)){var b=document.createElement('button');b.type='button';b.className='cc-accion bc-m60-approve';b.textContent='Aprobar dinero';b.dataset.declaracionId=s.dinero_id||'';box.appendChild(b)}
       row.appendChild(box);
     });
-    if(!document.getElementById('bc-m60-force-close')&&isAdmin()&&String(exp.estado||'').toUpperCase()!=='CERRADO'){
+    if(!document.getElementById('bc-m60-force-close')&&forceCloseCache===true&&String(exp.estado||'').toUpperCase()!=='CERRADO'){
       var wrap=document.createElement('div');wrap.id='bc-m60-force-close';wrap.style.cssText='margin-top:16px;padding:14px;border:1px solid rgba(180,40,40,.35);border-radius:10px';
       wrap.innerHTML='<strong>Administración</strong><div class="muted" style="margin:5px 0 10px">Cierra forzosamente el turno y termina las sesiones operativas restantes.</div>';
       var btn=document.createElement('button');btn.type='button';btn.className='cc-accion';btn.textContent='⚠️ Forzar cierre del turno';btn.addEventListener('click',forceClose);wrap.appendChild(btn);body.appendChild(wrap);
@@ -103,7 +113,7 @@
     m.addEventListener('click',function(e){var a=e.target.closest('.bc-m60-approve');if(!a)return;e.preventDefault();e.stopPropagation();approve(a.dataset.declaracionId,a);});
   }
   async function enrichModal(force){
-    var m=modal();if(!m||!turnId)return;bindClicks(m);await resolveAdmin();var data=await loadExp(!!force);if(!data)return;renderStep1();var body=m.querySelector('.m33-body[data-m33-step="2"]')||[].slice.call(m.querySelectorAll('.m33-body')).find(function(b){return b.querySelector('select[data-m33-sid]')});if(body)decorateStep2(body);
+    var m=modal();if(!m||!turnId)return;bindClicks(m);await resolveAdmin();await resolveForceClose();var data=await loadExp(!!force);if(!data)return;renderStep1();var body=m.querySelector('.m33-body[data-m33-step="2"]')||[].slice.call(m.querySelectorAll('.m33-body')).find(function(b){return b.querySelector('select[data-m33-sid]')});if(body)decorateStep2(body);
   }
   document.addEventListener('click',captureTurnId,true);
   var obs=new MutationObserver(function(){var m=modal();if(m&&turnId&&!loading){clearTimeout(obs._t);obs._t=setTimeout(function(){enrichModal(false)},80)}});obs.observe(document.body,{childList:true,subtree:true});
