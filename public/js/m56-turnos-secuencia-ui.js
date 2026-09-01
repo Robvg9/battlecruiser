@@ -1,4 +1,4 @@
-// BattleCruiser — M56.1 · UI secuencia estricta para Dependienta
+// BattleCruiser — M56.2 · UI secuencia estricta para Dependienta
 // Regla visual: solo la primera sesión elegible muestra ABRIR SESIÓN.
 // Las demás sesiones pendientes/programadas muestran 🔒 hasta que corresponda.
 // Regla de seguridad real: el backend iniciar_sesion_operativa también valida fecha + secuencia.
@@ -101,8 +101,10 @@
 
     var modal = document.querySelector('#m33-bg .m33-modal');
     if (!modal) return;
-    var rows = Array.prototype.slice.call(modal.querySelectorAll('.m33-session'))
-      .filter(function (row) { return row.querySelector('[data-m33-abrir-sesion]'); });
+
+    // Tomamos TODAS las filas, incluidas COMPLETADA y EN_CURSO, porque
+    // también son necesarias para decidir si una sesión posterior está bloqueada.
+    var rows = Array.prototype.slice.call(modal.querySelectorAll('.m33-session'));
     if (!rows.length) return;
 
     rows.sort(function (a, b) {
@@ -130,7 +132,7 @@
       if (!prevIncomplete) {
         var candidate = row.querySelector('[data-m33-abrir-sesion]');
         eligibleId = candidate && candidate.getAttribute('data-m33-abrir-sesion');
-        break;
+        if (eligibleId) break;
       }
     }
 
@@ -175,11 +177,17 @@
       try {
         if (typeof irATab === 'function') {
           irATab('ventas');
-          return;
+        } else {
+          var b = document.querySelector('.tab-btn[data-tab="ventas"]');
+          if (b) b.click();
         }
-        var b = document.querySelector('.tab-btn[data-tab="ventas"]');
-        if (b) b.click();
       } catch (e3) {}
+      setTimeout(function () {
+        try {
+          if (typeof window.bcRefrescarTurnoYPanelVenta === 'function') window.bcRefrescarTurnoYPanelVenta();
+          else if (typeof actualizarPanelAlmacenVenta === 'function') actualizarPanelAlmacenVenta();
+        } catch (e4) {}
+      }, 180);
     }, 120);
   }
 
