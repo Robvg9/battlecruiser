@@ -1,6 +1,9 @@
 // ==== Battlecruiser · js/venta-turno-ui.js ====
 // Almacén de venta = turno abierto del usuario (_turnoActual).
 // M26.6-FE: agregar al carrito usando almacén del turno (no el select oculto vacío).
+// M-SESION-VENTA: sin ABIERTO → "No puedes vender todavía" + [ABRIR SESIÓN]
+//   → Turnos / Información (flujo existente). Apertura vía iniciar_sesion_operativa
+//   (M22 / sesiones-operativas-ui). NO bc_iniciar_turno_sesion. NO abrir_turno.
 
 function obtenerAlmacenIdOperativoVenta() {
   if (typeof _turnoActual === "undefined" || !_turnoActual) return null;
@@ -69,6 +72,96 @@ function bcSincronizarSelectAlmacenTurno() {
     }
   } catch (e) {}
   return almId;
+}
+
+function bcHtmlBloqueoSinSesionVenta() {
+  return (
+    '<p class="lista-estado" style="font-size:1.05rem;margin-bottom:8px"><strong>No puedes vender todavía</strong></p>' +
+    '<p class="lista-estado">Necesitas tener una sesión abierta para realizar ventas.</p>' +
+    '<p class="muted">El almacén lo define tu sesión operativa. Abrí la siguiente sesión elegible en Turnos (Información).</p>' +
+    '<p id="venta-abrir-sesion-msg" class="msg" style="min-height:1.2em;margin:8px 0"></p>' +
+    '<button type="button" id="venta-abrir-sesion-btn" class="cc-accion">ABRIR SESIÓN</button>'
+  );
+}
+
+function bcSetMsgAbrirSesion(text, ok) {
+  var el = document.getElementById("venta-abrir-sesion-msg");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "msg " + (ok ? "ok" : (text ? "error" : ""));
+}
+
+/**
+ * Refresca turno_actual_usuario (M25 o refrescarTurnoActual) y actualiza panel Ventas.
+ * No inventa turno local: solo lo que devuelve el backend.
+ */
+async function bcRefrescarTurnoYPanelVenta() {
+  try {
+    if (typeof window.__BC_M25_refrescarTurno === "function") {
+      await window.__BC_M25_refrescarTurno();
+    } else if (typeof refrescarTurnoActual === "function") {
+      await refrescarTurnoActual();
+    }
+  } catch (e) {
+    try { console.warn("[venta-turno-ui] refrescar turno", e); } catch (x) {}
+  }
+  try {
+    if (typeof actualizarPanelAlmacenVenta === "function") actualizarPanelAlmacenVenta();
+  } catch (e2) {}
+  return typeof _turnoActual !== "undefined" ? _turnoActual : null;
+}
+
+/**
+ * Navega a Turnos (tab ciclos) — Página 1 / Información del flujo existente.
+ * La apertura de sesión la hace M22 / sesiones-operativas-ui con iniciar_sesion_operativa.
+ */
+function bcIrATurnosInformacion() {
+  window.__BC_VENTA_ABRIR_SESION__ = true;
+  if (typeof irATab === "function") {
+    irATab("ciclos");
+  } else {
+    var b =
+      document.querySelector('.tab-btn[data-tab="ciclos"]') ||
+      document.querySelector('.tab-btn[data-tab="turnos"]');
+    if (b) b.click();
+  }
+}
+
+/**
+ * Handler único del botón ABRIR SESIÓN.
+ * 1) Reconsulta turno_actual_usuario.
+ * 2) Si ya ABIERTO → habilita Ventas.
+ * 3) Si no → abre flujo Turnos Información (sin crear turno, sin bc_iniciar).
+ */
+async function bcVentaAbrirSesionClick() {
+  var btn = document.getElementById("venta-abrir-sesion-btn");
+  if (btn && btn.dataset.bcBusy === "1") return;
+  if (btn) {
+    btn.dataset.bcBusy = "1";
+    btn.disabled = true;
+  }
+  bcSetMsgAbrirSesion("Consultando estado de sesión…", true);
+  try {
+    if (!navigator.onLine) {
+      bcSetMsgAbrirSesion("Necesitás conexión para abrir una sesión.", false);
+      return;
+    }
+    var data = await bcRefrescarTurnoYPanelVenta();
+    if (data && data.estado === "ABIERTO") {
+      bcSetMsgAbrirSesion("✓ Sesión activa. Ya podés vender.", true);
+      return;
+    }
+    bcSetMsgAbrirSesion("Abrí tu próxima sesión en Turnos (Información).", true);
+    bcIrATurnosInformacion();
+  } catch (e) {
+    var msg = String((e && (e.message || e.details || e.code)) || e);
+    bcSetMsgAbrirSesion("No se pudo consultar el estado: " + msg, false);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.dataset.bcBusy = "0";
+    }
+  }
 }
 
 function actualizarPanelAlmacenVenta() {
@@ -172,6 +265,26 @@ function actualizarPanelAlmacenVenta() {
   }
 })();
 
+/**
+ * Tras iniciar_sesion_operativa en Turnos, al volver a Ventas se refresca el turno.
+ * Un solo listener de visibilidad / tab (sin duplicar handlers de ABRIR SESIÓN).
+ */
+(function bcVentaEscucharRetornoDeTurnos() {
+  if (window.__BC_VENTA_RETORNO_TURNOS__) return;
+  window.__BC_VENTA_RETORNO_TURNOS__ = true;
+  document.addEventListener(
+    "click",
+    function (e) {
+      var tabBtn = e.target && e.target.closest && e.target.closest('.tab-btn[data-tab="ventas"]');
+      if (!tabBtn) return;
+      setTimeout(function () {
+        bcRefrescarTurnoYPanelVenta();
+      }, 80);
+    },
+    true
+  );
+})();
+
 safeInit("venta-turno-ui", function () {
   const wrap = document.querySelector(".venta-almacen-wrap");
   const tab = document.getElementById("tab-ventas");
@@ -179,11 +292,7 @@ safeInit("venta-turno-ui", function () {
     const sin = document.createElement("div");
     sin.id = "venta-sin-turno";
     sin.className = "venta-sin-turno";
-    sin.innerHTML =
-      '<p class="lista-estado" style="font-size:1.05rem;margin-bottom:8px"><strong>Ventas no disponibles</strong></p>' +
-      '<p class="lista-estado">Necesitas tener un turno abierto para realizar ventas.</p>' +
-      '<p class="muted">El almacén del turno será el único punto desde el que podés vender. Un turno de otro usuario no habilita ventas.</p>' +
-      '<button type="button" id="venta-ir-turnos-btn" class="cc-accion">Ver Turnos</button>';
+    sin.innerHTML = bcHtmlBloqueoSinSesionVenta();
 
     const panel = document.createElement("div");
     panel.className = "venta-almacen-operativo";
@@ -192,7 +301,7 @@ safeInit("venta-turno-ui", function () {
     panel.innerHTML =
       '<span class="venta-almacen-label">🏪 Vendiendo desde</span>' +
       '<strong class="venta-almacen-nombre" id="venta-almacen-nombre">—</strong>' +
-      '<span class="muted venta-almacen-hint">Definido por tu turno abierto (no se puede cambiar aquí)</span>';
+      '<span class="muted venta-almacen-hint">Definido por tu sesión abierta (no se puede cambiar aquí)</span>';
 
     if (wrap) {
       wrap.replaceWith(panel);
@@ -227,25 +336,30 @@ safeInit("venta-turno-ui", function () {
   }
 
   var sinExist = document.getElementById("venta-sin-turno");
-  if (sinExist && !sinExist.dataset.bcM265) {
-    sinExist.dataset.bcM265 = "1";
-    sinExist.innerHTML =
-      '<p class="lista-estado" style="font-size:1.05rem;margin-bottom:8px"><strong>Ventas no disponibles</strong></p>' +
-      '<p class="lista-estado">Necesitas tener un turno abierto para realizar ventas.</p>' +
-      '<p class="muted">El almacén del turno será el único punto desde el que podés vender. Un turno de otro usuario no habilita ventas.</p>' +
-      '<button type="button" id="venta-ir-turnos-btn" class="cc-accion">Ver Turnos</button>';
+  if (sinExist) {
+    if (!sinExist.dataset.bcSesionVenta) {
+      sinExist.dataset.bcSesionVenta = "1";
+      sinExist.innerHTML = bcHtmlBloqueoSinSesionVenta();
+    }
   }
 
-  const btnIr = document.getElementById("venta-ir-turnos-btn");
+  // Un solo listener para ABRIR SESIÓN (no duplicar)
+  var btnAbrir = document.getElementById("venta-abrir-sesion-btn");
+  if (btnAbrir && !btnAbrir.dataset.bcAbrirSesionBound) {
+    btnAbrir.dataset.bcAbrirSesionBound = "1";
+    btnAbrir.addEventListener("click", function (e) {
+      e.preventDefault();
+      bcVentaAbrirSesionClick();
+    });
+  }
+
+  // Compat: botón legacy Ver Turnos → mismo handler
+  var btnIr = document.getElementById("venta-ir-turnos-btn");
   if (btnIr && !btnIr.dataset.bcIrTurnos) {
     btnIr.dataset.bcIrTurnos = "1";
-    btnIr.addEventListener("click", function () {
-      if (typeof irATab === "function") irATab("ciclos");
-      else {
-        var b = document.querySelector('.tab-btn[data-tab="ciclos"]') ||
-                document.querySelector('.tab-btn[data-tab="turnos"]');
-        if (b) b.click();
-      }
+    btnIr.addEventListener("click", function (e) {
+      e.preventDefault();
+      bcVentaAbrirSesionClick();
     });
   }
 
@@ -259,7 +373,7 @@ safeInit("venta-turno-ui", function () {
           e.stopImmediatePropagation();
           e.preventDefault();
           if (typeof setMsg === "function") {
-            setMsg("msg-venta", "No puedes vender sin un turno abierto con almacén.", false);
+            setMsg("msg-venta", "No puedes vender sin una sesión abierta.", false);
           }
           actualizarPanelAlmacenVenta();
         }
@@ -278,12 +392,11 @@ safeInit("venta-turno-ui", function () {
           e.stopImmediatePropagation();
           e.preventDefault();
           if (typeof setMsg === "function") {
-            setMsg("msg-venta-linea", "No puedes vender sin un turno abierto.", false);
+            setMsg("msg-venta-linea", "No puedes vender sin una sesión abierta.", false);
           }
           actualizarPanelAlmacenVenta();
           return;
         }
-        // Asegurar producto en mapa de precios antes del handler original
         var prodSel = document.getElementById("venta-producto");
         if (prodSel && prodSel.value) bcAsegurarPrecioProductoVenta(prodSel.value);
       },
@@ -292,7 +405,6 @@ safeInit("venta-turno-ui", function () {
   }
 
   // M26.6-FE: click en tarjeta → agregarLineaVenta con almacén del turno
-  // (el handler original lee #venta-almacen que puede estar vacío).
   const grid = document.getElementById("catalogo-grid");
   if (grid && !grid.dataset.bcM266Cart) {
     grid.dataset.bcM266Cart = "1";
@@ -306,7 +418,7 @@ safeInit("venta-turno-ui", function () {
           e.stopImmediatePropagation();
           e.preventDefault();
           if (typeof setMsg === "function") {
-            setMsg("msg-venta-linea", "No puedes vender sin un turno abierto.", false);
+            setMsg("msg-venta-linea", "No puedes vender sin una sesión abierta.", false);
           }
           actualizarPanelAlmacenVenta();
           return;
