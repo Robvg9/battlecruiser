@@ -1,5 +1,6 @@
 // ==== BattleCruiser · js/network-core.js ====
 // FASE 1 Offline Core — timeout de red central + consolidación de loading.
+// P0-B residual: tras encolar offline, refrescar proyección UI abierta.
 // Owner de loading: offline.js (loadingCount). Este módulo NO crea segundo contador.
 // No duplica IndexedDB ni cola. Integra withNetworkTimeout en withCache / ejecutarOperacion / sondeo.
 (function () {
@@ -13,11 +14,6 @@
   var NETWORK_TIMEOUT_MS = 12000;
   window.BC_NETWORK_TIMEOUT_MS = NETWORK_TIMEOUT_MS;
 
-  /**
-   * Error estructurado de timeout.
-   * Limitación: client.rpc de Supabase no expone AbortController de forma fiable;
-   * abandonamos la espera en UI (Promise.race) pero la petición puede completar en background.
-   */
   function crearErrorTimeout(label) {
     var err = new Error("NETWORK_TIMEOUT" + (label ? " (" + label + ")" : ""));
     err.code = "NETWORK_TIMEOUT";
@@ -33,10 +29,6 @@
     return msg.indexOf("network_timeout") !== -1 || (msg.indexOf("timeout") !== -1 && msg.indexOf("network") !== -1);
   }
 
-  /**
-   * withNetworkTimeout(promiseOrFn, timeoutMs?, label?)
-   * Si promiseOrFn es función, se invoca al entrar (lazy).
-   */
   async function withNetworkTimeout(promiseOrFn, timeoutMs, label) {
     var ms = typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : NETWORK_TIMEOUT_MS;
     var promise = typeof promiseOrFn === "function" ? promiseOrFn() : promiseOrFn;
@@ -94,6 +86,28 @@
   if (typeof hideLoading === "function") window.hideLoading = hideLoading;
   if (typeof resetLoadingOverlay === "function") window.resetLoadingOverlay = resetLoadingOverlay;
   if (typeof withLoading === "function") window.withLoading = withLoading;
+
+  /** P0-B: tras encolar, reflejar proyección en UIs abiertas (funciones existentes). */
+  function refrescarProyeccionUiTrasOffline() {
+    try {
+      if (typeof actualizarContadorColaPendiente === "function") actualizarContadorColaPendiente();
+      if (typeof actualizarStockDisponibleUI === "function") actualizarStockDisponibleUI();
+      if (typeof renderCatalogoGrid === "function") renderCatalogoGrid();
+      if (typeof actualizarStockTransferenciaUI === "function") actualizarStockTransferenciaUI();
+      if (typeof window.__bcInventarioProyectado === "function") {
+        var invEl = document.getElementById("inv-detalle");
+        if (invEl) window.__bcInventarioProyectado();
+      } else if (typeof refrescarInventario === "function") {
+        var tabInv = document.getElementById("tab-inventario");
+        if (tabInv && tabInv.classList.contains("visible")) refrescarInventario();
+      }
+    } catch (e) {
+      try {
+        console.warn("[BattleCruiser] P0-B refresh UI post-offline:", e);
+      } catch (e2) {}
+    }
+  }
+  window.__bcRefrescarProyeccionUiTrasOffline = refrescarProyeccionUiTrasOffline;
 
   if (typeof window.withCache === "function" && !window.withCache.__bcF1Timed) {
     window.withCache = async function (clave, consultaFn) {
@@ -167,6 +181,7 @@
           crearOperacionPendiente(tipo, payload, idempotency_key)
         );
         await refrescarOperacionesPendientesCache();
+        refrescarProyeccionUiTrasOffline();
         return { ok: true, offline: true, operacion: operacion };
       }
 
@@ -311,5 +326,5 @@
     } catch (e) {}
   }
 
-  console.info("[BattleCruiser] network-core F1 activo (timeout=" + NETWORK_TIMEOUT_MS + "ms)");
+  console.info("[BattleCruiser] network-core F1+P0-B activo (timeout=" + NETWORK_TIMEOUT_MS + "ms)");
 })();
