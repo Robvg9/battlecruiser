@@ -7,7 +7,7 @@
 
   const API = function () { return window.BattleCruiserTurnoAPI; };
   const ROOT_ID = 'ciclos-m18-root';
-  const VERSION = '9.4.3-turno';
+  const VERSION = '9.4.4-turno';
 
   let state = {
     view: 'detalle',
@@ -22,7 +22,7 @@
     return typeof escHtml === 'function'
       ? escHtml(v == null ? '' : v)
       : String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
-          return ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' })[c];
+          return ({ '&': '&', '<': '&lt;', '>': '&gt;', '"': '"', "'": '&#39;' })[c];
         });
   }
 
@@ -32,8 +32,11 @@
 
   function fmtDate(v) {
     if (!v) return '—';
+    const s = String(v);
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (m) return m[3] + '/' + m[2] + '/' + m[1];
     if (typeof fechaCorta === 'function') return fechaCorta(v);
-    return String(v).split('-').reverse().join('/');
+    return s.split('-').reverse().join('/');
   }
 
   function root() { return document.getElementById(ROOT_ID); }
@@ -348,9 +351,6 @@
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // MODALES
-  // ---------------------------------------------------------------------------
   function closeModal() {
     const m = document.getElementById('tm-modal-bg');
     if (m) m.remove();
@@ -693,8 +693,6 @@
     styles();
     hideLegacyTab();
     bind();
-    // NO llamar home() aquí — M29 es el único owner de HOME.
-    // NO rebindear refrescarCiclos / refrescarTurnos.
     window.BattleCruiserTurnosMaestro = {
       home: home,
       open: openTurno,
