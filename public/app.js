@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.43 — Turnos HOME: M29 owner único (contrato congelado)
-(function hotfixV9443(){
-  const VERSION="9.4.43";
+// v9.4.44 — P0-B residual: proyección stock offline + inventario online+pendientes
+(function hotfixV9444(){
+  const VERSION="9.4.44";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -36,7 +36,7 @@
     ["m47-productos-vista-final.js","47.5"],["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
-    ["p0a-local-reads.js","p0a.1"]
+    ["p0a-local-reads.js","p0b.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
