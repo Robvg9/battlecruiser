@@ -1,7 +1,6 @@
-// BattleCruiser — M56.4 · UI secuencia estricta basada en metadata real
-// No interpreta fechas desde el texto visual. Lee sesiones reales del turno mediante TurnoAPI.
-// Regla visual: solo la primera sesión elegible muestra ABRIR SESIÓN.
-// Regla de seguridad real: el backend dedicado también valida fecha + secuencia.
+// BattleCruiser — M56.5 · secuencia UI robusta con metadata real
+// No interpreta fechas desde texto visual. Usa turno_sesiones reales del turno.
+// La elegibilidad visual y la apertura real usan la misma regla: fecha + secuencia.
 (function () {
   'use strict';
   if (window.__bcM56TurnosSecuenciaUI) return;
@@ -22,10 +21,10 @@
     TODAY_CACHE = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     return TODAY_CACHE;
   }
-
   function norm(s) { return String(s == null ? '' : s).trim().toUpperCase(); }
+  function sinAcentos(s) { return norm(s).replace(/[ÁÀÂÄ]/g, 'A').replace(/[ÉÈÊË]/g, 'E').replace(/[ÍÌÎÏ]/g, 'I').replace(/[ÓÒÔÖ]/g, 'O').replace(/[ÚÙÛÜ]/g, 'U').replace(/Ñ/g, 'N'); }
   function terminal(st) {
-    st = norm(st);
+    st = sinAcentos(st);
     return st === 'COMPLETADA' || st === 'CANCELADA' || st === 'CANCELLED' || st === 'ANULADA';
   }
   function asArray(v) {
@@ -36,8 +35,8 @@
     return [];
   }
   function bloqueOrden(b) {
-    b = norm(b);
-    return b === 'MANANA' || b === 'MAÑANA' ? 1 : (b === 'TARDE' ? 2 : 0);
+    b = sinAcentos(b);
+    return b === 'MANANA' ? 1 : (b === 'TARDE' ? 2 : 0);
   }
   function metaClave(s) {
     return [Number(s.numero_dia != null ? s.numero_dia : s.dia_n) || 999999, bloqueOrden(s.bloque)];
@@ -47,13 +46,11 @@
     return ka[0] < kb[0] || (ka[0] === kb[0] && ka[1] < kb[1]);
   }
   function rowButton(row) { return row && row.querySelector('[data-m33-abrir-sesion]'); }
-
   function currentTurnoId() {
     if (lastTurnoId) return lastTurnoId;
     var card = document.querySelector('.m29-card[data-turno-id]');
     return card ? card.getAttribute('data-turno-id') : null;
   }
-
   function api() { return window.BattleCruiserTurnoAPI || null; }
 
   async function loadMetadata() {
@@ -65,23 +62,22 @@
       var a = api();
       if (!a || typeof a.listarSesionesTurno !== 'function') return false;
       try {
-        var raw = await a.listarSesionesTurno(turnoId);
-        var rows = asArray(raw);
+        var rows = asArray(await a.listarSesionesTurno(turnoId));
         var next = Object.create(null);
         rows.forEach(function (s) {
           if (!s || !s.id) return;
           next[String(s.id)] = {
             id: s.id,
             numero_dia: Number(s.numero_dia != null ? s.numero_dia : s.dia_n) || 999999,
-            bloque: norm(s.bloque),
+            bloque: sinAcentos(s.bloque),
             fecha: s.fecha ? String(s.fecha).slice(0, 10) : null,
-            estado: norm(s.estado)
+            estado: sinAcentos(s.estado)
           };
         });
         sessionMeta = next;
         return rows.length > 0;
       } catch (e) {
-        console.warn('[M56.4] No se pudo cargar metadata de sesiones', e);
+        console.warn('[M56.5] No se pudo cargar metadata de sesiones', e);
         return false;
       } finally {
         metaPromise = null;
@@ -97,7 +93,6 @@
     s.textContent = '.m56-lock{opacity:.7;background:transparent!important;border:1px solid rgba(148,163,184,.28)!important;color:inherit!important;cursor:not-allowed!important}.m56-lock-icon{margin-right:6px}.m56-when{display:block;margin-top:3px;font-size:.72rem;opacity:.62}';
     document.head.appendChild(s);
   }
-
   function bloquear(btn) {
     if (!btn) return;
     btn.disabled = true;
@@ -106,7 +101,6 @@
     btn.setAttribute('title', 'Esta sesión todavía no es elegible.');
     btn.innerHTML = '<span class="m56-lock-icon">🔒</span> Abrir sesión';
   }
-
   function desbloquear(btn) {
     if (!btn) return;
     btn.disabled = false;
@@ -115,8 +109,7 @@
     btn.removeAttribute('title');
     btn.textContent = 'Abrir sesión';
   }
-
-  function metaRows(modal) {
+  function visibleMetaRows(modal) {
     return Array.prototype.slice.call(modal.querySelectorAll('.m33-session')).map(function (row) {
       var btn = rowButton(row);
       if (!btn) return null;
@@ -126,44 +119,40 @@
     }).filter(Boolean);
   }
 
+  function findEligibleId() {
+    var all = Object.keys(sessionMeta).map(function (id) { return sessionMeta[id]; });
+    all.sort(function (a, b) {
+      var ka = metaClave(a), kb = metaClave(b);
+      return ka[0] - kb[0] || ka[1] - kb[1];
+    });
+    for (var i = 0; i < all.length; i++) {
+      var cur = all[i];
+      if (terminal(cur.estado) || cur.estado === 'EN_CURSO') continue;
+      if (cur.fecha !== hoy()) continue;
+      var blocked = false;
+      for (var j = 0; j < all.length; j++) {
+        if (!anterior(all[j], cur)) continue;
+        if (!terminal(all[j].estado)) { blocked = true; break; }
+      }
+      if (!blocked) return String(cur.id);
+    }
+    return null;
+  }
+
   function renderSequence() {
     if (rendering) return;
     var modal = document.querySelector('#m33-bg .m33-modal');
     if (!modal || !modal.querySelector('#m33-dep-msg, [data-m33-abrir-sesion]')) return;
     css();
-
-    var items = metaRows(modal);
+    var items = visibleMetaRows(modal);
     if (!items.length) return;
-
-    items.sort(function (a, b) {
-      var ka = metaClave(a.meta), kb = metaClave(b.meta);
-      return ka[0] - kb[0] || ka[1] - kb[1];
-    });
-
-    var eligibleId = null;
-    for (var i = 0; i < items.length; i++) {
-      var cur = items[i].meta;
-      if (terminal(cur.estado) || cur.estado === 'EN_CURSO') continue;
-      if (cur.fecha !== hoy()) continue;
-
-      var blocked = false;
-      for (var j = 0; j < items.length; j++) {
-        var prev = items[j].meta;
-        if (!anterior(prev, cur)) continue;
-        if (!terminal(prev.estado)) { blocked = true; break; }
-      }
-      if (!blocked) {
-        eligibleId = String(cur.id);
-        break;
-      }
-    }
-
+    var eligibleId = findEligibleId();
     rendering = true;
     try {
       items.forEach(function (it) {
         if (eligibleId && String(it.meta.id) === eligibleId) desbloquear(it.button);
         else bloquear(it.button);
-        if (it.meta.fecha && it.meta.fecha !== hoy() && norm(it.meta.estado) === 'PENDIENTE') {
+        if (it.meta.fecha && it.meta.fecha !== hoy() && it.meta.estado === 'PENDIENTE') {
           var sub = it.row.querySelector('.m33-muted');
           if (sub && !it.row.querySelector('.m56-when')) {
             var when = document.createElement('span');
@@ -173,9 +162,7 @@
           }
         }
       });
-    } finally {
-      rendering = false;
-    }
+    } finally { rendering = false; }
   }
 
   function onCardClick(e) {
@@ -213,47 +200,39 @@
       }, 180);
     }, 120);
   }
-
   function watchSuccess() {
     var msg = document.getElementById('m33-dep-msg');
-    if (msg && norm(msg.textContent).indexOf('SESION ABIERTA') >= 0) volverAVentas();
+    if (msg && sinAcentos(msg.textContent).indexOf('SESION ABIERTA') >= 0) volverAVentas();
   }
-
+  function observeAgain() {
+    if (document.body && observer) observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
   function bind() {
     if (observer) return;
     document.addEventListener('click', onCardClick, true);
     observer = new MutationObserver(function () {
       if (rendering) return;
       observer.disconnect();
-      try {
-        var hasModal = !!document.querySelector('#m33-bg .m33-modal [data-m33-abrir-sesion]');
-        if (hasModal) {
-          loadMetadata().then(function () { renderSequence(); watchSuccess(); });
-        } else {
-          watchSuccess();
-        }
-      } finally {
-        if (document.body) observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      var hasModal = !!document.querySelector('#m33-bg .m33-modal [data-m33-abrir-sesion]');
+      if (hasModal) {
+        loadMetadata().then(function () { renderSequence(); watchSuccess(); }).finally(observeAgain);
+      } else {
+        watchSuccess();
+        observeAgain();
       }
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     window.__bcM56Observer = observer;
-    loadMetadata().then(renderSequence);
-    renderSequence();
-    watchSuccess();
+    loadMetadata().then(function () { renderSequence(); watchSuccess(); });
   }
-
   function boot() {
     if (!document.body) return;
     bind();
-    setTimeout(function () { loadMetadata().then(renderSequence); }, 50);
-    setTimeout(function () { loadMetadata().then(renderSequence); }, 250);
-    setTimeout(function () { loadMetadata().then(renderSequence); }, 800);
+    setTimeout(function () { loadMetadata().then(renderSequence); }, 80);
+    setTimeout(function () { loadMetadata().then(renderSequence); }, 300);
+    setTimeout(function () { loadMetadata().then(renderSequence); }, 900);
   }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
-
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   window.__BC_M56 = {
     renderSequence: renderSequence,
     volverAVentas: volverAVentas,
