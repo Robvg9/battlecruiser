@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.4 — ADMIN: wizard completo · DEPENDIENTA: vista operativa (su sesión + abrir)
+// v33.5 — ADMIN: wizard completo · DEPENDIENTA: vista operativa (secuencia + abrir)
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -10,7 +10,7 @@
   const API = () => window.BattleCruiserTurnoAPI;
   const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false };
   const root = () => document.getElementById(ROOT_ID);
-  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
   const date = v => !v ? '-' : (typeof fechaCorta === 'function' ? fechaCorta(v) : String(v).split('T')[0].split('-').reverse().join('/'));
   const users = () => ((_cache && _cache.usuarios) || []).filter(u => u.activo !== false && !u.archivado);
   const field = v => (v == null || v === '') ? '-' : v;
@@ -54,7 +54,6 @@
         if (state.isAdmin) return;
       } catch (e) {}
     }
-    // Solo editar_any / dueño — no ciclos.crear (dependienta)
     state.isAdmin = can('turnos', 'editar_any') || can('ciclos', 'editar_any') || isDuenoRole();
   }
 
@@ -101,7 +100,6 @@
     return uid && String(uid) === String(me);
   }
 
-  // —— Vista ADMIN (wizard existente) ——
   function step1(t) {
     const s = state.sesiones;
     const assigned = s.filter(x => x.usuario_id).length;
@@ -122,7 +120,6 @@
     return '<div class="m33-session-row"><span>Estado</span><b>' + esc(st) + '</b></div>';
   }
 
-  // —— Vista DEPENDIENTA (solo su sesión + abrir) ——
   function bodyDependienta(t) {
     var me = currentUserId();
     var mias = state.sesiones.filter(sesionAsignadaAMi);
@@ -130,33 +127,17 @@
     html += '<h4 style="margin:18px 0 8px">Tus sesiones</h4>';
     html += '<p class="m33-muted">Solo ves las sesiones asignadas a vos. La secuencia la controla el sistema.</p>';
     html += '<p id="m33-dep-msg" class="m33-msg"></p>';
-
-    if (!me) {
-      html += '<p class="m33-muted">No se pudo identificar tu usuario.</p>';
-      return html;
-    }
-    if (!mias.length) {
-      html += '<p class="m33-muted">No tenés sesiones asignadas en este turno.</p>';
-      return html;
-    }
-
+    if (!me) { html += '<p class="m33-muted">No se pudo identificar tu usuario.</p>'; return html; }
+    if (!mias.length) { html += '<p class="m33-muted">No tenés sesiones asignadas en este turno.</p>'; return html; }
     html += mias.map(function (x) {
       var st = normEstadoSesion(x.estado);
-      var labelSt = st === 'PENDIENTE' || st === 'PROGRAMADA' ? 'Sin comenzar'
-        : st === 'EN_CURSO' ? 'En curso'
-        : st === 'COMPLETADA' ? 'Completada'
-        : (st || '—');
+      var labelSt = st === 'PENDIENTE' || st === 'PROGRAMADA' ? 'Sin comenzar' : st === 'EN_CURSO' ? 'En curso' : st === 'COMPLETADA' ? 'Completada' : (st || '—');
       var actions = '';
-      if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) {
-        actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
-      } else if (st === 'EN_CURSO') {
-        actions = '<span class="m33-pill m33-ok">Sesión en curso</span>';
-      } else {
-        actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
-      }
+      if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
+      else if (st === 'EN_CURSO') actions = '<span class="m33-pill m33-ok">Sesión en curso</span>';
+      else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
       return '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia || x.dia_n) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + ' · ' + esc(labelSt) + '</div></div><div>' + actions + '</div></div></div>';
     }).join('');
-
     return html;
   }
 
@@ -167,50 +148,26 @@
     el.className = 'm33-msg ' + (ok ? 'ok' : (text ? 'error' : ''));
   }
 
-  /**
-   * Apertura operativa para dependienta.
-   * Preferir iniciar_sesion_operativa (puente M14 / Ventas).
-   * No usar bc_iniciar_turno_sesion desde esta vía de Ventas.
-   */
+  // Apertura de una sesión M29/turno_sesiones. La RPC dedicada valida asignación,
+  // fecha de hoy, secuencia estricta y crea el tramo + ABIERTO legacy en la misma transacción.
   async function abrirSesionDependienta(sesionId, btn) {
     if (!sesionId) return;
     if (btn && btn.dataset.bcBusy === '1') return;
     if (btn) { btn.dataset.bcBusy = '1'; btn.disabled = true; }
     setDepMsg('Abriendo sesión…', true);
     try {
-      if (!navigator.onLine) {
-        setDepMsg('Necesitás conexión para abrir la sesión.', false);
-        return;
-      }
-      if (typeof client === 'undefined' || !client || !client.rpc) {
-        setDepMsg('Cliente no disponible.', false);
-        return;
-      }
-      var key = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : String(Date.now()) + '-' + Math.random().toString(16).slice(2);
-      var r = await client.rpc('iniciar_sesion_operativa', {
-        p_sesion_id: sesionId,
-        p_idempotency_key: key,
-        p_observacion: null
-      });
+      if (!navigator.onLine) { setDepMsg('Necesitás conexión para abrir la sesión.', false); return; }
+      if (typeof client === 'undefined' || !client || !client.rpc) { setDepMsg('Cliente no disponible.', false); return; }
+      var r = await client.rpc('bc_iniciar_turno_sesion_secuencial', { p_turno_sesion_id: sesionId });
       if (r && r.error) throw r.error;
-
       setDepMsg('✓ Sesión abierta. Ya podés vender.', true);
       try {
         if (typeof window.__BC_M25_refrescarTurno === 'function') await window.__BC_M25_refrescarTurno();
         else if (typeof refrescarTurnoActual === 'function') await refrescarTurnoActual();
       } catch (e) {}
-      try {
-        if (typeof actualizarPanelAlmacenVenta === 'function') actualizarPanelAlmacenVenta();
-      } catch (e2) {}
-
-      // Recargar sesiones del expediente si sigue abierto
+      try { if (typeof actualizarPanelAlmacenVenta === 'function') actualizarPanelAlmacenVenta(); } catch (e2) {}
       if (state.turno && state.turno.id) {
-        try {
-          await load(state.turno.id);
-          renderModal();
-        } catch (e3) {}
+        try { await load(state.turno.id); renderModal(); } catch (e3) {}
       }
     } catch (e) {
       var msg = String((e && (e.message || e.details || e.code)) || e);
@@ -220,29 +177,20 @@
     }
   }
 
-  function close() {
-    var bg = document.getElementById('m33-bg');
-    if (bg) bg.remove();
-  }
+  function close() { var bg = document.getElementById('m33-bg'); if (bg) bg.remove(); }
   async function deleteTurno() {
     if (!state.isAdmin) return;
     if (!confirm('¿Eliminar este Turno?')) return;
-    try {
-      await API().anularTurno(state.turno.id, 'Cancelado por ADMIN');
-      close();
-      if (window.__BC_M29__ && window.__BC_M29__.renderHome) window.__BC_M29__.renderHome();
-    } catch (e) { alert('No se pudo eliminar: ' + (e.message || e)); }
+    try { await API().anularTurno(state.turno.id, 'Cancelado por ADMIN'); close(); if (window.__BC_M29__ && window.__BC_M29__.renderHome) window.__BC_M29__.renderHome(); }
+    catch (e) { alert('No se pudo eliminar: ' + (e.message || e)); }
   }
   async function saveAssignments() {
     if (!state.isAdmin) return;
     const ov = document.getElementById('m33-bg');
     const sels = [].slice.call(ov.querySelectorAll('select[data-m33-sid]'));
     try {
-      for (var i = 0; i < sels.length; i++) {
-        if (sels[i].value) await API().asignarSesion(sels[i].dataset.m33Sid, sels[i].value);
-      }
-      await load(state.turno.id);
-      renderModal();
+      for (var i = 0; i < sels.length; i++) if (sels[i].value) await API().asignarSesion(sels[i].dataset.m33Sid, sels[i].value);
+      await load(state.turno.id); renderModal();
     } catch (e) { alert('No se pudieron guardar: ' + (e.message || e)); }
   }
 
@@ -250,27 +198,13 @@
     const ov = document.getElementById('m33-bg');
     if (!ov) return;
     const t = state.turno;
-
-    // DEPENDIENTA: un solo panel operativo
     if (!state.isAdmin) {
-      ov.innerHTML =
-        '<div class="m33-modal">' +
-        '<div class="m33-head"><div class="m33-title"><div><h3>Tu turno · ' + esc(field(t.almacen_nombre || t.almacen)) +
-        '</h3><div class="m33-muted">Sesión de trabajo</div></div><button type="button" id="m33-x">X</button></div></div>' +
-        '<div class="m33-body">' + bodyDependienta(t) + '</div>' +
-        '<div class="m33-foot"><div></div><div><button type="button" id="m33-close-final">Cerrar</button></div></div></div>';
+      ov.innerHTML = '<div class="m33-modal"><div class="m33-head"><div class="m33-title"><div><h3>Tu turno · ' + esc(field(t.almacen_nombre || t.almacen)) + '</h3><div class="m33-muted">Sesión de trabajo</div></div><button type="button" id="m33-x">X</button></div></div><div class="m33-body">' + bodyDependienta(t) + '</div><div class="m33-foot"><div></div><div><button type="button" id="m33-close-final">Cerrar</button></div></div></div>';
       ov.querySelector('#m33-x').onclick = close;
-      var c = ov.querySelector('#m33-close-final');
-      if (c) c.onclick = close;
-      ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn);
-        });
-      });
+      var c = ov.querySelector('#m33-close-final'); if (c) c.onclick = close;
+      ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
       return;
     }
-
-    // ADMIN: wizard completo
     const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];
     const bodies = [step1(t), step2(), step3(), step4(), step5(t)];
     const prev = state.step > 1 ? '<button type="button" id="m33-prev">Atrás</button>' : '';
@@ -285,54 +219,22 @@
   }
 
   async function open(id) {
-    css();
-    state.step = 1;
-    state.busy = true;
-    await resolveAdmin();
-    const ov = document.createElement('div');
-    ov.id = 'm33-bg';
-    ov.className = 'm33-bg';
-    ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>';
-    document.body.appendChild(ov);
-    try {
-      await load(id);
-      state.busy = false;
-      renderModal();
-    } catch (e) {
-      state.busy = false;
-      ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>';
-      ov.querySelector('#m33-error-close').onclick = close;
-    }
+    css(); state.step = 1; state.busy = true; await resolveAdmin();
+    const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
+    try { await load(id); state.busy = false; renderModal(); }
+    catch (e) { state.busy = false; ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>'; ov.querySelector('#m33-error-close').onclick = close; }
   }
 
-  function renderHome() {
-    if (window.__BC_M29__ && typeof window.__BC_M29__.renderHome === 'function') {
-      if (window.__BC_M29__.claimHomeOwnership) window.__BC_M29__.claimHomeOwnership();
-      return window.__BC_M29__.renderHome();
-    }
-  }
-
+  function renderHome() { if (window.__BC_M29__ && typeof window.__BC_M29__.renderHome === 'function') { if (window.__BC_M29__.claimHomeOwnership) window.__BC_M29__.claimHomeOwnership(); return window.__BC_M29__.renderHome(); } }
   function intercept() {
-    const r = root();
-    if (!r || r.dataset.m33Bound === '1') return;
-    r.dataset.m33Bound = '1';
+    const r = root(); if (!r || r.dataset.m33Bound === '1') return; r.dataset.m33Bound = '1';
     r.addEventListener('click', function (e) {
-      const card = e.target.closest('[data-m33-id],.m29-card');
-      if (!card) return;
-      const id = card.dataset.m33Id || card.dataset.turnoId || card.getAttribute('data-turno-id');
-      if (!id) return;
-      e.preventDefault();
-      e.stopPropagation();
-      open(id);
+      const card = e.target.closest('[data-m33-id],.m29-card'); if (!card) return;
+      const id = card.dataset.m33Id || card.dataset.turnoId || card.getAttribute('data-turno-id'); if (!id) return;
+      e.preventDefault(); e.stopPropagation(); open(id);
     }, true);
   }
-
-  function boot() {
-    css();
-    intercept();
-  }
-
-  window.__BC_M33 = { open: open, version: '33.4-dep', renderHome: renderHome };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  function boot() { css(); intercept(); }
+  window.__BC_M33 = { open: open, version: '33.5-dep', renderHome: renderHome };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
