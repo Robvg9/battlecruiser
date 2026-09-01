@@ -1,5 +1,5 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
-// HOME listado = solo M29. Este modulo solo abre expediente / detalle.
+// HOME listado = solo M29. Este módulo solo abre expediente / detalle.
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -32,7 +32,7 @@
     const a = API();
     if (!a || typeof a.obtenerExpedienteTurno !== 'function') throw Error('API de expediente no disponible.');
     const d = normalizeExp(await a.obtenerExpedienteTurno(id));
-    if (!d) throw Error('No se encontro el expediente del Turno.');
+    if (!d) throw Error('No se encontró el expediente del Turno.');
     return d;
   }
   async function load(id) {
@@ -46,13 +46,13 @@
     const s = state.sesiones;
     const assigned = s.filter(x => x.usuario_id).length;
     const declared = s.filter(x => x.dinero_declarado).length;
-    return '<div class="m33-summary"><div class="m33-box"><span>Almacen</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duracion</span><b>' + esc(field(t.dias_turno)) + ' dia(s)</b></div><div class="m33-box"><span>Sesiones</span><b>' + s.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + s.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + s.length + '</b></div></div><h4 style="margin:20px 0 8px">Sesiones</h4>' + (s.map(x => '<div class="m33-session"><div class="m33-session-row"><div><b>Dia ' + esc(x.numero_dia) + ' · ' + esc(x.bloque === 'MANANA' ? 'Manana' : x.bloque === 'TARDE' ? 'Tarde' : x.bloque || '-') + '</b><div class="m33-muted">' + esc(date(x.fecha)) + '</div></div><div><span class="m33-pill ' + (x.usuario_id ? 'm33-ok' : 'm33-warn') + '">' + esc(x.usuario_nombre || (x.usuario_id ? 'Asignada' : 'Sin asignar')) + '</span></div></div></div>').join('') || '<div class="m33-muted">Sin sesiones.</div>');
+    return '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duración</span><b>' + esc(field(t.dias_turno)) + ' día(s)</b></div><div class="m33-box"><span>Sesiones</span><b>' + s.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + s.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + s.length + '</b></div></div><h4 style="margin:20px 0 8px">Sesiones</h4>' + (s.map(x => '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia) + ' · ' + esc(x.bloque === 'MANANA' ? 'Mañana' : x.bloque === 'TARDE' ? 'Tarde' : x.bloque || '-') + '</b><div class="m33-muted">' + esc(date(x.fecha)) + '</div></div><div><span class="m33-pill ' + (x.usuario_id ? 'm33-ok' : 'm33-warn') + '">' + esc(x.usuario_nombre || (x.usuario_id ? 'Asignada' : 'Sin asignar')) + '</span></div></div></div>').join('') || '<div class="m33-muted">Sin sesiones.</div>');
   }
   function step2() {
     const us = users();
-    return '<p class="m33-muted">Asigna una trabajadora a cada sesion.</p>' + state.sesiones.map(s => {
+    return '<p class="m33-muted">Asigna una trabajadora a cada sesión.</p>' + state.sesiones.map(s => {
       const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' + (String(u.id) === String(s.usuario_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.email || u.id) + '</option>').join('');
-      return '<div class="m33-session"><label>Dia ' + esc(s.numero_dia) + '</label><select data-m33-sid="' + esc(s.id) + '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
+      return '<div class="m33-session"><label>Día ' + esc(s.numero_dia) + '</label><select data-m33-sid="' + esc(s.id) + '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
     }).join('');
   }
   function step3(t) {
@@ -68,7 +68,7 @@
 
   function close() { document.getElementById('m33-bg') && document.getElementById('m33-bg').remove(); }
   async function deleteTurno() {
-    if (!confirm('Eliminar este Turno?')) return;
+    if (!confirm('¿Eliminar este Turno?')) return;
     try {
       await API().anularTurno(state.turno.id, 'Cancelado por ADMIN');
       close();
@@ -90,9 +90,9 @@
     const ov = document.getElementById('m33-bg');
     if (!ov) return;
     const t = state.turno;
-    const titles = ['Informacion', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];
+    const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];
     const bodies = [step1(t), step2(), step3(t), step4(t), step5(t)];
-    const prev = state.step > 1 ? '<button id="m33-prev">Atras</button>' : '';
+    const prev = state.step > 1 ? '<button id="m33-prev">Atrás</button>' : '';
     const next = state.step < 5 ? '<button id="m33-next" class="primary">Avanzar</button>' : '<button id="m33-close-final">Cerrar</button>';
     ov.innerHTML = '<div class="m33-modal"><div class="m33-head"><div class="m33-title"><div><h3>Turno · ' + esc(field(t.almacen_nombre || t.almacen)) + '</h3><div class="m33-muted">' + esc(titles[state.step - 1]) + '</div></div><button id="m33-x">X</button></div><div class="m33-steps">' + titles.map(function (x, i) { return '<div class="m33-step ' + (state.step === i + 1 ? 'active' : '') + '"><b>' + (i + 1) + '</b> · ' + x + '</div>'; }).join('') + '</div></div><div class="m33-body">' + bodies[state.step - 1] + '</div><div class="m33-foot"><div>' + (state.step === 1 && String(t.estado_maestro || t.estado || '').toUpperCase() === 'PROGRAMADO' ? '<button id="m33-delete" class="danger">Eliminar</button>' : '') + '</div><div>' + prev + (state.step === 2 ? '<button id="m33-save" style="margin-left:8px">Guardar</button>' : '') + next + '</div></div></div>';
     ov.querySelector('#m33-x').onclick = close;
@@ -152,7 +152,7 @@
     // NO auto renderHome
   }
 
-  window.__BC_M33 = { open: open, version: '33.2-exp', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.3-exp', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
