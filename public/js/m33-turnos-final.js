@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.6 — ADMIN: wizard completo · DEPENDIENTA: vista operativa (secuencia + abrir) · fechas civiles sin desfase UTC
+// v33.7 — ADMIN: wizard completo · DEPENDIENTA: vista operativa · fechas civiles · asignación persistente inmediata
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -67,7 +67,7 @@
     if (document.getElementById('bc-m33-css')) return;
     const s = document.createElement('style');
     s.id = 'bc-m33-css';
-    s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px}.m33-modal{width:min(920px,100%);max-height:90vh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:20px 22px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:flex;gap:7px;margin-top:14px;overflow:auto}.m33-step{flex:1;min-width:100px;padding:7px 9px;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:20px 22px;overflow:auto}.m33-foot{padding:13px 22px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.m33-box{padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:10px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}@media(max-width:720px){.m33-summary{grid-template-columns:1fr 1fr}}';
+    s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px}.m33-modal{width:min(920px,100%);max-height:90vh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:20px 22px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:flex;gap:7px;margin-top:14px;overflow:auto}.m33-step{flex:1;min-width:100px;padding:7px 9px;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:20px 22px;overflow:auto}.m33-foot{padding:13px 22px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.m33-box{padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:10px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}@media(max-width:720px){.m33-summary{grid-template-columns:1fr 1fr}}';
     document.head.appendChild(s);
   }
 
@@ -114,9 +114,9 @@
   }
   function step2() {
     const us = users();
-    return '<p class="m33-muted">Asigna una trabajadora a cada sesión.</p>' + state.sesiones.map(s => {
+    return '<p class="m33-muted">Asigna una trabajadora a cada sesión. Los cambios se guardan inmediatamente; el botón Guardar vuelve a verificar todo el bloque.</p>' + '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>' + state.sesiones.map(s => {
       const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' + (String(u.id) === String(s.usuario_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.email || u.id) + '</option>').join('');
-      return '<div class="m33-session"><label>Día ' + esc(s.numero_dia) + '</label><select data-m33-sid="' + esc(s.id) + '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
+      return '<div class="m33-session"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) + '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || '') + '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
     }).join('');
   }
   function step3() { return '<div class="m33-muted">Movimientos del expediente (si hay datos).</div>'; }
@@ -190,14 +190,67 @@
     try { await API().anularTurno(state.turno.id, 'Cancelado por ADMIN'); close(); if (window.__BC_M29__ && window.__BC_M29__.renderHome) window.__BC_M29__.renderHome(); }
     catch (e) { alert('No se pudo eliminar: ' + (e.message || e)); }
   }
+
+  function setAsignacionMsg(text, ok) {
+    var el = document.getElementById('m33-asig-msg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'bc-m33-save-msg ' + (ok ? 'ok' : 'error');
+  }
+
+  async function persistAssignmentSelect(sel) {
+    if (!state.isAdmin || !sel || !sel.dataset.m33Sid) return;
+    var next = sel.value || '';
+    var prev = sel.dataset.bcPrev || '';
+    if (next === prev) return;
+    sel.disabled = true;
+    try {
+      if (!next) {
+        // No existe un RPC de desasignación en el contrato actual; no fingimos que
+        // quitar el valor lo guardó. Se recupera el último valor válido.
+        sel.value = prev;
+        throw new Error('Para quitar una asignación usá la reasignación del usuario; no se puede guardar "Sin asignar" desde este control.');
+      }
+      await API().asignarSesion(sel.dataset.m33Sid, next);
+      sel.dataset.bcPrev = next;
+      await load(state.turno.id);
+      setAsignacionMsg('✓ Asignación guardada y confirmada.', true);
+    } catch (e) {
+      sel.value = prev;
+      setAsignacionMsg('No se guardó la asignación: ' + String(e && e.message || e), false);
+      throw e;
+    } finally {
+      sel.disabled = false;
+    }
+  }
+
+  function bindAssignmentAutosave() {
+    var ov = document.getElementById('m33-bg');
+    if (!ov || ov.dataset.bcM33AssignBound === '1') return;
+    ov.dataset.bcM33AssignBound = '1';
+    ov.addEventListener('change', async function (e) {
+      var sel = e.target && e.target.closest ? e.target.closest('select[data-m33-sid]') : null;
+      if (!sel) return;
+      try { await persistAssignmentSelect(sel); } catch (_) {}
+    });
+  }
+
   async function saveAssignments() {
     if (!state.isAdmin) return;
     const ov = document.getElementById('m33-bg');
     const sels = [].slice.call(ov.querySelectorAll('select[data-m33-sid]'));
     try {
-      for (var i = 0; i < sels.length; i++) if (sels[i].value) await API().asignarSesion(sels[i].dataset.m33Sid, sels[i].value);
-      await load(state.turno.id); renderModal();
-    } catch (e) { alert('No se pudieron guardar: ' + (e.message || e)); }
+      for (var i = 0; i < sels.length; i++) {
+        if (sels[i].value) await persistAssignmentSelect(sels[i]);
+      }
+      await load(state.turno.id);
+      var expected = {};
+      sels.forEach(function(sel){ expected[String(sel.dataset.m33Sid)] = sel.value; });
+      var mismatches = (state.sesiones || []).filter(function(s){ return expected[String(s.id)] && String(s.usuario_id || '') !== String(expected[String(s.id)]); });
+      if (mismatches.length) throw new Error('La verificación detectó asignaciones no persistidas.');
+      setAsignacionMsg('✓ Asignaciones verificadas en Supabase.', true);
+      renderModal();
+    } catch (e) { setAsignacionMsg('No se pudieron guardar/verificar las asignaciones: ' + (e.message || e), false); }
   }
 
   function renderModal() {
@@ -222,6 +275,7 @@
     var cf = ov.querySelector('#m33-close-final'); if (cf) cf.onclick = close;
     var d = ov.querySelector('#m33-delete'); if (d) d.onclick = deleteTurno;
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
+    if (state.step === 2) bindAssignmentAutosave();
   }
 
   async function open(id) {
@@ -241,6 +295,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.6-dep', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.7-dep', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
