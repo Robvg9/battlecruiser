@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.47 — M33.5 + M56.5 + M57.3 · bootstrap íntegro
-(function hotfixV9447(){
-  const VERSION="9.4.47";
+// v9.4.48 — M33.5 + M56.5 + M57.4 · bootstrap íntegro
+(function hotfixV9448(){
+  const VERSION="9.4.48";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -47,7 +47,7 @@
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
     ["p0a-local-reads.js","p0b.1"],
     ["m56-turnos-secuencia-ui.js","56.5"],
-    ["m57-turnos-sesion-ux-fix.js","57.3"]
+    ["m57-turnos-sesion-ux-fix.js","57.4"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]')) return;
