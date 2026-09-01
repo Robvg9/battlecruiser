@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.50 — M33.5 + M56.6 + M57.4 + M58 · sync directo Ventas
-(function hotfixV9450(){
-  const VERSION="9.4.50";
+// v9.4.51 — M33.5 + M56.6 + M57.4 + M58.2 · Ventas autoritativa
+(function hotfixV9451(){
+  const VERSION="9.4.51";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -37,7 +37,7 @@
     ["m47-productos-vista-final.js","47.5"],["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
-    ["p0a-local-reads.js","p0b.1"],["m56-turnos-secuencia-ui.js","56.6"],["m57-turnos-sesion-ux-fix.js","57.4"],["m58-ventas-session-sync.js","58.1"]
+    ["p0a-local-reads.js","p0b.1"],["m56-turnos-secuencia-ui.js","56.6"],["m57-turnos-sesion-ux-fix.js","57.4"],["m58-ventas-session-sync.js","58.2"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]')) return;
