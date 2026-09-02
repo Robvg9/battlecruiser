@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.66 — M33.7 + M57.5 + M58.2 + M59.2 + M60.4 + M61 + M64 + M65 + M66.2 + M67
-(function hotfixV9466(){
-  const VERSION="9.4.66";
+// v9.4.68 — M33.7 + M57.5 + M60.4 + M61 + M64–M67 + M68 Smart POS definitivo
+(function hotfixV9468(){
+  const VERSION="9.4.68";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -38,7 +38,8 @@
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
     ["p0a-local-reads.js","p0b.1"],["m57-turnos-sesion-ux-fix.js","57.5"],["m58-ventas-session-sync.js","58.2"],["m59-turno-cierre-moderno.js","59.2"],["m60-turnos-operacion-control.js","60.4"],
-    ["m64-ventas-topbar-sticky.js","64.1"],["m65-ventas-smart-panel.js","65.1"],["m66-ventas-polish-final.js","66.2"],["m67-ventas-ux-compact.js","67.1"]
+    ["m64-ventas-topbar-sticky.js","64.1"],["m65-ventas-smart-panel.js","65.1"],["m66-ventas-polish-final.js","66.2"],["m67-ventas-ux-compact.js","67.1"],
+    ["m68-ventas-pos-definitivo.js","68.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]')) return;
