@@ -42,6 +42,8 @@
     ["m57-turnos-sesion-ux-fix.js","57.5"],
     ["m68-ventas-pos-definitivo.js","9.4.75"],
     ["hotfix-regresiones-20260902.js","20260902.1"],
+    ["hotfix-configuracion-20260902.js","20260902.1"],
+    ["hotfix-inventario-inmediato-20260902.js","20260902.1"],
     ["hotfix-turno-forceclose-20260902.js","20260902.1"]
   ];
 
