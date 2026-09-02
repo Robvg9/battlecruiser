@@ -1,450 +1,673 @@
-// BattleCruiser M68 — Smart POS definitivo
-// Una sola autoridad visual de Ventas. No MutationObserver global.
-// No altera lógica de negocio (stock, precios, registrar_venta, turnos).
-(function () {
+/**
+ * M68 — Ventas POS Definitivo (v9.4.69)
+ * Smart POS Sales Panel — capa única y autoritativa
+ * - Header compacto + buscador usable
+ * - Botones sin overflow de texto
+ * - Cantidad del carrito siempre visible
+ * - Carrito aprovecha todo el espacio derecho
+ * - Sin franja verde residual
+ * - Solo scroll en productos
+ * - Sin MutationObserver / sin freeze
+ */
+(function m68VentasPosDefinitivo() {
   'use strict';
-  if (window.__BC_M68) return;
-  window.__BC_M68 = true;
+  const VER = '9.4.69';
+  if (window.__BC_M68_LOADED__) return;
+  window.__BC_M68_LOADED__ = VER;
 
-  var STYLE_ID = 'bc-m68-pos-definitivo';
-  var booted = false;
+  const CSS = `
+/* ========== M68 AUTHORITATIVE LAYER ========== */
+#view-ventas,
+#view-ventas .ventas-panel,
+#view-ventas .ventas-main,
+#view-ventas .pos-layout,
+#view-ventas .ventas-layout,
+section[data-view="ventas"],
+.view-ventas {
+  --m68-gap: 10px;
+  --m68-radius: 12px;
+  --m68-card-bg: #0f172a;
+  --m68-header-bg: #0b1220;
+  --m68-border: 1px solid rgba(148,163,184,0.18);
+  --m68-text: #e2e8f0;
+  --m68-muted: #94a3b8;
+  --m68-accent: #3b82f6;
+  --m68-danger: #ef4444;
+  --m68-ok: #22c55e;
+  box-sizing: border-box !important;
+}
 
-  function css() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
-    s.id = STYLE_ID;
-    s.textContent = [
-      /* ===== CONTENEDOR PRINCIPAL ===== */
-      '#tab-ventas.bc-pos.visible{',
-      '  height:calc(100dvh - 96px)!important;max-height:calc(100dvh - 96px)!important;',
-      '  min-height:0!important;overflow:hidden!important;',
-      '  display:flex!important;flex-direction:column!important;',
-      '  background:#070f1a!important;color:#e8eef8!important;',
-      '  padding:8px 10px 10px!important;box-sizing:border-box!important;',
-      '}',
-      '#tab-ventas.bc-pos #venta-operativa-bloque{',
-      '  flex:1 1 auto!important;min-height:0!important;height:100%!important;',
-      '  display:flex!important;flex-direction:column!important;',
-      '  gap:8px!important;overflow:hidden!important;margin:0!important;padding:0!important;',
-      '}',
+/* ---- Layout principal: productos + carrito ---- */
+#view-ventas .pos-grid,
+#view-ventas .ventas-grid,
+#view-ventas .layout-ventas,
+#view-ventas .main-content > .grid,
+#view-ventas > .content,
+#view-ventas .ventas-body {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px) !important;
+  gap: var(--m68-gap) !important;
+  align-items: start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
 
-      /* ===== HEADER COMPACTO (una sola franja) ===== */
-      '#bc-venta-topbar{',
-      '  flex:0 0 auto!important;display:grid!important;',
-      '  grid-template-columns:minmax(140px,180px) minmax(0,1fr) auto auto auto!important;',
-      '  grid-template-areas:"ctx search qty add close"!important;',
-      '  align-items:center!important;gap:8px!important;',
-      '  min-height:48px!important;height:auto!important;max-height:none!important;',
-      '  margin:0!important;padding:6px 10px!important;',
-      '  border:1px solid rgba(90,130,180,.18)!important;border-radius:12px!important;',
-      '  background:linear-gradient(180deg,#0c1828,#0a1420)!important;',
-      '  box-shadow:0 4px 16px rgba(0,0,0,.2)!important;overflow:visible!important;',
-      '}',
-      '#bc-venta-topbar .bc-m64-context{',
-      '  grid-area:ctx!important;min-width:0!important;max-width:180px!important;',
-      '  display:flex!important;flex-direction:column!important;justify-content:center!important;',
-      '  gap:1px!important;padding:2px 8px 2px 0!important;margin:0!important;',
-      '  border-right:1px solid rgba(90,130,180,.14)!important;overflow:hidden!important;',
-      '  height:auto!important;',
-      '}',
-      '#bc-venta-topbar .bc-m64-title{display:none!important}',
-      '#bc-venta-topbar .bc-m64-context .venta-almacen-label{',
-      '  font:600 9px/1.1 Inter,system-ui,sans-serif!important;',
-      '  color:#6b7f96!important;letter-spacing:.06em!important;text-transform:uppercase!important;',
-      '  white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;',
-      '}',
-      '#bc-venta-topbar .bc-m64-context .venta-almacen-nombre{',
-      '  font:700 13px/1.15 Inter,system-ui,sans-serif!important;color:#eef4ff!important;',
-      '  white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;',
-      '}',
-
-      /* Formulario de búsqueda: ocupa el espacio central */
-      '#bc-venta-topbar #form-venta-linea{',
-      '  grid-area:search!important;display:flex!important;align-items:center!important;',
-      '  flex-wrap:nowrap!important;gap:6px!important;min-width:0!important;width:100%!important;',
-      '  height:40px!important;margin:0!important;padding:0!important;',
-      '  background:transparent!important;border:0!important;',
-      '}',
-      '#bc-venta-topbar #form-venta-linea .venta-buscar-wrap{',
-      '  position:relative!important;flex:1 1 auto!important;min-width:0!important;',
-      '  display:block!important;width:auto!important;',
-      '}',
-      '#bc-venta-topbar #venta-producto-buscar{',
-      '  display:block!important;width:100%!important;min-width:0!important;',
-      '  height:40px!important;max-width:none!important;box-sizing:border-box!important;',
-      '  padding:8px 14px!important;border-radius:10px!important;',
-      '  font:500 13px/1.2 Inter,system-ui,sans-serif!important;color:#f4f7fc!important;',
-      '  background:#0e1d30!important;border:1px solid rgba(91,132,182,.35)!important;outline:none!important;',
-      '}',
-      '#bc-venta-topbar #venta-producto-buscar:focus{',
-      '  border-color:rgba(37,128,255,.8)!important;box-shadow:0 0 0 2px rgba(37,128,255,.15)!important;',
-      '}',
-      '#bc-venta-topbar #venta-producto-buscar::placeholder{color:#5e728a!important}',
-      '#bc-venta-topbar #venta-producto-resultados{',
-      '  position:absolute!important;left:0!important;right:0!important;top:44px!important;',
-      '  z-index:400!important;max-height:280px!important;overflow-y:auto!important;',
-      '  border:1px solid rgba(91,132,182,.3)!important;border-radius:10px!important;',
-      '  background:#0d1b2c!important;box-shadow:0 16px 36px rgba(0,0,0,.45)!important;',
-      '}',
-      '#bc-venta-topbar #venta-cantidad{',
-      '  flex:0 0 56px!important;width:56px!important;min-width:56px!important;',
-      '  height:40px!important;box-sizing:border-box!important;text-align:center!important;',
-      '  padding:6px 4px!important;border-radius:10px!important;',
-      '  font:600 13px/1 Inter,system-ui,sans-serif!important;color:#f4f7fc!important;',
-      '  background:#0e1d30!important;border:1px solid rgba(91,132,182,.35)!important;',
-      '}',
-      '#bc-venta-topbar #venta-presentacion{',
-      '  flex:0 0 96px!important;width:96px!important;min-width:96px!important;',
-      '  height:40px!important;box-sizing:border-box!important;',
-      '  color:#f4f7fc!important;background:#0e1d30!important;',
-      '  border:1px solid rgba(91,132,182,.35)!important;border-radius:10px!important;',
-      '  font-size:12px!important;',
-      '}',
-      '#bc-venta-topbar #form-venta-linea button[type=submit]{',
-      '  flex:0 0 auto!important;min-width:110px!important;width:auto!important;',
-      '  height:40px!important;min-height:40px!important;margin:0!important;',
-      '  padding:0 14px!important;border-radius:10px!important;',
-      '  font:700 12px/1 Inter,system-ui,sans-serif!important;white-space:nowrap!important;',
-      '  background:linear-gradient(180deg,#1a7af8,#0c62e4)!important;color:#fff!important;',
-      '  border:1px solid rgba(50,140,255,.5)!important;overflow:visible!important;',
-      '  text-overflow:clip!important;',
-      '}',
-
-      /* Policy + Cerrar sesión: anchos fijos suficientes, texto completo */
-      '#bc-venta-topbar #bc-m275-policy{',
-      '  grid-area:qty!important;min-width:100px!important;width:auto!important;max-width:140px!important;',
-      '  height:40px!important;min-height:40px!important;margin:0!important;',
-      '  padding:4px 10px!important;display:flex!important;align-items:center!important;',
-      '  justify-content:center!important;box-sizing:border-box!important;',
-      '  border-radius:10px!important;white-space:nowrap!important;overflow:hidden!important;',
-      '  text-overflow:ellipsis!important;font-size:11px!important;',
-      '  background:#0e1d30!important;border:1px solid rgba(91,132,182,.25)!important;color:#c8d4e4!important;',
-      '}',
-      '#bc-venta-topbar #bc-m273-cerrar-sesion-btn{',
-      '  grid-area:close!important;min-width:128px!important;width:auto!important;',
-      '  height:40px!important;min-height:40px!important;margin:0!important;',
-      '  padding:0 14px!important;display:inline-flex!important;align-items:center!important;',
-      '  justify-content:center!important;box-sizing:border-box!important;',
-      '  border-radius:10px!important;white-space:nowrap!important;overflow:visible!important;',
-      '  text-overflow:clip!important;font:600 12px/1 Inter,system-ui,sans-serif!important;',
-      '  background:#3a1520!important;color:#ffb4bc!important;',
-      '  border:1px solid rgba(220,80,90,.4)!important;',
-      '}',
-
-      /* Categorías: segunda franja compacta bajo el topbar */
-      '#bc-venta-topbar #catalogo-categorias{display:none!important}',
-      '#bc-m66-head{',
-      '  display:flex!important;align-items:center!important;justify-content:space-between!important;',
-      '  gap:8px!important;padding:0 2px 6px!important;min-height:32px!important;flex:0 0 auto!important;',
-      '}',
-      '#bc-m66-head #bc-m64-add-title{',
-      '  font:700 15px/1 Inter,system-ui,sans-serif!important;color:#e8eef8!important;',
-      '  margin:0!important;padding:0!important;white-space:nowrap!important;',
-      '}',
-      '#bc-m66-head #venta-stock-disponible{',
-      '  font:500 10px/1 Inter,system-ui,sans-serif!important;color:#6b7f96!important;',
-      '  margin:0!important;white-space:nowrap!important;',
-      '}',
-      '#bc-m66-head #catalogo-categorias{',
-      '  display:flex!important;align-items:center!important;gap:5px!important;',
-      '  min-width:0!important;flex:1 1 auto!important;justify-content:flex-end!important;',
-      '  overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none!important;',
-      '}',
-      '#bc-m66-head #catalogo-categorias::-webkit-scrollbar{display:none!important}',
-      '#bc-m66-head .catalogo-chip{',
-      '  flex:0 0 auto!important;min-height:28px!important;height:28px!important;',
-      '  padding:0 11px!important;border-radius:8px!important;',
-      '  font:600 11px/28px Inter,system-ui,sans-serif!important;',
-      '  background:#0e1d30!important;color:#9aadc2!important;',
-      '  border:1px solid rgba(90,130,180,.2)!important;white-space:nowrap!important;',
-      '}',
-      '#bc-m66-head .catalogo-chip.activo,',
-      '#bc-m66-head .catalogo-chip.active,',
-      '#bc-m66-head .catalogo-chip[aria-pressed="true"]{',
-      '  background:rgba(25,120,248,.18)!important;color:#7eb6ff!important;',
-      '  border-color:rgba(40,130,255,.45)!important;',
-      '}',
-
-      /* ===== LAYOUT 2 COLUMNAS ===== */
-      '#tab-ventas.bc-pos #bc-venta-pos-layout{',
-      '  flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;',
-      '  display:grid!important;grid-template-columns:minmax(0,1fr) 340px!important;',
-      '  gap:10px!important;align-items:stretch!important;',
-      '}',
-      '#tab-ventas.bc-pos #bc-venta-pos-layout .bc-venta-catalog-col{',
-      '  min-width:0!important;min-height:0!important;height:100%!important;overflow:hidden!important;',
-      '  display:flex!important;flex-direction:column!important;',
-      '  padding:10px!important;border-radius:14px!important;',
-      '  background:linear-gradient(180deg,#0c1828,#08111e)!important;',
-      '  border:1px solid rgba(90,130,180,.16)!important;',
-      '  box-sizing:border-box!important;',
-      '}',
-
-      /* ===== SCROLL SOLO EN PRODUCTOS ===== */
-      '#bc-venta-productos-scroll{',
-      '  flex:1 1 auto!important;min-height:0!important;',
-      '  overflow-y:auto!important;overflow-x:hidden!important;',
-      '  padding:2px 2px 8px!important;',
-      '  scrollbar-width:thin!important;scrollbar-color:rgba(90,130,180,.45) transparent!important;',
-      '}',
-      '#bc-venta-productos-scroll #catalogo-grid{',
-      '  display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;',
-      '  gap:8px!important;align-content:start!important;margin:0!important;padding:0!important;',
-      '  width:100%!important;box-sizing:border-box!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card{',
-      '  display:grid!important;grid-template-columns:56px minmax(0,1fr) 30px!important;',
-      '  grid-template-rows:auto auto auto!important;column-gap:8px!important;row-gap:2px!important;',
-      '  align-items:center!important;min-width:0!important;min-height:108px!important;',
-      '  height:auto!important;padding:8px!important;box-sizing:border-box!important;',
-      '  border:1px solid rgba(90,130,180,.14)!important;border-radius:11px!important;',
-      '  background:linear-gradient(180deg,#101f33,#0b1829)!important;',
-      '  overflow:hidden!important;color:#edf3fb!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card:hover{',
-      '  border-color:rgba(40,130,255,.45)!important;transform:translateY(-1px)!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card-img,',
-      '#bc-venta-productos-scroll .catalogo-card-img-vacia{',
-      '  grid-column:1!important;grid-row:1 / span 3!important;',
-      '  width:56px!important;height:72px!important;max-height:72px!important;',
-      '  object-fit:contain!important;object-position:center!important;',
-      '  border-radius:8px!important;background:rgba(255,255,255,.03)!important;display:block!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card-nombre{',
-      '  grid-column:2!important;grid-row:1!important;margin:0!important;',
-      '  font:700 11px/1.25 Inter,system-ui,sans-serif!important;color:#edf3fb!important;',
-      '  display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;',
-      '  overflow:hidden!important;min-height:0!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card-stock{',
-      '  grid-column:2!important;grid-row:2!important;margin:0!important;',
-      '  font:500 9px/1.15 Inter,system-ui,sans-serif!important;color:#7a90a8!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card-precio{',
-      '  grid-column:2!important;grid-row:3!important;margin:2px 0 0!important;',
-      '  font:800 14px/1 Inter,system-ui,sans-serif!important;color:#f2f7ff!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card-categoria{display:none!important}',
-      '#bc-venta-productos-scroll .catalogo-card-cta{',
-      '  grid-column:3!important;grid-row:3!important;align-self:end!important;justify-self:end!important;',
-      '  width:30px!important;height:30px!important;min-height:30px!important;margin:0!important;padding:0!important;',
-      '  display:grid!important;place-items:center!important;',
-      '  border:1px solid rgba(43,126,255,.55)!important;border-radius:8px!important;',
-      '  background:linear-gradient(180deg,#1676f7,#0b61e4)!important;color:#fff!important;font-size:0!important;',
-      '}',
-      '#bc-venta-productos-scroll .catalogo-card-cta::before{',
-      '  content:"+"!important;font:700 20px/1 Inter,system-ui,sans-serif!important;',
-      '}',
-
-      /* ===== CARRITO FIJO ===== */
-      '#tab-ventas.bc-pos #bc-venta-cart-panel{',
-      '  min-width:0!important;min-height:0!important;height:100%!important;max-height:none!important;',
-      '  overflow:hidden!important;position:static!important;',
-      '  display:flex!important;flex-direction:column!important;',
-      '  padding:12px!important;border-radius:14px!important;',
-      '  background:linear-gradient(180deg,#111e30,#091321)!important;',
-      '  border:1px solid rgba(90,130,180,.18)!important;',
-      '  box-sizing:border-box!important;',
-      '}',
-      '#bc-venta-cart-panel .bc-cart-title{',
-      '  flex:0 0 auto!important;margin:0 0 8px!important;padding:0 0 8px!important;',
-      '  border-bottom:1px solid rgba(90,130,180,.12)!important;',
-      '  font:800 17px/1.1 Inter,system-ui,sans-serif!important;color:#f2f6fc!important;',
-      '}',
-      '#bc-venta-cart-panel #venta-lineas{',
-      '  flex:1 1 auto!important;min-height:0!important;max-height:none!important;',
-      '  overflow-y:auto!important;overflow-x:hidden!important;',
-      '  margin:0!important;padding:2px 0 6px!important;',
-      '  display:flex!important;flex-direction:column!important;gap:5px!important;',
-      '  scrollbar-width:thin!important;scrollbar-color:rgba(90,130,180,.4) transparent!important;',
-      '}',
-      '#bc-venta-cart-panel #venta-lineas .lista-item{',
-      '  display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;',
-      '  grid-template-rows:auto auto!important;gap:4px 6px!important;',
-      '  min-height:48px!important;padding:8px!important;box-sizing:border-box!important;',
-      '  border-radius:9px!important;border:1px solid rgba(90,130,180,.1)!important;',
-      '  background:rgba(11,24,40,.88)!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-info{',
-      '  min-width:0!important;display:flex!important;flex-direction:column!important;gap:1px!important;',
-      '  overflow:hidden!important;color:#f1f5fb!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-info > span:first-child{',
-      '  font:700 12px/1.2 Inter,system-ui,sans-serif!important;color:#f1f5fb!important;',
-      '  white-space:normal!important;overflow:hidden!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-info .muted{',
-      '  font:500 10px/1.15 Inter,system-ui,sans-serif!important;color:#7e93ab!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-precios{',
-      '  display:flex!important;align-items:center!important;gap:4px!important;',
-      '  grid-column:1 / -1!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-cant-wrap{',
-      '  display:flex!important;align-items:center!important;gap:3px!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-btn{',
-      '  width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;',
-      '  padding:0!important;border-radius:7px!important;',
-      '  background:#17304f!important;color:#fff!important;',
-      '  border:1px solid rgba(75,126,184,.4)!important;',
-      '  display:grid!important;place-items:center!important;',
-      '  font:700 16px/1 Inter,system-ui,sans-serif!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-cant-input{',
-      '  width:40px!important;min-width:40px!important;height:28px!important;',
-      '  box-sizing:border-box!important;text-align:center!important;',
-      '  color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;',
-      '  background:#0d1b2c!important;border:1px solid rgba(90,130,180,.35)!important;',
-      '  border-radius:7px!important;font:800 13px/1 Inter,system-ui,sans-serif!important;',
-      '  opacity:1!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-precios > .muted{',
-      '  min-width:56px!important;text-align:right!important;',
-      '  color:#c8d6e8!important;font:600 11px/1 Inter,system-ui,sans-serif!important;',
-      '  white-space:nowrap!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-borrar{',
-      '  width:28px!important;min-width:28px!important;height:28px!important;',
-      '  padding:0!important;border-radius:7px!important;font-size:0!important;',
-      '  background:#4a1820!important;color:#ffb7bd!important;',
-      '  border:1px solid rgba(255,90,105,.35)!important;',
-      '}',
-      '#bc-venta-cart-panel .venta-linea-borrar::before{',
-      '  content:"×"!important;font:700 18px/1 Inter,system-ui,sans-serif!important;',
-      '}',
-
-      /* Checkout siempre visible */
-      '#bc-venta-cart-panel .bc-cart-footer{',
-      '  flex:0 0 auto!important;display:flex!important;flex-direction:column!important;',
-      '  gap:8px!important;padding-top:8px!important;',
-      '  border-top:1px solid rgba(90,130,180,.12)!important;',
-      '}',
-      '#bc-venta-cart-panel #venta-total-wrap{',
-      '  margin:0!important;padding:10px 12px!important;min-height:52px!important;',
-      '  box-sizing:border-box!important;overflow:visible!important;',
-      '  border:1px solid rgba(90,130,180,.12)!important;border-radius:11px!important;',
-      '  background:linear-gradient(180deg,#112136,#0d1b2d)!important;',
-      '}',
-      '#bc-venta-cart-panel #venta-total-wrap .venta-total{',
-      '  margin:0!important;padding:0!important;background:transparent!important;border:0!important;',
-      '}',
-      '#bc-venta-cart-panel #venta-total-wrap .venta-total-valor{',
-      '  font:800 28px/1 Inter,system-ui,sans-serif!important;color:#2b83ff!important;',
-      '  letter-spacing:-.03em!important;',
-      '}',
-      '#bc-venta-cart-panel #btn-confirmar-venta{',
-      '  height:48px!important;min-height:48px!important;width:100%!important;margin:0!important;',
-      '  border-radius:11px!important;',
-      '  background:linear-gradient(180deg,#1a7af8,#0c62e4)!important;color:#fff!important;',
-      '  font:800 14px/1 Inter,system-ui,sans-serif!important;',
-      '  border:1px solid rgba(60,140,255,.55)!important;',
-      '  box-shadow:0 8px 20px rgba(16,101,231,.28)!important;',
-      '}',
-
-      /* Historial fuera del POS */
-      '#tab-ventas.bc-pos h3{',
-      '  /* hide "Historial de ventas" heading if still in DOM */
-      '}',
-      '#tab-ventas.bc-pos .ventas-historial-controles,',
-      '#tab-ventas.bc-pos #lista-ventas{display:none!important}',
-
-      /* ===== BREAKPOINTS ===== */
-      '@media(max-width:1280px){',
-      '  #bc-venta-productos-scroll #catalogo-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}',
-      '  #tab-ventas.bc-pos #bc-venta-pos-layout{grid-template-columns:minmax(0,1fr) 320px!important}',
-      '}',
-      '@media(max-width:1100px){',
-      '  #bc-venta-topbar{',
-      '    grid-template-columns:minmax(120px,160px) minmax(0,1fr) auto!important;',
-      '    grid-template-areas:"ctx search close"!important;',
-      '  }',
-      '  #bc-venta-topbar #bc-m275-policy{display:none!important}',
-      '  #bc-venta-topbar #venta-presentacion{display:none!important}',
-      '  #bc-venta-productos-scroll #catalogo-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}',
-      '}',
-      '@media(max-width:900px){',
-      '  #tab-ventas.bc-pos #bc-venta-pos-layout{',
-      '    grid-template-columns:1fr!important;grid-template-rows:minmax(0,1fr) auto!important;',
-      '  }',
-      '  #tab-ventas.bc-pos #bc-venta-cart-panel{height:auto!important;max-height:36dvh!important}',
-      '  #bc-venta-productos-scroll #catalogo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}',
-      '  #bc-venta-topbar{',
-      '    grid-template-columns:minmax(0,1fr) auto!important;',
-      '    grid-template-areas:"ctx close" "search search"!important;',
-      '    min-height:88px!important;',
-      '  }',
-      '}',
-      '@media(max-width:560px){',
-      '  #bc-venta-topbar{',
-      '    grid-template-columns:1fr!important;',
-      '    grid-template-areas:"ctx" "search" "close"!important;',
-      '  }',
-      '  #bc-venta-productos-scroll #catalogo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}',
-      '}'
-    ].join('');
-    document.head.appendChild(s);
+@media (min-width: 1400px) {
+  #view-ventas .pos-grid,
+  #view-ventas .ventas-grid,
+  #view-ventas .layout-ventas {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px) !important;
   }
+}
 
-  function hideHistory(tab) {
-    if (!tab) return;
-    tab.querySelectorAll('h3').forEach(function (h) {
-      var t = (h.textContent || '').trim().toLowerCase();
-      if (t === 'historial de ventas' || t.indexOf('historial') === 0) {
-        h.style.display = 'none';
-        h.hidden = true;
-        var n = h.nextElementSibling;
-        if (n && (n.classList.contains('ventas-historial-controles') || n.id === 'lista-ventas')) {
-          n.style.display = 'none';
-          n.hidden = true;
-        }
+@media (max-width: 1100px) {
+  #view-ventas .pos-grid,
+  #view-ventas .ventas-grid,
+  #view-ventas .layout-ventas {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ---- HEADER POS (contexto + búsqueda + acciones) ---- */
+#view-ventas .ventas-header,
+#view-ventas .pos-header,
+#view-ventas .header-ventas,
+#view-ventas .toolbar-ventas,
+#view-ventas .ventas-top,
+#view-ventas .panel-header {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 240px) minmax(200px, 1fr) auto auto auto !important;
+  gap: 8px !important;
+  align-items: center !important;
+  padding: 10px 12px !important;
+  background: var(--m68-header-bg) !important;
+  border: var(--m68-border) !important;
+  border-radius: var(--m68-radius) !important;
+  margin-bottom: 10px !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+/* Contexto "VENDIENDO DESDE" */
+#view-ventas .ventas-header .ctx,
+#view-ventas .pos-header .ctx,
+#view-ventas .vendiendo-desde,
+#view-ventas [class*="vendiendo"],
+#view-ventas .session-ctx {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  padding: 4px 8px !important;
+  background: rgba(15,23,42,0.6) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(34,197,94,0.25) !important;
+}
+#view-ventas .ventas-header .ctx strong,
+#view-ventas .vendiendo-desde strong,
+#view-ventas .session-ctx strong {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #f8fafc !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+#view-ventas .ventas-header .ctx small,
+#view-ventas .vendiendo-desde small {
+  font-size: 10px !important;
+  color: var(--m68-muted) !important;
+  line-height: 1.2 !important;
+}
+
+/* ---- BUSCADOR (ahora usable) ---- */
+#view-ventas .pos-search,
+#view-ventas .search-productos,
+#view-ventas input[type="search"],
+#view-ventas input[placeholder*="Buscar"],
+#view-ventas input[placeholder*="buscar"],
+#view-ventas .ventas-header input[type="text"],
+#view-ventas .toolbar input {
+  grid-column: 2 !important;
+  width: 100% !important;
+  min-width: 180px !important;
+  max-width: none !important;
+  height: 38px !important;
+  padding: 0 12px 0 36px !important;
+  font-size: 14px !important;
+  color: #f1f5f9 !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(148,163,184,0.35) !important;
+  border-radius: 10px !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+}
+#view-ventas .pos-search:focus,
+#view-ventas input[type="search"]:focus,
+#view-ventas .toolbar input:focus {
+  border-color: var(--m68-accent) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.25) !important;
+}
+
+/* Cantidad input */
+#view-ventas .qty-input,
+#view-ventas input[name*="cant"],
+#view-ventas input[placeholder*="Cant"],
+#view-ventas .cant-input {
+  width: 64px !important;
+  min-width: 64px !important;
+  height: 38px !important;
+  text-align: center !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #f8fafc !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(148,163,184,0.35) !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
+}
+
+/* ---- BOTONES del header: texto SIEMPRE dentro ---- */
+#view-ventas .ventas-header button,
+#view-ventas .pos-header button,
+#view-ventas .toolbar-ventas button,
+#view-ventas .ventas-top button,
+#view-ventas .panel-header button,
+#view-ventas button.btn-add,
+#view-ventas button.btn-agregar,
+#view-ventas button[class*="agregar"],
+#view-ventas button[class*="cerrar"],
+#view-ventas button[class*="precios"],
+#view-ventas .btn-cerrar-sesion {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  border-radius: 10px !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+/* Botón principal "Agregar a la venta" */
+#view-ventas button.btn-add,
+#view-ventas button.btn-agregar,
+#view-ventas button[class*="agregar"],
+#view-ventas .btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: #fff !important;
+  min-width: 140px !important;
+  max-width: 180px !important;
+}
+
+/* Botón secundario (precios alternativos) */
+#view-ventas button[class*="precios"],
+#view-ventas .btn-alt-prices {
+  background: rgba(51,65,85,0.8) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(148,163,184,0.3) !important;
+  min-width: 120px !important;
+  max-width: 160px !important;
+  font-size: 12px !important;
+}
+
+/* Cerrar sesión */
+#view-ventas button[class*="cerrar"],
+#view-ventas .btn-cerrar-sesion,
+#view-ventas button.btn-danger {
+  background: #dc2626 !important;
+  color: #fff !important;
+  min-width: 110px !important;
+  max-width: 140px !important;
+}
+
+/* Categorías (chips) */
+#view-ventas .categorias,
+#view-ventas .cats,
+#view-ventas .filter-cats,
+#view-ventas .category-pills {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  padding: 0 0 8px 0 !important;
+  margin: 0 !important;
+}
+#view-ventas .categorias button,
+#view-ventas .cats button,
+#view-ventas .category-pills button,
+#view-ventas button.cat-pill {
+  height: 30px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 160px !important;
+  border-radius: 999px !important;
+  background: rgba(30,41,59,0.9) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid rgba(148,163,184,0.2) !important;
+}
+#view-ventas .categorias button.active,
+#view-ventas .cats button.active,
+#view-ventas button.cat-pill.active {
+  background: rgba(59,130,246,0.25) !important;
+  color: #93c5fd !important;
+  border-color: rgba(59,130,246,0.5) !important;
+}
+
+/* ---- PRODUCTOS (solo scroll aquí) ---- */
+#view-ventas .productos,
+#view-ventas .products-grid,
+#view-ventas .product-list,
+#view-ventas .grid-productos {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  gap: 10px !important;
+  max-height: calc(100vh - 280px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 4px 2px 12px 2px !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148,163,184,0.35) transparent !important;
+}
+#view-ventas .product-card,
+#view-ventas .producto-card,
+#view-ventas .card-producto {
+  background: #1e293b !important;
+  border: 1px solid rgba(148,163,184,0.15) !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  min-height: 120px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+  transition: transform 0.12s ease, border-color 0.12s ease !important;
+}
+#view-ventas .product-card:hover,
+#view-ventas .producto-card:hover {
+  border-color: rgba(59,130,246,0.45) !important;
+  transform: translateY(-1px) !important;
+}
+#view-ventas .product-card .price,
+#view-ventas .producto-card .precio {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #f8fafc !important;
+}
+
+/* ---- CARRITO (fijo, legible, aprovecha espacio) ---- */
+#view-ventas .cart,
+#view-ventas .carrito,
+#view-ventas .venta-actual,
+#view-ventas .panel-carrito,
+#view-ventas .cart-panel {
+  position: sticky !important;
+  top: 8px !important;
+  background: #0f172a !important;
+  border: var(--m68-border) !important;
+  border-radius: var(--m68-radius) !important;
+  padding: 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  max-height: calc(100vh - 160px) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#view-ventas .cart h3,
+#view-ventas .carrito h3,
+#view-ventas .venta-actual h3,
+#view-ventas .panel-carrito h3 {
+  margin: 0 0 4px 0 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Lista de ítems del carrito */
+#view-ventas .cart-items,
+#view-ventas .carrito-items,
+#view-ventas .venta-actual .items,
+#view-ventas .cart-list {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding-right: 2px !important;
+  scrollbar-width: thin !important;
+}
+
+/* Ítem del carrito */
+#view-ventas .cart-item,
+#view-ventas .carrito-item,
+#view-ventas .item-venta {
+  display: grid !important;
+  grid-template-columns: 1fr auto auto auto !important;
+  gap: 6px !important;
+  align-items: center !important;
+  padding: 8px 10px !important;
+  background: rgba(30,41,59,0.7) !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(148,163,184,0.12) !important;
+  min-height: 44px !important;
+}
+
+#view-ventas .cart-item .name,
+#view-ventas .carrito-item .nombre {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #f1f5f9 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
+}
+#view-ventas .cart-item .unit,
+#view-ventas .carrito-item .precio-u {
+  font-size: 11px !important;
+  color: var(--m68-muted) !important;
+}
+
+/* Controles de cantidad (−  qty  +) — CANTIDAD SIEMPRE VISIBLE */
+#view-ventas .qty-controls,
+#view-ventas .cantidad-ctrl,
+#view-ventas .cart-item .qty,
+#view-ventas .carrito-item .qty {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  background: #1e293b !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(148,163,184,0.25) !important;
+  overflow: hidden !important;
+}
+#view-ventas .qty-controls button,
+#view-ventas .cantidad-ctrl button,
+#view-ventas .cart-item .qty button,
+#view-ventas .carrito-item button {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #e2e8f0 !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+}
+#view-ventas .qty-controls button:hover,
+#view-ventas .cantidad-ctrl button:hover {
+  background: rgba(59,130,246,0.2) !important;
+}
+
+/* El número de cantidad — FORZAR VISIBILIDAD */
+#view-ventas .qty-controls .qty-value,
+#view-ventas .qty-controls span,
+#view-ventas .cantidad-ctrl span,
+#view-ventas .cart-item .qty span,
+#view-ventas .carrito-item .qty span,
+#view-ventas .cart-item input[type="number"],
+#view-ventas .carrito-item input[type="number"],
+#view-ventas .item-venta .cantidad {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 28px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #f8fafc !important;
+  background: #0f172a !important;
+  border-left: 1px solid rgba(148,163,184,0.2) !important;
+  border-right: 1px solid rgba(148,163,184,0.2) !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+/* Precio línea + eliminar */
+#view-ventas .cart-item .line-total,
+#view-ventas .carrito-item .subtotal {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #e2e8f0 !important;
+  white-space: nowrap !important;
+  min-width: 70px !important;
+  text-align: right !important;
+}
+#view-ventas .cart-item .btn-remove,
+#view-ventas .carrito-item .btn-x {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px !important;
+  background: rgba(239,68,68,0.15) !important;
+  color: #fca5a5 !important;
+  border: none !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+}
+
+/* Total permanente */
+#view-ventas .cart-total,
+#view-ventas .total-venta,
+#view-ventas .venta-total {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 12px 14px !important;
+  background: linear-gradient(135deg, #1e293b, #0f172a) !important;
+  border: 1px solid rgba(59,130,246,0.35) !important;
+  border-radius: 10px !important;
+  margin-top: 4px !important;
+}
+#view-ventas .cart-total .label,
+#view-ventas .total-venta .label {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #94a3b8 !important;
+}
+#view-ventas .cart-total .amount,
+#view-ventas .total-venta .amount,
+#view-ventas .total-venta strong {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  color: #60a5fa !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Botón Confirmar venta */
+#view-ventas .btn-confirmar,
+#view-ventas button[class*="confirmar"],
+#view-ventas .cart button.primary,
+#view-ventas .venta-actual button.btn-primary {
+  width: 100% !important;
+  height: 44px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  margin-top: 4px !important;
+}
+#view-ventas .btn-confirmar:hover {
+  filter: brightness(1.08) !important;
+}
+
+/* Mensajes de error debajo del carrito */
+#view-ventas .cart-msg,
+#view-ventas .venta-error,
+#view-ventas .alert-error {
+  font-size: 12px !important;
+  color: #fca5a5 !important;
+  line-height: 1.35 !important;
+  margin-top: 4px !important;
+}
+
+/* ---- ELIMINAR FRANJA VERDE / residuales ---- */
+#view-ventas .green-stripe,
+#view-ventas .franja-verde,
+#view-ventas .bottom-stripe,
+#view-ventas .ventas-footer-stripe,
+#view-ventas .panel-footer::before,
+#view-ventas .panel-footer::after,
+#view-ventas .cart::after,
+#view-ventas .carrito::after,
+#view-ventas .venta-actual::after {
+  display: none !important;
+  content: none !important;
+  height: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Ocultar historial si existe en esta vista */
+#view-ventas .historial-ventas,
+#view-ventas .history-panel,
+#view-ventas [data-section="historial"] {
+  display: none !important;
+}
+
+/* Stock label */
+#view-ventas .stock-info,
+#view-ventas .stock-label {
+  font-size: 12px !important;
+  color: var(--m68-muted) !important;
+  white-space: nowrap !important;
+}
+
+/* Forzar que ningún botón del header se desborde */
+#view-ventas .ventas-header > *,
+#view-ventas .pos-header > *,
+#view-ventas .toolbar-ventas > * {
+  min-width: 0 !important;
+}
+#view-ventas .ventas-header button span,
+#view-ventas .pos-header button span,
+#view-ventas .toolbar-ventas button span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  display: inline-block !important;
+}
+
+/* Responsive: en pantallas medianas el carrito baja */
+@media (max-width: 1100px) {
+  #view-ventas .cart,
+  #view-ventas .carrito,
+  #view-ventas .venta-actual {
+    position: relative !important;
+    top: 0 !important;
+    max-height: none !important;
+  }
+}
+`;
+
+  function inject() {
+    let style = document.getElementById('m68-ventas-pos-css');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'm68-ventas-pos-css';
+      document.head.appendChild(style);
+    }
+    style.textContent = CSS;
+
+    // Asegurar que el version footer muestre la nueva
+    document.querySelectorAll('.footnote, .app-footer-version, [class*="version"]').forEach(el => {
+      if (el.textContent && el.textContent.includes('BattleCruiser')) {
+        el.textContent = `v${VER} — BattleCruiser`;
       }
     });
-    var list = document.getElementById('lista-ventas');
-    if (list) { list.style.display = 'none'; list.hidden = true; }
-    var cont = tab.querySelector('.ventas-historial-controles');
-    if (cont) { cont.style.display = 'none'; cont.hidden = true; }
   }
 
-  function ensureCerrarLabel() {
-    var btn = document.getElementById('bc-m273-cerrar-sesion-btn');
-    if (!btn) return;
-    var t = (btn.textContent || '').trim();
-    if (t.indexOf('Cerrar') === 0 && t.length < 14) {
-      btn.textContent = 'Cerrar sesión';
-    }
+  // Forzar visibilidad de cantidades en el carrito (sin MutationObserver)
+  function forceQtyVisible() {
+    const root = document.getElementById('view-ventas') || document.querySelector('[data-view="ventas"]') || document.body;
+    if (!root) return;
+    // Cualquier span/input dentro de controles de cantidad
+    root.querySelectorAll('.cart-item span, .carrito-item span, .item-venta span, .qty span, .cantidad span, .qty-value, [class*="qty"] span, [class*="cantidad"] span').forEach(el => {
+      const t = (el.textContent || '').trim();
+      if (/^\d+$/.test(t) || el.classList.contains('qty-value')) {
+        el.style.setProperty('color', '#f8fafc', 'important');
+        el.style.setProperty('-webkit-text-fill-color', '#f8fafc', 'important');
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+        el.style.setProperty('background', '#0f172a', 'important');
+        el.style.setProperty('font-weight', '700', 'important');
+        el.style.setProperty('font-size', '14px', 'important');
+        el.style.setProperty('min-width', '32px', 'important');
+        el.style.setProperty('display', 'inline-flex', 'important');
+        el.style.setProperty('align-items', 'center', 'important');
+        el.style.setProperty('justify-content', 'center', 'important');
+      }
+    });
+    // Inputs de cantidad
+    root.querySelectorAll('.cart-item input[type="number"], .carrito-item input[type="number"], .item-venta input').forEach(inp => {
+      inp.style.setProperty('color', '#f8fafc', 'important');
+      inp.style.setProperty('-webkit-text-fill-color', '#f8fafc', 'important');
+      inp.style.setProperty('opacity', '1', 'important');
+      inp.style.setProperty('background', '#0f172a', 'important');
+      inp.style.setProperty('font-weight', '700', 'important');
+      inp.style.setProperty('text-align', 'center', 'important');
+    });
   }
 
-  function boot() {
-    var tab = document.getElementById('tab-ventas');
-    if (!tab) return false;
-    css();
-    hideHistory(tab);
-    ensureCerrarLabel();
-    booted = true;
-    return true;
-  }
-
-  // Arranque limitado — sin MutationObserver sobre body
-  var tries = 0;
-  function start() {
-    if (boot() || tries >= 24) return;
-    tries++;
-    setTimeout(start, 200);
-  }
-
-  // Re-aplicar solo al cambiar a la pestaña Ventas (evento ligero)
-  document.addEventListener('click', function (e) {
-    var t = e.target && e.target.closest ? e.target.closest('.tab-btn[data-tab="ventas"], [data-tab="ventas"]') : null;
-    if (t) setTimeout(function () { boot(); }, 80);
-  }, true);
-
+  // Boot inmediato + por si el DOM aún no está listo
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(start, 400); });
+    document.addEventListener('DOMContentLoaded', () => { inject(); forceQtyVisible(); });
   } else {
-    setTimeout(start, 400);
+    inject();
+    forceQtyVisible();
   }
+  // Re-aplicar en momentos clave (sin observer continuo)
+  setTimeout(() => { inject(); forceQtyVisible(); }, 300);
+  setTimeout(() => { inject(); forceQtyVisible(); }, 1200);
+  setTimeout(() => { inject(); forceQtyVisible(); }, 3000);
 
-  window.__BC_M68 = { version: '68.1', boot: boot };
+  // Cuando el usuario agrega productos, re-forzar una vez
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t && (t.closest('#view-ventas') || t.closest('[data-view="ventas"]'))) {
+      setTimeout(forceQtyVisible, 80);
+      setTimeout(forceQtyVisible, 250);
+    }
+  }, { passive: true });
+
+  console.info('[M68] Ventas POS Definitivo cargado', VER);
 })();
