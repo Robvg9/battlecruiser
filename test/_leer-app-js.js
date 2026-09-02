@@ -29,23 +29,19 @@ function leerAppJsConcatenado(baseDir) {
     .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
     .join("\n");
 
-  // Compatibilidad exclusiva del harness: algunos tests B3 heredados esperan
-  // el antiguo acceso funcional al contexto. La aplicación actual mantiene
-  // _usuarioActual como variable interna. No modifica ningún módulo productivo.
+  // Compatibilidad exclusiva del harness. La producción mantiene
+  // _usuarioActual como variable interna; aquí exponemos un callable legacy
+  // que refleja dinámicamente el mismo objeto para los tests B3 antiguos.
   const bridge = `
 ;(function __bcTestCompatibilityBridge(){
   try {
     if (typeof _usuarioActual !== "undefined") {
-      const getUsuario = () => _usuarioActual;
-      Object.defineProperty(window, "_usuarioActual", {
-        configurable: true,
-        get: getUsuario,
-        set: (value) => {
-          if (typeof value === "function") return;
-          _usuarioActual = value;
-        }
+      const accessor = function(){ return _usuarioActual || null; };
+      ["id","nombre","activo","role_id","rol","role","rol_nombre"].forEach((key) => {
+        try { Object.defineProperty(accessor, key, { configurable:true, get:() => _usuarioActual && _usuarioActual[key] }); } catch (_) {}
       });
-      window.__bcTestUsuarioActualAccessor = function(){ return _usuarioActual; };
+      window._usuarioActual = accessor;
+      window.__bcTestUsuarioActualAccessor = accessor;
     }
     if (typeof _usuarioActualId !== "undefined") {
       Object.defineProperty(window, "_usuarioActualId", {
@@ -57,7 +53,6 @@ function leerAppJsConcatenado(baseDir) {
     if (typeof _permisosEfectivos !== "undefined") {
       window._permisosEfectivosRef = function(){ return _permisosEfectivos; };
     }
-    window._usuarioActual = function(){ return typeof _usuarioActual !== "undefined" ? _usuarioActual : null; };
     if (typeof usuarioPuedeOperar !== "function") {
       window.usuarioPuedeOperar = function(){
         return !!(typeof _usuarioActual !== "undefined" && _usuarioActual && _usuarioActual.activo !== false);
@@ -76,8 +71,6 @@ function leerAppJsConcatenado(baseDir) {
         return res;
       };
     }
-    // Sincroniza el ID de sesión para pruebas de cola que ejecutan justo
-    // después del boot de auth/contexto.
     setTimeout(() => {
       if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId && typeof _usuarioActual !== "undefined" && _usuarioActual?.id) {
         _usuarioActualId = _usuarioActual.id;
