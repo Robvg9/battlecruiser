@@ -4,6 +4,15 @@
   if (window.__BCFinalIntegration20260902) return;
   window.__BCFinalIntegration20260902 = true;
 
+  function ensureRealTestFix() {
+    if (document.querySelector('script[data-bc-real-tests-fix="1"]')) return;
+    const s = document.createElement('script');
+    s.src = 'js/hotfix-pruebas-reales-20260902.js?v=20260902.2';
+    s.async = false;
+    s.dataset.bcRealTestsFix = '1';
+    document.body.appendChild(s);
+  }
+
   function patchSessionOpen() {
     const hub = window.__BC_M33;
     const api = window.BattleCruiserTurnoAPI;
@@ -39,30 +48,11 @@
     const btn = document.getElementById('bc-importar-excel-hotfix');
     if (btn && !btn.dataset.bcOfficialImport) {
       btn.dataset.bcOfficialImport = '1';
-      btn.onclick = function () {
-        const official = document.getElementById('bc-m55-open');
-        if (official) official.click();
-        else window.setTimeout(() => {
-          const retry = document.getElementById('bc-m55-open');
-          if (retry) retry.click();
-        }, 250);
-      };
-    }
-    const xlsx = document.getElementById('bc-exportar-plantilla-xlsx');
-    if (xlsx && !xlsx.dataset.bcOfficialTemplate) {
-      xlsx.dataset.bcOfficialTemplate = '1';
-      xlsx.onclick = function () {
-        const official = document.getElementById('bc-m55-template');
-        if (official) official.click();
-        else document.getElementById('bc-exportar-plantilla-csv')?.click();
-      };
+      btn.onclick = function () { document.getElementById('bc-m55-open')?.click(); };
     }
   }
 
-  function patch() { patchSessionOpen(); patchImportButtons(); }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patch, {once:true});
-  else patch();
-  setTimeout(patch, 300);
-  setTimeout(patch, 900);
-  setTimeout(patch, 1800);
+  function patch() { ensureRealTestFix(); patchSessionOpen(); patchImportButtons(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', patch, {once:true}); else patch();
+  [200,500,1000,2000,4000,7000].forEach(ms => setTimeout(patch, ms));
 })();
