@@ -7,8 +7,7 @@
   window.__BC_M62_TURNOS_FECHA_UI = true;
 
   var ZONA_NEGOCIO = 'America/Puerto_Rico';
-  var observer = null;
-  var timer = null;
+  var intervalo = null;
   var busy = false;
 
   function normalizar(v) {
@@ -36,11 +35,7 @@
 
   function api() { return window.BattleCruiserTurnoAPI || null; }
   function turnoId() {
-    var bg = document.getElementById('m33-bg');
     var card = document.querySelector('.m29-card[data-turno-id]');
-    if (window.__BC_M56 && window.__BC_M56.currentTurnoId) {
-      try { return window.__BC_M56.currentTurnoId(); } catch (e) {}
-    }
     return card ? card.getAttribute('data-turno-id') : null;
   }
   function asArray(v) {
@@ -81,55 +76,68 @@
     }
     return null;
   }
+  function css() {
+    if (document.getElementById('bc-m62-css')) return;
+    var s = document.createElement('style');
+    s.id = 'bc-m62-css';
+    s.textContent = '.m62-eligible{font-size:0!important}.m62-eligible::after{content:"Abrir sesión";font-size:.9rem}';
+    document.head.appendChild(s);
+  }
   function liberar(btn) {
     if (!btn) return;
     btn.disabled = false;
     btn.classList.remove('m56-lock', 'm57-locked');
+    btn.classList.add('m62-eligible');
     btn.removeAttribute('aria-disabled');
     btn.removeAttribute('title');
-    btn.textContent = 'Abrir sesión';
   }
   function bloquear(btn) {
     if (!btn) return;
+    btn.classList.remove('m62-eligible');
     btn.disabled = true;
     btn.classList.add('m57-locked');
     btn.setAttribute('aria-disabled', 'true');
     btn.setAttribute('title', 'Esta sesión está bloqueada por la secuencia o por su fecha programada.');
-    btn.innerHTML = '<span class="m57-lock-icon">🔒</span> Abrir sesión';
   }
-  async function aplicar() {
-    if (busy) return;
+  async function cargarElegible() {
+    if (busy) return null;
     var modal = document.querySelector('#m33-bg .m33-modal');
-    if (!modal || !modal.querySelector('[data-m33-abrir-sesion]')) return;
+    if (!modal || !modal.querySelector('[data-m33-abrir-sesion]')) return null;
     var id = turnoId(), a = api();
-    if (!id || !a || typeof a.listarSesionesTurno !== 'function') return;
+    if (!id || !a || typeof a.listarSesionesTurno !== 'function') return null;
     busy = true;
     try {
       var rows = asArray(await a.listarSesionesTurno(id));
-      var ok = elegible(rows);
-      var buttons = modal.querySelectorAll('[data-m33-abrir-sesion]');
-      Array.prototype.forEach.call(buttons, function (btn) {
-        if (ok && String(btn.getAttribute('data-m33-abrir-sesion')) === ok) liberar(btn);
-        else bloquear(btn);
-      });
+      return elegible(rows);
     } catch (e) {
-      try { console.warn('[M62] No se pudo reconciliar elegibilidad de Turnos', e); } catch (_) {}
+      return null;
     } finally {
       busy = false;
     }
   }
-  function schedule() {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(function () { timer = null; aplicar(); }, 35);
+  async function aplicar() {
+    css();
+    var ok = await cargarElegible();
+    var modal = document.querySelector('#m33-bg .m33-modal');
+    if (!modal) return;
+    Array.prototype.forEach.call(modal.querySelectorAll('[data-m33-abrir-sesion]'), function (btn) {
+      if (ok && String(btn.getAttribute('data-m33-abrir-sesion')) === ok) liberar(btn);
+      else bloquear(btn);
+    });
   }
   function bind() {
-    if (observer) return;
-    observer = new MutationObserver(function () { schedule(); });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    schedule();
-    setTimeout(aplicar, 120);
-    setTimeout(aplicar, 350);
-    setTimeout(aplicar, 900);
+    // Window-capture ocurre antes del document-capture de M57.
+    window.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-m33-abrir-sesion]') : null;
+      if (!btn) return;
+      cargarElegible().then(function (ok) {
+        if (ok && String(btn.getAttribute('data-m33-abrir-sesion')) === ok) {
+          liberar(btn);
+        }
+      });
+    }, true);
+    intervalo = setInterval(function () { aplicar(); }, 150);
+    aplicar();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
