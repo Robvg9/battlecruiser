@@ -16,7 +16,6 @@ const MODULOS_APP = [
   "ventas.js",
   "catalogos.js",
   "configuracion.js",
-  "catalogo-avanzado.js",
   "usuarios-permisos.js",
   "mando.js",
   "reportes.js",
