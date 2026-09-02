@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.71 — M68 Ventas POS Definitivo (estructura + CSS autoritativo)
-(function hotfixV9470(){
-  const VERSION="9.4.71";
+// v9.4.73 — M68 Ventas POS: topbar sin recorte, sin scroll de página, buscador funcional
+(function hotfixV9473(){
+  const VERSION="9.4.73";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -38,11 +38,9 @@
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
     ["p0a-local-reads.js","p0a.1"],
-    // Turnos TZ + selectedTurnoId fixes
     ["m56-turnos-secuencia-ui.js","56.7"],
     ["m57-turnos-sesion-ux-fix.js","57.5"],
-    // M68 last = authoritative POS structure + visual layer
-    ["m68-ventas-pos-definitivo.js","9.4.71"]
+    ["m68-ventas-pos-definitivo.js","9.4.73"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
