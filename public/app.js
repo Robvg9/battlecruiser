@@ -42,10 +42,43 @@
     ["m57-turnos-sesion-ux-fix.js","57.5"],
     ["m68-ventas-pos-definitivo.js","9.4.75"]
   ];
-  modules.forEach(([name,version])=>{
-    if(document.querySelector('script[src*="'+name+'"]'))return;
-    const s=document.createElement("script");s.src="js/"+name+(version?"?v="+version:"");s.async=false;
-    s.onerror=()=>console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);
-    document.body.appendChild(s);
-  });
+
+  // The shell must remain hidden until the whole current patch chain has
+  // executed. Otherwise auth can reveal the static legacy DOM while the
+  // definitive modules are still arriving, producing the "old UI flash".
+  let resolveUIReady;
+  window.__BC_UI_READY__ = new Promise(resolve => { resolveUIReady = resolve; });
+  window.__BC_UI_READY_RESOLVED__ = false;
+
+  function cargarUno(name, version){
+    return new Promise(resolve => {
+      if(document.querySelector('script[src*="'+name+'"]')){
+        resolve();
+        return;
+      }
+      const s=document.createElement("script");
+      s.src="js/"+name+(version?"?v="+version:"");
+      s.async=false;
+      let terminado=false;
+      const terminar=(estado)=>{
+        if(terminado)return;
+        terminado=true;
+        if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);
+        resolve();
+      };
+      s.onload=()=>terminar("ok");
+      s.onerror=()=>terminar("error");
+      // Never leave the app shell blocked forever on one bad asset/network.
+      setTimeout(()=>terminar("timeout"), 10000);
+      document.body.appendChild(s);
+    });
+  }
+
+  (async function arrancarCadenaActual(){
+    for(const [name,version] of modules){
+      await cargarUno(name,version);
+    }
+    window.__BC_UI_READY_RESOLVED__ = true;
+    resolveUIReady();
+  })();
 })();
