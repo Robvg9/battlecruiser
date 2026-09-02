@@ -44,7 +44,8 @@
     ["hotfix-regresiones-20260902.js","20260902.1"],
     ["hotfix-configuracion-20260902.js","20260902.1"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],
-    ["hotfix-turno-forceclose-20260902.js","20260902.1"]
+    ["hotfix-turno-forceclose-20260902.js","20260902.1"],
+    ["hotfix-integracion-final-20260902.js","20260902.1"]
   ];
 
   let resolveUIReady;
