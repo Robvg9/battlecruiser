@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.75 — M68: topbar sin recorte, borde derecho carrito alineado, sin footer, buscador funcional
+// v9.4.76 — M68: boot de autenticación independiente de módulos opcionales
 (function hotfixV9475(){
-  const VERSION="9.4.75";
+  const VERSION="9.4.76";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -70,16 +70,22 @@
       };
       s.onload=()=>terminar("ok");
       s.onerror=()=>terminar("error");
-      setTimeout(()=>terminar("timeout"), 10000);
+      setTimeout(()=>terminar("timeout"), 4000);
       document.body.appendChild(s);
     });
   }
 
-  (async function arrancarCadenaActual(){
-    for(const [name,version] of modules){
-      await cargarUno(name,version);
-    }
-    window.__BC_UI_READY_RESOLVED__ = true;
+  function terminarBootUI(){
+    if(window.__BC_UI_READY_RESOLVED__) return;
+    window.__BC_UI_READY_RESOLVED__=true;
     resolveUIReady();
-  })();
+  }
+
+  // El shell autenticado NO depende de que cada módulo opcional termine de descargar.
+  // Primero habilitamos la UI y luego dejamos que los módulos complementarios se carguen
+  // en paralelo, evitando el bloqueo secuencial que podía dejar al usuario en el login.
+  const actuales = modules.filter(([name]) => !document.querySelector('script[src*="'+name+'"]'));
+  const pendientes = actuales.map(([name,version]) => cargarUno(name,version));
+  setTimeout(terminarBootUI, 1500);
+  Promise.allSettled(pendientes).then(terminarBootUI);
 })();
