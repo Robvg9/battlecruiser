@@ -9,6 +9,7 @@
   var ZONA_NEGOCIO = 'America/Puerto_Rico';
   var intervalo = null;
   var busy = false;
+  var selectedTurnoId = null;
 
   function normalizar(v) {
     return String(v == null ? '' : v).trim().toUpperCase()
@@ -35,6 +36,7 @@
 
   function api() { return window.BattleCruiserTurnoAPI || null; }
   function turnoId() {
+    if (selectedTurnoId) return selectedTurnoId;
     var card = document.querySelector('.m29-card[data-turno-id]');
     return card ? card.getAttribute('data-turno-id') : null;
   }
@@ -99,7 +101,7 @@
     btn.setAttribute('aria-disabled', 'true');
     btn.setAttribute('title', 'Esta sesión está bloqueada por la secuencia o por su fecha programada.');
   }
-  async function cargarElegible() {
+  async function obtenerElegible() {
     if (busy) return null;
     var modal = document.querySelector('#m33-bg .m33-modal');
     if (!modal || !modal.querySelector('[data-m33-abrir-sesion]')) return null;
@@ -107,8 +109,7 @@
     if (!id || !a || typeof a.listarSesionesTurno !== 'function') return null;
     busy = true;
     try {
-      var rows = asArray(await a.listarSesionesTurno(id));
-      return elegible(rows);
+      return elegible(asArray(await a.listarSesionesTurno(id)));
     } catch (e) {
       return null;
     } finally {
@@ -117,7 +118,7 @@
   }
   async function aplicar() {
     css();
-    var ok = await cargarElegible();
+    var ok = await obtenerElegible();
     var modal = document.querySelector('#m33-bg .m33-modal');
     if (!modal) return;
     Array.prototype.forEach.call(modal.querySelectorAll('[data-m33-abrir-sesion]'), function (btn) {
@@ -126,14 +127,14 @@
     });
   }
   function bind() {
-    // Window-capture ocurre antes del document-capture de M57.
     window.addEventListener('click', function (e) {
+      var card = e.target && e.target.closest ? e.target.closest('.m29-card[data-turno-id]') : null;
+      if (card) selectedTurnoId = card.getAttribute('data-turno-id') || null;
+
       var btn = e.target && e.target.closest ? e.target.closest('[data-m33-abrir-sesion]') : null;
       if (!btn) return;
-      cargarElegible().then(function (ok) {
-        if (ok && String(btn.getAttribute('data-m33-abrir-sesion')) === ok) {
-          liberar(btn);
-        }
+      obtenerElegible().then(function (ok) {
+        if (ok && String(btn.getAttribute('data-m33-abrir-sesion')) === ok) liberar(btn);
       });
     }, true);
     intervalo = setInterval(function () { aplicar(); }, 150);
