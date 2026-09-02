@@ -1,14 +1,11 @@
 /**
- * M68 — Ventas POS Definitivo (v9.4.74)
- * 1) Topbar: contenido centrado, sin recorte
- * 2) Borde derecho del carrito = borde derecho del topbar (alineación perfecta)
- * 3) Sin scroll de página; solo productos (y líneas del carrito si hace falta)
- * 4) Footer inferior oculto y sacado del flujo en Ventas
- * 5) Buscador filtra la grilla por nombre
+ * M68 — Ventas POS Definitivo (v9.4.75)
+ * 2) Borde derecho del carrito = borde derecho del topbar (mismo grid)
+ * 4) Footer inferior eliminado de verdad (clase en html/body + display none JS)
  */
 (function m68VentasPosDefinitivo() {
   'use strict';
-  const VER = '9.4.74';
+  const VER = '9.4.75';
   window.__BC_M68_LOADED__ = VER;
 
   const TOP_ID = 'bc-venta-topbar';
@@ -16,29 +13,33 @@
   const LAYOUT_ID = 'bc-venta-pos-layout';
   const CART_ID = 'bc-venta-cart-panel';
   const STYLE_ID = 'm68-ventas-pos-css';
+  const POS_CLASS = 'bc-ventas-activa';
 
   const CSS = `
-/* ========== M68 v9.4.74 ========== */
-html:has(#tab-ventas.bc-pos.visible),
-body:has(#tab-ventas.bc-pos.visible) {
+/* ========== M68 v9.4.75 ========== */
+html.${POS_CLASS},
+body.${POS_CLASS} {
   overflow: hidden !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
 }
 
-/* Shell: solo header + main (sin fila de footer) */
-.app-shell.visible:has(#tab-ventas.bc-pos.visible) {
+html.${POS_CLASS} .app-shell.visible,
+body.${POS_CLASS} .app-shell.visible,
+.app-shell.visible.${POS_CLASS} {
   height: 100dvh !important;
   max-height: 100dvh !important;
   overflow: hidden !important;
   grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-columns: 240px minmax(0, 1fr) !important;
   grid-template-areas: "header header" "sidebar main" !important;
 }
 
-/* 4) Footer: eliminado de verdad (display + sacado del flujo + zero size) */
-.app-shell.visible:has(#tab-ventas.bc-pos.visible) .app-footer,
-body:has(#tab-ventas.bc-pos.visible) .app-footer,
-#app-shell:has(#tab-ventas.bc-pos.visible) .app-footer {
+html.${POS_CLASS} .app-footer,
+body.${POS_CLASS} .app-footer,
+.app-shell.${POS_CLASS} .app-footer,
+html.${POS_CLASS} footer.app-footer,
+body.${POS_CLASS} .app-footer-version {
   display: none !important;
   visibility: hidden !important;
   height: 0 !important;
@@ -48,13 +49,14 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   padding: 0 !important;
   border: 0 !important;
   overflow: hidden !important;
-  position: absolute !important;
-  pointer-events: none !important;
   opacity: 0 !important;
-  z-index: -1 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -9999px !important;
 }
 
-.app-shell.visible:has(#tab-ventas.bc-pos.visible) .main-content {
+html.${POS_CLASS} .main-content,
+body.${POS_CLASS} .main-content {
   overflow: hidden !important;
   min-height: 0 !important;
   height: 100% !important;
@@ -62,12 +64,12 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   padding: 10px 12px !important;
   scrollbar-width: none !important;
 }
-.app-shell.visible:has(#tab-ventas.bc-pos.visible) .main-content::-webkit-scrollbar {
+html.${POS_CLASS} .main-content::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
 }
-.app-shell.visible:has(#tab-ventas.bc-pos.visible) .main-content > .rule-orn {
+html.${POS_CLASS} .main-content > .rule-orn {
   display: none !important;
 }
 
@@ -88,24 +90,42 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   padding: 0 !important;
 }
 
+/* Un solo grid: topbar ocupa las 2 columnas; carrito es la col 2.
+   Así el borde derecho de ambas cards es EXACTAMENTE el mismo. */
 #tab-ventas.bc-pos #venta-operativa-bloque {
-  display: flex !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 360px !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-areas:
+    "topbar topbar"
+    "catalog cart" !important;
   flex: 1 1 auto !important;
-  flex-direction: column !important;
   min-height: 0 !important;
   width: 100% !important;
   max-width: none !important;
   overflow: hidden !important;
-  gap: 10px !important;
+  column-gap: 10px !important;
+  row-gap: 10px !important;
   padding: 0 !important;
   margin: 0 !important;
   height: 100% !important;
   box-sizing: border-box !important;
+  align-items: stretch !important;
+  justify-items: stretch !important;
 }
 
-/* ---- TOPBAR: altura suficiente, items centrados, sin recorte ---- */
+#tab-ventas.bc-pos #${LAYOUT_ID} {
+  display: contents !important;
+}
+
 #tab-ventas.bc-pos #${TOP_ID} {
-  flex: 0 0 auto !important;
+  grid-area: topbar !important;
+  justify-self: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  flex: none !important;
   display: grid !important;
   grid-template-columns: minmax(160px, 220px) minmax(180px, 1fr) auto !important;
   grid-template-areas: "ctx search close" !important;
@@ -115,14 +135,11 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   min-height: 60px !important;
   height: auto !important;
   padding: 10px 12px !important;
-  margin: 0 !important;
   border: 1px solid rgba(180,160,100,0.22) !important;
   border-radius: 12px !important;
   background: rgba(12,22,18,0.97) !important;
   box-sizing: border-box !important;
   overflow: visible !important;
-  width: 100% !important;
-  max-width: 100% !important;
 }
 
 #tab-ventas.bc-pos #${TOP_ID} .bc-m64-context,
@@ -277,42 +294,14 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   display: none !important;
 }
 
-/* ---- LAYOUT: mismo ancho exacto que el topbar (punto 2) ---- */
-#tab-ventas.bc-pos #${LAYOUT_ID} {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px) !important;
-  gap: 10px !important;
-  align-items: stretch !important;
-  height: 100% !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-}
-
-/* Garantiza que topbar y layout tengan el mismo borde derecho */
-#tab-ventas.bc-pos #${TOP_ID},
-#tab-ventas.bc-pos #${LAYOUT_ID} {
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  box-sizing: border-box !important;
-}
-
-@media (min-width: 1400px) {
-  #tab-ventas.bc-pos #${LAYOUT_ID} {
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 400px) !important;
-  }
-}
 @media (max-width: 1000px) {
-  #tab-ventas.bc-pos #${LAYOUT_ID} {
-    grid-template-columns: 1fr !important;
-    grid-template-rows: minmax(0, 1fr) minmax(220px, 34dvh) !important;
+  #tab-ventas.bc-pos #venta-operativa-bloque {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) minmax(220px, 34dvh) !important;
+    grid-template-areas:
+      "topbar"
+      "catalog"
+      "cart" !important;
   }
   #tab-ventas.bc-pos #${TOP_ID} {
     grid-template-columns: minmax(100px, 1fr) auto !important;
@@ -322,9 +311,11 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   }
 }
 
-#tab-ventas.bc-pos #${LAYOUT_ID} .bc-venta-catalog-col {
+#tab-ventas.bc-pos .bc-venta-catalog-col {
+  grid-area: catalog !important;
   min-width: 0 !important;
   min-height: 0 !important;
+  width: 100% !important;
   height: 100% !important;
   overflow: hidden !important;
   display: flex !important;
@@ -334,14 +325,15 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   border-radius: 12px !important;
   padding: 12px !important;
   box-sizing: border-box !important;
+  margin: 0 !important;
 }
 
-#tab-ventas.bc-pos #${LAYOUT_ID} .bc-venta-catalog-col #bc-m275-policy,
-#tab-ventas.bc-pos #${LAYOUT_ID} .bc-venta-catalog-col #venta-stock-disponible {
+#tab-ventas.bc-pos .bc-venta-catalog-col #bc-m275-policy,
+#tab-ventas.bc-pos .bc-venta-catalog-col #venta-stock-disponible {
   display: none !important;
 }
 
-#tab-ventas.bc-pos #${LAYOUT_ID} .bc-venta-catalog-col #catalogo-categorias {
+#tab-ventas.bc-pos .bc-venta-catalog-col #catalogo-categorias {
   display: flex !important;
   flex-wrap: wrap !important;
   gap: 6px !important;
@@ -445,15 +437,16 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
 #tab-ventas.bc-pos #${SCROLL_ID} .catalogo-card-stock { font-size: 10px !important; color: #7a8a78 !important; }
 #tab-ventas.bc-pos #${SCROLL_ID} .catalogo-card-categoria { display: none !important; }
 
-/* Carrito: mismo borde derecho que el topbar (punto 2 reforzado) */
 #tab-ventas.bc-pos #${CART_ID} {
+  grid-area: cart !important;
+  justify-self: stretch !important;
   min-width: 0 !important;
   min-height: 0 !important;
   width: 100% !important;
+  max-width: none !important;
   height: 100% !important;
-  max-height: 100% !important;
+  max-height: none !important;
   margin: 0 !important;
-  margin-right: 0 !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
@@ -462,6 +455,8 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   border-radius: 12px !important;
   background: #0f1a16 !important;
   box-sizing: border-box !important;
+  position: static !important;
+  flex: none !important;
 }
 #tab-ventas.bc-pos #${CART_ID} .bc-cart-title,
 #tab-ventas.bc-pos #${CART_ID} h3 {
@@ -557,6 +552,14 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
 #tab-ventas.bc-pos * {
   overscroll-behavior: contain !important;
 }
+
+@media (max-width: 1023px) {
+  html.${POS_CLASS} .app-shell.visible,
+  body.${POS_CLASS} .app-shell.visible {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "header" "main" !important;
+  }
+}
 `;
 
   function injectCSS() {
@@ -567,6 +570,48 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
       document.head.appendChild(style);
     }
     style.textContent = CSS;
+  }
+
+  function ventasVisible() {
+    var tab = document.getElementById('tab-ventas');
+    return !!(tab && tab.classList.contains('visible') && !tab.classList.contains('hidden'));
+  }
+
+  function hideFooterEl(footer, hide) {
+    if (!footer) return;
+    if (hide) {
+      footer.setAttribute('hidden', '');
+      footer.setAttribute('aria-hidden', 'true');
+      footer.style.setProperty('display', 'none', 'important');
+      footer.style.setProperty('height', '0', 'important');
+      footer.style.setProperty('margin', '0', 'important');
+      footer.style.setProperty('padding', '0', 'important');
+      footer.style.setProperty('border', '0', 'important');
+      footer.style.setProperty('overflow', 'hidden', 'important');
+    } else {
+      footer.removeAttribute('hidden');
+      footer.removeAttribute('aria-hidden');
+      footer.style.removeProperty('display');
+      footer.style.removeProperty('height');
+      footer.style.removeProperty('margin');
+      footer.style.removeProperty('padding');
+      footer.style.removeProperty('border');
+      footer.style.removeProperty('overflow');
+    }
+  }
+
+  function syncPosMode() {
+    var on = ventasVisible();
+    document.documentElement.classList.toggle(POS_CLASS, on);
+    document.body.classList.toggle(POS_CLASS, on);
+    var shell = document.getElementById('app-shell') || document.querySelector('.app-shell');
+    if (shell) shell.classList.toggle(POS_CLASS, on);
+    hideFooterEl(document.querySelector('.app-footer'), on);
+    document.querySelectorAll('footer').forEach(function (f) {
+      if (f.classList.contains('app-footer') || /Salón Privado|BattleCruiser/i.test(f.textContent || '')) {
+        hideFooterEl(f, on);
+      }
+    });
   }
 
   function safeMove(el, parent, before) {
@@ -585,12 +630,21 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
     tab.querySelectorAll('h3').forEach(function (h) {
       var t = (h.textContent || '').trim().toLowerCase();
       if (t.indexOf('historial') !== -1) {
-        h.style.display = 'none';
+        h.style.setProperty('display', 'none', 'important');
         h.hidden = true;
       }
     });
-    var list = document.getElementById('lista-ventas');
-    if (list) { list.style.display = 'none'; list.hidden = true; }
+    ['lista-ventas', 'ventas-buscar', 'ventas-contador', 'venta-detalle'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.style.setProperty('display', 'none', 'important');
+        el.hidden = true;
+      }
+    });
+    tab.querySelectorAll('.ventas-historial-controles').forEach(function (el) {
+      el.style.setProperty('display', 'none', 'important');
+      el.hidden = true;
+    });
   }
 
   function norm(s) {
@@ -637,6 +691,22 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
       return out;
     };
     window.renderCatalogoGrid.__bcM68 = true;
+  }
+
+  function patchHistorialFighter() {
+    if (typeof window.actualizarPanelAlmacenVenta === 'function' && !window.actualizarPanelAlmacenVenta.__bcM68pos) {
+      var orig = window.actualizarPanelAlmacenVenta;
+      window.actualizarPanelAlmacenVenta = function () {
+        var r = orig.apply(this, arguments);
+        try {
+          ensureStructure();
+          syncPosMode();
+          hideHistoryHard(document.getElementById('tab-ventas'));
+        } catch (e) {}
+        return r;
+      };
+      window.actualizarPanelAlmacenVenta.__bcM68pos = true;
+    }
   }
 
   function wireSearchFilter() {
@@ -689,6 +759,7 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
       top.setAttribute('aria-label', 'Controles de venta');
       bloque.insertBefore(top, bloque.firstChild);
     }
+    if (top.parentNode !== bloque) safeMove(top, bloque, bloque.firstChild);
 
     var ctx = document.getElementById('venta-almacen-operativo');
     if (ctx) {
@@ -716,12 +787,12 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
     }
     if (layout.parentNode !== bloque) safeMove(layout, bloque);
 
-    var catCol = layout.querySelector('.bc-venta-catalog-col');
+    var catCol = layout.querySelector('.bc-venta-catalog-col') || bloque.querySelector('.bc-venta-catalog-col');
     if (!catCol) {
       catCol = document.createElement('div');
       catCol.className = 'bc-venta-catalog-col';
-      layout.insertBefore(catCol, layout.firstChild);
     }
+    safeMove(catCol, layout, layout.firstChild);
 
     var cats = document.getElementById('catalogo-categorias');
     if (cats) safeMove(cats, catCol, catCol.firstChild);
@@ -740,20 +811,18 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
     var cart = document.getElementById(CART_ID);
     if (!cart) {
       var lineas = document.getElementById('venta-lineas');
-      if (lineas) {
-        cart = lineas.closest('[id="' + CART_ID + '"]') || null;
-      }
+      if (lineas) cart = lineas.closest('#' + CART_ID) || null;
       if (!cart) {
         cart = document.createElement('div');
         cart.id = CART_ID;
       }
     }
-    if (cart !== layout && cart !== bloque && cart !== tab) {
+    if (cart && cart !== layout && cart !== bloque && cart !== tab) {
       safeMove(cart, layout);
     }
 
-    var title = cart.querySelector('.bc-cart-title');
-    if (!title) {
+    var title = cart && cart.querySelector('.bc-cart-title');
+    if (cart && !title) {
       title = document.createElement('div');
       title.className = 'bc-cart-title';
       title.textContent = 'Carrito';
@@ -761,13 +830,13 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
     }
 
     var lineasEl = document.getElementById('venta-lineas');
-    if (lineasEl) safeMove(lineasEl, cart);
+    if (lineasEl && cart) safeMove(lineasEl, cart);
 
     var totalWrap = document.getElementById('venta-total-wrap');
-    if (totalWrap) safeMove(totalWrap, cart);
+    if (totalWrap && cart) safeMove(totalWrap, cart);
 
     var btnConf = document.getElementById('btn-confirmar-venta');
-    if (btnConf) safeMove(btnConf, cart);
+    if (btnConf && cart) safeMove(btnConf, cart);
 
     hideHistoryHard(tab);
     return true;
@@ -776,8 +845,10 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   function boot() {
     injectCSS();
     var ok = ensureStructure();
+    syncPosMode();
     wireSearchFilter();
     patchRenderCatalog();
+    patchHistorialFighter();
     document.querySelectorAll('.footnote, .app-footer-version').forEach(function (el) {
       if (el.textContent && /BattleCruiser/i.test(el.textContent)) {
         el.textContent = 'v' + VER + ' — BattleCruiser';
@@ -790,7 +861,7 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   function start() {
     boot();
     tries++;
-    if (tries < 40) setTimeout(start, 250);
+    if (tries < 48) setTimeout(start, 250);
   }
 
   if (document.readyState === 'loading') {
@@ -800,14 +871,27 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer,
   }
 
   document.addEventListener('click', function (e) {
-    if (e.target && e.target.closest && e.target.closest('#tab-ventas')) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest('#tab-ventas') || t.closest('.tab-btn') || t.closest('#tabs')) {
       setTimeout(function () {
         ensureStructure();
+        syncPosMode();
         wireSearchFilter();
         applySearchFilter();
-      }, 60);
+      }, 40);
     }
   }, true);
+
+  if (!window.__BC_M68_TAB_OBS__) {
+    window.__BC_M68_TAB_OBS__ = true;
+    var tab = document.getElementById('tab-ventas');
+    if (tab) {
+      new MutationObserver(function () {
+        syncPosMode();
+      }).observe(tab, { attributes: true, attributeFilter: ['class'] });
+    }
+  }
 
   console.info('[M68] Ventas POS Definitivo', VER);
 })();

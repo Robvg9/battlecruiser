@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.74 — M68: topbar sin recorte, borde derecho carrito alineado, sin footer, buscador funcional
-(function hotfixV9474(){
-  const VERSION="9.4.74";
+// v9.4.75 — M68: topbar sin recorte, borde derecho carrito alineado, sin footer, buscador funcional
+(function hotfixV9475(){
+  const VERSION="9.4.75";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -40,7 +40,7 @@
     ["p0a-local-reads.js","p0a.1"],
     ["m56-turnos-secuencia-ui.js","56.7"],
     ["m57-turnos-sesion-ux-fix.js","57.5"],
-    ["m68-ventas-pos-definitivo.js","9.4.74"]
+    ["m68-ventas-pos-definitivo.js","9.4.75"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
