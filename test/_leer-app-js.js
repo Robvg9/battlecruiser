@@ -85,4 +85,5 @@ function leerAppJsConcatenado(baseDir) {
   return source + "\n" + bridge;
 }
 
+// Fuerza un nuevo ciclo de verificación del PR después de ajustes del harness.
 module.exports = { leerAppJsConcatenado, MODULOS_APP };
