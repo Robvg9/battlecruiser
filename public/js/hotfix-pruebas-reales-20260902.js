@@ -1,102 +1,22 @@
-// BattleCruiser — correcciones derivadas de pruebas humanas 2026-09-02
-(function () {
-  'use strict';
-  if (window.__BCRealTestsFix20260902) return;
-  window.__BCRealTestsFix20260902 = true;
-  const same=(a,b)=>a!=null&&b!=null&&String(a)===String(b);
-  const num=v=>Number.isFinite(Number(v))?Number(v):0;
-  const adminRoles=['dueño','dueno','admin','administrador','owner'];
-  function isAdmin(){try{const u=window._usuarioActual||{};return (typeof tienePermiso==='function'&&(tienePermiso('turnos','editar_any')||tienePermiso('ciclos','editar_any')||tienePermiso('usuarios','editar')))||adminRoles.includes(String(u.rol||u.role||'').toLowerCase());}catch(_){return false;}}
-
-  async function stockCanonical(){
-    const r=await window.client.rpc('bc_stock_operativo');
-    if(r.error)throw r.error;
-    const rows=Array.isArray(r.data)?r.data:[];
-    if(window._cache)window._cache.stock=rows.map(x=>({id:x.id||null,producto_id:x.producto_id,almacen_id:x.almacen_id,cantidad:num(x.cantidad),minimo:num(x.minimo),productos:x.producto_nombre?{nombre:x.producto_nombre}:undefined}));
-    return window._cache?.stock||[];
-  }
-  function patchStock(){
-    if(typeof window.cargarStockAlmacenes!=='function'||window.cargarStockAlmacenes.__bcReal)return;
-    const fn=async function(force){
-      if(!force&&window._stockCargaEstado==='ok'&&Array.isArray(window._cache?.stock))return window._cache.stock;
-      if(!navigator.onLine){window._stockCargaEstado='error';window._stockCargaError='Sin conexión';return [];}
-      window._stockCargaEstado='loading';window._stockCargaError=null;
-      try{const rows=await stockCanonical();window._stockCargaEstado='ok';window._stockCargaError=null;window.renderPanelAlmacenSeleccionado?.();window.actualizarStockDisponibleUI?.();window.renderCatalogoGrid?.();return rows;}
-      catch(e){window._stockCargaEstado='error';window._stockCargaError=String(e?.message||e);window.renderPanelAlmacenSeleccionado?.();return []}
-    };
-    fn.__bcReal=true;window.cargarStockAlmacenes=fn;try{cargarStockAlmacenes=fn}catch(_){}
-  }
-  function patchStockTruth(){
-    if(typeof window.obtenerStockDisponible!=='function'||window.obtenerStockDisponible.__bcReal)return;
-    const old=window.obtenerStockDisponible;
-    const fn=(p,a)=>{const row=(window._cache?.stock||[]).find(s=>same(s.producto_id,p)&&same(s.almacen_id,a));if(row)return{valor:Math.max(num(row.cantidad),0),ajuste:0,noCalculable:false,loaded:true,unknown:false,estado:'ok',hasRow:true};return old(p,a)};
-    fn.__bcReal=true;window.obtenerStockDisponible=fn;try{obtenerStockDisponible=fn}catch(_){}
-  }
-  function patchConfig(){const btn=document.querySelector('.tab-btn[data-tab="config"]'),panel=document.getElementById('tab-config');if(!btn||!panel||!isAdmin())return;btn.classList.remove('hidden','tab-sin-permiso','bc-config-tab-hidden');btn.style.removeProperty('display');btn.removeAttribute('aria-hidden');panel.classList.remove('hidden');}
-  function patchPermissions(){const old=window.aplicarPermisosAInterfaz;if(typeof old!=='function'||old.__bcReal)return;const fn=function(){const r=old.apply(this,arguments);setTimeout(patchConfig,0);return r};fn.__bcReal=true;window.aplicarPermisosAInterfaz=fn;try{aplicarPermisosAInterfaz=fn}catch(_){} }
-  function patchTurnos(){
-    const hub=window.__BC_M33,api=window.BattleCruiserTurnoAPI;
-    if(!hub||typeof hub.open!=='function'||!api||typeof api.obtenerExpedienteTurno!=='function'||hub.open.__bcReal)return;
-    const old=hub.open;
-    const fn=async function(id){
-      const r=await old.apply(this,arguments);
-      try{
-        const raw=await api.obtenerExpedienteTurno(id),exp=Array.isArray(raw)?raw[0]||{}:raw||{},ss=Array.isArray(exp.sesiones)?exp.sesiones:[],modal=document.getElementById('m33-bg'),body=modal?.querySelector('.m33-body');
-        if(!body)return r;
-        let host=body.querySelector('.bc-real-sessions');if(!host){host=document.createElement('div');host.className='bc-real-sessions';body.appendChild(host)}
-        const groups={MAÑANA:[],TARDE:[]};ss.forEach(s=>{const b=String(s.bloque||s.turno||s.periodo||'').toUpperCase();groups[b.includes('TAR')||b.includes('PM')?'TARDE':'MAÑANA'].push(s)});
-        const me=window._usuarioActualId||window._usuarioActual?.id;
-        const g=(t,rows)=>'<section style="margin-top:14px"><h4>'+t+'</h4>'+(rows.length?rows.map(s=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(201,162,77,.12)"><span>Día '+(s.numero_dia||'—')+' · '+(s.fecha||'—')+' · '+(s.usuario_nombre||'Sin asignar')+'</span><span class="m33-pill">'+(s.estado||'PENDIENTE')+(me&&same(s.usuario_id,me)?' · Tu sesión':'')+'</span></div>').join(''):'<div class="m33-muted">Sin sesiones</div>')+'</section>';
-        host.innerHTML=g('Mañana',groups.MAÑANA)+g('Tarde',groups.TARDE);
-      }catch(e){console.warn('[BattleCruiser] sesión completa',e)}
-      return r;
-    };
-    fn.__bcReal=true;hub.open=fn;
-  }
-  function patchInventory(){
-    const old=window.refrescarInventario;
-    if(typeof old!=='function'||old.__bcReal)return;
-    const fn=function(){
-      try{
-        const rows=window._cache?.stock||[];
-        if(rows.length&&typeof window.renderInventario==='function'){
-          const pm=new Map((window._cache?.productos||[]).map(p=>[String(p.id),p]));
-          const am=new Map((window._cache?.almacenes||[]).map(a=>[String(a.id),a]));
-          window.renderInventario(rows.map(s=>({producto_id:s.producto_id,producto:pm.get(String(s.producto_id))?.nombre||s.producto||'—',almacen_id:s.almacen_id,almacen:am.get(String(s.almacen_id))?.nombre||s.almacen||'—',cantidad:num(s.cantidad),minimo:num(s.minimo),estado:num(s.cantidad)<=0?'agotado':num(s.cantidad)<=num(s.minimo)?'bajo':'normal',valor_inventario:num(s.cantidad)*num(pm.get(String(s.producto_id))?.precio_normal)})));
-        }
-      }catch(_){}
-      return old.apply(this,arguments);
-    };
-    fn.__bcReal=true;window.refrescarInventario=fn;
-  }
-  function patchImport(){
-    const form=document.getElementById('form-producto'),btn=document.getElementById('prod-submit-btn');
-    if(!form||!btn||btn.dataset.bcImportMenu)return;
-    btn.dataset.bcImportMenu='1';btn.type='button';btn.textContent='Agregar producto ▾';
-    const w=document.createElement('span');w.style.cssText='position:relative;display:inline-flex;margin-left:8px';
-    w.innerHTML='<button type="button" id="bc-tools-products" class="cc-accion">Importar / Plantillas ▾</button><div id="bc-tools-menu" style="display:none;position:absolute;right:0;top:calc(100% + 5px);z-index:3000;min-width:230px;padding:5px;background:var(--stone);border:1px solid var(--gold-dim);border-radius:8px"><button type="button" id="bc-tools-import" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">📥 Importar Excel / CSV</button><button type="button" id="bc-tools-xlsx" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">📄 Plantilla XLSX</button><button type="button" id="bc-tools-csv" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">🧾 Plantilla CSV</button><button type="button" id="bc-tools-help" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">❓ Instrucciones</button></div>';
-    form.appendChild(w);const m=w.querySelector('#bc-tools-menu');
-    w.querySelector('#bc-tools-products').onclick=()=>m.style.display=m.style.display==='none'?'block':'none';
-    w.querySelector('#bc-tools-import').onclick=()=>{document.getElementById('bc-m55-open')?.click();m.style.display='none'};
-    const csvText='nombre,categoria,precio_normal,precio_mayorista,presentacion_normal,presentacion_mayorista\nCerveza Bucanero,Bebidas,50.00,45.00,unidad,caja x 24\n';
-    w.querySelector('#bc-tools-csv').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csvText],{type:'text/csv;charset=utf-8'}));a.download='plantilla_productos_battlecruiser.csv';a.click();m.style.display='none'};
-    w.querySelector('#bc-tools-xlsx').onclick=async()=>{try{const X=window.XLSX||(typeof loadSheetJS==='function'?await loadSheetJS():null);if(!X){alert('No se pudo cargar el generador XLSX.');return}const wb=X.utils.book_new(),ws=X.utils.aoa_to_sheet([['nombre','categoria','precio_normal','precio_mayorista','presentacion_normal','presentacion_mayorista'],['Cerveza Bucanero','Bebidas',50,45,'unidad','caja x 24']]);X.utils.book_append_sheet(wb,ws,'Productos');X.writeFile(wb,'plantilla_productos_battlecruiser.xlsx')}catch(e){alert('No se pudo generar el XLSX: '+(e?.message||e))}m.style.display='none'};
-    w.querySelector('#bc-tools-help').onclick=()=>{alert('Cómo llenar la plantilla:\n\nSolo el nombre es obligatorio. Categoría, precio normal, precio mayorista, presentación normal y presentación mayorista son opcionales.\n\nEjemplo: Cerveza Bucanero | Bebidas | 50.00 | 45.00 | unidad | caja x 24.\n\nUna fila vacía en un campo opcional significa que ese dato no se configura.');m.style.display='none'};
-    document.querySelectorAll('.bc-m55-bar,.bc-import-toolbar').forEach(x=>x.style.display='none');
-  }
-  function patchSales(){
-    const old=window.agregarLineaVenta;if(typeof old!=='function'||old.__bcReal)return;
-    const fn=function(producto,cantidad,almacen){
-      const p=window.ventaProductosPrecios?.[producto]||(window._cache?.productos||[]).find(x=>same(x.id,producto));
-      if(!p){window.setMsg?.('msg-venta-linea','Producto no encontrado.',false);return false}
-      const tipo=window.ventaAlmacenesTipo?.[almacen]||'minorista';const precio=tipo==='mayorista'?p.precio_mayorista:p.precio_normal;
-      if(!(Number(precio)>0)){window.setMsg?.('msg-venta-linea','No se puede vender: falta precio configurado.',false);return false}
-      if(!p.presentacion_id){window.setMsg?.('msg-venta-linea','No se puede vender: falta presentación configurada.',false);return false}
-      return old.apply(this,arguments);
-    };fn.__bcReal=true;window.agregarLineaVenta=fn;try{agregarLineaVenta=fn}catch(_){}
-  }
-  function improveProductForm(){const pn=document.getElementById('prod-precio-normal');if(pn){pn.removeAttribute('required');pn.placeholder='Precio normal (opcional)'}const pm=document.getElementById('prod-precio-mayorista');if(pm)pm.placeholder='Precio mayorista (opcional)'}
-  function boot(){patchStock();patchStockTruth();patchPermissions();patchConfig();patchTurnos();patchInventory();patchImport();patchSales();improveProductForm();if(window._usuarioActualId)window.cargarStockAlmacenes?.(false)}
-  boot();[250,700,1500,3000,5000].forEach(t=>setTimeout(()=>{try{boot()}catch(e){}},t));
-  const poll=setInterval(()=>{try{boot()}catch(_){}} ,500);setTimeout(()=>clearInterval(poll),12000);
+(function(){'use strict';if(window.__BCRealTestsFix20260902)return;window.__BCRealTestsFix20260902=true;const same=(a,b)=>a!=null&&b!=null&&String(a)===String(b),num=v=>Number.isFinite(Number(v))?Number(v):0;
+function isAdmin(){try{const u=window._usuarioActual||{};return (typeof window.tienePermiso==='function'&&(window.tienePermiso('turnos','editar_any')||window.tienePermiso('ciclos','editar_any')||window.tienePermiso('usuarios','editar')))||['dueño','dueno','admin','administrador','owner'].includes(String(u.rol||u.role||'').toLowerCase())}catch(_){return false}}
+async function loadStock(){const r=await window.client.rpc('bc_stock_operativo');if(r.error)throw r.error;const rows=Array.isArray(r.data)?r.data:[];if(window._cache)window._cache.stock=rows;return rows}
+function patchStock(){if(typeof window.cargarStockAlmacenes!=='function'||window.cargarStockAlmacenes.__bcReal)return;const fn=async function(force){if(!force&&window._stockCargaEstado==='ok'&&Array.isArray(window._cache?.stock)&&window._cache.stock.length)return window._cache.stock;if(!navigator.onLine){window._stockCargaEstado='error';return[]}window._stockCargaEstado='loading';try{const rows=await loadStock();window._stockCargaEstado='ok';window._stockCargaError=null;window.renderPanelAlmacenSeleccionado?.();window.actualizarStockDisponibleUI?.();window.renderCatalogoGrid?.();return rows}catch(e){window._stockCargaEstado='error';window._stockCargaError=String(e?.message||e);window.renderPanelAlmacenSeleccionado?.();return[]}};fn.__bcReal=true;window.cargarStockAlmacenes=fn;try{cargarStockAlmacenes=fn}catch(_){}
+}
+function patchStockTruth(){if(typeof window.obtenerStockDisponible!=='function'||window.obtenerStockDisponible.__bcReal)return;const old=window.obtenerStockDisponible;const fn=(p,a)=>{const row=(window._cache?.stock||[]).find(s=>same(s.producto_id,p)&&same(s.almacen_id,a));if(row)return{valor:Math.max(num(row.cantidad),0),ajuste:0,noCalculable:false,loaded:true,unknown:false,estado:'ok',hasRow:true};return old(p,a)};fn.__bcReal=true;window.obtenerStockDisponible=fn;try{obtenerStockDisponible=fn}catch(_){}
+}
+function patchConfig(){const btn=document.querySelector('.tab-btn[data-tab="config"]'),panel=document.getElementById('tab-config');if(!btn||!panel||!isAdmin())return;btn.classList.remove('hidden','tab-sin-permiso','bc-config-tab-hidden');btn.style.removeProperty('display');btn.removeAttribute('aria-hidden');panel.classList.remove('hidden')}
+function patchPermissions(){const old=window.aplicarPermisosAInterfaz;if(typeof old!=='function'||old.__bcReal)return;const fn=function(){const r=old.apply(this,arguments);setTimeout(patchConfig,0);return r};fn.__bcReal=true;window.aplicarPermisosAInterfaz=fn;try{aplicarPermisosAInterfaz=fn}catch(_){}
+}
+function patchTurnos(){const hub=window.__BC_M33,api=window.BattleCruiserTurnoAPI;if(!hub||typeof hub.open!=='function'||!api||typeof api.obtenerExpedienteTurno!=='function'||hub.open.__bcReal)return;const old=hub.open;const fn=async function(id){const r=await old.apply(this,arguments);try{const raw=await api.obtenerExpedienteTurno(id),exp=Array.isArray(raw)?raw[0]||{}:raw||{},ss=Array.isArray(exp.sesiones)?exp.sesiones:[],body=document.getElementById('m33-bg')?.querySelector('.m33-body');if(!body)return r;let host=body.querySelector('.bc-real-sessions');if(!host){host=document.createElement('div');host.className='bc-real-sessions';body.appendChild(host)}const groups={MAÑANA:[],TARDE:[]};ss.forEach(s=>{const b=String(s.bloque||s.turno||s.periodo||'').toUpperCase();groups[b.includes('TAR')||b.includes('PM')?'TARDE':'MAÑANA'].push(s)});const me=window._usuarioActualId||window._usuarioActual?.id;const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));const g=(t,rows)=>'<section class="bc-real-session-group"><h4>'+t+'</h4>'+(rows.length?rows.map(s=>'<div class="bc-real-session-row"><span>Día '+esc(s.numero_dia||'—')+' · '+esc(s.fecha||'—')+' · '+esc(s.usuario_nombre||'Sin asignar')+'</span><span class="m33-pill">'+esc(s.estado||'PENDIENTE')+(me&&same(s.usuario_id,me)?' · Tu sesión':'')+'</span></div>').join(''):'<div class="m33-muted">Sin sesiones</div>')+'</section>';host.innerHTML=g('Mañana',groups.MAÑANA)+g('Tarde',groups.TARDE)}catch(e){console.warn('[BattleCruiser] sesiones completas',e)}return r};fn.__bcReal=true;hub.open=fn}
+function patchInventory(){const old=window.refrescarInventario;if(typeof old!=='function'||old.__bcReal)return;const fn=function(){try{const rows=window._cache?.stock||[];if(rows.length&&typeof window.renderInventario==='function'){const pm=new Map((window._cache?.productos||[]).map(p=>[String(p.id),p])),am=new Map((window._cache?.almacenes||[]).map(a=>[String(a.id),a]));window.renderInventario(rows.map(s=>({producto_id:s.producto_id,producto:pm.get(String(s.producto_id))?.nombre||s.producto||'—',almacen_id:s.almacen_id,almacen:am.get(String(s.almacen_id))?.nombre||s.almacen||'—',cantidad:num(s.cantidad),minimo:num(s.minimo),estado:num(s.cantidad)<=0?'agotado':num(s.cantidad)<=num(s.minimo)?'bajo':'normal',valor_inventario:num(s.cantidad)*num(pm.get(String(s.producto_id))?.precio_normal)})))}}catch(_){}return old.apply(this,arguments)};fn.__bcReal=true;window.refrescarInventario=fn}
+function patchImport(){const form=document.getElementById('form-producto'),btn=document.getElementById('prod-submit-btn');if(!form||!btn||btn.dataset.bcImportMenu)return;btn.dataset.bcImportMenu='1';btn.type='button';btn.textContent='Agregar producto ▾';const w=document.createElement('span');w.style.cssText='position:relative;display:inline-flex;margin-left:8px';w.innerHTML='<button type="button" id="bc-tools-products" class="cc-accion">Importar / Plantillas ▾</button><div id="bc-tools-menu" style="display:none;position:absolute;right:0;top:calc(100% + 5px);z-index:3000;min-width:230px;padding:5px;background:var(--stone);border:1px solid var(--gold-dim);border-radius:8px"><button type="button" id="bc-tools-import" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">📥 Importar Excel / CSV</button><button type="button" id="bc-tools-xlsx" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">📄 Plantilla XLSX</button><button type="button" id="bc-tools-csv" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">🧾 Plantilla CSV</button><button type="button" id="bc-tools-help" style="display:block;width:100%;padding:9px;text-align:left;background:none;border:0;color:var(--text)">❓ Instrucciones</button></div>';form.appendChild(w);const m=w.querySelector('#bc-tools-menu');w.querySelector('#bc-tools-products').onclick=()=>m.style.display=m.style.display==='none'?'block':'none';w.querySelector('#bc-tools-import').onclick=()=>{document.getElementById('bc-m55-open')?.click();m.style.display='none'};const csvText='nombre,categoria,precio_normal,precio_mayorista,presentacion_normal,presentacion_mayorista\nCerveza Bucanero,Bebidas,50.00,45.00,unidad,caja x 24\n';w.querySelector('#bc-tools-csv').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csvText],{type:'text/csv;charset=utf-8'}));a.download='plantilla_productos_battlecruiser.csv';a.click();m.style.display='none'};w.querySelector('#bc-tools-xlsx').onclick=async()=>{try{const X=window.XLSX||(typeof window.loadSheetJS==='function'?await window.loadSheetJS():null);if(!X)throw Error('Generador XLSX no disponible');const wb=X.utils.book_new(),ws=X.utils.aoa_to_sheet([['nombre','categoria','precio_normal','precio_mayorista','presentacion_normal','presentacion_mayorista'],['Cerveza Bucanero','Bebidas',50,45,'unidad','caja x 24']]);X.utils.book_append_sheet(wb,ws,'Productos');X.writeFile(wb,'plantilla_productos_battlecruiser.xlsx')}catch(e){alert('No se pudo generar el XLSX: '+(e?.message||e))}m.style.display='none'};w.querySelector('#bc-tools-help').onclick=()=>{alert('Cómo llenar la plantilla:\n\nSolo nombre es obligatorio. Categoría, precio normal, precio mayorista, presentación normal y presentación mayorista son opcionales.\n\nEjemplo: Cerveza Bucanero | Bebidas | 50.00 | 45.00 | unidad | caja x 24.\n\nUna fila vacía en un campo opcional significa que ese dato no se configura.');m.style.display='none'};document.querySelectorAll('.bc-m55-bar,.bc-import-toolbar').forEach(x=>x.style.display='none')}
+function patchSales(){const old=window.agregarLineaVenta;if(typeof old!=='function'||old.__bcReal)return;const fn=function(producto,cantidad,almacen){const p=window.ventaProductosPrecios?.[producto]||(window._cache?.productos||[]).find(x=>same(x.id,producto));if(!p){window.setMsg?.('msg-venta-linea','Producto no encontrado.',false);return false}const tipo=window.ventaAlmacenesTipo?.[almacen]||'minorista';const precio=tipo==='mayorista'?p.precio_mayorista:p.precio_normal;if(!(Number(precio)>0)){window.setMsg?.('msg-venta-linea','No se puede vender: falta precio configurado.',false);return false}if(!p.presentacion_id){window.setMsg?.('msg-venta-linea','No se puede vender: falta presentación configurada.',false);return false}return old.apply(this,arguments)};fn.__bcReal=true;window.agregarLineaVenta=fn;try{agregarLineaVenta=fn}catch(_){}
+}
+function improveProductForm(){const pn=document.getElementById('prod-precio-normal'),pm=document.getElementById('prod-precio-mayorista');if(pn){pn.removeAttribute('required');pn.placeholder='Precio normal (opcional)'}if(pm)pm.placeholder='Precio mayorista (opcional)'}
+function redesignCommunication(){if(document.getElementById('bc-real-com-css'))return;const s=document.createElement('style');s.id='bc-real-com-css';s.textContent='#tab-comunicacion .com-layout{display:grid!important;grid-template-columns:310px minmax(0,1fr)!important;gap:12px!important;min-height:520px!important;height:calc(100vh - 240px)!important}#tab-comunicacion .com-col-lista,#tab-comunicacion .com-col-chat{background:var(--stone)!important;border:1px solid var(--gold-dim)!important;border-radius:14px!important;overflow:hidden!important}#tab-comunicacion .com-lista-header{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;padding:12px!important;background:var(--stone-2)!important;border-bottom:1px solid var(--gold-dim)!important}#tab-comunicacion #lista-conversaciones{height:calc(100% - 63px)!important;overflow:auto!important;padding:7px!important}#tab-comunicacion .com-conv-item{display:grid!important;grid-template-columns:34px minmax(0,1fr) auto!important;gap:9px!important;padding:11px 10px!important;border-radius:10px!important}#tab-comunicacion .com-conv-activa{background:rgba(201,162,77,.13)!important;border-color:var(--gold-dim)!important}#tab-comunicacion .com-msg{max-width:78%!important;padding:10px 12px!important;border-radius:12px 12px 12px 4px!important;background:var(--stone-2)!important;border:1px solid rgba(201,162,77,.12)!important}#tab-comunicacion .com-msg-propio{align-self:flex-end!important;border-radius:12px 12px 4px 12px!important;background:rgba(201,162,77,.12)!important}#tab-comunicacion .com-input-bar{display:flex!important;gap:8px!important;padding:10px!important;border-top:1px solid var(--gold-dim)!important;background:var(--stone-2)!important}#tab-comunicacion .com-input-bar input{flex:1!important;min-width:0!important}@media(max-width:820px){#tab-comunicacion .com-layout{grid-template-columns:1fr!important;height:auto!important;min-height:0!important}#tab-comunicacion .com-col-lista,#tab-comunicacion .com-col-chat{min-height:450px!important}}';document.head.appendChild(s)}
+function patchConnectivity(){if(typeof window.actualizarIndicadorConexion!=='function'||window.actualizarIndicadorConexion.__bcReal)return;const old=window.actualizarIndicadorConexion;const fn=function(){try{if(window._conectividadReal==='offline'&&navigator.onLine&&Date.now()-(window.__bcLastRealProbe||0)<15000)return old.apply(this,arguments)}catch(_){}return old.apply(this,arguments)};fn.__bcReal=true;window.actualizarIndicadorConexion=fn}
+function boot(){patchStock();patchStockTruth();patchPermissions();patchConfig();patchTurnos();patchInventory();patchImport();patchSales();improveProductForm();redesignCommunication();patchConnectivity();if(window._usuarioActualId)window.cargarStockAlmacenes?.(true)}
+function start(){boot();const p=setInterval(()=>{try{boot()}catch(_){}} ,400);setTimeout(()=>clearInterval(p),15000)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
