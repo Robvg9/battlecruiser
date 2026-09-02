@@ -4,7 +4,13 @@
   if (window.__BCForceClose20260902) return;
   window.__BCForceClose20260902 = true;
 
-  function isAdmin() {
+  async function isAdmin() {
+    try {
+      if (window.BattleCruiserTurnoAPI && typeof window.BattleCruiserTurnoAPI.actorIsAdmin === 'function') {
+        const r = await window.BattleCruiserTurnoAPI.actorIsAdmin();
+        if (r === true || r === 'true' || r === 1 || r === '1' || (r && (r.is_admin === true || r.isAdmin === true))) return true;
+      }
+    } catch (e) {}
     try {
       if (typeof window.tienePermiso === 'function' && window.tienePermiso('turnos', 'editar_any')) return true;
       const u = window._usuarioActual;
@@ -12,9 +18,10 @@
       return ['dueño','dueno','admin','administrador'].includes(r);
     } catch (e) { return false; }
   }
-  function addButton(turnoId) {
+
+  async function addButton(turnoId) {
     const modal = document.getElementById('m33-bg');
-    if (!modal || !turnoId || !isAdmin()) return;
+    if (!modal || !turnoId || !(await isAdmin())) return;
     modal.setAttribute('data-turno-id', String(turnoId));
     const foot = modal.querySelector('.m33-foot');
     if (!foot || foot.querySelector('.bc-force-close-turno')) return;
@@ -24,7 +31,7 @@
     b.textContent = 'Forzar cierre';
     b.title = 'Cerrar este turno de forma administrativa. Solo ADMIN.';
     b.onclick = async function () {
-      if (!isAdmin()) { b.remove(); return; }
+      if (!(await isAdmin())) { b.remove(); return; }
       const motivo = window.prompt('Motivo del cierre forzado:', 'Cierre forzado por ADMIN');
       if (motivo === null) return;
       b.disabled = true;
@@ -52,9 +59,9 @@
     const original = hub.open;
     const wrapped = async function (turnoId) {
       const result = await original.apply(this, arguments);
-      addButton(turnoId);
-      setTimeout(() => addButton(turnoId), 0);
-      setTimeout(() => addButton(turnoId), 200);
+      await addButton(turnoId);
+      setTimeout(() => { addButton(turnoId); }, 0);
+      setTimeout(() => { addButton(turnoId); }, 200);
       return result;
     };
     wrapped.__bcForceCloseWrapped = true;
