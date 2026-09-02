@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.73 — M68 Ventas POS: topbar sin recorte, sin scroll de página, buscador funcional
-(function hotfixV9473(){
-  const VERSION="9.4.73";
+// v9.4.74 — M68: topbar sin recorte, borde derecho carrito alineado, sin footer, buscador funcional
+(function hotfixV9474(){
+  const VERSION="9.4.74";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -40,7 +40,7 @@
     ["p0a-local-reads.js","p0a.1"],
     ["m56-turnos-secuencia-ui.js","56.7"],
     ["m57-turnos-sesion-ux-fix.js","57.5"],
-    ["m68-ventas-pos-definitivo.js","9.4.73"]
+    ["m68-ventas-pos-definitivo.js","9.4.74"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
