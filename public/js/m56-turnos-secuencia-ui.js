@@ -1,7 +1,7 @@
-// BattleCruiser — M56.6 · secuencia UI robusta con metadata real
+// BattleCruiser — M56.7 · secuencia UI robusta con metadata real
 // No interpreta fechas desde texto visual. Usa turno_sesiones reales del turno.
-// La elegibilidad visual y la apertura real usan la misma regla: fecha + secuencia.
-// M56.6: evita competir con M57 durante la redirección a Ventas.
+// La elegibilidad visual y la apertura real usan la misma regla: fecha operativa PR + secuencia.
+// M56.7: fecha = America/Puerto_Rico (misma fuente que backend RPC y M62). Evita competir con M57 durante redirección a Ventas.
 (function () {
   'use strict';
   if (window.__bcM56TurnosSecuenciaUI) return;
@@ -15,11 +15,24 @@
   var metaTurnoId = null;
   var metaPromise = null;
   var sessionMeta = Object.create(null);
+  var ZONA = 'America/Puerto_Rico';
 
   function hoy() {
     if (TODAY_CACHE) return TODAY_CACHE;
-    var d = new Date();
-    TODAY_CACHE = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    try {
+      if (window.__BC_M62 && typeof window.__BC_M62.hoyNegocio === 'function') {
+        TODAY_CACHE = window.__BC_M62.hoyNegocio();
+        return TODAY_CACHE;
+      }
+      var p = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+      var y = p.find(function (x) { return x.type === 'year'; }).value;
+      var m = p.find(function (x) { return x.type === 'month'; }).value;
+      var d = p.find(function (x) { return x.type === 'day'; }).value;
+      TODAY_CACHE = y + '-' + m + '-' + d;
+    } catch (e) {
+      var d2 = new Date();
+      TODAY_CACHE = d2.getUTCFullYear() + '-' + String(d2.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d2.getUTCDate()).padStart(2, '0');
+    }
     return TODAY_CACHE;
   }
   function norm(s) { return String(s == null ? '' : s).trim().toUpperCase(); }
@@ -72,7 +85,7 @@
         });
         sessionMeta = next;
         return rows.length > 0;
-      } catch (e) { console.warn('[M56.6] No se pudo cargar metadata de sesiones', e); return false; }
+      } catch (e) { console.warn('[M56.7] No se pudo cargar metadata de sesiones', e); return false; }
       finally { metaPromise = null; }
     })();
     return metaPromise;
@@ -85,7 +98,7 @@
     document.head.appendChild(s);
   }
   function bloquear(btn) { if(!btn)return; btn.disabled=true; btn.classList.add('m56-lock'); btn.setAttribute('aria-disabled','true'); btn.setAttribute('title','Esta sesión todavía no es elegible.'); btn.innerHTML='<span class="m56-lock-icon">🔒</span> Abrir sesión'; }
-  function desbloquear(btn) { if(!btn)return; btn.disabled=false; btn.classList.remove('m56-lock'); btn.removeAttribute('aria-disabled'); btn.removeAttribute('title'); btn.textContent='Abrir sesión'; }
+  function desbloquear(btn) { if(!btn)return; btn.disabled=false; btn.classList.remove('m56-lock','m57-locked'); btn.removeAttribute('aria-disabled'); btn.removeAttribute('title'); btn.textContent='Abrir sesión'; }
   function visibleMetaRows(modal) {
     return Array.prototype.slice.call(modal.querySelectorAll('.m33-session')).map(function(row){ var btn=rowButton(row); if(!btn)return null; var id=btn.getAttribute('data-m33-abrir-sesion'); var m=id?sessionMeta[String(id)]:null; return m?{row:row,button:btn,meta:m}:null; }).filter(Boolean);
   }
@@ -106,7 +119,7 @@
     try { items.forEach(function(it){if(eligibleId&&String(it.meta.id)===eligibleId)desbloquear(it.button);else bloquear(it.button);if(it.meta.fecha&&it.meta.fecha!==hoy()&&it.meta.estado==='PENDIENTE'){var sub=it.row.querySelector('.m33-muted');if(sub&&!it.row.querySelector('.m56-when')){var when=document.createElement('span');when.className='m56-when';when.textContent=it.meta.fecha>hoy()?'Disponible en su fecha programada':'Fecha ya pasada';sub.appendChild(when);}}}); }
     finally{rendering=false;}
   }
-  function onCardClick(e){var card=e.target&&e.target.closest?e.target.closest('.m29-card[data-turno-id]'):null;if(!card)return;lastTurnoId=card.getAttribute('data-turno-id')||null;metaTurnoId=null;metaPromise=null;sessionMeta=Object.create(null);}
+  function onCardClick(e){var card=e.target&&e.target.closest?e.target.closest('.m29-card[data-turno-id]'):null;if(!card)return;lastTurnoId=card.getAttribute('data-turno-id')||null;metaTurnoId=null;metaPromise=null;sessionMeta=Object.create(null);TODAY_CACHE=null;}
 
   function volverAVentas(){
     if(redirected)return;
@@ -127,5 +140,5 @@
   }
   function boot(){if(!document.body)return;bind();setTimeout(function(){loadMetadata().then(renderSequence);},80);setTimeout(function(){loadMetadata().then(renderSequence);},300);setTimeout(function(){loadMetadata().then(renderSequence);},900);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.__BC_M56={renderSequence:renderSequence,volverAVentas:volverAVentas,reload:function(){metaTurnoId=null;metaPromise=null;return loadMetadata().then(renderSequence);}};
+  window.__BC_M56={renderSequence:renderSequence,volverAVentas:volverAVentas,reload:function(){metaTurnoId=null;metaPromise=null;TODAY_CACHE=null;return loadMetadata().then(renderSequence);},hoy:hoy,version:'56.7'};
 })();
