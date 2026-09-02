@@ -46,6 +46,24 @@
     }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindAuth);
-  else bindAuth();
+  function loadM62() {
+    try {
+      if (document.querySelector('script[data-bc-m62-turnos="1"]')) return;
+      var s = document.createElement('script');
+      s.src = 'js/m62-turnos-fecha-operativa-ui-fix.js?v=62.1';
+      s.async = false;
+      s.dataset.bcM62Turnos = '1';
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) {
+      console.warn('[BattleCruiser] M61 no pudo cargar M62', e);
+    }
+  }
+
+  function boot() {
+    bindAuth();
+    loadM62();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
