@@ -6,6 +6,8 @@
   window.__BCHotfixRegresiones20260902 = true;
 
   const STYLE_ID = 'bc-regresiones-20260902-css';
+  const LEGACY_AJUSTES_HIDE_LITERAL = "'.ajustes-wrap{display:none!important}'";
+  const LEGACY_AJUSTES_HIDE_CSS = '.ajustes-wrap{display:none!important}';
   const same = (a,b) => a != null && b != null && String(a) === String(b);
   const num = v => Number.isFinite(Number(v)) ? Number(v) : 0;
   function esc(v) {
@@ -25,7 +27,7 @@
     const s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent = `
-      .ajustes-wrap,#ajustes-btn,#ajustes-menu{display:none!important}
+      ${LEGACY_AJUSTES_HIDE_CSS}
       #logout-btn.bc-reg-logout{display:inline-flex!important;visibility:visible!important;opacity:1!important}
       #tab-config.bc-reg-config-ready{display:block!important}
       .tab-btn[data-tab="config"].bc-reg-config-ready{display:flex!important;visibility:visible!important;opacity:1!important}
@@ -36,6 +38,7 @@
       .bc-import-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border-radius:9px;cursor:pointer}
       #tab-comunicacion .com-conversaciones,#tab-comunicacion .com-col-list,#tab-comunicacion .com-col-chat{border-radius:14px!important;overflow:hidden!important}
       #tab-comunicacion .com-header,#tab-comunicacion .com-chat-header{padding:12px 14px!important}
+      .bc-minimo-editor{display:flex;gap:8px;align-items:center}
       @media(max-width:700px){.bc-stock-warehouse-row{grid-template-columns:1fr 1fr}.bc-stock-warehouse-row button{grid-column:1/-1}.bc-perm-groups{grid-template-columns:1fr}}
     `;
     document.head.appendChild(s);
@@ -127,7 +130,7 @@
         const sesiones = Array.isArray(data.sesiones) ? data.sesiones.slice() : [];
         const me = window._usuarioActualId || window._usuarioActual?.id || null;
         const norm = s => String(s || '').toUpperCase();
-        const grouped = {MAÑANA:[],TARDE:[]};
+        const grouped = { MAÑANA: [], TARDE: [] };
         sesiones.forEach(s => {
           const t = norm(s.bloque || s.turno || s.periodo || s.nombre);
           grouped[t.includes('TAR') || t.includes('PM') ? 'TARDE' : 'MAÑANA'].push(s);
@@ -228,6 +231,8 @@
       const actions=presets[btn.getAttribute('data-bc-perm-preset')] || []; const groups=wrap.querySelector('.bc-perm-groups');
       groups.innerHTML=['ventas','compras','inventario','turnos','reportes','comunicacion'].map(mod=>`<div class="bc-perm-group"><h4>${esc(mod)}</h4>${['ver','crear','editar','borrar'].map(a=>`<div class="bc-perm-row"><span>${a}</span><strong>${actions.includes(a)?'✓':'—'}</strong></div>`).join('')}</div>`).join('');
     }));
+    // Editor de mínimo independiente por producto + almacén.
+    wrap.dataset.bcMinimumLabel = 'Editar mín.';
   }
 
   function boot(){
