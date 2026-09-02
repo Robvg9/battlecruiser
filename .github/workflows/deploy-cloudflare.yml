@@ -27,18 +27,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           unset CLOUDFLARE_ACCOUNT_ID
           echo "🔎 Resolving Cloudflare account ID from the configured API token..."
-          WHOAMI_OUTPUT="$(npx --no-install wrangler whoami 2>&1)"
+          WHOAMI_OUTPUT="$(npx wrangler whoami 2>&1 || true)"
           printf '%s\n' "$WHOAMI_OUTPUT"
           ACCOUNT_ID="$(printf '%s\n' "$WHOAMI_OUTPUT" | grep -Eo '[0-9a-f]{32}' | head -n 1 || true)"
           if [ -z "$ACCOUNT_ID" ]; then
-            echo "❌ Could not resolve a Cloudflare account ID from wrangler whoami."
-            exit 1
+            echo "⚠️ Could not parse account ID from wrangler whoami; wrangler-action will resolve it."
+          else
+            echo "✅ Cloudflare account resolved."
+            echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" >> "$GITHUB_ENV"
           fi
-          echo "✅ Cloudflare account resolved."
-          echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" >> "$GITHUB_ENV"
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
@@ -59,6 +59,7 @@ jobs:
             exit 1
           fi
           echo "🔎 Expected production version: $EXPECTED_VERSION"
+          sleep 8
           PROBE_URL="https://battlecruiser.robvg9.workers.dev/app.js?bc_verify=$(date +%s%N)"
           echo "🔎 Probing: $PROBE_URL"
           curl --fail --silent --show-error --location --max-time 30 \
