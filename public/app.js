@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.63 — M33.7 + M57.5 + M58.2 + M59.2 + M60.4 + M61 + M64 + M65
-(function hotfixV9463(){
-  const VERSION="9.4.63";
+// v9.4.64 — M33.7 + M57.5 + M58.2 + M59.2 + M60.4 + M61 + M64 + M65 + M66
+(function hotfixV9464(){
+  const VERSION="9.4.64";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -38,7 +38,7 @@
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
     ["p0a-local-reads.js","p0b.1"],["m57-turnos-sesion-ux-fix.js","57.5"],["m58-ventas-session-sync.js","58.2"],["m59-turno-cierre-moderno.js","59.2"],["m60-turnos-operacion-control.js","60.4"],
-    ["m64-ventas-topbar-sticky.js","64.1"],["m65-ventas-smart-panel.js","65.1"]
+    ["m64-ventas-topbar-sticky.js","64.1"],["m65-ventas-smart-panel.js","65.1"],["m66-ventas-polish-final.js","66.1"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]')) return;
