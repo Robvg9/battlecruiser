@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.60 — M33.7 + M56.7 + M57.5 + M58.2 + M59.2 + M60.4 + M61 · Turnos fecha operativa PR
-(function hotfixV9460(){
-  const VERSION="9.4.60";
+// v9.4.61 — M33.7 + M57.5 + M58.2 + M59.2 + M60.4 + M61 · Turnos sin competencia de M56/M62
+(function hotfixV9461(){
+  const VERSION="9.4.61";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -37,7 +37,7 @@
     ["m47-productos-vista-final.js","47.5"],["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],
     ["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],
-    ["p0a-local-reads.js","p0b.1"],["m56-turnos-secuencia-ui.js","56.7"],["m57-turnos-sesion-ux-fix.js","57.5"],["m58-ventas-session-sync.js","58.2"],["m59-turno-cierre-moderno.js","59.2"],["m60-turnos-operacion-control.js","60.4"]
+    ["p0a-local-reads.js","p0b.1"],["m57-turnos-sesion-ux-fix.js","57.5"],["m58-ventas-session-sync.js","58.2"],["m59-turno-cierre-moderno.js","59.2"],["m60-turnos-operacion-control.js","60.4"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]')) return;
