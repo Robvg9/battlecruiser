@@ -4,4 +4,4 @@ Approved for deletion on branch `cleanup-forensic-20260902`: historical/unreacha
 
 Conservative exclusions are intentional: current loaders, dynamic dependencies, current Turnos/Ciclos modules, current Ventas business logic, current M68 POS authority, and ambiguous non-entrypoint files remain untouched.
 
-A separate test issue (#19) was created accidentally while validating connector write access; it is unrelated to the application and will be closed immediately.
+A separate test issue (#19) was created accidentally while validating connector write access. It is unrelated to the application and is being closed.
