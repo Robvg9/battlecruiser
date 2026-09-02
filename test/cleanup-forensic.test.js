@@ -1,5 +1,6 @@
 "use strict";
 
+const { test } = require("node:test");
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
@@ -70,6 +71,4 @@ test("cleanup forense: ningún source público referencia literalmente un asset 
   assert.deepStrictEqual(hits, [], `referencias residuales detectadas:\n${hits.join("\n")}`);
 });
 
-// Keep this exact list aligned with the cleanup decision document. This catches
-// accidental drift between the documented deletion set and the executable guard.
 assert.strictEqual(DELETED.length, 24, "la auditoría debe cubrir exactamente 24 assets");
