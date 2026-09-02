@@ -19,7 +19,7 @@
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","33.2"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.2"],["ui-operaciones-hub.js","41.1"],["ui-ajustes-panel.js","96.1"],
-    ["hide-config-tab.js","42.2"],["alta-usuario-sin-email.js","46.1"],["m22-sesiones-en-m21.js","25.4"],["m22-fe-patches-m21.js","22.1"],
+    ["alta-usuario-sin-email.js","46.1"],["m22-sesiones-en-m21.js","25.4"],["m22-fe-patches-m21.js","22.1"],
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],["m24-asignaciones-operativas.js","24.4"],
     ["m24-2-asignar-sesion-ui.js","24.6"],["m24-2-asignaciones-selects-repair.js","24.5"],["m25-fe-sync-turno-ventas.js","25.1"],
     ["m26-ventas-ux.js","26.5"],["m26-6-stock-cart-patch.js","26.6"],["m26-7-ventas-repair.js","26.7"],["m26-8-ventas-cart-confirm.js","26.8"],
@@ -40,7 +40,8 @@
     ["p0a-local-reads.js","p0a.1"],
     ["m56-turnos-secuencia-ui.js","56.7"],
     ["m57-turnos-sesion-ux-fix.js","57.5"],
-    ["m68-ventas-pos-definitivo.js","9.4.75"]
+    ["m68-ventas-pos-definitivo.js","9.4.75"],
+    ["hotfix-regresiones-20260902.js","20260902.1"]
   ];
 
   // The shell must remain hidden until the whole current patch chain has
