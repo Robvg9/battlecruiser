@@ -22,12 +22,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve Cloudflare account ID from API token
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          unset CLOUDFLARE_ACCOUNT_ID
+          echo "🔎 Resolving Cloudflare account ID from the configured API token..."
+          WHOAMI_OUTPUT="$(npx --no-install wrangler whoami 2>&1)"
+          printf '%s\n' "$WHOAMI_OUTPUT"
+          ACCOUNT_ID="$(printf '%s\n' "$WHOAMI_OUTPUT" | grep -Eo '[0-9a-f]{32}' | head -n 1 || true)"
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "❌ Could not resolve a Cloudflare account ID from wrangler whoami."
+            exit 1
+          fi
+          echo "✅ Cloudflare account resolved."
+          echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID" >> "$GITHUB_ENV"
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
