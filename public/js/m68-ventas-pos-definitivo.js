@@ -1,14 +1,14 @@
 /**
- * M68 — Ventas POS Definitivo (v9.4.73)
+ * M68 — Ventas POS Definitivo (v9.4.74)
  * 1) Topbar: contenido centrado, sin recorte
- * 2) Borde derecho del carrito = borde derecho del topbar
+ * 2) Borde derecho del carrito = borde derecho del topbar (alineación perfecta)
  * 3) Sin scroll de página; solo productos (y líneas del carrito si hace falta)
- * 4) Footer inferior oculto en Ventas
+ * 4) Footer inferior oculto y sacado del flujo en Ventas
  * 5) Buscador filtra la grilla por nombre
  */
 (function m68VentasPosDefinitivo() {
   'use strict';
-  const VER = '9.4.73';
+  const VER = '9.4.74';
   window.__BC_M68_LOADED__ = VER;
 
   const TOP_ID = 'bc-venta-topbar';
@@ -18,7 +18,7 @@
   const STYLE_ID = 'm68-ventas-pos-css';
 
   const CSS = `
-/* ========== M68 v9.4.73 ========== */
+/* ========== M68 v9.4.74 ========== */
 html:has(#tab-ventas.bc-pos.visible),
 body:has(#tab-ventas.bc-pos.visible) {
   overflow: hidden !important;
@@ -26,6 +26,7 @@ body:has(#tab-ventas.bc-pos.visible) {
   max-height: 100dvh !important;
 }
 
+/* Shell: solo header + main (sin fila de footer) */
 .app-shell.visible:has(#tab-ventas.bc-pos.visible) {
   height: 100dvh !important;
   max-height: 100dvh !important;
@@ -34,14 +35,23 @@ body:has(#tab-ventas.bc-pos.visible) {
   grid-template-areas: "header header" "sidebar main" !important;
 }
 
+/* 4) Footer: eliminado de verdad (display + sacado del flujo + zero size) */
 .app-shell.visible:has(#tab-ventas.bc-pos.visible) .app-footer,
-body:has(#tab-ventas.bc-pos.visible) .app-footer {
+body:has(#tab-ventas.bc-pos.visible) .app-footer,
+#app-shell:has(#tab-ventas.bc-pos.visible) .app-footer {
   display: none !important;
+  visibility: hidden !important;
   height: 0 !important;
+  max-height: 0 !important;
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
-  overflow: hidden !important;
   border: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  z-index: -1 !important;
 }
 
 .app-shell.visible:has(#tab-ventas.bc-pos.visible) .main-content {
@@ -267,7 +277,7 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer {
   display: none !important;
 }
 
-/* ---- LAYOUT: mismo ancho que el topbar; carrito al borde derecho ---- */
+/* ---- LAYOUT: mismo ancho exacto que el topbar (punto 2) ---- */
 #tab-ventas.bc-pos #${LAYOUT_ID} {
   flex: 1 1 auto !important;
   min-height: 0 !important;
@@ -281,6 +291,16 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer {
   max-width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Garantiza que topbar y layout tengan el mismo borde derecho */
+#tab-ventas.bc-pos #${TOP_ID},
+#tab-ventas.bc-pos #${LAYOUT_ID} {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   box-sizing: border-box !important;
 }
 
@@ -425,7 +445,7 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer {
 #tab-ventas.bc-pos #${SCROLL_ID} .catalogo-card-stock { font-size: 10px !important; color: #7a8a78 !important; }
 #tab-ventas.bc-pos #${SCROLL_ID} .catalogo-card-categoria { display: none !important; }
 
-/* Carrito: misma altura, mismo borde derecho que el topbar */
+/* Carrito: mismo borde derecho que el topbar (punto 2 reforzado) */
 #tab-ventas.bc-pos #${CART_ID} {
   min-width: 0 !important;
   min-height: 0 !important;
@@ -433,6 +453,7 @@ body:has(#tab-ventas.bc-pos.visible) .app-footer {
   height: 100% !important;
   max-height: 100% !important;
   margin: 0 !important;
+  margin-right: 0 !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
