@@ -10,6 +10,12 @@
   function normalize(data){if(data==null)return null;return Array.isArray(data)?(data.length===1?data[0]:data):data}
   async function callRpc(name,params){clientOk();onlineRequired();let timer=null;try{if(typeof showLoading==='function')showLoading();const call=client.rpc(name,params||{});const timeout=new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error('Tiempo de espera agotado (25s).')),TIMEOUT_MS)});const r=await Promise.race([call,timeout]);if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'RPC_ERROR';e.rpc=name;e.raw=r.error;throw e}return normalize(r?r.data:null)}finally{if(timer)clearTimeout(timer);if(typeof resetLoadingOverlay==='function')resetLoadingOverlay();else if(typeof hideLoading==='function')hideLoading()}}
   async function selectTable(table,columns,filterColumn,filterValue,orderColumn){clientOk();onlineRequired();if(!client.from)throw new Error('Cliente Supabase no permite consultas directas.');let q=client.from(table).select(columns||'*');if(filterColumn)q=q.eq(filterColumn,filterValue);if(orderColumn)q=q.order(orderColumn,{ascending:true});const r=await q;if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'QUERY_ERROR';e.table=table;throw e}return r&&r.data?r.data:[]}
+  async function listarSesionesViaExpediente(id){
+    if(!id) return [];
+    const expediente=await callRpc(RPC.expediente,{p_turno_id:id});
+    if(Array.isArray(expediente)) return expediente.length===1 && Array.isArray(expediente[0]?.sesiones) ? expediente[0].sesiones : [];
+    return expediente && Array.isArray(expediente.sesiones) ? expediente.sesiones : [];
+  }
   const API={
     RPC,uuid,
     crearTurno:o=>{o=o||{};return callRpc(RPC.crearTurno,{p_almacen_id:o.almacenId,p_fecha_inicio:o.inicioPlan,p_dias:o.cantidadDias,p_asignaciones:o.asignaciones||[]})},
@@ -24,7 +30,8 @@
     crearDescuento:o=>{o=o||{};return callRpc(RPC.crearDescuento,{p_turno_id:o.turnoId,p_usuario_id:o.usuarioId,p_monto:Number(o.monto),p_motivo:o.motivo||'',p_turno_sesion_id:o.sesionId||null,p_turno_tramo_id:o.tramoId||null})},
     listarTurnos:o=>{o=o||{};return callRpc(RPC.listarTurnos,{p_usuario_id:o.usuarioId||null,p_estado:o.estado||null,p_almacen_id:o.almacenId||null,p_limite:o.limit??50,p_offset:o.offset??0})},
     listarTurnosMaestros:o=>{o=o||{};return callRpc(RPC.listarTurnosMaestros,{p_limite:o.limit??100,p_offset:o.offset??0})},
-    listarSesionesTurno:id=>selectTable('turno_sesiones','*','turno_id',id,'numero_dia'),
+    // RLS-safe: no lectura directa de turno_sesiones. Usa la RPC del expediente, que ya es SECURITY DEFINER.
+    listarSesionesTurno:listarSesionesViaExpediente,
     listarTramosSesion:id=>selectTable('turno_tramos','*','turno_sesion_id',id,'inicio_at'),
     obtenerExpedienteTurno:id=>callRpc(RPC.expediente,{p_turno_id:id}),
     actorIsAdmin:()=>callRpc(RPC.actorIsAdmin,{}),
