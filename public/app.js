@@ -45,7 +45,8 @@
     ["hotfix-configuracion-20260902.js","20260902.1"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],
     ["hotfix-turno-forceclose-20260902.js","20260902.1"],
-    ["hotfix-integracion-final-20260902.js","20260902.1"]
+    ["hotfix-integracion-final-20260902.js","20260902.1"],
+    ["hotfix-14-regresiones-20260902.js","14.1"]
   ];
 
   let resolveUIReady;
@@ -54,38 +55,17 @@
 
   function cargarUno(name, version){
     return new Promise(resolve => {
-      if(document.querySelector('script[src*="'+name+'"]')){
-        resolve();
-        return;
-      }
+      if(document.querySelector('script[src*="'+name+'"]')){ resolve(); return; }
       const s=document.createElement("script");
       s.src="js/"+name+(version?"?v="+version:"");
       s.async=false;
       let terminado=false;
-      const terminar=(estado)=>{
-        if(terminado)return;
-        terminado=true;
-        if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);
-        resolve();
-      };
-      s.onload=()=>terminar("ok");
-      s.onerror=()=>terminar("error");
-      setTimeout(()=>terminar("timeout"), 4000);
-      document.body.appendChild(s);
+      const terminar=(estado)=>{ if(terminado)return; terminado=true; if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name); resolve(); };
+      s.onload=()=>terminar("ok"); s.onerror=()=>terminar("error"); setTimeout(()=>terminar("timeout"),4000); document.body.appendChild(s);
     });
   }
-
-  function terminarBootUI(){
-    if(window.__BC_UI_READY_RESOLVED__) return;
-    window.__BC_UI_READY_RESOLVED__=true;
-    resolveUIReady();
-  }
-
-  // El shell autenticado NO depende de que cada módulo opcional termine de descargar.
-  // Primero habilitamos la UI y luego dejamos que los módulos complementarios se carguen
-  // en paralelo, evitando el bloqueo secuencial que podía dejar al usuario en el login.
-  const actuales = modules.filter(([name]) => !document.querySelector('script[src*="'+name+'"]'));
-  const pendientes = actuales.map(([name,version]) => cargarUno(name,version));
-  setTimeout(terminarBootUI, 1500);
-  Promise.allSettled(pendientes).then(terminarBootUI);
+  function terminarBootUI(){ if(window.__BC_UI_READY_RESOLVED__) return; window.__BC_UI_READY_RESOLVED__=true; resolveUIReady(); }
+  const actuales=modules.filter(([name])=>!document.querySelector('script[src*="'+name+'"]'));
+  const pendientes=actuales.map(([name,version])=>cargarUno(name,version));
+  setTimeout(terminarBootUI,1500); Promise.allSettled(pendientes).then(terminarBootUI);
 })();
