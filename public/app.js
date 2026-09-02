@@ -41,12 +41,10 @@
     ["m56-turnos-secuencia-ui.js","56.7"],
     ["m57-turnos-sesion-ux-fix.js","57.5"],
     ["m68-ventas-pos-definitivo.js","9.4.75"],
-    ["hotfix-regresiones-20260902.js","20260902.1"]
+    ["hotfix-regresiones-20260902.js","20260902.1"],
+    ["hotfix-turno-forceclose-20260902.js","20260902.1"]
   ];
 
-  // The shell must remain hidden until the whole current patch chain has
-  // executed. Otherwise auth can reveal the static legacy DOM while the
-  // definitive modules are still arriving, producing the "old UI flash".
   let resolveUIReady;
   window.__BC_UI_READY__ = new Promise(resolve => { resolveUIReady = resolve; });
   window.__BC_UI_READY_RESOLVED__ = false;
@@ -69,7 +67,6 @@
       };
       s.onload=()=>terminar("ok");
       s.onerror=()=>terminar("error");
-      // Never leave the app shell blocked forever on one bad asset/network.
       setTimeout(()=>terminar("timeout"), 10000);
       document.body.appendChild(s);
     });
