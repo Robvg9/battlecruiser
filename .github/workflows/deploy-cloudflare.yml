@@ -22,10 +22,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Normalize Cloudflare API token
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          TOKEN="${RAW_CLOUDFLARE_API_TOKEN//$'\r'/}"
+          TOKEN="${TOKEN//$'\n'/}"
+          TOKEN="${TOKEN#Bearer }"
+          TOKEN="${TOKEN#bearer }"
+          if [ -z "$TOKEN" ]; then
+            echo "Cloudflare API token secret is empty."
+            exit 1
+          fi
+          printf 'CLOUDFLARE_API_TOKEN=%s\n' "$TOKEN" >> "$GITHUB_ENV"
+          echo "✅ Cloudflare API token normalized."
+
       - name: Resolve Cloudflare account ID from API token
         shell: bash
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
         run: |
           set -uo pipefail
           unset CLOUDFLARE_ACCOUNT_ID
@@ -43,10 +60,10 @@ jobs:
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
           command: deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Verify production serves this commit
