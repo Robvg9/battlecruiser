@@ -38,8 +38,34 @@ window.__bcOnContextoLoaderReady = function () {
   }
 };
 
+function bcUIReadyThen(fn) {
+  const ready = window.__BC_UI_READY__;
+  if (!ready || typeof ready.then !== "function") {
+    fn();
+    return;
+  }
+  Promise.race([
+    ready,
+    new Promise(resolve => setTimeout(resolve, 12000))
+  ]).then(fn).catch(fn);
+}
+
 function showApp(session) {
   if (!session || !session.user) return;
+
+  // Nunca expongas el shell estático/legacy antes de que la cadena UI actual
+  // termine. Esto elimina el pantallazo de menús/vistas retirados durante boot.
+  if (!window.__BC_UI_READY_RESOLVED__) {
+    _bcPendingSession = session;
+    bcUIReadyThen(() => {
+      if (_bcPendingSession === session || _bcPendingSession) {
+        const pending = _bcPendingSession || session;
+        _bcPendingSession = null;
+        showApp(pending);
+      }
+    });
+    return;
+  }
 
   // Idempotencia: misma sesión y shell ya visible → solo asegurar contexto
   if (_bcSesionActivaId === session.user.id && appShell && appShell.classList.contains("visible")) {
@@ -104,9 +130,12 @@ function bcResolverBootSinSesion() {
 }
 
 function bcResolverBootConSesion(session) {
-  document.documentElement.classList.remove("bc-auth-booting");
-  if (loginForm) loginForm.removeAttribute("aria-busy");
-  showApp(session);
+  const mostrar = () => {
+    document.documentElement.classList.remove("bc-auth-booting");
+    if (loginForm) loginForm.removeAttribute("aria-busy");
+    showApp(session);
+  };
+  bcUIReadyThen(mostrar);
 }
 
 client.auth.getSession().then(function (res) {
@@ -239,14 +268,14 @@ safeInit("nuevo-usuario", () => {
       const { data, error } = await clienteTemporal.auth.signUp({ email, password });
       if (error) {
         msgEl.textContent = "Error al crear usuario: " + (error.message || "Error desconocido");
-        console.error("[Battlecruiser] (nuevo-usuario)", error);
+        console.error("[BattleCruiser] (nuevo-usuario)", error);
         return;
       }
 
       const nuevoId = data && data.user && data.user.id;
       if (!nuevoId) {
         msgEl.textContent = "El usuario se creó en autenticación, pero no se recibió su id. Contactá soporte técnico antes de reintentar.";
-        console.error("[Battlecruiser] (nuevo-usuario) signUp sin data.user.id", data);
+        console.error("[BattleCruiser] (nuevo-usuario) signUp sin data.user.id", data);
         return;
       }
 
@@ -262,7 +291,7 @@ safeInit("nuevo-usuario", () => {
       if (typeof refrescarUsuarios === "function") refrescarUsuarios();
     } catch (e) {
       msgEl.textContent = "Ocurrió un error inesperado al crear el usuario (" + (e && e.message ? e.message : "error desconocido") + "). No se pudo confirmar si quedó creado — revisá la lista antes de reintentar.";
-      console.error("[Battlecruiser] (nuevo-usuario) excepción inesperada", e);
+      console.error("[BattleCruiser] (nuevo-usuario) excepción inesperada", e);
     } finally {
       hideLoading();
     }
