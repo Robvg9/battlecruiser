@@ -1,7 +1,7 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.70 — M68 Ventas POS Definitivo (estructura + CSS autoritativo)
+// v9.4.71 — M68 Ventas POS Definitivo (estructura + CSS autoritativo)
 (function hotfixV9470(){
-  const VERSION="9.4.70";
+  const VERSION="9.4.71";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -42,7 +42,7 @@
     ["m56-turnos-secuencia-ui.js","56.7"],
     ["m57-turnos-sesion-ux-fix.js","57.5"],
     // M68 last = authoritative POS structure + visual layer
-    ["m68-ventas-pos-definitivo.js","9.4.70"]
+    ["m68-ventas-pos-definitivo.js","9.4.71"]
   ];
   modules.forEach(([name,version])=>{
     if(document.querySelector('script[src*="'+name+'"]'))return;
