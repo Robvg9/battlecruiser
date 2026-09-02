@@ -3,16 +3,31 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
 const hotfix = fs.readFileSync(path.join(root, 'public', 'js', 'hotfix-regresiones-20260902.js'), 'utf8');
 const force = fs.readFileSync(path.join(root, 'public', 'js', 'hotfix-turno-forceclose-20260902.js'), 'utf8');
 const sql = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260902_bc_regresiones_operativas.sql'), 'utf8');
+const NEW_JS = [
+  'hotfix-regresiones-20260902.js',
+  'hotfix-turno-forceclose-20260902.js',
+  'hotfix-configuracion-20260902.js',
+  'hotfix-inventario-inmediato-20260902.js',
+  'hotfix-integracion-final-20260902.js'
+];
 
 test('loader: no vuelve a ocultar Configuración y carga el hotfix final', () => {
   assert.ok(!app.includes('["hide-config-tab.js","42.2"]'), 'hide-config-tab no debe volver a cargar');
   assert.ok(app.includes('hotfix-regresiones-20260902.js'));
   assert.ok(app.includes('hotfix-turno-forceclose-20260902.js'));
+  assert.ok(app.includes('hotfix-integracion-final-20260902.js'));
+});
+
+test('syntax: todos los módulos JS nuevos pasan node --check', () => {
+  for (const file of NEW_JS) {
+    execFileSync(process.execPath, ['--check', path.join(root, 'public', 'js', file)], { stdio: 'pipe' });
+  }
 });
 
 test('logout: usa LogOut y frontera de sesión', () => {
@@ -37,6 +52,7 @@ test('turnos: existe agrupación explícita de mañana y tarde', () => {
 test('force-close: solo vía RPC administrativa', () => {
   assert.ok(force.includes("bc_forzar_cierre_turno_admin"));
   assert.ok(force.includes("tienePermiso('turnos', 'editar_any')"));
+  assert.ok(force.includes('BattleCruiserTurnoAPI.actorIsAdmin'));
   assert.ok(sql.includes("IF NOT public.bc_actor_is_admin()"));
   assert.ok(sql.includes("estado_maestro = 'CERRADO'"));
 });
