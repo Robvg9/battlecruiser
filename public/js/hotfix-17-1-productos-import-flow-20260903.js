@@ -32,12 +32,15 @@
   function cleanLegacy(){
     document.getElementById('bc149-menu')?.remove();
     document.getElementById('bc-m55-template')?.remove();
+    document.getElementById('bc164-add-open')?.remove();
     document.querySelectorAll('#tab-productos .bc-m55-bar').forEach(function(x){x.remove()});
     document.querySelectorAll('#tab-productos button').forEach(function(b){
       if(b.closest('#bc171-overlay'))return;
+      if(b.id==='bc171-add')return;
       var t=txt(b);
-      if(/^(importar excel\s*\/\s*csv|importar productos|plantilla xlsx|plantilla csv|como llenar|cómo llenar)$/.test(t))b.remove();
+      if(/^(importar excel\s*\/\s*csv|importar productos|plantilla xlsx|plantilla csv|como llenar|cómo llenar|agregar producto)$/.test(t))b.remove();
     });
+    document.getElementById('bc164-overlay')?.remove();
   }
   function close(){
     if(!overlay||!form||!placeholder)return;
@@ -70,28 +73,24 @@
       if(typeof window.__BCM55_openOffline==='function'){window.__BCM55_openOffline();return;}
       alert('El importador todavía no terminó de cargar.');
     }));
-    a2.appendChild(toolButton('bc171-help','Cómo llenar',function(){if(typeof window.__BC1410_csv==='function'){} alert('Obligatorio: nombre. Opcionales: categoria, precio_normal, precio_mayorista, presentacion_normal y presentacion_mayorista.');}));
-    s2.appendChild(a2);
-    steps.appendChild(s1);steps.appendChild(s2);
-    var fw=document.createElement('div');fw.className='bc171-form-wrap';fw.id='bc171-form-host';
-    fw.appendChild(form);
+    a2.appendChild(toolButton('bc171-help','Cómo llenar',function(){alert('Obligatorio: nombre. Opcionales: categoria, precio_normal, precio_mayorista, presentacion_normal y presentacion_mayorista.');}));
+    s2.appendChild(a2);steps.appendChild(s1);steps.appendChild(s2);
+    var fw=document.createElement('div');fw.className='bc171-form-wrap';fw.id='bc171-form-host';fw.appendChild(form);
     var foot=document.createElement('div');foot.className='bc171-footer';
     var cancel=document.createElement('button');cancel.type='button';cancel.className='bc171-cancel';cancel.textContent='Cancelar';cancel.onclick=close;
     var save=document.createElement('button');save.type='button';save.className='bc171-save';save.id='bc171-save';save.textContent='Registrar nuevo producto';save.onclick=function(){if(form.requestSubmit)form.requestSubmit();else form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));};
     foot.appendChild(cancel);foot.appendChild(save);
     modal.appendChild(head);modal.appendChild(steps);modal.appendChild(fw);modal.appendChild(foot);overlay.appendChild(modal);document.body.appendChild(overlay);
     var native=form.querySelector('#prod-submit-btn');if(native)native.classList.add('bc171-native-hidden');
-    head.querySelector('.bc171-close').onclick=close;
-    overlay.addEventListener('click',function(e){if(e.target===overlay)close()});
+    head.querySelector('.bc171-close').onclick=close;overlay.addEventListener('click',function(e){if(e.target===overlay)close()});
   }
   function ensure(){
-    var tab=document.getElementById('tab-productos'),f=document.getElementById('form-producto');
-    if(!tab||!f)return false;
+    var tab=document.getElementById('tab-productos'),f=document.getElementById('form-producto');if(!tab||!f)return false;
     form=f;css();cleanLegacy();
     var old=document.getElementById('bc171-add');if(!old){old=document.createElement('button');old.type='button';old.id='bc171-add';old.className='bc171-add';old.textContent='Registrar nuevo producto';old.onclick=open;tab.insertBefore(old,tab.firstChild)}
     window.__BC171_open=open;window.__BC171_close=close;return true;
   }
-  function boot(){[0,300,800,1500,3000].forEach(function(ms){setTimeout(ensure,ms)})}
+  function boot(){[0,300,800,1500,3000,5000].forEach(function(ms){setTimeout(ensure,ms)})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-  window.__BC171_verify=function(){return{addButton:!!document.getElementById('bc171-add'),legacyGone:!document.getElementById('bc149-menu')&&!document.getElementById('bc-m55-template')&&!document.querySelector('#tab-productos .bc-m55-bar'),form:!!document.getElementById('form-producto'),inModal:!!(document.querySelector('#bc171-overlay #form-producto')),step1:!!document.getElementById('bc171-xlsx')&&!!document.getElementById('bc171-csv'),step2:!!document.getElementById('bc171-import'),save:!!document.getElementById('bc171-save')}};
+  window.__BC171_verify=function(){return{addButton:!!document.getElementById('bc171-add'),legacyGone:!document.getElementById('bc149-menu')&&!document.getElementById('bc-m55-template')&&!document.querySelector('#tab-productos .bc-m55-bar')&&!document.getElementById('bc164-add-open'),form:!!document.getElementById('form-producto'),inModal:!!(document.querySelector('#bc171-overlay #form-producto')),step1:!!document.getElementById('bc171-xlsx')&&!!document.getElementById('bc171-csv'),step2:!!document.getElementById('bc171-import'),save:!!document.getElementById('bc171-save')}};
 })();
