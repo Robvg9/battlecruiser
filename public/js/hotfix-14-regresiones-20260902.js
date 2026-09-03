@@ -1,23 +1,11 @@
 // BattleCruiser — hotfix 14 regresiones operativas
 (function(){
-  'use strict';
-  if(window.__BC14Regresiones20260902)return;
-  window.__BC14Regresiones20260902=true;
-  function num(v){var n=Number(v);return Number.isFinite(n)?n:0;}
-  function instalarStockCanonico(){
-    if(typeof window.cargarStockAlmacenes!=='function')return false;
-    if(window.cargarStockAlmacenes.__bc14StockCanonico)return true;
-    async function cargar(force){
-      if(!force&&window._stockCargaEstado==='ok'&&Array.isArray(window._cache&&window._cache.stock)){window.renderPanelAlmacenSeleccionado?.();return window._cache.stock;}
-      window._stockCargaEstado='loading';window._stockCargaError=null;
-      try{var r=await window.client.rpc('bc_stock_operativo');if(r.error)throw r.error;var rows=Array.isArray(r.data)?r.data:[];window._cache=window._cache||{};window._cache.stock=rows.map(function(x){return{id:x.id||null,producto_id:x.producto_id,almacen_id:x.almacen_id,cantidad:num(x.cantidad),minimo:x.minimo==null?null:num(x.minimo),productos:x.producto_nombre?{nombre:x.producto_nombre}:undefined,almacen_nombre:x.almacen_nombre||''};});window._stockCargaEstado='ok';window.renderPanelAlmacenSeleccionado?.();return window._cache.stock;}catch(e){window._stockCargaEstado='error';window._stockCargaError=e&&e.message?e.message:String(e);window.renderPanelAlmacenSeleccionado?.();return[];}
-    }
-    cargar.__bc14StockCanonico=true;window.cargarStockAlmacenes=cargar;try{cargarStockAlmacenes=cargar;}catch(_){ }return true;
-  }
-  function cargar(nombre,version){if(document.querySelector('script[src*="'+nombre+'"]'))return;var s=document.createElement('script');s.src='js/'+nombre+(version?'?v='+version:'');s.async=false;s.dataset.bc14chain='1';s.onerror=function(){console.warn('[BC] módulo 14 regresiones no cargó',nombre);};document.body.appendChild(s);}
-  function cargarCadena(){
-    [['bc14-3-compra-stock-refresh.js','3.1'],['bc14-4-inventario-inmediato.js','4.1'],['bc14-5-turnos-manana-tarde.js','5.1'],['bc14-6-configuracion-visible.js','6.1'],['bc14-8-comunicacion-ui.js','8.1'],['bc14-9-productos-menu.js','9.1'],['bc14-10-plantillas.js','10.1'],['bc14-12-venta-requisitos-ui.js','12.1'],['bc14-14-conectividad.js','14.2']].forEach(function(x){cargar(x[0],x[1]);});
-  }
-  function arrancar(){if(instalarStockCanonico()){cargarCadena();return;}[150,400,900,1800,3000].forEach(function(ms){setTimeout(function(){if(instalarStockCanonico())cargarCadena();},ms);});setTimeout(cargarCadena,3200);}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',arrancar,{once:true});else arrancar();
+'use strict';
+if(window.__BC14Regresiones20260902)return;window.__BC14Regresiones20260902=true;
+function num(v){var n=Number(v);return Number.isFinite(n)?n:0;}
+function instalarStockCanonico(){if(typeof window.cargarStockAlmacenes!=='function')return false;if(window.cargarStockAlmacenes.__bc14StockCanonico)return true;async function cargar(force){if(!force&&window._stockCargaEstado==='ok'&&Array.isArray(window._cache&&window._cache.stock)){window.renderPanelAlmacenSeleccionado?.();return window._cache.stock;}window._stockCargaEstado='loading';window._stockCargaError=null;try{var r=await window.client.rpc('bc_stock_operativo');if(r.error)throw r.error;var rows=Array.isArray(r.data)?r.data:[];window._cache=window._cache||{};window._cache.stock=rows.map(function(x){return{id:x.id||null,producto_id:x.producto_id,almacen_id:x.almacen_id,cantidad:num(x.cantidad),minimo:x.minimo==null?null:num(x.minimo),productos:x.producto_nombre?{nombre:x.producto_nombre}:undefined,almacen_nombre:x.almacen_nombre||''};});window._stockCargaEstado='ok';window.renderPanelAlmacenSeleccionado?.();return window._cache.stock;}catch(e){window._stockCargaEstado='error';window._stockCargaError=e&&e.message?e.message:String(e);window.renderPanelAlmacenSeleccionado?.();return[];}}cargar.__bc14StockCanonico=true;window.cargarStockAlmacenes=cargar;try{cargarStockAlmacenes=cargar;}catch(_){}return true;}
+function cargar(nombre,version){if(document.querySelector('script[src*="'+nombre+'"]'))return;var s=document.createElement('script');s.src='js/'+nombre+(version?'?v='+version:'');s.async=false;s.dataset.bc14chain='1';s.onerror=function(){console.warn('[BC] módulo 14 regresiones no cargó',nombre);};document.body.appendChild(s);}
+function cargarCadena(){[['bc14-3-compra-stock-refresh.js','3.1'],['bc14-4-inventario-inmediato.js','4.1'],['bc14-5-turnos-manana-tarde.js','5.2'],['bc14-6-configuracion-visible.js','6.1'],['bc14-8-comunicacion-ui.js','8.1'],['bc14-9-productos-menu.js','9.1'],['bc14-10-plantillas.js','10.1'],['bc14-12-venta-requisitos-ui.js','12.1'],['bc14-14-conectividad.js','14.2'],['hotfix-16-4-agregar-producto-modal-20260902.js','16.4']].forEach(function(x){cargar(x[0],x[1]);});}
+function arrancar(){if(instalarStockCanonico()){cargarCadena();return;}[150,400,900,1800,3000].forEach(function(ms){setTimeout(function(){if(instalarStockCanonico())cargarCadena();},ms);});setTimeout(cargarCadena,3200);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',arrancar,{once:true});else arrancar();
 })();
