@@ -57,7 +57,7 @@
     aprobarTurno:(t,o)=>callRpc(RPC.aprobarTurno,{p_turno_id:t,p_comentario:o||null}),
     aprobarDiferencia:(d,o)=>callRpc(RPC.aprobarDiferencia,{p_diferencia_id:d,p_comentario:o||null}),
     crearDescuento:o=>{o=o||{};return callRpc(RPC.crearDescuento,{p_turno_id:o.turnoId,p_usuario_id:o.usuarioId,p_monto:Number(o.monto),p_motivo:o.motivo||'',p_turno_sesion_id:o.sesionId||null,p_turno_tramo_id:o.tramoId||null})},
-    listarTurnos:o=>{o=o||{};return callRpc(RPC.listarTurnos,{p_usuario_id:o.usuarioId||null,p_estado:o.estado||null,p_almacen_id:o.almacenId||null,p_limite:o.limit??50,p_offset:o.offset??0})},
+    listarTurnos:o=>{o=o||{};if(String(o.estado||'').toUpperCase()==='PENDIENTE_APROBACION'){return callRpc(RPC.listarTurnosMaestros,{p_limite:o.limit??100,p_offset:o.offset??0}).then(function(data){const items=Array.isArray(data)?data:(data&&Array.isArray(data.turnos)?data.turnos:(data&&Array.isArray(data.items)?data.items:[]));return items.filter(function(t){return String((t&&t.estado_maestro)||'').toUpperCase()==='PENDIENTE_APROBACION';});});}return callRpc(RPC.listarTurnos,{p_usuario_id:o.usuarioId||null,p_estado:o.estado||null,p_almacen_id:o.almacenId||null,p_limite:o.limit??50,p_offset:o.offset??0})},
     listarTurnosMaestros:o=>{o=o||{};return callRpc(RPC.listarTurnosMaestros,{p_limite:o.limit??100,p_offset:o.offset??0})},
     // RLS-safe: no lectura directa de turno_sesiones. Usa la RPC del expediente, que ya es SECURITY DEFINER.
     listarSesionesTurno:listarSesionesViaExpediente,
