@@ -77,3 +77,13 @@ test('navegación: configuración y secciones operativas quedan visibles con ses
   assert.match(src, /Las acciones sensibles siguen protegidas por tienePermiso/);
   assert.match(src, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
 });
+
+test('navegación: guardia final garantiza botón Configuración aunque otra capa lo quite u oculte', () => {
+  const app = read('public/app.js');
+  const guard = read('public/js/hotfix-secciones-visibles-20260903.js');
+  assert.match(app, /hotfix-secciones-visibles-20260903\.js/);
+  assert.match(guard, /data-tab[\'\"]config/);
+  assert.match(guard, /textContent=LABELS\.config/);
+  assert.match(guard, /setProperty\('display','flex','important'\)/);
+  assert.match(guard, /MutationObserver/);
+});
