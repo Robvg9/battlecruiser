@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.76 — M68: boot de autenticación independiente de módulos opcionales
+// v9.4.77 — M68: boot de autenticación independiente de módulos opcionales
 (function hotfixV9475(){
-  const VERSION="9.4.76";
+  const VERSION="9.4.77";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -14,7 +14,7 @@
 })();
 (function cargarModulosDinamicos(){
   const modules=[
-    ["turno-api.js","9.4.5"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.2"],
+    ["turno-api.js","9.4.6"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.2"],
     ["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js",null],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.30"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","33.2"],
