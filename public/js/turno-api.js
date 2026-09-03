@@ -3,7 +3,7 @@
 (function (global) {
   'use strict';
   const TIMEOUT_MS=25000;
-  const RPC={crearTurno:'bc_crear_turno',crearSesion:'bc_crear_turno_sesion',asignarSesion:'bc_asignar_turno_sesion',iniciarSesion:'bc_iniciar_turno_sesion',cerrarSesion:'bc_cerrar_turno_sesion',interrumpirRelevar:'bc_interrumpir_y_relevar',declararDinero:'bc_declarar_dinero',enviarAprobacion:'bc_enviar_turno_a_aprobacion',aprobarTurno:'bc_aprobar_turno',aprobarDiferencia:'bc_aprobar_diferencia',crearDescuento:'bc_crear_descuento',registrarEntregaInv:'bc_registrar_entrega_inventario',recibirEntregaInv:'bc_recibir_entrega_inventario',recibirYCrearSucesor:'bc_recibir_entrega_inventario_y_crear_sucesor',prepararSucesor:'bc_preparar_turno_sucesor',crearSucesor:'bc_crear_sucesor_turno',turnoEstado:'bc_turno_estado',turnoTransition:'bc_turno_transition',actorIsAdmin:'bc_actor_is_admin',listarTurnos:'listar_turnos',listarTurnosMaestros:'bc_listar_turnos_maestros_home',anularTurno:'bc_anular_turno',configObtener:'bc_obtener_configuracion_turnos',configDuracion:'bc_configurar_duracion_turnos',editarDias:'bc_editar_dias_turno',registrarLlegadaCompra:'bc_registrar_llegada_compra',confirmarRecepcionCompra:'bc_confirmar_recepcion_compra',expediente:'bc_obtener_expediente_turno'};
+  const RPC={crearTurno:'bc_crear_turno',crearSesion:'bc_crear_turno_sesion',asignarSesion:'bc_asignar_turno_sesion',iniciarSesion:'bc_iniciar_turno_sesion',cerrarSesion:'bc_cerrar_turno_sesion',interrumpirRelevar:'bc_interrumpir_y_relevar',interrumpirRelevarConDeclaracion:'bc_interrumpir_y_relevar_con_declaracion',declararDinero:'bc_declarar_dinero',enviarAprobacion:'bc_enviar_turno_a_aprobacion',aprobarTurno:'bc_aprobar_turno',aprobarDiferencia:'bc_aprobar_diferencia',crearDescuento:'bc_crear_descuento',registrarEntregaInv:'bc_registrar_entrega_inventario',recibirEntregaInv:'bc_recibir_entrega_inventario',recibirYCrearSucesor:'bc_recibir_entrega_inventario_y_crear_sucesor',prepararSucesor:'bc_preparar_turno_sucesor',crearSucesor:'bc_crear_sucesor_turno',turnoEstado:'bc_turno_estado',turnoTransition:'bc_turno_transition',actorIsAdmin:'bc_actor_is_admin',listarTurnos:'listar_turnos',listarTurnosMaestros:'bc_listar_turnos_maestros_home',anularTurno:'bc_anular_turno',configObtener:'bc_obtener_configuracion_turnos',configDuracion:'bc_configurar_duracion_turnos',editarDias:'bc_editar_dias_turno',registrarLlegadaCompra:'bc_registrar_llegada_compra',confirmarRecepcionCompra:'bc_confirmar_recepcion_compra',expediente:'bc_obtener_expediente_turno'};
   function uuid(){return crypto.randomUUID()}
   function onlineRequired(){if(!navigator.onLine){const e=new Error('Esta operación de Turno requiere Internet.');e.code='OFFLINE';throw e}}
   function clientOk(){if(typeof client==='undefined'||!client||!client.rpc)throw new Error('Cliente Supabase no disponible.')}
@@ -16,12 +16,41 @@
     if(Array.isArray(expediente)) return expediente.length===1 && Array.isArray(expediente[0]?.sesiones) ? expediente[0].sesiones : [];
     return expediente && Array.isArray(expediente.sesiones) ? expediente.sesiones : [];
   }
+  async function interrumpirYRelevar(sesionId,sustitutoId,motivo,monto){
+    const tramos=await selectTable('turno_tramos','*','turno_sesion_id',sesionId,'inicio_at');
+    const activo=(tramos||[]).find(function(t){return String(t.estado||'').toUpperCase()==='ACTIVO';});
+    if(!activo||!activo.id)throw new Error('No hay un tramo activo para interrumpir.');
+    if(monto!=null)return callRpc(RPC.interrumpirRelevarConDeclaracion,{p_turno_tramo_id:activo.id,p_sustituto_id:sustitutoId,p_motivo:motivo||'Emergencia',p_monto:Number(monto)});
+    return callRpc(RPC.interrumpirRelevar,{p_turno_tramo_id:activo.id,p_sustituto_id:sustitutoId,p_motivo:motivo||'Emergencia'});
+  }
+  async function autenticarSustituto(usuarioOEmail,password){
+    clientOk(); onlineRequired();
+    if(!usuarioOEmail||!password)throw new Error('Usuario y contraseña del sustituto son obligatorios.');
+    if(!client.auth||!client.auth.getSession||!client.auth.signInWithPassword||!client.auth.setSession)throw new Error('Cliente Supabase no permite autenticación temporal del sustituto.');
+    let prevSession=null;
+    const sess=await client.auth.getSession();
+    prevSession=sess&&sess.data&&sess.data.session;
+    try{
+      let email=String(usuarioOEmail).trim();
+      if(email&&email.indexOf('@')===-1&&typeof client.rpc==='function'){
+        try{const r=await client.rpc('obtener_email_por_nombre_usuario',{p_nombre_usuario:usuarioOEmail});if(!r.error&&r.data)email=typeof r.data==='string'?r.data:(r.data.email||email)}catch(e){}
+      }
+      const sign=await client.auth.signInWithPassword({email:email,password:password});
+      if(sign.error)throw sign.error;
+      const sustituto=sign.data&&sign.data.user;
+      if(!sustituto)throw new Error('No se pudo autenticar al sustituto.');
+      return {id:sustituto.id,email:sustituto.email};
+    }finally{
+      if(prevSession&&prevSession.refresh_token){try{await client.auth.setSession({access_token:prevSession.access_token,refresh_token:prevSession.refresh_token})}catch(e){}}
+    }
+  }
   const API={
     RPC,uuid,
     crearTurno:o=>{o=o||{};return callRpc(RPC.crearTurno,{p_almacen_id:o.almacenId,p_fecha_inicio:o.inicioPlan,p_dias:o.cantidadDias,p_asignaciones:o.asignaciones||[]})},
     asignarSesion:(s,u)=>callRpc(RPC.asignarSesion,{p_turno_sesion_id:s,p_usuario_id:u}),
     iniciarSesion:s=>callRpc(RPC.iniciarSesion,{p_turno_sesion_id:s}),
     cerrarSesion:s=>callRpc(RPC.cerrarSesion,{p_turno_sesion_id:s}),
+    interrumpirYRelevar,
     anularTurno:(t,m)=>callRpc(RPC.anularTurno,{p_turno_id:t,p_motivo:m||null}),
     declararDinero:(t,m)=>callRpc(RPC.declararDinero,{p_turno_tramo_id:t,p_monto:Number(m)}),
     enviarAprobacion:t=>callRpc(RPC.enviarAprobacion,{p_turno_id:t}),
@@ -36,6 +65,10 @@
     obtenerExpedienteTurno:id=>callRpc(RPC.expediente,{p_turno_id:id}),
     actorIsAdmin:()=>callRpc(RPC.actorIsAdmin,{}),
     obtenerConfiguracion:()=>callRpc(RPC.configObtener,{}),
+    configurarDuracion:(habilitada,diasFijos)=>callRpc(RPC.configDuracion,{p_habilitada:Boolean(habilitada),p_dias_fijos:diasFijos==null?null:Number(diasFijos)}),
+    editarDiasTurno:(t,d)=>callRpc(RPC.editarDias,{p_turno_id:t,p_nuevos_dias:Number(d)}),
+    registrarEntregaInventario:(t,r,c)=>callRpc(RPC.registrarEntregaInv,{p_turno_id:t,p_usuario_receptor:r||null,p_comentario:c||null}),
+    autenticarSustituto,
     registrarLlegadaCompra:(compraId,almacenId,observacion)=>callRpc(RPC.registrarLlegadaCompra,{p_compra_id:compraId,p_almacen_id:almacenId,p_observacion:observacion||null}),
     confirmarRecepcionCompra:(recepcionId,aceptar,observacion)=>callRpc(RPC.confirmarRecepcionCompra,{p_recepcion_id:recepcionId,p_aceptar:Boolean(aceptar),p_observacion:observacion||null}),
     turnoEstado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
