@@ -9,7 +9,8 @@ var mods=[
  ['hotfix-17-12-comunicacion-limpiar-pruebas-20260903.js','17.12'],
  ['hotfix-17-13-configuracion-admin-visible-20260903.js','17.13'],
  ['hotfix-17-15-reportes-dedupe-id-20260903.js','17.15'],
- ['hotfix-17-17-reportes-unificacion-20260903.js','17.17']
+ ['hotfix-17-17-reportes-unificacion-20260903.js','17.17'],
+ ['hotfix-17-18-presentacion-rpc-map-20260903.js','17.18']
 ];
 function load(name,v){if(document.querySelector('script[src*="'+name+'"]'))return;var s=document.createElement('script');s.src='js/'+name+'?v='+v;s.async=false;document.body.appendChild(s)}
 function boot(){mods.forEach(function(x){load(x[0],x[1])})}
