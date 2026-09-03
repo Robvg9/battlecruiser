@@ -38,7 +38,7 @@
     ["m68-ventas-pos-definitivo.js","9.4.75"],["hotfix-regresiones-20260902.js","20260902.1"],["hotfix-configuracion-20260902.js","20260902.1"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-turno-forceclose-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.1"],["bc14-ventas-stock.js","2.1"],
-    ["hotfix-17-1-productos-import-flow-20260903.js","17.1"]
+    ["hotfix-17-1-productos-import-flow-20260903.js","17.1"],["hotfix-17-2-productos-save-20260903.js","17.2"]
   ];
   let resolveUIReady;window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});window.__BC_UI_READY_RESOLVED__=false;
   function cargarUno(name,version){return new Promise(resolve=>{if(document.querySelector('script[src*="'+name+'"]')){resolve();return;}const s=document.createElement("script");s.src="js/"+name+(version?"?v="+version:"");s.async=false;let terminado=false;const terminar=(estado)=>{if(terminado)return;terminado=true;if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);resolve();};s.onload=()=>terminar("ok");s.onerror=()=>terminar("error");setTimeout(()=>terminar("timeout"),4000);document.body.appendChild(s);});}
