@@ -9,7 +9,9 @@
   function clientOk(){if(typeof client==='undefined'||!client||!client.rpc)throw new Error('Cliente Supabase no disponible.')}
   function normalize(data){if(data==null)return null;return Array.isArray(data)?(data.length===1?data[0]:data):data}
   async function callRpc(name,params){clientOk();onlineRequired();let timer=null;try{if(typeof showLoading==='function')showLoading();const call=client.rpc(name,params||{});const timeout=new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error('Tiempo de espera agotado (25s).')),TIMEOUT_MS)});const r=await Promise.race([call,timeout]);if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'RPC_ERROR';e.rpc=name;e.raw=r.error;throw e}return normalize(r?r.data:null)}finally{if(timer)clearTimeout(timer);if(typeof resetLoadingOverlay==='function')resetLoadingOverlay();else if(typeof hideLoading==='function')hideLoading()}}
-  async function selectTable(table,columns,filterColumn,filterValue,orderColumn){clientOk();onlineRequired();if(!client.from)throw new Error('Cliente Supabase no permite consultas directas.');let q=client.from(table).select(columns||'*');if(filterColumn)q=q.eq(filterColumn,filterValue);if(orderColumn)q=q.order(orderColumn,{ascending:true});const r=await q;if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'QUERY_ERROR';e.table=table;throw e}return r&&r.data?r.data:[]}
+  function callRpcWithObject(o){return callRpc(o.name,o.params)}
+  function registerCall(name,params){return callRpcWithObject({name,params})}
+  function selectTable(table,columns,filterColumn,filterValue,orderColumn){clientOk();onlineRequired();if(!client.from)throw new Error('Cliente Supabase no permite consultas directas.');let q=client.from(table).select(columns||'*');if(filterColumn)q=q.eq(filterColumn,filterValue);if(orderColumn)q=q.order(orderColumn,{ascending:true});return q.then(r=>{if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'QUERY_ERROR';e.table=table;throw e}return r&&r.data?r.data:[]})}
   async function listarSesionesViaExpediente(id){
     if(!id) return [];
     const expediente=await callRpc(RPC.expediente,{p_turno_id:id});
@@ -36,6 +38,8 @@
     obtenerExpedienteTurno:id=>callRpc(RPC.expediente,{p_turno_id:id}),
     actorIsAdmin:()=>callRpc(RPC.actorIsAdmin,{}),
     obtenerConfiguracion:()=>callRpc(RPC.configObtener,{}),
+    registrarLlegadaCompra:(compraId,almacenId,observacion)=>callRpc(RPC.registrarLlegadaCompra,{p_compra_id:compraId,p_almacen_id:almacenId,p_observacion:observacion||null}),
+    confirmarRecepcionCompra:(recepcionId,aceptar,observacion)=>callRpc(RPC.confirmarRecepcionCompra,{p_recepcion_id:recepcionId,p_aceptar:Boolean(aceptar),p_observacion:observacion||null}),
     turnoEstado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
     estado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
     labelEstado:e=>({PROGRAMADO:'Programado',EN_CURSO:'En curso',PENDIENTE_APROBACION:'Pendiente de aprobación',CERRADO:'Cerrado',CANCELADO:'Cancelado',ACTIVO:'Activo',PLANIFICADO:'Programado',EN_VALIDACION:'Pendiente de aprobación',VALIDADO:'Cerrado'})[String(e||'').toUpperCase()]||e||'—'
