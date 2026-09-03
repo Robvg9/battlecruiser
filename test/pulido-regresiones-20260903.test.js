@@ -87,3 +87,28 @@ test('navegación: guardia final garantiza botón Configuración aunque otra cap
   assert.match(guard, /setProperty\('display','flex','important'\)/);
   assert.match(guard, /MutationObserver/);
 });
+
+test('configuración: contiene el antiguo panel Ajustes con sus opciones principales', () => {
+  const src = read('public/js/configuracion.js');
+  for (const token of [
+    'Ajustes básicos',
+    'Actualizar app / borrar caché',
+    'Modo oscuro',
+    'Modo claro',
+    'Actualización automática',
+    'Sincronización automática',
+    'Sincronizar al abrir app',
+    'Sincronizar solo en Wi‑Fi',
+    'Región / Conexión',
+    'Notificaciones',
+    'Modo compacto',
+    'Cambiar contraseña',
+    'Administrador de datos',
+    'Restaurar ajustes',
+    'Cerrar sesión',
+    'bc-ui-preferences-v2'
+  ]) assert.match(src, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  assert.match(src, /document\.getElementById\("update-app-btn"\)/);
+  assert.match(src, /document\.getElementById\("change-pass-btn"\)/);
+  assert.match(src, /document\.getElementById\("logout-btn"\)/);
+});

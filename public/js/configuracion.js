@@ -48,9 +48,9 @@ function renderDiagnosticoConfig() {
   const user = typeof _usuarioActual !== "undefined" && _usuarioActual ? ((_usuarioActual.nombre || "—") + (_usuarioActual.rol ? " · " + _usuarioActual.rol : "")) : "—";
   const b3 = typeof contextoB3Disponible === "function" && contextoB3Disponible();
   function card(valor, etiqueta) { return '<div class="resumen-card"><div class="valor">' + valor + '</div><div class="etiqueta">' + etiqueta + "</div></div>"; }
-  grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(escHtml(user), "Usuario actual");
+  grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual");
   const nota = document.getElementById("cfg-backup-nota");
-  if (nota) nota.textContent = "Respaldo/restauración de datos: no implementado en el cliente. Requiere política y herramientas de Supabase (export/import) fuera de esta PWA.";
+  if (nota) nota.textContent = "Respaldo/restauración de datos: no implementado en el cliente. Requiere política y herramientas de Supabase.";
   const btnMando = document.getElementById("cfg-ir-mando");
   if (btnMando) btnMando.classList.toggle("hidden", !(typeof tienePermiso === "function" && tienePermiso("auditoria", "ver")));
 }
@@ -77,6 +77,18 @@ safeInit("config-mantenimiento", function () {
   function load() {
     if (document.getElementById("bc-ui-revision-script")) return;
     var s = document.createElement("script"); s.id = "bc-ui-revision-script"; s.src = "js/ui-revision-2026-08.js"; s.defer = true; document.head.appendChild(s);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", load, { once: true }); else load();
+})();
+
+(function cargarAjustesMigradosConfiguracion() {
+  function load() {
+    if (document.getElementById("bc-config-ajustes-migrados-script")) return;
+    var s = document.createElement("script");
+    s.id = "bc-config-ajustes-migrados-script";
+    s.src = "js/configuracion-ajustes-migrados-20260903.js?v=1";
+    s.defer = true;
+    document.head.appendChild(s);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", load, { once: true }); else load();
 })();
