@@ -69,3 +69,11 @@ test('pulido: el submit del producto se captura antes del listener heredado', ()
   assert.match(src, /document\.addEventListener\('submit',formCapture,true\)/);
   assert.match(src, /stopImmediatePropagation/);
 });
+
+test('navegación: configuración y secciones operativas quedan visibles con sesión', () => {
+  const src = read('public/js/permisos-navegacion.js');
+  assert.match(src, /if \(tab === "config" \|\| tab === "pendientes"\)/);
+  assert.match(src, /setTabVisible\(btn, true\);/);
+  assert.match(src, /Las acciones sensibles siguen protegidas por tienePermiso/);
+  assert.match(src, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
+});

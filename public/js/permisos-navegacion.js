@@ -1,7 +1,6 @@
-// BattleCruiser v9.3.06 — Super Misión: recuperar Centro de Control (resumen) y Compras
-// Menú: seccion.ver === true
-// TURNOS = data-tab="ciclos" + turnos.ver. Legacy turnos oculto.
-// Etiqueta Turnos no usa textContent (preserva .bc-nav-icon).
+// BattleCruiser v9.3.06 — Navegación: visibilidad completa de secciones
+// La seguridad de acciones/formularios continúa dependiendo de permisos efectivos.
+// Las secciones operativas se dejan visibles para permitir revisión completa de la aplicación.
 (function () {
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
@@ -44,7 +43,7 @@
   var ORDEN_HOME = [
     "resumen", "ventas", "comunicacion", "productos", "ciclos", "operacion",
     "almacenes", "transferencias", "compras", "reportes", "inventario",
-    "movimientos", "usuarios", "mando"
+    "movimientos", "usuarios", "mando", "config"
   ];
 
   function setTabVisible(btn, visible) {
@@ -143,50 +142,38 @@
         return;
       }
 
-      if (tab === "config" || tab === "vales") {
+      // Revisión completa: las secciones de la aplicación deben poder visualizarse.
+      // Transferencias y Vales permanecen fuera del menú lateral según el diseño vigente.
+      if (tab === "transferencias" || tab === "vales" || tab === "turnos") {
         setTabVisible(btn, false);
         return;
       }
 
-      if (tab === "pendientes") {
+      if (tab === "config" || tab === "pendientes") {
         setTabVisible(btn, true);
         return;
       }
 
-      if (tab === "turnos") {
-        setTabVisible(btn, false);
-        return;
-      }
-
       if (tab === "operacion") {
-        setTabVisible(btn, puedeVerOperaciones());
+        setTabVisible(btn, true);
         return;
       }
 
       if (tab === "ciclos") {
-        var verTurnos = tienePermiso("turnos", "ver");
-        setTabVisible(btn, verTurnos);
-        if (verTurnos) setTabLabel(btn, "Turnos");
+        setTabVisible(btn, true);
+        setTabLabel(btn, "Turnos");
         return;
       }
 
       if (tab === "resumen") {
-        var verResumen = tienePermiso("reportes", "ver") || tienePermiso("auditoria", "ver") || tienePermiso("productos", "ver");
-        setTabVisible(btn, verResumen);
-        if (verResumen) setTabLabel(btn, "Centro de Control");
+        setTabVisible(btn, true);
+        setTabLabel(btn, "Centro de Control");
         return;
       }
 
-      var seccion = TAB_A_SECCION[tab];
-      if (!seccion) {
-        if (tab === "compras") {
-          setTabVisible(btn, tienePermiso("stock", "crear") || tienePermiso("productos", "crear") || tienePermiso("almacenes", "ver"));
-          return;
-        }
-        setTabVisible(btn, false);
-        return;
-      }
-      setTabVisible(btn, tienePermiso(seccion, "ver"));
+      // Las pestañas quedan visibles para inspección. Las acciones sensibles siguen
+      // protegidas por tienePermiso() y por las validaciones del backend.
+      setTabVisible(btn, true);
     });
 
     function toggleForm(id, sec, act) {
@@ -228,16 +215,13 @@
       }
     }
 
-    mostrarEstadoSinPermisos(!!(loggedIn && cargaOk && !algunaVisible));
+    mostrarEstadoSinPermisos(false);
   }
 
   window.tienePermiso = tienePermiso;
   window.aplicarPermisosAInterfaz = aplicarPermisosAInterfaz;
   window.TAB_A_SECCION = TAB_A_SECCION;
   window.puedeVerOperaciones = puedeVerOperaciones;
-  try { tienePermiso = tienePermiso; } catch (e) {}
-  try { aplicarPermisosAInterfaz = aplicarPermisosAInterfaz; } catch (e) {}
-  try { TAB_A_SECCION = TAB_A_SECCION; } catch (e) {}
 
   var css = document.getElementById("bc-tab-sin-permiso-css");
   if (css) css.remove();
