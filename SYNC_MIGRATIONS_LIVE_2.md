@@ -1,1 +1,0 @@
-Supabase LIVE migration history verified against GitHub on 2026-09-03. Canonical latest IDs: 20260903175826 and 20260903175852.
