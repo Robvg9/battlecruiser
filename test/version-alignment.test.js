@@ -17,9 +17,7 @@ test('app.js y service-worker.js comparten la misma versión BattleCruiser', () 
   assert.equal(swVersion, appVersion);
 });
 
-test('Service Worker usa su versión en los nombres de caché', () => {
-  const swVersion = extract(sw, /BC_SW_VERSION\s*=\s*["'](\d+\.\d+\.\d+)["']/, 'BC_SW_VERSION');
-  assert.match(sw, new RegExp(`battlecruiser-shell-\\" \\+ BC_SW_VERSION`));
-  assert.match(sw, new RegExp(`battlecruiser-static-\\" \\+ BC_SW_VERSION`));
-  assert.match(sw, new RegExp(`\\"${swVersion}\\"`));
+test('Service Worker construye los nombres de caché desde BC_SW_VERSION', () => {
+  assert.match(sw, /BC_SHELL\s*=\s*["']battlecruiser-shell-["']\s*\+\s*BC_SW_VERSION/);
+  assert.match(sw, /BC_STATIC\s*=\s*["']battlecruiser-static-["']\s*\+\s*BC_SW_VERSION/);
 });
