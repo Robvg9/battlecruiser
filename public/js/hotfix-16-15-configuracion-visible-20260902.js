@@ -1,0 +1,6 @@
+// BattleCruiser — 16.15: Configuración no puede desaparecer para administración.
+(function(){'use strict';if(window.__BC1615)return;window.__BC1615=true;
+function isAdmin(){try{var u=window._usuarioActual||window.__bcUser||{};var r=String(u.rol||u.role||u.nombre_rol||'').toLowerCase();if(['dueno','dueño','owner','admin','administrador'].indexOf(r)>=0)return true;return typeof tienePermiso==='function'&&(tienePermiso('configuracion','ver')||tienePermiso('configuracion','editar')||tienePermiso('usuarios','editar'));}catch(_){return false}}
+function install(){var b=document.querySelector('.tab-btn[data-tab="config"]'),p=document.getElementById('tab-config');if(!b||!p||!isAdmin())return false;['hidden','tab-sin-permiso','oculto'].forEach(function(c){b.classList.remove(c);p.classList.remove(c)});b.hidden=false;b.removeAttribute('aria-hidden');b.style.removeProperty('display');if(getComputedStyle(b).display==='none')b.style.display='';return true;}
+function boot(){[0,250,600,1200,2200,4000].forEach(function(ms){setTimeout(install,ms)});}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.__BC1615_verify=function(){var b=document.querySelector('.tab-btn[data-tab="config"]');return{button:!!b,visible:!!b&&b.hidden!==true&&getComputedStyle(b).display!=='none'}};
+})();
