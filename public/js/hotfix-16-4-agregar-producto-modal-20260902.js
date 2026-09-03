@@ -11,6 +11,7 @@ document.body.appendChild(modal);modal.querySelector('#bc164-form-host').appendC
 function closeModal(){if(!modal||!form||!placeholder)return;placeholder.parentNode.insertBefore(form,placeholder.nextSibling);modal.remove();modal=null;}
 function install(){var tab=findMain();form=document.getElementById('form-producto');if(!tab||!form)return false;if(!placeholder){placeholder=document.createComment('bc164-form-placeholder');form.parentNode.insertBefore(placeholder,form);}
 cleanupLegacy();css();var old=document.getElementById('bc164-add-open');if(!old){old=document.createElement('button');old.type='button';old.id='bc164-add-open';old.textContent='Agregar producto';old.onclick=openModal;tab.insertBefore(old,placeholder.nextSibling);}
+window.__BC164_open=openModal;window.__BC164_close=closeModal;
 return true;}
 function boot(){[0,300,800,1500,2500].forEach(function(ms){setTimeout(install,ms)});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
