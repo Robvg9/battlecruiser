@@ -1,7 +1,13 @@
 // BattleCruiser — 16.x regression suite
 (function(){'use strict';if(window.__BC16Suite)return;window.__BC16Suite=true;
 function r7(){var t=document.getElementById('tab-reportes');if(!t)return false;var f=t.querySelector('.bc-m42-filters');if(f){f.style.display='none';f.dataset.bc16='quick-hidden';}return !!t.querySelector('.bc-m45-quick');}
-function boot(){setTimeout(r7,800);setTimeout(r7,1800);}
+var cartQty={};
+function productId(el){return el?.dataset?.productoId||el?.dataset?.productId||el?.dataset?.id||el?.getAttribute?.('data-producto-id')||el?.getAttribute?.('data-product-id')||''}
+function badge(card,id){if(!id)return;var b=card.querySelector('.bc16-qty-badge');if(!b){b=document.createElement('span');b.className='bc16-qty-badge';b.style.cssText='position:absolute;top:6px;right:6px;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 11px/1 Inter,sans-serif;box-sizing:border-box;z-index:3;';card.style.position=card.style.position||'relative';card.appendChild(b);}var q=Number(cartQty[id]||0);b.textContent=q>0?String(q):'';b.style.display=q>0?'flex':'none';}
+function refreshBadges(){document.querySelectorAll('#tab-ventas [data-producto-id],#tab-ventas [data-product-id]').forEach(function(x){var c=x.closest('.bc-product-card,.producto-card,.catalogo-card,.venta-producto-card,[class*=card]')||x;var id=productId(x)||productId(c);if(id)badge(c,id)});}
+function wire(){var root=document.getElementById('tab-ventas');if(!root||root.dataset.bc16cart==='1')return false;root.dataset.bc16cart='1';root.addEventListener('click',function(e){var card=e.target.closest('[data-producto-id],[data-product-id],.bc-product-card,.producto-card,.catalogo-card');if(!card)return;var id=productId(card)||productId(card.querySelector('[data-producto-id],[data-product-id]'));if(!id)return;if(e.target.closest('button')||card.matches('.bc-product-card,.producto-card,.catalogo-card')){cartQty[id]=(Number(cartQty[id])||0)+1;setTimeout(refreshBadges,0);}});var obs=new MutationObserver(function(){refreshBadges()});obs.observe(root,{childList:true,subtree:true});refreshBadges();return true;}
+function boot(){r7();wire();[600,1200,2200].forEach(function(ms){setTimeout(wire,ms);setTimeout(refreshBadges,ms)});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.__BC16_verify7=function(){var f=document.querySelector('#tab-reportes .bc-m42-filters');return{quick:!!document.querySelector('#tab-reportes .bc-m45-quick'),filtersHidden:!!(f&&f.dataset.bc16==='quick-hidden')}};
+window.__BC16_verify8=function(){return{cartRoot:!!document.querySelector('#tab-ventas[data-bc16cart="1"]'),badgeCss:!!document.querySelector('.bc16-qty-badge')}};
 })();
