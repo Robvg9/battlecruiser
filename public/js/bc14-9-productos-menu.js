@@ -11,9 +11,11 @@ function install(){
  b.onclick=function(e){e.preventDefault();menu.hidden=!menu.hidden;menu.style.top=(b.offsetTop+b.offsetHeight+5)+'px';menu.style.left=b.offsetLeft+'px';};
  menu.querySelector('[data-a="save"]').onclick=function(){menu.hidden=true;f.requestSubmit();};
  menu.querySelector('[data-a="import"]').onclick=function(){menu.hidden=true;document.getElementById('bc-m55-open')?.click();};
- menu.querySelector('[data-a="xlsx"]').onclick=function(){menu.hidden=true;document.getElementById('bc-m55-template')?.click();};
- menu.querySelector('[data-a="csv"]').onclick=function(){menu.hidden=true;document.getElementById('bc-m55-template-csv')?.click();};
+ menu.querySelector('[data-a="xlsx"]').onclick=function(){menu.hidden=true;document.getElementById('bc14-template-xlsx')?.click();};
+ menu.querySelector('[data-a="csv"]').onclick=function(){menu.hidden=true;document.getElementById('bc14-template-csv')?.click();};
  menu.querySelector('[data-a="help"]').onclick=function(){alert('NOMBRE es obligatorio. Categoría, precio normal, precio mayorista, presentación normal y presentación mayorista son opcionales.');menu.hidden=true;};
+ var x=document.createElement('button');x.type='button';x.id='bc14-template-xlsx';x.hidden=true;x.onclick=function(){if(typeof window.__BC1410_xlsx==='function')window.__BC1410_xlsx();};f.appendChild(x);
+ var c=document.createElement('button');c.type='button';c.id='bc14-template-csv';c.hidden=true;c.onclick=function(){if(typeof window.__BC1410_csv==='function')window.__BC1410_csv();};f.appendChild(c);
  return true;
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){if(!install())setTimeout(install,600);},{once:true});else if(!install())setTimeout(install,600);
