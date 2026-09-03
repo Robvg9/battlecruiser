@@ -15,6 +15,8 @@ function loadApi() {
     client: { rpc },
     showLoading() {},
     resetLoadingOverlay() {},
+    setTimeout,
+    clearTimeout,
   };
   context.window = context;
   vm.runInNewContext(fs.readFileSync('public/js/turno-api.js', 'utf8'), context, { filename: 'turno-api.js' });
