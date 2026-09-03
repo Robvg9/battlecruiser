@@ -36,6 +36,8 @@
     obtenerExpedienteTurno:id=>callRpc(RPC.expediente,{p_turno_id:id}),
     actorIsAdmin:()=>callRpc(RPC.actorIsAdmin,{}),
     obtenerConfiguracion:()=>callRpc(RPC.configObtener,{}),
+    registrarLlegadaCompra:(compraId,almacenId,observacion)=>callRpc(RPC.registrarLlegadaCompra,{p_compra_id:compraId,p_almacen_id:almacenId,p_observacion:observacion||null}),
+    confirmarRecepcionCompra:(recepcionId,aceptar,observacion)=>callRpc(RPC.confirmarRecepcionCompra,{p_recepcion_id:recepcionId,p_aceptar:Boolean(aceptar),p_observacion:observacion||null}),
     turnoEstado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
     estado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
     labelEstado:e=>({PROGRAMADO:'Programado',EN_CURSO:'En curso',PENDIENTE_APROBACION:'Pendiente de aprobación',CERRADO:'Cerrado',CANCELADO:'Cancelado',ACTIVO:'Activo',PLANIFICADO:'Programado',EN_VALIDACION:'Pendiente de aprobación',VALIDADO:'Cerrado'})[String(e||'').toUpperCase()]||e||'—'
