@@ -35,6 +35,7 @@
     listarTramosSesion:id=>selectTable('turno_tramos','*','turno_sesion_id',id,'inicio_at'),
     obtenerExpedienteTurno:id=>callRpc(RPC.expediente,{p_turno_id:id}),
     actorIsAdmin:()=>callRpc(RPC.actorIsAdmin,{}),
+    obtenerConfiguracion:()=>callRpc(RPC.configObtener,{}),
     turnoEstado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
     estado:t=>callRpc(RPC.turnoEstado,{p_turno_id:t}),
     labelEstado:e=>({PROGRAMADO:'Programado',EN_CURSO:'En curso',PENDIENTE_APROBACION:'Pendiente de aprobación',CERRADO:'Cerrado',CANCELADO:'Cancelado',ACTIVO:'Activo',PLANIFICADO:'Programado',EN_VALIDACION:'Pendiente de aprobación',VALIDADO:'Cerrado'})[String(e||'').toUpperCase()]||e||'—'
