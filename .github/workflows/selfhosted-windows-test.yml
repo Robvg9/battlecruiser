@@ -2,8 +2,6 @@ name: BattleCruiser Self-Hosted Windows Test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 concurrency:
   group: battlecruiser-selfhosted-windows-${{ github.ref }}
@@ -13,17 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  stale-queue-cleanup:
-    if: ${{ github.event_name == 'push' && github.sha != github.event.before }}
-    runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 2
-    steps:
-      - name: Cleanup stale focused-run queue
-        shell: cmd
-        run: echo Focused Windows diagnostics are manual-only; this push run exists only to cancel stale queued diagnostics.
-
   selfhosted-windows:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 15
 
