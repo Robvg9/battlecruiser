@@ -64,37 +64,67 @@ function leerAppJsConcatenado(baseDir) {
       }
     } catch (_) {}
 
-    if (testClient && testClient.__rpcResult &&
-        typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
-      _usuarioActualId = "u-test";
-      _usuarioActual = {
-        id: "u-test",
-        nombre: "Test",
-        activo: true,
-        role_id: "r-test",
-        rol: "Dueño"
-      };
-      _permisosEfectivos = {
-        productos: { ver: true, crear: true, editar: true, borrar: true },
-        stock: { ver: true, crear: true, editar: true, borrar: true },
-        compras: { ver: true, crear: true, editar: true, borrar: true },
-        ventas: { ver: true, crear: true, editar: true, borrar: true },
-        transferencias: { ver: true, crear: true, editar: true, borrar: true },
-        vales: { ver: true, crear: true, editar: true, borrar: true },
-        almacenes: { ver: true, crear: true, editar: true, borrar: true },
-        reportes: { ver: true, crear: true, editar: true, borrar: true },
-        turnos: { ver: true, crear: true, editar: true, borrar: true },
-        usuarios: { ver: true, crear: true, editar: true, borrar: true },
-        auditoria: { ver: true, crear: true, editar: true, borrar: true },
-        comunicacion: { ver: true, crear: true, editar: true, borrar: true },
-        gastos: { ver: true, crear: true, editar: true, borrar: true },
-        mermas: { ver: true, crear: true, editar: true, borrar: true },
-        reinversiones: { ver: true, crear: true, editar: true, borrar: true },
-        responsabilidades: { ver: true, crear: true, editar: true, borrar: true },
-        incidencias: { ver: true, crear: true, editar: true, borrar: true }
-      };
-      _permisosCargaExitosa = true;
-      _permisosCargaFallidaRed = false;
+    if (testClient && testClient.__rpcResult) {
+      try {
+        if (!testClient.__bcB23RpcShim) {
+          const originalRpc = testClient.rpc.bind(testClient);
+          const perfil = [{ id: "u-test", nombre: "Test", activo: true, role_id: "r-test", rol: "Dueño" }];
+          const permisoFilas = [
+            ["productos", "ver"], ["productos", "crear"], ["productos", "editar"], ["productos", "borrar"],
+            ["stock", "ver"], ["stock", "crear"], ["stock", "editar"], ["stock", "borrar"],
+            ["compras", "ver"], ["compras", "crear"], ["compras", "editar"], ["compras", "borrar"],
+            ["ventas", "ver"], ["ventas", "crear"], ["ventas", "editar"], ["ventas", "borrar"],
+            ["transferencias", "ver"], ["transferencias", "crear"], ["transferencias", "editar"], ["transferencias", "borrar"],
+            ["vales", "ver"], ["vales", "crear"], ["vales", "editar"], ["vales", "borrar"],
+            ["almacenes", "ver"], ["almacenes", "crear"], ["almacenes", "editar"], ["almacenes", "borrar"],
+            ["reportes", "ver"], ["reportes", "crear"], ["reportes", "editar"], ["reportes", "borrar"],
+            ["turnos", "ver"], ["turnos", "crear"], ["turnos", "editar"], ["turnos", "borrar"],
+            ["usuarios", "ver"], ["usuarios", "crear"], ["usuarios", "editar"], ["usuarios", "borrar"],
+            ["auditoria", "ver"], ["auditoria", "crear"], ["auditoria", "editar"], ["auditoria", "borrar"],
+            ["comunicacion", "ver"], ["comunicacion", "crear"], ["comunicacion", "editar"], ["comunicacion", "borrar"],
+            ["gastos", "ver"], ["gastos", "crear"], ["gastos", "editar"], ["gastos", "borrar"],
+            ["mermas", "ver"], ["mermas", "crear"], ["mermas", "editar"], ["mermas", "borrar"],
+            ["reinversiones", "ver"], ["reinversiones", "crear"], ["reinversiones", "editar"], ["reinversiones", "borrar"],
+            ["responsabilidades", "ver"], ["responsabilidades", "crear"], ["responsabilidades", "editar"], ["responsabilidades", "borrar"],
+            ["incidencias", "ver"], ["incidencias", "crear"], ["incidencias", "editar"], ["incidencias", "borrar"],
+          ].map(([seccion, accion]) => ({ seccion, accion }));
+          testClient.rpc = async function(nombre, params) {
+            if (nombre === "perfil_usuario_actual") return { data: perfil, error: null };
+            if (nombre === "permisos_usuario_actual") return { data: permisoFilas, error: null };
+            if (nombre === "usuario_esta_activo") return { data: true, error: null };
+            return originalRpc(nombre, params);
+          };
+          testClient.__bcB23RpcShim = true;
+        }
+      } catch (_) {}
+
+      if (typeof _usuarioActualId !== "undefined") _usuarioActualId = "u-test";
+      if (typeof _usuarioActual !== "undefined") {
+        _usuarioActual = { id: "u-test", nombre: "Test", activo: true, role_id: "r-test", rol: "Dueño" };
+      }
+      if (typeof _permisosEfectivos !== "undefined") {
+        _permisosEfectivos = {
+          productos: { ver:true, crear:true, editar:true, borrar:true },
+          stock: { ver:true, crear:true, editar:true, borrar:true },
+          compras: { ver:true, crear:true, editar:true, borrar:true },
+          ventas: { ver:true, crear:true, editar:true, borrar:true },
+          transferencias: { ver:true, crear:true, editar:true, borrar:true },
+          vales: { ver:true, crear:true, editar:true, borrar:true },
+          almacenes: { ver:true, crear:true, editar:true, borrar:true },
+          reportes: { ver:true, crear:true, editar:true, borrar:true },
+          turnos: { ver:true, crear:true, editar:true, borrar:true },
+          usuarios: { ver:true, crear:true, editar:true, borrar:true },
+          auditoria: { ver:true, crear:true, editar:true, borrar:true },
+          comunicacion: { ver:true, crear:true, editar:true, borrar:true },
+          gastos: { ver:true, crear:true, editar:true, borrar:true },
+          mermas: { ver:true, crear:true, editar:true, borrar:true },
+          reinversiones: { ver:true, crear:true, editar:true, borrar:true },
+          responsabilidades: { ver:true, crear:true, editar:true, borrar:true },
+          incidencias: { ver:true, crear:true, editar:true, borrar:true },
+        };
+      }
+      if (typeof _permisosCargaExitosa !== "undefined") _permisosCargaExitosa = true;
+      if (typeof _permisosCargaFallidaRed !== "undefined") _permisosCargaFallidaRed = false;
       try { window.__bcTestClient = testClient; } catch (_) {}
     }
 
