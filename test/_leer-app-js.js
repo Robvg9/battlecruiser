@@ -195,7 +195,7 @@ function leerAppJsConcatenado(baseDir) {
   const nombresFunciones = [...source.matchAll(/(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)]
     .map((m) => m[1]);
   const exportaciones = [...new Set(nombresFunciones)]
-    .map((nombre) => `try { window[${JSON.stringify(nombre)}] = ${nombre}; } catch (_) {}`)
+    .map((nombre) => `try { if (typeof window[${JSON.stringify(nombre)}] !== "function") window[${JSON.stringify(nombre)}] = ${nombre}; } catch (_) {}`)
     .join("\n");
   const exportBridge = `
 ;(function __bcTestExportFunctionBindings(){
