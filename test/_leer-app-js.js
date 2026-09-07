@@ -29,9 +29,6 @@ function leerAppJsConcatenado(baseDir) {
     .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
     .join("\n");
 
-  // Compatibilidad exclusiva del harness. La producción mantiene
-  // _usuarioActual como variable interna; aquí exponemos un callable legacy
-  // que refleja dinámicamente el mismo objeto para los tests B3 antiguos.
   const bridge = `
 ;(function __bcTestCompatibilityBridge(){
   try {
@@ -72,10 +69,6 @@ function leerAppJsConcatenado(baseDir) {
       };
     }
 
-    // El bridge no debe introducir una espera artificial que deje operaciones
-    // offline huérfanas mientras auth.js ya conoce la sesión. Sincronizamos
-    // el id en cuanto el mock de auth resuelva y mantenemos solo un fail-safe
-    // corto para escenarios donde el contexto se inicializa más tarde.
     if (typeof _usuarioActualId !== "undefined" && typeof client !== "undefined" &&
         client.auth && typeof client.auth.getSession === "function") {
       Promise.resolve(client.auth.getSession()).then((res) => {
@@ -96,8 +89,24 @@ function leerAppJsConcatenado(baseDir) {
 })();
 `;
 
-  return source + "\n" + bridge;
+  const nombresFunciones = [...source.matchAll(/(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((m) => m[1]);
+  const exportBridge = `
+;(function __bcTestExportFunctionBindings(){
+  try {
+    const nombres = ${JSON.stringify([...new Set(nombresFunciones)])};
+    nombres.forEach((nombre) => {
+      try {
+        if (typeof window[nombre] !== "function" && typeof globalThis[nombre] === "function") {
+          window[nombre] = globalThis[nombre];
+        }
+      } catch (_) {}
+    });
+  } catch (_) {}
+})();
+`;
+
+  return source + "\n" + bridge + "\n" + exportBridge;
 }
 
-// Fuerza un nuevo ciclo de verificación del PR después de ajustes del harness.
 module.exports = { leerAppJsConcatenado, MODULOS_APP };
