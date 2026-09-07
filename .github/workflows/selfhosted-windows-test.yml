@@ -2,11 +2,9 @@ name: BattleCruiser Self-Hosted Windows Test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 concurrency:
-  group: battlecruiser-selfhosted-windows-${{ github.ref }}
+  group: battlecruiser-focused-windows-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
