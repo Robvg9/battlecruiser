@@ -9,6 +9,7 @@ permissions:
 jobs:
   selfhosted-windows:
     runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -37,4 +38,4 @@ jobs:
 
       - name: Automated tests
         shell: cmd
-        run: npm test
+        run: node --test --test-force-exit test/*.test.js
