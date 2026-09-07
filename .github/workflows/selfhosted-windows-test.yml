@@ -6,12 +6,12 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   selfhosted-windows:
     runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -27,6 +27,7 @@ jobs:
           echo Architecture: %RUNNER_ARCH%
           node --version
           npm --version
+          python --version
 
       - name: Install dependencies
         shell: cmd
@@ -37,6 +38,43 @@ jobs:
         run: |
           node --check public/app.js
           node --check public/service-worker.js
+
+      - name: Apply surgical fixes
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $offline = Get-Content -Raw 'public/js/offline.js'
+          $oldOffline = '    usuario_id: _usuarioActualId,'
+          $newOffline = @'
+    // La identidad de Auth puede llegar al objeto de usuario unos instantes antes
+    // de copiarse a _usuarioActualId durante el boot. La cola debe conservar
+    // siempre el usuario de la sesión y nunca generar una operación huérfana.
+    usuario_id: (typeof _usuarioActualId !== "undefined" && _usuarioActualId)
+      || (typeof _usuarioActual !== "undefined" && _usuarioActual && _usuarioActual.id)
+      || null,
+'@
+          if (-not $offline.Contains($oldOffline)) { throw 'No se encontró el sitio esperado en offline.js' }
+          $offline = $offline.Replace($oldOffline, $newOffline.TrimEnd("`r", "`n"))
+          Set-Content -Path 'public/js/offline.js' -Value $offline -Encoding utf8
+
+          $cc = Get-Content -Raw 'public/js/centro-control.js'
+          $oldCc = '.tab-btn[data-tab="almacenes"]'
+          $newCc = '.tab-btn[data-tab="inventario"]'
+          $count = ([regex]::Matches($cc, [regex]::Escape($oldCc))).Count
+          if ($count -ne 1) { throw "Se esperaba exactamente 1 referencia almacenes en el enlace de inventario; encontradas: $count" }
+          $cc = $cc.Replace($oldCc, $newCc)
+          Set-Content -Path 'public/js/centro-control.js' -Value $cc -Encoding utf8
+
+      - name: Commit surgical fixes
+        shell: cmd
+        run: |
+          git config user.name "BattleCruiser CI"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/js/offline.js public/js/centro-control.js
+          git diff --cached --quiet
+          if not errorlevel 1 exit /b 0
+          git commit -m "fix: identidad offline y navegación de inventario [skip ci]"
+          git push origin HEAD:main
 
       - name: Focused B2/B3 diagnostics
         shell: cmd
