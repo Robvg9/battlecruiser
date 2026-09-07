@@ -91,18 +91,12 @@ function leerAppJsConcatenado(baseDir) {
 
   const nombresFunciones = [...source.matchAll(/(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)]
     .map((m) => m[1]);
+  const exportaciones = [...new Set(nombresFunciones)]
+    .map((nombre) => `try { window[${JSON.stringify(nombre)}] = ${nombre}; } catch (_) {}`)
+    .join("\n");
   const exportBridge = `
 ;(function __bcTestExportFunctionBindings(){
-  try {
-    const nombres = ${JSON.stringify([...new Set(nombresFunciones)])};
-    nombres.forEach((nombre) => {
-      try {
-        if (typeof window[nombre] !== "function" && typeof globalThis[nombre] === "function") {
-          window[nombre] = globalThis[nombre];
-        }
-      } catch (_) {}
-    });
-  } catch (_) {}
+  ${exportaciones}
 })();
 `;
 
