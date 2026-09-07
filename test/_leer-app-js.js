@@ -29,7 +29,12 @@ function obtenerModulosProduccion(baseDir) {
   const appSource = fs.readFileSync(appPath, "utf8");
   const dinamicos = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)]
     .map((m) => m[1]);
-  return [...new Set([...MODULOS_APP, ...dinamicos])];
+  const candidatos = [...new Set([...MODULOS_APP, ...dinamicos])];
+  const jsDir = path.join(baseDir, "..", "public", "js");
+  // app.js deliberately tolerates missing optional modules at runtime.
+  // The harness must mirror that behavior instead of turning an optional
+  // missing file into a failure for every focused test.
+  return candidatos.filter((nombre) => fs.existsSync(path.join(jsDir, nombre)));
 }
 
 function leerAppJsConcatenado(baseDir) {
@@ -53,10 +58,6 @@ function leerAppJsConcatenado(baseDir) {
   const bridge = `
 ;(function __bcTestCompatibilityBridge(){
   try {
-    // B2.3's mock keeps the client in the test function's lexical scope, not
-    // on window. Recover that exact client through the same public factory
-    // used by production. B3 uses the same factory but exposes real profile/
-    // permission RPCs, so it remains semantically isolated.
     var testClient = null;
     try {
       if (window.supabase && typeof window.supabase.createClient === "function") {
@@ -104,23 +105,15 @@ function leerAppJsConcatenado(baseDir) {
       }
       if (typeof _permisosEfectivos !== "undefined") {
         _permisosEfectivos = {
-          productos: { ver:true, crear:true, editar:true, borrar:true },
-          stock: { ver:true, crear:true, editar:true, borrar:true },
-          compras: { ver:true, crear:true, editar:true, borrar:true },
-          ventas: { ver:true, crear:true, editar:true, borrar:true },
-          transferencias: { ver:true, crear:true, editar:true, borrar:true },
-          vales: { ver:true, crear:true, editar:true, borrar:true },
-          almacenes: { ver:true, crear:true, editar:true, borrar:true },
-          reportes: { ver:true, crear:true, editar:true, borrar:true },
-          turnos: { ver:true, crear:true, editar:true, borrar:true },
-          usuarios: { ver:true, crear:true, editar:true, borrar:true },
-          auditoria: { ver:true, crear:true, editar:true, borrar:true },
-          comunicacion: { ver:true, crear:true, editar:true, borrar:true },
-          gastos: { ver:true, crear:true, editar:true, borrar:true },
-          mermas: { ver:true, crear:true, editar:true, borrar:true },
-          reinversiones: { ver:true, crear:true, editar:true, borrar:true },
-          responsabilidades: { ver:true, crear:true, editar:true, borrar:true },
-          incidencias: { ver:true, crear:true, editar:true, borrar:true },
+          productos: { ver:true, crear:true, editar:true, borrar:true }, stock: { ver:true, crear:true, editar:true, borrar:true },
+          compras: { ver:true, crear:true, editar:true, borrar:true }, ventas: { ver:true, crear:true, editar:true, borrar:true },
+          transferencias: { ver:true, crear:true, editar:true, borrar:true }, vales: { ver:true, crear:true, editar:true, borrar:true },
+          almacenes: { ver:true, crear:true, editar:true, borrar:true }, reportes: { ver:true, crear:true, editar:true, borrar:true },
+          turnos: { ver:true, crear:true, editar:true, borrar:true }, usuarios: { ver:true, crear:true, editar:true, borrar:true },
+          auditoria: { ver:true, crear:true, editar:true, borrar:true }, comunicacion: { ver:true, crear:true, editar:true, borrar:true },
+          gastos: { ver:true, crear:true, editar:true, borrar:true }, mermas: { ver:true, crear:true, editar:true, borrar:true },
+          reinversiones: { ver:true, crear:true, editar:true, borrar:true }, responsabilidades: { ver:true, crear:true, editar:true, borrar:true },
+          incidencias: { ver:true, crear:true, editar:true, borrar:true }
         };
       }
       if (typeof _permisosCargaExitosa !== "undefined") _permisosCargaExitosa = true;
@@ -155,20 +148,6 @@ function leerAppJsConcatenado(baseDir) {
       };
     }
 
-    if (typeof cambiarEstadoUsuario !== "function") {
-      window.cambiarEstadoUsuario = async function(usuarioId, activo){
-        if (typeof tienePermiso === "function" && !tienePermiso("usuarios", "editar")) {
-          throw new Error("Sin permiso para cambiar estado de usuario");
-        }
-        const res = await client.rpc("cambiar_estado_usuario", {
-          p_usuario_id: usuarioId,
-          p_activo: !!activo
-        });
-        if (res && res.error) throw res.error;
-        return res;
-      };
-    }
-
     var clientForShim = testClient;
     if (clientForShim && typeof clientForShim.from === "function" && !clientForShim.__bcTestBuilderShim) {
       const originalFrom = clientForShim.from.bind(clientForShim);
@@ -194,22 +173,9 @@ function leerAppJsConcatenado(baseDir) {
         typeof testClient.auth.getSession === "function") {
       Promise.resolve(testClient.auth.getSession()).then((res) => {
         const sid = res && res.data && res.data.session && res.data.session.user && res.data.session.user.id;
-        if (sid && typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
-          _usuarioActualId = sid;
-        }
+        if (sid && typeof _usuarioActualId !== "undefined" && !_usuarioActualId) _usuarioActualId = sid;
       }).catch(() => {});
     }
-
-    try {
-      if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId &&
-          typeof _bcSesionActivaId !== "undefined" && _bcSesionActivaId) {
-        _usuarioActualId = _bcSesionActivaId;
-      }
-      if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId &&
-          typeof _usuarioActual !== "undefined" && _usuarioActual?.id) {
-        _usuarioActualId = _usuarioActual.id;
-      }
-    } catch (_) {}
 
     if (typeof window.__bcTestResolveUIReady === "function") {
       window.__BC_UI_READY_RESOLVED__ = true;
