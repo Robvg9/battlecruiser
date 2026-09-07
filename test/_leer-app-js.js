@@ -42,9 +42,6 @@ function leerAppJsConcatenado(baseDir) {
     .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
     .join("\n");
 
-  // Reproduce the production loader contract before any module executes:
-  // optional modules may wait for UI readiness, and auth must not reveal or
-  // initialize the shell until the complete production module graph loaded.
   const prelude = `
 ;(function __bcTestBootPrelude(){
   window.__BC_VERSION__ = ${JSON.stringify(version)};
@@ -56,6 +53,39 @@ function leerAppJsConcatenado(baseDir) {
   const bridge = `
 ;(function __bcTestCompatibilityBridge(){
   try {
+    // Some focused tests intentionally provide only a generic RPC result.
+    // Give those tests a complete authenticated session context so they can
+    // exercise UI/queue behavior without depending on the auth/profile RPCs.
+    // B3 and other contextual tests provide their own profile/perms RPCs and
+    // do not expose __rpcResult, so they keep their real test semantics.
+    if (typeof client !== "undefined" && client && client.__rpcResult &&
+        typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
+      _usuarioActualId = "u-test";
+      _usuarioActual = {
+        id: "u-test",
+        nombre: "Test",
+        activo: true,
+        role_id: "r-test",
+        rol: "Dueño"
+      };
+      _permisosEfectivos = {
+        productos: { ver: true, crear: true, editar: true },
+        stock: { ver: true, crear: true },
+        compras: { ver: true, crear: true },
+        ventas: { ver: true, crear: true },
+        transferencias: { ver: true, crear: true },
+        vales: { ver: true, crear: true },
+        almacenes: { ver: true, crear: true },
+        reportes: { ver: true },
+        turnos: { ver: true },
+        usuarios: { ver: true, crear: true },
+        auditoria: { ver: true },
+        comunicacion: { ver: true }
+      };
+      _permisosCargaExitosa = true;
+      _permisosCargaFallidaRed = false;
+    }
+
     if (typeof _usuarioActual !== "undefined") {
       const accessor = function(){ return _usuarioActual || null; };
       ["id","nombre","activo","role_id","rol","role","rol_nombre"].forEach((key) => {
