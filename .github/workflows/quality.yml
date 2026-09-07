@@ -1,64 +1,82 @@
 name: BattleCruiser Quality
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: battlecruiser-quality-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 35
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Verify runner environment
+        shell: cmd
+        run: |
+          echo Runner: %RUNNER_NAME%
+          echo OS: %RUNNER_OS%
+          echo Architecture: %RUNNER_ARCH%
+          node --version
+          npm --version
 
       - name: Install dependencies
+        shell: cmd
         run: npm ci
 
       - name: Syntax check
+        shell: cmd
         run: |
           node --check public/app.js
           node --check public/service-worker.js
 
-      - name: Automated tests
+      - name: Focused B2.3
+        shell: cmd
+        run: node --test --test-force-exit test/b2.3-centro-control.test.js
+
+      - name: Focused B3
+        shell: cmd
+        run: node --test --test-force-exit test/b3-usuarios-permisos.test.js
+
+      - name: Full automated suite
+        shell: cmd
         run: npm test
 
       - name: Verify production serves current application version
-        shell: bash
+        shell: powershell
         run: |
-          set -euo pipefail
-          EXPECTED_VERSION="$(grep -Eo 'const VERSION="[^"]+"' public/app.js | head -n 1 | cut -d'"' -f2)"
-          if [ -z "$EXPECTED_VERSION" ]; then
-            echo "❌ Could not determine expected application version from public/app.js."
-            exit 1
-          fi
-          echo "🔎 Expected production version: $EXPECTED_VERSION"
-          for attempt in 1 2 3 4 5; do
-            PROBE_URL="https://battlecruiser.robvg9.workers.dev/app.js?bc_verify=$(date +%s%N)"
-            if curl --fail --silent --show-error --location --max-time 30 \
-              -H 'Cache-Control: no-cache' "$PROBE_URL" -o /tmp/bc-production-app.js; then
-              if grep -Fq "const VERSION=\"$EXPECTED_VERSION\"" /tmp/bc-production-app.js; then
-                echo "✅ Production serves BattleCruiser $EXPECTED_VERSION."
-                exit 0
-              fi
-            fi
-            echo "⏳ Production has not reached $EXPECTED_VERSION yet (attempt $attempt/5)."
-            sleep 10
-          done
-          echo "❌ Production is not serving the expected version $EXPECTED_VERSION."
-          echo "Version markers found in production:"
-          grep -Eo 'const VERSION="[^"]+"' /tmp/bc-production-app.js | head -n 5 || true
-          exit 1
+          $ErrorActionPreference = 'Stop'
+          $match = Select-String -Path 'public/app.js' -Pattern 'const VERSION="([^"]+)"' | Select-Object -First 1
+          if (-not $match) { throw 'Could not determine expected application version from public/app.js.' }
+          $expected = $match.Matches.Groups[1].Value
+          Write-Host "Expected production version: $expected"
+          $ok = $false
+          for ($attempt = 1; $attempt -le 8; $attempt++) {
+            try {
+              $url = "https://battlecruiser.robvg9.workers.dev/app.js?bc_verify=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())-$attempt"
+              $body = (Invoke-WebRequest -UseBasicParsing -Headers @{ 'Cache-Control' = 'no-cache' } -Uri $url -TimeoutSec 30).Content
+              if ($body -like "*const VERSION=\"$expected\"*") {
+                Write-Host "Production serves BattleCruiser $expected."
+                $ok = $true
+                break
+              }
+            } catch {
+              Write-Host "Production probe failed on attempt $attempt: $($_.Exception.Message)"
+            }
+            Start-Sleep -Seconds 10
+          }
+          if (-not $ok) { throw "Production is not serving expected version $expected." }
