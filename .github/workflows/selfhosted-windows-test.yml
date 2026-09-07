@@ -9,6 +9,7 @@ permissions:
 jobs:
   selfhosted-windows:
     runs-on: [self-hosted, Windows, X64]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,24 +17,24 @@ jobs:
           fetch-depth: 1
 
       - name: Verify runner environment
-        shell: powershell
+        shell: cmd
         run: |
-          Write-Host "Runner: $env:RUNNER_NAME"
-          Write-Host "OS: $env:RUNNER_OS"
-          Write-Host "Architecture: $env:RUNNER_ARCH"
+          echo Runner: %RUNNER_NAME%
+          echo OS: %RUNNER_OS%
+          echo Architecture: %RUNNER_ARCH%
           node --version
           npm --version
 
       - name: Install dependencies
-        shell: powershell
+        shell: cmd
         run: npm ci
 
       - name: Syntax check
-        shell: powershell
+        shell: cmd
         run: |
           node --check public/app.js
           node --check public/service-worker.js
 
       - name: Automated tests
-        shell: powershell
+        shell: cmd
         run: npm test
