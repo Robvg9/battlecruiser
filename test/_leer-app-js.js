@@ -69,6 +69,28 @@ function leerAppJsConcatenado(baseDir) {
       };
     }
 
+    // Los tests usan mocks deliberadamente mínimos. Completar de forma
+    // retrocompatible los métodos de query-builder que la producción usa.
+    if (typeof client !== "undefined" && typeof client.from === "function" && !client.__bcTestBuilderShim) {
+      const originalFrom = client.from.bind(client);
+      const adaptarBuilder = (builder) => {
+        if (!builder || typeof builder !== "object") return builder;
+        ["eq","neq","gt","gte","lt","lte","in","is","not","like","ilike","match","or","filter","range"]
+          .forEach((metodo) => {
+            if (typeof builder[metodo] !== "function") builder[metodo] = () => builder;
+          });
+        ["select","order","limit","maybeSingle","single","insert","update","upsert","delete","csv"]
+          .forEach((metodo) => {
+            if (typeof builder[metodo] !== "function") return;
+            const original = builder[metodo].bind(builder);
+            builder[metodo] = (...args) => adaptarBuilder(original(...args));
+          });
+        return builder;
+      };
+      client.from = (...args) => adaptarBuilder(originalFrom(...args));
+      client.__bcTestBuilderShim = true;
+    }
+
     if (typeof _usuarioActualId !== "undefined" && typeof client !== "undefined" &&
         client.auth && typeof client.auth.getSession === "function") {
       Promise.resolve(client.auth.getSession()).then((res) => {
