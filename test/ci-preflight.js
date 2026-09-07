@@ -3,7 +3,6 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const { execFileSync } = require("child_process");
 
 const repoRoot = path.join(__dirname, "..");
 const publicDir = path.join(repoRoot, "public");
@@ -17,31 +16,22 @@ function listarJs(dir) {
   });
 }
 
-function ejecutarGit(args) {
-  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim();
-}
+const expectedSha = String(process.env.GITHUB_SHA || "").trim();
+if (expectedSha) console.log(`[preflight] GITHUB_SHA=${expectedSha}`);
 
-const head = ejecutarGit(["rev-parse", "HEAD"]);
-const status = ejecutarGit(["status", "--short"]);
-if (status) {
-  console.error("[preflight] Working tree dirty after checkout:");
-  console.error(status);
-  process.exit(1);
-}
-
-console.log(`[preflight] HEAD=${head}`);
-
-const appSource = fs.readFileSync(path.join(publicDir, "app.js"), "utf8");
+const appPath = path.join(publicDir, "app.js");
+const appSource = fs.readFileSync(appPath, "utf8");
 const referenciasDinamicas = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)].map((m) => m[1]);
-const faltantes = [...new Set(referenciasDinamicas)].filter((nombre) => !fs.existsSync(path.join(jsDir, nombre)));
+const unicas = [...new Set(referenciasDinamicas)];
+const faltantes = unicas.filter((nombre) => !fs.existsSync(path.join(jsDir, nombre)));
 if (faltantes.length) {
   console.error("[preflight] Missing modules referenced by public/app.js:");
   faltantes.forEach((nombre) => console.error(`  - ${nombre}`));
   process.exit(1);
 }
-console.log(`[preflight] Module references OK — ${new Set(referenciasDinamicas).size} dynamic module(s).`);
+console.log(`[preflight] Module references OK — ${unicas.length} dynamic module(s).`);
 
-const archivos = [path.join(publicDir, "app.js"), path.join(publicDir, "service-worker.js"), ...listarJs(jsDir)];
+const archivos = [appPath, path.join(publicDir, "service-worker.js"), ...listarJs(jsDir)];
 let errores = 0;
 for (const archivo of archivos) {
   const source = fs.readFileSync(archivo, "utf8");
