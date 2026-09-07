@@ -31,6 +31,16 @@ if (status) {
 
 console.log(`[preflight] HEAD=${head}`);
 
+const appSource = fs.readFileSync(path.join(publicDir, "app.js"), "utf8");
+const referenciasDinamicas = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)].map((m) => m[1]);
+const faltantes = [...new Set(referenciasDinamicas)].filter((nombre) => !fs.existsSync(path.join(jsDir, nombre)));
+if (faltantes.length) {
+  console.error("[preflight] Missing modules referenced by public/app.js:");
+  faltantes.forEach((nombre) => console.error(`  - ${nombre}`));
+  process.exit(1);
+}
+console.log(`[preflight] Module references OK — ${new Set(referenciasDinamicas).size} dynamic module(s).`);
+
 const archivos = [path.join(publicDir, "app.js"), path.join(publicDir, "service-worker.js"), ...listarJs(jsDir)];
 let errores = 0;
 for (const archivo of archivos) {
@@ -44,10 +54,10 @@ for (const archivo of archivos) {
   }
 }
 
-const appPath = path.relative(repoRoot, path.join(publicDir, "js", "m27-6-ventas-presentaciones.js"));
-if (fs.existsSync(path.join(repoRoot, appPath))) {
-  const line = fs.readFileSync(path.join(repoRoot, appPath), "utf8").split(/\r?\n/).find((l) => l.includes("function canSell"));
-  console.log(`[preflight] ${appPath} canSell=${line ? line.trim().slice(0, 260) : "NOT FOUND"}`);
+const m276Path = path.join(jsDir, "m27-6-ventas-presentaciones.js");
+if (fs.existsSync(m276Path)) {
+  const line = fs.readFileSync(m276Path, "utf8").split(/\r?\n/).find((l) => l.includes("function canSell"));
+  console.log(`[preflight] public/js/m27-6-ventas-presentaciones.js canSell=${line ? line.trim().slice(0, 260) : "NOT FOUND"}`);
 }
 
 if (errores) {
