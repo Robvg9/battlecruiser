@@ -27,23 +27,35 @@ const MODULOS_APP = [
 function obtenerModulosProduccion(baseDir) {
   const appPath = path.join(baseDir, "..", "public", "app.js");
   const appSource = fs.readFileSync(appPath, "utf8");
-  const dinamicos = [...appSource.matchAll(/\[\s*[\"']([^\"']+\.js)[\"']\s*,/g)]
+  const dinamicos = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)]
     .map((m) => m[1]);
   return [...new Set([...MODULOS_APP, ...dinamicos])];
 }
 
 function leerAppJsConcatenado(baseDir) {
+  const appPath = path.join(baseDir, "..", "public", "app.js");
+  const appSource = fs.readFileSync(appPath, "utf8");
+  const versionMatch = appSource.match(/const VERSION="([^"]+)"/);
+  const version = versionMatch ? versionMatch[1] : "unknown";
   const modulos = obtenerModulosProduccion(baseDir);
   const source = modulos
     .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
     .join("\n");
 
+  // Reproduce the production loader contract before any module executes:
+  // optional modules may wait for UI readiness, and auth must not reveal or
+  // initialize the shell until the complete production module graph loaded.
+  const prelude = `
+;(function __bcTestBootPrelude(){
+  window.__BC_VERSION__ = ${JSON.stringify(version)};
+  window.__BC_UI_READY_RESOLVED__ = false;
+  window.__BC_UI_READY__ = new Promise(function(resolve){ window.__bcTestResolveUIReady = resolve; });
+})();
+`;
+
   const bridge = `
 ;(function __bcTestCompatibilityBridge(){
   try {
-    if (!window.__BC_UI_READY__) window.__BC_UI_READY__ = Promise.resolve();
-    window.__BC_UI_READY_RESOLVED__ = true;
-
     if (typeof _usuarioActual !== "undefined") {
       const accessor = function(){ return _usuarioActual || null; };
       ["id","nombre","activo","role_id","rol","role","rol_nombre"].forEach((key) => {
@@ -115,20 +127,28 @@ function leerAppJsConcatenado(baseDir) {
       }).catch(() => {});
     }
 
-    setTimeout(() => {
-      try {
-        if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId &&
-            typeof _bcSesionActivaId !== "undefined" && _bcSesionActivaId) {
-          _usuarioActualId = _bcSesionActivaId;
-        }
-        if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId &&
-            typeof _usuarioActual !== "undefined" && _usuarioActual?.id) {
-          _usuarioActualId = _usuarioActual.id;
-        }
-      } catch (_) {}
-    }, 0);
+    try {
+      if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId &&
+          typeof _bcSesionActivaId !== "undefined" && _bcSesionActivaId) {
+        _usuarioActualId = _bcSesionActivaId;
+      }
+      if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId &&
+          typeof _usuarioActual !== "undefined" && _usuarioActual?.id) {
+        _usuarioActualId = _usuarioActual.id;
+      }
+    } catch (_) {}
+
+    if (typeof window.__bcTestResolveUIReady === "function") {
+      window.__BC_UI_READY_RESOLVED__ = true;
+      window.__bcTestResolveUIReady();
+      window.__bcTestResolveUIReady = null;
+    }
   } catch (e) {
     console.warn("[BattleCruiser test bridge]", e);
+    try {
+      window.__BC_UI_READY_RESOLVED__ = true;
+      if (typeof window.__bcTestResolveUIReady === "function") window.__bcTestResolveUIReady();
+    } catch (_) {}
   }
 })();
 `;
@@ -144,7 +164,7 @@ function leerAppJsConcatenado(baseDir) {
 })();
 `;
 
-  return source + "\n" + bridge + "\n" + exportBridge;
+  return prelude + source + "\n" + bridge + "\n" + exportBridge;
 }
 
 module.exports = { leerAppJsConcatenado, MODULOS_APP, obtenerModulosProduccion };
