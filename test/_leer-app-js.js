@@ -2,7 +2,6 @@
 const fs = require("fs");
 const path = require("path");
 
-// The 19 base modules mirror the scripts that form the application core.
 const MODULOS_APP = [
   "core.js",
   "auth.js",
@@ -25,33 +24,30 @@ const MODULOS_APP = [
   "comunicacion.js",
 ];
 
-// app.js is the production loader. Keep the harness synchronized with that
-// loader instead of maintaining a second, stale module inventory by hand.
 function obtenerModulosProduccion(baseDir) {
   const appPath = path.join(baseDir, "..", "public", "app.js");
   const appSource = fs.readFileSync(appPath, "utf8");
-  const dinamicos = [...appSource.matchAll(/\[\s*[\"']([^\"']+\\.js)[\"']\s*,/g)]
+  const dinamicos = [...appSource.matchAll(/\[\s*[\"']([^\"']+\.js)[\"']\s*,/g)]
     .map((m) => m[1]);
   return [...new Set([...MODULOS_APP, ...dinamicos])];
 }
 
-function prepararCompatibilidad(window, client) {
-  // The production boot exposes this readiness contract from app.js.
-  // Tests concatenate module scripts directly, so provide the same resolved
-  // state without loading app.js a second time.
-  if (!window.__BC_UI_READY__) window.__BC_UI_READY__ = Promise.resolve();
-  window.__BC_UI_READY_RESOLVED__ = true;
+function leerAppJsConcatenado(baseDir) {
+  const modulos = obtenerModulosProduccion(baseDir);
+  const source = modulos
+    .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
+    .join("\n");
 
+  const bridge = `
+;(function __bcTestCompatibilityBridge(){
   try {
+    if (!window.__BC_UI_READY__) window.__BC_UI_READY__ = Promise.resolve();
+    window.__BC_UI_READY_RESOLVED__ = true;
+
     if (typeof _usuarioActual !== "undefined") {
-      const accessor = function () { return _usuarioActual || null; };
-      ["id", "nombre", "activo", "role_id", "rol", "role", "rol_nombre"].forEach((key) => {
-        try {
-          Object.defineProperty(accessor, key, {
-            configurable: true,
-            get: () => _usuarioActual && _usuarioActual[key],
-          });
-        } catch (_) {}
+      const accessor = function(){ return _usuarioActual || null; };
+      ["id","nombre","activo","role_id","rol","role","rol_nombre"].forEach((key) => {
+        try { Object.defineProperty(accessor, key, { configurable:true, get:() => _usuarioActual && _usuarioActual[key] }); } catch (_) {}
       });
       window._usuarioActual = accessor;
       window.__bcTestUsuarioActualAccessor = accessor;
@@ -61,45 +57,43 @@ function prepararCompatibilidad(window, client) {
       Object.defineProperty(window, "_usuarioActualId", {
         configurable: true,
         get: () => _usuarioActualId,
-        set: (value) => { _usuarioActualId = value; },
+        set: (value) => { _usuarioActualId = value; }
       });
     }
 
     if (typeof _permisosEfectivos !== "undefined") {
-      window._permisosEfectivosRef = function () { return _permisosEfectivos; };
+      window._permisosEfectivosRef = function(){ return _permisosEfectivos; };
     }
 
     if (typeof usuarioPuedeOperar !== "function") {
-      window.usuarioPuedeOperar = function () {
+      window.usuarioPuedeOperar = function(){
         return !!(typeof _usuarioActual !== "undefined" && _usuarioActual && _usuarioActual.activo !== false);
       };
     }
 
     if (typeof cambiarEstadoUsuario !== "function") {
-      window.cambiarEstadoUsuario = async function (usuarioId, activo) {
+      window.cambiarEstadoUsuario = async function(usuarioId, activo){
         if (typeof tienePermiso === "function" && !tienePermiso("usuarios", "editar")) {
           throw new Error("Sin permiso para cambiar estado de usuario");
         }
         const res = await client.rpc("cambiar_estado_usuario", {
           p_usuario_id: usuarioId,
-          p_activo: !!activo,
+          p_activo: !!activo
         });
         if (res && res.error) throw res.error;
         return res;
       };
     }
 
-    // Tests use intentionally small query-builder mocks. Fill in missing
-    // chain methods without replacing methods that already have semantics.
-    if (typeof client.from === "function" && !client.__bcTestBuilderShim) {
+    if (typeof client !== "undefined" && typeof client.from === "function" && !client.__bcTestBuilderShim) {
       const originalFrom = client.from.bind(client);
       const adaptarBuilder = (builder) => {
         if (!builder || typeof builder !== "object") return builder;
-        ["eq", "neq", "gt", "gte", "lt", "lte", "in", "is", "not", "like", "ilike", "match", "or", "filter", "range"]
+        ["eq","neq","gt","gte","lt","lte","in","is","not","like","ilike","match","or","filter","range"]
           .forEach((metodo) => {
             if (typeof builder[metodo] !== "function") builder[metodo] = () => builder;
           });
-        ["select", "order", "limit", "maybeSingle", "single", "insert", "update", "upsert", "delete", "csv"]
+        ["select","order","limit","maybeSingle","single","insert","update","upsert","delete","csv"]
           .forEach((metodo) => {
             if (typeof builder[metodo] !== "function") return;
             const original = builder[metodo].bind(builder);
@@ -111,9 +105,8 @@ function prepararCompatibilidad(window, client) {
       client.__bcTestBuilderShim = true;
     }
 
-    // Auth mocks are asynchronous. Mirror the authenticated session id into
-    // the queue identity as soon as the mocked session resolves.
-    if (typeof _usuarioActualId !== "undefined" && client.auth && typeof client.auth.getSession === "function") {
+    if (typeof _usuarioActualId !== "undefined" && typeof client !== "undefined" &&
+        client.auth && typeof client.auth.getSession === "function") {
       Promise.resolve(client.auth.getSession()).then((res) => {
         const sid = res && res.data && res.data.session && res.data.session.user && res.data.session.user.id;
         if (sid && typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
@@ -134,21 +127,6 @@ function prepararCompatibilidad(window, client) {
         }
       } catch (_) {}
     }, 0);
-  } catch (e) {
-    console.warn("[BattleCruiser test bridge]", e);
-  }
-}
-
-function leerAppJsConcatenado(baseDir) {
-  const modulos = obtenerModulosProduccion(baseDir);
-  const source = modulos
-    .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
-    .join("\n");
-
-  const bridge = `
-;(function __bcTestCompatibilityBridge(){
-  try {
-    prepararCompatibilidad(window, client);
   } catch (e) {
     console.warn("[BattleCruiser test bridge]", e);
   }
