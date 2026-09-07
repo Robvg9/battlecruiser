@@ -71,11 +71,25 @@ function leerAppJsConcatenado(baseDir) {
         return res;
       };
     }
+
+    // El bridge no debe introducir una espera artificial que deje operaciones
+    // offline huérfanas mientras auth.js ya conoce la sesión. Sincronizamos
+    // el id en cuanto el mock de auth resuelva y mantenemos solo un fail-safe
+    // corto para escenarios donde el contexto se inicializa más tarde.
+    if (typeof _usuarioActualId !== "undefined" && typeof client !== "undefined" &&
+        client.auth && typeof client.auth.getSession === "function") {
+      Promise.resolve(client.auth.getSession()).then((res) => {
+        const sid = res && res.data && res.data.session && res.data.session.user && res.data.session.user.id;
+        if (sid && typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
+          _usuarioActualId = sid;
+        }
+      }).catch(() => {});
+    }
     setTimeout(() => {
       if (typeof _usuarioActualId !== "undefined" && !_usuarioActualId && typeof _usuarioActual !== "undefined" && _usuarioActual?.id) {
         _usuarioActualId = _usuarioActual.id;
       }
-    }, 120);
+    }, 250);
   } catch (e) {
     console.warn("[BattleCruiser test bridge]", e);
   }
