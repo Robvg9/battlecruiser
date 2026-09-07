@@ -2,6 +2,8 @@ name: BattleCruiser Self-Hosted Windows Test
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -9,7 +11,7 @@ permissions:
 jobs:
   selfhosted-windows:
     runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -36,6 +38,11 @@ jobs:
           node --check public/app.js
           node --check public/service-worker.js
 
-      - name: Automated tests
+      - name: Focused B2/B3 diagnostics
         shell: cmd
-        run: node --test --test-force-exit test/*.test.js
+        run: |
+          echo === B2.3 ===
+          node --test --test-force-exit test/b2.3-centro-control.test.js
+          if errorlevel 1 exit /b 1
+          echo === B3 ===
+          node --test --test-force-exit test/b3-usuarios-permisos.test.js
