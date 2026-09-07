@@ -63,19 +63,20 @@ jobs:
           $match = Select-String -Path 'public/app.js' -Pattern 'const VERSION="([^"]+)"' | Select-Object -First 1
           if (-not $match) { throw 'Could not determine expected application version from public/app.js.' }
           $expected = $match.Matches.Groups[1].Value
+          $pattern = 'const VERSION="' + $expected + '"'
           Write-Host "Expected production version: $expected"
           $ok = $false
           for ($attempt = 1; $attempt -le 8; $attempt++) {
             try {
               $url = "https://battlecruiser.robvg9.workers.dev/app.js?bc_verify=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())-$attempt"
               $body = (Invoke-WebRequest -UseBasicParsing -Headers @{ 'Cache-Control' = 'no-cache' } -Uri $url -TimeoutSec 30).Content
-              if ($body -like "*const VERSION=\"$expected\"*") {
+              if ($body.Contains($pattern)) {
                 Write-Host "Production serves BattleCruiser $expected."
                 $ok = $true
                 break
               }
             } catch {
-              Write-Host "Production probe failed on attempt $attempt: $($_.Exception.Message)"
+              Write-Host "Production probe failed on attempt $attempt`: $($_.Exception.Message)"
             }
             Start-Sleep -Seconds 10
           }
