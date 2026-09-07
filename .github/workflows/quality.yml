@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: battlecruiser-quality-${{ github.ref }}
+  group: battlecruiser-selfhosted-windows-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
