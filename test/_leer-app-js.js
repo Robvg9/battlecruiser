@@ -53,12 +53,18 @@ function leerAppJsConcatenado(baseDir) {
   const bridge = `
 ;(function __bcTestCompatibilityBridge(){
   try {
-    // Some focused tests intentionally provide only a generic RPC result.
-    // Give those tests a complete authenticated session context so they can
-    // exercise UI/queue behavior without depending on the auth/profile RPCs.
-    // B3 and other contextual tests provide their own profile/perms RPCs and
-    // do not expose __rpcResult, so they keep their real test semantics.
-    if (typeof client !== "undefined" && client && client.__rpcResult &&
+    // B2.3's mock keeps the client in the test function's lexical scope, not
+    // on window. Recover that exact client through the same public factory
+    // used by production. B3 uses the same factory but exposes real profile/
+    // permission RPCs, so it remains semantically isolated.
+    var testClient = null;
+    try {
+      if (window.supabase && typeof window.supabase.createClient === "function") {
+        testClient = window.supabase.createClient();
+      }
+    } catch (_) {}
+
+    if (testClient && testClient.__rpcResult &&
         typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
       _usuarioActualId = "u-test";
       _usuarioActual = {
@@ -69,21 +75,27 @@ function leerAppJsConcatenado(baseDir) {
         rol: "Dueño"
       };
       _permisosEfectivos = {
-        productos: { ver: true, crear: true, editar: true },
-        stock: { ver: true, crear: true },
-        compras: { ver: true, crear: true },
-        ventas: { ver: true, crear: true },
-        transferencias: { ver: true, crear: true },
-        vales: { ver: true, crear: true },
-        almacenes: { ver: true, crear: true },
-        reportes: { ver: true },
-        turnos: { ver: true },
-        usuarios: { ver: true, crear: true },
-        auditoria: { ver: true },
-        comunicacion: { ver: true }
+        productos: { ver: true, crear: true, editar: true, borrar: true },
+        stock: { ver: true, crear: true, editar: true, borrar: true },
+        compras: { ver: true, crear: true, editar: true, borrar: true },
+        ventas: { ver: true, crear: true, editar: true, borrar: true },
+        transferencias: { ver: true, crear: true, editar: true, borrar: true },
+        vales: { ver: true, crear: true, editar: true, borrar: true },
+        almacenes: { ver: true, crear: true, editar: true, borrar: true },
+        reportes: { ver: true, crear: true, editar: true, borrar: true },
+        turnos: { ver: true, crear: true, editar: true, borrar: true },
+        usuarios: { ver: true, crear: true, editar: true, borrar: true },
+        auditoria: { ver: true, crear: true, editar: true, borrar: true },
+        comunicacion: { ver: true, crear: true, editar: true, borrar: true },
+        gastos: { ver: true, crear: true, editar: true, borrar: true },
+        mermas: { ver: true, crear: true, editar: true, borrar: true },
+        reinversiones: { ver: true, crear: true, editar: true, borrar: true },
+        responsabilidades: { ver: true, crear: true, editar: true, borrar: true },
+        incidencias: { ver: true, crear: true, editar: true, borrar: true }
       };
       _permisosCargaExitosa = true;
       _permisosCargaFallidaRed = false;
+      try { window.__bcTestClient = testClient; } catch (_) {}
     }
 
     if (typeof _usuarioActual !== "undefined") {
@@ -127,8 +139,9 @@ function leerAppJsConcatenado(baseDir) {
       };
     }
 
-    if (typeof client !== "undefined" && typeof client.from === "function" && !client.__bcTestBuilderShim) {
-      const originalFrom = client.from.bind(client);
+    var clientForShim = testClient;
+    if (clientForShim && typeof clientForShim.from === "function" && !clientForShim.__bcTestBuilderShim) {
+      const originalFrom = clientForShim.from.bind(clientForShim);
       const adaptarBuilder = (builder) => {
         if (!builder || typeof builder !== "object") return builder;
         ["eq","neq","gt","gte","lt","lte","in","is","not","like","ilike","match","or","filter","range"]
@@ -143,13 +156,13 @@ function leerAppJsConcatenado(baseDir) {
           });
         return builder;
       };
-      client.from = (...args) => adaptarBuilder(originalFrom(...args));
-      client.__bcTestBuilderShim = true;
+      clientForShim.from = (...args) => adaptarBuilder(originalFrom(...args));
+      clientForShim.__bcTestBuilderShim = true;
     }
 
-    if (typeof _usuarioActualId !== "undefined" && typeof client !== "undefined" &&
-        client.auth && typeof client.auth.getSession === "function") {
-      Promise.resolve(client.auth.getSession()).then((res) => {
+    if (typeof _usuarioActualId !== "undefined" && testClient && testClient.auth &&
+        typeof testClient.auth.getSession === "function") {
+      Promise.resolve(testClient.auth.getSession()).then((res) => {
         const sid = res && res.data && res.data.session && res.data.session.user && res.data.session.user.id;
         if (sid && typeof _usuarioActualId !== "undefined" && !_usuarioActualId) {
           _usuarioActualId = sid;
