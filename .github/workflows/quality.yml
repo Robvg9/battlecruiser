@@ -32,18 +32,16 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Production JS integrity and syntax
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          git reset --hard HEAD
-          git clean -ffdx
           git diff --exit-code
           git diff --cached --exit-code
           node test/ci-preflight.js
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Syntax check
         run: |
