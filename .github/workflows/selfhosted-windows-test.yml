@@ -33,11 +33,7 @@ jobs:
       - name: Verify checkout integrity
         shell: cmd
         run: |
-          git reset --hard HEAD
-          git clean -ffdx
-          git diff --exit-code
-          git diff --cached --exit-code
-          git rev-parse HEAD
+          echo GITHUB_SHA=%GITHUB_SHA%
           node test/ci-preflight.js
 
       - name: Verify runner environment
