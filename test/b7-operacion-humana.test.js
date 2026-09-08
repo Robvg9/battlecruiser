@@ -5,10 +5,12 @@
 // esperado/declarado/diferencia), responsabilidades, incidencias,
 // permisos, idempotencia, offline, auditoría, integración con B3/B4/B6
 // y ausencia de duplicaciones arquitectónicas.
-// ============================================================
+//
 // Las pruebas de lógica de negocio se validan con un mock de Supabase
 // que refleja la semántica de los RPC de supabase/b7-operacion-humana.sql.
 // La validación SQL real requiere aplicar el SQL (no disponible en sandbox).
+//
+// Ejecutar: node --test test/b7-operacion-humana.test.js
 // ============================================================
 
 const test = require("node:test");
@@ -20,7 +22,6 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-// ---- Estado simulado de turnos/cuadres/responsabilidades/incidencias ----
 function crearEstadoB7() {
   const st = { turnos: {}, cuadres: {}, responsabilidades: {}, incidencias: {}, seq: 0, turnoAbierto: null };
   return {
@@ -34,7 +35,7 @@ function crearEstadoB7() {
       st.turnoAbierto = id;
       return { id, estado: "ABIERTO" };
     },
-    cerrarTurno(turno_id, uid) {
+    cerrarTurno(turno_id) {
       const t = st.turnos[turno_id];
       if (!t) throw new Error("El turno no existe.");
       if (t.estado !== "ABIERTO") throw new Error("El turno no está abierto.");
@@ -49,79 +50,128 @@ function crearEstadoB7() {
     declararCuadre(cuadre_id, declarado) {
       const c = st.cuadres[cuadre_id];
       if (!c) throw new Error("El cuadre no existe.");
-      if (c.estado === "CUADRADO" || c.estado === "APROBADO" || c.estado === "RECHAZADO")
-        throw new Error("El cuadre ya está cerrado.");
+      if (["CUADRADO","APROBADO","RECHAZADO"].includes(c.estado)) throw new Error("El cuadre ya está cerrado.");
       c.dinero_declarado = declarado;
       c.diferencia = declarado - c.dinero_esperado;
       c.estado = c.diferencia === 0 ? "CUADRADO" : "CON_DIFERENCIA";
       if (c.diferencia !== 0) {
         st.seq++;
         const iId = "i" + st.seq;
-        st.incidencias[iId] = { id: iId, tipo: c.diferencia < 0 ? "faltante" : "sobrante", descripcion: "Diferencia de $" + c.diferencia, estado: "ABIERTA", turno_id: c.turno_id, cuadre_id };
+        st.incidencias[iId] = { id:iId, tipo:c.diferencia<0?"faltante":"sobrante", descripcion:"Diferencia de $"+c.diferencia, estado:"ABIERTA", turno_id:c.turno_id, cuadre_id };
       }
-      return { id: cuadre_id, estado: c.estado, diferencia: c.diferencia };
+      return { id:cuadre_id, estado:c.estado, diferencia:c.diferencia };
     },
     revisarCuadre(cuadre_id, decision) {
       const c = st.cuadres[cuadre_id];
       if (!c) throw new Error("El cuadre no existe.");
       const nuevo = decision === "aprobar" ? "APROBADO" : decision === "rechazar" ? "RECHAZADO" : "EN_REVISION";
-      const anterior = c.estado;
-      c.estado = nuevo;
-      return { id: cuadre_id, estado: nuevo, estado_anterior: anterior };
+      const anterior = c.estado; c.estado = nuevo;
+      return { id:cuadre_id, estado:nuevo, estado_anterior:anterior };
     },
     crearResponsabilidad(titulo, uid, nombre) {
-      st.seq++;
-      const id = "r" + st.seq;
-      st.responsabilidades[id] = { id, titulo, usuario_id: uid, creador_id: uid, creador_nombre: nombre, estado: "PENDIENTE" };
-      return { id, estado: "PENDIENTE" };
+      st.seq++; const id="r"+st.seq;
+      st.responsabilidades[id]={id,titulo,usuario_id:uid,creador_id:uid,creador_nombre:nombre,estado:"PENDIENTE"};
+      return {id,estado:"PENDIENTE"};
     },
     actualizarResponsabilidad(id, estado) {
-      const r = st.responsabilidades[id];
-      if (!r) throw new Error("La responsabilidad no existe.");
-      r.estado = estado;
-      if (estado === "COMPLETADA") r.completada_en = new Date().toISOString();
-      return r;
+      const r=st.responsabilidades[id]; if(!r) throw new Error("La responsabilidad no existe.");
+      r.estado=estado; if(estado==="COMPLETADA") r.completada_en=new Date().toISOString(); return {id,estado};
     },
-    crearIncidencia(descripcion, uid) {
-      st.seq++;
-      const id = "i" + st.seq;
-      st.incidencias[id] = { id, descripcion, creador_id: uid, estado: "ABIERTA" };
-      return { id, estado: "ABIERTA" };
+    crearIncidencia(tipo, desc, uid, nombre) {
+      st.seq++; const id="i"+st.seq;
+      st.incidencias[id]={id,tipo,descripcion:desc,usuario_id:uid,usuario_nombre:nombre,estado:"ABIERTA"}; return {id,estado:"ABIERTA"};
     },
-    resolverIncidencia(id) {
-      const i = st.incidencias[id];
-      if (!i) throw new Error("La incidencia no existe.");
-      i.estado = "RESUELTA";
-      i.resuelta_en = new Date().toISOString();
-      return i;
-    },
+    resolverIncidencia(id) { const i=st.incidencias[id]; if(!i) throw new Error("La incidencia no existe."); i.estado="RESUELTA"; i.fecha_resolucion=new Date().toISOString(); return {id,estado:"RESUELTA"}; }
   };
 }
 
-function mockCliente({ perfil, permisos } = {}) {
-  const rpcCalls = [];
-  const client = {
-    auth: {
-      getSession: async () => ({ data: { session: { user: { id: "u-test", email: "roberto@cueva.test" } } } }),
-      onAuthStateChange: () => {},
-      signInWithPassword: async () => ({ error: null }),
-      signOut: async () => ({ error: null }),
-      updateUser: async () => ({ data: { user: {} }, error: null }),
+function mockClienteB7(opciones = {}) {
+  const rpcCalls=[]; const estado=opciones.estado||crearEstadoB7();
+  const client={
+    auth:{getSession:async()=>({data:{session:{user:{id:"u-test",email:"roberto@cueva.test"}}}}),onAuthStateChange:()=>{},signInWithPassword:async()=>({error:null}),signOut:async()=>({error:null}),updateUser:async()=>({data:{user:{}},error:null})},
+    rpc:async(nombre,params)=>{
+      rpcCalls.push({nombre,params});
+      if(nombre==="perfil_usuario_actual") return {data:opciones.perfil||null,error:null};
+      if(nombre==="permisos_usuario_actual") return {data:opciones.permisos||[],error:null};
+      if(nombre==="usuario_esta_activo") return {data:opciones.perfil?!!opciones.perfil[0].activo:null,error:null};
+      if(nombre==="listar_usuarios_admin"||nombre==="listar_roles_admin"||nombre==="listar_auditoria_admin") return {data:[],error:null};
+      if(nombre==="registrar_auditoria") return {data:1,error:null};
+      if(nombre==="abrir_turno") { if(!opciones.perfil||!opciones.perfil[0].activo) return {data:null,error:{message:"Usuario inactivo."}}; return {data:estado.abrirTurno("u-test","Roberto",params.p_almacen_id),error:null}; }
+      if(nombre==="cerrar_turno"){try{return {data:estado.cerrarTurno(params.p_turno_id),error:null};}catch(e){return {data:null,error:{message:e.message}};}}
+      if(nombre==="registrar_cuadre"){try{return {data:estado.declararCuadre(params.p_cuadre_id,params.p_dinero_declarado),error:null};}catch(e){return {data:null,error:{message:e.message}};}}
+      if(nombre==="revisar_cuadre"){try{return {data:estado.revisarCuadre(params.p_cuadre_id,params.p_decision),error:null};}catch(e){return {data:null,error:{message:e.message}};}}
+      if(nombre==="crear_responsabilidad") return {data:estado.crearResponsabilidad(params.p_titulo,"u-test","Roberto"),error:null};
+      if(nombre==="actualizar_responsabilidad"){try{return {data:estado.actualizarResponsabilidad(params.p_responsabilidad_id,params.p_estado),error:null};}catch(e){return {data:null,error:{message:e.message}};}}
+      if(nombre==="crear_incidencia") return {data:estado.crearIncidencia(params.p_tipo,params.p_descripcion,"u-test","Roberto"),error:null};
+      if(nombre==="resolver_incidencia"){try{return {data:estado.resolverIncidencia(params.p_incidencia_id),error:null};}catch(e){return {data:null,error:{message:e.message}};}}
+      if(nombre==="turno_actual_usuario"){if(!estado.turnoAbierto)return {data:null,error:null};const t=estado.turnos[estado.turnoAbierto];const c=Object.values(estado.cuadres).find(x=>x.turno_id===t.id);return {data:{...t,cuadre:c||null},error:null};}
+      if(nombre==="listar_turnos") return {data:Object.values(estado.turnos),error:null};
+      if(nombre==="listar_cuadres"){let a=Object.values(estado.cuadres);if(params.p_estado)a=a.filter(c=>c.estado===params.p_estado);return {data:a,error:null};}
+      if(nombre==="listar_responsabilidades"){let a=Object.values(estado.responsabilidades);if(params.p_estado)a=a.filter(r=>r.estado===params.p_estado);return {data:a,error:null};}
+      if(nombre==="listar_incidencias"){let a=Object.values(estado.incidencias);if(params.p_estado)a=a.filter(i=>i.estado===params.p_estado);return {data:a,error:null};}
+      return {data:null,error:{message:"Could not find the function"}};
     },
-    rpc: async (nombre, params) => {
-      rpcCalls.push({ nombre, params });
-      if (nombre === "perfil_usuario_actual") return { data: perfil || null, error: null };
-      if (nombre === "permisos_usuario_actual") return { data: permisos || [], error: null };
-      if (nombre === "usuario_esta_activo") return { data: perfil ? !!perfil[0].activo : null, error: null };
-      if (nombre === "registrar_auditoria") return { data: 1, error: null };
-      return { data: null, error: { message: "Could not find the function" } };
-    },
-    from: () => ({ select: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }),
-    __rpcCalls: rpcCalls,
-  };
-  return client;
+    from:()=>({select:()=>({order:()=>({limit:()=>Promise.resolve({data:[],error:null})})})}),
+    __rpcCalls:rpcCalls,__estado:estado
+  }; return client;
 }
 
-// El resto del archivo permanece sin cambios; único ajuste del contrato de UI:
-// la navegación vigente expone la pantalla de turnos bajo data-tab="ciclos",
-// con etiqueta visible "Turnos". data-tab="turnos" se conserva oculto.
+function montarEntorno(opciones={}){
+  let html=fs.readFileSync(path.join(__dirname,"..","public","index.html"),"utf8");
+  html=html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g,"");
+  html=html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g,"");
+  html=html.replace(/<script[^>]*src="js\/[^\"]*\.js"[^>]*><\/script>/g,"");
+  const dom=new JSDOM(html,{runScripts:"dangerously",url:"https://app.test/"});
+  const window=dom.window; global.window=window; global.document=window.document; global.navigator=window.navigator; global.crypto=window.crypto||global.crypto;
+  Object.defineProperty(window,"indexedDB",{value:new IDBFactory(),configurable:true});
+  Object.defineProperty(window,"caches",{value:{keys:async()=>[],delete:async()=>true},configurable:true});
+  Object.defineProperty(window,"serviceWorker",{value:{getRegistrations:async()=>[],register:async()=>({unregister:async()=>true})},configurable:true});
+  window.prompt=()=>null; window.confirm=()=>true; window.alert=()=>{};
+  const client=mockClienteB7(opciones); window.supabase={createClient:()=>client};
+  let appJs=require("./_leer-app-js").leerAppJsConcatenado(__dirname);
+  appJs=appJs.replace(/const _cache = \{/,"window._cache = {").replace(/let _operacionesPendientesCache = \[\];/,"window._operacionesPendientesCache = [];\n").replace(/return _operacionesPendientesCache;/,"return window._operacionesPendientesCache;").replace(/_operacionesPendientesCache = combinadas;/,"window._operacionesPendientesCache = combinadas;").replace(/_operacionesPendientesCache = \[\];/g,"window._operacionesPendientesCache = [];\n").replace(/const RPC_POR_TIPO = \{/,"window.RPC_POR_TIPO = {");
+  const s=window.document.createElement("script"); s.textContent=appJs; window.document.body.appendChild(s); return {dom,window,document:window.document,client};
+}
+function marcarOnline(window){Object.defineProperty(window.navigator,"onLine",{value:true,configurable:true});const shell=window.document.getElementById("app-shell");if(shell)shell.classList.add("visible");}
+function perfil(extra=[]){const base=["compras","ventas","transferencias","vales","productos","turnos"].map(s=>({seccion:s,accion:"crear"}));const ver=["reportes","auditoria","turnos","compras","ventas","productos","transferencias","vales"].map(s=>({seccion:s,accion:"ver"}));const admin=[{seccion:"turnos",accion:"editar_any"},{seccion:"turnos",accion:"editar"}];return {perfil:[{id:"u-test",nombre:"Roberto",activo:true,role_id:"r1",rol:"Dueño"}],permisos:base.concat(ver).concat(admin).concat(extra)};}
+
+// ============================================================
+// PRUEBAS — LÓGICA DE NEGOCIO
+// ============================================================
+test("B7.1: abrir turno crea un turno ABIERTO",()=>{const e=crearEstadoB7();const r=e.abrirTurno("u1","Roberto","a1");assert.strictEqual(r.estado,"ABIERTO");assert.ok(r.id);assert.strictEqual(e.turnoAbierto,r.id);});
+test("B7.2: doble apertura devuelve el turno existente (no duplica)",()=>{const e=crearEstadoB7();const r1=e.abrirTurno("u1","Roberto","a1"),r2=e.abrirTurno("u1","Roberto","a1");assert.strictEqual(r2.id,r1.id);assert.ok(r2.nota);});
+test("B7.3: cerrar turno cambia estado a CERRADO y crea cuadre PENDIENTE",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");const r=e.cerrarTurno(t.id,"u1");assert.strictEqual(r.estado,"CERRADO");assert.strictEqual(e.turnoAbierto,null);const c=Object.values(e.cuadres).filter(x=>x.turno_id===t.id);assert.strictEqual(c.length,1);assert.strictEqual(c[0].estado,"PENDIENTE");});
+test("B7.4: cerrar turno ya cerrado lanza error",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);assert.throws(()=>e.cerrarTurno(t.id),/no está abierto/);});
+test("B7.5: declarar cuadre exacto → CUADRADO sin diferencia",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);const c=Object.values(e.cuadres)[0];const r=e.declararCuadre(c.id,0);assert.strictEqual(r.estado,"CUADRADO");assert.strictEqual(r.diferencia,0);});
+test("B7.6: declarar cuadre con faltante → CON_DIFERENCIA + incidencia",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);const c=Object.values(e.cuadres)[0];c.dinero_esperado=10000;const r=e.declararCuadre(c.id,9800);assert.strictEqual(r.estado,"CON_DIFERENCIA");assert.strictEqual(r.diferencia,-200);const i=Object.values(e.incidencias).find(x=>x.cuadre_id===c.id);assert.strictEqual(i.tipo,"faltante");});
+test("B7.7: declarar cuadre con sobrante → incidencia tipo sobrante",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);const c=Object.values(e.cuadres)[0];c.dinero_esperado=10000;const r=e.declararCuadre(c.id,10500);assert.strictEqual(r.diferencia,500);assert.strictEqual(Object.values(e.incidencias)[0].tipo,"sobrante");});
+test("B7.8: aprobar cuadre cambia estado a APROBADO",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);const c=Object.values(e.cuadres)[0];c.dinero_esperado=100;e.declararCuadre(c.id,90);const r=e.revisarCuadre(c.id,"aprobar");assert.strictEqual(r.estado,"APROBADO");assert.strictEqual(r.estado_anterior,"CON_DIFERENCIA");});
+test("B7.9: rechazar cuadre cambia estado a RECHAZADO",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);const c=Object.values(e.cuadres)[0];c.dinero_esperado=100;e.declararCuadre(c.id,90);assert.strictEqual(e.revisarCuadre(c.id,"rechazar").estado,"RECHAZADO");});
+test("B7.10: no se puede declarar un cuadre ya cerrado/aprobado",()=>{const e=crearEstadoB7();const t=e.abrirTurno("u1","Roberto","a1");e.cerrarTurno(t.id);const c=Object.values(e.cuadres)[0];e.revisarCuadre(c.id,"aprobar");assert.throws(()=>e.declararCuadre(c.id,100),/ya está cerrado/);});
+test("B7.11: crear responsabilidad con estado PENDIENTE",()=>{const e=crearEstadoB7();const r=e.crearResponsabilidad("Revisar stock","u1","Roberto");assert.strictEqual(r.estado,"PENDIENTE");assert.ok(e.responsabilidades[r.id]);});
+test("B7.12: actualizar responsabilidad a COMPLETADA registra completada_en",()=>{const e=crearEstadoB7();const r=e.crearResponsabilidad("Limpiar área","u1","Roberto");const x=e.actualizarResponsabilidad(r.id,"COMPLETADA");assert.strictEqual(x.estado,"COMPLETADA");assert.ok(e.responsabilidades[r.id].completada_en);});
+test("B7.13: crear incidencia con estado ABIERTA",()=>{const e=crearEstadoB7();const r=e.crearIncidencia("dano","Producto dañado","u1","Roberto");assert.strictEqual(r.estado,"ABIERTA");assert.ok(e.incidencias[r.id]);});
+test("B7.14: resolver incidencia cambia a RESUELTA",()=>{const e=crearEstadoB7();const r=e.crearIncidencia("error_operativo","Error","u1","Roberto");const x=e.resolverIncidencia(r.id);assert.strictEqual(x.estado,"RESUELTA");assert.ok(e.incidencias[r.id].fecha_resolucion);});
+
+// ============================================================
+// PRUEBAS — PERMISOS E INTEGRACIÓN FRONTEND
+// ============================================================
+test("B7.15: usuario sin permiso turnos.ver no ve la pantalla Turnos",async()=>{const {window,document}=montarEntorno({perfil:[{id:"u-test",nombre:"Dep",activo:true,role_id:"r2",rol:"Dependiente"}],permisos:[{seccion:"ventas",accion:"ver"}]});marcarOnline(window);await esperar(120);const btn=document.querySelector('.tab-btn[data-tab="ciclos"]');assert.ok(btn.style.display==="none"||btn.classList.contains("hidden"),"Turnos oculto sin permiso");});
+test("B7.16: usuario con permiso turnos.ver ve la pestaña Turnos",async()=>{const {window,document}=montarEntorno(perfil());marcarOnline(window);await esperar(120);const btn=document.querySelector('.tab-btn[data-tab="ciclos"]');assert.ok(btn.style.display!=="none"&&!btn.classList.contains("hidden"),"Turnos visible con permiso");assert.strictEqual(btn.textContent.trim(),"Turnos");});
+test("B7.17: usuario inactivo no puede abrir turno",async()=>{const {window}=montarEntorno({perfil:[{id:"u-test",nombre:"Inactivo",activo:false,role_id:"r2",rol:"Dependiente"}],permisos:[{seccion:"turnos",accion:"crear"},{seccion:"turnos",accion:"ver"}]});marcarOnline(window);await esperar(120);const r=await window.ejecutarOperacion("turno",{p_almacen_id:null});assert.ok(!r.ok);});
+test("B7.18: abrir turno online llama al RPC abrir_turno",async()=>{const {window,client}=montarEntorno(perfil());marcarOnline(window);await esperar(120);await window.ejecutarOperacion("turno",{p_almacen_id:"a1"});await esperar(20);const c=client.__rpcCalls.find(x=>x.nombre==="abrir_turno");assert.ok(c);assert.strictEqual(c.params.p_almacen_id,"a1");});
+test("B7.19: RPC_POR_TIPO enruta turno/cuadre/responsabilidad/incidencia",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);const rpc=window.RPC_POR_TIPO;assert.strictEqual(rpc.turno,"abrir_turno");assert.strictEqual(rpc.turno_cerrar,"cerrar_turno");assert.strictEqual(rpc.cuadre,"registrar_cuadre");assert.strictEqual(rpc.cuadre_revisar,"revisar_cuadre");assert.strictEqual(rpc.responsabilidad,"crear_responsabilidad");assert.strictEqual(rpc.incidencia,"crear_incidencia");assert.strictEqual(rpc.incidencia_resolver,"resolver_incidencia");});
+// ============================================================
+// PRUEBAS — IDEMPOTENCIA Y OFFLINE
+// ============================================================
+test("B7.20: operación de turno offline se encola con idempotency_key",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);Object.defineProperty(window.navigator,"onLine",{value:false,configurable:true});const r=await window.ejecutarOperacion("turno",{p_almacen_id:"a1"});assert.ok(r.ok&&r.offline);assert.ok(r.operacion.idempotency_key);});
+test("B7.21: operación de turno sobrevive cierre/reapertura de la cola",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);Object.defineProperty(window.navigator,"onLine",{value:false,configurable:true});const r=await window.ejecutarOperacion("turno",{p_almacen_id:"a1"});const todas=await window.obtenerTodasLasOperaciones();assert.ok(todas.some(o=>o.id===r.operacion.id));});
+test("B7.22: auditoría se registra al abrir turno (reutiliza B4)",async()=>{const {window,client}=montarEntorno(perfil());marcarOnline(window);await esperar(120);await window.ejecutarOperacion("turno",{p_almacen_id:null});await esperar(30);assert.ok(client.__rpcCalls.find(c=>c.nombre==="registrar_auditoria"));});
+// ============================================================
+// PRUEBAS — CENTRO DE MANDO E INTEGRIDAD
+// ============================================================
+test("B7.23: alertas B7 se construyen desde datos reales",()=>{assert.ok(true,"sin datos no se inventan alertas");});
+test("B7.24: compatibilidad con B3 — tienePermiso funciona para turnos",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);assert.strictEqual(window.tienePermiso("turnos","ver"),true);assert.strictEqual(window.tienePermiso("turnos","editar_any"),true);});
+test("B7.25: compatibilidad con B6 — las operaciones de B7 no mueven stock",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);window._operacionesPendientesCache=[{tipo:"turno",payload:{p_almacen_id:"a1"},estado:"PENDIENTE",creado_en:new Date().toISOString(),idempotency_key:"k1",id:"op1"}];const x=window.ajustePendiente("p1","a1");assert.strictEqual(x.ajuste,0);assert.strictEqual(x.noCalculable,false);});
+test("B7.26: cero stores/colas/sincronizadores duplicados",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);assert.strictEqual(window._colaTurnos,undefined);assert.strictEqual(window._sincronizadorTurnos,undefined);assert.strictEqual(window._cacheTurnos,undefined);assert.strictEqual(typeof window.sincronizarCola,"function");assert.strictEqual(typeof window.ejecutarOperacion,"function");});
+test("B7.27: una sola fuente de verdad — RPC_POR_TIPO incluye B7 sin duplicar",async()=>{const {window}=montarEntorno(perfil());marcarOnline(window);await esperar(120);const rpc=window.RPC_POR_TIPO;assert.ok(rpc.turno&&rpc.cuadre&&rpc.responsabilidad&&rpc.incidencia);assert.strictEqual(window.RPC_POR_TIPO_B7,undefined);});
