@@ -43,6 +43,10 @@ Module._load = function (request, parent, isMain) {
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
       globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
+      // offline.js also uses a shared localStorage mutex. Hold it from the
+      // very beginning so bootstrap timers cannot start an in-flight sync
+      // before the test's explicit call is made.
+      try { globalThis.window.localStorage.setItem("battlecruiser-sincronizando", "1"); } catch (_) {}
     }
 
     // B2.3 supplies a deliberately minimal Supabase mock. app.js subscribes
@@ -99,12 +103,15 @@ Module._load = function (request, parent, isMain) {
         // production function. It checks the gate immediately; keeping the
         // flag true across the returned Promise would also admit background
         // auto-sync calls that happen while the first sync is still pending.
+        // The localStorage mutex is temporarily opened for the same reason.
         window.__BC_B23_EXPLICIT_SYNC__ = true;
+        try { window.localStorage.removeItem("battlecruiser-sincronizando"); } catch (_) {}
         let resultado;
         try {
           resultado = syncOriginal.apply(this, arguments);
         } finally {
           window.__BC_B23_EXPLICIT_SYNC__ = false;
+          try { window.localStorage.setItem("battlecruiser-sincronizando", "1"); } catch (_) {}
         }
         return resultado;
       };
