@@ -129,6 +129,8 @@ for (const part of [
   "fase-c-aislamiento-cases-1.js",
   "fase-c-aislamiento-cases-2.js",
   "fase-c-aislamiento-cases-3.js",
+  "fase-c-aislamiento-cases-4.js",
 ]) {
-  eval(_fs.readFileSync(_path.join(__dirname, part), "utf8"));
+  const p = _path.join(__dirname, part);
+  if (_fs.existsSync(p)) eval(_fs.readFileSync(p, "utf8"));
 }
