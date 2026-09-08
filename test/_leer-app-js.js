@@ -20,7 +20,7 @@ function obtenerModulosProduccion(baseDir) {
 function leerAppJsConcatenado(baseDir) {
   const appPath = path.join(baseDir, "..", "public", "app.js");
   const appSource = fs.readFileSync(appPath, "utf8");
-  const versionMatch = appSource.match(/const VERSION="([^"]+)"/);
+  const versionMatch = appSource.match(/const VERSION=\"([^\"]+)\"/);
   const version = versionMatch ? versionMatch[1] : "unknown";
   const modulos = obtenerModulosProduccion(baseDir);
   let source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
@@ -30,8 +30,9 @@ function leerAppJsConcatenado(baseDir) {
   // which otherwise starts asynchronous UI refreshes against a partial DOM.
   // B3 uses a different mock and keeps the normal auth boot path untouched.
   source = source
+    .replace(/let _usuarioActualId = null;/, 'let _usuarioActualId = "u-test";')
     .replace(/function showApp\(session\) \{/, "function showApp(session) { if (window.__BC_B23_TEST_MODE__) return;")
-    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return; }");
+    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return;");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
@@ -83,6 +84,11 @@ function leerAppJsConcatenado(baseDir) {
 
     if (testClient && testClient.__rpcResult) {
       try {
+        if (testClient.auth && typeof testClient.auth.getUser !== "function") {
+          testClient.auth.getUser = async function(){
+            return { data: { user: { id: "u-test", email: "test@app.test" } }, error: null };
+          };
+        }
         if (!testClient.__bcB23RpcShim) {
           const originalRpc = testClient.rpc.bind(testClient);
           const perfil = [{ id: "u-test", nombre: "Test", activo: true, role_id: "r-test", rol: "Dueño" }];
@@ -178,7 +184,7 @@ function leerAppJsConcatenado(baseDir) {
     if (typeof _usuarioActualId !== "undefined" && testClient && testClient.auth && typeof testClient.auth.getSession === "function") {
       Promise.resolve(testClient.auth.getSession()).then((res)=>{
         const sid=res&&res.data&&res.data.session&&res.data.session.user&&res.data.session.user.id;
-        if(sid&&typeof _usuarioActualId!=="undefined"&&!_usuarioActualId) _usuarioActualId=sid;
+        if(sid&&typeof _usuarioActualId!=="undefined") _usuarioActualId=sid;
       }).catch(()=>{});
     }
 
