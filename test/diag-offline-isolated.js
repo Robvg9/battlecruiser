@@ -18,6 +18,7 @@ const { IDBFactory } = require("fake-indexeddb");
 
   global.window = window;
   global.document = window.document;
+  global.navigator = window.navigator;
 
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true, writable: true });
@@ -37,6 +38,7 @@ const { IDBFactory } = require("fake-indexeddb");
     let _usuarioActual = { id: "u-test", nombre: "Test", activo: true };
     let appShell = { classList: { contains: () => true } };
     let _cache = { productos: [], almacenes: [], presentaciones: [] };
+    function safeInit(_nombre, fn){ try { fn(); } catch (_) {} }
     function usuarioPuedeOperar(){ return true; }
     function sincronizarUsuarioIdParaOperaciones(){ _usuarioActualId = "u-test"; }
     function actualizarIndicadorConexion(){}
