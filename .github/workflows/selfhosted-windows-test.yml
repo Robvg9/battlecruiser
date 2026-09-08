@@ -55,6 +55,10 @@ jobs:
           node --check public/app.js
           node --check public/service-worker.js
 
+      - name: Isolated offline queue diagnostic
+        shell: cmd
+        run: node test/diag-offline.js
+
       - name: Focused B2/B3 diagnostics
         shell: cmd
         run: |
