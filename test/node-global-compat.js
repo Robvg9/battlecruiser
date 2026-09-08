@@ -36,11 +36,10 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
-    // B2.3 must have its auto-sync barrier installed BEFORE the concatenated
-    // application source is evaluated. Some bootstrap modules can schedule
-    // connectivity work during evaluation, so installing this after the
-    // source has executed is too late and allows a concurrent sync to win
-    // the race against an explicit test assertion.
+    // B2.3 must establish the auto-sync barrier BEFORE any application module
+    // is evaluated. Several modules can perform bootstrap work while the
+    // concatenated source is executing; setting the flag only after
+    // originalReader() returns is too late and leaves a race window.
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
       globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
@@ -91,7 +90,7 @@ Module._load = function (request, parent, isMain) {
 
     source += `
 ;(function __bcB23SyncIsolation(){
-  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
+  if (__bcIsB23 && !window.__BC_B23_SUPPRESS_AUTO_SYNC__) window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
   if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
   try {
     if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
