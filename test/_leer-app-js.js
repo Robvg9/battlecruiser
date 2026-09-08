@@ -52,6 +52,18 @@ function leerAppJsConcatenado(baseDir) {
   window.__BC_VERSION__ = ${JSON.stringify(version)};
   window.__BC_UI_READY_RESOLVED__ = false;
   window.__BC_UI_READY__ = new Promise(function(resolve){ window.__bcTestResolveUIReady = resolve; });
+  // jsdom no implementa estas APIs de navegador que el frontend usa durante boot.
+  if (typeof window.requestAnimationFrame !== "function") {
+    window.requestAnimationFrame = function(cb){ return window.setTimeout(function(){ cb(Date.now()); }, 16); };
+  }
+  if (typeof window.cancelAnimationFrame !== "function") {
+    window.cancelAnimationFrame = function(id){ window.clearTimeout(id); };
+  }
+  try {
+    if (window.HTMLCanvasElement && typeof window.HTMLCanvasElement.prototype.getContext !== "function") {
+      window.HTMLCanvasElement.prototype.getContext = function(){ return null; };
+    }
+  } catch (_) {}
 })();
 `;
 
@@ -182,6 +194,13 @@ function leerAppJsConcatenado(baseDir) {
       window.__bcTestResolveUIReady();
       window.__bcTestResolveUIReady = null;
     }
+
+    // Simula una sesión autenticada usando el mismo flujo de producción que
+    // asigna _usuarioActualId y dispara cargarContextoUsuario().
+    try {
+      const bootSession = { user: { id: "u-test", email: "test@app.test" } };
+      if (typeof showApp === "function") showApp(bootSession);
+    } catch (_) {}
   } catch (e) {
     console.warn("[BattleCruiser test bridge]", e);
     try {
