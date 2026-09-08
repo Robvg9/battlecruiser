@@ -18,7 +18,8 @@ const { IDBFactory } = require("fake-indexeddb");
 
   global.window = window;
   global.document = window.document;
-  global.navigator = window.navigator;
+  // Node 24 exposes globalThis.navigator as a read-only accessor. The production
+  // code only needs window.navigator, so do not assign/override the global one.
 
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true, writable: true });
