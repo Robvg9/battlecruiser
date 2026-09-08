@@ -8,12 +8,35 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
-  const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
+
+  const dom = new JSDOM(html, {
+    runScripts: "dangerously",
+    url: "https://app.test/",
+    virtualConsole: new (require("jsdom").VirtualConsole)().sendTo(console, { omitJSDOMErrors: true }),
+  });
   const { window } = dom;
+
+  // El diagnóstico mide la cola offline; errores asíncronos de UI secundaria
+  // durante el boot de JSDOM no deben abortar el proceso antes de imprimir la
+  // evidencia de la cola. Se registran explícitamente como ruido de harness.
+  window.addEventListener("error", (event) => {
+    try {
+      console.warn("[B23 DIAG] ignored async UI error:", event.error || event.message || event);
+      event.preventDefault();
+    } catch (_) {}
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    try {
+      console.warn("[B23 DIAG] ignored async UI rejection:", event.reason);
+      event.preventDefault();
+    } catch (_) {}
+  });
+
   global.window = window; global.document = window.document; global.navigator = window.navigator; global.crypto = window.crypto;
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window, "caches", { value: { keys: async () => [], delete: async () => true }, configurable: true });
   Object.defineProperty(window, "serviceWorker", { value: { getRegistrations: async () => [], register: async () => ({ unregister: async () => true }) }, configurable: true });
+
   const calls = [];
   const client = {
     auth: {
@@ -25,8 +48,10 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
     __rpcResult: { data: "ok", error: null }, __rpcCalls: calls,
   };
   window.supabase = { createClient: () => client };
+
   const source = require("./_leer-app-js").leerAppJsConcatenado(__dirname);
   const script = window.document.createElement("script"); script.textContent = source; window.document.body.appendChild(script);
+
   const snap = (label) => console.log("[B23 DIAG]", label, {
     uid: window._usuarioActualId,
     userId: window._usuarioActual && window._usuarioActual.id,
@@ -35,11 +60,20 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
     save: typeof window.guardarOperacionPendiente,
     pending: typeof window.obtenerOperacionesPorEstado === "function" && window._usuarioActualId ? undefined : "uid-missing",
   });
+
   snap("after-script");
   await wait(0); snap("after-0ms");
   await wait(30); snap("after-30ms");
+
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const result = await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 10 });
   console.log("[B23 DIAG] execute-result", result);
-  console.log("[B23 DIAG] queue", window._usuarioActualId ? await window.obtenerOperacionesPorEstado("PENDIENTE") : "uid-missing-after-execute");
+  const queue = window._usuarioActualId
+    ? await window.obtenerOperacionesPorEstado("PENDIENTE")
+    : "uid-missing-after-execute";
+  console.log("[B23 DIAG] queue", queue);
+
+  if (!window._usuarioActualId) process.exitCode = 2;
+  else if (!result || result.ok !== true || result.offline !== true) process.exitCode = 3;
+  else if (!Array.isArray(queue) || queue.length !== 1) process.exitCode = 4;
 })();
