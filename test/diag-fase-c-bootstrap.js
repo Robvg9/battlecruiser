@@ -14,7 +14,11 @@ const absolute = path.resolve(__dirname, target);
 const source = fs.readFileSync(absolute, "utf8");
 const markers = [
   ["function prepararDOM(opciones = {}) {", "console.error('[FaseC DIAG] ENTER prepararDOM');"],
-  ["function inyectarApp(window, opciones = {}) {", "console.error('[FaseC DIAG] ENTER inyectarApp');"],
+  ["function inyectarApp(window, opciones = {}) {", "console.error('[FaseC DIAG] ENTER inyectarApp');\n  console.error('[FaseC DIAG] BEFORE leerAppJsConcatenado');"],
+  ["let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);", "let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);\n  console.error('[FaseC DIAG] AFTER leerAppJsConcatenado');"],
+  ["const s = window.document.createElement(\"script\");", "console.error('[FaseC DIAG] BEFORE create script');\n  const s = window.document.createElement(\"script\");"],
+  ["s.textContent = appJs;", "s.textContent = appJs;\n  console.error('[FaseC DIAG] BEFORE append script');"],
+  ["window.document.body.appendChild(s);", "window.document.body.appendChild(s);\n  console.error('[FaseC DIAG] AFTER append script');"],
   ["function montarEntorno(opciones = {}) {", "console.error('[FaseC DIAG] ENTER montarEntorno');"],
   ["async function montarEntornoConIdb(opciones, prepararIdb) {", "console.error('[FaseC DIAG] ENTER montarEntornoConIdb');"],
 ];
@@ -46,11 +50,11 @@ child.stderr.on("data", (chunk) => process.stderr.write(String(chunk)));
 let finished = false;
 const timer = setTimeout(() => {
   if (finished) return;
-  console.error("[FaseC DIAG] HARD TIMEOUT 15000ms — bootstrap/test process remains alive");
+  console.error("[FaseC DIAG] HARD TIMEOUT 12000ms — bootstrap/test process remains alive");
   try { child.kill(); } catch (_) {}
   finished = true;
   process.exitCode = 1;
-}, 15000);
+}, 12000);
 
 child.on("error", (error) => {
   if (finished) return;
