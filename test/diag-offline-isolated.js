@@ -20,11 +20,10 @@ function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
   global.window = window;
   global.document = window.document;
-  global.navigator = window.navigator;
   global.crypto = window.crypto || global.crypto;
 
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
-  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true, writable: true });
 
   const rpcCalls = [];
   const client = {
