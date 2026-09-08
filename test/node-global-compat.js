@@ -65,6 +65,41 @@ Module._load = function (request, parent, isMain) {
     }
 
     let source = originalReader(baseDir);
+
+    // The production sync function already handles network failures by
+    // moving SINCRONIZANDO -> PENDIENTE. In B2.3 the fixture also boots
+    // background UI work; a background sync can immediately pick that same
+    // operation up again and make the assertion observe SINCRONIZANDO. Keep
+    // automatic syncs out of the isolated fixture while allowing tests that
+    // explicitly call window.sincronizarCola() to exercise the real function.
+    if (__bcIsB23) {
+      source = source.replace(
+        "async function sincronizarCola() {",
+        "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;"
+      );
+    }
+
+    source += `
+;(function __bcB23SyncIsolation(){
+  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
+  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
+  try {
+    if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
+      const syncOriginal = window.sincronizarCola;
+      window.sincronizarCola = async function () {
+        window.__BC_B23_EXPLICIT_SYNC__ = true;
+        try {
+          return await syncOriginal.apply(this, arguments);
+        } finally {
+          window.__BC_B23_EXPLICIT_SYNC__ = false;
+        }
+      };
+      window.__bcB23ExplicitSyncWrapped = true;
+    }
+  } catch (_) {}
+})();
+`;
+
     source += `
 ;(function __bcB3HarnessCompat(){
   try {
