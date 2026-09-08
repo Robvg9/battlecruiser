@@ -23,13 +23,29 @@ function leerAppJsConcatenado(baseDir) {
   const versionMatch = appSource.match(/const VERSION="([^"]+)"/);
   const version = versionMatch ? versionMatch[1] : "unknown";
   const modulos = obtenerModulosProduccion(baseDir);
-  const source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
+  let source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
+
+  // B2.3 uses a special mock client (__rpcResult) and manually controls the
+  // visible shell. Prevent only that harness from running the real auth boot,
+  // which otherwise starts asynchronous UI refreshes against a partial DOM.
+  // B3 uses a different mock and keeps the normal auth boot path untouched.
+  source = source
+    .replace(/function showApp\(session\) \{/, "function showApp(session) { if (window.__BC_B23_TEST_MODE__) return;")
+    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return; }");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
   window.__BC_VERSION__ = ${JSON.stringify(version)};
   window.__BC_UI_READY_RESOLVED__ = false;
   window.__BC_UI_READY__ = new Promise(function(resolve){ window.__bcTestResolveUIReady = resolve; });
+  try {
+    var __bcTestClient = window.supabase && typeof window.supabase.createClient === "function"
+      ? window.supabase.createClient()
+      : null;
+    window.__BC_B23_TEST_MODE__ = !!(__bcTestClient && __bcTestClient.__rpcResult);
+  } catch (_) {
+    window.__BC_B23_TEST_MODE__ = false;
+  }
   if (typeof window.requestAnimationFrame !== "function") {
     window.requestAnimationFrame = function(cb){ return window.setTimeout(function(){ cb(Date.now()); }, 16); };
   }
