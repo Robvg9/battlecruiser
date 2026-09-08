@@ -8,11 +8,11 @@ for (const key of ["navigator", "crypto"]) {
 
 const { afterEach } = require("node:test");
 const __bcIsB23 = process.argv.some((arg) => String(arg).includes("b2.3-centro-control.test.js"));
+const __bcIsB3 = process.argv.some((arg) => String(arg).includes("b3-usuarios-permisos.test.js"));
 afterEach(() => {
-  // B2.3 starts background module work against several independent JSDOMs.
-  // Closing/removing globals after every test races with those callbacks and
-  // turns otherwise passing assertions into unhandledRejection failures.
-  if (__bcIsB23) return;
+  // B2.3 y B3 arrancan trabajo de fondo contra varios JSDOM independientes.
+  // Cerrar/remover globals al terminar cada test provoca carreras con esos callbacks.
+  if (__bcIsB23 || __bcIsB3) return;
   try {
     const w = globalThis.window;
     if (w && typeof w.close === "function") w.close();
