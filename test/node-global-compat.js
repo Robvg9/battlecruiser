@@ -33,7 +33,6 @@ Module._load = function (request, parent, isMain) {
   loaded.leerAppJsConcatenado = function (baseDir) {
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
-      globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
       try { globalThis.window.localStorage.removeItem("battlecruiser-sincronizando"); } catch (_) {}
     }
 
@@ -65,44 +64,14 @@ Module._load = function (request, parent, isMain) {
     let source = originalReader(baseDir);
 
     if (__bcIsB23) {
+      // Stack-based gate only: explicit calls from the B2.3 test file pass;
+      // timers/background callbacks do not include the test path in the stack.
+      // No EXPLICIT flag → no race between gate lifetime and async work.
+      // Production mutex (_sincronizando + localStorage) remains authoritative.
       source = source.replace(
         "async function sincronizarCola() {",
-        "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;"
+        "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__) {\n    const __bcStack = String(new Error().stack || \"\");\n    if (!__bcStack.includes(\"b2.3-centro-control.test.js\")) return;\n  }"
       );
-
-      // Hold the explicit gate for the full async lifetime of the intentional
-      // call. Background timers that fire while the real sync is in flight
-      // still hit production's _sincronizando / localStorage mutex and return.
-      // Closing the gate only after the Promise settles avoids observing a
-      // transient SINCRONIZANDO left by a late background re-entry.
-      source += `
-;(function __bcB23SyncIsolation(){
-  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
-  try {
-    if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
-      const syncOriginal = window.sincronizarCola;
-      window.sincronizarCola = function () {
-        window.__BC_B23_EXPLICIT_SYNC__ = true;
-        let result;
-        try {
-          result = syncOriginal.apply(this, arguments);
-        } catch (err) {
-          window.__BC_B23_EXPLICIT_SYNC__ = false;
-          throw err;
-        }
-        if (result && typeof result.then === "function") {
-          return Promise.resolve(result).finally(function () {
-            window.__BC_B23_EXPLICIT_SYNC__ = false;
-          });
-        }
-        window.__BC_B23_EXPLICIT_SYNC__ = false;
-        return result;
-      };
-      window.__bcB23ExplicitSyncWrapped = true;
-    }
-  } catch (_) {}
-})();
-`;
     }
 
     source += `
