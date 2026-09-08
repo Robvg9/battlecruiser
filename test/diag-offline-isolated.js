@@ -4,8 +4,6 @@ const path = require("path");
 const { JSDOM, VirtualConsole } = require("jsdom");
 const { IDBFactory } = require("fake-indexeddb");
 
-function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
 (async () => {
   const html = "<!doctype html><html><body><span id=\"cola-pendientes-badge\" class=\"hidden\"></span></body></html>";
   const virtualConsole = new VirtualConsole();
@@ -20,7 +18,7 @@ function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
   global.window = window;
   global.document = window.document;
-  global.crypto = window.crypto || global.crypto;
+  global.crypto = window.crypto;
 
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true, writable: true });
