@@ -90,7 +90,6 @@ Module._load = function (request, parent, isMain) {
 
     source += `
 ;(function __bcB23SyncIsolation(){
-  if (__bcIsB23 && !window.__BC_B23_SUPPRESS_AUTO_SYNC__) window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
   if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
   try {
     if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
