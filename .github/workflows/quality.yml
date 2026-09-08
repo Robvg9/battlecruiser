@@ -33,48 +33,35 @@ jobs:
           cache: npm
 
       - name: Production JS integrity and syntax
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          node test/ci-preflight.js
+        shell: cmd
+        run: node test/ci-preflight.js
 
       - name: Install dependencies
+        shell: cmd
         run: npm ci
 
       - name: Syntax check
+        shell: cmd
         run: |
           node --check public/app.js
           node --check public/service-worker.js
 
       - name: Focused B2.3
-        run: node -r ./test/node-global-compat.js --test --test-force-exit test/b2.3-centro-control.test.js
+        shell: cmd
+        run: node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/b2.3-centro-control.test.js
 
       - name: Focused B3
-        run: node -r ./test/node-global-compat.js --test --test-force-exit test/b3-usuarios-permisos.test.js
+        shell: cmd
+        run: node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/b3-usuarios-permisos.test.js
 
       - name: Full automated suite
-        shell: powershell
+        shell: cmd
         run: |
-          $ErrorActionPreference = 'Stop'
-          $env:NODE_OPTIONS = '--require=./test/node-global-compat.js'
+          set "NODE_OPTIONS=--require=./test/node-global-compat.js"
           npm test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if errorlevel 1 exit /b 1
+          set "NODE_OPTIONS="
 
       - name: Verify production serves current application version
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $match = Select-String -Path 'public/app.js' -Pattern 'const VERSION="([^"]+)"' | Select-Object -First 1
-          if (-not $match) { throw 'Could not determine expected application version from public/app.js.' }
-          $expected = $match.Matches.Groups[1].Value
-          $pattern = 'const VERSION="' + $expected + '"'
-          $ok = $false
-          for ($attempt = 1; $attempt -le 8; $attempt++) {
-            try {
-              $url = "https://battlecruiser.robvg9.workers.dev/app.js?bc_verify=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())-$attempt"
-              $body = (Invoke-WebRequest -UseBasicParsing -Headers @{ 'Cache-Control' = 'no-cache' } -Uri $url -TimeoutSec 30).Content
-              if ($body.Contains($pattern)) { $ok = $true; break }
-            } catch { Write-Host "Production probe attempt $attempt failed: $($_.Exception.Message)" }
-            Start-Sleep -Seconds 10
-          }
-          if (-not $ok) { throw "Production is not serving expected version $expected." }
+        shell: cmd
+        run: node test/verify-production-version.js
