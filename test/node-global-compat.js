@@ -12,17 +12,29 @@ for (const key of ["navigator", "crypto"]) {
   } catch (_) {}
 }
 
-// Cada test de BattleCruiser puede crear su propio JSDOM. Cerrarlo al terminar
-// evita timers/listeners/IndexedDB vivos que contaminen el siguiente test.
-// Esto es especialmente importante porque el suite comparte el proceso Node.
+// Cada test de BattleCruiser puede crear su propio JSDOM. La mayoría de suites
+// lo cierra al terminar. B2.3, sin embargo, contiene tareas UI asíncronas
+// disparadas por el mismo grafo de módulos; destruir su window al final de cada
+// test deja callbacks pendientes apuntando a globals eliminados y produce
+// falsos unhandledRejection. B2.3 solicita explícitamente conservar las windows
+// durante todo el archivo y cerrarlas al salir el proceso.
 const { afterEach } = require("node:test");
 afterEach(() => {
+  if (globalThis.__BC_KEEP_JSDOM_ALIVE__) return;
   try {
     const w = globalThis.window;
     if (w && typeof w.close === "function") w.close();
   } catch (_) {}
   for (const key of ["window", "document", "navigator"]) {
     try { delete globalThis[key]; } catch (_) {}
+  }
+});
+
+process.once("exit", () => {
+  const doms = globalThis.__BC_TEST_DOMS__;
+  if (!Array.isArray(doms)) return;
+  for (const dom of doms) {
+    try { if (dom && dom.window && typeof dom.window.close === "function") dom.window.close(); } catch (_) {}
   }
 });
 
