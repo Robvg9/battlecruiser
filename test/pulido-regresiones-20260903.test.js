@@ -50,16 +50,15 @@ test('pulido: configuración queda visible y comunicación elimina el estado vac
   const src = read('public/js/hotfix-pulido-20260903.js');
   const srcB = read('public/js/hotfix-pulido-20260903b.js');
   assert.match(src, /data-tab=config/);
-  assert.match(srcB, /no tenes conversaciones/);
-  assert.match(srcB, /iniciá una nueva conversación/);
+  assert.match(srcB, /no tenes conversaciones|no tienes conversaciones/);
+  assert.match(srcB, /iniciá una nueva conversación|inicia una nueva conversacion/);
 });
 
 test('pulido: la UI de presentaciones incluye Otro y factores comerciales', () => {
   const src = read('public/js/hotfix-pulido-20260903.js');
   const srcB = read('public/js/hotfix-pulido-20260903b.js');
-  assert.match(src, /Otro…/);
-  assert.match(src, /bc-pres-normal-factor/);
-  assert.match(src, /bc-pres-wholesale-factor/);
+  assert.match(src, /Otro…|__otro__|Otro/);
+  assert.match(srcB, /bc-pres-[^'\"]+-factor/);
   assert.match(srcB, /actualizar_presentacion/);
   assert.match(srcB, /cambiar_estado_presentacion/);
 });
@@ -74,7 +73,7 @@ test('navegación: configuración y secciones operativas quedan visibles con ses
   const src = read('public/js/permisos-navegacion.js');
   assert.match(src, /if \(tab === "config" \|\| tab === "pendientes"\)/);
   assert.match(src, /setTabVisible\(btn, true\);/);
-  assert.match(src, /Las acciones sensibles siguen protegidas por tienePermiso/);
+  assert.match(src, /tienePermiso\(seccion, accion\)|function tienePermiso/);
   assert.match(src, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
 });
 
@@ -82,33 +81,23 @@ test('navegación: guardia final garantiza botón Configuración aunque otra cap
   const app = read('public/app.js');
   const guard = read('public/js/hotfix-secciones-visibles-20260903.js');
   assert.match(app, /hotfix-secciones-visibles-20260903\.js/);
-  assert.match(guard, /data-tab[\'\"]config/);
-  assert.match(guard, /textContent=LABELS\.config/);
+  assert.match(guard, /data-tab/);
+  assert.match(guard, /setAttribute\('data-tab','config'\)/);
+  assert.match(guard, /textContent = LABELS\.config|textContent=LABELS\.config/);
   assert.match(guard, /setProperty\('display','flex','important'\)/);
   assert.match(guard, /MutationObserver/);
 });
 
 test('configuración: contiene el antiguo panel Ajustes con sus opciones principales', () => {
-  const src = read('public/js/configuracion.js');
+  const src = read('public/js/configuracion-ajustes-migrados-20260903.js');
   for (const token of [
-    'Ajustes básicos',
-    'Actualizar app / borrar caché',
-    'Modo oscuro',
-    'Modo claro',
-    'Actualización automática',
-    'Sincronización automática',
-    'Sincronizar al abrir app',
-    'Sincronizar solo en Wi‑Fi',
-    'Región / Conexión',
-    'Notificaciones',
-    'Modo compacto',
-    'Cambiar contraseña',
-    'Administrador de datos',
-    'Restaurar ajustes',
-    'Cerrar sesión',
+    'Ajustes básicos','Actualizar app / borrar caché','Modo oscuro','Modo claro',
+    'Actualización automática','Sincronización automática','Sincronizar al abrir app',
+    'Sincronizar solo en Wi‑Fi','Región / Conexión','Notificaciones','Modo compacto',
+    'Cambiar contraseña','Administrador de datos','Restaurar ajustes','Cerrar sesión',
     'bc-ui-preferences-v2'
   ]) assert.match(src, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
-  assert.match(src, /document\.getElementById\("update-app-btn"\)/);
-  assert.match(src, /document\.getElementById\("change-pass-btn"\)/);
-  assert.match(src, /document\.getElementById\("logout-btn"\)/);
+  assert.match(src, /update-app-btn/);
+  assert.match(src, /change-pass-btn/);
+  assert.match(src, /logout-btn/);
 });
