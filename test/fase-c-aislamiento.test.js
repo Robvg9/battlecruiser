@@ -78,7 +78,9 @@ function inyectarApp(window, opciones = {}) {
     .replace(/_operacionesPendientesCache = \[\];/g, "_operacionesPendientesCache = []; window._operacionesPendientesCache = [];")
     .replace(/let _usuarioActualId = null;/, "var _usuarioActualId = null;")
     .replace(/let _usuarioActual = null;/, "var _usuarioActual = null;")
-    .replace(/function idbAbrir\(\) {/, "window.idbAbrir = function idbAbrir() {");
+    .replace(/let _refrescosPendientes = null;/, "var _refrescosPendientes = null;")
+    .replace(/function idbAbrir\(\) {/, "window.idbAbrir = function idbAbrir() {")
+    .replace(/let _idbConexion = null;/, "let _idbConexion = null; window._idbConexion = () => _idbConexion; window._idbConexionReset = () => { _idbConexion = null; };");
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
@@ -86,6 +88,13 @@ function inyectarApp(window, opciones = {}) {
 
 function montarEntorno(opciones = {}) {
   const env = prepararDOM(opciones);
+  inyectarApp(env.window, opciones);
+  return env;
+}
+
+async function montarEntornoConIdb(opciones, prepararIdb) {
+  const env = prepararDOM(opciones);
+  if (prepararIdb) await prepararIdb(env.window.indexedDB);
   inyectarApp(env.window, opciones);
   return env;
 }
@@ -101,11 +110,6 @@ function setUsuario(window, uid) {
   window._usuarioActual = { id: uid, nombre: uid, activo: true, role_id: "r1", rol: "Dueño" };
 }
 
-function logout(window) {
-  window._usuarioActualId = null;
-  if (typeof window.limpiarContextoUsuario === "function") window.limpiarContextoUsuario();
-}
-
 const PERFIL = [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }];
 const PERMISOS_TODOS = [
   { seccion: "productos", accion: "crear" }, { seccion: "productos", accion: "editar" },
@@ -116,3 +120,10 @@ const PERMISOS_TODOS = [
   { seccion: "ventas", accion: "ver" }, { seccion: "transferencias", accion: "ver" },
   { seccion: "vales", accion: "ver" },
 ];
+
+// Load cases in the same scope so helpers are visible.
+const _fs = require("fs");
+const _path = require("path");
+for (const part of ["fase-c-aislamiento-cases-0.js", "fase-c-aislamiento-cases-1.js", "fase-c-aislamiento-cases-2.js"]) {
+  eval(_fs.readFileSync(_path.join(__dirname, part), "utf8"));
+}
