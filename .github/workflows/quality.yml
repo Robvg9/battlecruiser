@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   quality:
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 35
 
     steps:
@@ -49,13 +49,13 @@ jobs:
           node --check public/service-worker.js
 
       - name: Focused B2.3
-        run: node --test --test-force-exit test/b2.3-centro-control.test.js
+        run: node -r ./test/node-global-compat.js --test --test-force-exit test/b2.3-centro-control.test.js
 
       - name: Focused B3
-        run: node --test --test-force-exit test/b3-usuarios-permisos.test.js
+        run: node -r ./test/node-global-compat.js --test --test-force-exit test/b3-usuarios-permisos.test.js
 
       - name: Full automated suite
-        run: npm test
+        run: node -r ./test/node-global-compat.js ./node_modules/.bin/npm test
 
       - name: Verify production serves current application version
         shell: powershell

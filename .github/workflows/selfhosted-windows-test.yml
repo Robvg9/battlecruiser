@@ -21,7 +21,7 @@ permissions:
 jobs:
   selfhosted-windows:
     runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 15
+    timeout-minutes: 35
 
     steps:
       - name: Checkout
@@ -64,7 +64,10 @@ jobs:
         shell: cmd
         run: |
           echo === B2.3 ===
-          node --test --test-force-exit test/b2.3-centro-control.test.js
+          node -r ./test/node-global-compat.js --test --test-force-exit test/b2.3-centro-control.test.js
           if errorlevel 1 exit /b 1
           echo === B3 ===
-          node --test --test-force-exit test/b3-usuarios-permisos.test.js
+          node -r ./test/node-global-compat.js --test --test-force-exit test/b3-usuarios-permisos.test.js
+          if errorlevel 1 exit /b 1
+          echo === FULL SUITE ===
+          node -r ./test/node-global-compat.js ./node_modules/.bin/npm test
