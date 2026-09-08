@@ -10,8 +10,6 @@ const { afterEach } = require("node:test");
 const __bcIsB23 = process.argv.some((arg) => String(arg).includes("b2.3-centro-control.test.js"));
 const __bcIsB3 = process.argv.some((arg) => String(arg).includes("b3-usuarios-permisos.test.js"));
 afterEach(() => {
-  // B2.3 y B3 arrancan trabajo de fondo contra varios JSDOM independientes.
-  // Cerrar/remover globals al terminar cada test provoca carreras con esos callbacks.
   if (__bcIsB23 || __bcIsB3) return;
   try {
     const w = globalThis.window;
@@ -33,14 +31,12 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
-    // B2.3: suppress auto-sync early. Production localStorage mutex is NOT held here.
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
       globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
       try { globalThis.window.localStorage.removeItem("battlecruiser-sincronizando"); } catch (_) {}
     }
 
-    // B2.3 minimal Supabase auth surface for bootstrap.
     if (__bcIsB23 && globalThis.window && globalThis.window.supabase && typeof globalThis.window.supabase.createClient === "function") {
       const supabaseMock = globalThis.window.supabase;
       if (!supabaseMock.__bcAuthStateCompatWrapped) {
@@ -68,15 +64,17 @@ Module._load = function (request, parent, isMain) {
 
     let source = originalReader(baseDir);
 
-    // B2.3 gate: block background/auto sincronizarCola; explicit test calls open the gate.
     if (__bcIsB23) {
       source = source.replace(
         "async function sincronizarCola() {",
         "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;"
       );
 
-      // Explicit-call bridge: open gate only for the synchronous entry.
-      // Background timers never set the flag. Production mutex/state machine untouched.
+      // Hold the explicit gate for the full async lifetime of the intentional
+      // call. Background timers that fire while the real sync is in flight
+      // still hit production's _sincronizando / localStorage mutex and return.
+      // Closing the gate only after the Promise settles avoids observing a
+      // transient SINCRONIZANDO left by a late background re-entry.
       source += `
 ;(function __bcB23SyncIsolation(){
   if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
@@ -85,11 +83,20 @@ Module._load = function (request, parent, isMain) {
       const syncOriginal = window.sincronizarCola;
       window.sincronizarCola = function () {
         window.__BC_B23_EXPLICIT_SYNC__ = true;
+        let result;
         try {
-          return syncOriginal.apply(this, arguments);
-        } finally {
+          result = syncOriginal.apply(this, arguments);
+        } catch (err) {
           window.__BC_B23_EXPLICIT_SYNC__ = false;
+          throw err;
         }
+        if (result && typeof result.then === "function") {
+          return Promise.resolve(result).finally(function () {
+            window.__BC_B23_EXPLICIT_SYNC__ = false;
+          });
+        }
+        window.__BC_B23_EXPLICIT_SYNC__ = false;
+        return result;
       };
       window.__bcB23ExplicitSyncWrapped = true;
     }
