@@ -12,6 +12,20 @@ for (const key of ["navigator", "crypto"]) {
   } catch (_) {}
 }
 
+// Cada test de BattleCruiser puede crear su propio JSDOM. Cerrarlo al terminar
+// evita timers/listeners/IndexedDB vivos que contaminen el siguiente test.
+// Esto es especialmente importante porque el suite comparte el proceso Node.
+const { afterEach } = require("node:test");
+afterEach(() => {
+  try {
+    const w = globalThis.window;
+    if (w && typeof w.close === "function") w.close();
+  } catch (_) {}
+  for (const key of ["window", "document", "navigator"]) {
+    try { delete globalThis[key]; } catch (_) {}
+  }
+});
+
 // B3's focused harness intentionally loads the stable module graph and omits
 // the dynamically loaded admin extension. Inject only the two compatibility
 // behaviors required by the B3 contract, without changing production code.
