@@ -33,9 +33,6 @@ function montarEntorno() {
   );
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
-  // Misión de modularización: también se quitan los <script src="js/...">
-  // (los módulos reales se inyectan a mano más abajo, igual que antes se
-  // inyectaba app.js completo — así el test no depende de red).
   html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
   const { window } = dom;
@@ -46,20 +43,14 @@ function montarEntorno() {
   global.navigator = window.navigator;
   global.crypto = window.crypto || global.crypto;
   // sincronizarCola usa localStorage como mutex entre pestañas. En un script
-  // Node, `localStorage` no es un global aunque sí exista en window; el
-  // navegador real sí expone ambos accesos. Reflejamos el storage del jsdom
-  // en global para que el test ejerza el mismo camino de producción.
+  // Node, localStorage no es global aunque sí exista en window.
   global.localStorage = window.localStorage;
   global.sessionStorage = window.sessionStorage;
 
-  // jsdom no trae indexedDB; inyectamos fake-indexeddb en window.
-  // fake-indexeddb: una instancia fresca por entorno (simula IndexedDB real).
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window, "caches", { value: { keys: async () => [], delete: async () => true }, configurable: true });
   Object.defineProperty(window, "serviceWorker", { value: { getRegistrations: async () => [], register: async () => ({ unregister: async () => true }) }, configurable: true });
 
-  // Mock mínimo del cliente Supabase. Las pruebas de B2.3 no tocan el
-  // backend real: la cola y el Centro de Control son offline-first.
   const rpcCalls = [];
   const client = {
     auth: {
@@ -72,7 +63,6 @@ function montarEntorno() {
     },
     rpc: async (nombre, params) => {
       rpcCalls.push({ nombre, params });
-      // Por defecto éxito. Las pruebas pueden overridear client.__setRpcResult.
       return client.__rpcResult;
     },
     from: () => ({
@@ -83,11 +73,6 @@ function montarEntorno() {
   };
   window.supabase = { createClient: () => client };
 
-  // Cargar app.js en el contexto del window. Exponemos algunas constantes
-  // internas top-level (const/let) reescribiendo esas declaraciones a
-  // asignaciones window.X, SOLO para el test (no se toca public/app.js).
-  // Esto permite verificar proyección/actividad/novedades sin duplicar
-  // la lógica ni crear una segunda fuente.
   let appJs = require("./_leer-app-js").leerAppJsConcatenado(__dirname);
   appJs = appJs
     .replace(/const _cache = \{/, "window._cache = {")
@@ -108,22 +93,24 @@ function montarEntorno() {
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-// Marca el shell visible (simula login) y simula online.
 function marcarOnline(window) {
   Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
   const shell = window.document.getElementById("app-shell");
   if (shell) shell.classList.add("visible");
 }
 
-// Crear una operación pendiente real en la cola (igual que haría
-// ejecutarOperación cuando offline). Reutiliza las funciones internas
-// del propio app.js cargado en el window.
+// Crear una operación pendiente real en la cola. El fixture fija explícitamente
+// usuario_id porque esa es una precondición legítima de la cola de producción:
+// guardarOperacionPendiente rechaza operaciones huérfanas.
 async function crearOp(window, tipo, payload, estado, extra) {
   const w = window;
   const op = w.crearOperacionPendiente(tipo, payload);
+  op.usuario_id = "u-test";
   if (estado) op.estado = estado;
   if (extra) Object.assign(op, extra);
-  return await w.guardarOperacionPendiente(op);
+  const guardada = await w.guardarOperacionPendiente(op);
+  assert.ok(guardada, `debe guardar la operación ${tipo} en la cola`);
+  return guardada;
 }
 
 // ---- tests ----
@@ -160,7 +147,6 @@ test("B2.3-A: conectividad y sincronización son estados distintos (offline + pe
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const ops = [{ id: "1", estado: "PENDIENTE", creado_en: new Date().toISOString(), tipo: "venta", payload: {} }];
   const estado = window.calcularEstadoOperacional(ops, false);
-  // offline PERO con pendientes: no es normal, es atencion.
   assert.strictEqual(estado.nivel, "atencion");
   assert.ok(/Pendientes/.test(estado.texto));
 });
@@ -177,23 +163,20 @@ test("B2.3-B: el Centro de Atención aparece con REQUIERE_ATENCION y desaparece 
   const { window, document } = montarEntorno();
   marcarOnline(window);
   await esperar(30);
-
-  // Crear una operación en REQUIERE_ATENCION en la cola real.
   await crearOp(window, "venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 2 }] }, "REQUIERE_ATENCION", { ultimo_error: "Stock insuficiente." });
   await window.refrescarCentroControl();
   await esperar(10);
 
   const atencion = document.getElementById("cc-atencion");
-  assert.ok(atencion.innerHTML.includes("Requiere atención") || atencion.querySelector(".cc-asunto"), "debe aparecer el asunto crítico");
-  assert.ok(atencion.innerHTML.includes("Stock insuficiente."), "debe mostrar el motivo");
+  assert.ok(atencion.innerHTML.includes("Requiere atención") || atencion.querySelector(".cc-asunto"));
+  assert.ok(atencion.innerHTML.includes("Stock insuficiente."));
 
-  // Resolver: eliminar la operación (reutiliza eliminarOperacionPendiente).
   const item = atencion.querySelector(".cc-asunto");
   const id = item.dataset.id;
   await window.eliminarOperacionPendiente(id);
   await window.refrescarCentroControl();
   await esperar(10);
-  assert.ok(/Nada requiere atención/.test(atencion.innerHTML), "debe desaparecer tras resolver");
+  assert.ok(/Nada requiere atención/.test(atencion.innerHTML));
 });
 
 test("B2.3-C: acción Reintentar reutiliza el flujo existente y conserva idempotency_key", async () => {
@@ -205,29 +188,22 @@ test("B2.3-C: acción Reintentar reutiliza el flujo existente y conserva idempot
   const claveAntes = op.idempotency_key;
   await window.refrescarCentroControl();
   await esperar(10);
-
-  // El RPC devuelve éxito ahora.
   client.__rpcResult = { data: "ok", error: null };
 
   await window.reintentarOperacionPendiente(op.id, null);
   await esperar(20);
 
-  // Verificar que el RPC recibió la MISMA idempotency_key (literal).
   const call = client.__rpcCalls.find((c) => c.params && c.params.p_idempotency_key);
   assert.ok(call, "debe haber llamado al RPC");
   assert.strictEqual(call.params.p_idempotency_key, claveAntes, "idempotency_key conservada literal");
 });
 
 test("B2.3-C: acción Eliminar quita la operación de la cola", async () => {
-  const { window, document } = montarEntorno();
+  const { window } = montarEntorno();
   marcarOnline(window);
   await esperar(30);
 
   const op = await crearOp(window, "venta", { p_almacen_id: "a1", p_lineas: [] }, "REQUIERE_ATENCION", { ultimo_error: "x" });
-  await window.refrescarCentroControl();
-  await esperar(10);
-
-  // Simular confirm.
   const confirmOrig = window.confirm;
   window.confirm = () => true;
   try {
@@ -246,17 +222,17 @@ test("B2.3-D: el detalle muestra idempotency_key, tipo, estado, fecha e intentos
   await esperar(30);
 
   const op = await crearOp(window, "compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 5, p_costo_unitario: 10 }, "REQUIERE_ATENCION", { ultimo_error: "sin permiso", intentos: 3 });
-  const cont = document.getElementById("pendiente-detalle");
+  const cont = window.document.getElementById("pendiente-detalle");
   cont.classList.remove("hidden");
   window.mostrarDetalleOperacion(op);
   await esperar(5);
 
   const html = cont.innerHTML;
-  assert.ok(/Compra/.test(html), "debe mostrar el tipo");
-  assert.ok(/Requiere atención/.test(html), "debe mostrar el estado");
-  assert.ok(/idempotency_key/.test(html), "debe mostrar idempotency_key");
-  assert.ok(/Intentos/.test(html) && html.includes("3"), "debe mostrar intentos");
-  assert.ok(/Motivo de atención/.test(html), "debe mostrar el motivo");
+  assert.ok(/Compra/.test(html));
+  assert.ok(/Requiere atención/.test(html));
+  assert.ok(/idempotency_key/.test(html));
+  assert.ok(/Intentos/.test(html) && html.includes("3"));
+  assert.ok(/Motivo de atención/.test(html));
 });
 
 test("B2.3-C: acciones bloqueadas para SINCRONIZANDO (no reintento paralelo)", async () => {
@@ -265,12 +241,10 @@ test("B2.3-C: acciones bloqueadas para SINCRONIZANDO (no reintento paralelo)", a
   await esperar(30);
 
   const op = await crearOp(window, "venta", { p_almacen_id: "a1", p_lineas: [] }, "SINCRONIZANDO");
-  // reintentarOperacionPendiente debe rechazar si no está en REQUIERE_ATENCION.
-  // El #msg-pendientes ya existe en el HTML real (index.html), lo reutilizamos.
   const msgEl = window.document.getElementById("msg-pendientes");
   await window.reintentarOperacionPendiente(op.id, null);
   await esperar(10);
-  assert.ok(/no requiere reintento/.test(msgEl.textContent), "debe bloquear reintento en SINCRONIZANDO");
+  assert.ok(/no requiere reintento/.test(msgEl.textContent));
 });
 
 test("B2.3: doble sincronización simultánea → 1 sola ejecución real (mutex _sincronizando)", async () => {
@@ -282,7 +256,6 @@ test("B2.3: doble sincronización simultánea → 1 sola ejecución real (mutex 
   client.__rpcResult = { data: "ok", error: null };
   client.__rpcCalls.length = 0;
 
-  // Lanzar 3 sincronizaciones en paralelo: el mutex debe dejar 1 sola.
   await Promise.all([
     window.sincronizarCola(),
     window.sincronizarCola(),
@@ -303,15 +276,12 @@ test("B2.3: persistencia — el Centro se reconstruye desde la cola tras recarga
   await esperar(10);
   assert.ok(d1.getElementById("cc-atencion").innerHTML.includes("Requiere atención") || d1.getElementById("cc-atencion").querySelector(".cc-asunto"));
 
-  // Simular recarga: leer la MISMA cola (IndexedDB persiste en un navegador
-  // real; acá re-consultamos con el mismo entorno para reconstruir).
   await w1.refrescarOperacionesPendientesCache();
   await w1.refrescarCentroControl();
   await esperar(10);
-  assert.ok(d1.getElementById("cc-atencion").querySelector(".cc-asunto"), "el Centro reconstruye la cola tras recarga");
-  // Verificar que la operación sigue en la cola (persistencia real de IDB).
+  assert.ok(d1.getElementById("cc-atencion").querySelector(".cc-asunto"));
   const visibles = await w1.obtenerOperacionesVisiblesPanel();
-  assert.ok(visibles.some((o) => o.estado === "REQUIERE_ATENCION"), "la operación persiste en IndexedDB tras recarga");
+  assert.ok(visibles.some((o) => o.estado === "REQUIERE_ATENCION"));
 });
 
 test("B2.3-K: proyección de stock reutiliza ajustePendiente (no recalcula)", async () => {
