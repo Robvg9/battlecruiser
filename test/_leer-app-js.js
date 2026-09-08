@@ -20,19 +20,10 @@ function obtenerModulosProduccion(baseDir) {
 function leerAppJsConcatenado(baseDir) {
   const appPath = path.join(baseDir, "..", "public", "app.js");
   const appSource = fs.readFileSync(appPath, "utf8");
-  const versionMatch = appSource.match(/const VERSION=\"([^\"]+)\"/);
+  const versionMatch = appSource.match(/const VERSION="([^"]+)"/);
   const version = versionMatch ? versionMatch[1] : "unknown";
   const modulos = obtenerModulosProduccion(baseDir);
-  let source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
-
-  // B2.3 uses a special mock client (__rpcResult) and manually controls the
-  // visible shell. Prevent only that harness from running the real auth boot,
-  // which otherwise starts asynchronous UI refreshes against a partial DOM.
-  // B3 uses a different mock and keeps the normal auth boot path untouched.
-  source = source
-    .replace(/let _usuarioActualId = null;/, 'let _usuarioActualId = "u-test";')
-    .replace(/function showApp\(session\) \{/, "function showApp(session) { if (window.__BC_B23_TEST_MODE__) return;")
-    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return;");
+  const source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
@@ -84,11 +75,6 @@ function leerAppJsConcatenado(baseDir) {
 
     if (testClient && testClient.__rpcResult) {
       try {
-        if (testClient.auth && typeof testClient.auth.getUser !== "function") {
-          testClient.auth.getUser = async function(){
-            return { data: { user: { id: "u-test", email: "test@app.test" } }, error: null };
-          };
-        }
         if (!testClient.__bcB23RpcShim) {
           const originalRpc = testClient.rpc.bind(testClient);
           const perfil = [{ id: "u-test", nombre: "Test", activo: true, role_id: "r-test", rol: "Dueño" }];
@@ -139,21 +125,6 @@ function leerAppJsConcatenado(baseDir) {
       if (typeof _permisosCargaExitosa !== "undefined") _permisosCargaExitosa = true;
       if (typeof _permisosCargaFallidaRed !== "undefined") _permisosCargaFallidaRed = false;
       try { window.__bcTestClient = testClient; } catch (_) {}
-
-      // B2.3 creates synthetic queued operations directly instead of going
-      // through ejecutarOperacion(). Keep the production guard that rejects
-      // orphan operations, but give this harness the same authenticated user
-      // context every time its helper reaches guardarOperacionPendiente().
-      try {
-        const guardarOriginal = window.guardarOperacionPendiente;
-        if (typeof guardarOriginal === "function" && !window.__bcB23GuardarShim) {
-          window.guardarOperacionPendiente = async function(operacion) {
-            if (operacion && !operacion.usuario_id) operacion.usuario_id = "u-test";
-            return guardarOriginal(operacion);
-          };
-          window.__bcB23GuardarShim = true;
-        }
-      } catch (_) {}
     }
 
     if (typeof _usuarioActual !== "undefined") {
@@ -208,10 +179,6 @@ function leerAppJsConcatenado(baseDir) {
       window.__bcTestResolveUIReady();
       window.__bcTestResolveUIReady = null;
     }
-
-    // No auto-boot here. Individual tests decide when showApp() is required,
-    // keeping harness setup deterministic and preventing asynchronous UI boot
-    // from racing the behavior under test.
   } catch (e) {
     console.warn("[BattleCruiser test bridge]",e);
     try { window.__BC_UI_READY_RESOLVED__=true; if(typeof window.__bcTestResolveUIReady === "function") window.__bcTestResolveUIReady(); } catch (_) {}
