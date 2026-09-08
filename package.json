@@ -2,7 +2,7 @@
   "name": "battlecruiser",
   "private": true,
   "scripts": {
-    "test": "node --test --test-force-exit --test-concurrency=1 test/*.test.js"
+    "test": "node test/run-suite.js"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",
