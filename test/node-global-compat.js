@@ -9,17 +9,10 @@ for (const key of ["navigator", "crypto"]) {
 const { afterEach } = require("node:test");
 const __bcIsB23 = process.argv.some((arg) => String(arg).includes("b2.3-centro-control.test.js"));
 const __bcIsB3 = process.argv.some((arg) => String(arg).includes("b3-usuarios-permisos.test.js"));
-
-// Las suites JSDOM inyectan trabajo asíncrono real del frontend (timers,
-// listeners, IndexedDB y callbacks de caché). Borrar window/document/
-// localStorage al cerrar cada test rompe ese trabajo pendiente y provoca
-// fallos espurios en el siguiente microtask/event loop. Cada test que monta
-// entorno reemplaza estos globals explícitamente, por lo que conservar el
-// último entorno es seguro dentro del proceso del archivo.
-const __bcUsesJsdom = /(?:b2\.3-centro-control|b3-usuarios-permisos|b4-centro-mando|b5-reportes|b6-nucleo-operativo|b7-operacion-humana|b8-comunicacion|m3-productos-crud|fase-c-aislamiento|fase-c-regresion)\.test\.js/.test(process.argv.join(" "));
-
 afterEach(() => {
-  if (__bcUsesJsdom || __bcIsB23 || __bcIsB3) return;
+  // B2.3 y B3 arrancan trabajo de fondo contra varios JSDOM independientes.
+  // Cerrar/remover globals al terminar cada test provoca carreras con esos callbacks.
+  if (__bcIsB23 || __bcIsB3) return;
   try {
     const w = globalThis.window;
     if (w && typeof w.close === "function") w.close();
@@ -29,6 +22,9 @@ afterEach(() => {
   }
 });
 
+// B3's focused harness intentionally loads the stable module graph and omits
+// the dynamically loaded admin extension. Inject only the two compatibility
+// behaviors required by the B3 contract, without changing production code.
 const Module = require("node:module");
 const originalLoad = Module._load;
 
@@ -40,11 +36,18 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
+    // B2.3 must establish the auto-sync barrier BEFORE any application module
+    // is evaluated. Several modules can perform bootstrap work while the
+    // concatenated source is executing; setting the flag only after
+    // originalReader() returns is too late and leaves a race window.
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
       globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
     }
 
+    // B2.3 supplies a deliberately minimal Supabase mock. app.js subscribes
+    // to auth state during bootstrap, so add the missing API surface here at
+    // the moment the fixture is actually loaded. This remains test-only.
     if (__bcIsB23 && globalThis.window && globalThis.window.supabase && typeof globalThis.window.supabase.createClient === "function") {
       const supabaseMock = globalThis.window.supabase;
       if (!supabaseMock.__bcAuthStateCompatWrapped) {
@@ -58,7 +61,10 @@ Module._load = function (request, parent, isMain) {
                   user: { id: "u-test", email: "test@app.test" },
                 }));
               }
-              return { data: { subscription: { unsubscribe: () => {} } }, error: null };
+              return {
+                data: { subscription: { unsubscribe: () => {} } },
+                error: null,
+              };
             };
           }
           return client;
@@ -68,6 +74,13 @@ Module._load = function (request, parent, isMain) {
     }
 
     let source = originalReader(baseDir);
+
+    // The production sync function already handles network failures by
+    // moving SINCRONIZANDO -> PENDIENTE. In B2.3 the fixture also boots
+    // background UI work; a background sync can immediately pick that same
+    // operation up again and make the assertion observe SINCRONIZANDO. Keep
+    // automatic syncs out of the isolated fixture while allowing tests that
+    // explicitly call window.sincronizarCola() to exercise the real function.
     if (__bcIsB23) {
       source = source.replace(
         "async function sincronizarCola() {",
@@ -81,10 +94,19 @@ Module._load = function (request, parent, isMain) {
   try {
     if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
       const syncOriginal = window.sincronizarCola;
-      window.sincronizarCola = async function () {
+      window.sincronizarCola = function () {
+        // Open the explicit gate only for the synchronous entry into the
+        // production function. It checks the gate immediately; keeping the
+        // flag true across the returned Promise would also admit background
+        // auto-sync calls that happen while the first sync is still pending.
         window.__BC_B23_EXPLICIT_SYNC__ = true;
-        try { return await syncOriginal.apply(this, arguments); }
-        finally { window.__BC_B23_EXPLICIT_SYNC__ = false; }
+        let resultado;
+        try {
+          resultado = syncOriginal.apply(this, arguments);
+        } finally {
+          window.__BC_B23_EXPLICIT_SYNC__ = false;
+        }
+        return resultado;
       };
       window.__bcB23ExplicitSyncWrapped = true;
     }
@@ -126,8 +148,9 @@ Module._load = function (request, parent, isMain) {
           }
           return resultado;
         };
-        try { return await loaderOriginal.apply(this, arguments); }
-        finally {
+        try {
+          return await loaderOriginal.apply(this, arguments);
+        } finally {
           client.rpc = rpcOriginal;
           if (faltaSqlB3) window.__bcB3NoAplicado = true;
         }
