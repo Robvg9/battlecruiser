@@ -23,7 +23,7 @@ Module._load = function (request, parent, isMain) {
     // Undo only the obsolete localStorage lock injected by the previous
     // compatibility layer. The real production mutex must own that key.
     source = source.replace(
-      /\n\s*try \{ globalThis\.window\.localStorage\.setItem\("battlecruiser-sincronizando", "1"\); \} catch \(_) \{\}/,
+      '\n        try { globalThis.window.localStorage.setItem("battlecruiser-sincronizando", "1"); } catch (_) {}',
       ""
     );
 
