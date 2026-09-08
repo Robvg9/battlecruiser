@@ -139,6 +139,21 @@ function leerAppJsConcatenado(baseDir) {
       if (typeof _permisosCargaExitosa !== "undefined") _permisosCargaExitosa = true;
       if (typeof _permisosCargaFallidaRed !== "undefined") _permisosCargaFallidaRed = false;
       try { window.__bcTestClient = testClient; } catch (_) {}
+
+      // B2.3 creates synthetic queued operations directly instead of going
+      // through ejecutarOperacion(). Keep the production guard that rejects
+      // orphan operations, but give this harness the same authenticated user
+      // context every time its helper reaches guardarOperacionPendiente().
+      try {
+        const guardarOriginal = window.guardarOperacionPendiente;
+        if (typeof guardarOriginal === "function" && !window.__bcB23GuardarShim) {
+          window.guardarOperacionPendiente = async function(operacion) {
+            if (operacion && !operacion.usuario_id) operacion.usuario_id = "u-test";
+            return guardarOriginal(operacion);
+          };
+          window.__bcB23GuardarShim = true;
+        }
+      } catch (_) {}
     }
 
     if (typeof _usuarioActual !== "undefined") {
