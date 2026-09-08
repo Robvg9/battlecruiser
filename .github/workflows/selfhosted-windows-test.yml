@@ -24,28 +24,6 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Configure Git PATH
-        shell: powershell
-        run: |
-          $candidates = @(
-            "C:\Program Files\Git\cmd",
-            "C:\Program Files\Git\bin",
-            "C:\Program Files (x86)\Git\cmd",
-            "C:\Program Files (x86)\Git\bin"
-          )
-          $gitDir = $null
-          foreach ($dir in $candidates) {
-            if (Test-Path (Join-Path $dir "git.exe")) {
-              $gitDir = $dir
-              Add-Content -Path $env:GITHUB_PATH -Value $dir
-              break
-            }
-          }
-          if (-not $gitDir) {
-            throw "Git no está instalado en las rutas estándar del runner ROBVG."
-          }
-          & (Join-Path $gitDir "git.exe") --version
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
