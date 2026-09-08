@@ -21,16 +21,41 @@ function mark(needle, suffix) {
   instrumented = instrumented.replace(needle, needle + suffix);
 }
 
-mark("function inyectarApp(window, opciones = {}) {", "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] ENTER inyectarApp\");");
-mark("let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);", "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] AFTER leerAppJsConcatenado chars=\" + appJs.length);");
-mark(".replace(/let _refrescosPendientes = null;/, \"var _refrescosPendientes = null;\")", ";\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] AFTER transforms\");");
-mark("s.textContent = appJs;", "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] BEFORE append\");");
-mark("window.document.body.appendChild(s);", "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] AFTER append\");");
-mark("function montarEntorno(opciones = {}) {", "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] ENTER montarEntorno\");");
-mark("async function montarEntornoConIdb(opciones, prepararIdb) {", "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] ENTER montarEntornoConIdb\");");
+mark(
+  "function inyectarApp(window, opciones = {}) {",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] ENTER inyectarApp\");"
+);
+mark(
+  "let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] AFTER leerAppJsConcatenado chars=\" + appJs.length);"
+);
+mark(
+  ".replace(/let _idbConexion = null;/, \"let _idbConexion = null; window._idbConexion = () => _idbConexion; window._idbConexionReset = () => { _idbConexion = null; };\");",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] AFTER transforms\");"
+);
+mark(
+  "s.textContent = appJs;",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] BEFORE append\");"
+);
+mark(
+  "window.document.body.appendChild(s);",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] AFTER append\");"
+);
+mark(
+  "function montarEntorno(opciones = {}) {",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] ENTER montarEntorno\");"
+);
+mark(
+  "async function montarEntornoConIdb(opciones, prepararIdb) {",
+  "\n  if (process.env.BC_DIAG_BOOT === \"1\") console.error(\"[FaseC DIAG] ENTER montarEntornoConIdb\");"
+);
 
 const bootstrap = path.join(__dirname, ".diag-fase-c-instrumented.cjs");
-fs.writeFileSync(bootstrap, `\"use strict\";\nconst Module=require(\"node:module\");\nconst m=new Module(${JSON.stringify(absolute)},module);\nm.filename=${JSON.stringify(absolute)};\nm.paths=Module._nodeModulePaths(${JSON.stringify(path.dirname(absolute))});\nm._compile(${JSON.stringify(instrumented)},${JSON.stringify(absolute)});\n`, "utf8");
+fs.writeFileSync(
+  bootstrap,
+  `"use strict";\nconst Module=require("node:module");\nconst m=new Module(${JSON.stringify(absolute)},module);\nm.filename=${JSON.stringify(absolute)};\nm.paths=Module._nodeModulePaths(${JSON.stringify(path.dirname(absolute))});\nm._compile(${JSON.stringify(instrumented)},${JSON.stringify(absolute)});\n`,
+  "utf8"
+);
 
 console.error(`[FaseC DIAG] TARGET=${target}`);
 console.error("[FaseC DIAG] spawning instrumented node:test process");
