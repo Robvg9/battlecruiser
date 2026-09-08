@@ -36,6 +36,16 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
+    // B2.3 must have its auto-sync barrier installed BEFORE the concatenated
+    // application source is evaluated. Some bootstrap modules can schedule
+    // connectivity work during evaluation, so installing this after the
+    // source has executed is too late and allows a concurrent sync to win
+    // the race against an explicit test assertion.
+    if (__bcIsB23 && globalThis.window) {
+      globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
+      globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
+    }
+
     // B2.3 supplies a deliberately minimal Supabase mock. app.js subscribes
     // to auth state during bootstrap, so add the missing API surface here at
     // the moment the fixture is actually loaded. This remains test-only.
