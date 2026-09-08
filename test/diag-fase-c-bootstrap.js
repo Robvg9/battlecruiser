@@ -12,19 +12,23 @@ if (!target) {
 
 const absolute = path.resolve(__dirname, target);
 const source = fs.readFileSync(absolute, "utf8");
-const markers = [
-  ["function prepararDOM(opciones = {}) {", "console.error('[FaseC DIAG] ENTER prepararDOM');"],
-  ["function inyectarApp(window, opciones = {}) {", "console.error('[FaseC DIAG] ENTER inyectarApp');\n  console.error('[FaseC DIAG] BEFORE leerAppJsConcatenado');"],
-  ["let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);", "let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);\n  console.error('[FaseC DIAG] AFTER leerAppJsConcatenado');"],
+const replacements = [
+  ["function prepararDOM(opciones = {}) {", "function prepararDOM(opciones = {}) {\n  console.error('[FaseC DIAG] ENTER prepararDOM');"],
+  ["function inyectarApp(window, opciones = {}) {", "function inyectarApp(window, opciones = {}) {\n  console.error('[FaseC DIAG] ENTER inyectarApp');\n  console.error('[FaseC DIAG] BEFORE leerAppJsConcatenado');"],
+  ["let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);", "console.error('[FaseC DIAG] BEFORE leerAppJsConcatenado');\n  let appJs = require(\"./_leer-app-js\").leerAppJsConcatenado(__dirname);\n  console.error('[FaseC DIAG] AFTER leerAppJsConcatenado');"],
   ["const s = window.document.createElement(\"script\");", "console.error('[FaseC DIAG] BEFORE create script');\n  const s = window.document.createElement(\"script\");"],
   ["s.textContent = appJs;", "s.textContent = appJs;\n  console.error('[FaseC DIAG] BEFORE append script');"],
   ["window.document.body.appendChild(s);", "window.document.body.appendChild(s);\n  console.error('[FaseC DIAG] AFTER append script');"],
-  ["function montarEntorno(opciones = {}) {", "console.error('[FaseC DIAG] ENTER montarEntorno');"],
-  ["async function montarEntornoConIdb(opciones, prepararIdb) {", "console.error('[FaseC DIAG] ENTER montarEntornoConIdb');"],
+  ["function montarEntorno(opciones = {}) {", "function montarEntorno(opciones = {}) {\n  console.error('[FaseC DIAG] ENTER montarEntorno');"],
+  ["async function montarEntornoConIdb(opciones, prepararIdb) {", "async function montarEntornoConIdb(opciones, prepararIdb) {\n  console.error('[FaseC DIAG] ENTER montarEntornoConIdb');"],
 ];
 let instrumented = source;
-for (const [needle, marker] of markers) {
-  instrumented = instrumented.replace(needle, needle + "\n  " + marker);
+for (const [needle, replacement] of replacements) {
+  if (!instrumented.includes(needle)) {
+    console.error('[FaseC DIAG] marker needle missing:', needle.slice(0, 80));
+    continue;
+  }
+  instrumented = instrumented.replace(needle, replacement);
 }
 
 const bootstrap = path.join(__dirname, ".diag-fase-c-instrumented.cjs");
