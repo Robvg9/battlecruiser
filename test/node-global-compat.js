@@ -22,34 +22,6 @@ afterEach(() => {
   }
 });
 
-// B2.3's test fixture supplies a minimal Supabase client. Keep the fixture
-// compatible with the auth API used during app.js bootstrap without touching
-// production code or requiring every test fixture to duplicate the method.
-if (__bcIsB23 && globalThis.window && globalThis.window.supabase && typeof globalThis.window.supabase.createClient === "function") {
-  const supabaseMock = globalThis.window.supabase;
-  if (!supabaseMock.__bcAuthStateCompatWrapped) {
-    const createClientOriginal = supabaseMock.createClient;
-    supabaseMock.createClient = function () {
-      const client = createClientOriginal.apply(this, arguments);
-      if (client && client.auth && typeof client.auth.onAuthStateChange !== "function") {
-        client.auth.onAuthStateChange = (callback) => {
-          if (typeof callback === "function") {
-            queueMicrotask(() => callback("INITIAL_SESSION", {
-              user: { id: "u-test", email: "test@app.test" },
-            }));
-          }
-          return {
-            data: { subscription: { unsubscribe: () => {} } },
-            error: null,
-          };
-        };
-      }
-      return client;
-    };
-    supabaseMock.__bcAuthStateCompatWrapped = true;
-  }
-}
-
 // B3's focused harness intentionally loads the stable module graph and omits
 // the dynamically loaded admin extension. Inject only the two compatibility
 // behaviors required by the B3 contract, without changing production code.
@@ -64,6 +36,34 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
+    // B2.3 supplies a deliberately minimal Supabase mock. app.js subscribes
+    // to auth state during bootstrap, so add the missing API surface here at
+    // the moment the fixture is actually loaded. This remains test-only.
+    if (__bcIsB23 && globalThis.window && globalThis.window.supabase && typeof globalThis.window.supabase.createClient === "function") {
+      const supabaseMock = globalThis.window.supabase;
+      if (!supabaseMock.__bcAuthStateCompatWrapped) {
+        const createClientOriginal = supabaseMock.createClient;
+        supabaseMock.createClient = function () {
+          const client = createClientOriginal.apply(this, arguments);
+          if (client && client.auth && typeof client.auth.onAuthStateChange !== "function") {
+            client.auth.onAuthStateChange = (callback) => {
+              if (typeof callback === "function") {
+                queueMicrotask(() => callback("INITIAL_SESSION", {
+                  user: { id: "u-test", email: "test@app.test" },
+                }));
+              }
+              return {
+                data: { subscription: { unsubscribe: () => {} } },
+                error: null,
+              };
+            };
+          }
+          return client;
+        };
+        supabaseMock.__bcAuthStateCompatWrapped = true;
+      }
+    }
+
     let source = originalReader(baseDir);
     source += `
 ;(function __bcB3HarnessCompat(){
