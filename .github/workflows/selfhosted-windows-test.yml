@@ -34,7 +34,6 @@ jobs:
         shell: cmd
         run: |
           echo GITHUB_SHA=%GITHUB_SHA%
-          git --version
           node test/ci-preflight.js
 
       - name: Verify runner environment
@@ -70,4 +69,7 @@ jobs:
           node -r ./test/node-global-compat.js --test --test-force-exit test/b3-usuarios-permisos.test.js
           if errorlevel 1 exit /b 1
           echo === FULL SUITE ===
-          node -r ./test/node-global-compat.js ./node_modules/.bin/npm test
+          set "NODE_OPTIONS=--require=./test/node-global-compat.js"
+          npm test
+          if errorlevel 1 exit /b 1
+          set "NODE_OPTIONS="

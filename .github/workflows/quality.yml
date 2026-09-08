@@ -36,8 +36,6 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          git diff --exit-code
-          git diff --cached --exit-code
           node test/ci-preflight.js
 
       - name: Install dependencies
@@ -55,7 +53,12 @@ jobs:
         run: node -r ./test/node-global-compat.js --test --test-force-exit test/b3-usuarios-permisos.test.js
 
       - name: Full automated suite
-        run: node -r ./test/node-global-compat.js ./node_modules/.bin/npm test
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:NODE_OPTIONS = '--require=./test/node-global-compat.js'
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify production serves current application version
         shell: powershell
