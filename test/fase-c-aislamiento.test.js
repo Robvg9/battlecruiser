@@ -124,6 +124,11 @@ const PERMISOS_TODOS = [
 // Load cases in the same scope so helpers are visible.
 const _fs = require("fs");
 const _path = require("path");
-for (const part of ["fase-c-aislamiento-cases-0.js", "fase-c-aislamiento-cases-1.js", "fase-c-aislamiento-cases-2.js"]) {
+for (const part of [
+  "fase-c-aislamiento-cases-0.js",
+  "fase-c-aislamiento-cases-1.js",
+  "fase-c-aislamiento-cases-2.js",
+  "fase-c-aislamiento-cases-3.js",
+]) {
   eval(_fs.readFileSync(_path.join(__dirname, part), "utf8"));
 }
