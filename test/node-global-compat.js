@@ -22,9 +22,6 @@ afterEach(() => {
   }
 });
 
-// B3's focused harness intentionally loads the stable module graph and omits
-// the dynamically loaded admin extension. Inject only the two compatibility
-// behaviors required by the B3 contract, without changing production code.
 const Module = require("node:module");
 const originalLoad = Module._load;
 
@@ -32,20 +29,18 @@ Module._load = function (request, parent, isMain) {
   const loaded = originalLoad.call(this, request, parent, isMain);
   if (!request.endsWith("_leer-app-js")) return loaded;
   if (!loaded || typeof loaded.leerAppJsConcatenado !== "function") return loaded;
-  if (loaded.__bcB3CompatWrapped) return loaded;
+  if (loaded.__bcCompatWrapped) return loaded;
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
-    // B2.3: mark suppress early. Do NOT hold the production localStorage mutex.
-    // Explicit vs auto is handled by test/b23-sync-harness.js.
+    // B2.3: suppress auto-sync early. Production localStorage mutex is NOT held here.
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
       globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
+      try { globalThis.window.localStorage.removeItem("battlecruiser-sincronizando"); } catch (_) {}
     }
 
-    // B2.3 supplies a deliberately minimal Supabase mock. app.js subscribes
-    // to auth state during bootstrap, so add the missing API surface here at
-    // the moment the fixture is actually loaded. This remains test-only.
+    // B2.3 minimal Supabase auth surface for bootstrap.
     if (__bcIsB23 && globalThis.window && globalThis.window.supabase && typeof globalThis.window.supabase.createClient === "function") {
       const supabaseMock = globalThis.window.supabase;
       if (!supabaseMock.__bcAuthStateCompatWrapped) {
@@ -73,13 +68,34 @@ Module._load = function (request, parent, isMain) {
 
     let source = originalReader(baseDir);
 
-    // Minimal B2.3 gate only (no localStorage lock, no complex wrap).
-    // b23-sync-harness.js owns the explicit-call bridge.
+    // B2.3 gate: block background/auto sincronizarCola; explicit test calls open the gate.
     if (__bcIsB23) {
       source = source.replace(
         "async function sincronizarCola() {",
         "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;"
       );
+
+      // Explicit-call bridge: open gate only for the synchronous entry.
+      // Background timers never set the flag. Production mutex/state machine untouched.
+      source += `
+;(function __bcB23SyncIsolation(){
+  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
+  try {
+    if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
+      const syncOriginal = window.sincronizarCola;
+      window.sincronizarCola = function () {
+        window.__BC_B23_EXPLICIT_SYNC__ = true;
+        try {
+          return syncOriginal.apply(this, arguments);
+        } finally {
+          window.__BC_B23_EXPLICIT_SYNC__ = false;
+        }
+      };
+      window.__bcB23ExplicitSyncWrapped = true;
+    }
+  } catch (_) {}
+})();
+`;
     }
 
     source += `
@@ -145,6 +161,6 @@ Module._load = function (request, parent, isMain) {
 `;
     return source;
   };
-  loaded.__bcB3CompatWrapped = true;
+  loaded.__bcCompatWrapped = true;
   return loaded;
 };
