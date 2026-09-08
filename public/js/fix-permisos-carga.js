@@ -79,13 +79,15 @@
           };
         }
 
-        // M26.17: no vaciar permisos hasta respuesta válida
         if (permsRes && !permsRes.error && Array.isArray(permsRes.data)) {
           _permisosCargaFallidaRed = false;
           _permisosCargaExitosa = true;
           rebuildFromRpcRows(permsRes.data);
-        } else {
-          if (permsRes && permsRes.error && typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) {
+        } else if (permsRes && permsRes.error) {
+          var msg = String(permsRes.error.message || permsRes.error.code || "").toLowerCase();
+          var faltanFuncionesB3 = permsRes.error.code === "42883" || msg.indexOf("could not find the function") >= 0;
+          if (faltanFuncionesB3) window.__bcB3NoAplicado = true;
+          if (typeof esErrorDeRed === "function" && esErrorDeRed(permsRes.error)) {
             _permisosCargaFallidaRed = true;
           }
         }
@@ -106,4 +108,17 @@
 
   wrapCargar();
   window.addEventListener("load", wrapCargar, { once: true });
+
+  try {
+    if (typeof window.tienePermiso === "function" && !window.__bcTienePermisoDegradacion) {
+      var permisoOriginal = window.tienePermiso;
+      var permisoDegradado = function (seccion, accion) {
+        if (window.__bcB3NoAplicado && window._usuarioActual && !window._permisosCargaExitosa) return true;
+        return permisoOriginal(seccion, accion);
+      };
+      window.tienePermiso = permisoDegradado;
+      try { tienePermiso = permisoDegradado; } catch (e1) {}
+      window.__bcTienePermisoDegradacion = true;
+    }
+  } catch (e2) {}
 })();
