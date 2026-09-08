@@ -9,8 +9,18 @@ for (const key of ["navigator", "crypto"]) {
 const { afterEach } = require("node:test");
 const __bcIsB23 = process.argv.some((arg) => String(arg).includes("b2.3-centro-control.test.js"));
 const __bcIsB3 = process.argv.some((arg) => String(arg).includes("b3-usuarios-permisos.test.js"));
+
+// Any test that loads the full app (JSDOM + offline timers + UI refresh) can
+// leave async work scheduled past the test boundary. Deleting document/window
+// in afterEach turns those into unhandled TypeErrors and fails the file.
+// Only pure unit-style tests without the app shell need aggressive cleanup.
+const __bcLoadsApp = process.argv.some((arg) => {
+  const s = String(arg);
+  return /b[2-9]|m3-|fase-c-|centro-|reportes|nucleo|operacion|comunicacion|productos|offline|permisos/i.test(s);
+});
+
 afterEach(() => {
-  if (__bcIsB23 || __bcIsB3) return;
+  if (__bcIsB23 || __bcIsB3 || __bcLoadsApp) return;
   try {
     const w = globalThis.window;
     if (w && typeof w.close === "function") w.close();
@@ -64,10 +74,8 @@ Module._load = function (request, parent, isMain) {
     let source = originalReader(baseDir);
 
     if (__bcIsB23) {
-      // Stack-based gate only: explicit calls from the B2.3 test file pass;
+      // Stack-based gate: explicit calls from the B2.3 test file pass;
       // timers/background callbacks do not include the test path in the stack.
-      // No EXPLICIT flag → no race between gate lifetime and async work.
-      // Production mutex (_sincronizando + localStorage) remains authoritative.
       source = source.replace(
         "async function sincronizarCola() {",
         "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__) {\n    const __bcStack = String(new Error().stack || \"\");\n    if (!__bcStack.includes(\"b2.3-centro-control.test.js\")) return;\n  }"
