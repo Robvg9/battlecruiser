@@ -3,37 +3,17 @@ const fs = require("fs");
 const path = require("path");
 
 const MODULOS_APP = [
-  "core.js",
-  "auth.js",
-  "offline.js",
-  "centro-control.js",
-  "navegacion.js",
-  "productos.js",
-  "presentaciones.js",
-  "almacenes.js",
-  "transferencias.js",
-  "vales.js",
-  "ventas.js",
-  "catalogos.js",
-  "configuracion.js",
-  "usuarios-permisos.js",
-  "mando.js",
-  "reportes.js",
-  "nucleo-operativo.js",
-  "operacion-humana.js",
-  "comunicacion.js",
+  "core.js", "auth.js", "offline.js", "centro-control.js", "navegacion.js", "productos.js", "presentaciones.js", "almacenes.js",
+  "transferencias.js", "vales.js", "ventas.js", "catalogos.js", "configuracion.js", "usuarios-permisos.js", "mando.js", "reportes.js",
+  "nucleo-operativo.js", "operacion-humana.js", "comunicacion.js",
 ];
 
 function obtenerModulosProduccion(baseDir) {
   const appPath = path.join(baseDir, "..", "public", "app.js");
   const appSource = fs.readFileSync(appPath, "utf8");
-  const dinamicos = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)]
-    .map((m) => m[1]);
+  const dinamicos = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)].map((m) => m[1]);
   const candidatos = [...new Set([...MODULOS_APP, ...dinamicos])];
   const jsDir = path.join(baseDir, "..", "public", "js");
-  // app.js deliberately tolerates missing optional modules at runtime.
-  // The harness must mirror that behavior instead of turning an optional
-  // missing file into a failure for every focused test.
   return candidatos.filter((nombre) => fs.existsSync(path.join(jsDir, nombre)));
 }
 
@@ -43,16 +23,13 @@ function leerAppJsConcatenado(baseDir) {
   const versionMatch = appSource.match(/const VERSION="([^"]+)"/);
   const version = versionMatch ? versionMatch[1] : "unknown";
   const modulos = obtenerModulosProduccion(baseDir);
-  const source = modulos
-    .map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8"))
-    .join("\n");
+  const source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
   window.__BC_VERSION__ = ${JSON.stringify(version)};
   window.__BC_UI_READY_RESOLVED__ = false;
   window.__BC_UI_READY__ = new Promise(function(resolve){ window.__bcTestResolveUIReady = resolve; });
-  // jsdom no implementa estas APIs de navegador que el frontend usa durante boot.
   if (typeof window.requestAnimationFrame !== "function") {
     window.requestAnimationFrame = function(cb){ return window.setTimeout(function(){ cb(Date.now()); }, 16); };
   }
@@ -60,8 +37,21 @@ function leerAppJsConcatenado(baseDir) {
     window.cancelAnimationFrame = function(id){ window.clearTimeout(id); };
   }
   try {
-    if (window.HTMLCanvasElement && typeof window.HTMLCanvasElement.prototype.getContext !== "function") {
-      window.HTMLCanvasElement.prototype.getContext = function(){ return null; };
+    if (window.HTMLCanvasElement) {
+      window.HTMLCanvasElement.prototype.getContext = function(){
+        return {
+          canvas: this,
+          clearRect:function(){}, fillRect:function(){}, strokeRect:function(){},
+          beginPath:function(){}, closePath:function(){}, moveTo:function(){}, lineTo:function(){},
+          stroke:function(){}, fill:function(){}, arc:function(){}, rect:function(){},
+          save:function(){}, restore:function(){}, translate:function(){}, rotate:function(){}, scale:function(){},
+          fillText:function(){}, strokeText:function(){}, measureText:function(text){ return { width: String(text || "").length * 6 }; },
+          setTransform:function(){}, resetTransform:function(){},
+          setLineDash:function(){},
+          createLinearGradient:function(){ return { addColorStop:function(){} }; },
+          createPattern:function(){ return null; },
+        };
+      };
     }
   } catch (_) {}
 })();
@@ -72,9 +62,7 @@ function leerAppJsConcatenado(baseDir) {
   try {
     var testClient = null;
     try {
-      if (window.supabase && typeof window.supabase.createClient === "function") {
-        testClient = window.supabase.createClient();
-      }
+      if (window.supabase && typeof window.supabase.createClient === "function") testClient = window.supabase.createClient();
     } catch (_) {}
 
     if (testClient && testClient.__rpcResult) {
@@ -83,23 +71,23 @@ function leerAppJsConcatenado(baseDir) {
           const originalRpc = testClient.rpc.bind(testClient);
           const perfil = [{ id: "u-test", nombre: "Test", activo: true, role_id: "r-test", rol: "Dueño" }];
           const permisoFilas = [
-            ["productos", "ver"], ["productos", "crear"], ["productos", "editar"], ["productos", "borrar"],
-            ["stock", "ver"], ["stock", "crear"], ["stock", "editar"], ["stock", "borrar"],
-            ["compras", "ver"], ["compras", "crear"], ["compras", "editar"], ["compras", "borrar"],
-            ["ventas", "ver"], ["ventas", "crear"], ["ventas", "editar"], ["ventas", "borrar"],
-            ["transferencias", "ver"], ["transferencias", "crear"], ["transferencias", "editar"], ["transferencias", "borrar"],
-            ["vales", "ver"], ["vales", "crear"], ["vales", "editar"], ["vales", "borrar"],
-            ["almacenes", "ver"], ["almacenes", "crear"], ["almacenes", "editar"], ["almacenes", "borrar"],
-            ["reportes", "ver"], ["reportes", "crear"], ["reportes", "editar"], ["reportes", "borrar"],
-            ["turnos", "ver"], ["turnos", "crear"], ["turnos", "editar"], ["turnos", "borrar"],
-            ["usuarios", "ver"], ["usuarios", "crear"], ["usuarios", "editar"], ["usuarios", "borrar"],
-            ["auditoria", "ver"], ["auditoria", "crear"], ["auditoria", "editar"], ["auditoria", "borrar"],
-            ["comunicacion", "ver"], ["comunicacion", "crear"], ["comunicacion", "editar"], ["comunicacion", "borrar"],
-            ["gastos", "ver"], ["gastos", "crear"], ["gastos", "editar"], ["gastos", "borrar"],
-            ["mermas", "ver"], ["mermas", "crear"], ["mermas", "editar"], ["mermas", "borrar"],
-            ["reinversiones", "ver"], ["reinversiones", "crear"], ["reinversiones", "editar"], ["reinversiones", "borrar"],
-            ["responsabilidades", "ver"], ["responsabilidades", "crear"], ["responsabilidades", "editar"], ["responsabilidades", "borrar"],
-            ["incidencias", "ver"], ["incidencias", "crear"], ["incidencias", "editar"], ["incidencias", "borrar"],
+            ["productos","ver"],["productos","crear"],["productos","editar"],["productos","borrar"],
+            ["stock","ver"],["stock","crear"],["stock","editar"],["stock","borrar"],
+            ["compras","ver"],["compras","crear"],["compras","editar"],["compras","borrar"],
+            ["ventas","ver"],["ventas","crear"],["ventas","editar"],["ventas","borrar"],
+            ["transferencias","ver"],["transferencias","crear"],["transferencias","editar"],["transferencias","borrar"],
+            ["vales","ver"],["vales","crear"],["vales","editar"],["vales","borrar"],
+            ["almacenes","ver"],["almacenes","crear"],["almacenes","editar"],["almacenes","borrar"],
+            ["reportes","ver"],["reportes","crear"],["reportes","editar"],["reportes","borrar"],
+            ["turnos","ver"],["turnos","crear"],["turnos","editar"],["turnos","borrar"],
+            ["usuarios","ver"],["usuarios","crear"],["usuarios","editar"],["usuarios","borrar"],
+            ["auditoria","ver"],["auditoria","crear"],["auditoria","editar"],["auditoria","borrar"],
+            ["comunicacion","ver"],["comunicacion","crear"],["comunicacion","editar"],["comunicacion","borrar"],
+            ["gastos","ver"],["gastos","crear"],["gastos","editar"],["gastos","borrar"],
+            ["mermas","ver"],["mermas","crear"],["mermas","editar"],["mermas","borrar"],
+            ["reinversiones","ver"],["reinversiones","crear"],["reinversiones","editar"],["reinversiones","borrar"],
+            ["responsabilidades","ver"],["responsabilidades","crear"],["responsabilidades","editar"],["responsabilidades","borrar"],
+            ["incidencias","ver"],["incidencias","crear"],["incidencias","editar"],["incidencias","borrar"],
           ].map(([seccion, accion]) => ({ seccion, accion }));
           testClient.rpc = async function(nombre, params) {
             if (nombre === "perfil_usuario_actual") return { data: perfil, error: null };
@@ -112,20 +100,18 @@ function leerAppJsConcatenado(baseDir) {
       } catch (_) {}
 
       if (typeof _usuarioActualId !== "undefined") _usuarioActualId = "u-test";
-      if (typeof _usuarioActual !== "undefined") {
-        _usuarioActual = { id: "u-test", nombre: "Test", activo: true, role_id: "r-test", rol: "Dueño" };
-      }
+      if (typeof _usuarioActual !== "undefined") _usuarioActual = { id:"u-test", nombre:"Test", activo:true, role_id:"r-test", rol:"Dueño" };
       if (typeof _permisosEfectivos !== "undefined") {
         _permisosEfectivos = {
-          productos: { ver:true, crear:true, editar:true, borrar:true }, stock: { ver:true, crear:true, editar:true, borrar:true },
-          compras: { ver:true, crear:true, editar:true, borrar:true }, ventas: { ver:true, crear:true, editar:true, borrar:true },
-          transferencias: { ver:true, crear:true, editar:true, borrar:true }, vales: { ver:true, crear:true, editar:true, borrar:true },
-          almacenes: { ver:true, crear:true, editar:true, borrar:true }, reportes: { ver:true, crear:true, editar:true, borrar:true },
-          turnos: { ver:true, crear:true, editar:true, borrar:true }, usuarios: { ver:true, crear:true, editar:true, borrar:true },
-          auditoria: { ver:true, crear:true, editar:true, borrar:true }, comunicacion: { ver:true, crear:true, editar:true, borrar:true },
-          gastos: { ver:true, crear:true, editar:true, borrar:true }, mermas: { ver:true, crear:true, editar:true, borrar:true },
-          reinversiones: { ver:true, crear:true, editar:true, borrar:true }, responsabilidades: { ver:true, crear:true, editar:true, borrar:true },
-          incidencias: { ver:true, crear:true, editar:true, borrar:true }
+          productos:{ver:true,crear:true,editar:true,borrar:true}, stock:{ver:true,crear:true,editar:true,borrar:true},
+          compras:{ver:true,crear:true,editar:true,borrar:true}, ventas:{ver:true,crear:true,editar:true,borrar:true},
+          transferencias:{ver:true,crear:true,editar:true,borrar:true}, vales:{ver:true,crear:true,editar:true,borrar:true},
+          almacenes:{ver:true,crear:true,editar:true,borrar:true}, reportes:{ver:true,crear:true,editar:true,borrar:true},
+          turnos:{ver:true,crear:true,editar:true,borrar:true}, usuarios:{ver:true,crear:true,editar:true,borrar:true},
+          auditoria:{ver:true,crear:true,editar:true,borrar:true}, comunicacion:{ver:true,crear:true,editar:true,borrar:true},
+          gastos:{ver:true,crear:true,editar:true,borrar:true}, mermas:{ver:true,crear:true,editar:true,borrar:true},
+          reinversiones:{ver:true,crear:true,editar:true,borrar:true}, responsabilidades:{ver:true,crear:true,editar:true,borrar:true},
+          incidencias:{ver:true,crear:true,editar:true,borrar:true}
         };
       }
       if (typeof _permisosCargaExitosa !== "undefined") _permisosCargaExitosa = true;
@@ -136,57 +122,33 @@ function leerAppJsConcatenado(baseDir) {
     if (typeof _usuarioActual !== "undefined") {
       const accessor = function(){ return _usuarioActual || null; };
       ["id","nombre","activo","role_id","rol","role","rol_nombre"].forEach((key) => {
-        try { Object.defineProperty(accessor, key, { configurable:true, get:() => _usuarioActual && _usuarioActual[key] }); } catch (_) {}
+        try { Object.defineProperty(accessor,key,{configurable:true,get:() => _usuarioActual && _usuarioActual[key]}); } catch (_) {}
       });
       window._usuarioActual = accessor;
       window.__bcTestUsuarioActualAccessor = accessor;
     }
-
-    if (typeof _usuarioActualId !== "undefined") {
-      Object.defineProperty(window, "_usuarioActualId", {
-        configurable: true,
-        get: () => _usuarioActualId,
-        set: (value) => { _usuarioActualId = value; }
-      });
-    }
-
-    if (typeof _permisosEfectivos !== "undefined") {
-      window._permisosEfectivosRef = function(){ return _permisosEfectivos; };
-    }
-
-    if (typeof usuarioPuedeOperar !== "function") {
-      window.usuarioPuedeOperar = function(){
-        return !!(typeof _usuarioActual !== "undefined" && _usuarioActual && _usuarioActual.activo !== false);
-      };
-    }
+    if (typeof _usuarioActualId !== "undefined") Object.defineProperty(window,"_usuarioActualId",{configurable:true,get:()=>_usuarioActualId,set:(value)=>{_usuarioActualId=value;}});
+    if (typeof _permisosEfectivos !== "undefined") window._permisosEfectivosRef = function(){ return _permisosEfectivos; };
+    if (typeof usuarioPuedeOperar !== "function") window.usuarioPuedeOperar = function(){ return !!(typeof _usuarioActual !== "undefined" && _usuarioActual && _usuarioActual.activo !== false); };
 
     var clientForShim = testClient;
     if (clientForShim && typeof clientForShim.from === "function" && !clientForShim.__bcTestBuilderShim) {
       const originalFrom = clientForShim.from.bind(clientForShim);
       const adaptarBuilder = (builder) => {
         if (!builder || typeof builder !== "object") return builder;
-        ["eq","neq","gt","gte","lt","lte","in","is","not","like","ilike","match","or","filter","range"]
-          .forEach((metodo) => {
-            if (typeof builder[metodo] !== "function") builder[metodo] = () => builder;
-          });
-        ["select","order","limit","maybeSingle","single","insert","update","upsert","delete","csv"]
-          .forEach((metodo) => {
-            if (typeof builder[metodo] !== "function") return;
-            const original = builder[metodo].bind(builder);
-            builder[metodo] = (...args) => adaptarBuilder(original(...args));
-          });
+        ["eq","neq","gt","gte","lt","lte","in","is","not","like","ilike","match","or","filter","range"].forEach((metodo)=>{ if(typeof builder[metodo]!=="function") builder[metodo]=()=>builder; });
+        ["select","order","limit","maybeSingle","single","insert","update","upsert","delete","csv"].forEach((metodo)=>{ if(typeof builder[metodo]!=="function") return; const original=builder[metodo].bind(builder); builder[metodo]=(...args)=>adaptarBuilder(original(...args)); });
         return builder;
       };
       clientForShim.from = (...args) => adaptarBuilder(originalFrom(...args));
       clientForShim.__bcTestBuilderShim = true;
     }
 
-    if (typeof _usuarioActualId !== "undefined" && testClient && testClient.auth &&
-        typeof testClient.auth.getSession === "function") {
-      Promise.resolve(testClient.auth.getSession()).then((res) => {
-        const sid = res && res.data && res.data.session && res.data.session.user && res.data.session.user.id;
-        if (sid && typeof _usuarioActualId !== "undefined" && !_usuarioActualId) _usuarioActualId = sid;
-      }).catch(() => {});
+    if (typeof _usuarioActualId !== "undefined" && testClient && testClient.auth && typeof testClient.auth.getSession === "function") {
+      Promise.resolve(testClient.auth.getSession()).then((res)=>{
+        const sid=res&&res.data&&res.data.session&&res.data.session.user&&res.data.session.user.id;
+        if(sid&&typeof _usuarioActualId!=="undefined"&&!_usuarioActualId) _usuarioActualId=sid;
+      }).catch(()=>{});
     }
 
     if (typeof window.__bcTestResolveUIReady === "function") {
@@ -195,33 +157,24 @@ function leerAppJsConcatenado(baseDir) {
       window.__bcTestResolveUIReady = null;
     }
 
-    // Simula una sesión autenticada usando el mismo flujo de producción que
-    // asigna _usuarioActualId y dispara cargarContextoUsuario().
     try {
-      const bootSession = { user: { id: "u-test", email: "test@app.test" } };
-      if (typeof showApp === "function") showApp(bootSession);
+      const bootSession={user:{id:"u-test",email:"test@app.test"}};
+      if(typeof showApp === "function") showApp(bootSession);
     } catch (_) {}
   } catch (e) {
-    console.warn("[BattleCruiser test bridge]", e);
-    try {
-      window.__BC_UI_READY_RESOLVED__ = true;
-      if (typeof window.__bcTestResolveUIReady === "function") window.__bcTestResolveUIReady();
-    } catch (_) {}
+    console.warn("[BattleCruiser test bridge]",e);
+    try { window.__BC_UI_READY_RESOLVED__=true; if(typeof window.__bcTestResolveUIReady === "function") window.__bcTestResolveUIReady(); } catch (_) {}
   }
 })();
 `;
 
-  const nombresFunciones = [...source.matchAll(/(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)]
-    .map((m) => m[1]);
-  const exportaciones = [...new Set(nombresFunciones)]
-    .map((nombre) => `try { if (typeof window[${JSON.stringify(nombre)}] !== "function") window[${JSON.stringify(nombre)}] = ${nombre}; } catch (_) {}`)
-    .join("\n");
+  const nombresFunciones = [...source.matchAll(/(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)].map((m)=>m[1]);
+  const exportaciones = [...new Set(nombresFunciones)].map((nombre)=>`try { if (typeof window[${JSON.stringify(nombre)}] !== "function") window[${JSON.stringify(nombre)}] = ${nombre}; } catch (_) {}`).join("\n");
   const exportBridge = `
 ;(function __bcTestExportFunctionBindings(){
   ${exportaciones}
 })();
 `;
-
   return prelude + source + "\n" + bridge + "\n" + exportBridge;
 }
 
