@@ -59,9 +59,9 @@ jobs:
         shell: cmd
         run: node test/diag-offline-isolated.js
 
-      - name: Focused B2.3-B diagnostic
+      - name: Focused B2.3 diagnostics
         shell: cmd
-        run: node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 --test-name-pattern="^B2\.3-B:" test/b2.3-centro-control.test.js
+        run: node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/b2.3-centro-control.test.js
 
       - name: Focused B3 diagnostics
         shell: cmd
