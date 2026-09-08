@@ -1,40 +1,24 @@
 "use strict";
 
-// Node 21+ exposes navigator/crypto on globalThis through read-only accessors.
-// Legacy jsdom tests assign those globals for browser emulation, so remove the
-// configurable accessors before the test starts. This file is test-only and
-// never loaded by production code.
 for (const key of ["navigator", "crypto"]) {
   try {
-    if (Object.prototype.hasOwnProperty.call(globalThis, key)) {
-      delete globalThis[key];
-    }
+    if (Object.prototype.hasOwnProperty.call(globalThis, key)) delete globalThis[key];
   } catch (_) {}
 }
 
-// Cada test de BattleCruiser puede crear su propio JSDOM. La mayoría de suites
-// lo cierra al terminar. B2.3, sin embargo, contiene tareas UI asíncronas
-// disparadas por el mismo grafo de módulos; destruir su window al final de cada
-// test deja callbacks pendientes apuntando a globals eliminados y produce
-// falsos unhandledRejection. B2.3 solicita explícitamente conservar las windows
-// durante todo el archivo y cerrarlas al salir el proceso.
 const { afterEach } = require("node:test");
+const __bcIsB23 = process.argv.some((arg) => String(arg).includes("b2.3-centro-control.test.js"));
 afterEach(() => {
-  if (globalThis.__BC_KEEP_JSDOM_ALIVE__) return;
+  // B2.3 starts background module work against several independent JSDOMs.
+  // Closing/removing globals after every test races with those callbacks and
+  // turns otherwise passing assertions into unhandledRejection failures.
+  if (__bcIsB23) return;
   try {
     const w = globalThis.window;
     if (w && typeof w.close === "function") w.close();
   } catch (_) {}
-  for (const key of ["window", "document", "navigator"]) {
+  for (const key of ["window", "document", "navigator", "localStorage", "sessionStorage"]) {
     try { delete globalThis[key]; } catch (_) {}
-  }
-});
-
-process.once("exit", () => {
-  const doms = globalThis.__BC_TEST_DOMS__;
-  if (!Array.isArray(doms)) return;
-  for (const dom of doms) {
-    try { if (dom && dom.window && typeof dom.window.close === "function") dom.window.close(); } catch (_) {}
   }
 });
 
