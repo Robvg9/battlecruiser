@@ -36,17 +36,11 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
-    // B2.3 must establish the auto-sync barrier BEFORE any application module
-    // is evaluated. Several modules can perform bootstrap work while the
-    // concatenated source is executing; setting the flag only after
-    // originalReader() returns is too late and leaves a race window.
+    // B2.3: mark suppress early. Do NOT hold the production localStorage mutex.
+    // Explicit vs auto is handled by test/b23-sync-harness.js.
     if (__bcIsB23 && globalThis.window) {
       globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
       globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
-      // offline.js also uses a shared localStorage mutex. Hold it from the
-      // very beginning so bootstrap timers cannot start an in-flight sync
-      // before the test's explicit call is made.
-      try { globalThis.window.localStorage.setItem("battlecruiser-sincronizando", "1"); } catch (_) {}
     }
 
     // B2.3 supplies a deliberately minimal Supabase mock. app.js subscribes
@@ -79,47 +73,14 @@ Module._load = function (request, parent, isMain) {
 
     let source = originalReader(baseDir);
 
-    // The production sync function already handles network failures by
-    // moving SINCRONIZANDO -> PENDIENTE. In B2.3 the fixture also boots
-    // background UI work; a background sync can immediately pick that same
-    // operation up again and make the assertion observe SINCRONIZANDO. Keep
-    // automatic syncs out of the isolated fixture while allowing tests that
-    // explicitly call window.sincronizarCola() to exercise the real function.
+    // Minimal B2.3 gate only (no localStorage lock, no complex wrap).
+    // b23-sync-harness.js owns the explicit-call bridge.
     if (__bcIsB23) {
       source = source.replace(
         "async function sincronizarCola() {",
         "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;"
       );
     }
-
-    source += `
-;(function __bcB23SyncIsolation(){
-  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
-  try {
-    if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
-      const syncOriginal = window.sincronizarCola;
-      window.sincronizarCola = function () {
-        // Open the explicit gate only for the synchronous entry into the
-        // production function. It checks the gate immediately; keeping the
-        // flag true across the returned Promise would also admit background
-        // auto-sync calls that happen while the first sync is still pending.
-        // The localStorage mutex is temporarily opened for the same reason.
-        window.__BC_B23_EXPLICIT_SYNC__ = true;
-        try { window.localStorage.removeItem("battlecruiser-sincronizando"); } catch (_) {}
-        let resultado;
-        try {
-          resultado = syncOriginal.apply(this, arguments);
-        } finally {
-          window.__BC_B23_EXPLICIT_SYNC__ = false;
-          try { window.localStorage.setItem("battlecruiser-sincronizando", "1"); } catch (_) {}
-        }
-        return resultado;
-      };
-      window.__bcB23ExplicitSyncWrapped = true;
-    }
-  } catch (_) {}
-})();
-`;
 
     source += `
 ;(function __bcB3HarnessCompat(){

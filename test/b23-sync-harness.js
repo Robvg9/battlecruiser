@@ -1,9 +1,7 @@
 "use strict";
 
-// B2.3-only harness layered after node-global-compat.js. It removes the
-// previous test-only sync bridge and replaces it with a narrower rule:
-// automatic sincronizarCola() calls are blocked while explicit calls made by
-// the B2.3 test file are allowed. Production code remains untouched.
+// B2.3-only: block background/auto sincronizarCola while allowing explicit
+// calls from the test file. Production code is never modified on disk.
 const IS_B23 = process.argv.some((arg) => String(arg).includes("b2.3-centro-control.test.js"));
 if (!IS_B23) return;
 
@@ -18,31 +16,54 @@ Module._load = function (request, parent, isMain) {
 
   const originalReader = loaded.leerAppJsConcatenado;
   loaded.leerAppJsConcatenado = function (baseDir) {
+    // Ensure suppress is set before any app module evaluates.
+    if (globalThis.window) {
+      globalThis.window.__BC_B23_SUPPRESS_AUTO_SYNC__ = true;
+      globalThis.window.__BC_B23_EXPLICIT_SYNC__ = false;
+      // Do NOT hold the production localStorage mutex here — that belongs to
+      // the real sincronizarCola implementation only.
+      try { globalThis.window.localStorage.removeItem("battlecruiser-sincronizando"); } catch (_) {}
+    }
+
     let source = originalReader(baseDir);
 
-    // Undo only the obsolete localStorage lock injected by the previous
-    // compatibility layer. The real production mutex must own that key.
-    source = source.replace(
-      '\n        try { globalThis.window.localStorage.setItem("battlecruiser-sincronizando", "1"); } catch (_) {}',
-      ""
-    );
+    // Keep a single early-return gate. Explicit test calls open the gate via
+    // the window.sincronizarCola wrapper below (not via stack inspection).
+    if (!source.includes("__BC_B23_SUPPRESS_AUTO_SYNC__")) {
+      source = source.replace(
+        "async function sincronizarCola() {",
+        "async function sincronizarCola() {\n  if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;"
+      );
+    }
 
-    // Undo the obsolete B2.3 explicit-sync bridge injected by the previous
-    // compatibility layer. The bridge kept state across async work and could
-    // itself create SINCRONIZANDO observations.
+    // Strip any previous isolation IIFE so we install exactly one wrapper.
     source = source.replace(
-      /\n;\(function __bcB23SyncIsolation\(\)\{[\s\S]*?\n\}\)\(\);\n/,
+      /\n;\(function __bcB23SyncIsolation\(\)\{[\s\S]*?\n\}\)\(\);\n/g,
       "\n"
     );
 
-    // Replace the previous boolean gate with a caller-aware gate. Background
-    // timers/callbacks do not originate in the B2.3 test file, while explicit
-    // sync calls made by that test do. This keeps the production function and
-    // its mutex/state machine untouched.
-    source = source.replace(
-      "if (window.__BC_B23_SUPPRESS_AUTO_SYNC__ && !window.__BC_B23_EXPLICIT_SYNC__) return;",
-      "if (window.__BC_B23_SUPPRESS_AUTO_SYNC__) {\n    const __bcB23Stack = String(new Error().stack || \"\");\n    if (!__bcB23Stack.includes(\"b2.3-centro-control.test.js\")) return;\n  }"
-    );
+    // Single clean wrapper: open the explicit gate only for the synchronous
+    // entry into production sincronizarCola. Background timers never set the
+    // flag, so they remain blocked. Production mutex and state machine stay intact.
+    source += `
+;(function __bcB23SyncIsolation(){
+  if (!window.__BC_B23_SUPPRESS_AUTO_SYNC__) return;
+  try {
+    if (typeof window.sincronizarCola === "function" && !window.__bcB23ExplicitSyncWrapped) {
+      const syncOriginal = window.sincronizarCola;
+      window.sincronizarCola = function () {
+        window.__BC_B23_EXPLICIT_SYNC__ = true;
+        try {
+          return syncOriginal.apply(this, arguments);
+        } finally {
+          window.__BC_B23_EXPLICIT_SYNC__ = false;
+        }
+      };
+      window.__bcB23ExplicitSyncWrapped = true;
+    }
+  } catch (_) {}
+})();
+`;
 
     return source;
   };
