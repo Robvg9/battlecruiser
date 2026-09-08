@@ -24,3 +24,48 @@ function fechaHoraCompleta(fecha){return new Date(fecha).toLocaleString("es",{da
 function poblarSelectAlmacenes(sel,placeholder){if(!sel)return;const actual=sel.value;const almacenes=(_cache&&_cache.almacenes)?_cache.almacenes:[];sel.innerHTML='<option value="">'+(placeholder||'Todos los almacenes')+'</option>';almacenes.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.nombre;sel.appendChild(o);});if(actual)sel.value=actual;}
 function setLoading(listId,texto){const el=document.getElementById(listId);if(el)el.innerHTML='<p class="lista-estado">'+(texto||"Cargando…")+"</p>";}
 function setEmpty(listId,texto){const el=document.getElementById(listId);if(el)el.innerHTML='<p class="lista-estado">'+texto+"</p>";}
+
+// Transferencias: los elementos se crean dinámicamente, así que el click
+// se delega desde su contenedor. El panel se pinta inmediatamente y luego
+// mostrarDetalleTransferencia() puede enriquecerlo con las líneas del RPC.
+safeInit("detalle-transferencia-click", function () {
+  var lista = document.getElementById("lista-transferencias");
+  if (!lista || lista.dataset.bcTrfDetalleClick === "1") return;
+  lista.dataset.bcTrfDetalleClick = "1";
+  var abrir = function (target) {
+    var item = target && target.closest ? target.closest(".trf-item[data-trf-id]") : null;
+    if (!item) return;
+    var id = item.getAttribute("data-trf-id") || "";
+    if (!id) return;
+    var cont = document.getElementById("transferencia-detalle");
+    var trf = (_cache.transferencias || []).find(function (t) { return String(t.id) === String(id); });
+    if (cont && trf) {
+      var fecha = trf.fecha ? fechaHoraCompleta(trf.fecha) : "—";
+      var estado = trf.estado ? escHtml(trf.estado) : "Registrada";
+      cont.innerHTML = '<div class="detalle-cabecera">'
+        + '<span class="detalle-tipo">Transferencia #' + escHtml(idCorto(trf.id || id)) + '</span>'
+        + '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
+        + '</div>'
+        + '<div class="detalle-cuerpo">'
+        + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || id) + '</span></div>'
+        + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fecha) + '</span></div>'
+        + '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + estado + '</span></div>'
+        + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + '</span></div>'
+        + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + '</span></div>'
+        + '</div>';
+      cont.classList.remove("hidden");
+      var cerrar = cont.querySelector(".trf-detalle-cerrar-btn");
+      if (cerrar && typeof cerrarDetalleTransferencia === "function") cerrar.addEventListener("click", cerrarDetalleTransferencia);
+    }
+    if (typeof mostrarDetalleTransferencia === "function") {
+      Promise.resolve(mostrarDetalleTransferencia(id)).catch(function (e) { console.warn("[Battlecruiser] detalle transferencia", e); });
+    }
+  };
+  lista.addEventListener("click", function (e) { abrir(e.target); });
+  lista.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") {
+      abrir(e.target);
+      if (e.target.closest && e.target.closest(".trf-item[data-trf-id]")) e.preventDefault();
+    }
+  });
+});
