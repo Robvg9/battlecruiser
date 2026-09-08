@@ -31,7 +31,7 @@ function leerAppJsConcatenado(baseDir) {
   // B3 uses a different mock and keeps the normal auth boot path untouched.
   source = source
     .replace(/function showApp\(session\) \{/, "function showApp(session) { if (window.__BC_B23_TEST_MODE__) return;")
-    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return;");
+    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return; }");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
