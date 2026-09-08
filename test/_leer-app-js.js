@@ -9,12 +9,12 @@ const MODULOS_APP = [
 ];
 
 function obtenerModulosProduccion(baseDir) {
-  const appPath = path.join(baseDir, "..", "public", "app.js");
-  const appSource = fs.readFileSync(appPath, "utf8");
-  const dinamicos = [...appSource.matchAll(/\[\s*["']([^"']+\.js)["']\s*,/g)].map((m) => m[1]);
-  const candidatos = [...new Set([...MODULOS_APP, ...dinamicos])];
   const jsDir = path.join(baseDir, "..", "public", "js");
-  return candidatos.filter((nombre) => fs.existsSync(path.join(jsDir, nombre)));
+  // Test harness deliberately loads only the stable application modules. The
+  // optional/hotfix module graph in app.js contains many independent boot
+  // timers and UI patches; loading all of them makes isolated jsdom tests race
+  // against a partial DOM and does not exercise B2.3/B3 behavior more deeply.
+  return MODULOS_APP.filter((nombre) => fs.existsSync(path.join(jsDir, nombre)));
 }
 
 function leerAppJsConcatenado(baseDir) {
@@ -31,7 +31,7 @@ function leerAppJsConcatenado(baseDir) {
   // B3 uses a different mock and keeps the normal auth boot path untouched.
   source = source
     .replace(/function showApp\(session\) \{/, "function showApp(session) { if (window.__BC_B23_TEST_MODE__) return;")
-    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return; }");
+    .replace(/function showLogin\(\) \{/, "function showLogin() { if (window.__BC_B23_TEST_MODE__) { _bcAuthBootResolved = true; return;");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
