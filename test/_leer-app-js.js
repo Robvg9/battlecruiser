@@ -137,7 +137,22 @@ function leerAppJsConcatenado(baseDir) {
       const adaptarBuilder = (builder) => {
         if (!builder || typeof builder !== "object") return builder;
         ["eq","neq","gt","gte","lt","lte","in","is","not","like","ilike","match","or","filter","range"].forEach((metodo)=>{ if(typeof builder[metodo]!=="function") builder[metodo]=()=>builder; });
-        ["select","order","limit","maybeSingle","single","insert","update","upsert","delete","csv"].forEach((metodo)=>{ if(typeof builder[metodo]!=="function") return; const original=builder[metodo].bind(builder); builder[metodo]=(...args)=>adaptarBuilder(original(...args)); });
+        ["select","order","limit","maybeSingle","single","insert","update","upsert","delete","csv"].forEach((metodo)=>{
+          if(typeof builder[metodo]!=="function") return;
+          const original=builder[metodo].bind(builder);
+          builder[metodo]=(...args)=>adaptarBuilder(original(...args));
+        });
+        if (typeof builder.then !== "function") {
+          builder.then = function(resolve, reject){
+            return Promise.resolve({ data: [], error: null }).then(resolve, reject);
+          };
+          builder.catch = function(reject){
+            return Promise.resolve({ data: [], error: null }).catch(reject);
+          };
+          builder.finally = function(handler){
+            return Promise.resolve({ data: [], error: null }).finally(handler);
+          };
+        }
         return builder;
       };
       clientForShim.from = (...args) => adaptarBuilder(originalFrom(...args));
@@ -157,10 +172,9 @@ function leerAppJsConcatenado(baseDir) {
       window.__bcTestResolveUIReady = null;
     }
 
-    try {
-      const bootSession={user:{id:"u-test",email:"test@app.test"}};
-      if(typeof showApp === "function") showApp(bootSession);
-    } catch (_) {}
+    // No auto-boot here. Individual tests decide when showApp() is required,
+    // keeping harness setup deterministic and preventing asynchronous UI boot
+    // from racing the behavior under test.
   } catch (e) {
     console.warn("[BattleCruiser test bridge]",e);
     try { window.__BC_UI_READY_RESOLVED__=true; if(typeof window.__bcTestResolveUIReady === "function") window.__bcTestResolveUIReady(); } catch (_) {}
