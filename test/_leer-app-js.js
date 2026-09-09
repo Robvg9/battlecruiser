@@ -213,7 +213,11 @@ function leerAppJsConcatenado(baseDir) {
       clientForShim.__bcTestBuilderShim = true;
     }
 
-    if (typeof _usuarioActualId !== "undefined" && testClient && testClient.auth && typeof testClient.auth.getSession === "function") {
+    // Only auto-set _usuarioActualId from getSession in B2.3 mode.
+    // Fase C tests freely switch users via setUsuario(window, uid); an
+    // unconditional Promise.resolve(getSession()) would race and overwrite
+    // the id after idbSet, breaking C2-1 cache isolation by usuario.
+    if (window.__BC_B23_TEST_MODE__ && typeof _usuarioActualId !== "undefined" && testClient && testClient.auth && typeof testClient.auth.getSession === "function") {
       Promise.resolve(testClient.auth.getSession()).then((res)=>{
         const sid=res&&res.data&&res.data.session&&res.data.session.user&&res.data.session.user.id;
         if(sid&&typeof _usuarioActualId!=="undefined") _usuarioActualId=sid;
