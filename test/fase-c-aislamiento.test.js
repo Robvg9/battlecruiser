@@ -107,7 +107,14 @@ function marcarOnline(window) {
 
 function setUsuario(window, uid) {
   window._usuarioActualId = uid;
-  window._usuarioActual = { id: uid, nombre: uid, activo: true, role_id: "r1", rol: "Dueño" };
+  if (typeof window.__bcSetUsuarioActualId === "function") {
+    window.__bcSetUsuarioActualId(uid);
+  }
+  const perfil = { id: uid, nombre: uid, activo: true, role_id: "r1", rol: "Dueño" };
+  window._usuarioActual = perfil;
+  if (typeof window.__bcSetUsuarioActual === "function") {
+    window.__bcSetUsuarioActual(perfil);
+  }
 }
 
 const PERFIL = [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }];
