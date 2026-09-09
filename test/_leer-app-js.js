@@ -17,13 +17,28 @@ function obtenerModulosProduccion(baseDir) {
   return MODULOS_APP.filter((nombre) => fs.existsSync(path.join(jsDir, nombre)));
 }
 
+function leerModulo(jsDir, nombre) {
+  const contenido = fs.readFileSync(path.join(jsDir, nombre), "utf8");
+  // Solo en diagnóstico de bootstrap: marcador síncrono justo antes de cada módulo.
+  // No altera producción ni tests normales (BC_DIAG_BOOT no está seteado).
+  if (process.env.BC_DIAG_BOOT === "1") {
+    return (
+      'console.error("[FaseC DIAG] ENTER MODULE ' + nombre + '");\n' +
+      contenido +
+      '\nconsole.error("[FaseC DIAG] EXIT MODULE ' + nombre + '");\n'
+    );
+  }
+  return contenido;
+}
+
 function leerAppJsConcatenado(baseDir) {
   const appPath = path.join(baseDir, "..", "public", "app.js");
   const appSource = fs.readFileSync(appPath, "utf8");
   const versionMatch = appSource.match(/const VERSION="([^"]+)"/);
   const version = versionMatch ? versionMatch[1] : "unknown";
+  const jsDir = path.join(baseDir, "..", "public", "js");
   const modulos = obtenerModulosProduccion(baseDir);
-  const source = modulos.map((nombre) => fs.readFileSync(path.join(baseDir, "..", "public", "js", nombre), "utf8")).join("\n");
+  const source = modulos.map((nombre) => leerModulo(jsDir, nombre)).join("\n");
 
   const prelude = `
 ;(function __bcTestBootPrelude(){
