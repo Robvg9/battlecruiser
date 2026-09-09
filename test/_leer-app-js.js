@@ -161,6 +161,14 @@ function leerAppJsConcatenado(baseDir) {
         function () { return _usuarioActualId; },
         function (value) { _usuarioActualId = value; }
       );
+      // Always expose a direct lexical writer for the harness.
+      // setUsuario must update the binding that idbSet/idbGet close over,
+      // not only the window data property (JSDOM classic-script divergence).
+      try {
+        window.__bcSetUsuarioActualId = function (v) {
+          if (typeof _usuarioActualId !== "undefined") _usuarioActualId = v;
+        };
+      } catch (_) {}
     }
 
     if (typeof _usuarioActual !== "undefined") {
@@ -180,6 +188,11 @@ function leerAppJsConcatenado(baseDir) {
         try { window._usuarioActual = accessor; } catch (_) {}
         try { window.__bcTestUsuarioActualAccessor = accessor; } catch (_) {}
       }
+      try {
+        window.__bcSetUsuarioActual = function (v) {
+          if (typeof _usuarioActual !== "undefined") _usuarioActual = v;
+        };
+      } catch (_) {}
     }
 
     if (typeof _permisosEfectivos !== "undefined") window._permisosEfectivosRef = function(){ return _permisosEfectivos; };
