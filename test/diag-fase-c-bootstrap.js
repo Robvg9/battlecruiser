@@ -72,21 +72,37 @@ const child = spawn(process.execPath, [
   windowsHide: false,
 });
 
-child.stdout.on("data", (chunk) => process.stdout.write(String(chunk)));
-child.stderr.on("data", (chunk) => process.stderr.write(String(chunk)));
-
 let finished = false;
-const timer = setTimeout(() => {
-  if (finished) return;
-  console.error("[FaseC DIAG] HARD TIMEOUT 12000ms — bootstrap/test process remains alive");
+let sawAfterAppend = false;
+
+// Hang detector: only kill if bootstrap never returns from appendChild.
+// Once AFTER append is observed, the original hang is gone; let the suite
+// finish under --test-timeout (async IDB/timers keeping the process alive
+// after tests is expected and is not a bootstrap hang).
+const hangTimer = setTimeout(() => {
+  if (finished || sawAfterAppend) return;
+  console.error("[FaseC DIAG] HARD TIMEOUT 12000ms — AFTER append never appeared (bootstrap hang)");
   try { child.kill(); } catch (_) {}
   finished = true;
   process.exitCode = 1;
 }, 12000);
 
+function onChunk(chunk, stream) {
+  const text = String(chunk);
+  if (!sawAfterAppend && text.includes("[FaseC DIAG] AFTER append")) {
+    sawAfterAppend = true;
+    clearTimeout(hangTimer);
+    console.error("[FaseC DIAG] bootstrap returned from appendChild — hang detector disarmed");
+  }
+  stream.write(text);
+}
+
+child.stdout.on("data", (chunk) => onChunk(chunk, process.stdout));
+child.stderr.on("data", (chunk) => onChunk(chunk, process.stderr));
+
 child.on("error", (error) => {
   if (finished) return;
-  clearTimeout(timer);
+  clearTimeout(hangTimer);
   finished = true;
   console.error("[FaseC DIAG] child process error:", error);
   process.exitCode = 1;
@@ -94,9 +110,9 @@ child.on("error", (error) => {
 
 child.on("exit", (code, signal) => {
   if (finished) return;
-  clearTimeout(timer);
+  clearTimeout(hangTimer);
   finished = true;
-  console.error(`[FaseC DIAG] child exited code=${code} signal=${signal || "none"}`);
+  console.error(`[FaseC DIAG] child exited code=${code} signal=${signal || "none"} afterAppend=${sawAfterAppend}`);
   process.exitCode = code === 0 ? 0 : 1;
   try { fs.unlinkSync(bootstrap); } catch (_) {}
 });
