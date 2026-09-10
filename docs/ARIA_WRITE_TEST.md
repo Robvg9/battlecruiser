@@ -1,0 +1,1 @@
+ARIA WRITE TEST — creado por el runtime gobernado de ARIA.
