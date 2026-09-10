@@ -1,4 +1,5 @@
 name: BattleCruiser Self-Hosted Windows Test
+# ARIA runner connectivity validation: infrastructure-only trigger, no application logic change.
 
 on:
   workflow_dispatch:
@@ -44,6 +45,14 @@ jobs:
           echo Architecture: %RUNNER_ARCH%
           node --version
           npm --version
+
+      - name: ARIA runner connectivity proof
+        shell: cmd
+        run: |
+          echo ARIA_BATTLECRUISER_RUNNER=ONLINE
+          echo RUNNER_NAME=%RUNNER_NAME%
+          echo RUNNER_OS=%RUNNER_OS%
+          echo RUNNER_ARCH=%RUNNER_ARCH%
 
       - name: Install dependencies
         shell: cmd
