@@ -4,7 +4,7 @@ name: BattleCruiser Self-Hosted Windows Test
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, aria/aria-control-test-20260910]
     paths:
       - "public/**"
       - "test/**"
