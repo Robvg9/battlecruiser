@@ -25,11 +25,17 @@ jobs:
     timeout-minutes: 35
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          clean: true
+      - name: Checkout via git (no codeload dependency)
+        shell: cmd
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if exist .git rmdir /s /q .git
+          git init
+          git remote add origin https://github.com/%GITHUB_REPOSITORY%.git
+          git -c http.extraheader="AUTHORIZATION: bearer %GH_TOKEN%" fetch --depth=1 origin %GITHUB_SHA%
+          git checkout --force FETCH_HEAD
+          git status --short
 
       - name: Verify checkout integrity
         shell: cmd
