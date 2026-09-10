@@ -8,6 +8,7 @@
   function onlineRequired(){if(!navigator.onLine){const e=new Error('Esta operación de Turno requiere Internet.');e.code='OFFLINE';throw e}}
   function clientOk(){if(typeof client==='undefined'||!client||!client.rpc)throw new Error('Cliente Supabase no disponible.')}
   function normalize(data){if(data==null)return null;return Array.isArray(data)?(data.length===1?data[0]:data):data}
+  function finiteNumber(value,label){const n=Number(value);if(!Number.isFinite(n))throw new Error(`${label} debe ser un número válido.`);return n}
   async function callRpc(name,params){clientOk();onlineRequired();let timer=null;try{if(typeof showLoading==='function')showLoading();const call=client.rpc(name,params||{});const timeout=new Promise((_,rej)=>{timer=setTimeout(()=>rej(new Error('Tiempo de espera agotado (25s).')),TIMEOUT_MS)});const r=await Promise.race([call,timeout]);if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'RPC_ERROR';e.rpc=name;e.raw=r.error;throw e}return normalize(r?r.data:null)}finally{if(timer)clearTimeout(timer);if(typeof resetLoadingOverlay==='function')resetLoadingOverlay();else if(typeof hideLoading==='function')hideLoading()}}
   async function selectTable(table,columns,filterColumn,filterValue,orderColumn){clientOk();onlineRequired();if(!client.from)throw new Error('Cliente Supabase no permite consultas directas.');let q=client.from(table).select(columns||'*');if(filterColumn)q=q.eq(filterColumn,filterValue);if(orderColumn)q=q.order(orderColumn,{ascending:true});const r=await q;if(r&&r.error){const e=new Error(r.error.message||String(r.error));e.code=r.error.code||'QUERY_ERROR';e.table=table;throw e}return r&&r.data?r.data:[]}
   async function listarSesionesViaExpediente(id){
@@ -20,7 +21,7 @@
     const tramos=await selectTable('turno_tramos','*','turno_sesion_id',sesionId,'inicio_at');
     const activo=(tramos||[]).find(function(t){return String(t.estado||'').toUpperCase()==='ACTIVO';});
     if(!activo||!activo.id)throw new Error('No hay un tramo activo para interrumpir.');
-    if(monto!=null)return callRpc(RPC.interrumpirRelevarConDeclaracion,{p_turno_tramo_id:activo.id,p_sustituto_id:sustitutoId,p_motivo:motivo||'Emergencia',p_monto:Number(monto)});
+    if(monto!=null)return callRpc(RPC.interrumpirRelevarConDeclaracion,{p_turno_tramo_id:activo.id,p_sustituto_id:sustitutoId,p_motivo:motivo||'Emergencia',p_monto:finiteNumber(monto,'El monto')});
     return callRpc(RPC.interrumpirRelevar,{p_turno_tramo_id:activo.id,p_sustituto_id:sustitutoId,p_motivo:motivo||'Emergencia'});
   }
   async function autenticarSustituto(usuarioOEmail,password){
@@ -46,17 +47,17 @@
   }
   const API={
     RPC,uuid,
-    crearTurno:o=>{o=o||{};return callRpc(RPC.crearTurno,{p_almacen_id:o.almacenId,p_fecha_inicio:o.inicioPlan,p_dias:o.cantidadDias,p_asignaciones:o.asignaciones||[]})},
+    crearTurno:o=>{o=o||{};return callRpc(RPC.crearTurno,{p_almacen_id:o.almacenId,p_fecha_inicio:o.inicioPlan,p_dias:finiteNumber(o.cantidadDias,'La cantidad de días'),p_asignaciones:o.asignaciones||[]})},
     asignarSesion:(s,u)=>callRpc(RPC.asignarSesion,{p_turno_sesion_id:s,p_usuario_id:u}),
     iniciarSesion:s=>callRpc(RPC.iniciarSesion,{p_turno_sesion_id:s}),
     cerrarSesion:s=>callRpc(RPC.cerrarSesion,{p_turno_sesion_id:s}),
     interrumpirYRelevar,
     anularTurno:(t,m)=>callRpc(RPC.anularTurno,{p_turno_id:t,p_motivo:m||null}),
-    declararDinero:(t,m)=>callRpc(RPC.declararDinero,{p_turno_tramo_id:t,p_monto:Number(m)}),
+    declararDinero:(t,m)=>callRpc(RPC.declararDinero,{p_turno_tramo_id:t,p_monto:finiteNumber(m,'El monto')}),
     enviarAprobacion:t=>callRpc(RPC.enviarAprobacion,{p_turno_id:t}),
     aprobarTurno:(t,o)=>callRpc(RPC.aprobarTurno,{p_turno_id:t,p_comentario:o||null}),
     aprobarDiferencia:(d,o)=>callRpc(RPC.aprobarDiferencia,{p_diferencia_id:d,p_comentario:o||null}),
-    crearDescuento:o=>{o=o||{};return callRpc(RPC.crearDescuento,{p_turno_id:o.turnoId,p_usuario_id:o.usuarioId,p_monto:Number(o.monto),p_motivo:o.motivo||'',p_turno_sesion_id:o.sesionId||null,p_turno_tramo_id:o.tramoId||null})},
+    crearDescuento:o=>{o=o||{};return callRpc(RPC.crearDescuento,{p_turno_id:o.turnoId,p_usuario_id:o.usuarioId,p_monto:finiteNumber(o.monto,'El monto'),p_motivo:o.motivo||'',p_turno_sesion_id:o.sesionId||null,p_turno_tramo_id:o.tramoId||null})},
     listarTurnos:o=>{o=o||{};if(String(o.estado||'').toUpperCase()==='PENDIENTE_APROBACION'){return callRpc(RPC.listarTurnosMaestros,{p_limite:o.limit??100,p_offset:o.offset??0}).then(function(data){const items=Array.isArray(data)?data:(data&&Array.isArray(data.turnos)?data.turnos:(data&&Array.isArray(data.items)?data.items:[]));return items.filter(function(t){return String((t&&t.estado_maestro)||'').toUpperCase()==='PENDIENTE_APROBACION';});});}return callRpc(RPC.listarTurnos,{p_usuario_id:o.usuarioId||null,p_estado:o.estado||null,p_almacen_id:o.almacenId||null,p_limite:o.limit??50,p_offset:o.offset??0})},
     listarTurnosMaestros:o=>{o=o||{};return callRpc(RPC.listarTurnosMaestros,{p_limite:o.limit??100,p_offset:o.offset??0})},
     // RLS-safe: no lectura directa de turno_sesiones. Usa la RPC del expediente, que ya es SECURITY DEFINER.
@@ -65,8 +66,8 @@
     obtenerExpedienteTurno:id=>callRpc(RPC.expediente,{p_turno_id:id}),
     actorIsAdmin:()=>callRpc(RPC.actorIsAdmin,{}),
     obtenerConfiguracion:()=>callRpc(RPC.configObtener,{}),
-    configurarDuracion:(habilitada,diasFijos)=>callRpc(RPC.configDuracion,{p_habilitada:Boolean(habilitada),p_dias_fijos:diasFijos==null?null:Number(diasFijos)}),
-    editarDiasTurno:(t,d)=>callRpc(RPC.editarDias,{p_turno_id:t,p_nuevos_dias:Number(d)}),
+    configurarDuracion:(habilitada,diasFijos)=>callRpc(RPC.configDuracion,{p_habilitada:Boolean(habilitada),p_dias_fijos:diasFijos==null?null:finiteNumber(diasFijos,'Los días fijos')}),
+    editarDiasTurno:(t,d)=>callRpc(RPC.editarDias,{p_turno_id:t,p_nuevos_dias:finiteNumber(d,'Los días del Turno')}),
     registrarEntregaInventario:(t,r,c)=>callRpc(RPC.registrarEntregaInv,{p_turno_id:t,p_usuario_receptor:r||null,p_comentario:c||null}),
     autenticarSustituto,
     registrarLlegadaCompra:(compraId,almacenId,observacion)=>callRpc(RPC.registrarLlegadaCompra,{p_compra_id:compraId,p_almacen_id:almacenId,p_observacion:observacion||null}),
