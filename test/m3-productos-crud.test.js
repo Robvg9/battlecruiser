@@ -5,12 +5,6 @@
 // NO estaban conectados a NINGÚN lado del frontend (ni RPC_POR_TIPO, ni UI,
 // ni cola offline). Estas pruebas cubren la integración agregada y el fix
 // de entidad_id en sincronizarCola (Fase 3, punto 5 de la misión).
-//
-// Ejecutar: node --test test/m3-productos-crud.test.js
-// NOTA DE HONESTIDAD: este archivo se escribió y se revisó su sintaxis con
-// `node --check`, pero NO pude ejecutarlo en este entorno porque
-// `jsdom`/`fake-indexeddb` no están instalados y no hay red para
-// instalarlos (ver informe de la misión). Debe correrse antes de mergear.
 // ============================================================
 
 const test = require("node:test");
@@ -38,8 +32,6 @@ function mockCliente({ perfil, permisos } = {}) {
       if (nombre === "permisos_usuario_actual") return { data: permisos || [], error: null };
       if (nombre === "usuario_esta_activo") return { data: perfil ? !!perfil[0].activo : null, error: null };
       if (nombre === "registrar_auditoria") return { data: 1, error: null };
-      // Contrato real de producción: ambos RPC devuelven UUID escalar, no
-      // un objeto {id: ...}.
       if (nombre === "actualizar_producto") return { data: params.p_producto_id, error: null };
       if (nombre === "cambiar_estado_producto") return { data: params.p_producto_id, error: null };
       if (nombre === "crear_producto") return { data: "prod-uuid-nuevo", error: null };
@@ -57,9 +49,6 @@ function montarEntorno(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
-  // Misión de modularización: también se quitan los <script src="js/...">
-  // (los módulos reales se inyectan a mano más abajo, igual que antes se
-  // inyectaba app.js completo — así el test no depende de red).
   html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
   const window = dom.window;
@@ -86,8 +75,8 @@ function montarEntorno(opciones = {}) {
   return { dom, window, document: window.document, client };
 }
 
-function marcarOnline(window) {
-  Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
+function marcarOnline(window, online = true) {
+  Object.defineProperty(window.navigator, "onLine", { value: online, configurable: true });
   const shell = window.document.getElementById("app-shell");
   if (shell) shell.classList.add("visible");
 }
@@ -121,17 +110,11 @@ test("M3/F2: ejecutarOperacion('producto_actualizar', ...) llama a actualizar_pr
   assert.ok(llamada, "debe haberse llamado a actualizar_producto");
   assert.strictEqual(llamada.params.p_producto_id, "prod-123");
   assert.ok(llamada.params.p_idempotency_key, "debe llevar idempotency_key");
-  // Fase C (P5): producto_actualizar está cubierto por el trigger, NO se
-  // audita desde el frontend.
-  const llamadaAuditoria = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
-  assert.ok(!llamadaAuditoria, "producto_actualizar NO debe llamar registrar_auditoria (trigger lo cubre)");
+  assert.ok(!client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria"), "producto_actualizar NO debe llamar registrar_auditoria (trigger lo cubre)");
 });
 
 test("M3/F2: ejecutarOperacion('producto_estado', ...) llama a cambiar_estado_producto con p_activo correcto", async () => {
-  const { window, client } = montarEntorno({
-    perfil: PERFIL_DUENO,
-    permisos: [{ seccion: "productos", accion: "editar" }],
-  });
+  const { window, client } = montarEntorno({ perfil: PERFIL_DUENO, permisos: [{ seccion: "productos", accion: "editar" }] });
   marcarOnline(window);
   await esperar(80);
   const r = await window.ejecutarOperacion("producto_estado", { p_producto_id: "prod-456", p_activo: false });
@@ -142,36 +125,36 @@ test("M3/F2: ejecutarOperacion('producto_estado', ...) llama a cambiar_estado_pr
   assert.strictEqual(llamada.params.p_activo, false);
 });
 
-test("M3/F3 (fix entidad_id): sincronizarCola registra el UUID real del RPC, no el id local de IndexedDB", async () => {
-  // Regresión del bug señalado por la misión: registrarAuditoria usaba
-  // op.id (id LOCAL de la cola offline) como entidad_id tras sincronizar,
-  // en vez del UUID real devuelto por el RPC.
+test("M3/F3 (fix entidad_id): sincronizarCola ejecuta el RPC real después de guardar una operación offline", async () => {
   const { window, client } = montarEntorno({
     perfil: PERFIL_DUENO,
     permisos: [{ seccion: "productos", accion: "editar" }],
   });
-  marcarOnline(window);
+  // Mantener OFFLINE durante la creación evita que un sincronizador automático
+  // consuma la operación antes de la sincronización explícita de esta prueba.
+  marcarOnline(window, false);
   await esperar(80);
   const op = window.crearOperacionPendiente("producto_estado", { p_producto_id: "prod-789", p_activo: true });
+  assert.strictEqual(op.usuario_id, "u-test", "la operación debe capturar el usuario actual");
   await window.guardarOperacionPendiente(op);
+
+  const antes = client.__rpcCalls.length;
+  marcarOnline(window, true);
   await window.sincronizarCola();
   await esperar(50);
-  // Fase C (P5): producto_estado está cubierto por el trigger
-  // auditar_mutacion_operativa(), el frontend NO debe duplicar la auditoría
-  // ni al sincronizar.
-  const llamadaAuditoria = client.__rpcCalls
-    .filter((c) => c.nombre === "registrar_auditoria")
-    .find((c) => c.params.p_descripcion && c.params.p_descripcion.includes("sincronizada"));
-  assert.ok(!llamadaAuditoria, "producto_estado NO debe auditarse desde el frontend (trigger lo cubre)");
-  // Verificar que el RPC sí se ejecutó (la op se sincronizó).
-  const cambiarEstado = client.__rpcCalls.find((c) => c.nombre === "cambiar_estado_producto");
+
+  const nuevas = client.__rpcCalls.slice(antes);
+  const cambiarEstado = nuevas.find((c) => c.nombre === "cambiar_estado_producto");
   assert.ok(cambiarEstado, "debe haberse llamado a cambiar_estado_producto");
+  assert.strictEqual(cambiarEstado.params.p_producto_id, "prod-789");
+  assert.strictEqual(cambiarEstado.params.p_activo, true);
+  assert.ok(!nuevas.find((c) => c.nombre === "registrar_auditoria"), "producto_estado NO debe auditarse desde el frontend");
 });
 
 test("M3/F2: sin permiso productos.editar, refrescarProductos no debe ofrecer botones de Editar/Desactivar", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
-    permisos: [{ seccion: "productos", accion: "ver" }], // sin editar
+    permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
   await esperar(80);
