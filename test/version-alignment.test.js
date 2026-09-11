@@ -23,6 +23,7 @@ test('Service Worker construye los nombres de caché desde BC_SW_VERSION', () =>
   assert.match(sw, /BC_STATIC\s*=\s*["']battlecruiser-static-["']\s*\+\s*BC_SW_VERSION/);
 });
 
+// BC-4.3: el documento TURNO debe permanecer alineado con los artefactos físicos.
 test('Documento TURNO declara la misma versión FE que los artefactos físicos', () => {
   const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
   const docVersion = extract(turnoDoc, /\*\*Versión FE:\*\*\s*v(\d+\.\d+\.\d+)/, 'Versión FE del documento TURNO');
