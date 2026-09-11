@@ -15,6 +15,12 @@ const { IDBFactory } = require("fake-indexeddb");
 const fs = require("fs");
 const path = require("path");
 
+// Cada caso monta un JSDOM y reasigna global.window/document/navigator.
+// Ejecutarlos en paralelo permite que un caso reemplace el entorno global
+// activo de otro y produzca fallos falsos. Este archivo requiere aislamiento
+// serial para que cada entorno permanezca estable durante su propio test.
+const testSerial = (name, fn) => test(name, { concurrency: false }, fn);
+
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 function mockCliente({ perfil, permisos, usuarios, roles, auditoria } = {}) {
@@ -54,7 +60,7 @@ function montarEntorno(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
   html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
-  // Misión de modularización: también se quitan los <script src="js/...">
+  // Misión de modularización: también se quitan los <script src="js/...")
   // (los módulos reales se inyectan a mano más abajo, igual que antes se
   // inyectaba app.js completo — así el test no depende de red).
   html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
@@ -90,7 +96,7 @@ function marcarOnline(window) {
 
 // ---- tests ----
 
-test("B4.2/A: el Centro de Mando muestra estado general derivado de la cola real", async () => {
+testSerial("B4.2/A: el Centro de Mando muestra estado general derivado de la cola real", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -107,7 +113,7 @@ test("B4.2/A: el Centro de Mando muestra estado general derivado de la cola real
   assert.ok(estado.className.includes("cc-estado-critico"), "estado crítico con REQUIERE_ATENCION");
 });
 
-test("B4.2/C: alertas aparecen con REQUIERE_ATENCION y desaparecen al resolver", async () => {
+testSerial("B4.2/C: alertas aparecen con REQUIERE_ATENCION y desaparecen al resolver", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -129,7 +135,7 @@ test("B4.2/C: alertas aparecen con REQUIERE_ATENCION y desaparecen al resolver",
   assert.ok(/Sin alertas/.test(alertas.innerHTML), "debe desaparecer la alerta tras resolver");
 });
 
-test("B4.2/B: actividad reciente se carga desde _cache (sin consultas nuevas)", async () => {
+testSerial("B4.2/B: actividad reciente se carga desde _cache (sin consultas nuevas)", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -146,7 +152,7 @@ test("B4.2/B: actividad reciente se carga desde _cache (sin consultas nuevas)", 
   assert.ok(act.innerHTML.includes("Venta"), "debe mostrar la venta de _cache");
 });
 
-test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando", async () => {
+testSerial("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "ventas", accion: "ver" }], // sin auditoria.ver
@@ -157,7 +163,7 @@ test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando"
   assert.ok(btnMando.style.display === "none" || btnMando.classList.contains("hidden"), "Centro de Mando oculto sin permiso");
 });
 
-test("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", async () => {
+testSerial("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -168,7 +174,7 @@ test("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", a
   assert.ok(btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"), "Centro de Mando visible con permiso");
 });
 
-test("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el RPC devuelve UUID escalar", async () => {
+testSerial("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el RPC devuelve UUID escalar", async () => {
   // Regresión del bug: registrarAuditoria usaba `data && data.id`, pero RPC
   // como crear_producto/registrar_venta/registrar_compra/registrar_transferencia/
   // registrar_vale_salida devuelven un UUID escalar en producción (data ES el
@@ -188,7 +194,7 @@ test("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el
   assert.ok(!llamadaAuditoria, "producto NO debe llamar registrar_auditoria (trigger lo cubre)");
 });
 
-test("B4.5: auditoría se carga con filtros y respeta permiso", async () => {
+testSerial("B4.5: auditoría se carga con filtros y respeta permiso", async () => {
   const { window, document, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -212,7 +218,7 @@ test("B4.5: auditoría se carga con filtros y respeta permiso", async () => {
   assert.ok(callFiltro, "el filtro debe pasar el tipo al RPC");
 });
 
-test("B4.4: trazabilidad — operación exitosa registra auditoría con idempotency_key", async () => {
+testSerial("B4.4: trazabilidad — operación exitosa registra auditoría con idempotency_key", async () => {
   const { window, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "ventas", accion: "crear" }],
@@ -240,7 +246,7 @@ test("B4.4: trazabilidad — operación exitosa registra auditoría con idempote
   assert.ok(!audCall, "venta NO debe registrar auditoría (trigger lo cubre)");
 });
 
-test("B4.8: offline no inventa datos de auditoría", async () => {
+testSerial("B4.8: offline no inventa datos de auditoría", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -254,7 +260,7 @@ test("B4.8: offline no inventa datos de auditoría", async () => {
   assert.ok(/Sin conexión|offline|no disponible/i.test(aud.innerHTML), "offline no debe inventar datos de auditoría");
 });
 
-test("B4.11: reconexión refresca el Centro de Mando", async () => {
+testSerial("B4.11: reconexión refresca el Centro de Mando", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -267,7 +273,7 @@ test("B4.11: reconexión refresca el Centro de Mando", async () => {
   assert.ok(/Conectado/.test(conn.textContent), "debe mostrar conectado tras refrescar");
 });
 
-test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos", async () => {
+testSerial("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos", async () => {
   const { window } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -285,7 +291,7 @@ test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos",
   assert.ok(res.operacion.idempotency_key, "conserva idempotency_key");
 });
 
-test("B4.9: cambio A → B no contamina el Centro de Mando", async () => {
+testSerial("B4.9: cambio A → B no contamina el Centro de Mando", async () => {
   const { window, client } = montarEntorno({
     perfil: [{ id: "u-a", nombre: "A", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -310,7 +316,7 @@ test("B4.9: cambio A → B no contamina el Centro de Mando", async () => {
   assert.strictEqual(window.tienePermiso("auditoria", "ver"), false, "B NO hereda permisos de A");
 });
 
-test("B4.20: no se crean stores IndexedDB adicionales", async () => {
+testSerial("B4.20: no se crean stores IndexedDB adicionales", async () => {
   const { window } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
