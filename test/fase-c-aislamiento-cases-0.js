@@ -4,28 +4,15 @@
 
 test("C3-1: obtenerOperacionesPorEstado NO devuelve operaciones de otro usuario", async () => {
   const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
-  // Usuario A guarda una operación
+  marcarOnline(window); await esperar(80);
   setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [] }, "key-A")
-  );
-
-  // Usuario B guarda una operación
+  await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [] }, "key-A"));
   setUsuario(window, "usuario-B");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 }, "key-B")
-  );
-
-  // Usuario A solo debe ver SU operación
+  await window.guardarOperacionPendiente(window.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 }, "key-B"));
   setUsuario(window, "usuario-A");
   const opsA = await window.obtenerOperacionesPorEstado("PENDIENTE");
   assert.strictEqual(opsA.length, 1, "Usuario A debe ver solo 1 operación (la suya)");
   assert.strictEqual(opsA[0].tipo, "venta", "La operación de A debe ser venta");
-
-  // Usuario B solo debe ver SU operación
   setUsuario(window, "usuario-B");
   const opsB = await window.obtenerOperacionesPorEstado("PENDIENTE");
   assert.strictEqual(opsB.length, 1, "Usuario B debe ver solo 1 operación (la suya)");
@@ -34,19 +21,9 @@ test("C3-1: obtenerOperacionesPorEstado NO devuelve operaciones de otro usuario"
 
 test("C3-2: obtenerTodasLasOperaciones NO devuelve operaciones de otro usuario", async () => {
   const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
-  setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", {}, "key-A1")
-  );
-
-  setUsuario(window, "usuario-B");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("compra", {}, "key-B1")
-  );
-
+  marcarOnline(window); await esperar(80);
+  setUsuario(window, "usuario-A"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", {}, "key-A1"));
+  setUsuario(window, "usuario-B"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("compra", {}, "key-B1"));
   setUsuario(window, "usuario-A");
   const todasA = await window.obtenerTodasLasOperaciones();
   assert.strictEqual(todasA.length, 1, "Usuario A debe ver solo 1 operación total");
@@ -55,42 +32,26 @@ test("C3-2: obtenerTodasLasOperaciones NO devuelve operaciones de otro usuario",
 
 test("C3-3: refrescarOperacionesPendientesCache NO mezcla operaciones entre usuarios", async () => {
   const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
-  setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 5 }] }, "key-A")
-  );
-
-  setUsuario(window, "usuario-B");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 10 }] }, "key-B")
-  );
-
-  setUsuario(window, "usuario-A");
-  await window.refrescarOperacionesPendientesCache();
+  marcarOnline(window); await esperar(80);
+  setUsuario(window, "usuario-A"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 5 }] }, "key-A"));
+  setUsuario(window, "usuario-B"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 10 }] }, "key-B"));
+  setUsuario(window, "usuario-A"); await window.refrescarOperacionesPendientesCache();
   assert.strictEqual(window._operacionesPendientesCache.length, 1, "Cache de A debe tener 1 operación");
   assert.strictEqual(window._operacionesPendientesCache[0].usuario_id, "usuario-A");
 });
 
 test("C3-4: sincronizarCola NO procesa operaciones de otro usuario", async () => {
   const { window, client } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
+  marcarOnline(window); await esperar(80);
   setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "key-A")
-  );
-
+  await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "key-A"));
+  // A partir de aquí solo medimos las llamadas producidas por el intento de B.
+  const llamadasAntesDeCambiarA_B = client.__rpcCalls.length;
   setUsuario(window, "usuario-B");
-  await window.sincronizarCola();
-  await esperar(50);
-
-  const ventaRpc = client.__rpcCalls.find((c) => c.nombre === "registrar_venta");
+  await window.sincronizarCola(); await esperar(50);
+  const llamadasPosteriores = client.__rpcCalls.slice(llamadasAntesDeCambiarA_B);
+  const ventaRpc = llamadasPosteriores.find((c) => c.nombre === "registrar_venta");
   assert.ok(!ventaRpc, "Usuario B NO debe haber procesado la venta de usuario A");
-
   setUsuario(window, "usuario-A");
   const opsA = await window.obtenerOperacionesPorEstado("PENDIENTE");
   assert.strictEqual(opsA.length, 1, "La operación de A debe seguir pendiente");
@@ -98,16 +59,10 @@ test("C3-4: sincronizarCola NO procesa operaciones de otro usuario", async () =>
 
 test("C3-5: logout/login no mezcla cola (limpiarContextoUsuario limpia proyección)", async () => {
   const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
-  setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", {}, "key-A")
-  );
+  marcarOnline(window); await esperar(80);
+  setUsuario(window, "usuario-A"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", {}, "key-A"));
   await window.refrescarOperacionesPendientesCache();
   assert.strictEqual(window._operacionesPendientesCache.length, 1, "A tiene 1 op en proyección");
-
   window.limpiarContextoUsuario();
   assert.strictEqual(window._operacionesPendientesCache.length, 0, "Tras logout, proyección debe estar vacía");
   assert.strictEqual(window._usuarioActual, null, "Tras logout, _usuarioActual debe ser null");
@@ -115,46 +70,22 @@ test("C3-5: logout/login no mezcla cola (limpiarContextoUsuario limpia proyecci�
 
 test("C3-6: obtenerOperacionesVisiblesPanel NO devuelve operaciones de otro usuario", async () => {
   const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
-  setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", {}, "key-A")
-  );
-
-  setUsuario(window, "usuario-B");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("compra", {}, "key-B")
-  );
-
-  setUsuario(window, "usuario-A");
-  const visiblesA = await window.obtenerOperacionesVisiblesPanel();
+  marcarOnline(window); await esperar(80);
+  setUsuario(window, "usuario-A"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", {}, "key-A"));
+  setUsuario(window, "usuario-B"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("compra", {}, "key-B"));
+  setUsuario(window, "usuario-A"); const visiblesA = await window.obtenerOperacionesVisiblesPanel();
   assert.strictEqual(visiblesA.length, 1, "Panel de A debe mostrar solo 1 op");
   assert.strictEqual(visiblesA[0].usuario_id, "usuario-A");
 });
 
 test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuario", async () => {
   const { window, document } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
+  marcarOnline(window); await esperar(80);
   setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", {}, "key-A")
-  );
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("compra", {}, "key-A2")
-  );
-
-  setUsuario(window, "usuario-B");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", {}, "key-B")
-  );
-
-  setUsuario(window, "usuario-A");
-  await window.actualizarContadorColaPendiente();
-  await esperar(30);
+  await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", {}, "key-A"));
+  await window.guardarOperacionPendiente(window.crearOperacionPendiente("compra", {}, "key-A2"));
+  setUsuario(window, "usuario-B"); await window.guardarOperacionPendiente(window.crearOperacionPendiente("venta", {}, "key-B"));
+  setUsuario(window, "usuario-A"); await window.actualizarContadorColaPendiente(); await esperar(30);
   const badge = document.getElementById("cola-pendientes-badge");
   assert.ok(badge.textContent.includes("2"), "Badge de A debe mostrar 2 pendientes (no 3)");
 });
@@ -165,16 +96,11 @@ test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuari
 
 test("C2-1: idbSet/idbGet aislan por usuario (B no lee caché de A)", async () => {
   const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
-  await esperar(80);
-
-  setUsuario(window, "usuario-A");
-  await window.idbSet("productos", [{ id: "p1", nombre: "Producto de A" }]);
-
+  marcarOnline(window); await esperar(80);
+  setUsuario(window, "usuario-A"); await window.idbSet("productos", [{ id: "p1", nombre: "Producto de A" }]);
   setUsuario(window, "usuario-B");
   const cacheB = await window.idbGet("productos");
   assert.ok(!cacheB || !cacheB.datos || cacheB.datos.length === 0, "Usuario B NO debe ver caché de A");
-
   setUsuario(window, "usuario-A");
   const cacheA = await window.idbGet("productos");
   assert.ok(cacheA && cacheA.datos && cacheA.datos.length === 1, "Usuario A debe ver SU caché");
