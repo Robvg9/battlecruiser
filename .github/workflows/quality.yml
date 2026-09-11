@@ -24,11 +24,12 @@ jobs:
           fetch-depth: 1
           clean: true
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Verify runner Node environment
+        shell: cmd
+        run: |
+          node --version
+          npm --version
+          node -e "const major=Number(process.versions.node.split('.')[0]); if (major < 22) { console.error('Se requiere Node >=22; encontrado ' + process.version); process.exit(1); }"
 
       - name: Production JS integrity and syntax
         shell: cmd
