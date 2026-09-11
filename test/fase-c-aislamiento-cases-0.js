@@ -84,14 +84,11 @@ test("C3-4: sincronizarCola NO procesa operaciones de otro usuario", async () =>
     window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "key-A")
   );
 
-  // Solo las llamadas producidas desde este punto pertenecen a la prueba del usuario B.
-  const llamadasAntesDeCambiarA_B = client.__rpcCalls.length;
   setUsuario(window, "usuario-B");
   await window.sincronizarCola();
   await esperar(50);
 
-  const llamadasPosteriores = client.__rpcCalls.slice(llamadasAntesDeCambiarA_B);
-  const ventaRpc = llamadasPosteriores.find((c) => c.nombre === "registrar_venta");
+  const ventaRpc = client.__rpcCalls.find((c) => c.nombre === "registrar_venta");
   assert.ok(!ventaRpc, "Usuario B NO debe haber procesado la venta de usuario A");
 
   setUsuario(window, "usuario-A");
