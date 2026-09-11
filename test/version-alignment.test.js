@@ -4,6 +4,7 @@ const fs = require('node:fs');
 
 const app = fs.readFileSync('public/app.js', 'utf8');
 const sw = fs.readFileSync('public/service-worker.js', 'utf8');
+const turnoDoc = fs.readFileSync('docs/BATTLECRUISER_TURNO_MODELO_V1.md', 'utf8');
 
 function extract(text, pattern, label) {
   const m = text.match(pattern);
@@ -20,4 +21,12 @@ test('app.js y service-worker.js comparten la misma versión BattleCruiser', () 
 test('Service Worker construye los nombres de caché desde BC_SW_VERSION', () => {
   assert.match(sw, /BC_SHELL\s*=\s*["']battlecruiser-shell-["']\s*\+\s*BC_SW_VERSION/);
   assert.match(sw, /BC_STATIC\s*=\s*["']battlecruiser-static-["']\s*\+\s*BC_SW_VERSION/);
+});
+
+test('Documento TURNO declara la misma versión FE que los artefactos físicos', () => {
+  const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
+  const docVersion = extract(turnoDoc, /\*\*Versión FE:\*\*\s*v(\d+\.\d+\.\d+)/, 'Versión FE del documento TURNO');
+  assert.equal(docVersion, appVersion);
+  assert.match(turnoDoc, new RegExp(`public/app\\.js.*v${appVersion}`));
+  assert.match(turnoDoc, new RegExp(`public/service-worker\\.js.*v${appVersion}`));
 });
