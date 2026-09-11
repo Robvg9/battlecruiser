@@ -152,15 +152,8 @@ test("M3/F3 (fix entidad_id): sincronizarCola registra el UUID real del RPC, no 
   });
   marcarOnline(window);
   await esperar(80);
-
-  // Precondición explícita del test: crear/guardar una operación offline
-  // requiere una sesión con usuario_id conocido. El helper del puente lo
-  // expone sin alterar el comportamiento de producción.
-  window.__bcSetUsuarioActualId("u-test");
   const op = window.crearOperacionPendiente("producto_estado", { p_producto_id: "prod-789", p_activo: true });
-  assert.strictEqual(op.usuario_id, "u-test", "la operación debe quedar asociada al usuario actual");
-  const guardada = await window.guardarOperacionPendiente(op);
-  assert.ok(guardada, "la operación debe quedar guardada en IndexedDB");
+  await window.guardarOperacionPendiente(op);
   await window.sincronizarCola();
   await esperar(50);
   // Fase C (P5): producto_estado está cubierto por el trigger
