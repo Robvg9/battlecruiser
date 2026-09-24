@@ -1,0 +1,1 @@
+RWHT ARIA ↔ BattleCruiser — prueba de integración controlada.\n\nCreado por la ruta gobernada de ARIA para validar rama, escritura, lectura y PR sin fusionar.
