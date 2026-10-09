@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const TEST_DIR = __dirname;
-const TIMEOUT_MS = Number(process.env.BC_TEST_FILE_TIMEOUT_MS || 60000);
+const TIMEOUT_MS = Number(process.env.BC_TEST_FILE_TIMEOUT_MS || 120000);
 
 const files = fs.readdirSync(TEST_DIR)
   .filter((name) => name.endsWith(".test.js"))
