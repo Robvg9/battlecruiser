@@ -164,8 +164,13 @@ test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuari
 // ============================================================
 
 test("C2-1: idbSet/idbGet aislan por usuario (B no lee caché de A)", async () => {
-  const { window } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
+  // Este caso verifica el almacén y el espacio de claves, no el refresco online.
+  // Iniciar offline evita que el bootstrap de la app reescriba la caché de prueba
+  // con respuestas vacías del mock de Supabase mientras cambian los usuarios.
+  const env = prepararDOM({ perfil: PERFIL, permisos: PERMISOS_TODOS });
+  Object.defineProperty(env.window.navigator, "onLine", { value: false, configurable: true });
+  inyectarApp(env.window);
+  const { window } = env;
   await esperar(80);
 
   setUsuario(window, "usuario-A");
