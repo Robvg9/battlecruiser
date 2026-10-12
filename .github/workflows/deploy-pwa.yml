@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Wrangler
-        run: npm install --global wrangler@4.120.1
+        run: npm install --global wrangler@4.149.0
       - name: Verify PWA
         run: |
           test -f public/index.html
