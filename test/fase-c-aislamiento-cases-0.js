@@ -76,15 +76,26 @@ test("C3-3: refrescarOperacionesPendientesCache NO mezcla operaciones entre usua
 
 test("C3-4: sincronizarCola NO procesa operaciones de otro usuario", async () => {
   const { window, client } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
-  marcarOnline(window);
+
+  // La operación de A debe nacer realmente offline. Así evitamos que un
+  // auto-sync de arranque/reconexión pueda consumirla antes de cambiar a B.
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   await esperar(80);
 
   setUsuario(window, "usuario-A");
-  await window.guardarOperacionPendiente(
-    window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "key-A")
+  const opA = window.crearOperacionPendiente(
+    "venta",
+    { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] },
+    "key-A"
   );
+  assert.strictEqual(opA.usuario_id, "usuario-A", "La operación debe quedar ligada a A");
+  await window.guardarOperacionPendiente(opA);
 
+  // Cambia de usuario mientras la cola sigue pendiente.
   setUsuario(window, "usuario-B");
+
+  // Ya con conexión, B intenta sincronizar: solo debe considerar SU cola.
+  Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
   await window.sincronizarCola();
   await esperar(50);
 

@@ -3,7 +3,13 @@
 // reconciliación B7/B8, XSS, auditoría redundante y bug de categoría.
 // ============================================================
 
-const test = require("node:test");
+const nodeTest = require("node:test");
+const test = (name, optionsOrFn, maybeFn) => {
+  if (typeof optionsOrFn === "function") {
+    return nodeTest(name, { concurrency: false }, optionsOrFn);
+  }
+  return nodeTest(name, { ...(optionsOrFn || {}), concurrency: false }, maybeFn);
+};
 const assert = require("node:assert");
 const { JSDOM } = require("jsdom");
 const { IDBFactory } = require("fake-indexeddb");

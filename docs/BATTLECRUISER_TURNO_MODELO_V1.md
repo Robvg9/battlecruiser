@@ -1,7 +1,7 @@
 # BattleCruiser — Modelo TURNO V1 (Frontend)
 
 **Fecha:** 2026-08-28  
-**Versión FE:** v9.4.0  
+**Versión FE:** v9.4.77  
 **HEAD de referencia:** ver commits de restauración de `turno-api.js`  
 **Estado:** Implementación FE contra contrato backend `bc_*` documentado en Notion + introspección live.
 
@@ -24,8 +24,8 @@ Sesiones: N días × 2 bloques (MANANA/TARDE) = **2N** sesiones.
 | `public/js/turno-api.js` | Capa única de acceso a RPC `bc_*`. Online-only. Propaga errores reales. No simula éxito offline. |
 | `public/js/turnos-maestro.js` | UX Turnos: home por almacén, crear Turno, sesiones, declaración, interrupción/relevo, revisión ADMIN, descuentos. |
 
-Carga: `public/app.js` v9.4.0 incluye ambos al inicio de la lista dinámica.  
-Cache: `public/service-worker.js` v9.4.0.
+Carga: `public/app.js` v9.4.77 incluye ambos al inicio de la lista dinámica.  
+Cache: `public/service-worker.js` v9.4.77.
 
 ## RPC consumidas (contrato)
 
@@ -76,7 +76,7 @@ Autenticación de sustituto: **Supabase Auth** (`signInWithPassword`), no contra
 |------|--------|
 | **Notion** | Contrato TURNO vigente (Documento Maestro 2026-08-28). |
 | **Supabase** | Tablas `turno_*` + RPC `bc_*` live; legacy ciclo aún presente (aditivo). |
-| **GitHub** | FE v9.4.0 + `turno-api.js` restaurado; `turnos-maestro.js` puede requerir subida manual si el push de archivo grande falló/truncó. |
+| **GitHub** | FE v9.4.77 + `turno-api.js` restaurado; `turnos-maestro.js` puede requerir subida manual si el push de archivo grande falló/truncó. |
 
 ## Integridad archivos grandes
 
