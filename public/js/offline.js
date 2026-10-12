@@ -1267,7 +1267,7 @@ function sincronizandoGlobal(activo) {
   else { localStorage.removeItem('battlecruiser-sincronizando'); }
 }
 
-async function sincronizarCola() {
+async function procesarColaSincronizacion() {
   if (_sincronizando) return;
   // no hay auth.uid() en el backend y no se debe intentar enviar nada.
   if (!usuarioIdParaCola()) return;
@@ -1344,6 +1344,33 @@ async function sincronizarCola() {
     await consolidarRefrescosPendientes();
     actualizarIndicadorConexion();
   }
+}
+
+
+let _sincronizacionEnCurso = null;
+let _sincronizacionSolicitada = false;
+
+// No perder una solicitud de sincronización concurrente. Si el login o el
+// listener de conectividad ya estaba drenando la cola cuando se guardó una
+// operación nueva, el llamador espera el pase actual y fuerza un pase adicional
+// para incluir la operación que pudo quedar fuera de la instantánea FIFO.
+function sincronizarCola() {
+  if (_sincronizacionEnCurso) {
+    _sincronizacionSolicitada = true;
+    return _sincronizacionEnCurso;
+  }
+
+  const ejecucion = procesarColaSincronizacion();
+  let promesa = null;
+  promesa = ejecucion.finally(async () => {
+    if (_sincronizacionEnCurso === promesa) _sincronizacionEnCurso = null;
+    if (_sincronizacionSolicitada) {
+      _sincronizacionSolicitada = false;
+      await sincronizarCola();
+    }
+  });
+  _sincronizacionEnCurso = promesa;
+  return promesa;
 }
 
 function resumenEstadoCache() {
