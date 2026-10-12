@@ -2,7 +2,7 @@
 // Utilidades genéricas: safeInit, formato de fecha/dinero, helpers de UI de listas.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
-// ---- Config del proyecto Supabase de BattleCruiser ----
+// ---- Config del proyecto Supabase de Battlecruiser ----
 const SUPABASE_URL = "https://papxnkkjtkxsitcsvcme.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_pczHaS1JDPGrEA31vdbOLg_1l2qFhbm";
 
@@ -14,10 +14,10 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 (function cargarModuloMovimientoMultiple(){function cargar(){if(document.querySelector('script[data-battlecruiser-movimiento-multiple="1"]'))return;const s=document.createElement('script');s.src='js/movimiento-multiple.js?v=61';s.async=false;s.dataset.battlecruiserMovimientoMultiple='1';document.body.appendChild(s);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cargar,{once:true});else cargar();})();
 (function cargarModuloInventarioDetalle(){function cargar(){if(document.querySelector('script[data-battlecruiser-inventario-detalle="1"]'))return;const s=document.createElement('script');s.src='js/inventario-detalle.js?v=61';s.async=false;s.dataset.battlecruiserInventarioDetalle='1';document.body.appendChild(s);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cargar,{once:true});else cargar();})();
 (function cargarRuntimeGuards(){function cargar(){if(document.querySelector('script[data-battlecruiser-runtime-guards="1"]'))return;const s=document.createElement('script');s.src='js/runtime-guards.js?v=61';s.async=false;s.dataset.battlecruiserRuntimeGuards='1';document.body.appendChild(s);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cargar,{once:true});else cargar();})();
-(function programarLoadingGuard(){function cargar(){try{if(document.querySelector('script[data-battlecruiser-loading-guard="1"]'))return;const s=document.createElement('script');s.src='js/loading-guard.js';s.async=false;s.dataset.battlecruiserLoadingGuard='1';document.head.appendChild(s);}catch(e){console.warn('[BattleCruiser] No se pudo cargar loading-guard.js:',e);}}if(document.readyState==='complete')cargar();else window.addEventListener('load',cargar,{once:true});})();
+(function programarLoadingGuard(){function cargar(){try{if(document.querySelector('script[data-battlecruiser-loading-guard="1"]'))return;const s=document.createElement('script');s.src='js/loading-guard.js';s.async=false;s.dataset.battlecruiserLoadingGuard='1';document.head.appendChild(s);}catch(e){console.warn('[Battlecruiser] No se pudo cargar loading-guard.js:',e);}}if(document.readyState==='complete')cargar();else window.addEventListener('load',cargar,{once:true});})();
 function safeInit(nombre,fn){try{fn();}catch(e){console.error("[Battlecruiser] No se pudo iniciar '"+nombre+"':",e);}}
 function esperar(ms){return new Promise(r=>setTimeout(r,ms));}
-function money(n){const v=Number(n);return Number.isFinite(v)?v.toFixed(2):"0.00";}
+function money(n){const v=Number(n);if(!Number.isFinite(v)||Object.is(v,-0)||Math.abs(v)<0.005)return "0.00";return v.toFixed(2);}
 function fechaCorta(fecha){return new Date(fecha).toLocaleDateString("es",{day:"2-digit",month:"2-digit",year:"numeric"});}
 function fechaHora(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
 function fechaHoraCompleta(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
