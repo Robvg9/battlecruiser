@@ -79,12 +79,16 @@ test("C3-4: sincronizarCola NO procesa operaciones de otro usuario", async () =>
   marcarOnline(window);
   await esperar(80);
 
+  // A real offline queue must be enqueued while offline; otherwise the app's
+  // automatic reconnect synchronizer can legitimately drain it before B logs in.
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   setUsuario(window, "usuario-A");
   await window.guardarOperacionPendiente(
     window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "key-A")
   );
 
   setUsuario(window, "usuario-B");
+  Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
   await window.sincronizarCola();
   await esperar(50);
 
@@ -94,6 +98,42 @@ test("C3-4: sincronizarCola NO procesa operaciones de otro usuario", async () =>
   setUsuario(window, "usuario-A");
   const opsA = await window.obtenerOperacionesPorEstado("PENDIENTE");
   assert.strictEqual(opsA.length, 1, "La operación de A debe seguir pendiente");
+});
+
+test("C3-4B: sincronizarCola aborta si cambia el usuario durante la transición de estado", async () => {
+  const { window, client } = montarEntorno({ perfil: PERFIL, permisos: PERMISOS_TODOS });
+  marcarOnline(window);
+  await esperar(80);
+
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  setUsuario(window, "usuario-A");
+  await window.guardarOperacionPendiente(
+    window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 1 }] }, "key-A-race")
+  );
+  Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
+
+  const actualizarOriginal = window.actualizarOperacionPendiente;
+  let cambioForzado = false;
+  window.actualizarOperacionPendiente = async function (id, cambios) {
+    const resultado = await actualizarOriginal(id, cambios);
+    if (!cambioForzado && cambios && cambios.estado === "SINCRONIZANDO") {
+      cambioForzado = true;
+      setUsuario(window, "usuario-B");
+    }
+    return resultado;
+  };
+
+  await window.sincronizarCola();
+  assert.ok(cambioForzado, "La prueba debe forzar el cambio A → B mientras se actualiza IndexedDB");
+  assert.ok(
+    !client.__rpcCalls.some((c) => c.nombre === "registrar_venta"),
+    "El RPC de venta no debe salir después de que cambie la identidad activa"
+  );
+
+  setUsuario(window, "usuario-A");
+  const opsA = await window.obtenerOperacionesPorEstado("PENDIENTE");
+  assert.strictEqual(opsA.length, 1, "La venta de A debe conservarse en la cola");
+  assert.strictEqual(opsA[0].estado, "PENDIENTE", "La operación no debe quedar atrapada como SINCRONIZANDO");
 });
 
 test("C3-5: logout/login no mezcla cola (limpiarContextoUsuario limpia proyección)", async () => {
@@ -139,6 +179,9 @@ test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuari
   marcarOnline(window);
   await esperar(80);
 
+  // Keep queued operations pending: this case checks the badge's user scoping,
+  // not the online auto-sync path.
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   setUsuario(window, "usuario-A");
   await window.guardarOperacionPendiente(
     window.crearOperacionPendiente("venta", {}, "key-A")
@@ -156,7 +199,8 @@ test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuari
   await window.actualizarContadorColaPendiente();
   await esperar(30);
   const badge = document.getElementById("cola-pendientes-badge");
-  assert.ok(badge.textContent.includes("2"), "Badge de A debe mostrar 2 pendientes (no 3)");
+  assert.ok(badge.textContent.includes("2 pendientes"), "Badge de A debe mostrar 2 pendientes (no 3)");
+  assert.ok(!badge.textContent.includes("3 pendientes"), "Badge de A NO debe incluir la operación de B");
 });
 
 // ============================================================
