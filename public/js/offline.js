@@ -1269,19 +1269,29 @@ function sincronizandoGlobal(activo) {
 
 async function procesarColaSincronizacion() {
   if (_sincronizando) return;
-  // no hay auth.uid() en el backend y no se debe intentar enviar nada.
-  if (!usuarioIdParaCola()) return;
+  // Bind one drain pass to the user who started it. An IndexedDB await can
+  // outlive logout/login, so filtering only the initial queue snapshot is not
+  // enough to prevent a different user from submitting the previous user's op.
+  const usuarioIdSincronizacion = usuarioIdParaCola();
+  if (!usuarioIdSincronizacion) return;
+  const errorCambioUsuario = "La sesión cambió durante la sincronización; la operación se conserva pendiente para reintento idempotente.";
   if (localStorage.getItem('battlecruiser-sincronizando')) return;
   _sincronizando = true;
   sincronizandoGlobal(true);
   _refrescosPendientes = new Set();
   actualizarIndicadorConexion("sincronizando");
   try {
-    // ordena así), una operación a la vez, nunca todas en simultáneo.
+    // FIFO and one at a time. Abort a stale snapshot if identity changed while
+    // IndexedDB was being read.
     const operaciones = await obtenerOperacionesPorEstado("PENDIENTE");
+    if (usuarioIdParaCola() !== usuarioIdSincronizacion) return;
 
     for (const op of operaciones) {
       if (!navigator.onLine) break; // se perdió la conexión a mitad de la cola
+      if (usuarioIdParaCola() !== usuarioIdSincronizacion) break;
+      // Fail closed if the stored owner does not match the identity bound to
+      // this pass, even if a future query/index regression returns a foreign op.
+      if (!op || op.usuario_id !== usuarioIdSincronizacion) continue;
 
       await actualizarOperacionPendiente(op.id, {
         estado: "SINCRONIZANDO",
@@ -1289,9 +1299,29 @@ async function procesarColaSincronizacion() {
         ultimo_intento: new Date().toISOString(),
       });
 
+      // The IndexedDB write above is asynchronous: re-check identity immediately
+      // before the RPC, and restore PENDIENTE instead of sending under a new
+      // login if the account changed while that write was in flight.
+      if (usuarioIdParaCola() !== usuarioIdSincronizacion) {
+        await actualizarOperacionPendiente(op.id, {
+          estado: "PENDIENTE",
+          ultimo_error: errorCambioUsuario,
+        });
+        break;
+      }
+
       let error = null;
       let data = null;
       try {
+        // Keep this guard adjacent to the backend call; do not dispatch a
+        // previous user's payload after logout/login has changed the context.
+        if (usuarioIdParaCola() !== usuarioIdSincronizacion || op.usuario_id !== usuarioIdSincronizacion) {
+          await actualizarOperacionPendiente(op.id, {
+            estado: "PENDIENTE",
+            ultimo_error: errorCambioUsuario,
+          });
+          break;
+        }
         const respuesta = await client.rpc(
           RPC_POR_TIPO[op.tipo],
           Object.assign({}, op.payload, { p_idempotency_key: op.idempotency_key })
@@ -1302,8 +1332,26 @@ async function procesarColaSincronizacion() {
         error = e;
       }
 
+      // If an identity transition happened while the RPC was in flight, keep
+      // the item for a later idempotent retry. Do not run audit/cache follow-ups
+      // or remove it from the queue under the new user's context.
+      if (usuarioIdParaCola() !== usuarioIdSincronizacion) {
+        await actualizarOperacionPendiente(op.id, {
+          estado: "PENDIENTE",
+          ultimo_error: errorCambioUsuario,
+        });
+        break;
+      }
+
       if (!error) {
         await actualizarOperacionPendiente(op.id, { estado: "SINCRONIZADA" });
+        if (usuarioIdParaCola() !== usuarioIdSincronizacion) {
+          await actualizarOperacionPendiente(op.id, {
+            estado: "PENDIENTE",
+            ultimo_error: errorCambioUsuario,
+          });
+          break;
+        }
         // B4: registrar auditoría de la sincronización exitosa (trazabilidad
         if (tipoAuditableFrontend(op.tipo) && typeof registrarAuditoria === "function") {
           const entidadId = typeof data === "string" ? data : String((data && data.id) || op.id || "");
@@ -1334,6 +1382,7 @@ async function procesarColaSincronizacion() {
         estado: "REQUIERE_ATENCION",
         ultimo_error: error.message || String(error),
       });
+      if (usuarioIdParaCola() !== usuarioIdSincronizacion) break;
       await refrescarOperacionesPendientesCache();
       await reconciliarTrasOperacion(op.tipo, "negocio");
     }
