@@ -1,0 +1,188 @@
+name: RobVG Desktop Commander Rescue (isolated one-shot)
+
+on:
+  push:
+    branches:
+      - rescue/robvg-dc-recovery-20261014
+    paths:
+      - '.github/workflows/robvg-dc-rescue-once.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+    steps:
+      - name: Guard physical RobVG and ARIA identity
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:COMPUTERNAME -ine 'ROBVG') { throw "WRONG_COMPUTER=$env:COMPUTERNAME; no action taken." }
+          $configPath = 'D:\ARIA-Windows-Agent\Data\config.json'
+          if (-not (Test-Path -LiteralPath $configPath)) { throw "CONFIG_MISSING=$configPath" }
+          $cfg = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
+          $expected = 'windows-fe722cc6681e4f9c9cc35f5ebbb0a089'
+          if ([string]$cfg.device_id -ne $expected) { throw "DEVICE_ID_MISMATCH expected=$expected actual=$($cfg.device_id); no action taken." }
+          Write-Host "RESCUE_IDENTITY=PASS COMPUTER=$env:COMPUTERNAME DEVICE_ID=$($cfg.device_id)"
+          Write-Host "RUNNER_NAME=$env:RUNNER_NAME RUNNER_OS=$env:RUNNER_OS RUNNER_ARCH=$env:RUNNER_ARCH"
+
+      - name: Restart only validated degraded Desktop Commander child
+        id: rescue
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $started = Get-Date
+          $runtime = 'D:\ARIA-Windows-Agent'
+          $logs = Join-Path $runtime 'Logs'
+          $statusPath = Join-Path $logs 'desktop-commander-supervisor.json'
+          $stdoutPath = Join-Path $logs 'desktop-commander.stdout.log'
+          $stderrPath = Join-Path $logs 'desktop-commander.stderr.log'
+          $supervisorLog = Join-Path $logs 'desktop-commander-supervisor.log'
+          $entry = 'D:\ARIA-Windows-Agent\Tools\DesktopCommanderRemote-0.3.0\node_modules\@wonderwhy-er\desktop-commander\dist\index.js'
+          $evidenceDir = 'D:\Databank\RWHT\Evidence\DesktopCommanderRecovery'
+          $report = [ordered]@{
+            schema = 'robvg-dc-rescue-v1'
+            computer = $env:COMPUTERNAME
+            runner = $env:RUNNER_NAME
+            startedAt = $started.ToString('o')
+            deviceId = 'windows-fe722cc6681e4f9c9cc35f5ebbb0a089'
+            beforeState = $null
+            beforeChannelState = $null
+            beforeUpdatedAt = $null
+            beforePid = $null
+            childExactPathValidated = $false
+            supervisorCount = 0
+            degradedSince = $null
+            degradedSeconds = $null
+            childStopRequested = $false
+            actionError = $null
+            freshSubscription = $false
+            afterState = $null
+            afterChannelState = $null
+            afterUpdatedAt = $null
+            afterPid = $null
+            metadataHttp = $null
+            stdoutLastWrite = $null
+            stderrLastWrite = $null
+            result = 'FAIL'
+          }
+
+          try {
+            if (-not (Test-Path -LiteralPath $statusPath)) { throw "SUPERVISOR_STATUS_MISSING=$statusPath" }
+            $s = Get-Content -Raw -LiteralPath $statusPath | ConvertFrom-Json
+            $report.beforeState = [string]$s.state
+            $report.beforeChannelState = [string]$s.channel_state
+            $report.beforeUpdatedAt = [string]$s.updated_at
+            $report.beforePid = [int]$s.pid
+            Write-Host "DC_STATE_BEFORE=$($report.beforeState) CHANNEL=$($report.beforeChannelState) PID=$($report.beforePid) UPDATED=$($report.beforeUpdatedAt)"
+
+            $procs = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+            $child = @($procs | Where-Object { [int]$_.ProcessId -eq [int]$s.pid } | Select-Object -First 1)
+            if ($child.Count -gt 0) {
+              $cmd = [string]$child[0].CommandLine
+              $report.childExactPathValidated = ($child[0].Name -ieq 'node.exe' -and $cmd.IndexOf($entry, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+            }
+            $supervisors = @($procs | Where-Object {
+              $_.Name -match '^(powershell|pwsh)(\.exe)?$' -and [string]$_.CommandLine -match '(?i)desktop-commander-supervisor\.ps1'
+            })
+            $report.supervisorCount = $supervisors.Count
+            Write-Host "DC_CHILD_EXACT_PATH_VALIDATED=$($report.childExactPathValidated) SUPERVISOR_COUNT=$($report.supervisorCount)"
+
+            $timerLine = $null
+            if (Test-Path -LiteralPath $supervisorLog) {
+              $timerLine = Get-Content -LiteralPath $supervisorLog -Tail 6000 -ErrorAction Stop |
+                Where-Object { [string]$_ -match 'CHANNEL_DEGRADED_TIMER_STARTED' } |
+                Select-Object -Last 1
+            }
+            if ($timerLine) {
+              $m = [regex]::Match([string]$timerLine, '(?<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))')
+              if ($m.Success) {
+                $since = [DateTimeOffset]::Parse($m.Groups['ts'].Value)
+                $report.degradedSince = $since.ToString('o')
+                $report.degradedSeconds = [math]::Max(0, [int]([DateTimeOffset]::Now - $since).TotalSeconds)
+              }
+            }
+            Write-Host "CHANNEL_DEGRADED_SINCE=$($report.degradedSince) SECONDS=$($report.degradedSeconds)"
+
+            if ($report.beforeState -ne 'channel_degraded' -or $report.beforeChannelState -ne 'degraded') {
+              throw "GUARD_NOT_MET state=$($report.beforeState) channel=$($report.beforeChannelState)"
+            }
+            if (-not $report.childExactPathValidated) { throw "DC_CHILD_PID_OR_ENTRY_PATH_NOT_VALIDATED PID=$($report.beforePid)" }
+            if ($report.supervisorCount -lt 1) { throw 'SUPERVISOR_NOT_FOUND; refusing to stop child without its watchdog.' }
+            if ($null -eq $report.degradedSeconds -or [int]$report.degradedSeconds -lt 180) { throw "DEGRADED_DURATION_NOT_CONFIRMED seconds=$($report.degradedSeconds)" }
+
+            Stop-Process -Id ([int]$s.pid) -Force -ErrorAction Stop
+            $report.childStopRequested = $true
+            Write-Host "DC_CHILD_STOPPED=PASS PID=$($s.pid) ACTION=SUPERVISOR_RESPAWN_ONLY"
+
+            $deadline = (Get-Date).AddSeconds(50)
+            while ((Get-Date) -lt $deadline) {
+              Start-Sleep -Seconds 3
+              $latest = $null
+              try { $latest = Get-Content -Raw -LiteralPath $statusPath | ConvertFrom-Json } catch {}
+              if ($latest) {
+                $report.afterState = [string]$latest.state
+                $report.afterChannelState = [string]$latest.channel_state
+                $report.afterUpdatedAt = [string]$latest.updated_at
+                $report.afterPid = [int]$latest.pid
+              }
+              if (Test-Path -LiteralPath $stdoutPath) {
+                $report.stdoutLastWrite = (Get-Item -LiteralPath $stdoutPath).LastWriteTime.ToString('o')
+                $freshWrite = (Get-Item -LiteralPath $stdoutPath).LastWriteTime -ge $started
+                $tail = @(Get-Content -LiteralPath $stdoutPath -Tail 100 -ErrorAction SilentlyContinue)
+                $hasFreshSubscribe = @($tail | Where-Object { [string]$_ -match '(?i)Channel subscribed|Status:\s*Online' }).Count -gt 0
+                $freshState = $false
+                if ($latest -and $latest.updated_at) {
+                  $freshState = ([DateTimeOffset]::Parse([string]$latest.updated_at) -ge [DateTimeOffset]$started)
+                }
+                if ($freshWrite -and $hasFreshSubscribe -and $freshState -and
+                    [string]$report.afterState -eq 'channel_last_subscribed' -and
+                    [string]$report.afterChannelState -eq 'subscribed') {
+                  $report.freshSubscription = $true
+                  break
+                }
+              }
+            }
+
+            try {
+              $resp = Invoke-WebRequest -Uri 'https://mcp.desktopcommander.app/api/mcp-info' -UseBasicParsing -TimeoutSec 10
+              $report.metadataHttp = [int]$resp.StatusCode
+            } catch { $report.metadataHttp = "FAIL:$($_.Exception.GetType().Name)" }
+
+            if (Test-Path -LiteralPath $stderrPath) {
+              $report.stderrLastWrite = (Get-Item -LiteralPath $stderrPath).LastWriteTime.ToString('o')
+            }
+            Write-Host "DC_FRESH_SUBSCRIPTION=$($report.freshSubscription) AFTER_STATE=$($report.afterState) AFTER_CHANNEL=$($report.afterChannelState) AFTER_PID=$($report.afterPid) HTTP=$($report.metadataHttp)"
+            if ($report.freshSubscription) { $report.result = 'LOCAL_CHANNEL_RECOVERED' } else { $report.result = 'LOCAL_CHANNEL_NOT_VERIFIED' }
+          } catch {
+            $report.actionError = "$($_.Exception.GetType().Name):$($_.Exception.Message)"
+            $report.result = 'GUARDED_RECOVERY_FAILED'
+            Write-Host "RESCUE_ERROR=$($report.actionError)"
+          } finally {
+            $report.finishedAt = (Get-Date).ToString('o')
+            New-Item -ItemType Directory -Path $evidenceDir -Force -ErrorAction SilentlyContinue | Out-Null
+            $evidence = Join-Path $evidenceDir ('robvg-dc-rescue-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
+            $artifact = Join-Path $env:RUNNER_TEMP 'robvg-dc-rescue.json'
+            $json = $report | ConvertTo-Json -Depth 6
+            try {
+              Set-Content -LiteralPath $evidence -Value $json -Encoding UTF8
+              Set-Content -LiteralPath $artifact -Value $json -Encoding UTF8
+              Write-Host "EVIDENCE_PATH=$evidence"
+              Write-Host "EVIDENCE_SHA256=$((Get-FileHash -LiteralPath $evidence -Algorithm SHA256).Hash)"
+            } catch { Write-Host "EVIDENCE_SAVE_ERROR=$($_.Exception.Message)" }
+            Write-Host "RESCUE_RESULT=$($report.result)"
+          }
+          if ($report.result -ne 'LOCAL_CHANNEL_RECOVERED') { throw "RESCUE_NOT_VERIFIED result=$($report.result)" }
+          Write-Host 'ROBVG_DC_RESCUE=PASS'
+
+      - name: Upload rescue evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robvg-dc-rescue-evidence
+          path: ${{ runner.temp }}\robvg-dc-rescue.json
+          if-no-files-found: warn
+          retention-days: 14
