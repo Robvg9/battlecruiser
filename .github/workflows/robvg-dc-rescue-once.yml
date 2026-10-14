@@ -1,4 +1,4 @@
-name: RobVG Windows Task Visibility Diagnostic (isolated, fixed)
+name: RobVG Desktop Commander Focused Diagnostics (read-only)
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   inspect:
     runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 4
+    timeout-minutes: 3
     defaults:
       run:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
@@ -29,217 +29,74 @@ jobs:
           if ([string]$cfg.device_id -ne $expected) { throw "DEVICE_ID_MISMATCH=$($cfg.device_id)" }
           Write-Host "ROBVG_GUARD=PASS COMPUTER=$env:COMPUTERNAME DEVICE_ID=$($cfg.device_id) RUNNER=$env:RUNNER_NAME"
 
-      - name: Read current process ownership, registered tasks and XML without making changes
+      - name: Inspect status, logs, task query and watchdog logic (no changes)
         run: |
           $ErrorActionPreference = 'Continue'
-          $started = Get-Date
-          $logsRoot = 'D:\ARIA-Windows-Agent\Logs'
-          $evidenceRoot = 'D:\Databank\RWHT\Evidence\DesktopCommanderRecovery'
-          $statusPath = Join-Path $logsRoot 'desktop-commander-supervisor.json'
-          $supervisorScript = 'D:\ARIA-Windows-Agent\Runtime\windows\desktop-commander-supervisor.ps1'
-          $taskRoot = 'C:\Windows\System32\Tasks'
-          $report = [ordered]@{
-            schema = 'robvg-task-visibility-diagnostic-v2'
-            computer = $env:COMPUTERNAME
-            runner = $env:RUNNER_NAME
-            capturedAt = $started.ToString('o')
-            currentUser = $null
-            currentSid = $null
-            currentUserIsAdmin = $false
-            supervisorState = $null
-            supervisorChannel = $null
-            supervisorPid = $null
-            supervisorUpdatedAt = $null
-            targetProcess = @{}
-            processParents = @()
-            taskApiResults = @()
-            taskFileResults = @()
-            runnerServices = @()
-            supervisorLogic = @()
-            changesMade = $false
-            finishedAt = $null
-          }
-          function Safe([string]$x) {
-            $v = $x -replace '(?i)Bearer\s+\S+', 'Bearer [REDACTED]'
-            $v = $v -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+', '$1[REDACTED]'
-            $v = $v -replace '(?i)(refresh[_-]?token\s*)[:=]\s*[^\s,;]+', '$1=[REDACTED]'
-            $v = $v -replace 'https?://[^?\s]+\?[^\s]+', '[URL_QUERY_REDACTED]'
-            if ($v.Length -gt 300) { $v = $v.Substring(0,300) }
-            return $v
-          }
-          try {
-            $ident = [Security.Principal.WindowsIdentity]::GetCurrent()
-            $principal = New-Object Security.Principal.WindowsPrincipal($ident)
-            $report.currentUser = $ident.Name
-            $report.currentSid = [string]$ident.User.Value
-            $report.currentUserIsAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-            Write-Host "RUNNER_IDENTITY=$($ident.Name) SID=$($ident.User.Value) IS_ADMIN=$($report.currentUserIsAdmin) PROFILE=$env:USERPROFILE"
+          $root = 'D:\ARIA-Windows-Agent'
+          $logs = Join-Path $root 'Logs'
+          $statusPath = Join-Path $logs 'desktop-commander-supervisor.json'
+          $supervisorPath = Join-Path $root 'Runtime\windows\desktop-commander-supervisor.ps1'
 
-            if (Test-Path -LiteralPath $statusPath) {
-              $s = Get-Content -Raw -LiteralPath $statusPath | ConvertFrom-Json
-              $report.supervisorState = [string]$s.state
-              $report.supervisorChannel = [string]$s.channel_state
-              $report.supervisorPid = [int]$s.pid
-              $report.supervisorUpdatedAt = [string]$s.updated_at
-              Write-Host "SUPERVISOR_STATUS=$($s.state) CHANNEL=$($s.channel_state) ALIVE=$($s.process_alive) PID=$($s.pid) VERSION=$($s.version) UPDATED=$($s.updated_at)"
-              Write-Host "SUPERVISOR_NODE=$($s.node) ENTRY=$($s.entry)"
-              $pidValue = [int]$s.pid
-              $p = Get-CimInstance Win32_Process -Filter "ProcessId = $pidValue" -ErrorAction SilentlyContinue
-              if ($p) {
-                $owner = $null
-                try { $owner = Invoke-CimMethod -InputObject $p -MethodName GetOwner -ErrorAction Stop } catch {}
-                $report.targetProcess = @{
-                  found = $true
-                  pid = [int]$p.ProcessId
-                  name = [string]$p.Name
-                  path = [string]$p.ExecutablePath
-                  commandLineVisible = (-not [string]::IsNullOrWhiteSpace([string]$p.CommandLine))
-                  parentPid = [int]$p.ParentProcessId
-                  sessionId = [int]$p.SessionId
-                  created = [string]$p.CreationDate
-                  ownerDomain = if ($owner -and $owner.ReturnValue -eq 0) { [string]$owner.Domain } else { $null }
-                  ownerName = if ($owner -and $owner.ReturnValue -eq 0) { [string]$owner.User } else { $null }
-                  ownerReturnValue = if ($owner) { [int]$owner.ReturnValue } else { $null }
-                }
-                Write-Host "TARGET_PROCESS=$($report.targetProcess | ConvertTo-Json -Compress -Depth 4)"
-                $parentPid = [int]$p.ParentProcessId
-                for ($level=1; $level -le 5 -and $parentPid -gt 0; $level++) {
-                  $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $parentPid" -ErrorAction SilentlyContinue
-                  if (-not $parent) { break }
-                  $row = @{
-                    level=$level
-                    pid=[int]$parent.ProcessId
-                    name=[string]$parent.Name
-                    parentPid=[int]$parent.ParentProcessId
-                    path=[string]$parent.ExecutablePath
-                    commandLine=Safe ([string]$parent.CommandLine)
-                    sessionId=[int]$parent.SessionId
-                  }
-                  $report.processParents += $row
-                  Write-Host "PROCESS_PARENT=$($row | ConvertTo-Json -Compress)"
-                  $parentPid = [int]$parent.ParentProcessId
-                }
-              } else { Write-Host "TARGET_PROCESS_NOT_FOUND PID=$pidValue" }
-            } else { Write-Host 'SUPERVISOR_STATUS_FILE=MISSING' }
+          if (Test-Path -LiteralPath $statusPath) {
+            $s = Get-Content -Raw -LiteralPath $statusPath | ConvertFrom-Json
+            $item = Get-Item -LiteralPath $statusPath
+            $age = [math]::Round(((Get-Date).ToUniversalTime() - $item.LastWriteTimeUtc).TotalSeconds)
+            Write-Host "SUPERVISOR_STATUS=$($s.state) CHANNEL=$($s.channel_state) ALIVE=$($s.process_alive) PID=$($s.pid) VERSION=$($s.version) UPDATED=$($s.updated_at) FILE_AGE_SECONDS=$age"
+          } else { Write-Host 'SUPERVISOR_STATUS_FILE=MISSING' }
 
-            # Enumerate registered tasks via Task Scheduler COM, recursively including subfolders.
-            try {
-              $scheduler = New-Object -ComObject 'Schedule.Service'
-              $scheduler.Connect()
-              $folders = New-Object 'System.Collections.Stack'
-              $folders.Push($scheduler.GetFolder('\'))
-              while ($folders.Count -gt 0) {
-                $folder = $folders.Pop()
-                try {
-                  foreach ($task in @($folder.GetTasks(1))) {
-                    if ([string]$task.Name -notmatch '(?i)ARIA|Desktop.?Commander|Windows.?Local.?Agent|Agent.?Guardian') { continue }
-                    $def = $task.Definition
-                    $actions = @()
-                    foreach ($a in $def.Actions) {
-                      $actions += @{
-                        type=[int]$a.Type
-                        path=Safe ([string]$a.Path)
-                        arguments=Safe ([string]$a.Arguments)
-                        workingDirectory=Safe ([string]$a.WorkingDirectory)
-                      }
-                    }
-                    $triggers = @()
-                    foreach ($tr in $def.Triggers) {
-                      $triggers += @{type=[int]$tr.Type;enabled=[bool]$tr.Enabled}
-                    }
-                    $row = @{
-                      name=[string]$task.Name
-                      taskPath=[string]$task.Path
-                      enabled=[bool]$task.Enabled
-                      state=[int]$task.State
-                      lastRun=[string]$task.LastRunTime
-                      lastResult=[string]$task.LastTaskResult
-                      principal=[string]$def.Principal.UserId
-                      logonType=[int]$def.Principal.LogonType
-                      runLevel=[int]$def.Principal.RunLevel
-                      actions=$actions
-                      triggers=$triggers
-                    }
-                    $report.taskApiResults += $row
-                    Write-Host "REGISTERED_TASK=$($row | ConvertTo-Json -Compress -Depth 5)"
-                  }
-                } catch { Write-Host "TASK_FOLDER_READ_ERROR=$($folder.Path):$($_.Exception.GetType().Name):$($_.Exception.Message)" }
-                try { foreach ($childFolder in @($folder.GetFolders(0))) { $folders.Push($childFolder) } }
-                catch { Write-Host "TASK_SUBFOLDER_READ_ERROR=$($folder.Path):$($_.Exception.Message)" }
-              }
-              Write-Host "TASK_COM_ENUMERATION=PASS COUNT=$($report.taskApiResults.Count)"
-            } catch { Write-Host "TASK_COM_ENUMERATION=FAIL TYPE=$($_.Exception.GetType().Name) ERROR=$($_.Exception.Message)" }
-
-            # Read underlying registered task XML files to catch tasks hidden from the service identity.
-            if (Test-Path -LiteralPath $taskRoot) {
-              $files = @(Get-ChildItem -LiteralPath $taskRoot -Force -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { -not $_.PSIsContainer -and $_.FullName -match '(?i)ARIA|Desktop.?Commander|Windows.?Local.?Agent|Agent.?Guardian' } |
-                Select-Object -First 80)
-              foreach ($file in $files) {
-                $row = @{file=$file.FullName;lastWrite=$file.LastWriteTime.ToString('o');length=[int64]$file.Length;xmlParsed=$false}
-                try {
-                  [xml]$xml = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction Stop
-                  $get = {
-                    param($x,$query)
-                    $n = $x.SelectSingleNode($query)
-                    if ($n) { return [string]$n.InnerText }
-                    return ''
-                  }
-                  $row.principal = & $get $xml "//*[local-name()='Principal']/*[local-name()='UserId']"
-                  $row.logonType = & $get $xml "//*[local-name()='Principal']/*[local-name()='LogonType']"
-                  $row.runLevel = & $get $xml "//*[local-name()='Principal']/*[local-name()='RunLevel']"
-                  $row.command = Safe (& $get $xml "//*[local-name()='Actions']/*[local-name()='Exec']/*[local-name()='Command']")
-                  $row.arguments = Safe (& $get $xml "//*[local-name()='Actions']/*[local-name()='Exec']/*[local-name()='Arguments']")
-                  $row.workingDirectory = Safe (& $get $xml "//*[local-name()='Actions']/*[local-name()='Exec']/*[local-name()='WorkingDirectory']")
-                  $row.triggers = @($xml.SelectNodes("//*[local-name()='Triggers']/*") | ForEach-Object { $_.LocalName })
-                  $row.xmlParsed = $true
-                } catch { $row.xmlError = "$($_.Exception.GetType().Name):$($_.Exception.Message)" }
-                $report.taskFileResults += $row
-                Write-Host "TASK_XML=$($row | ConvertTo-Json -Compress -Depth 4)"
-              }
-              Write-Host "TASK_FILE_ENUMERATION=COMPLETE COUNT=$($report.taskFileResults.Count)"
+          foreach ($name in @('desktop-commander-supervisor.log','desktop-commander.stdout.log','desktop-commander.stderr.log','agent-heartbeat.json','status.json')) {
+            $path = Join-Path $logs $name
+            if (-not (Test-Path -LiteralPath $path)) { Write-Host "LOG_MISSING=$name"; continue }
+            $f = Get-Item -LiteralPath $path
+            Write-Host "LOG_META=$name|BYTES=$($f.Length)|LAST_WRITE=$($f.LastWriteTime.ToString('o'))"
+            if ($name -eq 'desktop-commander-supervisor.log') {
+              $tail = @(Get-Content -LiteralPath $path -Tail 45 -ErrorAction SilentlyContinue)
+            } elseif ($name -in @('desktop-commander.stdout.log','desktop-commander.stderr.log')) {
+              $tail = @(Get-Content -LiteralPath $path -Tail 35 -ErrorAction SilentlyContinue)
+            } else {
+              $tail = @(Get-Content -LiteralPath $path -Tail 5 -ErrorAction SilentlyContinue)
             }
-
-            try {
-              foreach ($svc in @(Get-CimInstance Win32_Service -ErrorAction Stop | Where-Object { $_.Name -match '^actions\.runner\.(Robvg9-aria-worker|Robvg9-battlecruiser)' })) {
-                $row=@{name=[string]$svc.Name;state=[string]$svc.State;startMode=[string]$svc.StartMode;startName=[string]$svc.StartName;pid=[int]$svc.ProcessId}
-                $report.runnerServices += $row
-                Write-Host "RUNNER_SERVICE=$($row | ConvertTo-Json -Compress)"
-              }
-            } catch { Write-Host "RUNNER_SERVICES_ERROR=$($_.Exception.Message)" }
-
-            if (Test-Path -LiteralPath $supervisorScript) {
-              $matches = @(Select-String -LiteralPath $supervisorScript -Pattern '(?i)Start-ScheduledTask|schtasks|Get-ScheduledTask|Stop-Process|Start-Process|restart|channel_unverified|channel_degraded|threshold|timer|Start-Child|startChild' -ErrorAction SilentlyContinue | Select-Object -First 65)
-              foreach ($m in $matches) {
-                $row=@{line=[int]$m.LineNumber;text=Safe ([string]$m.Line)}
-                $report.supervisorLogic += $row
-                Write-Host "SUPERVISOR_CODE=$($row | ConvertTo-Json -Compress)"
-              }
-            } else { Write-Host "SUPERVISOR_SCRIPT_MISSING=$supervisorScript" }
-
-            Write-Host 'DIAGNOSTIC_ACTIONS_TAKEN=NONE'
-          } catch {
-            Write-Host "DIAGNOSTIC_ERROR=$($_.Exception.GetType().Name):$($_.Exception.Message)"
-          } finally {
-            $report.finishedAt=(Get-Date).ToString('o')
-            New-Item -ItemType Directory -Path $evidenceRoot -Force -ErrorAction SilentlyContinue | Out-Null
-            $evidencePath=Join-Path $evidenceRoot ('robvg-task-visibility-v2-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
-            $artifactPath=Join-Path $env:RUNNER_TEMP 'robvg-task-visibility-v2.json'
-            $json=$report | ConvertTo-Json -Depth 10
-            try {
-              Set-Content -LiteralPath $evidencePath -Value $json -Encoding UTF8
-              Set-Content -LiteralPath $artifactPath -Value $json -Encoding UTF8
-              Write-Host "EVIDENCE_PATH=$evidencePath"
-              Write-Host "EVIDENCE_SHA256=$((Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash)"
-            } catch { Write-Host "EVIDENCE_SAVE_ERROR=$($_.Exception.GetType().Name):$($_.Exception.Message)" }
-            Write-Host 'TASK_VISIBILITY_DIAGNOSTIC_V2=COMPLETE_NO_CHANGES'
+            foreach ($line in $tail) {
+              $safe = [string]$line
+              $safe = $safe -replace '(?i)Bearer\s+\S+','Bearer [REDACTED]'
+              $safe = $safe -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+','$1[REDACTED]'
+              $safe = $safe -replace 'https?://[^?\s]+\?[^\s]+','[URL_QUERY_REDACTED]'
+              if ($safe.Length -gt 300) { $safe = $safe.Substring(0,300) }
+              Write-Host "LOG_LINE=$name|$safe"
+            }
           }
 
-      - name: Upload diagnostic evidence
+          Write-Host 'SCHTASKS_QUERY_BEGIN'
+          $taskOut = @(& schtasks.exe /Query /FO CSV /V 2>&1 | ForEach-Object { [string]$_ })
+          $taskExit = $LASTEXITCODE
+          Write-Host "SCHTASKS_QUERY_EXIT=$taskExit LINE_COUNT=$($taskOut.Count)"
+          foreach ($line in $taskOut | Where-Object { $_ -match '(?i)ARIA|Desktop.?Commander|Agent.?Guardian|Windows.?Local.?Agent|ERROR|Error' } | Select-Object -First 60) {
+            Write-Host "SCHTASKS_MATCH=$line"
+          }
+          Write-Host 'SCHTASKS_QUERY_END'
+
+          if (Test-Path -LiteralPath $supervisorPath) {
+            $source = @(Get-Content -LiteralPath $supervisorPath -ErrorAction Stop)
+            foreach ($n in (80..215)) {
+              if ($n -le $source.Count) {
+                $line = [string]$source[$n-1]
+                $line = $line -replace '(?i)Bearer\s+\S+','Bearer [REDACTED]'
+                $line = $line -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+','$1[REDACTED]'
+                Write-Host ("SUPERVISOR_SOURCE_LINE={0}|{1}" -f $n,$line)
+              }
+            }
+          } else { Write-Host "SUPERVISOR_SOURCE=MISSING:$supervisorPath" }
+
+          $p = Get-CimInstance Win32_Process -Filter "ProcessId = 13628" -ErrorAction SilentlyContinue
+          if ($p) {
+            $owner = $null
+            try { $owner = Invoke-CimMethod -InputObject $p -MethodName GetOwner -ErrorAction Stop } catch {}
+            Write-Host "TARGET_PROCESS=PID:$($p.ProcessId)|NAME:$($p.Name)|SESSION:$($p.SessionId)|PARENT:$($p.ParentProcessId)|CREATED:$($p.CreationDate)|OWNER_RC:$($owner.ReturnValue)|OWNER:$($owner.Domain)\$($owner.User)"
+          } else { Write-Host 'TARGET_PROCESS_PID_13628=NOT_FOUND' }
+          Write-Host 'FOCUSED_DIAGNOSTIC=COMPLETE_NO_CHANGES'
+
+      - name: Record diagnostic summary
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: robvg-task-visibility-v2-evidence
-          path: ${{ runner.temp }}\robvg-task-visibility-v2.json
-          if-no-files-found: warn
-          retention-days: 14
+        run: |
+          Write-Host "RUNNER=$env:RUNNER_NAME COMPUTER=$env:COMPUTERNAME"
+          Write-Host 'NO_TASKS_OR_PROCESSES_CHANGED=TRUE'
