@@ -194,28 +194,42 @@ safeInit("login", () => {
         return;
       }
 
-      const { data: emailLogin, error: errorUsuario } = await client.rpc(
-        "obtener_email_login_por_nombre",
-        { p_nombre: nombreUsuario }
-      );
-
-      if (errorUsuario || !emailLogin) {
-        loginError.textContent = "Usuario o contraseña incorrectos.";
-        if (errorUsuario) console.error("[Battlecruiser] (resolver usuario)", errorUsuario);
+      let respuestaLogin;
+      try {
+        respuestaLogin = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
+          method: "POST",
+          headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ username: nombreUsuario, password }),
+          cache: "no-store",
+        });
+      } catch (errorRed) {
+        loginError.textContent = "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento.";
         return;
       }
 
-      const { error } = await client.auth.signInWithPassword({
-        email: emailLogin,
-        password,
-      });
-
-      if (error) {
-        const msg = (error.message || "").toLowerCase();
-        loginError.textContent = (!navigator.onLine || msg.includes("failed to fetch") || msg.includes("timeout"))
-          ? "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento."
+      const resultadoLogin = await respuestaLogin.json().catch(() => null);
+      if (respuestaLogin.status === 401) {
+        loginError.textContent = "Usuario o contraseña incorrectos.";
+        return;
+      }
+      if (respuestaLogin.status === 429) {
+        loginError.textContent = "Demasiados intentos. Espera unos minutos y vuelve a probar.";
+        return;
+      }
+      if (!respuestaLogin.ok || !resultadoLogin?.session?.access_token || !resultadoLogin?.session?.refresh_token) {
+        loginError.textContent = (!navigator.onLine || respuestaLogin.status >= 500)
+          ? "El servicio de acceso no está disponible temporalmente. Intenta de nuevo en un momento."
           : "Usuario o contraseña incorrectos.";
-        console.error("[Battlecruiser] (login)", error);
+        return;
+      }
+
+      const { error: errorSesion } = await client.auth.setSession({
+        access_token: resultadoLogin.session.access_token,
+        refresh_token: resultadoLogin.session.refresh_token,
+      });
+      if (errorSesion) {
+        loginError.textContent = "No se pudo establecer la sesión. Intenta nuevamente.";
+        return;
       }
     } catch (e) {
       loginError.textContent = "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento.";
