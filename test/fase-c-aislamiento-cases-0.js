@@ -179,6 +179,9 @@ test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuari
   marcarOnline(window);
   await esperar(80);
 
+  // Keep queued operations pending: this case checks the badge's user scoping,
+  // not the online auto-sync path.
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   setUsuario(window, "usuario-A");
   await window.guardarOperacionPendiente(
     window.crearOperacionPendiente("venta", {}, "key-A")
@@ -196,7 +199,8 @@ test("C3-7: actualizarContadorColaPendiente NO cuenta operaciones de otro usuari
   await window.actualizarContadorColaPendiente();
   await esperar(30);
   const badge = document.getElementById("cola-pendientes-badge");
-  assert.ok(badge.textContent.includes("2"), "Badge de A debe mostrar 2 pendientes (no 3)");
+  assert.ok(badge.textContent.includes("2 pendientes"), "Badge de A debe mostrar 2 pendientes (no 3)");
+  assert.ok(!badge.textContent.includes("3 pendientes"), "Badge de A NO debe incluir la operación de B");
 });
 
 // ============================================================
