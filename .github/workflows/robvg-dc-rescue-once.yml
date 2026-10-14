@@ -1,4 +1,4 @@
-name: RobVG Desktop Commander Focused Diagnostics (read-only)
+name: RobVG Exact Scheduled Task Recovery Preflight (read-only)
 
 on:
   push:
@@ -27,76 +27,75 @@ jobs:
           $cfg = Get-Content -Raw -LiteralPath $cfgPath | ConvertFrom-Json
           $expected = 'windows-fe722cc6681e4f9c9cc35f5ebbb0a089'
           if ([string]$cfg.device_id -ne $expected) { throw "DEVICE_ID_MISMATCH=$($cfg.device_id)" }
-          Write-Host "ROBVG_GUARD=PASS COMPUTER=$env:COMPUTERNAME DEVICE_ID=$($cfg.device_id) RUNNER=$env:RUNNER_NAME"
+          Write-Host "ROBVG_IDENTITY_GUARD=PASS COMPUTER=$env:COMPUTERNAME DEVICE_ID=$($cfg.device_id) RUNNER=$env:RUNNER_NAME"
 
-      - name: Inspect status, logs, task query and watchdog logic (no changes)
+      - name: Query exact ARIA tasks through Task Scheduler CLI and registry (no changes)
         run: |
           $ErrorActionPreference = 'Continue'
-          $root = 'D:\ARIA-Windows-Agent'
-          $logs = Join-Path $root 'Logs'
-          $statusPath = Join-Path $logs 'desktop-commander-supervisor.json'
-          $supervisorPath = Join-Path $root 'Runtime\windows\desktop-commander-supervisor.ps1'
-
-          if (Test-Path -LiteralPath $statusPath) {
-            $s = Get-Content -Raw -LiteralPath $statusPath | ConvertFrom-Json
-            $item = Get-Item -LiteralPath $statusPath
-            $age = [math]::Round(((Get-Date).ToUniversalTime() - $item.LastWriteTimeUtc).TotalSeconds)
-            Write-Host "SUPERVISOR_STATUS=$($s.state) CHANNEL=$($s.channel_state) ALIVE=$($s.process_alive) PID=$($s.pid) VERSION=$($s.version) UPDATED=$($s.updated_at) FILE_AGE_SECONDS=$age"
-          } else { Write-Host 'SUPERVISOR_STATUS_FILE=MISSING' }
-
-          foreach ($name in @('desktop-commander-supervisor.log','desktop-commander.stdout.log','desktop-commander.stderr.log','agent-heartbeat.json','status.json')) {
-            $path = Join-Path $logs $name
-            if (-not (Test-Path -LiteralPath $path)) { Write-Host "LOG_MISSING=$name"; continue }
-            $f = Get-Item -LiteralPath $path
-            Write-Host "LOG_META=$name|BYTES=$($f.Length)|LAST_WRITE=$($f.LastWriteTime.ToString('o'))"
-            if ($name -eq 'desktop-commander-supervisor.log') {
-              $tail = @(Get-Content -LiteralPath $path -Tail 45 -ErrorAction SilentlyContinue)
-            } elseif ($name -in @('desktop-commander.stdout.log','desktop-commander.stderr.log')) {
-              $tail = @(Get-Content -LiteralPath $path -Tail 35 -ErrorAction SilentlyContinue)
-            } else {
-              $tail = @(Get-Content -LiteralPath $path -Tail 5 -ErrorAction SilentlyContinue)
-            }
-            foreach ($line in $tail) {
+          $names = @(
+            'ARIA-Desktop-Commander-Remote',
+            'ARIA-Windows-Headless-Startup',
+            'ARIA-Windows-Agent-Guardian',
+            'ARIA-Windows-Local-Agent'
+          )
+          foreach ($name in $names) {
+            Write-Host "EXACT_TASK_QUERY_BEGIN=$name"
+            $out = @(& schtasks.exe /Query /TN $name /FO LIST /V 2>&1 | ForEach-Object { [string]$_ })
+            $rc = $LASTEXITCODE
+            Write-Host "EXACT_TASK_QUERY_EXIT=$name RC=$rc LINES=$($out.Count)"
+            foreach ($line in $out) {
               $safe = [string]$line
-              $safe = $safe -replace '(?i)Bearer\s+\S+','Bearer [REDACTED]'
-              $safe = $safe -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+','$1[REDACTED]'
-              $safe = $safe -replace 'https?://[^?\s]+\?[^\s]+','[URL_QUERY_REDACTED]'
+              $safe = $safe -replace '(?i)Bearer\s+\S+', 'Bearer [REDACTED]'
+              $safe = $safe -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+', '$1[REDACTED]'
               if ($safe.Length -gt 300) { $safe = $safe.Substring(0,300) }
-              Write-Host "LOG_LINE=$name|$safe"
+              Write-Host "EXACT_TASK_QUERY_LINE=$name|$safe"
             }
+            Write-Host "EXACT_TASK_QUERY_END=$name"
           }
 
-          Write-Host 'SCHTASKS_QUERY_BEGIN'
-          $taskOut = @(& schtasks.exe /Query /FO CSV /V 2>&1 | ForEach-Object { [string]$_ })
-          $taskExit = $LASTEXITCODE
-          Write-Host "SCHTASKS_QUERY_EXIT=$taskExit LINE_COUNT=$($taskOut.Count)"
-          foreach ($line in $taskOut | Where-Object { $_ -match '(?i)ARIA|Desktop.?Commander|Agent.?Guardian|Windows.?Local.?Agent|ERROR|Error' } | Select-Object -First 60) {
-            Write-Host "SCHTASKS_MATCH=$line"
-          }
-          Write-Host 'SCHTASKS_QUERY_END'
-
-          if (Test-Path -LiteralPath $supervisorPath) {
-            $source = @(Get-Content -LiteralPath $supervisorPath -ErrorAction Stop)
-            foreach ($n in (80..215)) {
-              if ($n -le $source.Count) {
-                $line = [string]$source[$n-1]
-                $line = $line -replace '(?i)Bearer\s+\S+','Bearer [REDACTED]'
-                $line = $line -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+','$1[REDACTED]'
-                Write-Host ("SUPERVISOR_SOURCE_LINE={0}|{1}" -f $n,$line)
+          try {
+            $tasks = @(
+              '\ARIA-Desktop-Commander-Remote',
+              '\ARIA-Windows-Headless-Startup',
+              '\ARIA-Windows-Agent-Guardian',
+              '\ARIA-Windows-Local-Agent'
+            )
+            $service = New-Object -ComObject 'Schedule.Service'
+            $service.Connect()
+            $root = $service.GetFolder('\')
+            foreach ($taskPath in $tasks) {
+              try {
+                $task = $root.GetTask($taskPath)
+                $def = $task.Definition
+                $actions = @()
+                foreach ($a in $def.Actions) {
+                  $actions += @{type=[int]$a.Type;path=[string]$a.Path;arguments=[string]$a.Arguments;workingDirectory=[string]$a.WorkingDirectory}
+                }
+                $triggers = @()
+                foreach ($tr in $def.Triggers) { $triggers += @{type=[int]$tr.Type;enabled=[bool]$tr.Enabled} }
+                Write-Host "COM_EXACT_TASK=$($(@{path=$task.Path;enabled=[bool]$task.Enabled;state=[int]$task.State;lastRun=[string]$task.LastRunTime;lastResult=[string]$task.LastTaskResult;principal=[string]$def.Principal.UserId;logonType=[int]$def.Principal.LogonType;runLevel=[int]$def.Principal.RunLevel;actions=$actions;triggers=$triggers} | ConvertTo-Json -Compress -Depth 5))"
+              } catch {
+                Write-Host "COM_EXACT_TASK_ERROR=$taskPath|$($_.Exception.GetType().Name)|$($_.Exception.Message)"
               }
             }
-          } else { Write-Host "SUPERVISOR_SOURCE=MISSING:$supervisorPath" }
+          } catch { Write-Host "COM_EXACT_TASK_API_ERROR=$($_.Exception.GetType().Name):$($_.Exception.Message)" }
 
-          $p = Get-CimInstance Win32_Process -Filter "ProcessId = 13628" -ErrorAction SilentlyContinue
-          if ($p) {
-            $owner = $null
-            try { $owner = Invoke-CimMethod -InputObject $p -MethodName GetOwner -ErrorAction Stop } catch {}
-            Write-Host "TARGET_PROCESS=PID:$($p.ProcessId)|NAME:$($p.Name)|SESSION:$($p.SessionId)|PARENT:$($p.ParentProcessId)|CREATED:$($p.CreationDate)|OWNER_RC:$($owner.ReturnValue)|OWNER:$($owner.Domain)\$($owner.User)"
-          } else { Write-Host 'TARGET_PROCESS_PID_13628=NOT_FOUND' }
-          Write-Host 'FOCUSED_DIAGNOSTIC=COMPLETE_NO_CHANGES'
-
-      - name: Record diagnostic summary
-        if: always()
-        run: |
-          Write-Host "RUNNER=$env:RUNNER_NAME COMPUTER=$env:COMPUTERNAME"
-          Write-Host 'NO_TASKS_OR_PROCESSES_CHANGED=TRUE'
+          $statusPath = 'D:\ARIA-Windows-Agent\Logs\desktop-commander-supervisor.json'
+          if (Test-Path -LiteralPath $statusPath) {
+            $s = Get-Content -Raw -LiteralPath $statusPath | ConvertFrom-Json
+            Write-Host "SUPERVISOR_STATUS=$($s.state)|CHANNEL=$($s.channel_state)|PID=$($s.pid)|VERSION=$($s.version)|UPDATED=$($s.updated_at)|ENTRY=$($s.entry)"
+          }
+          $supervisorLog = 'D:\ARIA-Windows-Agent\Logs\desktop-commander-supervisor.log'
+          if (Test-Path -LiteralPath $supervisorLog) {
+            Get-Content -LiteralPath $supervisorLog -Tail 500 -ErrorAction SilentlyContinue |
+              Where-Object { [string]$_ -match '(?i)CHANNEL_RESTART|CHANNEL_BACKEND_DEGRADED|CHANNEL_DEGRADED_TIMER|CHANNEL_RESTART_FAILED|REMOTE_CHANNEL_STATE|SUPERVISOR_START|START_REQUEST|STARTED pid|CHILD_CONFIRMED' } |
+              Select-Object -Last 30 |
+              ForEach-Object {
+                $safe = [string]$_
+                $safe = $safe -replace '(?i)Bearer\s+\S+','Bearer [REDACTED]'
+                $safe = $safe -replace '(?i)((?:token|secret|password|authorization|api[_-]?key)\s*[:=]\s*)[^\s,;]+','$1[REDACTED]'
+                if ($safe.Length -gt 300) { $safe = $safe.Substring(0,300) }
+                Write-Host "SUPERVISOR_EVENT=$safe"
+              }
+          }
+          Write-Host 'TASK_PREFLIGHT=COMPLETE_NO_CHANGES'
