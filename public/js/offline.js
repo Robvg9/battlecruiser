@@ -419,13 +419,28 @@ async function eliminarOperacionPendiente(id) {
   }
 }
 
+let _contadorColaRequestSeq = 0;
+
+// El contador es una proyección UI, no una fuente de verdad. Varias escrituras
+// fire-and-forget pueden disparar lecturas en paralelo; una respuesta antigua
+// no puede sobrescribir el badge de otra sesión ni un recuento más reciente.
 async function actualizarContadorColaPendiente() {
   const el = document.getElementById("cola-pendientes-badge");
   if (!el) return;
   const uid = usuarioIdParaCola();
-  if (!uid) { el.classList.add("hidden"); el.textContent = ""; return; }
+  const requestSeq = ++_contadorColaRequestSeq;
+  if (!uid) {
+    el.classList.add("hidden");
+    el.textContent = "";
+    el.classList.remove("atencion");
+    return;
+  }
   try {
     const db = await idbAbrir();
+    // Otro login/logout o una actualización más reciente puede haber ocurrido
+    // mientras IndexedDB abría la conexión.
+    if (usuarioIdParaCola() !== uid || requestSeq !== _contadorColaRequestSeq) return;
+
     const { pendientes, atencion } = await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_OPS_STORE, "readonly");
       // No hay índice compuesto [usuario_id, estado]: se trae por usuario_id
@@ -439,6 +454,11 @@ async function actualizarContadorColaPendiente() {
       };
       tx.onerror = () => reject(tx.error);
     });
+
+    // Do not let an old read finish late and repaint another user's badge or
+    // overwrite a newer count for the same user.
+    if (usuarioIdParaCola() !== uid || requestSeq !== _contadorColaRequestSeq) return;
+
     if (pendientes === 0 && atencion === 0) {
       el.classList.add("hidden");
       el.classList.remove("atencion");
