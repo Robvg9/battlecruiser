@@ -313,7 +313,7 @@ safeInit("password-recovery-request", () => {
     recoveryMsg.className = "msg";
     recoveryMsg.textContent = "";
 
-    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       recoveryMsg.className = "msg error";
       recoveryMsg.textContent = "Escribe un correo válido en el campo superior para enviarte el enlace.";
       usuarioInput.focus();
