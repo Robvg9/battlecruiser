@@ -1,0 +1,4 @@
+project_id = "papxnkkjtkxsitcsvcme"
+
+[functions.bc-username-login]
+verify_jwt = false
