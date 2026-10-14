@@ -301,6 +301,49 @@ safeInit("login", () => {
   });
 });
 
+// Permitir solicitar otro enlace de recuperación directamente desde el login.
+safeInit("password-recovery-request", () => {
+  const recoveryBtn = document.getElementById("password-recovery-request-btn");
+  const recoveryMsg = document.getElementById("password-recovery-msg");
+  const usuarioInput = document.getElementById("email");
+  if (!recoveryBtn || !recoveryMsg || !usuarioInput) return;
+
+  recoveryBtn.addEventListener("click", async () => {
+    const email = usuarioInput.value.trim();
+    recoveryMsg.className = "msg";
+    recoveryMsg.textContent = "";
+
+    if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      recoveryMsg.className = "msg error";
+      recoveryMsg.textContent = "Escribe un correo válido en el campo superior para enviarte el enlace.";
+      usuarioInput.focus();
+      return;
+    }
+
+    recoveryBtn.disabled = true;
+    recoveryBtn.textContent = "Enviando correo…";
+    try {
+      const { error } = await client.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/?bc_recovery=1"
+      });
+      if (error) {
+        recoveryMsg.className = "msg error";
+        recoveryMsg.textContent = "No se pudo solicitar el correo: " + (error.message || "inténtalo más tarde.");
+        return;
+      }
+      recoveryMsg.className = "msg";
+      recoveryMsg.textContent = "Solicitud enviada. Revisa la bandeja de entrada y spam; usa el correo más reciente.";
+    } catch (error) {
+      recoveryMsg.className = "msg error";
+      recoveryMsg.textContent = "No se pudo conectar para solicitar el correo. Comprueba la conexión e inténtalo otra vez.";
+      console.error("[BattleCruiser] password recovery request failed", error);
+    } finally {
+      recoveryBtn.disabled = false;
+      recoveryBtn.textContent = "Enviar correo de recuperación";
+    }
+  });
+});
+
 safeInit("logout", () => {
   logoutBtn.addEventListener("click", async () => {
     if (typeof resetearNavegacionParaNuevaSesion === "function") resetearNavegacionParaNuevaSesion();
