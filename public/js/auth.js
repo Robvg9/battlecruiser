@@ -21,6 +21,18 @@ let _bcSesionActivaId = null;
 /** Sesión descubierta antes de que usuarios-permisos.js defina cargarContextoUsuario. */
 let _bcPendingSession = null;
 let _bcAuthBootResolved = false;
+// Recovery links must open the password form directly; do not make the user hunt for Ajustes.
+// Keep a query marker as fallback because Supabase may consume/remove the recovery hash during boot.
+let _bcRecoveryMode = (function () {
+  try {
+    const query = new URLSearchParams(window.location.search || "");
+    const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+    return query.get("bc_recovery") === "1" || hash.get("type") === "recovery";
+  } catch (_) {
+    return false;
+  }
+})();
+let _bcRecoveryUiScheduled = false;
 
 function bcIntentarCargarContexto() {
   if (typeof cargarContextoUsuario !== "function") return false;
@@ -138,10 +150,50 @@ function bcResolverBootConSesion(session) {
   bcUIReadyThen(mostrar);
 }
 
+// Recovery links land here with a valid Supabase recovery session.
+// Display the existing secure updateUser form immediately, without requiring Ajustes.
+function bcMostrarFormularioRecuperacion() {
+  if (_bcRecoveryUiScheduled) return;
+  _bcRecoveryUiScheduled = true;
+  let intentos = 0;
+
+  const intentar = () => {
+    const shell = document.getElementById("app-shell");
+    const panel = document.getElementById("pass-panel");
+    if (!shell || !panel) {
+      if (intentos++ < 120) window.setTimeout(intentar, 250);
+      return;
+    }
+    if (!shell.classList.contains("visible")) {
+      if (intentos++ < 120) window.setTimeout(intentar, 250);
+      return;
+    }
+
+    panel.classList.remove("hidden");
+    const heading = panel.querySelector("h3");
+    if (heading) heading.textContent = "Establecer nueva contraseña";
+    const message = document.getElementById("msg-pass");
+    if (message) {
+      message.className = "msg";
+      message.textContent = "Enlace de recuperación reconocido. Escribe la nueva contraseña dos veces y pulsa Guardar nueva contraseña.";
+    }
+    const form = document.getElementById("form-pass");
+    const submit = form && form.querySelector("button[type='submit']");
+    if (submit) submit.textContent = "Guardar nueva contraseña";
+    const input = document.getElementById("pass-new");
+    if (input) input.focus({ preventScroll: true });
+    panel.scrollIntoView({ block: "start", behavior: "auto" });
+  };
+
+  intentar();
+}
+
 client.auth.getSession().then(function (res) {
   var data = res && res.data;
-  if (data && data.session) bcResolverBootConSesion(data.session);
-  else if (!_bcAuthBootResolved) bcResolverBootSinSesion();
+  if (data && data.session) {
+    bcResolverBootConSesion(data.session);
+    if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
+  } else if (!_bcAuthBootResolved) bcResolverBootSinSesion();
 }).catch(function () {
   if (!_bcAuthBootResolved) bcResolverBootSinSesion();
 });
@@ -155,6 +207,13 @@ setTimeout(function () {
 }, 8000);
 
 client.auth.onAuthStateChange(function (event, session) {
+  // PASSWORD_RECOVERY is the authoritative signal; open the reset form immediately.
+  if (event === "PASSWORD_RECOVERY" && session) {
+    _bcRecoveryMode = true;
+    showApp(session);
+    bcMostrarFormularioRecuperacion();
+    return;
+  }
   // TOKEN_REFRESHED / INITIAL_SESSION con misma sesión: showApp es idempotente
   if (session) {
     if (event === "SIGNED_OUT") {
@@ -438,6 +497,14 @@ safeInit("cambiar-contraseña", () => {
     }
     console.log("[Battlecruiser] Contraseña actualizada para:", data.user && data.user.email);
     setMsg("msg-pass", "Contraseña actualizada. Ya podés usarla la próxima vez que entres.", true);
+    if (_bcRecoveryMode) {
+      _bcRecoveryMode = false;
+      const heading = passPanel.querySelector("h3");
+      if (heading) heading.textContent = "Contraseña actualizada";
+      const resetBtn = formPass.querySelector("button[type='submit']");
+      if (resetBtn) resetBtn.textContent = "Guardar contraseña";
+      try { window.history.replaceState({}, document.title, window.location.pathname); } catch (_) {}
+    }
     formPass.reset();
   });
 });
