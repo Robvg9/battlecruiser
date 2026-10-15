@@ -14,6 +14,18 @@
     }
   }
 
+  function removeClassIfPresent(el, className) {
+    if (el.classList.contains(className)) el.classList.remove(className);
+  }
+
+  function removeAttributeIfPresent(el, attribute) {
+    if (el.hasAttribute(attribute)) el.removeAttribute(attribute);
+  }
+
+  function setTabIndexIfNeeded(el, value) {
+    if (el.tabIndex !== value) el.tabIndex = value;
+  }
+
   function asegurarConfigButton(){
     var tabs = document.getElementById('tabs');
     if (!tabs) return;
@@ -27,12 +39,13 @@
       tabs.appendChild(btn);
     }
     if (btn) {
-      btn.classList.remove('hidden','tab-sin-permiso');
+      removeClassIfPresent(btn, 'hidden');
+      removeClassIfPresent(btn, 'tab-sin-permiso');
       setImportantStyle(btn, 'display', 'flex');
       setImportantStyle(btn, 'visibility', 'visible');
       setImportantStyle(btn, 'opacity', '1');
-      btn.removeAttribute('aria-hidden');
-      btn.tabIndex = 0;
+      removeAttributeIfPresent(btn, 'aria-hidden');
+      setTabIndexIfNeeded(btn, 0);
     }
   }
 
@@ -42,9 +55,10 @@
     tabs.querySelectorAll('.tab-btn[data-tab]').forEach(function(btn){
       var tab = btn.dataset.tab;
       if (KEEP_HIDDEN[tab]) return;
-      btn.classList.remove('hidden','tab-sin-permiso');
-      btn.removeAttribute('aria-hidden');
-      btn.tabIndex = 0;
+      removeClassIfPresent(btn, 'hidden');
+      removeClassIfPresent(btn, 'tab-sin-permiso');
+      removeAttributeIfPresent(btn, 'aria-hidden');
+      setTabIndexIfNeeded(btn, 0);
       setImportantStyle(btn, 'display', 'flex');
       setImportantStyle(btn, 'visibility', 'visible');
       setImportantStyle(btn, 'opacity', '1');
