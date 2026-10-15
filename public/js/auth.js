@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/auth.js ====
 // Autenticación, sesión, actualizar app, ajustes de cuenta, SW, atajos.
-// v9.2.80 — M26.4: boot sin flash de login; sesión pendiente hasta que exista cargarContextoUsuario.
+// v9.4.88 — defer auth UI continuation until app.js initializes its readiness promise.
 
 const loginForm = document.getElementById("login-form");
 const loginBtn = document.getElementById("login-btn");
@@ -302,7 +302,9 @@ window.__bcOnContextoLoaderReady = function () {
 function bcUIReadyThen(fn) {
   const ready = window.__BC_UI_READY__;
   if (!ready || typeof ready.then !== "function") {
-    fn();
+    // auth.js is parsed before app.js creates __BC_UI_READY__; run after the
+    // parser gets through app.js instead of synchronously re-entering showApp.
+    window.setTimeout(fn, 0);
     return;
   }
   Promise.race([
