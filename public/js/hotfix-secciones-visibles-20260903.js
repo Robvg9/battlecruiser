@@ -52,7 +52,7 @@
         var hasIcon = btn.querySelector('.bc-nav-icon');
         if (hasIcon) {
           var span=document.createElement('span'); span.className='bc-nav-label'; span.textContent=LABELS[tab]; btn.appendChild(span);
-        } else if (!btn.textContent.trim() || tab==='config') {
+        } else if ((!btn.textContent.trim() || tab==='config') && btn.textContent !== LABELS[tab]) {
           btn.textContent=LABELS[tab];
         }
       }
