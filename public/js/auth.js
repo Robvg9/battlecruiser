@@ -20,6 +20,8 @@ let _permisosCargaFallidaRed = false;
 let _bcSesionActivaId = null;
 /** Sesión descubierta antes de que usuarios-permisos.js defina cargarContextoUsuario. */
 let _bcPendingSession = null;
+let _bcContextLoadScheduled = false;
+let _bcContextSessionHint = null;
 let _bcAuthBootResolved = false;
 // No descartar una sesión válida mientras termina de prepararse la interfaz.
 let _bcAuthSessionDiscovered = false;
@@ -264,19 +266,36 @@ let _bcRecoveryMode = (function () {
 })();
 let _bcRecoveryUiScheduled = false;
 
-function bcIntentarCargarContexto() {
+function bcIntentarCargarContexto(session) {
   if (typeof cargarContextoUsuario !== "function") return false;
   if (_cargandoUsuario) return true;
   if (_usuarioActual && _permisosCargaExitosa) return true;
-  cargarContextoUsuario();
+  if (session && session.user) _bcContextSessionHint = session;
+  if (_bcContextLoadScheduled) return true;
+  _bcContextLoadScheduled = true;
+  // Supabase forbids re-entering its async Auth client from inside onAuthStateChange.
+  // Defer context loading until that callback has fully returned.
+  window.setTimeout(function () {
+    _bcContextLoadScheduled = false;
+    var readySession = _bcContextSessionHint;
+    _bcContextSessionHint = null;
+    if (readySession && _bcSesionActivaId &&
+        String(readySession.user.id) !== String(_bcSesionActivaId)) return;
+    if (typeof cargarContextoUsuario !== "function") {
+      if (readySession) _bcPendingSession = readySession;
+      return;
+    }
+    cargarContextoUsuario(readySession || null);
+  }, 0);
   return true;
 }
 
 /** Llamado al final de usuarios-permisos.js cuando la función ya existe. */
 window.__bcOnContextoLoaderReady = function () {
   if (_bcPendingSession || (_bcSesionActivaId && appShell && appShell.classList.contains("visible"))) {
+    var pending = _bcPendingSession;
     _bcPendingSession = null;
-    bcIntentarCargarContexto();
+    bcIntentarCargarContexto(pending || null);
   }
 };
 
@@ -313,7 +332,7 @@ function showApp(session) {
   // Idempotencia: misma sesión y shell ya visible → solo asegurar contexto
   if (_bcSesionActivaId === session.user.id && appShell && appShell.classList.contains("visible")) {
     if (!_usuarioActual || !_permisosCargaExitosa) {
-      if (!bcIntentarCargarContexto()) {
+      if (!bcIntentarCargarContexto(session)) {
         _bcPendingSession = session;
       }
     }
@@ -334,7 +353,7 @@ function showApp(session) {
   if (userEmailEl) userEmailEl.textContent = "Cargando usuario…";
   _usuarioActualId = session.user.id;
 
-  if (!bcIntentarCargarContexto()) {
+  if (!bcIntentarCargarContexto(session)) {
     // usuarios-permisos.js aún no cargó (orden de scripts / red lenta tras Actualizar app)
     _bcPendingSession = session;
   }
