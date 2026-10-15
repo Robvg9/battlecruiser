@@ -135,7 +135,7 @@ test("safe auth stack exposes only function names, script basenames and line num
   const result = safeStack({
     stack: [
       "RangeError: DO_NOT_EXPOSE_THIS_MESSAGE",
-      "    at getSession (https://battlecruiser.robvg9.workers.dev/js/auth.js?v=9.4.87:321:11)",
+      "    at getSession (https://battlecruiser.robvg9.workers.dev/js/auth.js?v=9.4.88:321:11)",
       "    at Object.process (https://cdn.example/supabase.js?secret=DO_NOT_EXPOSE_THIS:98:2)"
     ].join("\n")
   });
@@ -163,4 +163,50 @@ test("context loader reuses the session supplied by auth before calling getSessi
   assert.ok(source.indexOf("authUser = sessionInicial.user") < source.indexOf("client.auth.getSession()"));
   assert.match(source, /client\.rpc\("perfil_usuario_actual", \{\}\)/);
   assert.match(source, /client\.rpc\("permisos_usuario_actual", \{\}\)/);
+});
+
+
+test("UI-ready bootstrap waits asynchronously when auth loads before app.js", () => {
+  const match = auth.match(/(var _bcAuthUIReadyFallback = false;\nfunction bcUIReadyThen\(fn\) \{[\s\S]*?\n\})\n\s*function showApp/);
+  assert.ok(match, "UI-ready gate must be extractable");
+  const source = match[1];
+  const queued = [];
+  const runtime = {
+    window: {
+      __BC_UI_READY_RESOLVED__: false,
+      setTimeout(fn) { queued.push(fn); return queued.length; }
+    },
+    Date: { now: () => 0 },
+    console: { warn() {} },
+    callbackCount: 0
+  };
+  vm.runInNewContext(source + "\nbcUIReadyThen(function () { callbackCount++; });", runtime);
+  assert.equal(runtime.callbackCount, 0, "callback must not run synchronously while the UI flag is absent/false");
+  assert.equal(queued.length, 1, "the missing UI-ready flag must schedule an asynchronous check");
+  runtime.window.__BC_UI_READY_RESOLVED__ = true;
+  queued.shift()();
+  assert.equal(runtime.callbackCount, 1, "callback runs once after UI-ready resolves");
+});
+
+test("UI-ready gate has a real timeout escape from the bootstrap loop", () => {
+  const match = auth.match(/(var _bcAuthUIReadyFallback = false;\nfunction bcUIReadyThen\(fn\) \{[\s\S]*?\n\})\n\s*function showApp/);
+  assert.ok(match, "UI-ready gate must be extractable");
+  const queued = [];
+  const runtime = {
+    clock: 0,
+    window: {
+      __BC_UI_READY_RESOLVED__: false,
+      setTimeout(fn) { queued.push(fn); return queued.length; }
+    },
+    Date: { now: () => runtime.clock },
+    console: { warn() {} },
+    callbackCount: 0
+  };
+  vm.runInNewContext(match[1] + "\nbcUIReadyThen(function () { callbackCount++; });", runtime);
+  assert.equal(runtime.callbackCount, 0);
+  runtime.clock = 12000;
+  queued.shift()();
+  assert.equal(runtime._bcAuthUIReadyFallback, true);
+  assert.equal(runtime.callbackCount, 1);
+  assert.ok(auth.includes("if (!window.__BC_UI_READY_RESOLVED__ && !_bcAuthUIReadyFallback)"));
 });
