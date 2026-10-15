@@ -31,3 +31,15 @@ test("a discovered session is not replaced by the auth boot fail-safe while UI m
   assert.ok(auth.includes("if (!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession)"));
   assert.ok(auth.includes("no se fuerza login porque ya se detectó una sesión"));
 });
+
+test("session restoration reports only a safe diagnostic code and storage-key presence", () => {
+  assert.ok(auth.includes('function bcAuthStoragePresence()'));
+  assert.ok(auth.includes('sb-papxnkkjtkxsitcsvcme-auth-token'));
+  assert.ok(auth.includes('bc-auth-diagnostic'));
+  assert.ok(auth.includes('GETSESSION_EMPTY'));
+  assert.ok(auth.includes('GETSESSION_ERROR'));
+  assert.ok(auth.includes('BOOT_TIMEOUT'));
+  assert.ok(auth.includes('AUTH_SIGNED_OUT_EVENT'));
+  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage }'));
+  assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*(?:access_token|refresh_token)/);
+});
