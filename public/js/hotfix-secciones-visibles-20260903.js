@@ -79,7 +79,7 @@
     var s=document.createElement('style'); s.id='bc-secciones-visibles-css';
     s.textContent =
       '#tabs .tab-btn[data-tab="config"]{display:flex!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;height:auto!important;max-height:none!important;padding:revert!important;margin:revert!important;border:revert!important;}'+
-      '#tab-config{display:block!important;visibility:visible!important;}';
+      '#tab-config{visibility:visible!important;}';
     document.head.appendChild(s);
   }
 
