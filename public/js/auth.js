@@ -23,6 +23,33 @@ let _bcPendingSession = null;
 let _bcAuthBootResolved = false;
 // No descartar una sesión válida mientras termina de prepararse la interfaz.
 let _bcAuthSessionDiscovered = false;
+
+// Diagnóstico de restauración sin leer, guardar ni imprimir tokens.
+function bcAuthStoragePresence() {
+  try {
+    return window.localStorage.getItem("sb-papxnkkjtkxsitcsvcme-auth-token") === null
+      ? "MISSING"
+      : "PRESENT";
+  } catch (_) {
+    return "BLOCKED";
+  }
+}
+function bcAuthDiagnostic(code, visible) {
+  var storage = bcAuthStoragePresence();
+  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage };
+  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage });
+  if (!visible || !loginForm) return;
+  var el = document.getElementById("bc-auth-diagnostic");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "bc-auth-diagnostic";
+    el.className = "footnote";
+    el.setAttribute("role", "status");
+    loginForm.appendChild(el);
+  }
+  el.textContent = "Diagnóstico de sesión: " + code + " · almacenamiento local: " + storage
+    + ". Comparte solo este código; no compartas contraseñas ni datos de sesión.";
+}
 // Recovery links must open the password form directly; do not make the user hunt for Ajustes.
 // Keep a query marker as fallback because Supabase may consume/remove the recovery hash during boot.
 let _bcRecoveryMode = (function () {
@@ -195,17 +222,22 @@ function bcMostrarFormularioRecuperacion() {
 client.auth.getSession().then(function (res) {
   var data = res && res.data;
   if (data && data.session) {
+    bcAuthDiagnostic("SESSION_FOUND", false);
     bcResolverBootConSesion(data.session);
     if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
-  } else if (!_bcAuthBootResolved) bcResolverBootSinSesion();
+  } else if (!_bcAuthBootResolved) {
+    bcAuthDiagnostic(res && res.error ? "GETSESSION_ERROR" : "GETSESSION_EMPTY", true);
+    bcResolverBootSinSesion();
+  }
 }).catch(function () {
+  bcAuthDiagnostic("GETSESSION_ERROR", true);
   if (!_bcAuthBootResolved) bcResolverBootSinSesion();
 });
 
 // Red de seguridad: si getSession cuelga, no dejar la UI en limbo
 setTimeout(function () {
   if (!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession) {
-    console.warn("[BattleCruiser] getSession lento y sin sesión detectada — mostrando login (fail-safe)");
+    bcAuthDiagnostic("BOOT_TIMEOUT", true);
     bcResolverBootSinSesion();
   } else if (!_bcAuthBootResolved) {
     console.warn("[BattleCruiser] arranque de sesión aún pendiente; no se fuerza login porque ya se detectó una sesión");
@@ -223,11 +255,16 @@ client.auth.onAuthStateChange(function (event, session) {
   // TOKEN_REFRESHED / INITIAL_SESSION con misma sesión: showApp es idempotente
   if (session) {
     if (event === "SIGNED_OUT") {
+      bcAuthDiagnostic("AUTH_SIGNED_OUT_EVENT", true);
       showLogin();
       return;
     }
     showApp(session);
-  } else if (event === "SIGNED_OUT" || _bcAuthBootResolved) {
+  } else if (event === "SIGNED_OUT") {
+    bcAuthDiagnostic("AUTH_SIGNED_OUT_EVENT", true);
+    showLogin();
+  } else if (_bcAuthBootResolved && event !== "INITIAL_SESSION") {
+    bcAuthDiagnostic("AUTH_EVENT_" + String(event || "UNKNOWN") + "_NO_SESSION", true);
     showLogin();
   }
 });
