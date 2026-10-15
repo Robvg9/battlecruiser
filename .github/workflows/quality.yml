@@ -66,8 +66,22 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
-      - name: Real Chromium E2E — LIVE offline recovery
-        shell: cmd
+
+
+  live-offline-e2e:
+    name: LIVE offline recovery — Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+
+      - name: Run real-browser LIVE offline E2E
         run: node test/live-offline-e2e.js
 
       - name: Persist LIVE offline E2E evidence
