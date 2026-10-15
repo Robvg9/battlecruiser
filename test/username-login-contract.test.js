@@ -42,6 +42,10 @@ test("session restoration reports only a safe diagnostic code and storage-key pr
   assert.ok(auth.includes('BOOT_TIMEOUT'));
   assert.ok(auth.includes('AUTH_SIGNED_OUT_EVENT'));
   assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause }'));
+  assert.ok(auth.includes("function bcHandleGetSessionError(error)"));
+  assert.ok(auth.includes('if (storage !== "PRESENT")'));
+  assert.ok(auth.includes("waiting for the auth event"));
+  assert.ok(auth.includes('_bcAuthLastGetSessionErrorKind || "NONE"'));
   assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*(?:access_token|refresh_token)/);
 });
 
@@ -67,7 +71,7 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
 });
 
 test("getSession error classifier maps representative failures to fixed categories", () => {
-  const match = auth.match(/(function bcAuthErrorKind\(error\) \{[\s\S]*?\n\})\nfunction bcAuthDiagnostic/);
+  const match = auth.match(/(function bcAuthErrorKind\(error\) \{[\s\S]*?\n\})\nfunction bcHandleGetSessionError/);
   assert.ok(match, "classifier function must be extractable for unit checks");
   const classify = vm.runInNewContext("(" + match[1] + ")");
   assert.equal(classify({ name: "LockAcquireTimeoutError", message: "Lock acquisition timed out" }), "LOCK_TIMEOUT");
@@ -76,4 +80,18 @@ test("getSession error classifier maps representative failures to fixed categori
   assert.equal(classify({ name: "AuthRetryableFetchError", message: "Failed to fetch" }), "NETWORK_ERROR");
   assert.equal(classify({ name: "AuthSessionMissingError", message: "Auth session missing" }), "AUTH_ERROR");
   assert.equal(classify({ name: "UnexpectedError", message: "unclassified" }), "OTHER_ERROR");
+  assert.equal(classify({
+    name: "AuthUnknownError",
+    message: "Unexpected error during initialization",
+    originalError: { name: "TypeError", message: "Failed to fetch" }
+  }), "NETWORK_ERROR");
+  assert.equal(classify({
+    name: "AuthUnknownError",
+    message: "Unexpected error during initialization",
+    originalError: { name: "AuthApiError", message: "Invalid Refresh Token: Refresh Token Not Found" }
+  }), "REFRESH_TOKEN_ERROR");
+  assert.equal(classify({
+    name: "AuthUnknownError",
+    originalError: { cause: { name: "DOMException", message: "localStorage JSON parse failed" } }
+  }), "STORAGE_ERROR");
 });
