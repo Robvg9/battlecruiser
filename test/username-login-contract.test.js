@@ -60,7 +60,7 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
     "AUTH_ERROR",
     "OTHER_ERROR"
   ]) assert.ok(auth.includes('return "' + kind + '"'));
-  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, bcAuthErrorKind\(error\)\)/);
+  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, kind\)/);
   assert.match(auth, /cause: safeCause/);
   const diagnosticAndBoot = auth.slice(
     auth.indexOf("function bcAuthErrorKind(error)"),
