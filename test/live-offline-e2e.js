@@ -80,6 +80,9 @@ function findBrowser() {
     env.PROGRAMFILES && path.join(env.PROGRAMFILES, "Google", "Chrome", "Application", "chrome.exe"),
     env.LOCALAPPDATA && path.join(env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe"),
   ].filter(Boolean);
+  if (process.platform === "linux") {
+    candidates.push("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/opt/google/chrome/chrome");
+  }
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) return candidate;
   }
@@ -91,8 +94,16 @@ function findBrowser() {
         if (found && fs.existsSync(found)) return found;
       } catch (_) {}
     }
+  } else if (process.platform === "linux") {
+    for (const command of ["google-chrome", "chromium", "chromium-browser"]) {
+      try {
+        const found = execFileSync("which", [command], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+          .split(/\r?\n/).map((item) => item.trim()).find(Boolean);
+        if (found && fs.existsSync(found)) return found;
+      } catch (_) {}
+    }
   }
-  throw new Error("No se encontró Microsoft Edge ni Google Chrome en el runner Windows.");
+  throw new Error("No se encontró Microsoft Edge ni Google Chrome en el runner " + process.platform + ".");
 }
 async function localJson(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -216,6 +227,8 @@ async function main() {
   userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "battlecruiser-live-offline-"));
   browserProcess = spawn(browserPath, [
     "--headless=new",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
     "--disable-gpu",
     "--no-first-run",
     "--no-default-browser-check",
