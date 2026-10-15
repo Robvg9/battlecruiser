@@ -21,6 +21,8 @@ let _bcSesionActivaId = null;
 /** Sesión descubierta antes de que usuarios-permisos.js defina cargarContextoUsuario. */
 let _bcPendingSession = null;
 let _bcAuthBootResolved = false;
+// No descartar una sesión válida mientras termina de prepararse la interfaz.
+let _bcAuthSessionDiscovered = false;
 // Recovery links must open the password form directly; do not make the user hunt for Ajustes.
 // Keep a query marker as fallback because Supabase may consume/remove the recovery hash during boot.
 let _bcRecoveryMode = (function () {
@@ -64,6 +66,7 @@ function bcUIReadyThen(fn) {
 
 function showApp(session) {
   if (!session || !session.user) return;
+  _bcAuthSessionDiscovered = true;
 
   // Nunca expongas el shell estático/legacy antes de que la cadena UI actual
   // termine. Esto elimina el pantallazo de menús/vistas retirados durante boot.
@@ -142,6 +145,7 @@ function bcResolverBootSinSesion() {
 }
 
 function bcResolverBootConSesion(session) {
+  if (session && session.user) _bcAuthSessionDiscovered = true;
   const mostrar = () => {
     document.documentElement.classList.remove("bc-auth-booting");
     if (loginForm) loginForm.removeAttribute("aria-busy");
@@ -200,9 +204,11 @@ client.auth.getSession().then(function (res) {
 
 // Red de seguridad: si getSession cuelga, no dejar la UI en limbo
 setTimeout(function () {
-  if (!_bcAuthBootResolved) {
-    console.warn("[BattleCruiser] getSession lento — mostrando login (fail-safe)");
+  if (!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession) {
+    console.warn("[BattleCruiser] getSession lento y sin sesión detectada — mostrando login (fail-safe)");
     bcResolverBootSinSesion();
+  } else if (!_bcAuthBootResolved) {
+    console.warn("[BattleCruiser] arranque de sesión aún pendiente; no se fuerza login porque ya se detectó una sesión");
   }
 }, 8000);
 
