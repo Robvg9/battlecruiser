@@ -34,10 +34,25 @@ function bcAuthStoragePresence() {
     return "BLOCKED";
   }
 }
-function bcAuthDiagnostic(code, visible) {
+function bcAuthErrorKind(error) {
+  if (!error) return "NO_ERROR_OBJECT";
+  // Inspect only in memory; never display/log the raw SDK error or its message.
+  var name = String(error.name || "").toLowerCase();
+  var code = String(error.code || "").toLowerCase();
+  var message = String(error.message || "").toLowerCase();
+  var signature = name + " " + code + " " + message;
+  if (/navigator.?locks?|lock/.test(signature) && /timeout|timed out|acquir|held/.test(signature)) return "LOCK_TIMEOUT";
+  if (/refresh.?token|invalid_grant|session_not_found|refresh token/.test(signature)) return "REFRESH_TOKEN_ERROR";
+  if (/localstorage|storage|serialize|deserialize|json parse|invalid json/.test(signature)) return "STORAGE_ERROR";
+  if (/failed to fetch|fetcherror|network|offline|load failed|econn|http.?error/.test(signature)) return "NETWORK_ERROR";
+  if (/jwt|unauthorized|authsessionmissing|session missing|invalid session/.test(signature)) return "AUTH_ERROR";
+  return "OTHER_ERROR";
+}
+function bcAuthDiagnostic(code, visible, cause) {
   var storage = bcAuthStoragePresence();
-  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage };
-  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage });
+  var safeCause = cause || "NONE";
+  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause };
+  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage, cause: safeCause });
   if (!visible || !loginForm) return;
   var el = document.getElementById("bc-auth-diagnostic");
   if (!el) {
@@ -47,8 +62,10 @@ function bcAuthDiagnostic(code, visible) {
     el.setAttribute("role", "status");
     loginForm.appendChild(el);
   }
-  el.textContent = "Diagnóstico de sesión: " + code + " · almacenamiento local: " + storage
-    + ". Comparte solo este código; no compartas contraseñas ni datos de sesión.";
+  el.textContent = "Diagnóstico de sesión: " + code
+    + (safeCause !== "NONE" ? " · causa: " + safeCause : "")
+    + " · almacenamiento local: " + storage
+    + ". Comparte solo estos valores; no compartas contraseñas ni datos de sesión.";
 }
 // Recovery links must open the password form directly; do not make the user hunt for Ajustes.
 // Keep a query marker as fallback because Supabase may consume/remove the recovery hash during boot.
@@ -226,11 +243,15 @@ client.auth.getSession().then(function (res) {
     bcResolverBootConSesion(data.session);
     if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
   } else if (!_bcAuthBootResolved) {
-    bcAuthDiagnostic(res && res.error ? "GETSESSION_ERROR" : "GETSESSION_EMPTY", true);
+    bcAuthDiagnostic(
+      res && res.error ? "GETSESSION_ERROR" : "GETSESSION_EMPTY",
+      true,
+      res && res.error ? bcAuthErrorKind(res.error) : "NONE"
+    );
     bcResolverBootSinSesion();
   }
-}).catch(function () {
-  bcAuthDiagnostic("GETSESSION_ERROR", true);
+}).catch(function (error) {
+  bcAuthDiagnostic("GETSESSION_ERROR", true, bcAuthErrorKind(error));
   if (!_bcAuthBootResolved) bcResolverBootSinSesion();
 });
 
