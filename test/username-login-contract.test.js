@@ -102,7 +102,7 @@ test("getSession error classifier maps representative failures to fixed categori
 });
 
 test("session diagnostic fingerprints only safe nested error types", () => {
-  const match = auth.match(/(function bcAuthErrorShape\(error\) \{[\s\S]*?\n\})\nfunction bcAuthErrorFingerprint/);
+  const match = auth.match(/(function bcAuthErrorShape\(error\) \{[\s\S]*?\n\})\n\s*function bcAuthErrorFingerprint/);
   assert.ok(match, "shape function must be extractable for unit checks");
   const shape = vm.runInNewContext("(" + match[1] + ")");
   const result = shape({
