@@ -2,6 +2,8 @@ name: BattleCruiser Quality
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -63,3 +65,18 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: cmd
         run: node test/verify-production-version.js
+
+      - name: Real Chromium E2E — LIVE offline recovery
+        shell: cmd
+        run: node test/live-offline-e2e.js
+
+      - name: Persist LIVE offline E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-live-offline-e2e-${{ github.run_id }}
+          path: |
+            test-results/battlecruiser-live-offline-e2e.json
+            test-results/battlecruiser-live-offline-e2e.png
+          if-no-files-found: warn
+          retention-days: 90
