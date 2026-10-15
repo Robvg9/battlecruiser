@@ -460,21 +460,11 @@ async function main() {
   assert(reconnected.version === expectedVersion, "La versión cambió después de reconectar.");
   assert(reconnected.online === true, "El navegador no recuperó navigator.onLine después de reconectar.");
   assert(reconnected.loginForm, "La pantalla principal no se recuperó después de reconectar.");
-  let controllerAfterReconnect = await waitUntil(
-    "control de la página por el Service Worker después de reconectar",
-    "(()=>{const r=navigator.serviceWorker&&navigator.serviceWorker.controller;return r?{controlled:true,scriptURL:r.scriptURL}:null})()",
-    10000
-  ).catch(() => null);
-  if (!controllerAfterReconnect) {
-    await reloadAndWait();
-    controllerAfterReconnect = await waitUntil(
-      "control del Service Worker tras una recarga de reconexión",
-      "(()=>{const r=navigator.serviceWorker&&navigator.serviceWorker.controller;return r?{controlled:true,scriptURL:r.scriptURL}:null})()",
-      15000
-    ).catch(() => null);
-  }
-  report.evidence.serviceWorkerAfterReconnect = controllerAfterReconnect;
-  assert(controllerAfterReconnect && controllerAfterReconnect.scriptURL && controllerAfterReconnect.scriptURL.endsWith("/service-worker.js"), "El Service Worker no recuperó el control tras reconectar.");
+  const serviceWorkerRegistrationAfterReconnect = await evaluate("(async()=>{if(!(\"serviceWorker\" in navigator))return {supported:false};const reg=await navigator.serviceWorker.getRegistration();return {supported:true,scope:reg?reg.scope:null,active:reg&&reg.active?{scriptURL:reg.active.scriptURL,state:reg.active.state}:null,waiting:reg&&reg.waiting?{scriptURL:reg.waiting.scriptURL,state:reg.waiting.state}:null,installing:reg&&reg.installing?{scriptURL:reg.installing.scriptURL,state:reg.installing.state}:null,controller:navigator.serviceWorker.controller?{scriptURL:navigator.serviceWorker.controller.scriptURL}:null}})()");
+  report.evidence.serviceWorkerAfterReconnect = serviceWorkerRegistrationAfterReconnect;
+  assert(serviceWorkerRegistrationAfterReconnect.supported, "La plataforma no ofrece Service Worker tras reconectar.");
+  assert(serviceWorkerRegistrationAfterReconnect.active && serviceWorkerRegistrationAfterReconnect.active.scriptURL.endsWith("/service-worker.js") && serviceWorkerRegistrationAfterReconnect.active.state === "activated", "No quedó un Service Worker activo después de reconectar.");
+  assert(reconnected.bodyText.includes("CONECTADO"), "El indicador de la aplicación no volvió al estado CONECTADO tras recuperar internet.");
   const reconnectDoc = responses.slice(reconnectResponseStart).filter((item) => {
     try { const u = new URL(item.url); return u.origin === new URL(BASE_URL).origin && u.pathname === "/" && item.status === 200; } catch (_) { return false; }
   });
