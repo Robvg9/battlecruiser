@@ -127,8 +127,9 @@
       card.classList.add('bc-pulido-product-card');
       var n=stockFor(pid,alm);
       var el=card.querySelector('.catalogo-card-stock');
-      if(el)el.textContent='Stock: '+n;
-      else{var p=document.createElement('div');p.className='catalogo-card-stock';p.textContent='Stock: '+n;card.appendChild(p);}
+      var stockLabel='Stock: '+n;
+      if(el){if(el.textContent!==stockLabel)el.textContent=stockLabel;}
+      else{var p=document.createElement('div');p.className='catalogo-card-stock';p.textContent=stockLabel;card.appendChild(p);}
     });
   }
   function bindCatalogClicks(){
