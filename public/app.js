@@ -1,14 +1,14 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.82 — auth session diagnostics boot de autenticación independiente de módulos opcionales
+// v9.4.83 — auth diagnostic visibility fix
 (function hotfixV9475(){
-  const VERSION="9.4.82";
+  const VERSION="9.4.83";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
     if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
     if(label)label.textContent="Usuario";
-    document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
+    document.querySelectorAll(".app-version-label,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
   }
   aplicarVersion();window.addEventListener("pageshow",aplicarVersion);
 })();
