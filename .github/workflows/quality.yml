@@ -101,15 +101,17 @@ jobs:
         run: |
           set -euo pipefail
           base="https://${BC_PREVIEW_NAME}.robvg9.workers.dev"
-          expected="$(grep -oE 'const VERSION="[0-9]+\\.[0-9]+\\.[0-9]+"' public/app.js | head -n 1)"
+          expected="$(grep -o 'const VERSION="[^"]*"' public/app.js | head -n 1)"
+          sw_expected="$(grep -o 'BC_SW_VERSION = "[^"]*"' public/service-worker.js | head -n 1)"
           test -n "$expected"
+          test -n "$sw_expected"
           for attempt in $(seq 1 30); do
             index_status="$(curl --location --silent --output /tmp/bc-preview-index.html --write-out '%{http_code}' "$base/index.html?bc_preview_ready=$attempt" || true)"
             app_status="$(curl --location --silent --output /tmp/bc-preview-app.js --write-out '%{http_code}' "$base/app.js?bc_preview_ready=$attempt" || true)"
             sw_status="$(curl --location --silent --output /tmp/bc-preview-sw.js --write-out '%{http_code}' "$base/service-worker.js?bc_preview_ready=$attempt" || true)"
             if [ "$index_status" = "200" ] && [ "$app_status" = "200" ] && [ "$sw_status" = "200" ] \
               && grep -Fq "$expected" /tmp/bc-preview-app.js \
-              && grep -Fq "BC_SW_VERSION" /tmp/bc-preview-sw.js; then
+              && grep -Fq "$sw_expected" /tmp/bc-preview-sw.js; then
               echo "[preview] PASS — index.html, app.js, Service Worker reachable; $expected"
               exit 0
             fi
