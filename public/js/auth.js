@@ -149,13 +149,13 @@ function bcAuthSafeStack(error) {
     try { if (current && typeof current.stack === "string") stack = current.stack; } catch (_) {}
     if (stack) {
       var frames = [];
-      stack.split(/\\r?\\n/).slice(0, 12).forEach(function (line) {
-        var m = line.match(/^\\s*at\\s+([A-Za-z_$][A-Za-z0-9_$<>.]*)\\s+\\(https?:\\/\\/[^/\\s)]+\\/([^/?\\s):]+\\.js)(?:\\?[^:\\s)]*)?:(\\d+):\\d+\\)/);
+      stack.split(/\r?\n/).slice(0, 12).forEach(function (line) {
+        var m = line.match(/^\s*at\s+([A-Za-z_$][A-Za-z0-9_$<>.]*)\s+\(https?:\/\/[^/\s)]+\/([^/?\s):]+\.js)(?:\?[^:\s)]*)?:(\d+):\d+\)/);
         if (m) {
           frames.push(m[1].slice(0, 40) + "@" + m[2].slice(0, 40) + ":" + m[3]);
           return;
         }
-        m = line.match(/^\\s*at\\s+https?:\\/\\/[^/\\s)]+\\/([^/?\\s):]+\\.js)(?:\\?[^:\\s)]*)?:(\\d+):\\d+/);
+        m = line.match(/^\s*at\s+https?:\/\/[^/\s)]+\/([^/?\s):]+\.js)(?:\?[^:\s)]*)?:(\d+):\d+/);
         if (m) frames.push(m[1].slice(0, 40) + ":" + m[2]);
       });
       if (frames.length) return frames.slice(0, 3).join(">");
@@ -189,6 +189,8 @@ function bcHandleGetSessionError(error) {
     cause: kind,
     storage: "PRESENT",
     shape: shape,
+    fingerprint: fingerprint,
+    trace: trace,
     retries: _bcAuthGetSessionRetryAttempts
   });
   bcScheduleGetSessionRetry();
