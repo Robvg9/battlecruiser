@@ -1,4 +1,4 @@
-/* BattleCruiser Service Worker — v9.4.78
+/* BattleCruiser Service Worker — v9.4.79
  * App shell: network-first with a versioned offline cache fallback.
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
@@ -83,7 +83,20 @@ self.addEventListener("fetch", function(event) {
   } catch (error) {
     return;
   }
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) {
+    var offlineExternal = BC_OFFLINE_EXTERNAL.some(function(assetUrl) {
+      var expected = new URL(assetUrl);
+      return url.origin === expected.origin && url.pathname === expected.pathname;
+    });
+    if (!offlineExternal) return;
+    event.respondWith(caches.match(request, { ignoreSearch: true }).then(function(cached) {
+      if (cached) return cached;
+      // The install gate normally prepopulates this pinned asset. Online fallback
+      // keeps recovery possible if browser storage was cleared while connected.
+      return fetch(request);
+    }));
+    return;
+  }
 
   if (isAppShellRequest(url)) {
     var freshRequest = new Request(request, { cache: "no-store" });
