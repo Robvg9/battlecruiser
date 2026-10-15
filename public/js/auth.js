@@ -299,16 +299,29 @@ window.__bcOnContextoLoaderReady = function () {
   }
 };
 
+// Auth can execute before app.js creates its UI-ready promise. Never call fn synchronously
+// while the gate is false: showApp() would re-enter itself until the stack overflows.
+var _bcAuthUIReadyFallback = false;
 function bcUIReadyThen(fn) {
-  const ready = window.__BC_UI_READY__;
-  if (!ready || typeof ready.then !== "function") {
-    fn();
-    return;
+  var startedAt = Date.now();
+  var finished = false;
+  function checkReady() {
+    if (finished) return;
+    if (window.__BC_UI_READY_RESOLVED__ === true) {
+      finished = true;
+      fn();
+      return;
+    }
+    if (Date.now() - startedAt >= 12000) {
+      _bcAuthUIReadyFallback = true;
+      finished = true;
+      console.warn("[BattleCruiser] UI-ready gate timed out; continuing with bounded fallback");
+      fn();
+      return;
+    }
+    window.setTimeout(checkReady, 25);
   }
-  Promise.race([
-    ready,
-    new Promise(resolve => setTimeout(resolve, 12000))
-  ]).then(fn).catch(fn);
+  checkReady();
 }
 
 function showApp(session) {
@@ -317,7 +330,7 @@ function showApp(session) {
 
   // Nunca expongas el shell estático/legacy antes de que la cadena UI actual
   // termine. Esto elimina el pantallazo de menús/vistas retirados durante boot.
-  if (!window.__BC_UI_READY_RESOLVED__) {
+  if (!window.__BC_UI_READY_RESOLVED__ && !_bcAuthUIReadyFallback) {
     _bcPendingSession = session;
     bcUIReadyThen(() => {
       if (_bcPendingSession === session || _bcPendingSession) {
