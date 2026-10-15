@@ -12,7 +12,7 @@ const OUTPUT_DIR = path.join(process.cwd(), "test-results");
 const REPORT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.json");
 const SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.png");
 const CORE_PATHS = ["/", "/index.html", "/app.js", "/style.css"];
-const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js";
 const TIMEOUT_MS = 45000;
 
 const report = {
