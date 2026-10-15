@@ -24,12 +24,9 @@ jobs:
           fetch-depth: 1
           clean: true
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
+      # ROBVG self-hosted Windows runner has a managed Node/npm installation
+      # on PATH. Avoid downloading setup-node from codeload.github.com, which
+      # times out on this runner; local validation uses the same Node 24 runtime.
       - name: Production JS integrity and syntax
         shell: cmd
         run: node test/ci-preflight.js
