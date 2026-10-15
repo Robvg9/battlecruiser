@@ -41,7 +41,7 @@ test("session restoration reports only a safe diagnostic code and storage-key pr
   assert.ok(auth.includes('GETSESSION_ERROR'));
   assert.ok(auth.includes('BOOT_TIMEOUT'));
   assert.ok(auth.includes('AUTH_SIGNED_OUT_EVENT'));
-  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage }'));
+  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause }'));
   assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*(?:access_token|refresh_token)/);
 });
 
