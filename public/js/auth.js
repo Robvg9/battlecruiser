@@ -43,7 +43,7 @@ function bcAuthDiagnostic(code, visible) {
   if (!el) {
     el = document.createElement("p");
     el.id = "bc-auth-diagnostic";
-    el.className = "footnote";
+    el.className = "footnote bc-auth-diagnostic";
     el.setAttribute("role", "status");
     loginForm.appendChild(el);
   }
