@@ -41,7 +41,9 @@ jobs:
 
       - name: Install dependencies
         shell: cmd
-        run: npm ci
+        env:
+          NPM_CONFIG_CACHE: 'D:\Databank\npm-cache'
+        run: npm ci --prefer-offline
 
       - name: Syntax check
         shell: cmd
