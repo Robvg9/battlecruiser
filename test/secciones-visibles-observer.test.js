@@ -26,15 +26,18 @@ test("navigation observer settles after visibility normalization", async () => {
     attributes: true,
     attributeFilter: ["class", "style", "aria-hidden"],
   });
-  dom.window.eval(navSource);
-  await new Promise((resolve) => dom.window.setTimeout(resolve, 2200));
-  observer.disconnect();
+  try {
+    dom.window.eval(navSource);
+    await new Promise((resolve) => dom.window.setTimeout(resolve, 2200));
 
-  const config = dom.window.document.querySelector('#tabs [data-tab="config"]');
-  assert.equal(config.style.getPropertyValue("display"), "flex");
-  assert.equal(config.style.getPropertyPriority("display"), "important");
-  assert.ok(mutationRecords < 250, 'observer should settle instead of repeatedly changing styles; observed ' + mutationRecords + ' records');
-  dom.window.close();
+    const config = dom.window.document.querySelector('#tabs [data-tab="config"]');
+    assert.equal(config.style.getPropertyValue("display"), "flex");
+    assert.equal(config.style.getPropertyPriority("display"), "important");
+    assert.ok(mutationRecords < 250, 'observer should settle instead of repeatedly changing the DOM; observed ' + mutationRecords + ' records');
+  } finally {
+    observer.disconnect();
+    dom.window.close();
+  }
 });
 
 test("stock badge renderer avoids same-value DOM writes", () => {
