@@ -1,15 +1,15 @@
-/* BattleCruiser Service Worker — v9.4.83
+/* BattleCruiser Service Worker — v9.4.84
  * App shell: network-first with a versioned offline cache fallback.
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
  */
-var BC_SW_VERSION = "9.4.83";
+var BC_SW_VERSION = "9.4.84";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_SHELL = ["./", "./index.html", "./app.js", "./style.css"];
 var PRECACHE_STATIC = ["./manifest.json", "./favicon.png", "./icons/icon-192x192.png", "./icons/icon-512x512.png"];
 // The UMD Supabase client is a required runtime dependency, so cache this pinned public CDN asset for offline boot.
-var BC_OFFLINE_EXTERNAL = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
+var BC_OFFLINE_EXTERNAL = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"];
 
 self.addEventListener("install", function(event) {
   self.skipWaiting();

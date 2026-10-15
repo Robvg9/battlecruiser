@@ -7,6 +7,7 @@ const sw = fs.readFileSync('public/service-worker.js', 'utf8');
 const m68 = fs.readFileSync('public/js/m68-ventas-pos-definitivo.js', 'utf8');
 const index = fs.readFileSync('public/index.html', 'utf8');
 const auth = fs.readFileSync('public/js/auth.js', 'utf8');
+const e2e = fs.readFileSync('test/live-offline-e2e.js', 'utf8');
 
 function extract(text, pattern, label) {
   const m = text.match(pattern);
@@ -57,4 +58,12 @@ test('auth diagnostic stays visible and version updater changes only version lab
     'el actualizador no debe sobrescribir mensajes de diagnóstico que usen estilo footnote');
   assert.match(auth, /el\.className = ["']footnote bc-auth-diagnostic["']/,
     'el diagnóstico debe tener clase propia además del estilo footnote');
+});
+
+
+test('index, Service Worker and offline E2E share the current Supabase UMD pin', () => {
+  const sdkUrl = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js';
+  assert.ok(index.includes('<script src="' + sdkUrl + '"></script>'), 'index.html must load the pinned Supabase SDK');
+  assert.ok(sw.includes(sdkUrl), 'Service Worker must precache the same Supabase SDK');
+  assert.ok(e2e.includes('const SUPABASE_CDN_URL = "' + sdkUrl + '";'), 'offline E2E must verify the same pinned SDK');
 });
