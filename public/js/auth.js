@@ -159,8 +159,8 @@ function bcAuthSafeStack(error) {
           frames.push(m[1].slice(0, 40) + "@" + m[2].slice(0, 40) + ":" + m[3]);
           return;
         }
-        m = line.match(/^\s*at\s+(?:[A-Za-z_$][A-Za-z0-9_$<>.]*\s+\()?https?:\/\/[^/\s)]+\/(?:[^/?\s):]+\/)*([^/?\s):]+\.js)(?:\?[^:\s)]*)?:(\d+):\d+/);
-        if (m) frames.push(m[1].slice(0, 40) + ":" + m[2]);
+        m = line.match(/^\s*at\s+(?:([A-Za-z_$][A-Za-z0-9_$<>.]*)\s+\()?https?:\/\/[^/\s)]+\/(?:[^/?\s):]+\/)*([^/?\s):]+\.js)(?:\?[^:\s)]*)?:(\d+):\d+/);
+        if (m) frames.push((m[1] ? m[1].slice(0, 40) + "@" : "") + m[2].slice(0, 40) + ":" + m[3]);
       });
       if (frames.length) return frames.slice(0, 3).join(">");
     }
