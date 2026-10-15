@@ -3,18 +3,30 @@
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
  */
-var BC_SW_VERSION = "9.4.78";
+var BC_SW_VERSION = "9.4.79";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_SHELL = ["./", "./index.html", "./app.js", "./style.css"];
 var PRECACHE_STATIC = ["./manifest.json", "./favicon.png", "./icons/icon-192x192.png", "./icons/icon-512x512.png"];
+// The UMD Supabase client is a required runtime dependency, so cache this pinned public CDN asset for offline boot.
+var BC_OFFLINE_EXTERNAL = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
 
 self.addEventListener("install", function(event) {
   self.skipWaiting();
   event.waitUntil(caches.open(BC_STATIC).then(function(cache) {
     // Do not silently swallow a failed shell precache: an incomplete install
     // must not replace a working Service Worker with an offline-broken one.
-    return cache.addAll(PRECACHE_SHELL.concat(PRECACHE_STATIC));
+    return cache.addAll(PRECACHE_SHELL.concat(PRECACHE_STATIC)).then(function() {
+      return Promise.all(BC_OFFLINE_EXTERNAL.map(function(assetUrl) {
+        var request = new Request(assetUrl, { mode: "cors", cache: "no-store" });
+        return fetch(request).then(function(response) {
+          if (!response || !response.ok) {
+            throw new Error("Failed to precache required offline dependency: " + assetUrl);
+          }
+          return cache.put(request, response.clone());
+        });
+      }));
+    });
   }));
 });
 
