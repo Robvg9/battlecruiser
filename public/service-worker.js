@@ -9,7 +9,7 @@ var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_SHELL = ["./", "./index.html", "./app.js", "./style.css"];
 var PRECACHE_STATIC = ["./manifest.json", "./favicon.png", "./icons/icon-192x192.png", "./icons/icon-512x512.png"];
 // The UMD Supabase client is a required runtime dependency, so cache this pinned public CDN asset for offline boot.
-var BC_OFFLINE_EXTERNAL = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
+var BC_OFFLINE_EXTERNAL = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"];
 
 self.addEventListener("install", function(event) {
   self.skipWaiting();
