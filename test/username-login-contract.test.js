@@ -23,3 +23,11 @@ test("username login bridge keeps internal email resolution server-side", () => 
   assert.doesNotMatch(edge, /console\.(log|error)\(.*password/i);
   assert.doesNotMatch(edge, /reply\(\{\s*email\s*:/i);
 });
+
+test("a discovered session is not replaced by the auth boot fail-safe while UI modules prepare", () => {
+  assert.match(auth, /let _bcAuthSessionDiscovered = false;/);
+  assert.match(auth, /function bcResolverBootConSesion\\(session\\) \\{\\s*if \\(session && session\\.user\\) _bcAuthSessionDiscovered = true;/);
+  assert.match(auth, /function showApp\\(session\\) \\{\\s*if \\(!session \\|\\| !session\\.user\\) return;\\s*_bcAuthSessionDiscovered = true;/);
+  assert.match(auth, /if \\(!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession\\)/);
+  assert.match(auth, /no se fuerza login porque ya se detectó una sesión/);
+});
