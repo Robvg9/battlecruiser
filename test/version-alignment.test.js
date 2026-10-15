@@ -48,13 +48,13 @@ test('M68 usa la versión canónica para su pie y para invalidar caché', () => 
 
 
 test('auth diagnostic stays visible and version updater changes only version labels', () => {
-  const appVersion = extract(app, /const VERSION=["'](\\d+\\.\\d+\\.\\d+)["']/, 'VERSION de app.js');
-  const htmlVersion = extract(index, /<p class="footnote app-version-label">v(\\d+\\.\\d+\\.\\d+) — BattleCruiser<\\/p>/, 'versión visible del login');
+  const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
+  const htmlVersion = extract(index, /<p class="footnote app-version-label">v(\d+\.\d+\.\d+) — BattleCruiser<\/p>/, 'versión visible del login');
   assert.equal(htmlVersion, appVersion, 'la versión visible del login debe coincidir con app.js');
-  assert.match(app, /querySelectorAll\\(["']\\.app-version-label,\\.app-footer-version["']\\)/,
+  assert.match(app, /querySelectorAll\(["']\.app-version-label,\.app-footer-version["']\)/,
     'el actualizador debe seleccionar solo etiquetas explícitas de versión');
-  assert.doesNotMatch(app, /querySelectorAll\\(["']\\.footnote,\\.app-footer-version["']\\)/,
+  assert.doesNotMatch(app, /querySelectorAll\(["']\.footnote,\.app-footer-version["']\)/,
     'el actualizador no debe sobrescribir mensajes de diagnóstico que usen estilo footnote');
-  assert.match(auth, /el\\.className = ["']footnote bc-auth-diagnostic["']/,
+  assert.match(auth, /el\.className = ["']footnote bc-auth-diagnostic["']/,
     'el diagnóstico debe tener clase propia además del estilo footnote');
 });
