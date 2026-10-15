@@ -1,11 +1,11 @@
 /**
- * M68 — Ventas POS Definitivo (v9.4.75)
+ * M68 — Ventas POS Definitivo (versión sincronizada con app.js)
  * 2) Borde derecho del carrito = borde derecho del topbar (mismo grid)
  * 4) Footer inferior eliminado de verdad (clase en html/body + display none JS)
  */
 (function m68VentasPosDefinitivo() {
   'use strict';
-  const VER = '9.4.75';
+  const VER = String(window.__BC_VERSION__ || '9.4.77');
   window.__BC_M68_LOADED__ = VER;
 
   const TOP_ID = 'bc-venta-topbar';
@@ -16,7 +16,7 @@
   const POS_CLASS = 'bc-ventas-activa';
 
   const CSS = `
-/* ========== M68 v9.4.75 ========== */
+/* ========== M68 v${VER} ========== */
 html.${POS_CLASS},
 body.${POS_CLASS} {
   overflow: hidden !important;
