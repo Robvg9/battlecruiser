@@ -7,6 +7,13 @@
   var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true };
   var LABELS = { config:'Configuración', ciclos:'Turnos' };
 
+  // Avoid style-attribute mutations when the final value is already applied.
+  function setImportantStyle(el, property, value) {
+    if (el.style.getPropertyValue(property) !== value || el.style.getPropertyPriority(property) !== 'important') {
+      el.style.setProperty(property, value, 'important');
+    }
+  }
+
   function asegurarConfigButton(){
     var tabs = document.getElementById('tabs');
     if (!tabs) return;
@@ -21,10 +28,9 @@
     }
     if (btn) {
       btn.classList.remove('hidden','tab-sin-permiso');
-      btn.style.removeProperty('display');
-      btn.style.setProperty('display','flex','important');
-      btn.style.setProperty('visibility','visible','important');
-      btn.style.setProperty('opacity','1','important');
+      setImportantStyle(btn, 'display', 'flex');
+      setImportantStyle(btn, 'visibility', 'visible');
+      setImportantStyle(btn, 'opacity', '1');
       btn.removeAttribute('aria-hidden');
       btn.tabIndex = 0;
     }
@@ -39,10 +45,9 @@
       btn.classList.remove('hidden','tab-sin-permiso');
       btn.removeAttribute('aria-hidden');
       btn.tabIndex = 0;
-      btn.style.removeProperty('display');
-      btn.style.setProperty('display','flex','important');
-      btn.style.setProperty('visibility','visible','important');
-      btn.style.setProperty('opacity','1','important');
+      setImportantStyle(btn, 'display', 'flex');
+      setImportantStyle(btn, 'visibility', 'visible');
+      setImportantStyle(btn, 'opacity', '1');
       if (LABELS[tab] && !btn.querySelector('.bc-nav-label')) {
         var hasIcon = btn.querySelector('.bc-nav-icon');
         if (hasIcon) {
