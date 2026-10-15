@@ -7,6 +7,7 @@ const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const auth = fs.readFileSync(path.join(root, "public", "js", "auth.js"), "utf8").replace(/\r\n/g, "\n");
+const context = fs.readFileSync(path.join(root, "public", "js", "usuarios-permisos.js"), "utf8").replace(/\r\n/g, "\n");
 const edge = fs.readFileSync(path.join(root, "supabase", "functions", "bc-username-login", "index.ts"), "utf8");
 
 test("frontend routes username login through the server-side credential bridge", () => {
@@ -141,4 +142,25 @@ test("safe auth stack exposes only function names, script basenames and line num
   assert.equal(result, "getSession@auth.js:321>Object.process@supabase.js:98");
   assert.doesNotMatch(result, /https|secret|DO_NOT_EXPOSE/);
   assert.equal(safeStack({ stack: "no parseable frame" }), "NO_SAFE_FRAMES");
+});
+
+
+test("auth state callbacks defer context loading and forward their session", () => {
+  const match = auth.match(/(function bcIntentarCargarContexto\(session\) \{[\s\S]*?\n\})/);
+  assert.ok(match, "context helper must be extractable for checks");
+  assert.match(match[1], /window\.setTimeout\(function/);
+  assert.match(match[1], /cargarContextoUsuario\(readySession \|\| null\)/);
+  assert.doesNotMatch(match[1], /cargarContextoUsuario\(\);/);
+  assert.match(auth, /bcIntentarCargarContexto\(session\)/);
+});
+
+test("context loader reuses the session supplied by auth before calling getSession", () => {
+  const match = context.match(/(async function cargarContextoUsuario\(sessionInicial\) \{[\s\S]*?\n\})\ncargarContextoUsuario\.__bcM263Timeout/);
+  assert.ok(match, "context loader must be extractable for checks");
+  const source = match[1];
+  assert.match(source, /if \(sessionInicial && sessionInicial\.user\)/);
+  assert.match(source, /authUser = sessionInicial\.user/);
+  assert.ok(source.indexOf("authUser = sessionInicial.user") < source.indexOf("client.auth.getSession()"));
+  assert.match(source, /client\.rpc\("perfil_usuario_actual", \{\}\)/);
+  assert.match(source, /client\.rpc\("permisos_usuario_actual", \{\}\)/);
 });
