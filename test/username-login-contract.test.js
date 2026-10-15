@@ -41,7 +41,11 @@ test("session restoration reports only a safe diagnostic code and storage-key pr
   assert.ok(auth.includes('GETSESSION_ERROR'));
   assert.ok(auth.includes('BOOT_TIMEOUT'));
   assert.ok(auth.includes('AUTH_SIGNED_OUT_EVENT'));
-  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause }'));
+  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape }'));
+  assert.ok(auth.includes("function bcAuthErrorShape(error)"));
+  assert.ok(auth.includes("function bcScheduleGetSessionRetry()"));
+  assert.ok(auth.includes("_bcAuthGetSessionRetryAttempts >= 2"));
+  assert.ok(auth.includes("bcAuthDiagnostic(\"GETSESSION_ERROR\", true, kind, shape)"));
   assert.ok(auth.includes("function bcHandleGetSessionError(error)"));
   assert.ok(auth.includes('if (storage !== "PRESENT")'));
   assert.ok(auth.includes("waiting for the auth event"));
@@ -60,7 +64,7 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
     "AUTH_ERROR",
     "OTHER_ERROR"
   ]) assert.ok(auth.includes('return "' + kind + '"'));
-  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, kind\)/);
+  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, kind, shape\)/);
   assert.match(auth, /cause: safeCause/);
   const diagnosticAndBoot = auth.slice(
     auth.indexOf("function bcAuthErrorKind(error)"),
@@ -71,7 +75,7 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
 });
 
 test("getSession error classifier maps representative failures to fixed categories", () => {
-  const match = auth.match(/(function bcAuthErrorKind\(error\) \{[\s\S]*?\n\})\nfunction bcHandleGetSessionError/);
+  const match = auth.match(/(function bcAuthErrorKind\(error\) \{[\s\S]*?\n\})\nfunction bcAuthErrorShape/);
   assert.ok(match, "classifier function must be extractable for unit checks");
   const classify = vm.runInNewContext("(" + match[1] + ")");
   assert.equal(classify({ name: "LockAcquireTimeoutError", message: "Lock acquisition timed out" }), "LOCK_TIMEOUT");
@@ -94,4 +98,18 @@ test("getSession error classifier maps representative failures to fixed categori
     name: "AuthUnknownError",
     originalError: { cause: { name: "DOMException", message: "localStorage JSON parse failed" } }
   }), "STORAGE_ERROR");
+});
+
+test("session diagnostic fingerprints only safe nested error types", () => {
+  const match = auth.match(/(function bcAuthErrorShape\(error\) \{[\s\S]*?\n\})\nfunction bcHandleGetSessionError/);
+  assert.ok(match, "shape function must be extractable for unit checks");
+  const shape = vm.runInNewContext("(" + match[1] + ")");
+  const result = shape({
+    name: "AuthUnknownError",
+    message: "DO_NOT_EXPOSE_THIS_MESSAGE",
+    originalError: { name: "TypeError", message: "network details should not leak" }
+  });
+  assert.equal(result, "AuthUnknownError>TypeError");
+  assert.doesNotMatch(result, /DO_NOT_EXPOSE|network details/);
+  assert.ok(shape(null) === "NO_ERROR_OBJECT");
 });
