@@ -72,8 +72,32 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
+  deploy-pr-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4.149.0
+
+      - name: Deploy isolated PR preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          wrangler deploy --config wrangler.toml --name "$BC_PREVIEW_NAME"
+
   live-offline-e2e:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    needs: [deploy-pr-preview]
+    if: ${{ always() && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && (github.event_name != 'pull_request' || needs.deploy-pr-preview.result == 'success') }}
     name: LIVE offline recovery — Chromium
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -90,7 +114,7 @@ jobs:
 
       - name: Run real-browser LIVE offline E2E
         env:
-          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://test-battlecruiser-live-offline-e2e-20261015-battlecruiser.robvg9.workers.dev' || 'https://battlecruiser.robvg9.workers.dev' }}
+          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && format('https://bc-pr-{0}-battlecruiser.robvg9.workers.dev', github.event.number) || 'https://battlecruiser.robvg9.workers.dev' }}
         run: node test/live-offline-e2e.js
 
       - name: Persist LIVE offline E2E evidence
