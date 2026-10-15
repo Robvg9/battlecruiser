@@ -2,6 +2,8 @@ name: BattleCruiser Quality
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -63,3 +65,34 @@ jobs:
         if: github.event_name != 'pull_request'
         shell: cmd
         run: node test/verify-production-version.js
+
+
+
+  live-offline-e2e:
+    name: LIVE offline recovery — Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+
+      - name: Run real-browser LIVE offline E2E
+        env:
+          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://test-battlecruiser-live-offline-e2e-20261015-battlecruiser.robvg9.workers.dev' || 'https://battlecruiser.robvg9.workers.dev' }}
+        run: node test/live-offline-e2e.js
+
+      - name: Persist LIVE offline E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-live-offline-e2e-${{ github.run_id }}
+          path: |
+            test-results/battlecruiser-live-offline-e2e.json
+            test-results/battlecruiser-live-offline-e2e.png
+          if-no-files-found: warn
+          retention-days: 90

@@ -122,8 +122,13 @@ test('successful same-origin shell requests are cached for subsequent offline us
 });
 
 test('offline fallback serves a cached versioned app.js request by ignoring only the query string', async () => {
+  // Installation happens online, including the pinned CDN dependency; only later app requests fail offline.
   const worker = createWorker({
-    fetch: async function() { throw new TypeError('offline'); }
+    fetch: async function(request) {
+      const url = new URL(request.url);
+      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
+      throw new TypeError('offline');
+    }
   });
   await dispatchInstall(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=9.4.77'));
@@ -132,8 +137,13 @@ test('offline fallback serves a cached versioned app.js request by ignoring only
 });
 
 test('offline fallback serves the app root from the precache even with a query string', async () => {
+  // Model a successful online install, then a network outage during navigation.
   const worker = createWorker({
-    fetch: async function() { throw new TypeError('offline'); }
+    fetch: async function(request) {
+      const url = new URL(request.url);
+      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
+      throw new TypeError('offline');
+    }
   });
   await dispatchInstall(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/?offline_check=1'));
