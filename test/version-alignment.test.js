@@ -13,33 +13,33 @@ function extract(text, pattern, label) {
 }
 
 test('app.js y service-worker.js comparten la misma versión BattleCruiser', () => {
-  const appVersion = extract(app, /const VERSION=["'](\\d+\\.\\d+\\.\\d+)["']/, 'VERSION de app.js');
-  const swVersion = extract(sw, /BC_SW_VERSION\\s*=\\s*["'](\\d+\\.\\d+\\.\\d+)["']/, 'BC_SW_VERSION del Service Worker');
+  const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
+  const swVersion = extract(sw, /BC_SW_VERSION\s*=\s*["'](\d+\.\d+\.\d+)["']/, 'BC_SW_VERSION del Service Worker');
   assert.equal(swVersion, appVersion);
 });
 
 test('Service Worker construye los nombres de caché desde BC_SW_VERSION', () => {
-  assert.match(sw, /BC_SHELL\\s*=\\s*["']battlecruiser-shell-["']\\s*\\+\\s*BC_SW_VERSION/);
-  assert.match(sw, /BC_STATIC\\s*=\\s*["']battlecruiser-static-["']\\s*\\+\\s*BC_SW_VERSION/);
+  assert.match(sw, /BC_SHELL\s*=\s*["']battlecruiser-shell-["']\s*\+\s*BC_SW_VERSION/);
+  assert.match(sw, /BC_STATIC\s*=\s*["']battlecruiser-static-["']\s*\+\s*BC_SW_VERSION/);
 });
 
 test('M68 usa la versión canónica para su pie y para invalidar caché', () => {
-  const appVersion = extract(app, /const VERSION=["'](\\d+\\.\\d+\\.\\d+)["']/, 'VERSION de app.js');
+  const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
   const cacheVersion = extract(
     app,
-    /\\["m68-ventas-pos-definitivo\\.js","(\\d+\\.\\d+\\.\\d+)"\\]/,
+    /\["m68-ventas-pos-definitivo\.js","(\d+\.\d+\.\d+)"\]/,
     'versión de caché del módulo M68'
   );
   const moduleFallback = extract(
     m68,
-    /const VER = String\\(window\\.__BC_VERSION__ \\|\\| ["'](\\d+\\.\\d+\\.\\d+)["']\\);/,
+    /const VER = String\(window\.__BC_VERSION__ \|\| ["'](\d+\.\d+\.\d+)["']\);/,
     'fallback de versión del módulo M68'
   );
   assert.equal(cacheVersion, appVersion, 'el cache-buster de M68 debe coincidir con app.js');
   assert.equal(moduleFallback, appVersion, 'el fallback de M68 debe coincidir con app.js');
   assert.match(
     m68,
-    /el\\.textContent = 'v' \\+ VER \\+ ' — BattleCruiser';/,
+    /el\.textContent = 'v' \+ VER \+ ' — BattleCruiser';/,
     'M68 debe construir el pie a partir de VER sincronizada'
   );
 });
