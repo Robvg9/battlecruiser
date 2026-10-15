@@ -159,7 +159,7 @@ function bcAuthSafeStack(error) {
           frames.push(m[1].slice(0, 40) + "@" + m[2].slice(0, 40) + ":" + m[3]);
           return;
         }
-        m = line.match(/^\s*at\s+https?:\/\/[^/\s)]+\/(?:[^/?\s):]+\/)*([^/?\s):]+\.js)(?:\?[^:\s)]*)?:(\d+):\d+/);
+        m = line.match(/^\s*at\s+(?:[A-Za-z_$][A-Za-z0-9_$<>.]*\s+\()?https?:\/\/[^/\s)]+\/(?:[^/?\s):]+\/)*([^/?\s):]+\.js)(?:\?[^:\s)]*)?:(\d+):\d+/);
         if (m) frames.push(m[1].slice(0, 40) + ":" + m[2]);
       });
       if (frames.length) return frames.slice(0, 3).join(">");
@@ -279,8 +279,8 @@ function bcIntentarCargarContexto(session) {
     _bcContextLoadScheduled = false;
     var readySession = _bcContextSessionHint;
     _bcContextSessionHint = null;
-    if (readySession && _bcSesionActivaId &&
-        String(readySession.user.id) !== String(_bcSesionActivaId)) return;
+    if (readySession && (!_bcSesionActivaId ||
+        String(readySession.user.id) !== String(_bcSesionActivaId))) return;
     if (typeof cargarContextoUsuario !== "function") {
       if (readySession) _bcPendingSession = readySession;
       return;
