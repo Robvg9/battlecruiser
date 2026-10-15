@@ -12,6 +12,7 @@ const OUTPUT_DIR = path.join(process.cwd(), "test-results");
 const REPORT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.json");
 const SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.png");
 const CORE_PATHS = ["/", "/index.html", "/app.js", "/style.css"];
+const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 const TIMEOUT_MS = 45000;
 
 const report = {
@@ -179,7 +180,7 @@ async function reloadAndWait() {
   await delay(500);
 }
 function pageSnapshotExpression() {
-  return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
+  return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
 }
 function shellSnapshotPredicate() {
   return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState==='complete'&&s.version?s:null})()";
@@ -368,10 +369,11 @@ async function main() {
   assert(registration && registration.scriptURL && registration.scriptURL.endsWith("/service-worker.js"), "La página no quedó controlada por el Service Worker correcto.");
   report.evidence.serviceWorker = registration;
 
-  const cacheExpression = "(async()=>{const names=await caches.keys();const paths=" + JSON.stringify(CORE_PATHS) + ";const result={};for(const p of paths){result[p]=null;for(const n of names){const c=await caches.open(n);const r=await c.match(new URL(p,location.origin).href,{ignoreSearch:true});if(r){result[p]={cache:n,status:r.status};break;}}}return {names:names,core:result};})()";
+  const cacheExpression = "(async()=>{const names=await caches.keys();const paths=" + JSON.stringify(CORE_PATHS) + ";const external=" + JSON.stringify(SUPABASE_CDN_URL) + ";const result={};let supabase=null;for(const n of names){const c=await caches.open(n);if(!supabase){const ext=await c.match(external,{ignoreSearch:true});if(ext)supabase={cache:n,status:ext.status,type:ext.type};}for(const p of paths){if(result[p])continue;const r=await c.match(new URL(p,location.origin).href,{ignoreSearch:true});if(r)result[p]={cache:n,status:r.status};}}return {names:names,core:result,externalSupabase:supabase};})()";
   const cacheInventory = await evaluate(cacheExpression);
   report.evidence.cacheBeforeOffline = cacheInventory;
   assert(cacheInventory.names.includes("battlecruiser-static-" + expectedVersion), "No existe la caché estática de la versión " + expectedVersion + ".");
+  assert(cacheInventory.externalSupabase && cacheInventory.externalSupabase.status === 200, "Supabase UMD no quedó precargado en CacheStorage.");
   for (const assetPath of CORE_PATHS) {
     const cached = cacheInventory.core[assetPath];
     assert(cached && cached.status === 200, "El recurso core " + assetPath + " no está en CacheStorage con HTTP 200.");
@@ -398,6 +400,7 @@ async function main() {
   assert(offline.version === expectedVersion, "La versión no se mantuvo durante la recarga offline.");
   assert(offline.loginForm && offline.usernameField && offline.passwordField, "El formulario core no se recuperó al recargar offline.");
   assert(offline.localStylesheet, "El enlace a style.css no está presente offline.");
+  assert(offline.supabaseAvailable && offline.clientDefined, "El cliente Supabase o el cliente de aplicación no se inicializó offline.");
 
   // index.html is precached separately from the root URL, so request it explicitly while
   // the browser's network is disabled. This proves the indexed document is recoverable.
@@ -420,6 +423,22 @@ async function main() {
     assert(last.fromServiceWorker, "La respuesta offline de " + assetPath + " no acredita al Service Worker/cache.");
   }
   report.evidence.offlineCoreResponses = offlineCoreEvidence;
+  const offlineSupabaseResponses = offlineResponses.filter((item) => {
+    try {
+      const parsed = new URL(item.url);
+      const expected = new URL(SUPABASE_CDN_URL);
+      return parsed.origin === expected.origin && parsed.pathname === expected.pathname;
+    } catch (_) { return false; }
+  });
+  const supabaseResponse = offlineSupabaseResponses.length ? offlineSupabaseResponses[offlineSupabaseResponses.length - 1] : null;
+  report.evidence.offlineSupabaseResponse = supabaseResponse;
+  assert(supabaseResponse && supabaseResponse.status === 200 && supabaseResponse.fromServiceWorker, "Supabase UMD no se sirvió desde el Service Worker cuando no había red.");
+  const criticalOfflineExceptions = pageExceptions.filter((item) =>
+    item.phase === "offline_reload" &&
+    ((item.description || "").includes("createClient") || (item.description || "").includes("client is not defined"))
+  );
+  report.evidence.criticalOfflineExceptions = criticalOfflineExceptions;
+  assert(criticalOfflineExceptions.length === 0, "El arranque offline generó errores críticos de inicialización: " + JSON.stringify(criticalOfflineExceptions));
   report.evidence.offlineNetworkFailures = failures.slice(offlineFailureStart);
   report.evidence.offlineScreenshot = SCREENSHOT_PATH;
   const screenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
@@ -441,6 +460,21 @@ async function main() {
   assert(reconnected.version === expectedVersion, "La versión cambió después de reconectar.");
   assert(reconnected.online === true, "El navegador no recuperó navigator.onLine después de reconectar.");
   assert(reconnected.loginForm, "La pantalla principal no se recuperó después de reconectar.");
+  let controllerAfterReconnect = await waitUntil(
+    "control de la página por el Service Worker después de reconectar",
+    "(()=>{const r=navigator.serviceWorker&&navigator.serviceWorker.controller;return r?{controlled:true,scriptURL:r.scriptURL}:null})()",
+    10000
+  ).catch(() => null);
+  if (!controllerAfterReconnect) {
+    await reloadAndWait();
+    controllerAfterReconnect = await waitUntil(
+      "control del Service Worker tras una recarga de reconexión",
+      "(()=>{const r=navigator.serviceWorker&&navigator.serviceWorker.controller;return r?{controlled:true,scriptURL:r.scriptURL}:null})()",
+      15000
+    ).catch(() => null);
+  }
+  report.evidence.serviceWorkerAfterReconnect = controllerAfterReconnect;
+  assert(controllerAfterReconnect && controllerAfterReconnect.scriptURL && controllerAfterReconnect.scriptURL.endsWith("/service-worker.js"), "El Service Worker no recuperó el control tras reconectar.");
   const reconnectDoc = responses.slice(reconnectResponseStart).filter((item) => {
     try { const u = new URL(item.url); return u.origin === new URL(BASE_URL).origin && u.pathname === "/" && item.status === 200; } catch (_) { return false; }
   });
