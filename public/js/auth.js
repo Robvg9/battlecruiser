@@ -24,6 +24,9 @@ let _bcAuthBootResolved = false;
 // No descartar una sesión válida mientras termina de prepararse la interfaz.
 let _bcAuthSessionDiscovered = false;
 let _bcAuthLastGetSessionErrorKind = null;
+let _bcAuthLastGetSessionErrorShape = null;
+let _bcAuthGetSessionRetryAttempts = 0;
+let _bcAuthGetSessionRetryPending = false;
 
 // Diagnóstico de restauración sin leer, guardar ni imprimir tokens.
 function bcAuthStoragePresence() {
@@ -66,28 +69,91 @@ function bcAuthErrorKind(error) {
   }
   return "OTHER_ERROR";
 }
+function bcAuthErrorShape(error) {
+  var pending = [error];
+  var visited = [];
+  var shapes = [];
+  while (pending.length && visited.length < 8 && shapes.length < 4) {
+    var current = pending.shift();
+    if (current == null) continue;
+    if (typeof current === "object") {
+      if (visited.indexOf(current) !== -1) continue;
+      visited.push(current);
+    }
+    var type = "Unknown";
+    try {
+      if (typeof current === "string") type = "String";
+      else if (typeof current === "object") type = String(current.name || (current.constructor && current.constructor.name) || "Object");
+      else type = typeof current;
+    } catch (_) {
+      type = "Object";
+    }
+    type = type.replace(/[^A-Za-z0-9_$.-]/g, "").slice(0, 32) || "Object";
+    if (shapes.indexOf(type) === -1) shapes.push(type);
+    if (typeof current === "object") {
+      ["originalError", "cause", "error", "innerError", "context"].forEach(function (key) {
+        try { if (current[key] != null && current[key] !== current) pending.push(current[key]); } catch (_) {}
+      });
+    }
+  }
+  return shapes.length ? shapes.join(">") : "NO_ERROR_OBJECT";
+}
 function bcHandleGetSessionError(error) {
   var kind = bcAuthErrorKind(error);
+  var shape = bcAuthErrorShape(error);
   var storage = bcAuthStoragePresence();
   _bcAuthLastGetSessionErrorKind = kind;
-  bcAuthDiagnostic("GETSESSION_ERROR", true, kind);
+  _bcAuthLastGetSessionErrorShape = shape;
+  bcAuthDiagnostic("GETSESSION_ERROR", true, kind, shape);
   if (_bcAuthBootResolved) return;
   if (storage !== "PRESENT") {
     bcResolverBootSinSesion();
     return;
   }
-  // Keep the boot gate closed while onAuthStateChange tries to deliver the stored session.
-  // The existing 8-second guard is the bounded fallback if no session event arrives.
-  console.warn("[BattleCruiser] getSession failed while a session key exists; waiting for the auth event", {
+  // Keep boot pending briefly and retry the SDK read twice; do not clear stored auth state.
+  console.warn("[BattleCruiser] getSession failed while a session key exists; bounded retry scheduled", {
     cause: kind,
-    storage: "PRESENT"
+    storage: "PRESENT",
+    shape: shape,
+    retries: _bcAuthGetSessionRetryAttempts
   });
+  bcScheduleGetSessionRetry();
 }
-function bcAuthDiagnostic(code, visible, cause) {
+function bcScheduleGetSessionRetry() {
+  if (_bcAuthBootResolved || _bcAuthSessionDiscovered || _bcAuthGetSessionRetryPending || _bcAuthGetSessionRetryAttempts >= 2) return;
+  var attempt = ++_bcAuthGetSessionRetryAttempts;
+  _bcAuthGetSessionRetryPending = true;
+  window.setTimeout(function () {
+    _bcAuthGetSessionRetryPending = false;
+    if (_bcAuthBootResolved || _bcAuthSessionDiscovered) return;
+    Promise.resolve().then(function () {
+      return client.auth.getSession();
+    }).then(function (res) {
+      if (_bcAuthBootResolved || _bcAuthSessionDiscovered) return;
+      var data = res && res.data;
+      if (data && data.session) {
+        bcAuthDiagnostic("SESSION_FOUND_AFTER_RETRY", false);
+        bcResolverBootConSesion(data.session);
+        if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
+        return;
+      }
+      if (res && res.error) {
+        bcHandleGetSessionError(res.error);
+        return;
+      }
+      bcAuthDiagnostic("GETSESSION_RETRY_EMPTY", true, "NONE");
+      if (_bcAuthGetSessionRetryAttempts < 2) bcScheduleGetSessionRetry();
+    }).catch(function (error) {
+      bcHandleGetSessionError(error);
+    });
+  }, attempt === 1 ? 650 : 1400);
+}
+function bcAuthDiagnostic(code, visible, cause, shape) {
   var storage = bcAuthStoragePresence();
   var safeCause = cause || "NONE";
-  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause };
-  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage, cause: safeCause });
+  var safeShape = shape || "NONE";
+  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape };
+  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage, cause: safeCause, shape: safeShape });
   if (!visible || !loginForm) return;
   var el = document.getElementById("bc-auth-diagnostic");
   if (!el) {
@@ -99,6 +165,7 @@ function bcAuthDiagnostic(code, visible, cause) {
   }
   el.textContent = "Diagnóstico de sesión: " + code
     + (safeCause !== "NONE" ? " · causa: " + safeCause : "")
+    + (safeShape !== "NONE" ? " · tipo: " + safeShape : "")
     + " · almacenamiento local: " + storage
     + ". Comparte solo estos valores; no compartas contraseñas ni datos de sesión.";
 }
@@ -292,7 +359,7 @@ client.auth.getSession().then(function (res) {
 // Red de seguridad: si getSession cuelga, no dejar la UI en limbo
 setTimeout(function () {
   if (!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession) {
-    bcAuthDiagnostic("BOOT_TIMEOUT", true, _bcAuthLastGetSessionErrorKind || "NONE");
+    bcAuthDiagnostic("BOOT_TIMEOUT", true, _bcAuthLastGetSessionErrorKind || "NONE", _bcAuthLastGetSessionErrorShape || "NONE");
     bcResolverBootSinSesion();
   } else if (!_bcAuthBootResolved) {
     console.warn("[BattleCruiser] arranque de sesión aún pendiente; no se fuerza login porque ya se detectó una sesión");
