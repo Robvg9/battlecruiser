@@ -43,3 +43,20 @@ test("session restoration reports only a safe diagnostic code and storage-key pr
   assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage }'));
   assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*(?:access_token|refresh_token)/);
 });
+
+
+test("getSession diagnostic exposes only an allowlisted error category", () => {
+  assert.ok(auth.includes("function bcAuthErrorKind(error)"));
+  for (const kind of [
+    "LOCK_TIMEOUT",
+    "REFRESH_TOKEN_ERROR",
+    "STORAGE_ERROR",
+    "NETWORK_ERROR",
+    "AUTH_ERROR",
+    "OTHER_ERROR"
+  ]) assert.ok(auth.includes('return "' + kind + '"'));
+  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, bcAuthErrorKind\(error\)\)/);
+  assert.match(auth, /cause: safeCause/);
+  assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*error\.message/);
+  assert.doesNotMatch(auth, /console\.(warn|log|error)\([^\n]*error\.message/);
+});
