@@ -67,7 +67,7 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
 });
 
 test("getSession error classifier maps representative failures to fixed categories", () => {
-  const match = auth.match(/(function bcAuthErrorKind\\(error\\) \\{[\\s\\S]*?\\n\\})\\nfunction bcAuthDiagnostic/);
+  const match = auth.match(/(function bcAuthErrorKind\(error\) \{[\s\S]*?\n\})\nfunction bcAuthDiagnostic/);
   assert.ok(match, "classifier function must be extractable for unit checks");
   const classify = vm.runInNewContext("(" + match[1] + ")");
   assert.equal(classify({ name: "LockAcquireTimeoutError", message: "Lock acquisition timed out" }), "LOCK_TIMEOUT");
