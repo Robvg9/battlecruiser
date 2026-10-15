@@ -5,6 +5,8 @@ const fs = require('node:fs');
 const app = fs.readFileSync('public/app.js', 'utf8');
 const sw = fs.readFileSync('public/service-worker.js', 'utf8');
 const m68 = fs.readFileSync('public/js/m68-ventas-pos-definitivo.js', 'utf8');
+const index = fs.readFileSync('public/index.html', 'utf8');
+const auth = fs.readFileSync('public/js/auth.js', 'utf8');
 
 function extract(text, pattern, label) {
   const m = text.match(pattern);
@@ -42,4 +44,17 @@ test('M68 usa la versión canónica para su pie y para invalidar caché', () => 
     /el\.textContent = 'v' \+ VER \+ ' — BattleCruiser';/,
     'M68 debe construir el pie a partir de VER sincronizada'
   );
+});
+
+
+test('auth diagnostic stays visible and version updater changes only version labels', () => {
+  const appVersion = extract(app, /const VERSION=["'](\\d+\\.\\d+\\.\\d+)["']/, 'VERSION de app.js');
+  const htmlVersion = extract(index, /<p class="footnote app-version-label">v(\\d+\\.\\d+\\.\\d+) — BattleCruiser<\\/p>/, 'versión visible del login');
+  assert.equal(htmlVersion, appVersion, 'la versión visible del login debe coincidir con app.js');
+  assert.match(app, /querySelectorAll\\(["']\\.app-version-label,\\.app-footer-version["']\\)/,
+    'el actualizador debe seleccionar solo etiquetas explícitas de versión');
+  assert.doesNotMatch(app, /querySelectorAll\\(["']\\.footnote,\\.app-footer-version["']\\)/,
+    'el actualizador no debe sobrescribir mensajes de diagnóstico que usen estilo footnote');
+  assert.match(auth, /el\\.className = ["']footnote bc-auth-diagnostic["']/,
+    'el diagnóstico debe tener clase propia además del estilo footnote');
 });
