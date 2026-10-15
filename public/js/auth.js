@@ -24,7 +24,7 @@ let _bcAuthBootResolved = false;
 // No descartar una sesión válida mientras termina de prepararse la interfaz.
 let _bcAuthSessionDiscovered = false;
 let _bcAuthLastGetSessionErrorKind = null;
-let _bcAuthLastGetSessionErrorShape = null;
+let _bcAuthLastGetSessionErrorShape = null;\nlet _bcAuthLastGetSessionErrorFingerprint = null;\nlet _bcAuthLastGetSessionErrorTrace = null;
 let _bcAuthGetSessionRetryAttempts = 0;
 let _bcAuthGetSessionRetryPending = false;
 
@@ -98,13 +98,87 @@ function bcAuthErrorShape(error) {
   }
   return shapes.length ? shapes.join(">") : "NO_ERROR_OBJECT";
 }
+
+function bcAuthErrorFingerprint(error) {
+  var pending = [error];
+  var visited = [];
+  while (pending.length && visited.length < 8) {
+    var current = pending.shift();
+    if (current == null) continue;
+    if (typeof current === "object") {
+      if (visited.indexOf(current) !== -1) continue;
+      visited.push(current);
+    }
+    var name = "";
+    var message = "";
+    try {
+      if (typeof current === "string") message = current;
+      else if (typeof current === "object") {
+        name = String(current.name || (current.constructor && current.constructor.name) || "").toLowerCase();
+        message = String(current.message || "").toLowerCase();
+      }
+    } catch (_) {}
+    if (/maximum call stack size exceeded|too much recursion/.test(message)) return "STACK_OVERFLOW";
+    if (/invalid array length/.test(message)) return "INVALID_ARRAY_LENGTH";
+    if (/invalid string length/.test(message)) return "INVALID_STRING_LENGTH";
+    if (/out of memory/.test(message)) return "OUT_OF_MEMORY";
+    if (/cyclic|circular/.test(message)) return "CIRCULAR_DATA";
+    if (/quotaexceeded|localstorage|storage|serialize|deserialize|json parse|invalid json/.test(name + " " + message)) return "STORAGE_FAILURE";
+    if (/lock/.test(name + " " + message) && /timeout|timed out|acquir|held/.test(name + " " + message)) return "LOCK_FAILURE";
+    if (name === "rangeerror") return "RANGE_ERROR_UNCLASSIFIED";
+    if (name === "typeerror") return "TYPE_ERROR_UNCLASSIFIED";
+    if (typeof current === "object") {
+      ["originalError", "cause", "error", "innerError", "context"].forEach(function (key) {
+        try { if (current[key] != null && current[key] !== current) pending.push(current[key]); } catch (_) {}
+      });
+    }
+  }
+  return "UNCLASSIFIED";
+}
+function bcAuthSafeStack(error) {
+  var pending = [error];
+  var visited = [];
+  while (pending.length && visited.length < 8) {
+    var current = pending.shift();
+    if (current == null) continue;
+    if (typeof current === "object") {
+      if (visited.indexOf(current) !== -1) continue;
+      visited.push(current);
+    }
+    var stack = "";
+    try { if (current && typeof current.stack === "string") stack = current.stack; } catch (_) {}
+    if (stack) {
+      var frames = [];
+      stack.split(/\\r?\\n/).slice(0, 12).forEach(function (line) {
+        var m = line.match(/^\\s*at\\s+([A-Za-z_$][A-Za-z0-9_$<>.]*)\\s+\\(https?:\\/\\/[^/\\s)]+\\/([^/?\\s):]+\\.js)(?:\\?[^:\\s)]*)?:(\\d+):\\d+\\)/);
+        if (m) {
+          frames.push(m[1].slice(0, 40) + "@" + m[2].slice(0, 40) + ":" + m[3]);
+          return;
+        }
+        m = line.match(/^\\s*at\\s+https?:\\/\\/[^/\\s)]+\\/([^/?\\s):]+\\.js)(?:\\?[^:\\s)]*)?:(\\d+):\\d+/);
+        if (m) frames.push(m[1].slice(0, 40) + ":" + m[2]);
+      });
+      if (frames.length) return frames.slice(0, 3).join(">");
+    }
+    if (typeof current === "object") {
+      ["originalError", "cause", "error", "innerError", "context"].forEach(function (key) {
+        try { if (current[key] != null && current[key] !== current) pending.push(current[key]); } catch (_) {}
+      });
+    }
+  }
+  return "NO_SAFE_FRAMES";
+}
 function bcHandleGetSessionError(error) {
   var kind = bcAuthErrorKind(error);
   var shape = bcAuthErrorShape(error);
+  var fingerprint = bcAuthErrorFingerprint(error);
+  var trace = bcAuthSafeStack(error);
   var storage = bcAuthStoragePresence();
   _bcAuthLastGetSessionErrorKind = kind;
   _bcAuthLastGetSessionErrorShape = shape;
-  bcAuthDiagnostic("GETSESSION_ERROR", true, kind, shape);
+  _bcAuthLastGetSessionErrorFingerprint = fingerprint;
+  _bcAuthLastGetSessionErrorTrace = trace;
+  bcAuthDiagnostic("GETSESSION_ERROR", true, kind, shape, fingerprint, trace);
   if (_bcAuthBootResolved) return;
   if (storage !== "PRESENT") {
     bcResolverBootSinSesion();
@@ -148,12 +222,14 @@ function bcScheduleGetSessionRetry() {
     });
   }, attempt === 1 ? 650 : 1400);
 }
-function bcAuthDiagnostic(code, visible, cause, shape) {
+function bcAuthDiagnostic(code, visible, cause, shape, fingerprint, trace) {
   var storage = bcAuthStoragePresence();
   var safeCause = cause || "NONE";
   var safeShape = shape || "NONE";
-  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape };
-  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage, cause: safeCause, shape: safeShape });
+  var safeFingerprint = fingerprint || "NONE";
+  var safeTrace = trace || "NONE";
+  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace };
+  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace });
   if (!visible || !loginForm) return;
   var el = document.getElementById("bc-auth-diagnostic");
   if (!el) {
@@ -166,6 +242,8 @@ function bcAuthDiagnostic(code, visible, cause, shape) {
   el.textContent = "Diagnóstico de sesión: " + code
     + (safeCause !== "NONE" ? " · causa: " + safeCause : "")
     + (safeShape !== "NONE" ? " · tipo: " + safeShape : "")
+    + (safeFingerprint !== "NONE" ? " · firma: " + safeFingerprint : "")
+    + (safeTrace !== "NONE" ? " · traza: " + safeTrace : "")
     + " · almacenamiento local: " + storage
     + ". Comparte solo estos valores; no compartas contraseñas ni datos de sesión.";
 }
@@ -359,7 +437,7 @@ client.auth.getSession().then(function (res) {
 // Red de seguridad: si getSession cuelga, no dejar la UI en limbo
 setTimeout(function () {
   if (!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession) {
-    bcAuthDiagnostic("BOOT_TIMEOUT", true, _bcAuthLastGetSessionErrorKind || "NONE", _bcAuthLastGetSessionErrorShape || "NONE");
+    bcAuthDiagnostic("BOOT_TIMEOUT", true, _bcAuthLastGetSessionErrorKind || "NONE", _bcAuthLastGetSessionErrorShape || "NONE", _bcAuthLastGetSessionErrorFingerprint || "NONE", _bcAuthLastGetSessionErrorTrace || "NONE");
     bcResolverBootSinSesion();
   } else if (!_bcAuthBootResolved) {
     console.warn("[BattleCruiser] arranque de sesión aún pendiente; no se fuerza login porque ya se detectó una sesión");
