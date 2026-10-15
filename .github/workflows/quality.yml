@@ -2,9 +2,13 @@ name: BattleCruiser Quality
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  # Run production E2E only after the separate deploy workflow has completed.
+  # A push trigger races the deploy and can compare old LIVE assets against new source files.
+  workflow_run:
+    workflows: ["Deploy BattleCruiser PWA"]
+    types: [completed]
     branches: [main]
 
 concurrency:
@@ -16,6 +20,7 @@ permissions:
 
 jobs:
   quality:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 35
 
@@ -23,6 +28,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 1
           clean: true
 
@@ -60,21 +66,22 @@ jobs:
           set "NODE_OPTIONS="
 
       # Pull requests have not been deployed yet, so production must still serve the base release.
-      # Verify the exact current app version on workflow_dispatch; post-merge deployment and Windows gates also verify LIVE.
+      # workflow_dispatch and workflow_run both verify the exact deployed version.
       - name: Verify production serves current application version
         if: github.event_name != 'pull_request'
         shell: cmd
         run: node test/verify-production-version.js
 
-
-
   live-offline-e2e:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: LIVE offline recovery — Chromium
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
