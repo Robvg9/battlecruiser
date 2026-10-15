@@ -24,7 +24,9 @@ let _bcAuthBootResolved = false;
 // No descartar una sesión válida mientras termina de prepararse la interfaz.
 let _bcAuthSessionDiscovered = false;
 let _bcAuthLastGetSessionErrorKind = null;
-let _bcAuthLastGetSessionErrorShape = null;\nlet _bcAuthLastGetSessionErrorFingerprint = null;\nlet _bcAuthLastGetSessionErrorTrace = null;
+let _bcAuthLastGetSessionErrorShape = null;
+let _bcAuthLastGetSessionErrorFingerprint = null;
+let _bcAuthLastGetSessionErrorTrace = null;
 let _bcAuthGetSessionRetryAttempts = 0;
 let _bcAuthGetSessionRetryPending = false;
 
