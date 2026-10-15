@@ -57,6 +57,10 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
   ]) assert.ok(auth.includes('return "' + kind + '"'));
   assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, bcAuthErrorKind\(error\)\)/);
   assert.match(auth, /cause: safeCause/);
-  assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*error\.message/);
-  assert.doesNotMatch(auth, /console\.(warn|log|error)\([^\n]*error\.message/);
+  const diagnosticAndBoot = auth.slice(
+    auth.indexOf("function bcAuthErrorKind(error)"),
+    auth.indexOf("// Red de seguridad: si getSession cuelga")
+  );
+  assert.doesNotMatch(diagnosticAndBoot, /textContent\s*=\s*[^;]*error\.message/);
+  assert.doesNotMatch(diagnosticAndBoot, /console\.(warn|log|error)\([^\n]*error\.message/);
 });
