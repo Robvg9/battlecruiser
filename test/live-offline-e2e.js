@@ -170,6 +170,9 @@ async function reloadAndWait() {
 function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
 }
+function shellSnapshotPredicate() {
+  return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState==='complete'&&s.version?s:null})()";
+}
 async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const appSource = fs.readFileSync(path.join(PUBLIC_DIR, "app.js"), "utf8");
@@ -220,6 +223,7 @@ async function main() {
     "--disable-sync",
     "--disable-translate",
     "--remote-debugging-port=0",
+    "--remote-allow-origins=*",
     "--user-data-dir=" + userDataDir,
     "about:blank",
   ], { stdio: "ignore", windowsHide: true });
@@ -327,7 +331,7 @@ async function main() {
   report.evidence.phase = "online_initial";
   const initialResponseStart = responses.length;
   await navigateAndWait(BASE_URL + "/");
-  const initial = await waitUntil("shell online con versión esperada", pageSnapshotExpression() + " && 1", 10000);
+  const initial = await waitUntil("shell online con versión esperada", shellSnapshotPredicate(), 10000);
   report.evidence.onlineInitial = initial;
   assert(initial.readyState === "complete", "El documento LIVE no terminó de cargar.");
   assert(initial.version === expectedVersion, "Versión de navegador " + initial.version + " distinta de la esperada " + expectedVersion + ".");
@@ -373,7 +377,7 @@ async function main() {
   await reloadAndWait();
   const offline = await waitUntil(
     "render de la PWA durante la desconexión de red",
-    pageSnapshotExpression() + " && 1",
+    shellSnapshotPredicate(),
     15000
   );
   report.evidence.offlineReload = offline;
@@ -412,7 +416,7 @@ async function main() {
     connectionType: "wifi",
   });
   await reloadAndWait();
-  const reconnected = await waitUntil("recuperación tras reconectar internet", pageSnapshotExpression() + " && 1", 15000);
+  const reconnected = await waitUntil("recuperación tras reconectar internet", shellSnapshotPredicate(), 15000);
   report.evidence.onlineReconnect = reconnected;
   assert(reconnected.readyState === "complete", "La PWA no terminó de cargar tras reconectar.");
   assert(reconnected.version === expectedVersion, "La versión cambió después de reconectar.");
