@@ -7,6 +7,25 @@
   var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true };
   var LABELS = { config:'Configuración', ciclos:'Turnos' };
 
+  // Avoid style-attribute mutations when the final value is already applied.
+  function setImportantStyle(el, property, value) {
+    if (el.style.getPropertyValue(property) !== value || el.style.getPropertyPriority(property) !== 'important') {
+      el.style.setProperty(property, value, 'important');
+    }
+  }
+
+  function removeClassIfPresent(el, className) {
+    if (el.classList.contains(className)) el.classList.remove(className);
+  }
+
+  function removeAttributeIfPresent(el, attribute) {
+    if (el.hasAttribute(attribute)) el.removeAttribute(attribute);
+  }
+
+  function setTabIndexIfNeeded(el, value) {
+    if (el.tabIndex !== value) el.tabIndex = value;
+  }
+
   function asegurarConfigButton(){
     var tabs = document.getElementById('tabs');
     if (!tabs) return;
@@ -20,13 +39,13 @@
       tabs.appendChild(btn);
     }
     if (btn) {
-      btn.classList.remove('hidden','tab-sin-permiso');
-      btn.style.removeProperty('display');
-      btn.style.setProperty('display','flex','important');
-      btn.style.setProperty('visibility','visible','important');
-      btn.style.setProperty('opacity','1','important');
-      btn.removeAttribute('aria-hidden');
-      btn.tabIndex = 0;
+      removeClassIfPresent(btn, 'hidden');
+      removeClassIfPresent(btn, 'tab-sin-permiso');
+      setImportantStyle(btn, 'display', 'flex');
+      setImportantStyle(btn, 'visibility', 'visible');
+      setImportantStyle(btn, 'opacity', '1');
+      removeAttributeIfPresent(btn, 'aria-hidden');
+      setTabIndexIfNeeded(btn, 0);
     }
   }
 
@@ -36,18 +55,18 @@
     tabs.querySelectorAll('.tab-btn[data-tab]').forEach(function(btn){
       var tab = btn.dataset.tab;
       if (KEEP_HIDDEN[tab]) return;
-      btn.classList.remove('hidden','tab-sin-permiso');
-      btn.removeAttribute('aria-hidden');
-      btn.tabIndex = 0;
-      btn.style.removeProperty('display');
-      btn.style.setProperty('display','flex','important');
-      btn.style.setProperty('visibility','visible','important');
-      btn.style.setProperty('opacity','1','important');
+      removeClassIfPresent(btn, 'hidden');
+      removeClassIfPresent(btn, 'tab-sin-permiso');
+      removeAttributeIfPresent(btn, 'aria-hidden');
+      setTabIndexIfNeeded(btn, 0);
+      setImportantStyle(btn, 'display', 'flex');
+      setImportantStyle(btn, 'visibility', 'visible');
+      setImportantStyle(btn, 'opacity', '1');
       if (LABELS[tab] && !btn.querySelector('.bc-nav-label')) {
         var hasIcon = btn.querySelector('.bc-nav-icon');
         if (hasIcon) {
           var span=document.createElement('span'); span.className='bc-nav-label'; span.textContent=LABELS[tab]; btn.appendChild(span);
-        } else if (!btn.textContent.trim() || tab==='config') {
+        } else if ((!btn.textContent.trim() || tab==='config') && btn.textContent !== LABELS[tab]) {
           btn.textContent=LABELS[tab];
         }
       }

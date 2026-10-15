@@ -72,8 +72,58 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
+  deploy-pr-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4.149.0
+
+      - name: Deploy isolated PR preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          wrangler deploy --config wrangler.toml --name "$BC_PREVIEW_NAME"
+
+      - name: Wait for isolated preview assets
+        env:
+          BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+        run: |
+          set -euo pipefail
+          base="https://${BC_PREVIEW_NAME}.robvg9.workers.dev"
+          expected="$(grep -o 'const VERSION="[^"]*"' public/app.js | head -n 1)"
+          sw_expected="$(grep -o 'BC_SW_VERSION = "[^"]*"' public/service-worker.js | head -n 1)"
+          test -n "$expected"
+          test -n "$sw_expected"
+          for attempt in $(seq 1 30); do
+            index_status="$(curl --location --silent --output /tmp/bc-preview-index.html --write-out '%{http_code}' "$base/index.html?bc_preview_ready=$attempt" || true)"
+            app_status="$(curl --location --silent --output /tmp/bc-preview-app.js --write-out '%{http_code}' "$base/app.js?bc_preview_ready=$attempt" || true)"
+            sw_status="$(curl --location --silent --output /tmp/bc-preview-sw.js --write-out '%{http_code}' "$base/service-worker.js?bc_preview_ready=$attempt" || true)"
+            if [ "$index_status" = "200" ] && [ "$app_status" = "200" ] && [ "$sw_status" = "200" ] \
+              && grep -Fq "$expected" /tmp/bc-preview-app.js \
+              && grep -Fq "$sw_expected" /tmp/bc-preview-sw.js; then
+              echo "[preview] PASS — index.html, app.js, Service Worker reachable; $expected"
+              exit 0
+            fi
+            echo "[preview] attempt $attempt/30: index=$index_status app=$app_status service-worker=$sw_status"
+            sleep 2
+          done
+          echo "[preview] FAIL — candidate assets not reachable or version not aligned within 60 seconds"
+          exit 1
+
   live-offline-e2e:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    needs: [deploy-pr-preview]
+    if: ${{ always() && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && (github.event_name != 'pull_request' || needs.deploy-pr-preview.result == 'success') }}
     name: LIVE offline recovery — Chromium
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -90,7 +140,7 @@ jobs:
 
       - name: Run real-browser LIVE offline E2E
         env:
-          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://test-battlecruiser-live-offline-e2e-20261015-battlecruiser.robvg9.workers.dev' || 'https://battlecruiser.robvg9.workers.dev' }}
+          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && format('https://bc-pr-{0}-battlecruiser.robvg9.workers.dev', github.event.number) || 'https://battlecruiser.robvg9.workers.dev' }}
         run: node test/live-offline-e2e.js
 
       - name: Persist LIVE offline E2E evidence

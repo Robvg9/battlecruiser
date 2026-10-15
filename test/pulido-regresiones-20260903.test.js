@@ -84,7 +84,9 @@ test('navegación: guardia final garantiza botón Configuración aunque otra cap
   assert.match(guard, /data-tab/);
   assert.match(guard, /setAttribute\('data-tab','config'\)/);
   assert.match(guard, /textContent = LABELS\.config|textContent=LABELS\.config/);
-  assert.match(guard, /setProperty\('display','flex','important'\)/);
+  assert.match(guard, /function setImportantStyle\(el, property, value\)/);
+  assert.match(guard, /setImportantStyle\(btn, 'display', 'flex'\)/);
+  assert.match(guard, /getPropertyValue\(property\) !== value/);
   assert.match(guard, /MutationObserver/);
 });
 
