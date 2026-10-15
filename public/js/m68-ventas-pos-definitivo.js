@@ -5,7 +5,7 @@
  */
 (function m68VentasPosDefinitivo() {
   'use strict';
-  const VER = String(window.__BC_VERSION__ || '9.4.77');
+  const VER = String(window.__BC_VERSION__ || '9.4.78');
   window.__BC_M68_LOADED__ = VER;
 
   const TOP_ID = 'bc-venta-topbar';
