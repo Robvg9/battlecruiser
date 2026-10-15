@@ -48,7 +48,7 @@ test("session restoration reports only a safe diagnostic code and storage-key pr
   assert.ok(auth.includes("bcAuthDiagnostic(\"GETSESSION_ERROR\", true, kind, shape)"));
   assert.ok(auth.includes("function bcHandleGetSessionError(error)"));
   assert.ok(auth.includes('if (storage !== "PRESENT")'));
-  assert.ok(auth.includes("waiting for the auth event"));
+  assert.ok(auth.includes("bounded retry scheduled"));
   assert.ok(auth.includes('_bcAuthLastGetSessionErrorKind || "NONE"'));
   assert.doesNotMatch(auth, /textContent\s*=\s*[^;]*(?:access_token|refresh_token)/);
 });
