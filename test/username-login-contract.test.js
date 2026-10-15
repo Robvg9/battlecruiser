@@ -164,3 +164,22 @@ test("context loader reuses the session supplied by auth before calling getSessi
   assert.match(source, /client\.rpc\("perfil_usuario_actual", \{\}\)/);
   assert.match(source, /client\.rpc\("permisos_usuario_actual", \{\}\)/);
 });
+
+
+test("auth UI readiness callback is deferred when app.js has not initialized the promise yet", () => {
+  const match = auth.match(/(function bcUIReadyThen\(fn\) \{[\s\S]*?\n\})\n\nfunction showApp/);
+  assert.ok(match, "bcUIReadyThen must be extractable for its early-script regression test");
+  const scheduled = [];
+  const fakeWindow = {
+    __BC_UI_READY__: undefined,
+    setTimeout(fn, delay) { scheduled.push({ fn, delay }); }
+  };
+  const readyThen = vm.runInNewContext("(" + match[1] + ")", { window: fakeWindow });
+  let calls = 0;
+  readyThen(() => { calls += 1; });
+  assert.equal(calls, 0, "fn must not run synchronously while app.js has not initialized");
+  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0].delay, 0);
+  scheduled[0].fn();
+  assert.equal(calls, 1, "deferred callback should run once after the current parser turn");
+});
