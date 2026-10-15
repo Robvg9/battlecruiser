@@ -23,6 +23,7 @@ let _bcPendingSession = null;
 let _bcAuthBootResolved = false;
 // No descartar una sesión válida mientras termina de prepararse la interfaz.
 let _bcAuthSessionDiscovered = false;
+let _bcAuthLastGetSessionErrorKind = null;
 
 // Diagnóstico de restauración sin leer, guardar ni imprimir tokens.
 function bcAuthStoragePresence() {
@@ -36,17 +37,51 @@ function bcAuthStoragePresence() {
 }
 function bcAuthErrorKind(error) {
   if (!error) return "NO_ERROR_OBJECT";
-  // Inspect only in memory; never display/log the raw SDK error or its message.
-  var name = String(error.name || "").toLowerCase();
-  var code = String(error.code || "").toLowerCase();
-  var message = String(error.message || "").toLowerCase();
-  var signature = name + " " + code + " " + message;
-  if (/navigator.?locks?|lock/.test(signature) && /timeout|timed out|acquir|held/.test(signature)) return "LOCK_TIMEOUT";
-  if (/refresh.?token|invalid_grant|session_not_found|refresh token/.test(signature)) return "REFRESH_TOKEN_ERROR";
-  if (/localstorage|storage|serialize|deserialize|json parse|invalid json/.test(signature)) return "STORAGE_ERROR";
-  if (/failed to fetch|fetcherror|network|offline|load failed|econn|http.?error/.test(signature)) return "NETWORK_ERROR";
-  if (/jwt|unauthorized|authsessionmissing|session missing|invalid session/.test(signature)) return "AUTH_ERROR";
+  // Supabase may wrap an unexpected initialization failure in AuthUnknownError.originalError.
+  // Inspect nested causes only in memory; never display/log raw error details.
+  var pending = [error];
+  var visited = [];
+  while (pending.length && visited.length < 8) {
+    var current = pending.shift();
+    if (current == null) continue;
+    if (typeof current !== "object" && typeof current !== "string") continue;
+    if (typeof current === "object") {
+      if (visited.indexOf(current) !== -1) continue;
+      visited.push(current);
+    }
+    var name = typeof current === "object" ? String(current.name || (current.constructor && current.constructor.name) || "").toLowerCase() : "";
+    var code = typeof current === "object" ? String(current.code || "").toLowerCase() : "";
+    var message = typeof current === "string" ? current.toLowerCase() : String(current.message || "").toLowerCase();
+    var signature = name + " " + code + " " + message;
+    if (/navigator.?locks?|lock/.test(signature) && /timeout|timed out|acquir|held/.test(signature)) return "LOCK_TIMEOUT";
+    if (/refresh.?token|invalid_grant|session_not_found|refresh token/.test(signature)) return "REFRESH_TOKEN_ERROR";
+    if (/localstorage|storage|serialize|deserialize|json parse|invalid json|quotaexceeded/.test(signature)) return "STORAGE_ERROR";
+    if (/failed to fetch|fetcherror|network|offline|load failed|econn|http.?error|err_network/.test(signature)) return "NETWORK_ERROR";
+    if (/jwt|unauthorized|authsessionmissing|session missing|invalid session/.test(signature)) return "AUTH_ERROR";
+    if (typeof current === "object") {
+      ["originalError", "cause", "error", "innerError", "context"].forEach(function (key) {
+        try { if (current[key] != null && current[key] !== current) pending.push(current[key]); } catch (_) {}
+      });
+    }
+  }
   return "OTHER_ERROR";
+}
+function bcHandleGetSessionError(error) {
+  var kind = bcAuthErrorKind(error);
+  var storage = bcAuthStoragePresence();
+  _bcAuthLastGetSessionErrorKind = kind;
+  bcAuthDiagnostic("GETSESSION_ERROR", true, kind);
+  if (_bcAuthBootResolved) return;
+  if (storage !== "PRESENT") {
+    bcResolverBootSinSesion();
+    return;
+  }
+  // Keep the boot gate closed while onAuthStateChange tries to deliver the stored session.
+  // The existing 8-second guard is the bounded fallback if no session event arrives.
+  console.warn("[BattleCruiser] getSession failed while a session key exists; waiting for the auth event", {
+    cause: kind,
+    storage: "PRESENT"
+  });
 }
 function bcAuthDiagnostic(code, visible, cause) {
   var storage = bcAuthStoragePresence();
@@ -243,22 +278,21 @@ client.auth.getSession().then(function (res) {
     bcResolverBootConSesion(data.session);
     if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
   } else if (!_bcAuthBootResolved) {
-    bcAuthDiagnostic(
-      res && res.error ? "GETSESSION_ERROR" : "GETSESSION_EMPTY",
-      true,
-      res && res.error ? bcAuthErrorKind(res.error) : "NONE"
-    );
-    bcResolverBootSinSesion();
+    if (res && res.error) {
+      bcHandleGetSessionError(res.error);
+    } else {
+      bcAuthDiagnostic("GETSESSION_EMPTY", true);
+      bcResolverBootSinSesion();
+    }
   }
 }).catch(function (error) {
-  bcAuthDiagnostic("GETSESSION_ERROR", true, bcAuthErrorKind(error));
-  if (!_bcAuthBootResolved) bcResolverBootSinSesion();
+  bcHandleGetSessionError(error);
 });
 
 // Red de seguridad: si getSession cuelga, no dejar la UI en limbo
 setTimeout(function () {
   if (!_bcAuthBootResolved && !_bcAuthSessionDiscovered && !_bcPendingSession) {
-    bcAuthDiagnostic("BOOT_TIMEOUT", true);
+    bcAuthDiagnostic("BOOT_TIMEOUT", true, _bcAuthLastGetSessionErrorKind || "NONE");
     bcResolverBootSinSesion();
   } else if (!_bcAuthBootResolved) {
     console.warn("[BattleCruiser] arranque de sesión aún pendiente; no se fuerza login porque ya se detectó una sesión");
