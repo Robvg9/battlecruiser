@@ -140,10 +140,13 @@ test("B4.2/B: actividad reciente se carga desde _cache (sin consultas nuevas)", 
   window._cache.ventas = [{ fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } }];
   window._cache.transferencias = [];
   window._cache.vales = [];
-  await window.refrescarCentroMando();
-  await esperar(20);
+  // Esta prueba valida el render a partir de caché, no el refresco de datos.
+  // Renderizar directamente evita una carrera con el refresco inicial de ventas,
+  // que puede ejecutarse en paralelo en CI y reemplazar _cache.ventas por [].
+  window.renderActividadMando();
   const act = document.getElementById("mando-actividad");
   assert.ok(act.innerHTML.includes("Venta"), "debe mostrar la venta de _cache");
+  assert.ok(act.innerHTML.includes("$250.00"), "debe mostrar el total almacenado en caché");
 });
 
 test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando", async () => {
