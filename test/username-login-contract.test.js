@@ -3,6 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const auth = fs.readFileSync(path.join(root, "public", "js", "auth.js"), "utf8").replace(/\r\n/g, "\n");
@@ -63,4 +64,16 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
   );
   assert.doesNotMatch(diagnosticAndBoot, /textContent\s*=\s*[^;]*error\.message/);
   assert.doesNotMatch(diagnosticAndBoot, /console\.(warn|log|error)\([^\n]*error\.message/);
+});
+
+test("getSession error classifier maps representative failures to fixed categories", () => {
+  const match = auth.match(/(function bcAuthErrorKind\\(error\\) \\{[\\s\\S]*?\\n\\})\\nfunction bcAuthDiagnostic/);
+  assert.ok(match, "classifier function must be extractable for unit checks");
+  const classify = vm.runInNewContext("(" + match[1] + ")");
+  assert.equal(classify({ name: "LockAcquireTimeoutError", message: "Lock acquisition timed out" }), "LOCK_TIMEOUT");
+  assert.equal(classify({ name: "AuthApiError", message: "Invalid Refresh Token: Refresh Token Not Found" }), "REFRESH_TOKEN_ERROR");
+  assert.equal(classify({ name: "StorageError", message: "localStorage write failed" }), "STORAGE_ERROR");
+  assert.equal(classify({ name: "AuthRetryableFetchError", message: "Failed to fetch" }), "NETWORK_ERROR");
+  assert.equal(classify({ name: "AuthSessionMissingError", message: "Auth session missing" }), "AUTH_ERROR");
+  assert.equal(classify({ name: "UnexpectedError", message: "unclassified" }), "OTHER_ERROR");
 });
