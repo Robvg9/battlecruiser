@@ -161,7 +161,7 @@ function bcErrorEsRedOTimeout(err, huboTimeoutFlag) {
   return /timeout|failed to fetch|network|offline|err_internet|connection|load failed/.test(msg);
 }
 
-async function cargarContextoUsuario() {
+async function cargarContextoUsuario(sessionInicial) {
   if (_cargandoUsuario) return;
   _cargandoUsuario = true;
   mostrarEstadoIdentidadEnHeader("Cargando usuario…");
@@ -169,28 +169,34 @@ async function cargarContextoUsuario() {
   var huboTimeout = false;
   var huboErrorRed = false;
   try {
-    var sesionPack;
-    try {
-      sesionPack = await bcConTimeout(client.auth.getSession(), BC_CONTEXTO_TIMEOUT_MS, "getSession");
-    } catch (eSes) {
-      huboTimeout = !!(eSes && eSes.bcTimeout);
-      huboErrorRed = true;
-      console.warn("[BattleCruiser] getSession falló o timeout", eSes);
-      mostrarEstadoIdentidadEnHeader(huboTimeout ? "Tiempo agotado — reintentá" : "Sin conexión — reintentá");
-      asegurarBotonReintentarContexto();
-      if (bcRestaurarSnapshotPermisos("getSession red/timeout")) {
-        _permisosCargaFallidaRed = true;
-        if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
-        if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
+    var authUser = null;
+    if (sessionInicial && sessionInicial.user) {
+      // Reuse the session supplied by onAuthStateChange; the caller runs after that callback returns.
+      authUser = sessionInicial.user;
+    } else {
+      var sesionPack;
+      try {
+        sesionPack = await bcConTimeout(client.auth.getSession(), BC_CONTEXTO_TIMEOUT_MS, "getSession");
+      } catch (eSes) {
+        huboTimeout = !!(eSes && eSes.bcTimeout);
+        huboErrorRed = true;
+        console.warn("[BattleCruiser] getSession falló o timeout", eSes);
+        mostrarEstadoIdentidadEnHeader(huboTimeout ? "Tiempo agotado — reintentá" : "Sin conexión — reintentá");
+        asegurarBotonReintentarContexto();
+        if (bcRestaurarSnapshotPermisos("getSession red/timeout")) {
+          _permisosCargaFallidaRed = true;
+          if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+          if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
+        }
+        return;
       }
-      return;
+      var sesion = sesionPack && sesionPack.data;
+      if (!sesion || !sesion.session) {
+        limpiarContextoUsuario();
+        return;
+      }
+      authUser = sesion.session.user;
     }
-    var sesion = sesionPack && sesionPack.data;
-    if (!sesion || !sesion.session) {
-      limpiarContextoUsuario();
-      return;
-    }
-    var authUser = sesion.session.user;
 
     var perfilRes = null;
     var permsRes = null;

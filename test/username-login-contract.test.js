@@ -7,6 +7,7 @@ const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const auth = fs.readFileSync(path.join(root, "public", "js", "auth.js"), "utf8").replace(/\r\n/g, "\n");
+const context = fs.readFileSync(path.join(root, "public", "js", "usuarios-permisos.js"), "utf8").replace(/\r\n/g, "\n");
 const edge = fs.readFileSync(path.join(root, "supabase", "functions", "bc-username-login", "index.ts"), "utf8");
 
 test("frontend routes username login through the server-side credential bridge", () => {
@@ -41,11 +42,11 @@ test("session restoration reports only a safe diagnostic code and storage-key pr
   assert.ok(auth.includes('GETSESSION_ERROR'));
   assert.ok(auth.includes('BOOT_TIMEOUT'));
   assert.ok(auth.includes('AUTH_SIGNED_OUT_EVENT'));
-  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape }'));
+  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace }'));
   assert.ok(auth.includes("function bcAuthErrorShape(error)"));
   assert.ok(auth.includes("function bcScheduleGetSessionRetry()"));
   assert.ok(auth.includes("_bcAuthGetSessionRetryAttempts >= 2"));
-  assert.ok(auth.includes("bcAuthDiagnostic(\"GETSESSION_ERROR\", true, kind, shape)"));
+  assert.ok(auth.includes("bcAuthDiagnostic(\"GETSESSION_ERROR\", true, kind, shape, fingerprint, trace)"));
   assert.ok(auth.includes("function bcHandleGetSessionError(error)"));
   assert.ok(auth.includes('if (storage !== "PRESENT")'));
   assert.ok(auth.includes("bounded retry scheduled"));
@@ -64,7 +65,7 @@ test("getSession diagnostic exposes only an allowlisted error category", () => {
     "AUTH_ERROR",
     "OTHER_ERROR"
   ]) assert.ok(auth.includes('return "' + kind + '"'));
-  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, kind, shape\)/);
+  assert.match(auth, /bcAuthDiagnostic\("GETSESSION_ERROR", true, kind, shape, fingerprint, trace\)/);
   assert.match(auth, /cause: safeCause/);
   const diagnosticAndBoot = auth.slice(
     auth.indexOf("function bcAuthErrorKind(error)"),
@@ -101,7 +102,7 @@ test("getSession error classifier maps representative failures to fixed categori
 });
 
 test("session diagnostic fingerprints only safe nested error types", () => {
-  const match = auth.match(/(function bcAuthErrorShape\(error\) \{[\s\S]*?\n\})\nfunction bcHandleGetSessionError/);
+  const match = auth.match(/(function bcAuthErrorShape\(error\) \{[\s\S]*?\n\})\n\s*function bcAuthErrorFingerprint/);
   assert.ok(match, "shape function must be extractable for unit checks");
   const shape = vm.runInNewContext("(" + match[1] + ")");
   const result = shape({
@@ -112,4 +113,54 @@ test("session diagnostic fingerprints only safe nested error types", () => {
   assert.equal(result, "AuthUnknownError>TypeError");
   assert.doesNotMatch(result, /DO_NOT_EXPOSE|network details/);
   assert.ok(shape(null) === "NO_ERROR_OBJECT");
+});
+
+
+test("RangeError fingerprint uses allowlisted signatures without exposing raw messages", () => {
+  const match = auth.match(/(function bcAuthErrorFingerprint\(error\) \{[\s\S]*?\n\})\nfunction bcAuthSafeStack/);
+  assert.ok(match, "fingerprint function must be extractable for unit checks");
+  const fingerprint = vm.runInNewContext("(" + match[1] + ")");
+  assert.equal(fingerprint({ name: "RangeError", message: "Maximum call stack size exceeded" }), "STACK_OVERFLOW");
+  assert.equal(fingerprint({ name: "RangeError", message: "Invalid array length" }), "INVALID_ARRAY_LENGTH");
+  assert.equal(fingerprint({ name: "AuthUnknownError", originalError: { name: "RangeError", message: "Maximum call stack size exceeded" } }), "STACK_OVERFLOW");
+  const unknown = fingerprint({ name: "RangeError", message: "DO_NOT_EXPOSE_THIS_MESSAGE" });
+  assert.equal(unknown, "RANGE_ERROR_UNCLASSIFIED");
+  assert.doesNotMatch(unknown, /DO_NOT_EXPOSE/);
+});
+
+test("safe auth stack exposes only function names, script basenames and line numbers", () => {
+  const match = auth.match(/(function bcAuthSafeStack\(error\) \{[\s\S]*?\n\})\nfunction bcHandleGetSessionError/);
+  assert.ok(match, "safe stack function must be extractable for unit checks");
+  const safeStack = vm.runInNewContext("(" + match[1] + ")");
+  const result = safeStack({
+    stack: [
+      "RangeError: DO_NOT_EXPOSE_THIS_MESSAGE",
+      "    at getSession (https://battlecruiser.robvg9.workers.dev/js/auth.js?v=9.4.87:321:11)",
+      "    at Object.process (https://cdn.example/supabase.js?secret=DO_NOT_EXPOSE_THIS:98:2)"
+    ].join("\n")
+  });
+  assert.equal(result, "getSession@auth.js:321>Object.process@supabase.js:98");
+  assert.doesNotMatch(result, /https|secret|DO_NOT_EXPOSE/);
+  assert.equal(safeStack({ stack: "no parseable frame" }), "NO_SAFE_FRAMES");
+});
+
+
+test("auth state callbacks defer context loading and forward their session", () => {
+  const match = auth.match(/(function bcIntentarCargarContexto\(session\) \{[\s\S]*?\n\})/);
+  assert.ok(match, "context helper must be extractable for checks");
+  assert.match(match[1], /window\.setTimeout\(function/);
+  assert.match(match[1], /cargarContextoUsuario\(readySession \|\| null\)/);
+  assert.doesNotMatch(match[1], /cargarContextoUsuario\(\);/);
+  assert.match(auth, /bcIntentarCargarContexto\(session\)/);
+});
+
+test("context loader reuses the session supplied by auth before calling getSession", () => {
+  const match = context.match(/(async function cargarContextoUsuario\(sessionInicial\) \{[\s\S]*?\n\})\ncargarContextoUsuario\.__bcM263Timeout/);
+  assert.ok(match, "context loader must be extractable for checks");
+  const source = match[1];
+  assert.match(source, /if \(sessionInicial && sessionInicial\.user\)/);
+  assert.match(source, /authUser = sessionInicial\.user/);
+  assert.ok(source.indexOf("authUser = sessionInicial.user") < source.indexOf("client.auth.getSession()"));
+  assert.match(source, /client\.rpc\("perfil_usuario_actual", \{\}\)/);
+  assert.match(source, /client\.rpc\("permisos_usuario_actual", \{\}\)/);
 });
