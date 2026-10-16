@@ -77,6 +77,6 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.4\.94"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.4"><\/script>/);
-  assert.match(index, /<script src="app\\.js\\?v=9\\.4\\.94"><\\/script>/);
+  assert.match(index, /<script src="app\.js\?v=9\.4\.94"><\/script>/);
   assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.4\.94['"]\);/);
 });
