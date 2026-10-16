@@ -23,6 +23,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 // ---- Estado simulado de inventario (lotes + stock) en memoria ----
 // Refleja el comportamiento de los RPC de B6 para las pruebas de lógica.
 function crearEstadoInventarioMock() {
@@ -203,7 +212,7 @@ function mockClienteB6(opciones = {}) {
 function montarEntorno(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
-  html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
+  html = html.replace(/<script[^>]*src="app\.js(?:\?[^"]*)?"[^>]*><\/script>/g, "");
   // Misión de modularización: también se quitan los <script src="js/...">
   // (los módulos reales se inyectan a mano más abajo, igual que antes se
   // inyectaba app.js completo — así el test no depende de red).
@@ -380,11 +389,17 @@ test("B6.13: usuario sin permiso ventas.crear no puede ejecutar operación de ve
     permisos: [{ seccion: "ventas", accion: "ver" }], // sin crear
   });
   marcarOnline(window);
-  await esperar(80);
-  // ejecutarOperacion valida usuarioPuedeOperar; el backend validaría tiene_permiso.
-  // El frontend oculta el botón de crear venta.
   const form = window.document.getElementById("form-venta-linea");
-  assert.ok(form.classList.contains("hidden"), "form de venta oculto sin permiso crear");
+  assert.ok(
+    await esperarHasta(() =>
+      typeof window._usuarioActual === "function" &&
+      Boolean(window._usuarioActual()) &&
+      typeof window.tienePermiso === "function" &&
+      window.tienePermiso("ventas", "ver") &&
+      form.classList.contains("hidden")
+    ),
+    "form de venta oculto sin permiso crear en un máximo de 2 s"
+  );
 });
 
 test("B6.14: usuario inactivo no puede operar", async () => {
