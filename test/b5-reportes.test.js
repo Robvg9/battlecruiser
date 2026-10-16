@@ -16,6 +16,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 function mockCliente({ perfil, permisos, resumen, ventas, transferencias, vales, stock, movimiento, rentabilidad, compras } = {}) {
   const rpcCalls = [];
   const client = {
@@ -52,7 +61,7 @@ function mockCliente({ perfil, permisos, resumen, ventas, transferencias, vales,
 function montarEntorno(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
-  html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
+  html = html.replace(/<script[^>]*src="app\.js(?:\?[^"]*)?"[^>]*><\/script>/g, "");
   // Misión de modularización: también se quitan los <script src="js/...">
   // (los módulos reales se inyectan a mano más abajo, igual que antes se
   // inyectaba app.js completo — así el test no depende de red).
@@ -125,11 +134,21 @@ test("B5.5: el resumen ejecutivo se carga con datos reales del RPC", async () =>
     },
   });
   marcarOnline(window);
-  await esperar(80);
-  await window.refrescarReportes();
-  await esperar(20);
+  assert.ok(
+    await esperarHasta(() =>
+      typeof window._usuarioActual === "function" &&
+      Boolean(window._usuarioActual()) &&
+      typeof window.tienePermiso === "function" &&
+      window.tienePermiso("reportes", "ver")
+    ),
+    "contexto y permiso reportes deben estar listos en un máximo de 2 s"
+  );
   const resumen = document.getElementById("rep-resumen");
-  assert.ok(resumen.innerHTML.includes("15"), "debe mostrar cantidad de ventas");
+  await window.refrescarReportes();
+  assert.ok(
+    await esperarHasta(() => resumen.innerHTML.includes("15")),
+    "debe mostrar cantidad de ventas dentro de 2 s"
+  );
   assert.ok(resumen.innerHTML.includes("50000"), "debe mostrar ingresos");
   assert.ok(resumen.innerHTML.includes("No existe tabla histórica"), "debe mostrar nota de compras no disponible");
   assert.ok(resumen.innerHTML.includes("No existe costo histórico"), "debe mostrar nota de margen no disponible");
