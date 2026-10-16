@@ -80,8 +80,8 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
       const tools = document.createElement("div");
       tools.id = "productos-tools-nomenclatura";
       tools.innerHTML = `<button type="button" class="cc-accion" id="productos-nomenclatura-btn">⚙️ Nomenclatura y catálogos</button>`;
-      const formAnchor = form.parentElement || productosTab.firstElementChild;
-      if (formAnchor) formAnchor.insertAdjacentElement("beforebegin", tools);
+      // Keep the toolbar inside #tab-productos. M26 removes this UI if it is outside that panel.
+      form.insertAdjacentElement("beforebegin", tools);
 
       const modal = document.createElement("div");
       modal.id = "productos-nomenclatura-modal";
