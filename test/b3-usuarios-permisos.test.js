@@ -31,6 +31,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 // Construye un mock de cliente Supabase configurable.
 function mockCliente({ perfil, permisos, usuarios, roles } = {}) {
   const rpcCalls = [];
@@ -108,8 +117,10 @@ test("B3.2: el contexto del usuario se carga desde el RPC perfil_usuario_actual"
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
-  assert.ok(window._usuarioActual(), "debe haber contexto de usuario");
+  assert.ok(
+    await esperarHasta(() => window._usuarioActual()),
+    "debe haber contexto de usuario en un máximo de 2 s"
+  );
   assert.strictEqual(window._usuarioActual().nombre, "Roberto");
   assert.strictEqual(window._usuarioActual().rol, "Dueño");
   assert.strictEqual(window._usuarioActual().activo, true);
