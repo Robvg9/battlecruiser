@@ -67,3 +67,13 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
   assert.ok(sw.includes(sdkUrl), 'Service Worker must precache the same Supabase SDK');
   assert.ok(e2e.includes('const SUPABASE_CDN_URL = "' + sdkUrl + '";'), 'offline E2E must verify the same pinned SDK');
 });
+
+
+test('fixed LIVE scripts use refreshed cache keys and release version', () => {
+  assert.match(app, /const VERSION=["']9\.4\.89["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.4\.89["']/);
+  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261015\.1"\]/);
+  assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.4\.89"><\/script>/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.4\.89['"]\);/);
+});
