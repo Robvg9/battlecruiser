@@ -22,6 +22,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 function mockCliente({ perfil, permisos } = {}) {
   const rpcCalls = [];
   const client = {
@@ -80,6 +89,11 @@ function montarEntorno(opciones = {}) {
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
     .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
     .replace(/const RPC_POR_TIPO = \{/, "window.RPC_POR_TIPO = {");
+  appJs += `
+;window.__bcTestPermisosCargaExitosa = function () {
+  return typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa;
+};
+`;
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
@@ -106,7 +120,10 @@ test("M3/F2: ejecutarOperacion('producto_actualizar', ...) llama a actualizar_pr
     permisos: [{ seccion: "productos", accion: "editar" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(() => window.__bcTestPermisosCargaExitosa() && window.tienePermiso("productos", "editar")),
+    "el contexto y el permiso productos.editar deben terminar de cargarse antes de actualizar"
+  );
   const r = await window.ejecutarOperacion("producto_actualizar", {
     p_producto_id: "prod-123",
     p_nombre: "Coca-Cola 2L",
@@ -133,9 +150,12 @@ test("M3/F2: ejecutarOperacion('producto_estado', ...) llama a cambiar_estado_pr
     permisos: [{ seccion: "productos", accion: "editar" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(() => window.__bcTestPermisosCargaExitosa() && window.tienePermiso("productos", "editar")),
+    "el contexto y el permiso productos.editar deben terminar de cargarse antes de cambiar el estado"
+  );
   const r = await window.ejecutarOperacion("producto_estado", { p_producto_id: "prod-456", p_activo: false });
-  assert.ok(r.ok);
+  assert.ok(r.ok, "cambiar_estado_producto debe completarse una vez listos los permisos: " + JSON.stringify(r));
   const llamada = client.__rpcCalls.find((c) => c.nombre === "cambiar_estado_producto");
   assert.ok(llamada, "debe haberse llamado a cambiar_estado_producto");
   assert.strictEqual(llamada.params.p_producto_id, "prod-456");
@@ -151,7 +171,10 @@ test("M3/F3 (fix entidad_id): sincronizarCola registra el UUID real del RPC, no 
     permisos: [{ seccion: "productos", accion: "editar" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(() => window.__bcTestPermisosCargaExitosa() && window.tienePermiso("productos", "editar")),
+    "el contexto y el permiso productos.editar deben terminar de cargarse antes de sincronizar"
+  );
   const op = window.crearOperacionPendiente("producto_estado", { p_producto_id: "prod-789", p_activo: true });
   await window.guardarOperacionPendiente(op);
   await window.sincronizarCola();
@@ -174,7 +197,10 @@ test("M3/F2: sin permiso productos.editar, refrescarProductos no debe ofrecer bo
     permisos: [{ seccion: "productos", accion: "ver" }], // sin editar
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(() => window.__bcTestPermisosCargaExitosa() && window.tienePermiso("productos", "ver")),
+    "el permiso productos.ver debe terminar de cargarse antes de evaluar que no hay permiso de edición"
+  );
   window._cache.productos = [{ id: "p1", nombre: "Test", precio_normal: 10, precio_mayorista: null, activo: true }];
   const lista = document.getElementById("lista-productos");
   lista.innerHTML = "";
