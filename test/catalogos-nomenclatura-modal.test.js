@@ -41,6 +41,9 @@ test('opening product nomenclature never moves the whole Configuration tab into 
   try {
     window.eval(source);
     await wait(window, 80);
+    // The test covers reparenting, not live catalog data access.
+    window._refrescarCatalogo_categorias = () => {};
+    window._refrescarCatalogo_unidades = () => {};
 
     const main = document.querySelector('.main-content');
     const panel = document.getElementById('tab-config');
