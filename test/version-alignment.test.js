@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const app = fs.readFileSync('public/app.js', 'utf8');
 const sw = fs.readFileSync('public/service-worker.js', 'utf8');
 const m68 = fs.readFileSync('public/js/m68-ventas-pos-definitivo.js', 'utf8');
+const m26 = fs.readFileSync('public/js/m26-ui-integridad.js', 'utf8');
 const index = fs.readFileSync('public/index.html', 'utf8');
 const auth = fs.readFileSync('public/js/auth.js', 'utf8');
 const e2e = fs.readFileSync('test/live-offline-e2e.js', 'utf8');
@@ -73,6 +74,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.4\.95["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.4\.95["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261016\.5"\]/);
+  assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
+  assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.4\.95"><\/script>/);
