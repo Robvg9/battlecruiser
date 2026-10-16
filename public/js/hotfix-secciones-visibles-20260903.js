@@ -81,7 +81,9 @@
   function normalizarPanelConfigActivo(){
     var btn = document.querySelector('#tabs .tab-btn[data-tab="config"]');
     var panel = document.getElementById('tab-config');
-    if (!btn || !panel || !(btn.classList.contains('active') || configSelectionRequested || window.__BC_CONFIG_TAB_SELECTED === true)) return;
+    var selectionKnown = typeof window.__BC_CONFIG_TAB_SELECTED === 'boolean';
+    var selected = selectionKnown ? window.__BC_CONFIG_TAB_SELECTED : btn && btn.classList.contains('active');
+    if (!btn || !panel || !selected) return;
     // The legacy permission pass may clear .active together with .visible.
     // Honor the most recent explicit Configuración click until another tab is chosen.
     if (configSelectionRequested || window.__BC_CONFIG_TAB_SELECTED === true) {
