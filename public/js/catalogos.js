@@ -159,16 +159,56 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
   }
 
   let nomenclaturaOrigenes = [];
+
+  // Catalog lists sometimes sit directly under #tab-config rather than in a
+  // card. Never use the tab-panel itself as a movable fallback: that would
+  // place all of Configuration inside the hidden product-nomenclature modal.
+  function obtenerBloqueNomenclatura(id, el) {
+    if (!el) return null;
+    const existente = el.closest(".card") || el.closest(".cc-bloque");
+    if (existente) return existente;
+
+    const panel = el.closest(".tab-panel");
+    if (!panel) return el.parentElement;
+    let encabezado = el.previousElementSibling;
+    while (encabezado && encabezado.tagName !== "H3") encabezado = encabezado.previousElementSibling;
+    if (!encabezado) return null;
+
+    const bloque = document.createElement("div");
+    bloque.className = "cc-bloque";
+    bloque.dataset.bcNomenclatureBlock = id;
+    panel.insertBefore(bloque, encabezado);
+
+    let nodo = encabezado;
+    while (nodo) {
+      const siguiente = nodo.nextElementSibling;
+      if (nodo !== encabezado && nodo.tagName === "H3") break;
+      bloque.appendChild(nodo);
+      if (nodo === el) break;
+      nodo = siguiente;
+    }
+
+    if (!bloque.contains(el)) {
+      [...bloque.children].forEach((hijo) => panel.insertBefore(hijo, bloque));
+      bloque.remove();
+      return null;
+    }
+    return bloque;
+  }
+
   function prepararNomenclatura() {
-    nomenclaturaOrigenes = [];
+    // Reopening an already-open modal must not overwrite the original parents.
+    if (nomenclaturaOrigenes.length) return;
     const items = [["presentaciones-catalogo", "prod-nom-presentaciones-slot"], ["lista-categorias", "prod-nom-categorias-slot"], ["lista-unidades", "prod-nom-unidades-slot"]];
     items.forEach(([id, slotId]) => {
       const el = document.getElementById(id);
-      if (!el) return;
-      const bloque = el.closest(".card") || el.closest(".cc-bloque") || el.parentElement;
-      if (!bloque || !bloque.parentElement) return;
+      const slot = document.getElementById(slotId);
+      if (!el || !slot) return;
+      const bloque = obtenerBloqueNomenclatura(id, el);
+      if (!bloque || !bloque.parentElement || bloque.matches(".tab-panel")) return;
+      if (nomenclaturaOrigenes.some((origen) => origen.bloque === bloque)) return;
       nomenclaturaOrigenes.push({ bloque, parent: bloque.parentElement, next: bloque.nextSibling });
-      document.getElementById(slotId).appendChild(bloque);
+      slot.appendChild(bloque);
     });
     if (typeof _refrescarCatalogo_categorias === "function") _refrescarCatalogo_categorias();
     if (typeof _refrescarCatalogo_unidades === "function") _refrescarCatalogo_unidades();
