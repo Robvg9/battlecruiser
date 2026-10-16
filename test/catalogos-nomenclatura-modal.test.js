@@ -68,6 +68,12 @@ test('opening product nomenclature never moves the whole Configuration tab into 
     assert.equal(panel.parentElement, main, 'Configuration parent is stable after close');
     assert.equal(document.getElementById('form-categoria').closest('.cc-bloque').parentElement, panel);
     assert.equal(document.getElementById('form-unidad').closest('.cc-bloque').parentElement, panel);
+    const categoryBlock = document.getElementById('lista-categorias').closest('[data-bc-nomenclature-block]');
+    const unitsBlock = document.getElementById('lista-unidades').closest('[data-bc-nomenclature-block]');
+    const message = document.getElementById('msg-config');
+    assert.ok((categoryBlock.compareDocumentPosition(unitsBlock) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, 'category block order is preserved');
+    assert.ok((unitsBlock.compareDocumentPosition(message) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, 'unit block stays before the configuration message');
+    assert.equal(panel.querySelectorAll('comment').length, 0);
 
     // A second open/close cycle must not lose the original parents or duplicate wrappers.
     open.click();
