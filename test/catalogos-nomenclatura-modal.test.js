@@ -73,7 +73,10 @@ test('opening product nomenclature never moves the whole Configuration tab into 
     const message = document.getElementById('msg-config');
     assert.ok((categoryBlock.compareDocumentPosition(unitsBlock) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, 'category block order is preserved');
     assert.ok((unitsBlock.compareDocumentPosition(message) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, 'unit block stays before the configuration message');
-    assert.equal(panel.querySelectorAll('comment').length, 0);
+    const walker = document.createTreeWalker(panel, window.NodeFilter.SHOW_COMMENT);
+    let commentCount = 0;
+    while (walker.nextNode()) commentCount += 1;
+    assert.equal(commentCount, 0, 'temporary restoration anchors are removed after close');
 
     // A second open/close cycle must not lose the original parents or duplicate wrappers.
     open.click();
