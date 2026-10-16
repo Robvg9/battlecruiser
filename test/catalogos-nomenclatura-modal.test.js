@@ -49,6 +49,14 @@ test('opening product nomenclature never moves the whole Configuration tab into 
     const panel = document.getElementById('tab-config');
     const modal = document.getElementById('productos-nomenclatura-modal');
     const open = document.getElementById('productos-nomenclatura-btn');
+    const productTab = document.getElementById('tab-productos');
+    const toolbar = document.getElementById('productos-tools-nomenclatura');
+    assert.ok(productTab.contains(toolbar), 'toolbar must stay inside Products so the M26 cleanup guard retains it');
+    assert.ok(productTab.contains(open), 'nomenclature button must be owned by Products');
+    document.querySelectorAll('#productos-tools-nomenclatura,#productos-nomenclatura-btn').forEach((el) => {
+      if (!el.closest('#tab-productos')) el.remove();
+    });
+    assert.equal(document.getElementById('productos-nomenclatura-btn'), open, 'M26 cleanup must not delete the toolbar');
     assert.ok(modal, 'nomenclature modal should be installed');
     assert.ok(open, 'nomenclature action should be installed');
     assert.equal(panel.parentElement, main, 'Configuration starts in the main content');
