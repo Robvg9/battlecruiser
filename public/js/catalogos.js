@@ -165,10 +165,18 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
   // place all of Configuration inside the hidden product-nomenclature modal.
   function obtenerBloqueNomenclatura(id, el) {
     if (!el) return null;
-    const existente = el.closest(".card") || el.closest(".cc-bloque");
-    if (existente) return existente;
-
     const panel = el.closest(".tab-panel");
+    const existente = el.closest(".card") || el.closest(".cc-bloque");
+
+    // Existing cards are movable only when they are strictly inside the tab
+    // that owns the catalogue. A shared/outer .cc-bloque may wrap #tab-config;
+    // moving that ancestor into the hidden modal hides Configuration itself.
+    if (existente && (!panel || (
+      panel.contains(existente) &&
+      existente !== panel &&
+      !existente.contains(panel)
+    ))) return existente;
+
     if (!panel) return el.parentElement;
     let encabezado = el.previousElementSibling;
     while (encabezado && encabezado.tagName !== "H3") encabezado = encabezado.previousElementSibling;
