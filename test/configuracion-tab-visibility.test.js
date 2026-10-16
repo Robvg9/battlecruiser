@@ -66,6 +66,10 @@ test('active Configuración panel survives a legacy permission visibility reset'
 
     // A user selecting another tab must release the Configuración selection lock.
     homeButton.click();
+    // Simulate the normal navigation handler switching active tab and panel.
+    button.classList.remove('active');
+    homeButton.classList.add('active');
+    window.document.getElementById('tab-home').classList.add('visible');
     panel.classList.remove('visible');
     panel.classList.add('hidden');
     panel.style.setProperty('display', 'none', 'important');
