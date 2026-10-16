@@ -72,6 +72,23 @@
       }
     });
     asegurarConfigButton();
+    normalizarPanelConfigActivo();
+  }
+
+  // The legacy permission pass can hide the panel after the tab click.
+  // If Configuración is the selected tab, restore only its active panel.
+  function normalizarPanelConfigActivo(){
+    var btn = document.querySelector('#tabs .tab-btn[data-tab="config"]');
+    var panel = document.getElementById('tab-config');
+    if (!btn || !panel || !btn.classList.contains('active')) return;
+    removeClassIfPresent(panel, 'hidden');
+    removeClassIfPresent(panel, 'tab-sin-permiso');
+    removeAttributeIfPresent(panel, 'hidden');
+    removeAttributeIfPresent(panel, 'aria-hidden');
+    if (!panel.classList.contains('visible')) panel.classList.add('visible');
+    setImportantStyle(panel, 'display', 'block');
+    setImportantStyle(panel, 'visibility', 'visible');
+    setImportantStyle(panel, 'opacity', '1');
   }
 
   function injectCss(){
