@@ -6,6 +6,7 @@
 
   var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true };
   var LABELS = { config:'Configuración', ciclos:'Turnos' };
+  var configSelectionRequested = false;
 
   // Avoid style-attribute mutations when the final value is already applied.
   function setImportantStyle(el, property, value) {
@@ -72,6 +73,32 @@
       }
     });
     asegurarConfigButton();
+    normalizarPanelConfigActivo();
+  }
+
+  // The legacy permission pass can hide the panel after the tab click.
+  // If Configuración is the selected tab, restore only its active panel.
+  function normalizarPanelConfigActivo(){
+    var btn = document.querySelector('#tabs .tab-btn[data-tab="config"]');
+    var panel = document.getElementById('tab-config');
+    var selectionKnown = typeof window.__BC_CONFIG_TAB_SELECTED === 'boolean';
+    var selected = selectionKnown ? window.__BC_CONFIG_TAB_SELECTED : btn && btn.classList.contains('active');
+    if (!btn || !panel || !selected) return;
+    // The legacy permission pass may clear .active together with .visible.
+    // Honor the most recent explicit Configuración click until another tab is chosen.
+    if (configSelectionRequested || window.__BC_CONFIG_TAB_SELECTED === true) {
+      document.querySelectorAll('#tabs .tab-btn.active').forEach(function(other){ if (other !== btn) removeClassIfPresent(other, 'active'); });
+      if (!btn.classList.contains('active')) btn.classList.add('active');
+      document.querySelectorAll('.tab-panel.visible').forEach(function(otherPanel){ if (otherPanel !== panel) removeClassIfPresent(otherPanel, 'visible'); });
+    }
+    removeClassIfPresent(panel, 'hidden');
+    removeClassIfPresent(panel, 'tab-sin-permiso');
+    removeAttributeIfPresent(panel, 'hidden');
+    removeAttributeIfPresent(panel, 'aria-hidden');
+    if (!panel.classList.contains('visible')) panel.classList.add('visible');
+    setImportantStyle(panel, 'display', 'block');
+    setImportantStyle(panel, 'visibility', 'visible');
+    setImportantStyle(panel, 'opacity', '1');
   }
 
   function injectCss(){
@@ -83,7 +110,20 @@
     document.head.appendChild(s);
   }
 
-  function run(){ injectCss(); normalizarSecciones(); }
+  function instalarSelectorConfiguracion(){
+    var tabs = document.getElementById('tabs');
+    if (!tabs || tabs.__bcConfigVisibilityListener) return;
+    tabs.__bcConfigVisibilityListener = true;
+    tabs.addEventListener('click', function(event){
+      var btn = event.target.closest('.tab-btn[data-tab]');
+      if (!btn) return;
+      configSelectionRequested = btn.dataset.tab === 'config';
+      window.__BC_CONFIG_TAB_SELECTED = configSelectionRequested;
+      setTimeout(run, 0);
+    });
+  }
+
+  function run(){ injectCss(); instalarSelectorConfiguracion(); normalizarSecciones(); }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ run(); setTimeout(run,250); setTimeout(run,900); setTimeout(run,1800); });
   else { run(); setTimeout(run,250); setTimeout(run,900); setTimeout(run,1800); }

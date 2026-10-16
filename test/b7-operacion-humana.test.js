@@ -22,6 +22,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 function crearEstadoB7() {
   const st = { turnos: {}, cuadres: {}, responsabilidades: {}, incidencias: {}, seq: 0, turnoAbierto: null };
   return {
@@ -156,7 +165,7 @@ test("B7.14: resolver incidencia cambia a RESUELTA",()=>{const e=crearEstadoB7()
 // ============================================================
 // PRUEBAS — PERMISOS E INTEGRACIÓN FRONTEND
 // ============================================================
-test("B7.15: usuario sin permiso turnos.ver no ve la pantalla Turnos",async()=>{const {window,document}=montarEntorno({perfil:[{id:"u-test",nombre:"Dep",activo:true,role_id:"r2",rol:"Dependiente"}],permisos:[{seccion:"ventas",accion:"ver"}]});marcarOnline(window);await esperar(120);const btn=document.querySelector('.tab-btn[data-tab="ciclos"]');assert.ok(btn.style.display==="none"||btn.classList.contains("hidden"),"Turnos oculto sin permiso");});
+test("B7.15: usuario sin permiso turnos.ver no ve la pantalla Turnos",async()=>{const {window,document}=montarEntorno({perfil:[{id:"u-test",nombre:"Dep",activo:true,role_id:"r2",rol:"Dependiente"}],permisos:[{seccion:"ventas",accion:"ver"}]});marcarOnline(window);const btn=document.querySelector('.tab-btn[data-tab="ciclos"]');assert.ok(await esperarHasta(()=>btn.style.display==="none"||btn.classList.contains("hidden")),"Turnos oculto sin permiso dentro de 2 s");});
 test("B7.16: usuario con permiso turnos.ver ve la pestaña Turnos",async()=>{const {window,document}=montarEntorno(perfil());marcarOnline(window);await esperar(120);const btn=document.querySelector('.tab-btn[data-tab="ciclos"]');assert.ok(btn.style.display!=="none"&&!btn.classList.contains("hidden"),"Turnos visible con permiso");assert.strictEqual(btn.textContent.trim(),"Turnos");});
 test("B7.17: usuario inactivo no puede abrir turno",async()=>{const {window}=montarEntorno({perfil:[{id:"u-test",nombre:"Inactivo",activo:false,role_id:"r2",rol:"Dependiente"}],permisos:[{seccion:"turnos",accion:"crear"},{seccion:"turnos",accion:"ver"}]});marcarOnline(window);await esperar(120);const r=await window.ejecutarOperacion("turno",{p_almacen_id:null});assert.ok(!r.ok);});
 test("B7.18: abrir turno online llama al RPC abrir_turno",async()=>{const {window,client}=montarEntorno(perfil());marcarOnline(window);await esperar(120);await window.ejecutarOperacion("turno",{p_almacen_id:"a1"});await esperar(20);const c=client.__rpcCalls.find(x=>x.nombre==="abrir_turno");assert.ok(c);assert.strictEqual(c.params.p_almacen_id,"a1");});
