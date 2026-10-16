@@ -97,6 +97,11 @@ function montarEntorno(opciones = {}) {
     .replace(/return _operacionesPendientesCache;/, "return window._operacionesPendientesCache;")
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
     .replace(/_operacionesPendientesCache = \\[\\];/, "window._operacionesPendientesCache = [];");
+  appJs += `
+;window.__bcTestPermisosCargaExitosa = function () {
+  return typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa;
+};
+`;
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
@@ -158,7 +163,16 @@ test("B3.5/B3.6: tienePermiso refleja la matriz del backend (ver/crear/editar/bo
     ],
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(
+      () => window.__bcTestPermisosCargaExitosa() &&
+        window.tienePermiso("productos", "ver") &&
+        window.tienePermiso("productos", "crear") &&
+        window.tienePermiso("usuarios", "ver"),
+      2000
+    ),
+    "la matriz de permisos debe terminar de cargarse antes de comprobarla"
+  );
   assert.strictEqual(window.tienePermiso("productos", "ver"), true);
   assert.strictEqual(window.tienePermiso("productos", "crear"), true);
   assert.strictEqual(window.tienePermiso("productos", "borrar"), false, "borrar no está concedido");
@@ -336,7 +350,13 @@ test("B3.2b R1: usuario sin permisos (backend responde array vacío) NO ve todo"
     permisos: [], // backend respondió: este usuario no tiene permisos
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(
+      () => Boolean(window._usuarioActual()) && window.__bcTestPermisosCargaExitosa(),
+      2000
+    ),
+    "el contexto y la respuesta vacía de permisos deben terminar de cargarse"
+  );
   assert.ok(window._usuarioActual(), "hay contexto");
   assert.strictEqual(window.tienePermiso("productos", "ver"), false, "sin permisos reales no autoriza");
   assert.strictEqual(window.tienePermiso("reportes", "ver"), false, "sin permisos reales no autoriza");
