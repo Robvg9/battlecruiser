@@ -129,7 +129,7 @@ function montarEntorno(opciones = {}) {
   // Misión de modularización: también se quitan los <script src="js/...">
   // (los módulos reales se inyectan a mano más abajo, igual que antes se
   // inyectaba app.js completo — así el test no depende de red).
-  html = html.replace(/<script[^>]*src="js\/[^"]*\.js"[^>]*><\/script>/g, "");
+  html = html.replace(/<script[^>]*src="js\/[^"]*\.js(?:\?[^"]*)?"[^>]*><\/script>/g, "");
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
   const window = dom.window;
   global.window = window; global.document = window.document; global.navigator = window.navigator;

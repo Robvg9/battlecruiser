@@ -247,8 +247,19 @@ function actualizarStockDisponibleUI() {
   const cantidadInput = document.getElementById("venta-cantidad");
   if (!infoEl || !cantidadInput) return;
 
-  const almacen_id = document.getElementById("venta-almacen").value;
-  const producto_id = document.getElementById("venta-producto").value;
+  const almacenSelect = document.getElementById("venta-almacen");
+  const productoSelect = document.getElementById("venta-producto");
+  // Some layouts omit these optional selects (for example while a form is hidden
+  // or the offline shell is still mounting). Never dereference an absent control.
+  if (!almacenSelect || !productoSelect) {
+    infoEl.textContent = "";
+    infoEl.className = "msg";
+    cantidadInput.removeAttribute("max");
+    return;
+  }
+
+  const almacen_id = almacenSelect.value;
+  const producto_id = productoSelect.value;
 
   if (!almacen_id || !producto_id) {
     infoEl.textContent = "";
