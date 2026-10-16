@@ -17,6 +17,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 function mockCliente({ perfil, permisos, usuarios, roles, auditoria } = {}) {
   const rpcCalls = [];
   const client = {
@@ -76,6 +85,12 @@ function montarEntorno(opciones = {}) {
     .replace(/return _operacionesPendientesCache;/, "return window._operacionesPendientesCache;")
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
     .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];");
+  appJs += `
+;window.__bcTestSyncState = {
+  get active() { return typeof _sincronizando !== "undefined" && _sincronizando; },
+  markOnline() { if (typeof marcarConectividadReal === "function") marcarConectividadReal("online"); }
+};
+`;
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
@@ -263,11 +278,19 @@ test("B4.11: reconexión refresca el Centro de Mando", async () => {
     permisos: [{ seccion: "auditoria", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
   const conn = document.getElementById("mando-conn-info");
+  assert.ok(
+    await esperarHasta(() => Boolean(window._usuarioActual()), 2000),
+    "el contexto inicial debe terminar de cargarse antes de probar la reconexión"
+  );
+  assert.ok(
+    await esperarHasta(() => !window.__bcTestSyncState.active, 2000),
+    "la sincronización de arranque debe finalizar antes de verificar el indicador de conexión"
+  );
+  window.__bcTestSyncState.markOnline();
   await window.refrescarCentroMando();
   await esperar(20);
-  assert.ok(/Conectado/.test(conn.textContent), "debe mostrar conectado tras refrescar");
+  assert.ok(/Conectado/.test(conn.textContent), "debe mostrar conectado tras refrescar; estado observado: " + conn.textContent);
 });
 
 test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos", async () => {
