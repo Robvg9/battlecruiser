@@ -3,6 +3,8 @@
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
 function fillSelect(select, rows, valueKey, labelFn, keepFirst) {
+  // Several legacy/offscreen modules share this helper; their optional controls may not exist in the active DOM.
+  if (!select) return;
   const first = keepFirst ? select.querySelector("option") : null;
   select.innerHTML = "";
   if (first) select.appendChild(first);
