@@ -38,6 +38,8 @@ test('active Configuración panel survives a legacy permission visibility reset'
   const { window } = dom;
   try {
     window.eval(visibilityHotfix);
+    // Let JSDOM dispatch DOMContentLoaded so the delegated click listener is installed.
+    await wait(window, 80);
     const button = window.document.querySelector('.tab-btn[data-tab="config"]');
     const homeButton = window.document.querySelector('.tab-btn[data-tab="home"]');
     const panel = window.document.getElementById('tab-config');
