@@ -207,7 +207,10 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
       const bloque = obtenerBloqueNomenclatura(id, el);
       if (!bloque || !bloque.parentElement || bloque.matches(".tab-panel")) return;
       if (nomenclaturaOrigenes.some((origen) => origen.bloque === bloque)) return;
-      nomenclaturaOrigenes.push({ bloque, parent: bloque.parentElement, next: bloque.nextSibling });
+      const parent = bloque.parentElement;
+      const placeholder = document.createComment("bc-nomenclature-" + id);
+      parent.insertBefore(placeholder, bloque);
+      nomenclaturaOrigenes.push({ bloque, parent, placeholder });
       slot.appendChild(bloque);
     });
     if (typeof _refrescarCatalogo_categorias === "function") _refrescarCatalogo_categorias();
@@ -215,9 +218,15 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
     if (typeof refrescarPresentacionesCatalogo === "function") refrescarPresentacionesCatalogo();
   }
   function restaurarNomenclatura() {
-    nomenclaturaOrigenes.reverse().forEach(({ bloque, parent, next }) => {
+    nomenclaturaOrigenes.reverse().forEach(({ bloque, parent, placeholder }) => {
       if (!parent) return;
-      if (next && next.parentNode === parent) parent.insertBefore(bloque, next); else parent.appendChild(bloque);
+      if (placeholder && placeholder.parentNode === parent) {
+        parent.insertBefore(bloque, placeholder);
+        placeholder.remove();
+      } else {
+        parent.appendChild(bloque);
+        if (placeholder && placeholder.parentNode) placeholder.remove();
+      }
     });
     nomenclaturaOrigenes = [];
   }
