@@ -125,7 +125,7 @@ function mockClienteB8(opciones = {}) {
 function montarEntorno(opciones = {}) {
   let html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   html = html.replace(/<script[^>]*src="https:\/\/cdn[^>]*><\/script>/g, "");
-  html = html.replace(/<script[^>]*src="app\.js"[^>]*><\/script>/g, "");
+  html = html.replace(/<script[^>]*src="app\.js(?:\?[^"]*)?"[^>]*><\/script>/g, "");
   // Misión de modularización: también se quitan los <script src="js/...">
   // (los módulos reales se inyectan a mano más abajo, igual que antes se
   // inyectaba app.js completo — así el test no depende de red).
