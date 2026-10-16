@@ -39,8 +39,26 @@
     Object.keys(slots).forEach(function (id) {
       var el = document.getElementById(id), slot = document.getElementById(slots[id]);
       if (!el || !slot) return;
-      var bloque = el.closest('.cc-bloque') || el.closest('.card') || el.closest('.presentaciones-catalogo') || el.closest('.presentaciones-producto') || el.parentElement;
-      if (bloque && !slot.contains(bloque)) slot.appendChild(bloque);
+      var panel = el.closest('.tab-panel');
+      var candidatos = [
+        el.closest('.cc-bloque'),
+        el.closest('.card'),
+        el.closest('.presentaciones-catalogo'),
+        el.closest('.presentaciones-producto'),
+        el.parentElement
+      ].filter(Boolean);
+      // Never move an ancestor that contains a tab panel. In particular, a
+      // shared .cc-bloque around #tab-config would hide Configuration in this
+      // modal even though #tab-config keeps the same direct parent.
+      var bloque = candidatos.find(function (candidate) {
+        return !panel || (
+          panel.contains(candidate) &&
+          candidate !== panel &&
+          !candidate.contains(panel)
+        );
+      });
+      if (!bloque) return; // catalogos.js wraps just the related heading/form/list on demand.
+      if (!slot.contains(bloque)) slot.appendChild(bloque);
     });
   }
 
