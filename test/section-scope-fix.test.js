@@ -51,7 +51,7 @@ test('section guard displays only the selected panel and revokes leaked Configur
   await wait(window, 70);
 
   assert.equal(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.activePanelId, 'tab-productos');
-  assert.deepEqual(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds, ['tab-productos']);
+  assert.equal(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds.join(','), 'tab-productos');
   assert.equal(document.getElementById('tab-config').style.getPropertyValue('display'), 'none');
   assert.equal(document.getElementById('tab-config').style.getPropertyPriority('display'), 'important');
   assert.equal(window.getComputedStyle(document.getElementById('tab-config')).display, 'none');
@@ -62,19 +62,19 @@ test('section guard displays only the selected panel and revokes leaked Configur
 
   document.querySelector('[data-tab="config"]').click();
   await wait(window, 70);
-  assert.deepEqual(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds, ['tab-config']);
+  assert.equal(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds.join(','), 'tab-config');
   assert.equal(window.getComputedStyle(document.getElementById('tab-productos')).display, 'none');
   assert.equal(window.getComputedStyle(document.getElementById('tab-config')).display, 'block');
 
   document.querySelector('[data-tab="compras"]').click();
   await wait(window, 70);
-  assert.deepEqual(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds, ['tab-compras']);
+  assert.equal(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds.join(','), 'tab-compras');
   assert.equal(window.getComputedStyle(document.getElementById('tab-config')).display, 'none');
   assert.equal(window.getComputedStyle(document.getElementById('tab-compras')).display, 'block');
 
   document.querySelector('[data-tab="productos"]').click();
   await wait(window, 70);
-  assert.deepEqual(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds, ['tab-productos']);
+  assert.equal(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.visiblePanelIds.join(','), 'tab-productos');
   assert.equal(window.__BC_SECTION_SCOPE_DIAGNOSTICS__.productExtrasHidden, true);
   dom.window.close();
 });
