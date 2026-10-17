@@ -9,6 +9,7 @@
 
   var timer = null;
   var applying = false;
+  var initialized = false;
 
   function mainRoot() {
     return document.querySelector('.main-content');
@@ -163,6 +164,8 @@
   }
 
   function boot() {
+    if (initialized) return;
+    initialized = true;
     installStyles();
     schedule();
     [80, 300, 900, 1800, 3200, 5200].forEach(function (delay) {
@@ -187,7 +190,7 @@
     }
     if (main) {
       new MutationObserver(schedule).observe(main, {
-        childList: true, subtree: false, attributes: true,
+        childList: true, subtree: true, attributes: true,
         attributeFilter: ['class']
       });
     }
@@ -195,6 +198,7 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true });
+    window.setTimeout(boot, 0); // covers dynamically evaluated late scripts and DOM emulators
   } else {
     boot();
   }
