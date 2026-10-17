@@ -71,15 +71,16 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.4\.96["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.4\.96["']/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261016\.6"\]/);
+  assert.match(app, /const VERSION=["']9\.4\.97["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.4\.97["']/);
+  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261016\.7"\]/);
+  assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.4\.96"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.4\.97"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
-  assert.match(index, /<script src="app\.js\?v=9\.4\.96"><\/script>/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.4\.96['"]\);/);
+  assert.match(index, /<script src="app\.js\?v=9\.4\.97"><\/script>/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.4\.97['"]\);/);
 });
