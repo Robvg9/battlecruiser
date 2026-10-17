@@ -83,7 +83,22 @@
     var panel = document.getElementById('tab-config');
     var selectionKnown = typeof window.__BC_CONFIG_TAB_SELECTED === 'boolean';
     var selected = selectionKnown ? window.__BC_CONFIG_TAB_SELECTED : btn && btn.classList.contains('active');
-    if (!btn || !panel || !selected) return;
+    if (!btn || !panel) return;
+    // Revoke the inline overrides owned by this hotfix as soon as the owner
+    // selects another tab. Without this, display:block!important survives
+    // navigation and Configuración remains painted over every other section.
+    if (!selected) {
+      if (panel.style.getPropertyValue('display') === 'block' && panel.style.getPropertyPriority('display') === 'important') {
+        panel.style.removeProperty('display');
+      }
+      if (panel.style.getPropertyValue('visibility') === 'visible' && panel.style.getPropertyPriority('visibility') === 'important') {
+        panel.style.removeProperty('visibility');
+      }
+      if (panel.style.getPropertyValue('opacity') === '1' && panel.style.getPropertyPriority('opacity') === 'important') {
+        panel.style.removeProperty('opacity');
+      }
+      return;
+    }
     // The legacy permission pass may clear .active together with .visible.
     // Honor the most recent explicit Configuración click until another tab is chosen.
     if (configSelectionRequested || window.__BC_CONFIG_TAB_SELECTED === true) {
