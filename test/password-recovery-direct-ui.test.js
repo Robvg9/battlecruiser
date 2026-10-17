@@ -7,8 +7,7 @@ const auth = fs.readFileSync(path.join(__dirname, "../public/js/auth.js"), "utf8
 const html = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf8");
 
 assert.match(auth, /PASSWORD_RECOVERY/, "recovery auth event must be handled");
-assert.match(auth, /resetPasswordForEmail\(identifier,/, "recovery must accept an email identifier");
-assert.match(auth, /mode: "password-recovery", username: identifier/, "recovery must route usernames through the secure server-side resolver");
+assert.match(auth, /mode: "password-recovery", username: identifier/, "recovery must route email and usernames through the secure server-side resolver");
 assert.match(auth, /Usuario o correo/, "the login and recovery field must clearly accept either identifier");
 assert.match(auth, /password-recovery-request-btn/, "recovery request must be wired to a visible login button");
 assert.match(auth, /\?bc_recovery=1/, "recovery request must redirect to the direct reset UI");
