@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const APP_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS_PER_IP = 10;
+
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 const headers = {
@@ -66,7 +67,7 @@ Deno.serve(async (req: Request) => {
   const contentLength = Number(req.headers.get("content-length") || 0);
   if (contentLength > 4096) return reply({ error: "Solicitud inválida." }, 400);
 
-  let body: { username?: unknown; password?: unknown };
+  let body: { username?: unknown; password?: unknown; mode?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -75,7 +76,10 @@ Deno.serve(async (req: Request) => {
 
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!username || username.length > 120 || !password || password.length > 256) {
+  const mode = body.mode === "password-recovery" ? "password-recovery" : "login";
+  const isEmail = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(username);
+  if (!username || username.length > 120 ||
+      (mode === "login" && (!password || password.length > 256))) {
     return genericFailure(401);
   }
 
@@ -93,17 +97,42 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 
+  let email: string | null = null;
   try {
-    const resolved = await admin.rpc("obtener_email_login_por_nombre", { p_nombre: username });
-    if (resolved.error) {
-      return reply({ error: "El servicio de acceso no está disponible temporalmente." }, 503);
+    if (isEmail) {
+      // Login may use either the public username or the account email.
+      email = username;
+    } else {
+      const resolved = await admin.rpc("obtener_email_login_por_nombre", { p_nombre: username });
+      if (resolved.error) {
+        return reply({ error: "El servicio de acceso no está disponible temporalmente." }, 503);
+      }
+      if (typeof resolved.data === "string" && resolved.data.includes("@")) {
+        email = resolved.data;
+      }
     }
-    const email =
-      typeof resolved.data === "string" && resolved.data.includes("@")
-        ? resolved.data
-        : "bc-rwht-nonexistent-user@internal.battlecruiser.local";
 
-    const login = await auth.auth.signInWithPassword({ email, password });
+    if (mode === "password-recovery") {
+      // Keep the response indistinguishable for known and unknown usernames. The mapped
+      // email remains server-side and is never returned to the PWA.
+      const recoveryEmail = email || "bc-rwht-nonexistent-user@internal.battlecruiser.local";
+      try {
+        await auth.auth.resetPasswordForEmail(recoveryEmail, {
+          redirectTo: APP_ORIGIN + "/?bc_recovery=1",
+        });
+      } catch {
+        // Preserve the same public response for known and unknown accounts.
+      }
+      return reply({ accepted: true }, 200);
+    }
+
+    // Use the same Auth password verifier for real and unknown usernames; never return the
+    // internal email, and never reveal whether the username exists.
+    const login = await auth.auth.signInWithPassword({
+      email: email || "bc-rwht-nonexistent-user@internal.battlecruiser.local",
+      password,
+    });
+
     if (login.error || !login.data.session) return genericFailure(401);
 
     clearRateLimit(ip);
