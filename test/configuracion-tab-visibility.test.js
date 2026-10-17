@@ -74,10 +74,13 @@ test('active Configuración panel survives a legacy permission visibility reset'
     window.document.getElementById('tab-home').classList.add('visible');
     panel.classList.remove('visible');
     panel.classList.add('hidden');
-    panel.style.setProperty('display', 'none', 'important');
+    // Do not overwrite display here: the test must detect a leaked
+    // display:block!important from opening Configuración.
     await wait(window, 80);
     assert.ok(!panel.classList.contains('visible'));
     assert.ok(panel.classList.contains('hidden'));
+    assert.equal(panel.style.getPropertyValue('display'), '', "leaving Configuración removes the inline display override");
+    assert.equal(panel.style.getPropertyPriority('display'), '');
     assert.equal(window.getComputedStyle(panel).display, 'none');
   } finally {
     window.close();
