@@ -77,7 +77,6 @@ Deno.serve(async (req: Request) => {
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
   const mode = body.mode === "password-recovery" ? "password-recovery" : "login";
-  const isEmail = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(username);
   if (!username || username.length > 120 ||
       (mode === "login" && (!password || password.length > 256))) {
     return genericFailure(401);
@@ -99,40 +98,35 @@ Deno.serve(async (req: Request) => {
 
   let email: string | null = null;
   try {
-    if (isEmail) {
-      // Login may use either the public username or the account email.
-      email = username;
-    } else {
-      const resolved = await admin.rpc("obtener_email_login_por_nombre", { p_nombre: username });
-      if (resolved.error) {
-        return reply({ error: "El servicio de acceso no está disponible temporalmente." }, 503);
-      }
-      if (typeof resolved.data === "string" && resolved.data.includes("@")) {
-        email = resolved.data;
-      }
+    // The privileged resolver accepts either the public username or the account email,
+    // but only for an active application user. Keep the mapped address server-side.
+    const resolved = await admin.rpc("obtener_email_login_por_nombre", { p_nombre: username });
+    if (resolved.error) {
+      return reply({ error: "El servicio de acceso no está disponible temporalmente." }, 503);
+    }
+    if (typeof resolved.data === "string" && resolved.data.includes("@")) {
+      email = resolved.data;
     }
 
     if (mode === "password-recovery") {
-      // Keep the response indistinguishable for known and unknown usernames. The mapped
-      // email remains server-side and is never returned to the PWA.
+      // Keep the response indistinguishable for known and unknown identifiers.
+      // Supabase Auth performs the actual email delivery; no address is returned to the PWA.
       const recoveryEmail = email || "bc-rwht-nonexistent-user@internal.battlecruiser.local";
       try {
         await auth.auth.resetPasswordForEmail(recoveryEmail, {
           redirectTo: APP_ORIGIN + "/?bc_recovery=1",
         });
       } catch {
-        // Preserve the same public response for known and unknown accounts.
+        // Do not expose whether an account/username exists through the public response.
       }
       return reply({ accepted: true }, 200);
     }
 
-    // Use the same Auth password verifier for real and unknown usernames; never return the
-    // internal email, and never reveal whether the username exists.
+    // Use the same Auth password verifier for valid and unknown identifiers.
     const login = await auth.auth.signInWithPassword({
       email: email || "bc-rwht-nonexistent-user@internal.battlecruiser.local",
       password,
     });
-
     if (login.error || !login.data.session) return genericFailure(401);
 
     clearRateLimit(ip);
