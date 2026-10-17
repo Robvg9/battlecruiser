@@ -210,3 +210,21 @@ test("UI-ready gate has a real timeout escape from the bootstrap loop", () => {
   assert.equal(runtime.callbackCount, 1);
   assert.ok(auth.includes("if (!window.__BC_UI_READY_RESOLVED__ && !_bcAuthUIReadyFallback)"));
 });
+
+
+test("login bridge accepts username or email without returning the mapped email", () => {
+  assert.ok(edge.includes("const isEmail ="));
+  assert.ok(edge.includes("if (isEmail)"));
+  assert.ok(edge.includes("email = username"));
+  assert.ok(edge.includes("signInWithPassword"));
+  assert.ok(!edge.includes("return reply({ email"));
+});
+
+test("username recovery resolves internally, uses direct recovery redirect, and never reveals the email", () => {
+  assert.ok(edge.includes('body.mode === "password-recovery"'));
+  assert.ok(edge.includes('admin.rpc("obtener_email_login_por_nombre", { p_nombre: username })'));
+  assert.ok(edge.includes('auth.auth.resetPasswordForEmail(recoveryEmail, {'));
+  assert.ok(edge.includes('redirectTo: APP_ORIGIN + "/?bc_recovery=1"'));
+  assert.ok(edge.includes("return reply({ accepted: true }, 200)"));
+  assert.ok(!edge.includes("reply({ email"));
+});
