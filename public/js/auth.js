@@ -580,7 +580,7 @@ safeInit("login", () => {
   });
 });
 
-// Recuperación coherente con el inicio de sesión: acepta correo o nombre de usuario.
+// Recuperación coherente con el login: el servidor resuelve correo o nombre de usuario.
 safeInit("password-recovery-request", () => {
   const recoveryBtn = document.getElementById("password-recovery-request-btn");
   const recoveryMsg = document.getElementById("password-recovery-msg");
@@ -602,25 +602,18 @@ safeInit("password-recovery-request", () => {
     recoveryBtn.disabled = true;
     recoveryBtn.textContent = "Enviando correo…";
     try {
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
-        const { error } = await client.auth.resetPasswordForEmail(identifier, {
-          redirectTo: window.location.origin + "/?bc_recovery=1"
-        });
-        if (error) throw new Error("RECOVERY_REQUEST_FAILED");
-      } else {
-        const response = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
-          method: "POST",
-          headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "password-recovery", username: identifier }),
-          cache: "no-store",
-        });
-        if (response.status === 429) {
-          recoveryMsg.className = "msg error";
-          recoveryMsg.textContent = "Demasiados intentos. Espera unos minutos y vuelve a probar.";
-          return;
-        }
-        if (!response.ok) throw new Error("RECOVERY_REQUEST_FAILED");
+      const response = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
+        method: "POST",
+        headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "password-recovery", username: identifier }),
+        cache: "no-store",
+      });
+      if (response.status === 429) {
+        recoveryMsg.className = "msg error";
+        recoveryMsg.textContent = "Demasiados intentos. Espera unos minutos y vuelve a probar.";
+        return;
       }
+      if (!response.ok) throw new Error("RECOVERY_REQUEST_FAILED");
 
       recoveryMsg.className = "msg";
       recoveryMsg.textContent = "Si el correo o nombre de usuario corresponde a una cuenta activa, enviaremos un enlace al correo asociado. Revisa la bandeja de entrada y spam; usa el correo más reciente.";
