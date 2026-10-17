@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.4.95 — unwrap nested auth errors and defer false login
+// v9.4.96 — release stale Configuración display override on tab switch
 (function hotfixV9475(){
   const VERSION="9.4.96";
   window.__BC_VERSION__=VERSION;
