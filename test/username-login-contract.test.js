@@ -9,6 +9,7 @@ const root = path.join(__dirname, "..");
 const auth = fs.readFileSync(path.join(root, "public", "js", "auth.js"), "utf8").replace(/\r\n/g, "\n");
 const context = fs.readFileSync(path.join(root, "public", "js", "usuarios-permisos.js"), "utf8").replace(/\r\n/g, "\n");
 const edge = fs.readFileSync(path.join(root, "supabase", "functions", "bc-username-login", "index.ts"), "utf8");
+const identifierMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20261017190000_bc_login_identifier_recovery.sql"), "utf8");
 
 test("frontend routes username login through the server-side credential bridge", () => {
   assert.match(auth, /\/functions\/v1\/bc-username-login/);
@@ -212,17 +213,22 @@ test("UI-ready gate has a real timeout escape from the bootstrap loop", () => {
 });
 
 
-test("login bridge accepts username or email without returning the mapped email", () => {
-  assert.ok(edge.includes("const isEmail ="));
-  assert.ok(edge.includes("if (isEmail)"));
-  assert.ok(edge.includes("email = username"));
-  assert.ok(edge.includes("signInWithPassword"));
-  assert.ok(!edge.includes("return reply({ email"));
+test("login bridge resolves either email or username through the server-side active-user resolver", () => {
+  assert.ok(edge.includes('admin.rpc("obtener_email_login_por_nombre", { p_nombre: username })'));
+  assert.ok(edge.includes('email: email || "bc-rwht-nonexistent-user@internal.battlecruiser.local"'));
+  assert.ok(!edge.includes("reply({ email"));
 });
 
-test("username recovery resolves internally, uses direct recovery redirect, and never reveals the email", () => {
+test("identifier resolver accepts either email or username and preserves active-user privilege gates", () => {
+  assert.ok(identifierMigration.includes("lower(trim(au.email)) = lower(trim(p_nombre))"));
+  assert.ok(identifierMigration.includes("lower(trim(u.nombre)) = lower(trim(p_nombre))"));
+  assert.ok(identifierMigration.includes("u.activo = true"));
+  assert.ok(identifierMigration.includes("REVOKE ALL ON FUNCTION public.obtener_email_login_por_nombre(text) FROM PUBLIC, anon, authenticated"));
+  assert.ok(identifierMigration.includes("GRANT EXECUTE ON FUNCTION public.obtener_email_login_por_nombre(text) TO service_role"));
+});
+
+test("username recovery uses the server-side resolver, direct recovery redirect, and a generic response", () => {
   assert.ok(edge.includes('body.mode === "password-recovery"'));
-  assert.ok(edge.includes('admin.rpc("obtener_email_login_por_nombre", { p_nombre: username })'));
   assert.ok(edge.includes('auth.auth.resetPasswordForEmail(recoveryEmail, {'));
   assert.ok(edge.includes('redirectTo: APP_ORIGIN + "/?bc_recovery=1"'));
   assert.ok(edge.includes("return reply({ accepted: true }, 200)"));
