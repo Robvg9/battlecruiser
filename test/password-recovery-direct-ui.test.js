@@ -7,7 +7,9 @@ const auth = fs.readFileSync(path.join(__dirname, "../public/js/auth.js"), "utf8
 const html = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf8");
 
 assert.match(auth, /PASSWORD_RECOVERY/, "recovery auth event must be handled");
-assert.match(auth, /resetPasswordForEmail\(email,/, "login must provide a way to request another recovery email");
+assert.match(auth, /resetPasswordForEmail\(identifier,/, "recovery must accept an email identifier");
+assert.match(auth, /mode: "password-recovery", username: identifier/, "recovery must route usernames through the secure server-side resolver");
+assert.match(auth, /Usuario o correo/, "the login and recovery field must clearly accept either identifier");
 assert.match(auth, /password-recovery-request-btn/, "recovery request must be wired to a visible login button");
 assert.match(auth, /\?bc_recovery=1/, "recovery request must redirect to the direct reset UI");
 assert.match(auth, /bc_recovery/, "recovery URL marker must survive auth hash consumption");
@@ -16,6 +18,7 @@ assert.match(auth, /Establecer nueva contraseña/, "recovery form must identify 
 assert.match(auth, /updateUser\(\{ password: nueva \}\)/, "password change must use Supabase Auth updateUser");
 assert.match(auth, /Contraseña actualizada/, "successful reset must confirm completion");
 assert.match(html, /id="password-recovery-request-btn"/, "login must show the recovery-email button");
+assert.match(html, /correo o nombre de usuario/, "the login screen must explain the supported recovery identifiers");
 assert.match(html, /id="password-recovery-msg"/, "login must display recovery request status");
 assert.match(html, /id="pass-panel"/, "the password form must exist in the app shell");
 assert.match(html, /id="pass-new"/, "new password field must exist");
