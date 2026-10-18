@@ -350,3 +350,59 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 @media (min-width: 760px) {
   .cc-grid { grid-template-columns: 1fr 320px; }
 }
+
+/* Android-first header layout: keep Logout in the first row. */
+@media (max-width: 759px) {
+  .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand logout"
+      "status status"
+      "queue user"
+      "settings settings";
+    align-items: center;
+    gap: 10px 8px;
+  }
+  .header-left {
+    grid-area: brand;
+    min-width: 0;
+    gap: 8px;
+  }
+  .header-left h1 {
+    min-width: 0;
+    font-size: clamp(16px, 5vw, 20px);
+    overflow-wrap: anywhere;
+  }
+  .header-right {
+    display: contents;
+  }
+  #conn-status-app {
+    grid-area: status;
+    min-width: 0;
+  }
+  #cola-pendientes-badge {
+    grid-area: queue;
+    justify-self: start;
+  }
+  #user-email {
+    grid-area: user;
+    justify-self: end;
+    max-width: 62vw;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .ajustes-wrap {
+    grid-area: settings;
+    justify-self: end;
+  }
+  #logout-btn {
+    grid-area: logout;
+    justify-self: end;
+    align-self: center;
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+}
