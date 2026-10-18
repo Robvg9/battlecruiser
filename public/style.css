@@ -353,6 +353,14 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 
 /* Android-first header layout: keep Logout in the first row. */
 @media (max-width: 759px) {
+  /* The authenticated app is a document, not a fixed-height flex row: let the page scroll. */
+  body:has(#app-shell.visible) {
+    display: block !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
   /* Mobile layout: keep all panels in document flow so the footer cannot cover controls. */
   .app-shell.visible {
     display: flex;
