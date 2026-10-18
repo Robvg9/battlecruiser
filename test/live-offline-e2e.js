@@ -405,6 +405,12 @@ async function main() {
   assert(Math.abs(mobileHeader.logout.top - mobileHeader.brand.top) <= 18,
     "Logout no está alineado en la fila superior con el título: " + JSON.stringify(mobileHeader));
 
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
+  fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
+  report.evidence.androidMobileHeader.screenshot = ANDROID_HEADER_SCREENSHOT_PATH;
+  report.evidence.androidMobileHeader.environment = "Chromium CDP mobile emulation 360x800 @ deviceScaleFactor 2; no es una prueba en Android físico.";
+
   // Verify mobile content uses page scrolling and critical settings remain reachable.
   const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowX:s.overflowX,overflowY:s.overflowY,cssHeight:s.height,maxHeight:s.maxHeight,flex:s.flex,inlineStyle:e.getAttribute('style'),clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,shellDisplay:shell?getComputedStyle(shell).display:null,main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
   report.evidence.androidMobileContentLayout = mobileContentLayout;
@@ -418,15 +424,13 @@ async function main() {
   assert(mobileContentLayout.footer.position === "static" &&
          mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,
     "El pie se superpone o abandona el flujo después del contenido móvil: " + JSON.stringify(mobileContentLayout));
-  const mobileSettingsReachability = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>{const leaves=Array.from(document.querySelectorAll('strong,span,label,div,p'));const label=leaves.find(e=>e.children.length===0&&e.textContent.trim()==='Sincronizar solo en Wi‑Fi');const row=label&&(label.closest('.cfg-aj-row,.bc-aj-row,.field,.form-row')||label.parentElement?.parentElement||label);if(row&&typeof row.scrollIntoView==='function')row.scrollIntoView({block:'end',behavior:'instant'});requestAnimationFrame(()=>{const rr=row?row.getBoundingClientRect():null;const rect=rr?{top:rr.top,bottom:rr.bottom,height:rr.height}:null;resolve({found:!!row,text:label?.textContent?.trim()||null,row:rect,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,fullyVisible:!!(rect&&rect.top>=-1&&rect.bottom<=innerHeight+1),pageScrollY:scrollY});});})))()");
+  const settingsButtonClicked = await evaluate("(()=>{const b=document.querySelector('#ajustes-btn');if(!b)return false;b.click();return true;})()");
+  assert(settingsButtonClicked, "No se encontró el botón Ajustes en el encabezado móvil.");
+  await waitUntil("panel Ajustes abierto y control Wi-Fi disponible", "(()=>{const p=document.querySelector('#bc-aj-panel');return !!(p&&p.classList.contains('open')&&document.querySelector('#bc-aj-sync-wifi'))})()", 10000);
+  const mobileSettingsReachability = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>{const panel=document.querySelector('#bc-aj-panel');const body=document.querySelector('#bc-aj-panel .bc-aj-body');const control=document.querySelector('#bc-aj-sync-wifi');const row=control&&control.closest('.bc-aj-row');if(row&&typeof row.scrollIntoView==='function')row.scrollIntoView({block:'end',behavior:'instant'});requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height};};const br=box(body);const rr=box(row);resolve({panelOpen:!!(panel&&panel.classList.contains('open')),found:!!control,body:br,row:rr,bodyScrollTop:body?body.scrollTop:null,bodyScrollHeight:body?body.scrollHeight:null,bodyClientHeight:body?body.clientHeight:null,viewportHeight:innerHeight,fullyVisible:!!(panel&&panel.classList.contains('open')&&br&&rr&&rr.top>=br.top-1&&rr.bottom<=br.bottom+1&&rr.top>=-1&&rr.bottom<=innerHeight+1)});});})))()");
   report.evidence.androidMobileSettingsReachability = mobileSettingsReachability;
   assert(mobileSettingsReachability.found && mobileSettingsReachability.fullyVisible,
     "El control “Sincronizar solo en Wi‑Fi” no puede llevarse completamente a vista con el scroll móvil: " + JSON.stringify(mobileSettingsReachability));
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
-  fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
-  report.evidence.androidMobileHeader.screenshot = ANDROID_HEADER_SCREENSHOT_PATH;
-  report.evidence.androidMobileHeader.environment = "Chromium CDP mobile emulation 360x800 @ deviceScaleFactor 2; no es una prueba en Android físico.";
   await evaluate("(()=>{const s=document.querySelector('#app-shell');const l=document.querySelector('#login-form');if(s)s.classList.remove('visible');if(l)l.classList.remove('hidden');return true})()");
   await cdpCommand("Emulation.clearDeviceMetricsOverride");
   report.evidence.phase = "online_initial";
