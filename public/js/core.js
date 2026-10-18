@@ -6,7 +6,37 @@
 const SUPABASE_URL = "https://papxnkkjtkxsitcsvcme.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_pczHaS1JDPGrEA31vdbOLg_1l2qFhbm";
 
+
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Recover control when a new document has an active registration but no
+// navigator.serviceWorker.controller after reconnect/reload.
+(function recuperarControlServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  var claimRequested = false;
+  function recover(registration) {
+    if (navigator.serviceWorker.controller || !registration || !registration.active || claimRequested) return;
+    claimRequested = true;
+    try {
+      registration.active.postMessage({ type: "CLAIM_CLIENT" });
+    } catch (_) {
+      claimRequested = false;
+    }
+  }
+  function inspectRegistration() {
+    navigator.serviceWorker.getRegistration().then(recover).catch(function () {});
+  }
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    claimRequested = false;
+  });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", inspectRegistration, { once: true });
+  } else {
+    inspectRegistration();
+  }
+  navigator.serviceWorker.ready.then(recover).catch(function () {});
+})();
+
 
 (function cargarModuloHistoriales(){function cargar(){if(document.querySelector('script[data-battlecruiser-historiales="1"]'))return;const css=document.createElement('link');css.rel='stylesheet';css.href='style-historiales.css?v=56';document.head.appendChild(css);const s=document.createElement('script');s.src='js/historial-detalle.js?v=56';s.async=false;s.dataset.battlecruiserHistoriales='1';document.body.appendChild(s);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cargar,{once:true});else cargar();})();
 (function cargarModuloCompraMultiple(){function cargar(){if(document.querySelector('script[data-battlecruiser-compra-multiple="1"]'))return;const s=document.createElement('script');s.src='js/compra-multiple.js?v=80';s.async=false;s.dataset.battlecruiserCompraMultiple='1';document.head.appendChild(s);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cargar,{once:true});else cargar();})();
