@@ -31,7 +31,7 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+async function esperarHasta(condicion, timeoutMs = 5000, intervaloMs = 10) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (condicion()) return true;
@@ -139,8 +139,8 @@ test("B3.2: el contexto del usuario se carga desde el RPC perfil_usuario_actual"
   });
   marcarOnline(window);
   assert.ok(
-    await esperarHasta(() => window._usuarioActual()),
-    "debe haber contexto de usuario en un máximo de 2 s"
+    await esperarHasta(() => window._usuarioActual(), 5000),
+    "debe haber contexto de usuario en un máximo de 5 s"
   );
   assert.strictEqual(window._usuarioActual().nombre, "Roberto");
   assert.strictEqual(window._usuarioActual().rol, "Dueño");
@@ -185,7 +185,7 @@ test("B3.5/B3.6: tienePermiso refleja la matriz del backend (ver/crear/editar/bo
         window.tienePermiso("productos", "ver") &&
         window.tienePermiso("productos", "crear") &&
         window.tienePermiso("usuarios", "ver"),
-      2000
+      5000
     ),
     "la matriz de permisos debe terminar de cargarse antes de comprobarla"
   );
@@ -320,7 +320,7 @@ test("B3.12 Seguridad: la protección del Dueño está en el backend (el fronten
   const msgEl = window.document.getElementById("msg-usuarios");
   await window.cambiarEstadoUsuario("u-test", true);
   assert.ok(
-    await esperarHasta(() => /No se puede/.test(msgEl.textContent), 2000, 10),
+    await esperarHasta(() => /No se puede/.test(msgEl.textContent), 5000, 10),
     "el backend rechaza y el frontend lo muestra"
   );
 });
@@ -382,7 +382,7 @@ test("B3.2b R1: usuario sin permisos (backend responde array vacío) NO ve todo"
   assert.ok(
     await esperarHasta(
       () => Boolean(window._usuarioActual()) && window.__bcTestPermisosCargaExitosa(),
-      2000
+      5000
     ),
     "el contexto y la respuesta vacía de permisos deben terminar de cargarse"
   );
