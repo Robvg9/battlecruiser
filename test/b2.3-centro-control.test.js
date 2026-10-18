@@ -883,6 +883,8 @@ test("OFFLINE: FIFO — la cola ordena por creado_en ASC (la más antigua primer
   const { window } = montarEntorno();
   marcarOnline(window);
   await esperar(30);
+  // Keep background sync from consuming an item while the test builds its FIFO fixture.
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const w = window;
   const opA = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
   opA.creado_en = "2026-08-15T10:00:00Z";
