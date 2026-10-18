@@ -173,9 +173,11 @@ async function navigateAndWait(url) {
   await loaded;
   await delay(500);
 }
-async function reloadAndWait() {
+async function reloadAndWait(ignoreCache = true) {
   const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS);
-  await cdpCommand("Page.reload", { ignoreCache: true });
+  // Hard reloads bypass the Service Worker in Chromium; only use them for the
+  // offline cache probe. The online reconnect must be a normal navigation.
+  await cdpCommand("Page.reload", ignoreCache ? { ignoreCache: true } : {});
   await loaded;
   await delay(500);
 }
@@ -480,13 +482,23 @@ async function main() {
     uploadThroughput: -1,
     connectionType: "wifi",
   });
-  await reloadAndWait();
+  await reloadAndWait(false);
   const reconnected = await waitUntil("recuperación tras reconectar internet", shellSnapshotPredicate(), 15000);
   report.evidence.onlineReconnect = reconnected;
   assert(reconnected.readyState === "complete", "La PWA no terminó de cargar tras reconectar.");
   assert(reconnected.version === expectedVersion, "La versión cambió después de reconectar.");
   assert(reconnected.online === true, "El navegador no recuperó navigator.onLine después de reconectar.");
   assert(reconnected.loginForm, "La pantalla principal no se recuperó después de reconectar.");
+  // An active registration alone is insufficient: the reloaded document must regain control.
+  const controlledAfterReconnect = await waitUntil(
+    "control de página por el Service Worker después de reconectar",
+    "(()=>{const c=navigator.serviceWorker&&navigator.serviceWorker.controller;return c&&c.scriptURL&&c.scriptURL.endsWith('/service-worker.js')?{controlled:true,scriptURL:c.scriptURL}:null})()",
+    10000
+  ).catch(() => null);
+  report.evidence.controllerAfterReconnect = controlledAfterReconnect;
+  assert(controlledAfterReconnect && controlledAfterReconnect.controlled,
+    "La página volvió a cargar online, pero no recuperó el control del Service Worker: " + JSON.stringify(controlledAfterReconnect));
+  report.evidence.onlineReconnect = await evaluate(pageSnapshotExpression());
   const serviceWorkerRegistrationAfterReconnect = await evaluate("(async()=>{if(!(\"serviceWorker\" in navigator))return {supported:false};const reg=await navigator.serviceWorker.getRegistration();return {supported:true,scope:reg?reg.scope:null,active:reg&&reg.active?{scriptURL:reg.active.scriptURL,state:reg.active.state}:null,waiting:reg&&reg.waiting?{scriptURL:reg.waiting.scriptURL,state:reg.waiting.state}:null,installing:reg&&reg.installing?{scriptURL:reg.installing.scriptURL,state:reg.installing.state}:null,controller:navigator.serviceWorker.controller?{scriptURL:navigator.serviceWorker.controller.scriptURL}:null}})()");
   report.evidence.serviceWorkerAfterReconnect = serviceWorkerRegistrationAfterReconnect;
   assert(serviceWorkerRegistrationAfterReconnect.supported, "La plataforma no ofrece Service Worker tras reconectar.");

@@ -21,7 +21,7 @@ permissions:
 jobs:
   quality:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: windows-latest
     timeout-minutes: 35
 
     steps:
@@ -32,17 +32,20 @@ jobs:
           fetch-depth: 1
           clean: true
 
-      # ROBVG self-hosted Windows runner has a managed Node/npm installation
-      # on PATH. Avoid downloading setup-node from codeload.github.com, which
-      # times out on this runner; local validation uses the same Node 24 runtime.
+      # Use hosted Windows so Quality does not depend on the physical ROBVG PC
+      # or Desktop Commander. Pin Node to the same 24.19.0 runtime.
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+
       - name: Production JS integrity and syntax
         shell: cmd
         run: node test/ci-preflight.js
 
       - name: Install dependencies
         shell: cmd
-        env:
-          NPM_CONFIG_CACHE: 'D:\Databank\npm-cache'
         run: npm ci --prefer-offline
 
       - name: Syntax check

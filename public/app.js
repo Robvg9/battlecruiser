@@ -6,8 +6,8 @@
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
-    if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
-    if(label)label.textContent="Usuario";
+    if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario o correo";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
+    if(label)label.textContent="Usuario o correo";
     document.querySelectorAll(".app-version-label,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
   }
   aplicarVersion();window.addEventListener("pageshow",aplicarVersion);

@@ -31,13 +31,29 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+async function esperarHasta(condicion, timeoutMs = 5000, intervaloMs = 10) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (condicion()) return true;
     await esperar(intervaloMs);
   }
   return Boolean(condicion());
+}
+
+async function esperarContextoYPermisos(window, timeoutMs = 5000) {
+  const listo = await esperarHasta(() => {
+    try {
+      const usuario = typeof window._usuarioActual === "function"
+        ? window._usuarioActual()
+        : window._usuarioActual;
+      return Boolean(usuario) &&
+        typeof window.__bcTestPermisosCargaExitosa === "function" &&
+        window.__bcTestPermisosCargaExitosa();
+    } catch (_) {
+      return false;
+    }
+  }, timeoutMs, 10);
+  assert.ok(listo, "el contexto autenticado y los permisos deben cargarse antes de validar");
 }
 
 // Construye un mock de cliente Supabase configurable.
@@ -123,8 +139,8 @@ test("B3.2: el contexto del usuario se carga desde el RPC perfil_usuario_actual"
   });
   marcarOnline(window);
   assert.ok(
-    await esperarHasta(() => window._usuarioActual()),
-    "debe haber contexto de usuario en un máximo de 2 s"
+    await esperarHasta(() => window._usuarioActual(), 5000),
+    "debe haber contexto de usuario en un máximo de 5 s"
   );
   assert.strictEqual(window._usuarioActual().nombre, "Roberto");
   assert.strictEqual(window._usuarioActual().rol, "Dueño");
@@ -137,7 +153,7 @@ test("B3.3: un usuario inactivo no puede operar (usuarioPuedeOperar false)", asy
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   const puede = await window.usuarioPuedeOperar();
   assert.strictEqual(puede, false, "un usuario inactivo no debe poder operar");
 });
@@ -148,7 +164,7 @@ test("B3.3: un usuario activo puede operar", async () => {
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   const puede = await window.usuarioPuedeOperar();
   assert.strictEqual(puede, true);
 });
@@ -169,7 +185,7 @@ test("B3.5/B3.6: tienePermiso refleja la matriz del backend (ver/crear/editar/bo
         window.tienePermiso("productos", "ver") &&
         window.tienePermiso("productos", "crear") &&
         window.tienePermiso("usuarios", "ver"),
-      2000
+      5000
     ),
     "la matriz de permisos debe terminar de cargarse antes de comprobarla"
   );
@@ -186,7 +202,7 @@ test("B3.7: sin permiso 'ver', la sección se oculta del sidebar", async () => {
     permisos: [{ seccion: "ventas", accion: "ver" }], // solo ventas, no productos
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   const btnProductos = document.querySelector('.tab-btn[data-tab="productos"]');
   const btnVentas = document.querySelector('.tab-btn[data-tab="ventas"]');
   assert.ok(btnProductos.style.display === "none" || btnProductos.classList.contains("hidden"), "productos oculto sin permiso ver");
@@ -200,7 +216,7 @@ test("B3.18/B3.19: cambio de usuario — no hay contaminación de permisos A -> 
     permisos: [{ seccion: "productos", accion: "ver" }, { seccion: "usuarios", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   assert.strictEqual(window.tienePermiso("productos", "ver"), true);
 
   // Logout: limpiar contexto.
@@ -216,7 +232,15 @@ test("B3.18/B3.19: cambio de usuario — no hay contaminación de permisos A -> 
     return { data: null, error: null };
   };
   await window.cargarContextoUsuario();
-  await esperar(20);
+  assert.ok(
+    await esperarHasta(
+      () => window._usuarioActual() && window._usuarioActual().nombre === "B" &&
+        window.tienePermiso("ventas", "ver"),
+      5000,
+      10
+    ),
+    "el contexto y la matriz del usuario B deben terminar de cargarse"
+  );
   assert.strictEqual(window._usuarioActual().nombre, "B");
   assert.strictEqual(window.tienePermiso("productos", "ver"), false, "B NO hereda permisos de A");
   assert.strictEqual(window.tienePermiso("ventas", "ver"), true, "B tiene sus propios permisos");
@@ -228,7 +252,7 @@ test("B3.13/G: offline — el contexto conocido se conserva para navegación", a
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   // Simular offline: el contexto en memoria sigue disponible.
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   assert.strictEqual(window._usuarioActual().nombre, "Roberto", "contexto conservado offline");
@@ -241,7 +265,7 @@ test("B3.14/H: operación offline conserva usuario_id e idempotency_key", async 
     permisos: [{ seccion: "ventas", accion: "crear" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   // Offline: ejecutarOperacion encola.
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const res = await window.ejecutarOperacion("venta", { p_almacen_id: "a1", p_lineas: [{ producto_id: "p1", cantidad: 2 }] });
@@ -264,7 +288,7 @@ test("B3.10 Seguridad: cambiarEstadoUsuario verifica permiso antes de llamar al 
     permisos: [{ seccion: "ventas", accion: "ver" }], // NO tiene usuarios.editar
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   client.__rpcCalls.length = 0;
   await window.cambiarEstadoUsuario("u-otro", true);
   // No debe haber llamado al RPC porque no tiene permiso.
@@ -281,7 +305,7 @@ test("B3.12 Seguridad: la protección del Dueño está en el backend (el fronten
     permisos: [{ seccion: "usuarios", accion: "ver" }, { seccion: "usuarios", accion: "editar" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   // Simular que el backend rechaza (único Dueño).
   client.rpc = async (nombre) => {
     if (nombre === "cambiar_estado_usuario") return { data: null, error: { code: "P0001", message: "No se puede desactivar al único Dueño activo." } };
@@ -291,12 +315,14 @@ test("B3.12 Seguridad: la protección del Dueño está en el backend (el fronten
   };
   // Recargar contexto para que tenga permisos de editar.
   await window.cargarContextoUsuario();
-  await esperar(20);
+  assert.ok(window.tienePermiso("usuarios", "editar"), "el contexto recargado debe conservar el permiso probado");
   // #msg-usuarios ya existe en el HTML real; lo reutilizamos (sin duplicar).
   const msgEl = window.document.getElementById("msg-usuarios");
   await window.cambiarEstadoUsuario("u-test", true);
-  await esperar(20);
-  assert.ok(/No se puede/.test(msgEl.textContent), "el backend rechaza y el frontend lo muestra");
+  assert.ok(
+    await esperarHasta(() => /No se puede/.test(msgEl.textContent), 5000, 10),
+    "el backend rechaza y el frontend lo muestra"
+  );
 });
 
 test("B3.27 Arquitectura: no hay stores/colas/cachés de permisos duplicados", async () => {
@@ -305,7 +331,7 @@ test("B3.27 Arquitectura: no hay stores/colas/cachés de permisos duplicados", a
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   // Un único contexto de permisos: _permisosEfectivos (no hay _permisos2, etc.).
   assert.strictEqual(typeof window._permisosEfectivosRef(), "object");
   assert.strictEqual(window._permisosEfectivos2, undefined, "no hay sistema de permisos duplicado");
@@ -326,7 +352,10 @@ test("B3.2 Degradación: si el SQL de B3 no está aplicado, la app sigue usable"
     permisos: null,
   });
   marcarOnline(window);
-  await esperar(80);
+  assert.ok(
+    await esperarHasta(() => Boolean(window._usuarioActual()), 5000, 10),
+    "la sesión Auth debe resolverse antes de simular RPC inexistentes"
+  );
   // Simular el estado real de "SQL B3 no aplicado": los RPC no existen.
   client.rpc = async (nombre) => {
     return { data: null, error: { message: "Could not find the function" } };
@@ -353,7 +382,7 @@ test("B3.2b R1: usuario sin permisos (backend responde array vacío) NO ve todo"
   assert.ok(
     await esperarHasta(
       () => Boolean(window._usuarioActual()) && window.__bcTestPermisosCargaExitosa(),
-      2000
+      5000
     ),
     "el contexto y la respuesta vacía de permisos deben terminar de cargarse"
   );
@@ -369,7 +398,7 @@ test("B3.3 (cierre): usuario inactivo bloqueado via usuario_esta_activo online (
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   // Sobreescribir rpc para que usuario_esta_activo devuelva false explícitamente.
   client.rpc = async (nombre) => {
     if (nombre === "usuario_esta_activo") return { data: false, error: null };
