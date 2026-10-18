@@ -11,6 +11,7 @@ const PUBLIC_DIR = path.join(process.cwd(), "public");
 const OUTPUT_DIR = path.join(process.cwd(), "test-results");
 const REPORT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.json");
 const SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.png");
+const ANDROID_HEADER_SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-android-header-layout.png");
 const CORE_PATHS = ["/", "/index.html", "/app.js", "/style.css"];
 const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js";
 const TIMEOUT_MS = 45000;
@@ -380,6 +381,37 @@ async function main() {
     openClose: nomenclatureCycle,
     browser: "Chromium CDP",
   };
+
+
+  // Real Chromium mobile-emulation probe for the Android-first header.
+  // This is a viewport E2E, not a claim of physical-device validation.
+  report.evidence.phase = "android_mobile_header_layout";
+  await cdpCommand("Emulation.setDeviceMetricsOverride", {
+    width: 360,
+    height: 800,
+    deviceScaleFactor: 2,
+    mobile: true,
+  });
+  const mobileHeader = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,display:s.display,gridArea:s.gridArea};};const shell=document.querySelector('#app-shell');const header=document.querySelector('.app-header');if(shell)shell.classList.add('visible');const finish=()=>{const brand=header&&header.querySelector('.header-left');const logout=header&&header.querySelector('#logout-btn');resolve({ready:document.readyState==='complete',viewportWidth:innerWidth,viewportHeight:innerHeight,documentWidth:document.documentElement.scrollWidth,header:box(header),headerDisplay:header?getComputedStyle(header).display:null,brand:box(brand),title:box(header&&header.querySelector('h1')),logout:box(logout),rightOverflow:!!(header&&logout&&logout.getBoundingClientRect().right>header.getBoundingClientRect().right+1),brandLogoutOverlap:!!(brand&&logout&&logout.getBoundingClientRect().left<brand.getBoundingClientRect().right-1)});};requestAnimationFrame(finish);}))))()");
+  report.evidence.androidMobileHeader = mobileHeader;
+  assert(mobileHeader.ready && mobileHeader.header && mobileHeader.brand && mobileHeader.logout,
+    "No se pudo medir el encabezado móvil en Chromium: " + JSON.stringify(mobileHeader));
+  assert(mobileHeader.viewportWidth === 360, "Chromium no aplicó el viewport móvil 360px: " + JSON.stringify(mobileHeader));
+  assert(mobileHeader.headerDisplay === "grid" && mobileHeader.logout.gridArea === "logout",
+    "Logout no ocupa la celda superior derecha del grid móvil: " + JSON.stringify(mobileHeader));
+  assert(!mobileHeader.brandLogoutOverlap, "Logout se solapa con el logo/título en 360px: " + JSON.stringify(mobileHeader));
+  assert(!mobileHeader.rightOverflow && mobileHeader.logout.right <= mobileHeader.header.right + 1,
+    "Logout se sale del encabezado por la derecha en 360px: " + JSON.stringify(mobileHeader));
+  assert(Math.abs(mobileHeader.logout.top - mobileHeader.brand.top) <= 18,
+    "Logout no está alineado en la fila superior con el título: " + JSON.stringify(mobileHeader));
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
+  fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
+  report.evidence.androidMobileHeader.screenshot = ANDROID_HEADER_SCREENSHOT_PATH;
+  report.evidence.androidMobileHeader.environment = "Chromium CDP mobile emulation 360x800 @ deviceScaleFactor 2; no es una prueba en Android físico.";
+  await evaluate("(()=>{const s=document.querySelector('#app-shell');if(s)s.classList.remove('visible');return true})()");
+  await cdpCommand("Emulation.clearDeviceMetricsOverride");
+  report.evidence.phase = "online_initial";
 
   let registration = await waitUntil(
     "activación del Service Worker",
