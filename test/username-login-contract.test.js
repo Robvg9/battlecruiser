@@ -9,7 +9,7 @@ const root = path.join(__dirname, "..");
 const auth = fs.readFileSync(path.join(root, "public", "js", "auth.js"), "utf8").replace(/\r\n/g, "\n");
 const context = fs.readFileSync(path.join(root, "public", "js", "usuarios-permisos.js"), "utf8").replace(/\r\n/g, "\n");
 const edge = fs.readFileSync(path.join(root, "supabase", "functions", "bc-username-login", "index.ts"), "utf8");
-const identifierMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20261017190000_bc_login_identifier_recovery.sql"), "utf8");
+const identifierMigration = fs.readFileSync(path.join(root, "supabase", "migrations", "20261018005015_bc_login_identifier_recovery.sql"), "utf8");
 
 test("frontend routes username login through the server-side credential bridge", () => {
   assert.match(auth, /\/functions\/v1\/bc-username-login/);
