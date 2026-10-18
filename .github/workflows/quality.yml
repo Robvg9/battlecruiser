@@ -156,5 +156,6 @@ jobs:
           path: |
             test-results/battlecruiser-live-offline-e2e.json
             test-results/battlecruiser-live-offline-e2e.png
+            test-results/battlecruiser-android-header-layout.png
           if-no-files-found: warn
           retention-days: 90
