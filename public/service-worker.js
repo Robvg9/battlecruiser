@@ -117,5 +117,9 @@ self.addEventListener("fetch", function(event) {
 });
 
 self.addEventListener("message", function(event) {
-  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+  if (!event.data) return;
+  if (event.data.type === "SKIP_WAITING") self.skipWaiting();
+  if (event.data.type === "CLAIM_CLIENT" && event.waitUntil) {
+    event.waitUntil(self.clients.claim());
+  }
 });
