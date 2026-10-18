@@ -173,9 +173,11 @@ async function navigateAndWait(url) {
   await loaded;
   await delay(500);
 }
-async function reloadAndWait() {
+async function reloadAndWait(ignoreCache = true) {
   const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS);
-  await cdpCommand("Page.reload", { ignoreCache: true });
+  // Hard reloads bypass the Service Worker in Chromium; only use them for the
+  // offline cache probe. The online reconnect must be a normal navigation.
+  await cdpCommand("Page.reload", ignoreCache ? { ignoreCache: true } : {});
   await loaded;
   await delay(500);
 }
@@ -480,7 +482,7 @@ async function main() {
     uploadThroughput: -1,
     connectionType: "wifi",
   });
-  await reloadAndWait();
+  await reloadAndWait(false);
   const reconnected = await waitUntil("recuperación tras reconectar internet", shellSnapshotPredicate(), 15000);
   report.evidence.onlineReconnect = reconnected;
   assert(reconnected.readyState === "complete", "La PWA no terminó de cargar tras reconectar.");
