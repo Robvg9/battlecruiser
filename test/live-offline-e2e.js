@@ -487,6 +487,16 @@ async function main() {
   assert(reconnected.version === expectedVersion, "La versión cambió después de reconectar.");
   assert(reconnected.online === true, "El navegador no recuperó navigator.onLine después de reconectar.");
   assert(reconnected.loginForm, "La pantalla principal no se recuperó después de reconectar.");
+  // An active registration alone is insufficient: the reloaded document must regain control.
+  const controlledAfterReconnect = await waitUntil(
+    "control de página por el Service Worker después de reconectar",
+    "(()=>{const c=navigator.serviceWorker&&navigator.serviceWorker.controller;return c&&c.scriptURL&&c.scriptURL.endsWith('/service-worker.js')?{controlled:true,scriptURL:c.scriptURL}:null})()",
+    10000
+  ).catch(() => null);
+  report.evidence.controllerAfterReconnect = controlledAfterReconnect;
+  assert(controlledAfterReconnect && controlledAfterReconnect.controlled,
+    "La página volvió a cargar online, pero no recuperó el control del Service Worker: " + JSON.stringify(controlledAfterReconnect));
+  report.evidence.onlineReconnect = await evaluate(pageSnapshotExpression());
   const serviceWorkerRegistrationAfterReconnect = await evaluate("(async()=>{if(!(\"serviceWorker\" in navigator))return {supported:false};const reg=await navigator.serviceWorker.getRegistration();return {supported:true,scope:reg?reg.scope:null,active:reg&&reg.active?{scriptURL:reg.active.scriptURL,state:reg.active.state}:null,waiting:reg&&reg.waiting?{scriptURL:reg.waiting.scriptURL,state:reg.waiting.state}:null,installing:reg&&reg.installing?{scriptURL:reg.installing.scriptURL,state:reg.installing.state}:null,controller:navigator.serviceWorker.controller?{scriptURL:navigator.serviceWorker.controller.scriptURL}:null}})()");
   report.evidence.serviceWorkerAfterReconnect = serviceWorkerRegistrationAfterReconnect;
   assert(serviceWorkerRegistrationAfterReconnect.supported, "La plataforma no ofrece Service Worker tras reconectar.");
