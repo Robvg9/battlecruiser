@@ -1,13 +1,13 @@
 // ==== BattleCruiser · app.js ====
-// v9.4.98 — M68: boot de autenticación independiente de módulos opcionales; versión alineada con HTML y Service Worker
+// v9.4.76 — M68: boot de autenticación independiente de módulos opcionales
 (function hotfixV9475(){
-  const VERSION="9.4.98";
+  const VERSION="9.4.76";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
     const label=document.querySelector('label[for="email"]');
-    if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario o correo";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
-    if(label)label.textContent="Usuario o correo";
+    if(input){input.type="text";input.required=true;input.autocomplete="username";input.placeholder="Usuario";input.removeAttribute("pattern");input.removeAttribute("inputmode");}
+    if(label)label.textContent="Usuario";
     document.querySelectorAll(".footnote,.app-footer-version").forEach(el=>el.textContent=`v${VERSION} — BattleCruiser`);
   }
   aplicarVersion();window.addEventListener("pageshow",aplicarVersion);
