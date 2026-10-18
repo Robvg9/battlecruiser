@@ -164,7 +164,7 @@ test("B3.3: un usuario activo puede operar", async () => {
     permisos: [{ seccion: "productos", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarContextoYPermisos(window);
   const puede = await window.usuarioPuedeOperar();
   assert.strictEqual(puede, true);
 });
@@ -315,12 +315,14 @@ test("B3.12 Seguridad: la protección del Dueño está en el backend (el fronten
   };
   // Recargar contexto para que tenga permisos de editar.
   await window.cargarContextoUsuario();
-  await esperar(20);
+  assert.ok(window.tienePermiso("usuarios", "editar"), "el contexto recargado debe conservar el permiso probado");
   // #msg-usuarios ya existe en el HTML real; lo reutilizamos (sin duplicar).
   const msgEl = window.document.getElementById("msg-usuarios");
   await window.cambiarEstadoUsuario("u-test", true);
-  await esperar(20);
-  assert.ok(/No se puede/.test(msgEl.textContent), "el backend rechaza y el frontend lo muestra");
+  assert.ok(
+    await esperarHasta(() => /No se puede/.test(msgEl.textContent), 2000, 10),
+    "el backend rechaza y el frontend lo muestra"
+  );
 });
 
 test("B3.27 Arquitectura: no hay stores/colas/cachés de permisos duplicados", async () => {
