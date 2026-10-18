@@ -368,6 +368,15 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     height: auto;
     min-height: 100vh;
   }
+  /* Higher-specificity layout reset: a legacy shell rule clamps height and hides overflow. */
+  #app-shell.visible {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
   #app-shell.visible > main.main-content {
     height: auto !important;
     min-height: 0 !important;
