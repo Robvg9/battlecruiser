@@ -38,7 +38,7 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .center-col { display: flex; flex-direction: column; align-items: center; }
-body:has(.app-shell.visible) { align-items: flex-start; }
+body:has(.app-shell.visible) { align-items: flex-start; justify-content: flex-start; }
 .stalactites {
   position: fixed; top: 0; left: 0; right: 0; height: 3px;
   pointer-events: none; z-index: 1;
