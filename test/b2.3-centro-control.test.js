@@ -882,19 +882,29 @@ test("OFFLINE: compra/transferencia/vale offline también entran a la cola", asy
 test("OFFLINE: FIFO — la cola ordena por creado_en ASC (la más antigua primero)", async () => {
   const { window } = montarEntorno();
   marcarOnline(window);
-  await esperar(30);
-  // Keep background sync from consuming an item while the test builds its FIFO fixture.
+  // Put the test into offline mode before the boot's asynchronous sync path can run.
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  await esperar(30);
   const w = window;
+  assert.strictEqual(typeof w.__bcSetUsuarioActualId, "function", "el harness debe exponer un setter para el usuario de la fixture");
+  w.__bcSetUsuarioActualId("u-test");
   const opA = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
   opA.creado_en = "2026-08-15T10:00:00Z";
   const opB = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
   opB.creado_en = "2026-08-15T09:00:00Z";
   const opC = w.crearOperacionPendiente("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1 });
   opC.creado_en = "2026-08-15T11:00:00Z";
-  await w.guardarOperacionPendiente(opA);
-  await w.guardarOperacionPendiente(opB);
-  await w.guardarOperacionPendiente(opC);
+  assert.deepStrictEqual([opA.usuario_id, opB.usuario_id, opC.usuario_id], ["u-test", "u-test", "u-test"],
+    "las tres operaciones FIFO deben pertenecer al mismo usuario");
+  const guardadas = [];
+  for (const op of [opA, opB, opC]) {
+    const saved = await w.guardarOperacionPendiente(op);
+    assert.ok(saved && saved.id === op.id, "no se debe perder una operación de la fixture: " + op.id);
+    const persisted = await w.obtenerOperacionPendiente(op.id);
+    assert.ok(persisted && persisted.usuario_id === "u-test", "la operación debe persistir para el usuario de la fixture: " + op.id);
+    guardadas.push(persisted);
+  }
+  assert.strictEqual(guardadas.length, 3, "las tres operaciones se confirmaron en IndexedDB");
   const orden = (await w.obtenerOperacionesPorEstado("PENDIENTE")).map((o) => o.id);
   assert.deepStrictEqual(orden, [opB.id, opA.id, opC.id], "FIFO: la más antigua (09:00) va primero");
 });
