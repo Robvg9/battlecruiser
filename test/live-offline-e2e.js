@@ -405,15 +405,23 @@ async function main() {
   assert(Math.abs(mobileHeader.logout.top - mobileHeader.brand.top) <= 18,
     "Logout no está alineado en la fila superior con el título: " + JSON.stringify(mobileHeader));
 
-  // Verify mobile content and footer remain in normal document flow.
-  const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowY:s.overflowY,clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,shellDisplay:shell?getComputedStyle(shell).display:null,main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
+  // Verify mobile content uses page scrolling and critical settings remain reachable.
+  const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowX:s.overflowX,overflowY:s.overflowY,cssHeight:s.height,maxHeight:s.maxHeight,flex:s.flex,inlineStyle:e.getAttribute('style'),clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,shellDisplay:shell?getComputedStyle(shell).display:null,main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
   report.evidence.androidMobileContentLayout = mobileContentLayout;
   assert(mobileContentLayout.main && mobileContentLayout.footer,
     "No se pudo medir el panel principal y el pie en el viewport móvil: " + JSON.stringify(mobileContentLayout));
-  assert(mobileContentLayout.footer.position === "static",
-    "El pie permanece posicionado fuera del flujo normal en móvil: " + JSON.stringify(mobileContentLayout));
-  assert(mobileContentLayout.gap >= -1,
-    "El pie tapa o se solapa con el contenido principal en móvil: " + JSON.stringify(mobileContentLayout));
+  assert(mobileContentLayout.main.overflowY === "visible" &&
+         mobileContentLayout.main.scrollHeight <= mobileContentLayout.main.clientHeight + 1,
+    "El panel principal sigue recortado en un scroll interno en móvil: " + JSON.stringify(mobileContentLayout));
+  assert(mobileContentLayout.documentHeight > mobileContentLayout.viewportHeight,
+    "El documento móvil no crece para alojar el contenido completo: " + JSON.stringify(mobileContentLayout));
+  assert(mobileContentLayout.footer.position === "static" &&
+         mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,
+    "El pie se superpone o abandona el flujo después del contenido móvil: " + JSON.stringify(mobileContentLayout));
+  const mobileSettingsReachability = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>{const leaves=Array.from(document.querySelectorAll('strong,span,label,div,p'));const label=leaves.find(e=>e.children.length===0&&e.textContent.trim()==='Sincronizar solo en Wi‑Fi');const row=label&&(label.closest('.cfg-aj-row,.bc-aj-row,.field,.form-row')||label.parentElement?.parentElement||label);if(row&&typeof row.scrollIntoView==='function')row.scrollIntoView({block:'end',behavior:'instant'});requestAnimationFrame(()=>{const rr=row?row.getBoundingClientRect():null;const rect=rr?{top:rr.top,bottom:rr.bottom,height:rr.height}:null;resolve({found:!!row,text:label?.textContent?.trim()||null,row:rect,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,fullyVisible:!!(rect&&rect.top>=-1&&rect.bottom<=innerHeight+1),pageScrollY:scrollY});});})))()");
+  report.evidence.androidMobileSettingsReachability = mobileSettingsReachability;
+  assert(mobileSettingsReachability.found && mobileSettingsReachability.fullyVisible,
+    "El control “Sincronizar solo en Wi‑Fi” no puede llevarse completamente a vista con el scroll móvil: " + JSON.stringify(mobileSettingsReachability));
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
   fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));

@@ -360,10 +360,13 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     height: auto;
     min-height: 100vh;
   }
-  .main-content {
-    height: auto;
+  .app-shell.visible > .main-content {
+    height: auto !important;
     min-height: 0;
-    overflow: visible;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
     flex: 0 0 auto;
   }
   .app-footer {
