@@ -152,7 +152,12 @@
   }
 
   function ensurePanel() {
-    if (document.getElementById('bc-aj-panel')) return;
+    var existingPanel = document.getElementById('bc-aj-panel');
+    var existingBackdrop = document.getElementById('bc-aj-backdrop');
+    // Recover a partial UI mount instead of throwing when the panel or backdrop is missing.
+    if (existingPanel && existingBackdrop) return;
+    if (existingPanel) existingPanel.remove();
+    if (existingBackdrop) existingBackdrop.remove();
 
     var back = document.createElement('div');
     back.id = 'bc-aj-backdrop';
