@@ -837,9 +837,15 @@ safeInit("cambiar-contraseña", () => {
 });
 
 if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
-  window.addEventListener("load", () => {
+  // Register immediately as this module can be dynamically loaded after window.load.
+  // Re-run idempotently on online to recover if the browser dropped registration
+  // during an offline/online transition; registration does not reload the page.
+  const bcEnsureServiceWorker = () => {
     navigator.serviceWorker.register("./service-worker.js").catch(() => {});
-  });
+  };
+  bcEnsureServiceWorker();
+  window.addEventListener("load", bcEnsureServiceWorker);
+  window.addEventListener("online", bcEnsureServiceWorker);
 }
 
 safeInit("escape-cierra-paneles", () => {
