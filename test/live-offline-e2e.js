@@ -404,6 +404,16 @@ async function main() {
     "Logout se sale del encabezado por la derecha en 360px: " + JSON.stringify(mobileHeader));
   assert(Math.abs(mobileHeader.logout.top - mobileHeader.brand.top) <= 18,
     "Logout no está alineado en la fila superior con el título: " + JSON.stringify(mobileHeader));
+
+  // Verify mobile content and footer remain in normal document flow.
+  const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowY:s.overflowY,clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,shellDisplay:shell?getComputedStyle(shell).display:null,main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
+  report.evidence.androidMobileContentLayout = mobileContentLayout;
+  assert(mobileContentLayout.main && mobileContentLayout.footer,
+    "No se pudo medir el panel principal y el pie en el viewport móvil: " + JSON.stringify(mobileContentLayout));
+  assert(mobileContentLayout.footer.position === "static",
+    "El pie permanece posicionado fuera del flujo normal en móvil: " + JSON.stringify(mobileContentLayout));
+  assert(mobileContentLayout.gap >= -1,
+    "El pie tapa o se solapa con el contenido principal en móvil: " + JSON.stringify(mobileContentLayout));
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
   fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));

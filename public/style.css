@@ -353,6 +353,24 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 
 /* Android-first header layout: keep Logout in the first row. */
 @media (max-width: 759px) {
+  /* Mobile layout: keep all panels in document flow so the footer cannot cover controls. */
+  .app-shell.visible {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+  .main-content {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .app-footer {
+    position: static;
+    width: 100%;
+    flex: 0 0 auto;
+  }
   .app-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
