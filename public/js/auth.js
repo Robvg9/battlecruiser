@@ -511,10 +511,10 @@ safeInit("login", () => {
   if (usuarioInput) {
     usuarioInput.type = "text";
     usuarioInput.autocomplete = "username";
-    usuarioInput.placeholder = "Tu usuario";
+    usuarioInput.placeholder = "Usuario o correo";
     usuarioInput.removeAttribute("inputmode");
   }
-  if (usuarioLabel) usuarioLabel.textContent = "Usuario";
+  if (usuarioLabel) usuarioLabel.textContent = "Usuario o correo";
 
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -580,7 +580,7 @@ safeInit("login", () => {
   });
 });
 
-// Permitir solicitar otro enlace de recuperación directamente desde el login.
+// Recuperación coherente con el login: el servidor resuelve correo o nombre de usuario.
 safeInit("password-recovery-request", () => {
   const recoveryBtn = document.getElementById("password-recovery-request-btn");
   const recoveryMsg = document.getElementById("password-recovery-msg");
@@ -588,13 +588,13 @@ safeInit("password-recovery-request", () => {
   if (!recoveryBtn || !recoveryMsg || !usuarioInput) return;
 
   recoveryBtn.addEventListener("click", async () => {
-    const email = usuarioInput.value.trim();
+    const identifier = usuarioInput.value.trim();
     recoveryMsg.className = "msg";
     recoveryMsg.textContent = "";
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!identifier || identifier.length > 120) {
       recoveryMsg.className = "msg error";
-      recoveryMsg.textContent = "Escribe un correo válido en el campo superior para enviarte el enlace.";
+      recoveryMsg.textContent = "Escribe tu correo o nombre de usuario para recuperar el acceso.";
       usuarioInput.focus();
       return;
     }
@@ -602,20 +602,25 @@ safeInit("password-recovery-request", () => {
     recoveryBtn.disabled = true;
     recoveryBtn.textContent = "Enviando correo…";
     try {
-      const { error } = await client.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/?bc_recovery=1"
+      const response = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
+        method: "POST",
+        headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "password-recovery", username: identifier }),
+        cache: "no-store",
       });
-      if (error) {
+      if (response.status === 429) {
         recoveryMsg.className = "msg error";
-        recoveryMsg.textContent = "No se pudo solicitar el correo: " + (error.message || "inténtalo más tarde.");
+        recoveryMsg.textContent = "Demasiados intentos. Espera unos minutos y vuelve a probar.";
         return;
       }
+      if (!response.ok) throw new Error("RECOVERY_REQUEST_FAILED");
+
       recoveryMsg.className = "msg";
-      recoveryMsg.textContent = "Solicitud enviada. Revisa la bandeja de entrada y spam; usa el correo más reciente.";
+      recoveryMsg.textContent = "Si el correo o nombre de usuario corresponde a una cuenta activa, enviaremos un enlace al correo asociado. Revisa la bandeja de entrada y spam; usa el correo más reciente.";
     } catch (error) {
       recoveryMsg.className = "msg error";
-      recoveryMsg.textContent = "No se pudo conectar para solicitar el correo. Comprueba la conexión e inténtalo otra vez.";
-      console.error("[BattleCruiser] password recovery request failed", error);
+      recoveryMsg.textContent = "No se pudo completar la solicitud ahora mismo. Comprueba la conexión e inténtalo de nuevo.";
+      console.error("[BattleCruiser] password recovery request failed");
     } finally {
       recoveryBtn.disabled = false;
       recoveryBtn.textContent = "Enviar correo de recuperación";
