@@ -1,0 +1,19 @@
+name: BattleCruiser backup restore preflight
+on:
+  push:
+    branches:
+      - backup-preflight/db-backup-restore-20261019
+    paths:
+      - .github/workflows/bc-db-backup-restore-preflight.yml
+      - scripts/bc-backup-restore-preflight.mjs
+permissions:
+  contents: read
+jobs:
+  isolated-preflight:
+    if: github.ref_name == 'backup-preflight/db-backup-restore-20261019'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm isolated branch
+        run: echo 'BC_BACKUP_RESTORE_BRANCH_GATE=PASS'
