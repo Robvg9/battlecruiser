@@ -333,6 +333,14 @@
   }
 
   function open() {
+    var existingPanel = document.getElementById('bc-aj-panel');
+    if (existingPanel && existingPanel.dataset.bcMovedToConfig === '1') {
+      // Ajustes has been migrated into the Configuración tab. The header action
+      // should navigate there, not reopen a drawer that locks document scrolling.
+      var configTab = document.querySelector('.tab-btn[data-tab="config"]');
+      if (configTab && !configTab.classList.contains('active')) configTab.click();
+      return;
+    }
     ensurePanel();
     prefs = loadPrefs();
     syncUi();
