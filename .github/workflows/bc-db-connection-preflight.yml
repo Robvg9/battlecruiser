@@ -30,6 +30,44 @@ jobs:
           fi
           echo "BC_DB_SECRET_PRESENT=YES; value not printed"
 
+      - name: Validate connection target metadata (never print password)
+        shell: bash
+        env:
+          BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if ! meta="$(node - <<'NODE'
+          const raw = process.env.BC_SUPABASE_DB_URL || "";
+          try {
+            const u = new URL(raw);
+            const username = decodeURIComponent(u.username);
+            const database = decodeURIComponent(u.pathname.replace(/^\//, ""));
+            if (u.protocol !== "postgres:" && u.protocol !== "postgresql:") throw new Error("scheme");
+            if (!username || !u.hostname || !database) throw new Error("parts");
+            process.stdout.write([username, u.hostname, u.port || "default", database].join("|"));
+          } catch {
+            process.exit(7);
+          }
+          NODE
+          )"; then
+            echo "BC_DB_URI_METADATA=FAIL; connection string is not a valid PostgreSQL URI. Password was not inspected or printed."
+            exit 7
+          fi
+          IFS='|' read -r uri_user uri_host uri_port uri_db <<< "$meta"
+          echo "DB_URI_USERNAME=$uri_user"
+          echo "DB_URI_HOST=$uri_host"
+          echo "DB_URI_PORT=$uri_port"
+          echo "DB_URI_DATABASE=$uri_db"
+          if [ "$uri_user" != "postgres.papxnkkjtkxsitcsvcme" ]; then
+            echo "BC_DB_URI_METADATA=FAIL; Session Pooler username must be postgres.papxnkkjtkxsitcsvcme."
+            exit 8
+          fi
+          if [ "$uri_host" != "aws-0-us-east-1.pooler.supabase.com" ] || [ "$uri_port" != "5432" ] || [ "$uri_db" != "postgres" ]; then
+            echo "BC_DB_URI_METADATA=FAIL; host, port, or database does not match the Session Pooler values shown in Supabase Connect."
+            exit 9
+          fi
+          echo "BC_DB_URI_METADATA=PASS; expected Session Pooler target; password not printed"
+
       - name: Install PostgreSQL client
         shell: bash
         run: |
