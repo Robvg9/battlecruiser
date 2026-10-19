@@ -46,6 +46,9 @@
     }
     const backdrop = document.getElementById('bc-aj-backdrop');
     if (backdrop) backdrop.remove();
+    // This panel is now inline in the Configuración tab, not an open drawer.
+    // Release the body scroll lock that the programmatic Ajustes click may have set.
+    if (document.body) document.body.classList.remove('bc-aj-open');
   }
 
   function css() {
