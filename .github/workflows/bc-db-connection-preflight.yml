@@ -1,0 +1,69 @@
+name: BattleCruiser DB Connection Preflight (Read Only)
+
+on:
+  push:
+    branches:
+      - backup-preflight/db-connect-20261019
+    paths:
+      - .github/workflows/bc-db-connection-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connection-preflight:
+    name: PostgreSQL connection — read only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm secret exists without revealing it
+        shell: bash
+        env:
+          BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BC_SUPABASE_DB_URL:-}" ]; then
+            echo "BC_DB_SECRET_PRESENT=NO"
+            echo "The repository secret BC_SUPABASE_DB_URL is missing or unavailable to this workflow."
+            exit 2
+          fi
+          echo "BC_DB_SECRET_PRESENT=YES; value not printed"
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Test PostgreSQL authentication with SELECT only
+        shell: bash
+        env:
+          BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          set +e
+          output="$(PGCONNECT_TIMEOUT=12 psql "$BC_SUPABASE_DB_URL" \
+            --no-psqlrc --tuples-only --no-align --field-separator '|' \
+            --set=ON_ERROR_STOP=1 \
+            --command="SELECT current_database(), current_user, current_setting('server_version');" 2>&1)"
+          rc=$?
+          set -e
+
+          if [ "$rc" -ne 0 ]; then
+            printf '%s\n' "$output" | sed -E 's#postgres(ql)?://[^[:space:]]+#\[REDACTED_DB_URL\]#g'
+            echo "BC_DB_CONNECTION_PREFLIGHT=FAIL; no database writes were performed"
+            exit "$rc"
+          fi
+
+          IFS='|' read -r db role version <<< "$output"
+          if [ "$db" != "postgres" ] || [ -z "$role" ] || [ -z "$version" ]; then
+            echo "BC_DB_CONNECTION_PREFLIGHT=FAIL; response did not match the expected database"
+            exit 3
+          fi
+
+          echo "DATABASE_NAME=$db"
+          echo "DATABASE_ROLE=$role"
+          echo "POSTGRES_VERSION=$version"
+          echo "BC_DB_CONNECTION_PREFLIGHT=PASS; SELECT only; no writes performed"
