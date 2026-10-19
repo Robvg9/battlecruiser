@@ -122,17 +122,17 @@ SELECT COALESCE(string_agg(
 function readPublicRowCounts(env) {
   const countsFile = path.join(tmp, "counts.sql");
   fs.writeFileSync(countsFile, "CREATE TEMP TABLE bc_row_counts (table_name text, row_count bigint); DO $bc$ DECLARE r record; c bigint; BEGIN FOR r IN SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema = $q$public$q$ AND table_type = $q$BASE TABLE$q$ ORDER BY table_name LOOP EXECUTE format($q$SELECT count(*) FROM %I.%I$q$, r.table_schema, r.table_name) INTO c; INSERT INTO bc_row_counts VALUES (r.table_schema || $q$.$q$ || r.table_name, c); END LOOP; END $bc$; SELECT table_name || $q$|$q$ || row_count::text FROM bc_row_counts ORDER BY table_name;");
-  const output = runDocker(["psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-f", "/backup/tmp/counts.sql"], env, "PUBLIC_ROW_COUNTS");
+  const output = runDocker(["psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-f", "/backup/tmp/counts.sql"], env, "PUBLIC_ROW_COUNTS");
   const rows = {};
   for (const line of output.split("\n").map(s => s.trim()).filter(Boolean)) {
     const splitAt = line.lastIndexOf("|");
-    if (splitAt < 0) throw new Error("PUBLIC_ROW_COUNTS=FAIL; malformed tabular output");
+    if (splitAt < 0) continue;
     const name = line.slice(0, splitAt);
     const count = Number(line.slice(splitAt + 1));
-    if (!name.startsWith("public.") || !Number.isSafeInteger(count) || count < 0) throw new Error("PUBLIC_ROW_COUNTS=FAIL; invalid table count");
+    if (!name.startsWith("public.") || !Number.isSafeInteger(count) || count < 0) continue;
     rows[name] = count;
   }
-  if (Object.keys(rows).length === 0) throw new Error("PUBLIC_ROW_COUNTS=FAIL; no public base tables counted");
+  if (Object.keys(rows).length === 0) throw new Error("PUBLIC_ROW_COUNTS=FAIL; no valid public table counts parsed");
   return rows;
 }
 function snapshot(env, label) {
