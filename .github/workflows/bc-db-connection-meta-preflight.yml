@@ -1,0 +1,117 @@
+name: BattleCruiser DB Connection Metadata Preflight (Read Only)
+
+on:
+  push:
+    branches:
+      - backup-preflight/db-connect-meta-20261019
+    paths:
+      - .github/workflows/bc-db-connection-meta-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connection-preflight:
+    name: Validate URI and run SELECT only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm secret exists without revealing it
+        shell: bash
+        env:
+          BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BC_SUPABASE_DB_URL:-}" ]; then
+            echo "BC_DB_SECRET_PRESENT=NO"
+            exit 2
+          fi
+          echo "BC_DB_SECRET_PRESENT=YES; value not printed"
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Validate URI fields and authenticate without printing password
+        shell: bash
+        env:
+          BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { spawnSync } = require('node:child_process');
+
+          let url;
+          let username;
+          let password;
+          let database;
+          try {
+            url = new URL(process.env.BC_SUPABASE_DB_URL || '');
+            username = decodeURIComponent(url.username);
+            password = decodeURIComponent(url.password);
+            database = decodeURIComponent(url.pathname.replace(/^\//, ''));
+          } catch {
+            console.log('BC_DB_URI_METADATA=FAIL; malformed PostgreSQL connection string or invalid percent-encoding; password not printed');
+            process.exit(7);
+          }
+
+          console.log('DB_URI_USERNAME=' + username);
+          console.log('DB_URI_HOST=' + url.hostname);
+          console.log('DB_URI_PORT=' + (url.port || 'default'));
+          console.log('DB_URI_DATABASE=' + database);
+
+          if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
+              username !== 'postgres.papxnkkjtkxsitcsvcme' ||
+              url.hostname !== 'aws-0-us-east-1.pooler.supabase.com' ||
+              url.port !== '5432' ||
+              database !== 'postgres' ||
+              !password ||
+              url.hash) {
+            console.log('BC_DB_URI_METADATA=FAIL; expected Session Pooler values not present, password missing, or a reserved character may need percent-encoding. Password not printed.');
+            process.exit(8);
+          }
+          console.log('BC_DB_URI_METADATA=PASS; expected Session Pooler target; password not printed');
+
+          const query = "SELECT current_database(), current_user, current_setting('server_version');";
+          const result = spawnSync('psql', [
+            '--no-psqlrc',
+            '--tuples-only',
+            '--no-align',
+            '--field-separator', '|',
+            '--set=ON_ERROR_STOP=1',
+            '--host=' + url.hostname,
+            '--port=5432',
+            '--username=' + username,
+            '--dbname=' + database,
+            '--command=' + query
+          ], {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              PGPASSWORD: password,
+              PGSSLMODE: 'require',
+              PGCONNECT_TIMEOUT: '12'
+            }
+          });
+
+          if (result.status !== 0) {
+            const message = (result.stderr || result.error?.message || 'PostgreSQL connection failed').trim();
+            console.log(message);
+            console.log('BC_DB_CONNECTION_PREFLIGHT=FAIL; SELECT only; no database writes performed');
+            process.exit(result.status || 2);
+          }
+
+          const [db, role, version] = result.stdout.trim().split('|');
+          if (db !== 'postgres' || !role || !version) {
+            console.log('BC_DB_CONNECTION_PREFLIGHT=FAIL; response did not match expected database');
+            process.exit(3);
+          }
+          console.log('DATABASE_NAME=' + db);
+          console.log('DATABASE_ROLE=' + role);
+          console.log('POSTGRES_VERSION=' + version);
+          console.log('BC_DB_CONNECTION_PREFLIGHT=PASS; SELECT only; no writes performed');
+          NODE
