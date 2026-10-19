@@ -213,9 +213,23 @@ function dockerPsqlLocal(args, label) {
 
 async function restore() {
   if (!fs.existsSync(path.join(restored, "manifest.json"))) throw new Error("BC_RESTORE_INPUT=FAIL; decrypted archive not extracted");
+  const existingRoleOutput = dockerPsqlLocal(["psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", "SELECT rolname FROM pg_roles"], "BC_RESTORE_LOCAL_ROLE_LIST");
+  const existingRoles = new Set(existingRoleOutput.split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+  const sourceRoleLines = fs.readFileSync(path.join(restored, "roles.sql"), "utf8").split(/\r?\n/);
+  const skippedRoles = new Set();
+  const filteredRoleLines = sourceRoleLines.filter(line => {
+    const match = line.match(/^\s*(?:CREATE|ALTER)\s+ROLE\s+("[^"]+"|[A-Za-z0-9_$-]+)/i);
+    if (!match) return true;
+    const name = match[1].replace(/^"|"$/g, "");
+    if (!existingRoles.has(name)) return true;
+    skippedRoles.add(name);
+    return false;
+  });
+  fs.writeFileSync(path.join(restored, "roles-restore.sql"), filteredRoleLines.join("\n") + "\n", { mode: 0o600 });
+  console.log(`BC_RESTORE_ROLE_FILTER=PASS; preserving ${skippedRoles.size} roles supplied by isolated Supabase stack`);
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
-    "--file=/backup/restored/roles.sql",
+    "--file=/backup/restored/roles-restore.sql",
     "--file=/backup/restored/schema.sql",
     "--command", "SET session_replication_role = replica",
     "--file=/backup/restored/data.sql",
