@@ -40,19 +40,23 @@ test("the header Ajustes action navigates to Configuración after migration", ()
   const dom = new JSDOM(`<!doctype html><html><head></head><body>
     <button id="ajustes-btn" type="button">Ajustes</button>
     <button class="tab-btn" data-tab="config" type="button">Configuración</button>
-    <div id="bc-aj-panel" data-bc-moved-to-config="1"></div>
+    <div id="bc-aj-panel"></div>
   </body></html>`, { runScripts: "outside-only" });
 
   try {
     const doc = dom.window.document;
+    // Make ready-state deterministic so the module wires the header synchronously.
+    Object.defineProperty(doc, "readyState", { configurable: true, value: "complete" });
+    doc.getElementById("bc-aj-panel").dataset.bcMovedToConfig = "1";
+
     let configClicks = 0;
     doc.querySelector('.tab-btn[data-tab="config"]').addEventListener("click", () => configClicks++);
 
     dom.window.eval(read("public/js/ui-ajustes-panel.js"));
-    doc.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+    assert.equal(doc.getElementById("ajustes-btn").dataset.bcAj, "1", "header listener should be installed");
     doc.getElementById("ajustes-btn").click();
 
-    assert.equal(configClicks, 1);
+    assert.equal(configClicks, 1, "Ajustes should route to the migrated Configuración tab");
     assert.equal(dom.window.document.body.classList.contains("bc-aj-open"), false);
     assert.equal(doc.getElementById("bc-aj-panel").classList.contains("open"), false);
   } finally {
