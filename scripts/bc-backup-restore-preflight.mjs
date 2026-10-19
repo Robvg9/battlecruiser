@@ -237,18 +237,15 @@ async function restore() {
   });
   fs.writeFileSync(path.join(restored, "roles-restore.sql"), filteredRoleLines.join("\n") + "\n", { mode: 0o600 });
   console.log(`BC_RESTORE_ROLE_FILTER=PASS; preserving ${skippedRoles.size} roles supplied by isolated Supabase stack; skipped nonessential log_min_messages settings=${skippedLogSettings}`);
-  const clearLocalAuthSql = `DO $bc_clear_auth$ DECLARE r record; BEGIN FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname = 'auth' AND tablename NOT IN ('instances','schema_migrations') ORDER BY tablename LOOP EXECUTE format('TRUNCATE TABLE %I.%I RESTART IDENTITY CASCADE', r.schemaname, r.tablename); END LOOP; END $bc_clear_auth$;`;
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
     "--file=/backup/restored/roles-restore.sql",
     "--file=/backup/restored/schema.sql",
-    "--command", clearLocalAuthSql,
     "--command", "SET session_replication_role = replica",
     "--file=/backup/restored/data.sql",
     "--dbname=postgres"
   ], "BC_RESTORE_PUBLIC_DATABASE");
   console.log("BC_RESTORE_PUBLIC_DATABASE=PASS; explicit public-only data import");
-  console.log("BC_RESTORE_LOCAL_AUTH_BASELINE=PASS; temporary auth tables cleared before public data load");
 
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
@@ -260,7 +257,6 @@ async function restore() {
 
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
-    "--command", "TRUNCATE TABLE storage.objects, storage.buckets RESTART IDENTITY CASCADE",
     "--command", "SET session_replication_role = replica",
     "--file=/backup/restored/storage-metadata.sql",
     "--dbname=postgres"
