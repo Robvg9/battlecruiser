@@ -1,4 +1,5 @@
 name: BattleCruiser backup restore preflight
+
 on:
   push:
     branches:
@@ -6,14 +7,141 @@ on:
     paths:
       - .github/workflows/bc-db-backup-restore-preflight.yml
       - scripts/bc-backup-restore-preflight.mjs
+  workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   isolated-preflight:
     if: github.ref_name == 'backup-preflight/db-backup-restore-20261019'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      PROJECT_REF: papxnkkjtkxsitcsvcme
+      BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+      BC_BACKUP_PASSPHRASE: ${{ secrets.BC_BACKUP_PASSPHRASE }}
     steps:
       - uses: actions/checkout@v4
-      - name: Confirm isolated branch
-        run: echo 'BC_BACKUP_RESTORE_BRANCH_GATE=PASS'
+
+      - name: Initialize isolated workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BC_BACKUP_ROOT="$RUNNER_TEMP/bc-backup-restore"
+          mkdir -p "$BC_BACKUP_ROOT"
+          echo "BC_BACKUP_ROOT=$BC_BACKUP_ROOT" >> "$GITHUB_ENV"
+          if [ -z "${BC_SUPABASE_DB_URL:-}" ]; then echo "BC_DB_SECRET_PRESENT=NO"; exit 2; fi
+          echo "BC_DB_SECRET_PRESENT=YES; value not printed"
+          if [ -z "${BC_BACKUP_PASSPHRASE:-}" ]; then echo "BC_BACKUP_PASSPHRASE_PRESENT=NO"; exit 3; fi
+          pass_len=$(printf '%s' "$BC_BACKUP_PASSPHRASE" | wc -c | tr -d ' ')
+          if [ "$pass_len" -lt 20 ]; then echo "BC_BACKUP_PASSPHRASE_VALIDATION=FAIL; use at least 20 characters"; exit 4; fi
+          echo "BC_BACKUP_PASSPHRASE_VALIDATION=PASS; value not printed"
+
+      - name: Install pinned Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$BC_BACKUP_ROOT/cli" --no-save --no-package-lock supabase@2.121.0 >/dev/null
+          CLI="$BC_BACKUP_ROOT/cli/node_modules/.bin/supabase"
+          test -x "$CLI"
+          "$CLI" --version
+          "$CLI" db dump --help >/dev/null
+          "$CLI" init --help >/dev/null
+          "$CLI" start --help >/dev/null
+          "$CLI" status --help >/dev/null
+          echo "SUPABASE_CLI_BIN=$CLI" >> "$GITHUB_ENV"
+          echo "SUPABASE_CLI_DISCOVERY=PASS"
+
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17.6-alpine >/dev/null
+
+      - name: Export database and Storage source evidence
+        shell: bash
+        run: node scripts/bc-backup-restore-preflight.mjs backup
+
+      - name: Encrypt archive and verify integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$BC_BACKUP_ROOT"
+          CLEAR="$ROOT/battlecruiser-backup.tar.gz"
+          ENCRYPTED="$ROOT/battlecruiser-backup.tar.gz.gpg"
+          DECRYPTED="$ROOT/decrypted.tar.gz"
+          tar -czf "$CLEAR" -C "$ROOT/stage" .
+          test -s "$CLEAR"
+          printf '%s' "$BC_BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 --output "$ENCRYPTED" "$CLEAR"
+          printf '%s' "$BC_BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt --output "$DECRYPTED" "$ENCRYPTED" 2>/dev/null
+          cmp -s "$CLEAR" "$DECRYPTED"
+          tar -tzf "$DECRYPTED" >/dev/null
+          sha256sum "$ENCRYPTED" > "$ENCRYPTED.sha256"
+          echo "BC_BACKUP_ENCRYPTION=PASS; AES-256; round-trip and archive integrity verified"
+          echo "BC_BACKUP_SHA256=$(sha256sum "$ENCRYPTED" | cut -d ' ' -f 1)"
+          mkdir -p "$ROOT/restored"
+          tar -xzf "$DECRYPTED" -C "$ROOT/restored"
+          cmp -s "$ROOT/stage/manifest.json" "$ROOT/restored/manifest.json"
+          rm -f "$CLEAR" "$DECRYPTED"
+          echo "BC_BACKUP_ARCHIVE_REOPEN=PASS"
+
+      - name: Start temporary isolated Supabase stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$BC_BACKUP_ROOT"
+          mkdir -p "$ROOT/local-project"
+          cd "$ROOT/local-project"
+          "$SUPABASE_CLI_BIN" init --force > "$ROOT/supabase-init.log" 2>&1
+          sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
+          if ! "$SUPABASE_CLI_BIN" start > "$ROOT/supabase-start.log" 2>&1; then
+            echo "BC_LOCAL_STACK_START=FAIL; local generated credentials/logs suppressed"
+            exit 6
+          fi
+          if ! "$SUPABASE_CLI_BIN" status --output env > "$ROOT/local.env" 2> "$ROOT/supabase-status.log"; then
+            echo "BC_LOCAL_STACK_STATUS=FAIL; local credentials suppressed"
+            exit 7
+          fi
+          for key in DB_URL API_URL SERVICE_ROLE_KEY; do
+            grep -q "^$key=" "$ROOT/local.env" || { echo "BC_LOCAL_STACK_STATUS=FAIL; missing required local variable"; exit 8; }
+          done
+          echo "BC_LOCAL_STACK_START=PASS; temporary local stack only"
+
+      - name: Restore and reconcile isolated database and Storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a
+          . "$BC_BACKUP_ROOT/local.env"
+          set +a
+          node scripts/bc-backup-restore-preflight.mjs restore
+          node scripts/bc-backup-restore-preflight.mjs upload-storage
+          node scripts/bc-backup-restore-preflight.mjs verify
+
+      - name: Persist encrypted archive and sanitized reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-encrypted-backup-restore-evidence-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/bc-backup-restore/battlecruiser-backup.tar.gz.gpg
+            ${{ runner.temp }}/bc-backup-restore/battlecruiser-backup.tar.gz.gpg.sha256
+            ${{ runner.temp }}/bc-backup-restore/restore-report.json
+            ${{ runner.temp }}/bc-backup-restore/storage-restore-report.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Stop and clean temporary stack
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          ROOT="$RUNNER_TEMP/bc-backup-restore"
+          CLI="$ROOT/cli/node_modules/.bin/supabase"
+          if [ -x "$CLI" ] && [ -f "$ROOT/local-project/supabase/config.toml" ]; then
+            (cd "$ROOT/local-project" && "$CLI" stop --no-backup >/dev/null 2>&1)
+            echo "BC_LOCAL_STACK_STOP=ATTEMPTED; local temporary stack only"
+          else
+            echo "BC_LOCAL_STACK_STOP=SKIPPED"
+          fi
+          rm -f "$ROOT/battlecruiser-backup.tar.gz" "$ROOT/decrypted.tar.gz" "$ROOT/local.env"
+          rm -rf "$ROOT/stage" "$ROOT/restored" "$ROOT/local-project" "$ROOT/tmp" "$ROOT/cli"
+          echo "BC_UNENCRYPTED_TEMP_CLEANUP=ATTEMPTED"
