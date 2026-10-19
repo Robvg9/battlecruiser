@@ -333,7 +333,6 @@
   }
 
   function open() {
-    ensurePanel();
     var existingPanel = document.getElementById('bc-aj-panel');
     if (existingPanel && existingPanel.dataset.bcMovedToConfig === '1') {
       // Ajustes has been migrated into the Configuración tab. The header action
@@ -342,6 +341,7 @@
       if (configTab && !configTab.classList.contains('active')) configTab.click();
       return;
     }
+    ensurePanel();
     prefs = loadPrefs();
     syncUi();
     applyAppearance();
