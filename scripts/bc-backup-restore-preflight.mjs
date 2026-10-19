@@ -217,7 +217,12 @@ async function restore() {
   const existingRoles = new Set(existingRoleOutput.split(/\r?\n/).map(s => s.trim()).filter(Boolean));
   const sourceRoleLines = fs.readFileSync(path.join(restored, "roles.sql"), "utf8").split(/\r?\n/);
   const skippedRoles = new Set();
+  let skippedLogSettings = 0;
   const filteredRoleLines = sourceRoleLines.filter(line => {
+    if (/^\s*ALTER\s+ROLE\b.*\bSET\s+log_min_messages\b/i.test(line)) {
+      skippedLogSettings += 1;
+      return false;
+    }
     const match = line.match(/^\s*(?:CREATE|ALTER)\s+ROLE\s+("[^"]+"|[A-Za-z0-9_$-]+)/i);
     if (!match) return true;
     const name = match[1].replace(/^"|"$/g, "");
@@ -226,7 +231,7 @@ async function restore() {
     return false;
   });
   fs.writeFileSync(path.join(restored, "roles-restore.sql"), filteredRoleLines.join("\n") + "\n", { mode: 0o600 });
-  console.log(`BC_RESTORE_ROLE_FILTER=PASS; preserving ${skippedRoles.size} roles supplied by isolated Supabase stack`);
+  console.log(`BC_RESTORE_ROLE_FILTER=PASS; preserving ${skippedRoles.size} roles supplied by isolated Supabase stack; skipped nonessential log_min_messages settings=${skippedLogSettings}`);
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
     "--file=/backup/restored/roles-restore.sql",
