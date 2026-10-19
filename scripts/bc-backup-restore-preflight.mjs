@@ -219,7 +219,7 @@ async function restore() {
   const skippedRoles = new Set();
   let skippedLogSettings = 0;
   const filteredRoleLines = sourceRoleLines.filter(line => {
-    if (/^\s*ALTER\s+ROLE\b.*\bSET\s+log_min_messages\b/i.test(line)) {
+    if (/log_min_messages/i.test(line)) {
       skippedLogSettings += 1;
       return false;
     }
