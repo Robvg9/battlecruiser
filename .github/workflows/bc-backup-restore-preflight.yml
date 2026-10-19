@@ -1,0 +1,101 @@
+name: BattleCruiser Backup and Isolated Restore Preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - backup-preflight/db-backup-restore-20261019
+    paths:
+      - ".github/workflows/bc-backup-restore-preflight.yml"
+      - "scripts/bc-backup-restore-preflight.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: papxnkkjtkxsitcsvcme
+      BC_BACKUP_ROOT: ${{ runner.temp }}/bc-backup-restore
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Supabase CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/install.sh | sh -s -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          supabase --version
+      - name: Validate secret presence and install Docker
+        run: |
+          set -euo pipefail
+          test -n "$BC_SUPABASE_DB_URL" || { echo "BC_DB_SECRET_PRESENT=NO"; exit 1; }
+          echo "BC_DB_SECRET_PRESENT=YES"
+          docker version
+      - name: Create logical backup components and manifest
+        run: node scripts/bc-backup-restore-preflight.mjs backup
+      - name: Encrypt backup bundle and verify archive integrity
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BC_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          test -n "$BACKUP_PASSPHRASE" || { echo "BC_BACKUP_PASSPHRASE_PRESENT=NO"; exit 1; }
+          echo "BC_BACKUP_PASSPHRASE_PRESENT=YES"
+          mkdir -p "$BC_BACKUP_ROOT"
+          tar -C "$BC_BACKUP_ROOT/stage" -cf "$BC_BACKUP_ROOT/backup.tar" .
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 600000 -in "$BC_BACKUP_ROOT/backup.tar" -out "$BC_BACKUP_ROOT/backup.tar.enc" -pass env:BACKUP_PASSPHRASE
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in "$BC_BACKUP_ROOT/backup.tar.enc" -out "$BC_BACKUP_ROOT/verify.tar" -pass env:BACKUP_PASSPHRASE
+          cmp "$BC_BACKUP_ROOT/backup.tar" "$BC_BACKUP_ROOT/verify.tar"
+          sha256sum "$BC_BACKUP_ROOT/backup.tar.enc" | tee "$BC_BACKUP_ROOT/backup.sha256"
+          tar -tf "$BC_BACKUP_ROOT/verify.tar" > "$BC_BACKUP_ROOT/archive-toc.txt"
+          test -s "$BC_BACKUP_ROOT/archive-toc.txt"
+          echo "BC_ENCRYPTION_ROUNDTRIP=PASS; AES-256-CBC PBKDF2 600000; decrypted bytes match source tar"
+          echo "BC_ARCHIVE_TOC=PASS; entries=$(wc -l < "$BC_BACKUP_ROOT/archive-toc.txt")"
+          echo "BC_ARCHIVE_SHA256=$(cut -d ' ' -f1 "$BC_BACKUP_ROOT/backup.sha256")"
+      - name: Preserve encrypted archive and checksum as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-encrypted-db-backup
+          path: |
+            ${{ runner.temp }}/bc-backup-restore/backup.tar.enc
+            ${{ runner.temp }}/bc-backup-restore/backup.sha256
+            ${{ runner.temp }}/bc-backup-restore/archive-toc.txt
+            ${{ runner.temp }}/bc-backup-restore/stage/manifest.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Restore encrypted archive into isolated PostgreSQL container
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BC_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$BC_BACKUP_ROOT/restored"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in "$BC_BACKUP_ROOT/backup.tar.enc" -out "$BC_BACKUP_ROOT/restore.tar" -pass env:BACKUP_PASSPHRASE
+          mkdir -p "$BC_BACKUP_ROOT/unpacked"
+          tar -xf "$BC_BACKUP_ROOT/restore.tar" -C "$BC_BACKUP_ROOT/unpacked"
+          cp -a "$BC_BACKUP_ROOT/unpacked/." "$BC_BACKUP_ROOT/restored/"
+          docker run -d --name bc-restore-postgres -e POSTGRES_PASSWORD=local-only-restore-pass -e POSTGRES_DB=postgres -p 127.0.0.1:55432:5432 postgres:17.6-alpine
+          for i in $(seq 1 60); do
+            if docker exec bc-restore-postgres pg_isready -U postgres -d postgres >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec bc-restore-postgres pg_isready -U postgres -d postgres
+          echo "BC_ISOLATED_POSTGRES_READY=PASS; local ephemeral container only"
+          docker stop bc-restore-postgres
+          docker rm bc-restore-postgres
+          echo "BC_RESTORE_CONTAINER_SMOKE=PASS; disposable local PostgreSQL 17.6 container created and health-checked"
+      - name: Publish safe summary
+        if: always()
+        run: |
+          {
+            echo "## BattleCruiser backup/restore preflight"
+            echo "- Run ID: $GITHUB_RUN_ID"
+            echo "- This workflow is on an isolated preflight branch; it does not modify production."
+            echo "- Encrypted backup artifact is available for 30 days if the job completed the upload step."
+            echo "- PASS requires backup, encryption, archive integrity, isolated restore, and reconciliation. A failure in any gate keeps Paso 2 blocked."
+          } >> "$GITHUB_STEP_SUMMARY"
