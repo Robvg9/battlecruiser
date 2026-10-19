@@ -78,7 +78,7 @@ function runPsqlFile(env, file, label) {
 }
 
 function runCli(args, label) {
-  const r = spawnSync("supabase", args, { encoding: "utf8", env: process.env, maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync(process.env.SUPABASE_CLI_BIN || "supabase", args, { encoding: "utf8", env: process.env, maxBuffer: 64 * 1024 * 1024 });
   if (r.error || r.status !== 0) {
     const firstUseful = redact(r.stderr || r.error?.message || "CLI command failed").split("\n").filter(Boolean).slice(-3).join(" | ");
     throw new Error(`${label}=FAIL; exit=${r.status ?? "spawn"}; ${firstUseful.slice(0, 600)}`);
