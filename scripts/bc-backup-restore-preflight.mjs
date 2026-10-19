@@ -161,7 +161,7 @@ async function backup() {
   console.log("BC_DUMP_ROLES=PASS");
   runCli(["db", "dump", "--db-url", DB_URL, "-f", schemaFile], "BC_DUMP_SCHEMA");
   console.log("BC_DUMP_SCHEMA=PASS");
-  runCli(["db", "dump", "--db-url", DB_URL, "-f", dataFile, "--use-copy", "--data-only", "-x", "storage.buckets_vectors", "-x", "storage.vector_indexes"], "BC_DUMP_PUBLIC_DATA");
+  runCli(["db", "dump", "--db-url", DB_URL, "-f", dataFile, "--schema", "public", "--use-copy", "--data-only"], "BC_DUMP_PUBLIC_DATA");
   console.log("BC_DUMP_PUBLIC_DATA=PASS");
 
   runDocker(["pg_dump", "--data-only", "--schema=auth", "--exclude-table=auth.schema_migrations", "--exclude-table=auth.instances", "--no-owner", "--no-privileges", "--column-inserts", "--file=/backup/stage/auth-data.sql"], remote, "BC_DUMP_AUTH_DATA");
@@ -207,6 +207,11 @@ async function backup() {
 function dockerPsqlLocal(args, label) {
   const url = process.env.DB_URL || process.env.LOCAL_DB_URL;
   if (!url) throw new Error("LOCAL_DB_URL=NO");
+  const parsed = new URL(url);
+  const loopbackHosts = new Set(["127.0.0.1", "localhost", "[::1]"]);
+  if (!loopbackHosts.has(parsed.hostname) || parsed.port !== "54322") {
+    throw new Error("LOCAL_DB_TARGET_GUARD=FAIL; refusing restore/write outside loopback 127.0.0.1:54322");
+  }
   const target = connectionEnv(url, "disable");
   return runDocker(args, target, label);
 }
@@ -232,15 +237,18 @@ async function restore() {
   });
   fs.writeFileSync(path.join(restored, "roles-restore.sql"), filteredRoleLines.join("\n") + "\n", { mode: 0o600 });
   console.log(`BC_RESTORE_ROLE_FILTER=PASS; preserving ${skippedRoles.size} roles supplied by isolated Supabase stack; skipped nonessential log_min_messages settings=${skippedLogSettings}`);
+  const clearLocalAuthSql = \`DO $bc_clear_auth$ DECLARE r record; BEGIN FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE schemaname = 'auth' AND tablename NOT IN ('instances','schema_migrations') ORDER BY tablename LOOP EXECUTE format('TRUNCATE TABLE %I.%I RESTART IDENTITY CASCADE', r.schemaname, r.tablename); END LOOP; END $bc_clear_auth$;\`;
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
     "--file=/backup/restored/roles-restore.sql",
     "--file=/backup/restored/schema.sql",
+    "--command", clearLocalAuthSql,
     "--command", "SET session_replication_role = replica",
     "--file=/backup/restored/data.sql",
     "--dbname=postgres"
   ], "BC_RESTORE_PUBLIC_DATABASE");
-  console.log("BC_RESTORE_PUBLIC_DATABASE=PASS");
+  console.log("BC_RESTORE_PUBLIC_DATABASE=PASS; explicit public-only data import");
+  console.log("BC_RESTORE_LOCAL_AUTH_BASELINE=PASS; temporary auth tables cleared before public data load");
 
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
@@ -252,11 +260,12 @@ async function restore() {
 
   dockerPsqlLocal([
     "psql", "-X", "--single-transaction", "--set=ON_ERROR_STOP=1",
+    "--command", "TRUNCATE TABLE storage.objects, storage.buckets RESTART IDENTITY CASCADE",
     "--command", "SET session_replication_role = replica",
     "--file=/backup/restored/storage-metadata.sql",
     "--dbname=postgres"
   ], "BC_RESTORE_STORAGE_METADATA");
-  console.log("BC_RESTORE_STORAGE_METADATA=PASS");
+  console.log("BC_RESTORE_STORAGE_METADATA=PASS; temporary storage metadata replaced from source");
 
   const dropManaged = `DO $drop$ DECLARE r record; BEGIN FOR r IN SELECT schemaname, tablename, policyname FROM pg_policies WHERE schemaname IN ('auth','storage') LOOP EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', r.policyname, r.schemaname, r.tablename); END LOOP; END $drop$;`;
   dockerPsqlLocal(["psql", "-X", "--set=ON_ERROR_STOP=1", "--command", dropManaged, "--dbname=postgres"], "BC_RESTORE_CLEAR_LOCAL_MANAGED_POLICIES");
