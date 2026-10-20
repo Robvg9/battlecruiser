@@ -9,76 +9,64 @@ const { JSDOM } = require("jsdom");
 const ROOT = path.resolve(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 
-test("moving Ajustes into Configuración clears and continuously prevents the body scroll lock", async () => {
+test("long mobile sections clear stale Ajustes locks and become their own touch-scroll regions", async () => {
   const dom = new JSDOM(`<!doctype html><html><head></head><body class="bc-aj-open">
     <button class="tab-btn" data-tab="config" type="button">Configuración</button>
-    <div id="tab-config" class="visible"><h3>Configuración</h3></div>
+    <button class="tab-btn" data-tab="conectividad" type="button">Conectividad</button>
+    <button class="tab-btn" data-tab="preferencias" type="button">Preferencias</button>
+    <div id="tab-config" class="tab-panel visible"><h3>Configuración</h3></div>
+    <div id="tab-conectividad" class="tab-panel"><h3>Conectividad</h3></div>
+    <div id="tab-preferencias" class="tab-panel"><h3>Preferencias</h3></div>
     <div id="bc-aj-backdrop" class="open"></div>
-    <aside id="bc-aj-panel" class="open" role="dialog">
-      <div class="bc-aj-head"><h2>Ajustes</h2></div>
-      <button id="bc-aj-close" type="button">Cerrar</button>
-      <div class="bc-aj-body"></div>
-      <button id="bc-aj-logout" type="button">Cerrar sesión</button>
-    </aside>
+    <aside id="bc-aj-panel" class="open" role="dialog"><div class="bc-aj-body"></div></aside>
   </body></html>`, { runScripts: "outside-only" });
 
   try {
-    dom.window.eval(read("public/js/hotfix-configuracion-20260902.js"));
-    dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+    const win = dom.window;
+    const doc = win.document;
+    Object.defineProperty(doc, "readyState", { configurable: true, value: "complete" });
+    win.matchMedia = () => ({ matches: true, media: "(max-width: 759px)" });
+    win.eval(read("public/js/hotfix-configuracion-20260902.js"));
 
-    const doc = dom.window.document;
-    const panel = doc.getElementById("bc-aj-panel");
-    assert.equal(panel.parentElement.id, "tab-config");
-    assert.equal(panel.classList.contains("open"), false);
-    assert.equal(doc.getElementById("bc-aj-backdrop"), null);
     assert.equal(doc.body.classList.contains("bc-aj-open"), false);
+    assert.equal(doc.getElementById("bc-aj-panel"), null, "legacy drawer must be removed");
+    assert.equal(doc.getElementById("bc-aj-backdrop"), null, "legacy backdrop must be removed");
+    assert.equal(doc.body.classList.contains("bc-config-scroll-unlocked"), true);
+    assert.equal(doc.documentElement.classList.contains("bc-config-scroll-unlocked"), true);
+    assert.equal(doc.getElementById("tab-config").classList.contains("bc-config-scroll-region"), true);
 
-    // Simulate a legacy Ajustes handler reapplying the lock after migration.
-    doc.body.classList.add("bc-aj-open");
-    doc.getElementById("bc-aj-panel").classList.add("open");
-    doc.querySelector('.tab-btn[data-tab="config"]').click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(doc.body.classList.contains("bc-aj-open"), false, "Config tab click must release a reintroduced legacy lock");
-    assert.equal(doc.body.classList.contains("bc-config-scroll-unlocked"), true, "mobile Configuración must opt into document scrolling");
-    assert.equal(doc.documentElement.classList.contains("bc-config-scroll-unlocked"), true, "root document must be released from a stale scroll lock");
-    assert.equal(doc.getElementById("tab-config").classList.contains("bc-config-scroll-region"), true, "Configuración must become its own touch-scroll region");
+    for (const name of ["conectividad", "preferencias", "config"]) {
+      doc.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("visible"));
+      doc.getElementById("tab-" + name).classList.add("visible");
+      doc.body.classList.add("bc-aj-open");
+      doc.querySelector('.tab-btn[data-tab="' + name + '"]').click();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      assert.equal(doc.body.classList.contains("bc-aj-open"), false, name + " click clears stale legacy lock");
+      for (const section of ["config", "conectividad", "preferencias"]) {
+        assert.equal(
+          doc.getElementById("tab-" + section).classList.contains("bc-config-scroll-region"),
+          section === name,
+          "only the active section gets the touch-scroll region"
+        );
+      }
+    }
+
     const hotfix = read("public/js/hotfix-configuracion-20260902.js");
-    const css = read("public/style.css");
+    assert.match(hotfix, /legacyPanel\.parentNode\.removeChild\(legacyPanel\)/);
     assert.match(hotfix, /bc-config-scroll-region/);
-    assert.match(css, /#tab-config\.visible\.bc-config-scroll-region/);
-    assert.match(css, /overflow-y: auto !important/);
-    assert.match(css, /-webkit-overflow-scrolling: touch/);
-    assert.match(css, /touch-action: pan-y/);
-    assert.equal(doc.getElementById("bc-aj-panel").classList.contains("open"), false);
+    assert.match(hotfix, /overflow-y:auto!important/);
+    assert.match(hotfix, /-webkit-overflow-scrolling:touch/);
+    assert.match(hotfix, /touch-action:pan-y/);
   } finally {
     dom.window.close();
   }
 });
 
-test("the header Ajustes action navigates to Configuración after migration", () => {
-  const dom = new JSDOM(`<!doctype html><html><head></head><body>
-    <button id="ajustes-btn" type="button">Ajustes</button>
-    <button class="tab-btn" data-tab="config" type="button">Configuración</button>
-    <div id="bc-aj-panel"></div>
-  </body></html>`, { runScripts: "outside-only" });
-
-  try {
-    const doc = dom.window.document;
-    // Make ready-state deterministic so the module wires the header synchronously.
-    Object.defineProperty(doc, "readyState", { configurable: true, value: "complete" });
-    doc.getElementById("bc-aj-panel").dataset.bcMovedToConfig = "1";
-
-    let configClicks = 0;
-    doc.querySelector('.tab-btn[data-tab="config"]').addEventListener("click", () => configClicks++);
-
-    dom.window.eval(read("public/js/ui-ajustes-panel.js"));
-    assert.equal(doc.getElementById("ajustes-btn").dataset.bcAj, "1", "header listener should be installed");
-    doc.getElementById("ajustes-btn").click();
-
-    assert.equal(configClicks, 1, "Ajustes should route to the migrated Configuración tab");
-    assert.equal(dom.window.document.body.classList.contains("bc-aj-open"), false);
-    assert.equal(doc.getElementById("bc-aj-panel").classList.contains("open"), false);
-  } finally {
-    dom.window.close();
-  }
+test("the header does not render the retired Ajustes drawer; navigation exposes two clear sections", () => {
+  const index = read("public/index.html");
+  const app = read("public/app.js");
+  assert.doesNotMatch(index, /id="ajustes-btn"|id="ajustes-menu"|id="bc-aj-panel"/);
+  assert.doesNotMatch(app, /ui-ajustes-panel\.js/);
+  assert.match(index, /data-tab="conectividad">Conectividad/);
+  assert.match(index, /data-tab="preferencias">Preferencias/);
 });
