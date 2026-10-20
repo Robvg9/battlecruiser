@@ -46,7 +46,7 @@ test("Conectividad exposes diagnostic actions; Configuración remains for admin/
   assert.match(connectivity, /cfg-refrescar-diag/);
   assert.match(connectivity, /cfg-actualizar-app/);
   assert.match(index, /id="tab-config"/);
-  assert.match(index, /id="form-nuevo-rol"/);
+  assert.match(index, /id="lista-roles"/, "role management remains available in Configuración");
   assert.match(index, /id="form-categoria"/);
   assert.match(index, /id="form-unidad"/);
 });
