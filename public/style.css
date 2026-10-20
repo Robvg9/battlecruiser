@@ -329,7 +329,7 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   margin-top: 12px; background: var(--stone); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 16px;
 }
 .presentaciones-panel { display: flex; flex-direction: column; gap: 20px; margin-bottom: 6px; }
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .app-shell { max-width: none; width: 100%; text-align: left; }
   .app-shell.visible {
     display: grid;
@@ -352,7 +352,7 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 
 /* Android-first header layout: keep Logout in the first row. */
-@media (max-width: 759px) {
+@media (max-width: 759px), (hover: none) and (pointer: coarse) {
   /* The authenticated app is a document, not a fixed-height flex row: let the page scroll. */
   body:has(#app-shell.visible) {
     display: block !important;
@@ -631,4 +631,180 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     touch-action: pan-y;
     padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
+}
+
+
+/* Mobile recovery patch 9.5.6: document scroll, safe header controls and viewport-fit login. */
+@media (max-width: 759px), (hover: none) and (pointer: coarse) {
+  html:has(#app-shell.visible) {
+    height: auto !important; min-height: 100% !important; max-height: none !important;
+    overflow-x: hidden !important; overflow-y: auto !important;
+  }
+  body:has(#app-shell.visible) {
+    display: block !important; width: 100% !important; height: auto !important;
+    min-height: 100dvh !important; max-height: none !important;
+    overflow-x: hidden !important; overflow-y: visible !important;
+    padding: 0 !important; touch-action: pan-y;
+  }
+  #app-shell.visible {
+    display: flex !important; flex-direction: column !important; box-sizing: border-box !important;
+    width: 100% !important; max-width: none !important; height: auto !important;
+    min-height: 100dvh !important; max-height: none !important; margin: 0 !important;
+    padding: max(8px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left)) !important;
+    overflow: visible !important;
+  }
+  #app-shell.visible > .app-header {
+    box-sizing: border-box; width: 100%; min-width: 0; padding: 8px 4px 10px;
+  }
+  #app-shell.visible > .app-header .header-left {
+    display: flex; min-width: 0; padding-left: 2px;
+  }
+  #app-shell.visible > .app-header .header-right { display: contents; }
+  #sidebar-toggle-btn, #logout-btn {
+    display: inline-flex !important; visibility: visible !important; opacity: 1 !important;
+    position: relative; z-index: 2; flex: 0 0 auto;
+  }
+  #sidebar-toggle-btn {
+    width: 38px; height: 38px; min-width: 38px; margin-left: 2px;
+  }
+  #sidebar-toggle-btn svg { width: 20px; height: 20px; }
+  #logout-btn { min-height: 38px; margin-right: 2px; padding: 7px 10px; }
+  #app-shell.visible > main.main-content {
+    display: block; flex: 0 0 auto !important; width: 100%; min-width: 0;
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    padding: 12px 0 !important; overflow: visible !important; touch-action: pan-y;
+  }
+  #app-shell.visible > .app-footer { width: 100%; flex: 0 0 auto; }
+  #app-shell.visible .tab-panel.visible {
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    overflow: visible !important; touch-action: pan-y;
+  }
+
+  html:has(#login-form:not(.hidden)):not(:has(#app-shell.visible)) {
+    height: 100%; min-height: 100%; max-height: 100%; overflow: hidden !important;
+  }
+  body:not(:has(#app-shell.visible)) {
+    display: flex !important; flex-direction: column; align-items: center; justify-content: center;
+    width: 100%; height: 100svh !important; min-height: 100svh !important; max-height: 100svh !important;
+    overflow: hidden !important;
+    padding: max(4px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left)) !important;
+  }
+  body:not(:has(#app-shell.visible)) .center-col {
+    display: flex; flex: 1 1 auto; width: 100%; max-width: 700px; min-width: 0;
+    min-height: 0; height: 100%; margin: 0; align-items: center; justify-content: center; padding: 2px 0;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) {
+    width: 100%; max-width: 350px; max-height: calc(100svh - 8px); overflow: visible;
+    padding: clamp(6px, 1.6dvh, 18px) clamp(14px, 4vw, 24px) clamp(5px, 1.2dvh, 13px);
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-wrap { margin-bottom: clamp(0px, .5dvh, 6px); }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-glow {
+    width: clamp(38px, 12dvh, 100px); height: clamp(38px, 12dvh, 100px); top: -2px;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-icon {
+    width: clamp(19px, 4.8dvh, 34px); height: clamp(19px, 4.8dvh, 34px);
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .status-line {
+    margin-top: clamp(1px, .9dvh, 10px); font-size: clamp(8px, 1.6dvh, 10px); line-height: 1.1;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) h1 {
+    font-size: clamp(22px, 4.8dvh, 32px); margin-bottom: clamp(2px, .8dvh, 8px); line-height: 1.05;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .rule-orn { margin-bottom: clamp(3px, 1.2dvh, 16px); }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .subtitle {
+    font-size: clamp(9px, 1.9dvh, 12px); margin-bottom: clamp(4px, 1.4dvh, 20px); line-height: 1.15;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .field { margin-bottom: clamp(3px, 1.1dvh, 16px); }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) label {
+    font-size: clamp(9px, 1.7dvh, 11px); margin-bottom: clamp(2px, .7dvh, 6px); line-height: 1.1;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) input {
+    padding: clamp(5px, 1.7dvh, 11px) 11px; font-size: clamp(12px, 2.2dvh, 14px);
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) button[type="submit"] {
+    margin-top: 2px; padding: clamp(6px, 1.8dvh, 12px);
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .error {
+    min-height: 0; margin: clamp(0px, .6dvh, 8px) 0 0; font-size: clamp(10px, 2dvh, 13px); line-height: 1.15;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .footnote {
+    margin-top: clamp(3px, 1.3dvh, 18px); font-size: clamp(8px, 1.65dvh, 10.5px); line-height: 1.22;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .login-utility {
+    margin-top: clamp(1px, 1dvh, 16px); padding: clamp(1px, .6dvh, 6px) 4px;
+    font-size: clamp(8px, 1.65dvh, 10.5px); line-height: 1.15;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) #password-recovery-msg {
+    min-height: 0; margin: 1px 0 0; font-size: clamp(9px, 1.7dvh, 12px); line-height: 1.15;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .app-version-label { margin-top: clamp(2px, .7dvh, 8px); }
+}
+
+@media (max-height: 680px) and (orientation: portrait) {
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) { padding: 6px 16px 5px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-glow { display: none; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-wrap { margin-bottom: 0; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .status-line { margin-top: 2px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) h1 {
+    font-size: clamp(20px, 4.2dvh, 27px); margin-bottom: 2px;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .rule-orn { margin-bottom: 4px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .subtitle { margin-bottom: 5px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .field { margin-bottom: 5px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) label { margin-bottom: 2px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) input { padding: 6px 10px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) button[type="submit"] { padding: 7px 10px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .error { margin-top: 2px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .footnote {
+    margin-top: 5px; font-size: 9px; line-height: 1.15;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .login-utility {
+    margin-top: 3px; padding: 2px 4px; font-size: 8.5px;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) #password-recovery-msg { margin-top: 1px; font-size: 9px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .app-version-label { margin-top: 3px; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  body:not(:has(#app-shell.visible)) .center-col { max-width: 700px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) {
+    display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    grid-auto-rows: min-content; gap: 2px 12px; align-content: center; width: 100%;
+    max-width: 700px; max-height: calc(100svh - 8px); padding: 6px 12px; text-align: left;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .lantern-wrap,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > h1,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .rule-orn,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .subtitle { grid-column: 1; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .field,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > #login-btn,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > #login-error,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .footnote,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .login-utility,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > #password-recovery-msg,
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) > .app-version-label { grid-column: 2; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-wrap { margin-bottom: 0; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-glow { display: none; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .lantern-icon { width: 22px; height: 22px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .status-line { margin-top: 2px; font-size: 8px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) h1 { margin-bottom: 2px; font-size: 24px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .rule-orn { margin-bottom: 1px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .subtitle { margin-bottom: 0; font-size: 9px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .field { margin: 1px 0 2px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) label { margin-bottom: 1px; font-size: 9px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) input { padding: 4px 8px; font-size: 12px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) button[type="submit"] { margin-top: 1px; padding: 6px 8px; font-size: 12px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .error { margin: 0; font-size: 10px; line-height: 1.05; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .footnote { margin-top: 2px; font-size: 8.5px; line-height: 1.08; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .login-utility { margin-top: 1px; padding: 1px 2px; font-size: 8px; }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) #password-recovery-msg {
+    min-height: 0; margin-top: 0; font-size: 8.5px; line-height: 1.05;
+  }
+  body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .app-version-label { margin-top: 1px; font-size: 8px; }
 }
