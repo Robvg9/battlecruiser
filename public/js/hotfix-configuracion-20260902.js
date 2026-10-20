@@ -19,6 +19,12 @@
 
   function releaseScrollLock() {
     if (!document.body) return;
+    // Clear stale drawer state so a previous cached UI cannot keep the page locked.
+    document.body.classList.remove("bc-aj-open");
+    var legacyPanel = document.getElementById("bc-aj-panel");
+    if (legacyPanel && legacyPanel.parentNode) legacyPanel.parentNode.removeChild(legacyPanel);
+    var legacyBackdrop = document.getElementById("bc-aj-backdrop");
+    if (legacyBackdrop && legacyBackdrop.parentNode) legacyBackdrop.parentNode.removeChild(legacyBackdrop);
     var sections = ["config", "conectividad", "preferencias"].map(function (name) {
       return document.getElementById("tab-" + name);
     }).filter(Boolean);
