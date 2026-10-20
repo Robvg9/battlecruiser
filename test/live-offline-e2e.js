@@ -439,13 +439,20 @@ async function main() {
 
   const configClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=config]');if(!b)return false;b.click();return true;})()");
   assert(configClicked, "No se encontró la sección Configuración.");
-  const configAdminReady = "(()=>{const t=document.querySelector('#tab-config');const b=document.querySelector('.tab-btn[data-tab=config]');const state={panelExists:!!t,panelVisible:!!(t&&t.classList.contains('visible')),panelClasses:t?t.className:null,panelDisplay:t?getComputedStyle(t).display:null,buttonExists:!!b,buttonClasses:b?b.className:null,buttonDisplay:b?getComputedStyle(b).display:null,buttonInlineDisplay:b?b.style.display:null,buttonPermit:b?b.getAttribute('data-bc-permiso'):null,roleForm:!!(t&&t.querySelector('#form-nuevo-rol')),categoryForm:!!(t&&t.querySelector('#form-categoria')),unitForm:!!(t&&t.querySelector('#form-unidad')),legacyPanel:!!(t&&t.querySelector('#bc-aj-panel')),activeTab:document.querySelector('#tabs .tab-btn.active')?.dataset.tab||null};window.__BC_CONFIG_ADMIN_TEST_STATE__=state;return !!(state.panelExists&&state.panelVisible&&state.roleForm&&state.categoryForm&&state.unitForm&&!state.legacyPanel);})()";
+  const configAdminReady = "(()=>{const t=document.querySelector('#tab-config');const b=document.querySelector('.tab-btn[data-tab=config]');const state={panelExists:!!t,panelVisible:!!(t&&t.classList.contains('visible')),panelClasses:t?t.className:null,panelDisplay:t?getComputedStyle(t).display:null,buttonExists:!!b,buttonClasses:b?b.className:null,buttonDisplay:b?getComputedStyle(b).display:null,buttonInlineDisplay:b?b.style.display:null,buttonPermit:b?b.getAttribute('data-bc-permiso'):null,roleEntry:!!(t&&t.querySelector('#bc-btn-config-roles')),roleFormMoved:!!document.querySelector('#bc-modal-nuevo-rol #form-nuevo-rol'),roleListMoved:!!document.querySelector('#bc-modal-roles-permisos #lista-roles'),categoryForm:!!(t&&t.querySelector('#form-categoria')),unitForm:!!(t&&t.querySelector('#form-unidad')),legacyPanel:!!(t&&t.querySelector('#bc-aj-panel')),activeTab:document.querySelector('#tabs .tab-btn.active')?.dataset.tab||null};window.__BC_CONFIG_ADMIN_TEST_STATE__=state;return !!(state.panelExists&&state.panelVisible&&state.roleEntry&&state.roleFormMoved&&state.roleListMoved&&state.categoryForm&&state.unitForm&&!state.legacyPanel);})()";
   try {
     await waitUntil("Configuración de administración y catálogos", configAdminReady, 10000);
   } catch (error) {
     report.evidence.configAdminFailureState = await evaluate("window.__BC_CONFIG_ADMIN_TEST_STATE__||null");
     throw error;
   }
+  const rolesOpened = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-btn-config-roles');if(!b)return {entry:false,opened:false};b.click();const m=document.querySelector('#bc-modal-roles-permisos');return {entry:true,opened:!!(m&&m.classList.contains('open')),listInsideModal:!!(m&&m.querySelector('#lista-roles'))}})()");
+  report.evidence.configRolesModal = rolesOpened;
+  assert(rolesOpened.entry && rolesOpened.opened && rolesOpened.listInsideModal,
+    "Configuración no abre el modal existente de Roles y Permisos: " + JSON.stringify(rolesOpened));
+  await evaluate("(()=>{const b=document.querySelector('#bc-modal-roles-permisos [data-bc-roles-close=\"1\"]');if(b)b.click();return true})()");
+  await waitUntil("cierre del modal Roles y Permisos", "(()=>{const m=document.querySelector('#bc-modal-roles-permisos');return !!(m&&!m.classList.contains('open'))})()", 3000);
+
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
   const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
