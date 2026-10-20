@@ -28,7 +28,7 @@ test("Configuración agrupa Conectividad y Preferencias; Administración conserv
   assert.doesNotMatch(groupMarkup, /data-tab="config"/);
 });
 
-test("Conectividad y Preferencias tienen iconos SVG, y el grupo tiene desplegable funcional", () => {
+test("Conectividad y Preferencias tienen iconos SVG, y el grupo tiene desplegable funcional", async () => {
   assert.match(visual, /conectividad:\s*SVG\.pulse/);
   assert.match(visual, /preferencias:\s*SVG\.sliders/);
   assert.match(visual, /function wireConfigGroup\(\)/);
