@@ -46,9 +46,24 @@
     }
     const backdrop = document.getElementById('bc-aj-backdrop');
     if (backdrop) backdrop.remove();
-    // This panel is now inline in the Configuración tab, not an open drawer.
-    // Release the body scroll lock that the programmatic Ajustes click may have set.
-    if (document.body) document.body.classList.remove('bc-aj-open');
+    // This panel is inline in Configuración, never an open drawer after migration.
+    releaseScrollLock();
+  }
+
+  function releaseScrollLock() {
+    if (!document.body) return;
+    var panel = document.getElementById('bc-aj-panel');
+    var tab = document.getElementById('tab-config');
+    if (panel && panel.dataset.bcMovedToConfig === '1') {
+      panel.classList.remove('open');
+      document.body.classList.remove('bc-aj-open');
+      if (tab && tab.classList.contains('visible')) document.body.classList.add('bc-config-scroll-unlocked');
+    }
+    if (tab && tab.classList.contains('visible')) {
+      document.body.classList.add('bc-config-scroll-unlocked');
+    } else {
+      document.body.classList.remove('bc-config-scroll-unlocked');
+    }
   }
 
   function css() {
@@ -68,9 +83,39 @@
     document.head.appendChild(s);
   }
 
-  function boot() { css(); movePanel(); }
+  function boot() { css(); movePanel(); releaseScrollLock(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once:true });
   else boot();
+  document.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target.closest('.tab-btn[data-tab]') : null;
+    if (!target) return;
+    setTimeout(function () {
+      if (target.getAttribute('data-tab') === 'config') {
+        movePanel();
+        releaseScrollLock();
+      } else if (document.body) {
+        document.body.classList.remove('bc-config-scroll-unlocked');
+      }
+    }, 0);
+  }, true);
+  window.addEventListener('pageshow', boot);
+  if (document.body && typeof MutationObserver === 'function') {
+    var observer = new MutationObserver(function () {
+      // JSDOM/browser teardown can invalidate document; disconnect rather than touching a closed page.
+      if (!window.document || !window.document.body) {
+        observer.disconnect();
+        return;
+      }
+      movePanel();
+      releaseScrollLock();
+      var panel = window.document.getElementById('bc-aj-panel');
+      if (panel && panel.dataset.bcMovedToConfig === '1') observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('pagehide', function () { observer.disconnect(); }, { once:true });
+    setTimeout(function () { observer.disconnect(); }, 15000);
+  }
   setTimeout(boot, 350);
   setTimeout(boot, 1000);
+  setTimeout(boot, 2500);
 })();

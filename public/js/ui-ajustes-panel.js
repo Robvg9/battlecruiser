@@ -338,6 +338,13 @@
       // Ajustes has been migrated into the Configuración tab. The header action
       // should navigate there, not reopen a drawer that locks document scrolling.
       var configTab = document.querySelector('.tab-btn[data-tab="config"]');
+      existingPanel.classList.remove('open');
+      if (document.body) {
+        document.body.classList.remove('bc-aj-open');
+        if (configTab) document.body.classList.add('bc-config-scroll-unlocked');
+      }
+      var backdrop = document.getElementById('bc-aj-backdrop');
+      if (backdrop) backdrop.remove();
       if (configTab && !configTab.classList.contains('active')) configTab.click();
       return;
     }

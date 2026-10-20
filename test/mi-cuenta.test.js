@@ -69,8 +69,10 @@ test("Mi Cuenta is wired into the PWA header and mobile layout", () => {
   const app = read("public/app.js");
   const index = read("public/index.html");
   const css = read("public/style.css");
-  assert.ok(app.includes('["mi-cuenta.js","1.0"]'), "Mi Cuenta module must be loaded by the PWA");
+  assert.ok(app.includes('["mi-cuenta.js","1.1"]'), "Mi Cuenta module must be listed at the current version");
   assert.ok(index.includes('id="mi-cuenta-btn"'), "header must expose Mi Cuenta");
+  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/, "Mi Cuenta must bind directly from the shell, not depend on the slow dynamic loader");
+  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.1"><\/script>/, "critical Configuración scroll fix must load directly from the shell");
   assert.ok(css.includes('"account settings"'), "mobile header must allocate space to Mi Cuenta");
   assert.ok(css.includes(".bc-account-overlay.hidden { display: none !important; }"), "hidden account modal must stay hidden");
 });

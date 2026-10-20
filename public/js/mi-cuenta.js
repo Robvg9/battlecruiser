@@ -1,4 +1,4 @@
-// BattleCruiser — Mi Cuenta, v1.0. Read-only authenticated profile view.
+// BattleCruiser — Mi Cuenta, v1.1. Read-only authenticated profile view.
 (function miCuenta() {
   'use strict';
   if (window.__BCMiCuentaLoaded) return;
