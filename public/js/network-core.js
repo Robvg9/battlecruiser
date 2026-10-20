@@ -297,9 +297,11 @@
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
-        registrarDiagnosticoSondeo("online", "server_responded_with_error", startedAt);
-        if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
-        return true;
+        // An unexpected SDK/runtime exception is not proof that the server responded.
+        // Fail closed; only a resolved server result may mark connectivity online.
+        registrarDiagnosticoSondeo("offline", "probe_error", startedAt);
+        if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+        return false;
       }
     };
     window.sondearBackend.__bcF1Timed = true;
