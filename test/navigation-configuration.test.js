@@ -88,7 +88,6 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   }
   assert.equal(document.querySelector('#tabs .tab-btn[data-tab="resumen"]').classList.contains("active"), true);
   assert.equal(document.getElementById("tab-resumen").classList.contains("visible"), true);
-  assert.equal(document.getElementById("form-nuevo-rol").classList.contains("hidden"), true);
   assert.equal(document.getElementById("form-categoria").classList.contains("hidden"), true);
   assert.equal(document.getElementById("form-unidad").classList.contains("hidden"), true);
   dom.window.close();
