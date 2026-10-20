@@ -21,6 +21,7 @@ function _cfgEnsurePanel() {
     '<button type="button" id="cfg-refrescar-diag" class="cc-accion">Refrescar diagnóstico</button>' +
     "</div>" +
     '<p class="msg" id="msg-config-diag"></p>' +
+    '<p class="muted" id="cfg-backend-probe-note"></p>' +
     '<p class="muted" id="cfg-backup-nota"></p>';
 
   tab.insertBefore(block, tab.firstChild);
@@ -48,7 +49,17 @@ function renderDiagnosticoConfig() {
   const user = typeof _usuarioActual !== "undefined" && _usuarioActual ? ((_usuarioActual.nombre || "—") + (_usuarioActual.rol ? " · " + _usuarioActual.rol : "")) : "—";
   const b3 = typeof contextoB3Disponible === "function" && contextoB3Disponible();
   function card(valor, etiqueta) { return '<div class="resumen-card"><div class="valor">' + valor + '</div><div class="etiqueta">' + etiqueta + "</div></div>"; }
-  grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual");
+  const probe = window.__BC_BACKEND_PROBE__ || null;
+  const probeLabel = !probe ? "Sin prueba" : probe.status === "online" ? "Respuesta recibida" : probe.reason === "timeout" ? "Tiempo agotado" : probe.reason === "network_error" ? "Error de red" : probe.reason === "device_offline" ? "Dispositivo offline" : "Sin respuesta";
+  grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual") + card(probeLabel, "Último sondeo backend");
+  const probeNote = document.getElementById("cfg-backend-probe-note");
+  if (probeNote) {
+    if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. No se almacenan tokens ni datos de usuario.";
+    else {
+      const time = new Date(probe.checkedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      probeNote.textContent = "Último sondeo: " + probe.reason + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens.";
+    }
+  }
   const nota = document.getElementById("cfg-backup-nota");
   if (nota) nota.textContent = "Respaldo/restauración de datos: no implementado en el cliente. Requiere política y herramientas de Supabase.";
   const btnMando = document.getElementById("cfg-ir-mando");
