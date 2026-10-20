@@ -36,6 +36,9 @@ test("account and logout actions remain in appropriate locations", () => {
   assert.match(index, /id="logout-btn"/);
   assert.match(account, /getElementById\('bc-account-password'\)/);
   assert.doesNotMatch(account, /getElementById\('change-pass-btn'\)/);
+  const auth = read("js/auth.js");
+  assert.match(auth, /if \(!ajustesBtn \|\| !ajustesMenu\) return;/, "auth.js must tolerate the removed legacy dropdown");
+  assert.match(auth, /if \(formPass\) formPass\.addEventListener\("submit"/, "password form must still submit without the old header button");
 });
 
 test("Conectividad exposes diagnostic actions; Configuración remains for admin/catalogs", () => {
