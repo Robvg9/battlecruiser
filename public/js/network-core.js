@@ -289,7 +289,16 @@
       try {
         if (typeof AbortController === "function") {
           controller = new AbortController();
-          controllers.push(controller);
+          controllers.push({
+            signal: controller.signal,
+            abort: function () {
+              if (!settled) {
+                settled = true;
+                window.clearTimeout(timer);
+              }
+              try { controller.abort(); } catch (e) {}
+            }
+          });
         }
       } catch (e) { controller = null; }
 
