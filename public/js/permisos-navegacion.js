@@ -200,7 +200,6 @@
     toggleForm("form-categoria", "categorias", "crear");
     toggleForm("form-unidad", "unidades", "crear");
     toggleForm("form-nuevo-usuario", "usuarios", "crear");
-    toggleForm("form-nuevo-rol", "roles", "crear");
 
     // Selección inicial determinista: Centro de Control, no Administración.
     if (shellVisible && !window.__BC_INITIAL_SECTION_SELECTED__) {
