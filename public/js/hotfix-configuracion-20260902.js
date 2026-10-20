@@ -54,15 +54,22 @@
     if (!document.body) return;
     var panel = document.getElementById('bc-aj-panel');
     var tab = document.getElementById('tab-config');
+    var active = !!(tab && tab.classList.contains('visible'));
     if (panel && panel.dataset.bcMovedToConfig === '1') {
       panel.classList.remove('open');
       document.body.classList.remove('bc-aj-open');
-      if (tab && tab.classList.contains('visible')) document.body.classList.add('bc-config-scroll-unlocked');
     }
-    if (tab && tab.classList.contains('visible')) {
+    if (active) {
+      // Android WebView/PWA may ignore document scrolling even when height/overflow are reset.
+      // Give Configuración its own bounded, touch-scrollable region as a reliable fallback.
       document.body.classList.add('bc-config-scroll-unlocked');
+      if (document.documentElement) document.documentElement.classList.add('bc-config-scroll-unlocked');
+      tab.classList.add('bc-config-scroll-region');
+      if (!tab.hasAttribute('tabindex')) tab.setAttribute('tabindex', '0');
     } else {
       document.body.classList.remove('bc-config-scroll-unlocked');
+      if (document.documentElement) document.documentElement.classList.remove('bc-config-scroll-unlocked');
+      if (tab) tab.classList.remove('bc-config-scroll-region');
     }
   }
 
@@ -78,7 +85,8 @@
       '#tab-config #bc-aj-panel .bc-aj-sec{margin-bottom:16px}',
       '#tab-config #bc-aj-panel .bc-aj-logout{display:none!important}',
       '#tab-config #bc-aj-panel .bc-aj-x{display:none!important}',
-      '#cfg-preferences-note{margin:4px 0 14px}'
+      '#cfg-preferences-note{margin:4px 0 14px}',
+      '@media(max-width:759px){html.bc-config-scroll-unlocked,body.bc-config-scroll-unlocked{height:auto!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;touch-action:pan-y}body.bc-config-scroll-unlocked #app-shell.visible>main.main-content{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important}body.bc-config-scroll-unlocked #tab-config.visible.bc-config-scroll-region{box-sizing:border-box;height:auto!important;max-height:calc(100vh - 240px)!important;max-height:calc(100dvh - 240px)!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding-bottom:max(20px,env(safe-area-inset-bottom))}}'
     ].join('');
     document.head.appendChild(s);
   }
