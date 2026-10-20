@@ -12,11 +12,12 @@ const permissions = fs.readFileSync("public/js/permisos-navegacion.js", "utf8");
 const regression = fs.readFileSync("public/js/hotfix-regresiones-20260902.js", "utf8");
 
 test("Configuración agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
-  const groupStart = index.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
-  const groupStop = index.indexOf("</div>\n        </div>", groupStart);
+  const normalizedIndex = index.replace(/\r\n/g, "\n");
+  const groupStart = normalizedIndex.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
+  const groupStop = normalizedIndex.indexOf("</div>\n        </div>", groupStart);
   assert.ok(groupStart >= 0, "debe existir el grupo padre Configuración");
   assert.ok(groupStop > groupStart, "el grupo y las subsecciones deben estar anidados");
-  const groupMarkup = index.slice(groupStart, groupStop);
+  const groupMarkup = normalizedIndex.slice(groupStart, groupStop);
   assert.match(groupMarkup, /id="nav-config-toggle"[^>]*aria-expanded="true"/);
   assert.match(groupMarkup, /id="nav-config-subtabs"/);
   assert.match(groupMarkup, /data-tab="conectividad">Conectividad/);
