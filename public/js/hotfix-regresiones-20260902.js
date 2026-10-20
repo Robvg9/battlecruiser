@@ -29,7 +29,7 @@
     s.textContent = `
       ${LEGACY_AJUSTES_HIDE_CSS}
       #logout-btn.bc-reg-logout{display:inline-flex!important;visibility:visible!important;opacity:1!important}
-      #tab-config.bc-reg-config-ready{display:block!important}
+      #tab-config.bc-reg-config-ready.visible{display:block!important}
       .tab-btn[data-tab="config"].bc-reg-config-ready{display:flex!important;visibility:visible!important;opacity:1!important}
       .bc-force-close-turno{margin-left:8px!important;font-weight:700!important}
       .bc-stock-warehouse-row{display:grid;grid-template-columns:1.4fr .7fr .7fr auto;gap:8px;align-items:center}
