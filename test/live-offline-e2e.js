@@ -424,20 +424,20 @@ async function main() {
   assert(mobileContentLayout.footer.position === "static" &&
          mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,
     "El pie se superpone o abandona el flujo después del contenido móvil: " + JSON.stringify(mobileContentLayout));
-  const settingsStructure = await evaluate("(()=>({legacyMenuAbsent:!document.querySelector('#ajustes-btn, #ajustes-menu, #bc-aj-panel'),connectivityTab:!!document.querySelector('.tab-btn[data-tab=\\'conectividad\\']'),preferencesTab:!!document.querySelector('.tab-btn[data-tab=\\'preferencias\\']'),accountButton:!!document.querySelector('#mi-cuenta-btn'),logoutButton:!!document.querySelector('#logout-btn')}))()");
+  const settingsStructure = await evaluate("(()=>({legacyMenuAbsent:!document.querySelector('#ajustes-btn, #ajustes-menu, #bc-aj-panel'),connectivityTab:!!document.querySelector('.tab-btn[data-tab=conectividad]'),preferencesTab:!!document.querySelector('.tab-btn[data-tab=preferencias]'),accountButton:!!document.querySelector('#mi-cuenta-btn'),logoutButton:!!document.querySelector('#logout-btn')}))()");
   report.evidence.settingsStructure = settingsStructure;
   assert(settingsStructure.legacyMenuAbsent && settingsStructure.connectivityTab && settingsStructure.preferencesTab && settingsStructure.accountButton && settingsStructure.logoutButton,
     "La estructura nueva debe quitar el menú Ajustes duplicado y conservar Mi Cuenta/Cerrar sesión: " + JSON.stringify(settingsStructure));
 
-  const connectivityClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=\\'conectividad\\']');if(!b)return false;b.click();return true;})()");
+  const connectivityClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=conectividad]');if(!b)return false;b.click();return true;})()");
   assert(connectivityClicked, "No se encontró la sección Conectividad.");
   await waitUntil("Conectividad con diagnóstico y actualización", "(()=>{const t=document.querySelector('#tab-conectividad');return !!(t&&t.classList.contains('visible')&&t.querySelector('#cfg-mantenimiento')&&t.querySelector('#cfg-refrescar-diag')&&t.querySelector('#cfg-actualizar-app'))})()", 10000);
 
-  const preferencesClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=\\'preferencias\\']');if(!b)return false;b.click();return true;})()");
+  const preferencesClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=preferencias]');if(!b)return false;b.click();return true;})()");
   assert(preferencesClicked, "No se encontró la sección Preferencias.");
   await waitUntil("Preferencias personales con control Wi-Fi", "(()=>{const t=document.querySelector('#tab-preferencias');const p=document.querySelector('#cfg-preferencias-personales');return !!(t&&t.classList.contains('visible')&&p&&p.parentElement===t&&t.querySelector('#cfg-aj-sync-wifi')&&!t.querySelector('#bc-aj-panel'))})()", 10000);
 
-  const configClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=\\'config\\']');if(!b)return false;b.click();return true;})()");
+  const configClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=config]');if(!b)return false;b.click();return true;})()");
   assert(configClicked, "No se encontró la sección Configuración.");
   await waitUntil("Configuración de administración y catálogos", "(()=>{const t=document.querySelector('#tab-config');return !!(t&&t.classList.contains('visible')&&t.querySelector('#form-nuevo-rol')&&t.querySelector('#form-categoria')&&t.querySelector('#form-unidad')&&!t.querySelector('#bc-aj-panel'))})()", 10000);
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
