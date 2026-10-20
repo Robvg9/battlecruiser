@@ -251,9 +251,21 @@
     } catch (e) {}
   }
 
+  function registrarDiagnosticoSondeo(status, reason, startedAt) {
+    // Only safe categories and timing are exposed; never record credentials, tokens, URLs, or user data.
+    window.__BC_BACKEND_PROBE__ = {
+      status: status,
+      reason: reason,
+      checkedAt: new Date().toISOString(),
+      durationMs: Math.max(0, Date.now() - startedAt)
+    };
+  }
+
   if (typeof window.sondearBackend === "function" && !window.sondearBackend.__bcF1Timed) {
     window.sondearBackend = async function () {
+      var startedAt = Date.now();
       if (!navigator.onLine) {
+        registrarDiagnosticoSondeo("offline", "device_offline", startedAt);
         if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
         return false;
       }
@@ -267,16 +279,25 @@
         );
         var error = resultado && resultado.error;
         if (error && window.esErrorDeRed(error)) {
+          registrarDiagnosticoSondeo("offline", "network_error", startedAt);
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
+        registrarDiagnosticoSondeo("online", error ? "server_responded_with_auth_error" : "response_ok", startedAt);
         if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
         return true;
       } catch (e) {
-        if (window.esErrorDeRed(e) || esErrorTimeout(e)) {
+        if (esErrorTimeout(e)) {
+          registrarDiagnosticoSondeo("offline", "timeout", startedAt);
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
+        if (window.esErrorDeRed(e)) {
+          registrarDiagnosticoSondeo("offline", "network_error", startedAt);
+          if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+          return false;
+        }
+        registrarDiagnosticoSondeo("online", "server_responded_with_error", startedAt);
         if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
         return true;
       }
