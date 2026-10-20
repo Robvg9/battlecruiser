@@ -86,6 +86,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.1"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/);
+  assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.2"><\/script>/);
+  assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.2/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.1"><\/script>/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.1/);
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.1/);
