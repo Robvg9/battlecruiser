@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.1 — Android reliability: static critical modules and cache alignment
+// v9.5.2 — Android reliability: direct Supabase health probe and cache alignment
 (function hotfixV9475(){
   const VERSION="9.5.2";
   window.__BC_VERSION__=VERSION;
