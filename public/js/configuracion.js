@@ -65,7 +65,8 @@ function renderDiagnosticoConfig() {
     if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. No se almacenan tokens ni datos de usuario.";
     else {
       const time = new Date(probe.checkedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const httpStatus = typeof probe.httpStatus === "number" ? " · HTTP " + probe.httpStatus : "";\n      probeNote.textContent = "Último sondeo: " + probe.reason + httpStatus + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens.";
+      const httpStatus = typeof probe.httpStatus === "number" ? " · HTTP " + probe.httpStatus : "";
+      probeNote.textContent = "Último sondeo: " + probe.reason + httpStatus + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens.";
     }
   }
   const nota = document.getElementById("cfg-backup-nota");
