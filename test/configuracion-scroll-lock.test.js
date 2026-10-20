@@ -9,9 +9,10 @@ const { JSDOM } = require("jsdom");
 const ROOT = path.resolve(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 
-test("moving Ajustes into Configuración clears the body scroll lock", () => {
+test("moving Ajustes into Configuración clears and continuously prevents the body scroll lock", async () => {
   const dom = new JSDOM(`<!doctype html><html><head></head><body class="bc-aj-open">
-    <div id="tab-config"><h3>Configuración</h3></div>
+    <button class="tab-btn" data-tab="config" type="button">Configuración</button>
+    <div id="tab-config" class="visible"><h3>Configuración</h3></div>
     <div id="bc-aj-backdrop" class="open"></div>
     <aside id="bc-aj-panel" class="open" role="dialog">
       <div class="bc-aj-head"><h2>Ajustes</h2></div>
@@ -31,6 +32,15 @@ test("moving Ajustes into Configuración clears the body scroll lock", () => {
     assert.equal(panel.classList.contains("open"), false);
     assert.equal(doc.getElementById("bc-aj-backdrop"), null);
     assert.equal(doc.body.classList.contains("bc-aj-open"), false);
+
+    // Simulate a legacy Ajustes handler reapplying the lock after migration.
+    doc.body.classList.add("bc-aj-open");
+    doc.getElementById("bc-aj-panel").classList.add("open");
+    doc.querySelector('.tab-btn[data-tab="config"]').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(doc.body.classList.contains("bc-aj-open"), false, "Config tab click must release a reintroduced legacy lock");
+    assert.equal(doc.body.classList.contains("bc-config-scroll-unlocked"), true, "mobile Configuración must opt into document scrolling");
+    assert.equal(doc.getElementById("bc-aj-panel").classList.contains("open"), false);
   } finally {
     dom.window.close();
   }
