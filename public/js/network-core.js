@@ -270,20 +270,41 @@
         return false;
       }
       try {
-        var resultado = await withNetworkTimeout(
+        // Probe the Auth health endpoint directly. auth.getUser() can return
+        // AuthSessionMissingError locally when no session exists, without any HTTP request.
+        var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\/+$/, "") : "";
+        var apiKey = typeof SUPABASE_ANON_KEY === "string" ? SUPABASE_ANON_KEY : "";
+        if (!baseUrl || !apiKey || typeof fetch !== "function") {
+          registrarDiagnosticoSondeo("offline", "probe_config_missing", startedAt);
+          if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+          return false;
+        }
+        var response = await withNetworkTimeout(
           function () {
-            return client.auth.getUser();
+            return fetch(baseUrl + "/auth/v1/health", {
+              method: "GET",
+              headers: { apikey: apiKey },
+              cache: "no-store"
+            });
           },
           Math.min(NETWORK_TIMEOUT_MS, 8000),
           "sondearBackend"
         );
-        var error = resultado && resultado.error;
-        if (error && window.esErrorDeRed(error)) {
-          registrarDiagnosticoSondeo("offline", "network_error", startedAt);
+        if (!response || typeof response.ok !== "boolean") {
+          throw new Error("BACKEND_PROBE_INVALID_RESPONSE");
+        }
+        if (!response.ok) {
+          registrarDiagnosticoSondeo("offline", "server_http_error", startedAt);
+          if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
+            window.__BC_BACKEND_PROBE__.httpStatus = response.status;
+          }
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
-        registrarDiagnosticoSondeo("online", error ? "server_responded_with_auth_error" : "response_ok", startedAt);
+        registrarDiagnosticoSondeo("online", "response_ok", startedAt);
+        if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
+          window.__BC_BACKEND_PROBE__.httpStatus = response.status;
+        }
         if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
         return true;
       } catch (e) {
@@ -297,8 +318,7 @@
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
-        // An unexpected SDK/runtime exception is not proof that the server responded.
-        // Fail closed; only a resolved server result may mark connectivity online.
+        // An unexpected fetch/runtime exception is not proof that the server responded.
         registrarDiagnosticoSondeo("offline", "probe_error", startedAt);
         if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
         return false;
