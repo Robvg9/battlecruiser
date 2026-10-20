@@ -1,4 +1,4 @@
-// BattleCruiser — Mi Cuenta, v1.1. Read-only authenticated profile view.
+// BattleCruiser — Mi Cuenta, v1.2. Read-only authenticated profile view.
 (function miCuenta() {
   'use strict';
   if (window.__BCMiCuentaLoaded) return;
@@ -97,12 +97,14 @@
     if (back) back.addEventListener('click', closeModal);
     if (password) password.addEventListener('click', function () {
       closeModal();
-      var trigger = document.getElementById('change-pass-btn');
-      if (trigger) trigger.click();
-      else {
-        var passPanel = document.getElementById('pass-panel');
-        if (passPanel) passPanel.classList.remove('hidden');
+      var passPanel = document.getElementById('pass-panel');
+      if (!passPanel) return;
+      passPanel.classList.remove('hidden');
+      if (typeof passPanel.scrollIntoView === 'function') {
+        passPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+      var input = passPanel.querySelector('input');
+      if (input && typeof input.focus === 'function') input.focus();
     });
     modal.addEventListener('click', function (event) {
       if (event.target === modal) closeModal();
