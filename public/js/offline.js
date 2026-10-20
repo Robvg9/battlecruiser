@@ -1557,6 +1557,6 @@ safeInit("estado-conexion", () => {
   });
   window.addEventListener("offline", () => marcarConectividadReal("offline"));
   // At boot, verify reachability before reconciling queued work and refreshing live data.
-  if (navigator.onLine) alReconectar().catch(function () { actualizarIndicadorConexion(); });
+  if (navigator.onLine) sondearBackend().catch(function () { actualizarIndicadorConexion(); });
   actualizarIndicadorConexion();
 });;
