@@ -50,14 +50,22 @@ function renderDiagnosticoConfig() {
   const b3 = typeof contextoB3Disponible === "function" && contextoB3Disponible();
   function card(valor, etiqueta) { return '<div class="resumen-card"><div class="valor">' + valor + '</div><div class="etiqueta">' + etiqueta + "</div></div>"; }
   const probe = window.__BC_BACKEND_PROBE__ || null;
-  const probeLabel = !probe ? "Sin prueba" : probe.status === "online" ? "Respuesta recibida" : probe.reason === "timeout" ? "Tiempo agotado" : probe.reason === "network_error" ? "Error de red" : probe.reason === "device_offline" ? "Dispositivo offline" : "Sin respuesta";
+  const probeLabel = !probe ? "Sin prueba"
+    : probe.status === "online" ? "Respuesta recibida"
+    : probe.reason === "timeout" ? "Tiempo agotado"
+    : probe.reason === "network_error" ? "Error de red"
+    : probe.reason === "device_offline" ? "Dispositivo offline"
+    : probe.reason === "server_http_error" ? "Respuesta HTTP no válida"
+    : probe.reason === "probe_config_missing" ? "Sondeo sin configuración"
+    : probe.reason === "probe_error" ? "Error de sondeo"
+    : "Sin respuesta";
   grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual") + card(probeLabel, "Último sondeo backend");
   const probeNote = document.getElementById("cfg-backend-probe-note");
   if (probeNote) {
     if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. No se almacenan tokens ni datos de usuario.";
     else {
       const time = new Date(probe.checkedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      probeNote.textContent = "Último sondeo: " + probe.reason + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens.";
+      const httpStatus = typeof probe.httpStatus === "number" ? " · HTTP " + probe.httpStatus : "";\n      probeNote.textContent = "Último sondeo: " + probe.reason + httpStatus + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens.";
     }
   }
   const nota = document.getElementById("cfg-backup-nota");
