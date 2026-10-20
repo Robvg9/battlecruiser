@@ -439,7 +439,13 @@ async function main() {
 
   const configClicked = await evaluate("(()=>{const b=document.querySelector('.tab-btn[data-tab=config]');if(!b)return false;b.click();return true;})()");
   assert(configClicked, "No se encontró la sección Configuración.");
-  await waitUntil("Configuración de administración y catálogos", "(()=>{const t=document.querySelector('#tab-config');return !!(t&&t.classList.contains('visible')&&t.querySelector('#form-nuevo-rol')&&t.querySelector('#form-categoria')&&t.querySelector('#form-unidad')&&!t.querySelector('#bc-aj-panel'))})()", 10000);
+  const configAdminReady = "(()=>{const t=document.querySelector('#tab-config');const b=document.querySelector('.tab-btn[data-tab=config]');const state={panelExists:!!t,panelVisible:!!(t&&t.classList.contains('visible')),panelClasses:t?t.className:null,panelDisplay:t?getComputedStyle(t).display:null,buttonExists:!!b,buttonClasses:b?b.className:null,buttonDisplay:b?getComputedStyle(b).display:null,buttonInlineDisplay:b?b.style.display:null,buttonPermit:b?b.getAttribute('data-bc-permiso'):null,roleForm:!!(t&&t.querySelector('#form-nuevo-rol')),categoryForm:!!(t&&t.querySelector('#form-categoria')),unitForm:!!(t&&t.querySelector('#form-unidad')),legacyPanel:!!(t&&t.querySelector('#bc-aj-panel')),activeTab:document.querySelector('#tabs .tab-btn.active')?.dataset.tab||null};window.__BC_CONFIG_ADMIN_TEST_STATE__=state;return !!(state.panelExists&&state.panelVisible&&state.roleForm&&state.categoryForm&&state.unitForm&&!state.legacyPanel);})()";
+  try {
+    await waitUntil("Configuración de administración y catálogos", configAdminReady, 10000);
+  } catch (error) {
+    report.evidence.configAdminFailureState = await evaluate("window.__BC_CONFIG_ADMIN_TEST_STATE__||null");
+    throw error;
+  }
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
   const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
