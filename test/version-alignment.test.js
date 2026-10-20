@@ -98,7 +98,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   const config = fs.readFileSync('public/js/configuracion.js', 'utf8');
   assert.match(networkCore, /window\.__BC_BACKEND_PROBE__/);
   assert.match(networkCore, /registrarDiagnosticoSondeo\("degraded", reason/);
-  assert.match(networkCore, /baseUrl \\+ "\/rest\/v1\//, "Data API is the second real probe route");
+  assert.ok(networkCore.includes('baseUrl + "/rest/v1/"'), "Data API is the second real probe route");
   assert.match(networkCore, /PROBE_TIMEOUT_MS = 12000/);
   assert.match(networkCore, /fallosSondeoSeguidos >= 2/, "one isolated probe failure must not flip the app offline");
   assert.match(config, /cfg-backend-probe-note/);
