@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.6 — resilient network probes and separated settings, foreground recovery and safe queue sync
+// v9.5.6 — responsive mobile shell, login fit and touch scrolling
 (function hotfixV9475(){
   const VERSION="9.5.6";
   window.__BC_VERSION__=VERSION;
