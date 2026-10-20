@@ -100,8 +100,20 @@
   }, true);
   window.addEventListener('pageshow', boot);
   if (document.body && typeof MutationObserver === 'function') {
-    var observer = new MutationObserver(function () { movePanel(); releaseScrollLock(); });
+    var observer = new MutationObserver(function () {
+      // JSDOM/browser teardown can invalidate document; disconnect rather than touching a closed page.
+      if (!window.document || !window.document.body) {
+        observer.disconnect();
+        return;
+      }
+      movePanel();
+      releaseScrollLock();
+      var panel = window.document.getElementById('bc-aj-panel');
+      if (panel && panel.dataset.bcMovedToConfig === '1') observer.disconnect();
+    });
     observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('pagehide', function () { observer.disconnect(); }, { once:true });
+    setTimeout(function () { observer.disconnect(); }, 15000);
   }
   setTimeout(boot, 350);
   setTimeout(boot, 1000);
