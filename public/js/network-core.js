@@ -295,6 +295,9 @@
               if (!settled) {
                 settled = true;
                 window.clearTimeout(timer);
+                var cancelled = new Error("BACKEND_PROBE_CANCELLED");
+                cancelled.service = service;
+                reject(cancelled);
               }
               try { controller.abort(); } catch (e) {}
             }
