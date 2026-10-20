@@ -20,7 +20,8 @@
     star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.2 4.5 5 .7-3.6 3.5.9 5L12 14.8 7.5 16.7l.9-5L4.8 8.2l5-.7L12 3z"/></svg>',
     users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.9-3.2 3.2-4.8 6.5-4.8s5.6 1.6 6.5 4.8"/><circle cx="17" cy="9" r="2.4"/><path d="M16 15.2c2.2.2 3.9 1.4 4.6 3.8"/></svg>',
     bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M10 12h4"/></svg>',
-    config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
+    config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h7M15 18h5"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="13" cy="18" r="2"/></svg>'
   };
 
   var BY_TAB = {
@@ -28,7 +29,7 @@
     transferencias: SVG.swap, vales: SVG.doc, pendientes: SVG.clock, reportes: SVG.chart,
     inventario: SVG.layers, movimientos: SVG.pulse, turnos: SVG.person, ciclos: SVG.person,
     operacion: SVG.gear, comunicacion: SVG.chat, mando: SVG.star, usuarios: SVG.users,
-    config: SVG.config, compras: SVG.bag
+    conectividad: SVG.pulse, preferencias: SVG.sliders, config: SVG.users, compras: SVG.bag
   };
 
   var BY_LABEL = [
@@ -82,6 +83,18 @@
       '.sidebar-nav .tab-btn.active{background:rgba(201,162,77,.14)!important;color:var(--gold-bright)!important;box-shadow:inset 0 0 0 1px rgba(201,162,77,.22)}',
       '.sidebar-nav .tab-btn.active .bc-nav-icon{opacity:1;color:var(--gold)}',
       '.sidebar-nav .tab-btn .pendientes-tab-badge{margin-left:auto}',
+      '.sidebar-nav .bc-nav-group{width:100%;margin:4px 0 8px;border-top:1px solid rgba(201,162,77,.12);padding-top:5px}',
+      '.sidebar-nav .bc-nav-group-toggle{width:100%;display:flex;align-items:center;gap:12px;padding:11px 14px;border:0;border-radius:10px;background:transparent;color:var(--mist);font:500 13.5px Inter,system-ui,sans-serif;text-align:left;cursor:pointer}',
+      '.sidebar-nav .bc-nav-group-toggle:hover{background:rgba(201,162,77,.08);color:var(--text)}',
+      '.sidebar-nav .bc-nav-group-icon{width:20px;height:20px;flex:0 0 20px;display:inline-flex;align-items:center;justify-content:center}',
+      '.sidebar-nav .bc-nav-group-icon svg{width:18px;height:18px;display:block}',
+      '.sidebar-nav .bc-nav-group-label{flex:1;min-width:0}',
+      '.sidebar-nav .bc-nav-group-chevron{display:inline-flex;transition:transform .18s ease}',
+      '.sidebar-nav .bc-nav-group-chevron svg{width:16px;height:16px;display:block}',
+      '.sidebar-nav .bc-nav-group.expanded .bc-nav-group-chevron{transform:rotate(180deg)}',
+      '.sidebar-nav .bc-nav-group-items{display:none;flex-direction:column;gap:2px;margin:2px 0 0 10px;padding-left:8px;border-left:1px solid rgba(201,162,77,.2)}',
+      '.sidebar-nav .bc-nav-group.expanded .bc-nav-group-items{display:flex}',
+      '.sidebar-nav .bc-nav-group-items .tab-btn{padding-left:18px!important;font-size:13px!important}',
       '.sidebar-title{font-family:Cormorant Garamond,serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-dim)!important}',
       '.bc-header-logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin-right:2px;color:var(--gold)}',
       '.bc-header-logo svg{width:22px;height:22px}',
@@ -129,6 +142,18 @@
       btn.appendChild(icon);
       btn.appendChild(lab);
       if (badge) btn.appendChild(badge);
+    });
+  }
+
+  function wireConfigGroup() {
+    var group = document.getElementById('nav-config-group');
+    var toggle = document.getElementById('nav-config-toggle');
+    if (!group || !toggle || toggle.dataset.bcConfigToggleBound === '1') return;
+    toggle.dataset.bcConfigToggleBound = '1';
+    toggle.addEventListener('click', function () {
+      var expanded = toggle.getAttribute('aria-expanded') === 'true';
+      group.classList.toggle('expanded', !expanded);
+      toggle.setAttribute('aria-expanded', String(!expanded));
     });
   }
 
@@ -197,6 +222,7 @@
   function run() {
     injectStyles();
     decorateSidebar();
+    wireConfigGroup();
     decorateHeaderLogo();
     enhanceComunicacion();
     if (typeof aplicarPermisosAInterfaz === 'function') {

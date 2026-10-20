@@ -5,7 +5,7 @@
   window.__BC_SECCIONES_VISIBLES_20260903__ = true;
 
   var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true };
-  var LABELS = { config:'Configuración', ciclos:'Turnos' };
+  var LABELS = { config:'Administración', ciclos:'Turnos' };
   var configSelectionRequested = false;
 
   // Avoid style-attribute mutations when the final value is already applied.
