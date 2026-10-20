@@ -85,8 +85,7 @@
       '#tab-config #bc-aj-panel .bc-aj-sec{margin-bottom:16px}',
       '#tab-config #bc-aj-panel .bc-aj-logout{display:none!important}',
       '#tab-config #bc-aj-panel .bc-aj-x{display:none!important}',
-      '#cfg-preferences-note{margin:4px 0 14px}',
-      '@media(max-width:759px){html.bc-config-scroll-unlocked,body.bc-config-scroll-unlocked{height:auto!important;max-height:none!important;overflow-x:hidden!important;overflow-y:auto!important;touch-action:pan-y}body.bc-config-scroll-unlocked #app-shell.visible>main.main-content{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important}body.bc-config-scroll-unlocked #tab-config.visible.bc-config-scroll-region{box-sizing:border-box;height:auto!important;max-height:calc(100vh - 240px)!important;max-height:calc(100dvh - 240px)!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding-bottom:max(20px,env(safe-area-inset-bottom))}}'
+      '#cfg-preferences-note{margin:4px 0 14px}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -103,6 +102,9 @@
         releaseScrollLock();
       } else if (document.body) {
         document.body.classList.remove('bc-config-scroll-unlocked');
+        if (document.documentElement) document.documentElement.classList.remove('bc-config-scroll-unlocked');
+        var configTab = document.getElementById('tab-config');
+        if (configTab) configTab.classList.remove('bc-config-scroll-region');
       }
     }, 0);
   }, true);
