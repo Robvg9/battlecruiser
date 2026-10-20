@@ -600,3 +600,35 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     touch-action: pan-y;
   }
 }
+
+
+/* Android fallback: make the Configuración panel itself swipe-scrollable.
+   The page-level scroll rules above are retained, but are not the only path to its controls. */
+@media (max-width: 759px) {
+  html.bc-config-scroll-unlocked,
+  body.bc-config-scroll-unlocked {
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-y;
+  }
+  body.bc-config-scroll-unlocked #app-shell.visible > main.main-content {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  body.bc-config-scroll-unlocked #tab-config.visible.bc-config-scroll-region {
+    box-sizing: border-box;
+    height: auto !important;
+    max-height: calc(100vh - 240px) !important;
+    max-height: calc(100dvh - 240px) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}

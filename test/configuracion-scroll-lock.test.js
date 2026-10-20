@@ -40,6 +40,15 @@ test("moving Ajustes into Configuración clears and continuously prevents the bo
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(doc.body.classList.contains("bc-aj-open"), false, "Config tab click must release a reintroduced legacy lock");
     assert.equal(doc.body.classList.contains("bc-config-scroll-unlocked"), true, "mobile Configuración must opt into document scrolling");
+    assert.equal(doc.documentElement.classList.contains("bc-config-scroll-unlocked"), true, "root document must be released from a stale scroll lock");
+    assert.equal(doc.getElementById("tab-config").classList.contains("bc-config-scroll-region"), true, "Configuración must become its own touch-scroll region");
+    const hotfix = read("public/js/hotfix-configuracion-20260902.js");
+    const css = read("public/style.css");
+    assert.match(hotfix, /bc-config-scroll-region/);
+    assert.match(css, /#tab-config\.visible\.bc-config-scroll-region/);
+    assert.match(css, /overflow-y: auto !important/);
+    assert.match(css, /-webkit-overflow-scrolling: touch/);
+    assert.match(css, /touch-action: pan-y/);
     assert.equal(doc.getElementById("bc-aj-panel").classList.contains("open"), false);
   } finally {
     dom.window.close();

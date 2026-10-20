@@ -427,6 +427,47 @@ async function main() {
   const settingsButtonClicked = await evaluate("(()=>{const b=document.querySelector('#ajustes-btn');if(!b)return false;b.click();return true;})()");
   assert(settingsButtonClicked, "No se encontró el botón Ajustes en el encabezado móvil.");
   await waitUntil("pestaña Configuración visible, panel migrado y control Wi-Fi disponible", "(()=>{const t=document.querySelector('#tab-config');const p=document.querySelector('#bc-aj-panel');return !!(t&&t.classList.contains('visible')&&p&&p.parentElement===t&&document.querySelector('#bc-aj-sync-wifi')&&!document.body.classList.contains('bc-aj-open'))})()", 10000);
+  // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
+  // The installed Android PWA reported that Configuración remained impossible to scroll.
+  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
+  report.evidence.androidConfigScrollInitial = mobileConfigScrollInitial;
+  assert(mobileConfigScrollInitial && mobileConfigScrollInitial.found &&
+         mobileConfigScrollInitial.regionClass &&
+         (mobileConfigScrollInitial.overflowY === "auto" || mobileConfigScrollInitial.overflowY === "scroll") &&
+         mobileConfigScrollInitial.scrollHeight > mobileConfigScrollInitial.clientHeight + 80 &&
+         !mobileConfigScrollInitial.bodyLock,
+    "Configuración no tiene una región táctil desplazable real: " + JSON.stringify(mobileConfigScrollInitial));
+
+  const configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const top=Math.max(2,r.top+8);const bottom=Math.min(innerHeight-2,r.bottom-8);const distance=Math.min(220,bottom-top-30);return {x:Math.round(r.left+r.width*0.45),startY:Math.round(bottom-10),endY:Math.round(bottom-10-distance),distance:Math.round(distance)}})()");
+  assert(configSwipe && configSwipe.distance >= 100,
+    "No hay una zona visible suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
+  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  await cdpCommand("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+  });
+  for (let step = 1; step <= 6; step++) {
+    await delay(35);
+    const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 6);
+    await cdpCommand("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+    });
+  }
+  await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await delay(250);
+  const mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
+  report.evidence.androidConfigScrollGesture = {
+    initial: mobileConfigScrollInitial,
+    swipe: configSwipe,
+    after: mobileConfigScrollAfter,
+    method: "Chromium CDP touchStart/touchMove/touchEnd in 360x800 mobile emulation; not a physical Android test.",
+  };
+  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
+  assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollTop > mobileConfigScrollInitial.scrollTop + 20,
+    "El gesto vertical simulado no desplazó Configuración. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
+      "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
+
   const mobileSettingsReachability = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>{const panel=document.querySelector('#bc-aj-panel');const tab=document.querySelector('#tab-config');const body=document.querySelector('#bc-aj-panel .bc-aj-body');const control=document.querySelector('#bc-aj-sync-wifi');const row=control&&control.closest('.bc-aj-row');if(row&&typeof row.scrollIntoView==='function')row.scrollIntoView({block:'end',behavior:'instant'});requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height};};const br=box(body);const rr=box(row);const bodyLock=document.body.classList.contains('bc-aj-open');const bodyOverflowY=getComputedStyle(document.body).overflowY;resolve({configVisible:!!(tab&&tab.classList.contains('visible')),panelInsideConfig:!!(tab&&panel&&panel.parentElement===tab),bodyLock:bodyLock,bodyOverflowY:bodyOverflowY,found:!!control,body:br,row:rr,documentScrollY:window.scrollY,documentScrollHeight:document.documentElement.scrollHeight,bodyScrollTop:body?body.scrollTop:null,bodyScrollHeight:body?body.scrollHeight:null,bodyClientHeight:body?body.clientHeight:null,viewportHeight:innerHeight,fullyVisible:!!(tab&&tab.classList.contains('visible')&&panel&&panel.parentElement===tab&&!bodyLock&&bodyOverflowY!=='hidden'&&rr&&rr.top>=-1&&rr.bottom<=innerHeight+1)});});})))()");
   report.evidence.androidMobileSettingsReachability = mobileSettingsReachability;
   assert(mobileSettingsReachability.found && mobileSettingsReachability.fullyVisible,

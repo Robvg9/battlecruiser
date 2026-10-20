@@ -54,15 +54,22 @@
     if (!document.body) return;
     var panel = document.getElementById('bc-aj-panel');
     var tab = document.getElementById('tab-config');
+    var active = !!(tab && tab.classList.contains('visible'));
     if (panel && panel.dataset.bcMovedToConfig === '1') {
       panel.classList.remove('open');
       document.body.classList.remove('bc-aj-open');
-      if (tab && tab.classList.contains('visible')) document.body.classList.add('bc-config-scroll-unlocked');
     }
-    if (tab && tab.classList.contains('visible')) {
+    if (active) {
+      // Android WebView/PWA may ignore document scrolling even when height/overflow are reset.
+      // Give Configuración its own bounded, touch-scrollable region as a reliable fallback.
       document.body.classList.add('bc-config-scroll-unlocked');
+      if (document.documentElement) document.documentElement.classList.add('bc-config-scroll-unlocked');
+      tab.classList.add('bc-config-scroll-region');
+      if (!tab.hasAttribute('tabindex')) tab.setAttribute('tabindex', '0');
     } else {
       document.body.classList.remove('bc-config-scroll-unlocked');
+      if (document.documentElement) document.documentElement.classList.remove('bc-config-scroll-unlocked');
+      if (tab) tab.classList.remove('bc-config-scroll-region');
     }
   }
 
@@ -95,6 +102,9 @@
         releaseScrollLock();
       } else if (document.body) {
         document.body.classList.remove('bc-config-scroll-unlocked');
+        if (document.documentElement) document.documentElement.classList.remove('bc-config-scroll-unlocked');
+        var configTab = document.getElementById('tab-config');
+        if (configTab) configTab.classList.remove('bc-config-scroll-region');
       }
     }, 0);
   }, true);
