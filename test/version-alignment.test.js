@@ -91,7 +91,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.7 — responsive mobile shell, login fit and touch scrolling/);
+  assert.match(app, /v9\.5\.7 — immediate navigation and semantic configuration groups/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.7"><\/script>/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
