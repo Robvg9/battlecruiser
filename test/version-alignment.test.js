@@ -87,6 +87,12 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.1/);
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.1/);
+  const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
+  const config = fs.readFileSync('public/js/configuracion.js', 'utf8');
+  assert.match(networkCore, /window\.__BC_BACKEND_PROBE__/);
+  assert.match(networkCore, /registrarDiagnosticoSondeo\("offline", "timeout"/);
+  assert.match(config, /cfg-backend-probe-note/);
+  assert.match(config, /no incluye credenciales ni tokens/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.1"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.1/);
