@@ -132,13 +132,21 @@
   function aplicarPermisosAInterfaz() {
     var loggedIn = !!(typeof _usuarioActual !== "undefined" && _usuarioActual);
     var cargaOk = !!(typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa);
+    var shell = document.getElementById("app-shell");
+    var shellVisible = !!(shell && shell.classList.contains("visible"));
 
     document.querySelectorAll(".tab-btn[data-tab]").forEach(function (btn) {
       var tab = btn.dataset.tab;
       if (!tab) return;
 
       if (!loggedIn || !cargaOk) {
-        setTabVisible(btn, false);
+        // No bloquear la navegación mientras llegan los RPC del perfil.
+        // Los formularios sensibles permanecen fail-closed mediante tienePermiso().
+        if (!shellVisible || tab === "transferencias" || tab === "vales" || tab === "turnos") {
+          setTabVisible(btn, false);
+        } else {
+          setTabVisible(btn, true);
+        }
         return;
       }
 
@@ -192,6 +200,25 @@
     toggleForm("form-categoria", "categorias", "crear");
     toggleForm("form-unidad", "unidades", "crear");
     toggleForm("form-nuevo-usuario", "usuarios", "crear");
+    toggleForm("form-nuevo-rol", "roles", "crear");
+
+    // Selección inicial determinista: Centro de Control, no Administración.
+    if (shellVisible && !window.__BC_INITIAL_SECTION_SELECTED__) {
+      window.__BC_INITIAL_SECTION_SELECTED__ = true;
+      var selectedAtBoot = document.querySelector("#tabs .tab-btn.active[data-tab]");
+      if (!selectedAtBoot || selectedAtBoot.dataset.tab !== "resumen") {
+        if (typeof irATab === "function") {
+          try { irATab("resumen"); } catch (e) {}
+        } else {
+          document.querySelectorAll("#tabs .tab-btn.active").forEach(function (b) { b.classList.remove("active"); });
+          document.querySelectorAll(".tab-panel.visible").forEach(function (p) { p.classList.remove("visible"); });
+          var homeButton = document.querySelector('#tabs .tab-btn[data-tab="resumen"]');
+          var homePanel = document.getElementById("tab-resumen");
+          if (homeButton) homeButton.classList.add("active");
+          if (homePanel) homePanel.classList.add("visible");
+        }
+      }
+    }
 
     var algunaVisible = false;
     if (loggedIn && cargaOk) {
@@ -222,6 +249,24 @@
   window.aplicarPermisosAInterfaz = aplicarPermisosAInterfaz;
   window.TAB_A_SECCION = TAB_A_SECCION;
   window.puedeVerOperaciones = puedeVerOperaciones;
+  // Reevaluar justo cuando auth.js abre el shell, sin esperar los RPC de perfil.
+  (function observarShellAutenticado() {
+    var shell = document.getElementById("app-shell");
+    if (!shell || shell.dataset.bcEarlyNavigationObserver === "1") return;
+    shell.dataset.bcEarlyNavigationObserver = "1";
+    var applyWhenVisible = function () {
+      if (!shell.classList.contains("visible")) return;
+      window.setTimeout(function () {
+        try { aplicarPermisosAInterfaz(); } catch (e) {}
+      }, 0);
+    };
+    new MutationObserver(applyWhenVisible).observe(shell, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+    applyWhenVisible();
+  })();
+
 
   var css = document.getElementById("bc-tab-sin-permiso-css");
   if (css) css.remove();
