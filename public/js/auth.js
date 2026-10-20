@@ -756,8 +756,11 @@ safeInit("ojito-contraseña", () => {
 });
 
 safeInit("menu-ajustes", () => {
+  // The legacy header Ajustes dropdown was removed. Do not bind if an older shell
+  // or a future controlled rollback omits either element.
   const ajustesBtn = document.getElementById("ajustes-btn");
   const ajustesMenu = document.getElementById("ajustes-menu");
+  if (!ajustesBtn || !ajustesMenu) return;
 
   ajustesBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -777,18 +780,24 @@ safeInit("cambiar-contraseña", () => {
   const formPass = document.getElementById("form-pass");
   const ajustesMenu = document.getElementById("ajustes-menu");
 
-  changePassBtn.addEventListener("click", () => {
-    passPanel.classList.toggle("hidden");
-    if (ajustesMenu) ajustesMenu.classList.add("hidden");
-  });
+  // Password change is now opened from Mi Cuenta, not the removed legacy header button.
+  if (changePassBtn && passPanel) {
+    changePassBtn.addEventListener("click", () => {
+      passPanel.classList.toggle("hidden");
+      if (ajustesMenu) ajustesMenu.classList.add("hidden");
+    });
+  }
 
-  passCancelBtn.addEventListener("click", () => {
-    formPass.reset();
-    document.getElementById("msg-pass").textContent = "";
-    passPanel.classList.add("hidden");
-  });
+  if (passCancelBtn && formPass && passPanel) {
+    passCancelBtn.addEventListener("click", () => {
+      formPass.reset();
+      const message = document.getElementById("msg-pass");
+      if (message) message.textContent = "";
+      passPanel.classList.add("hidden");
+    });
+  }
 
-  formPass.addEventListener("submit", async (e) => {
+  if (formPass) formPass.addEventListener("submit", async (e) => {
     e.preventDefault();
     const nueva = document.getElementById("pass-new").value;
     const confirmar = document.getElementById("pass-confirm").value;
