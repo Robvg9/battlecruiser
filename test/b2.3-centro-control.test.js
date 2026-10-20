@@ -40,6 +40,13 @@ function montarEntorno() {
   const dom = new JSDOM(html, { runScripts: "dangerously", url: "https://app.test/" });
   const { window } = dom;
 
+  // The offline core now performs a real Auth health fetch in browsers.
+  // Keep B2.3 isolated from the network and explicitly model a healthy backend.
+  Object.defineProperty(window, "fetch", {
+    value: async function () { return { ok: true, status: 200 }; },
+    configurable: true
+  });
+
   // Globals que app.js espera.
   global.window = window;
   global.document = window.document;
