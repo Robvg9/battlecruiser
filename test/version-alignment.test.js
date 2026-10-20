@@ -71,32 +71,31 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.1["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.1["']/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261016\.7"\]/);
-  assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
-  assert.match(app, /\["ui-ajustes-panel\.js","96\.2"\]/);
-  assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.1"\]/);
-  assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
-  assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
-  assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
-  assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.1"><\/script>/);
-  assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
-  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.1"><\/script>/);
-  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/);
-  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.1/);
-  assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.1/);
+  assert.match(app, /const VERSION=["']9\\.5\\.1["']/);
+  assert.match(sw, /BC_SW_VERSION\\s*=\\s*["']9\\.5\\.1["']/);
+  assert.match(app, /\\["hotfix-secciones-visibles-20260903\\.js","20261016\\.7"\\]/);
+  assert.match(app, /\\["section-scope-fix\\.js","20261016\\.1"\\]/);
+  assert.match(app, /\\["ui-ajustes-panel\\.js","96\\.2"\\]/);
+  assert.match(app, /\\["hotfix-configuracion-20260902\\.js","20261020\\.1"\\]/);
+  assert.match(app, /\\["mi-cuenta\\.js","1\\.1"\\]/);
+  assert.match(app, /\\["m26-ui-integridad\\.js","26\\.31"\\]/);
+  assert.match(m26, /panel\\.contains\\(candidate\\)/, "M26 must move only containers inside their owning tab panel");
+  assert.match(index, /<script src="js\\/productos\\.js\\?v=20261015\\.1"><\\/script>/);
+  assert.match(index, /<script src="js\\/ventas\\.js\\?v=20261016\\.1"><\\/script>/);
+  assert.match(index, /<script src="js\\/auth\\.js\\?v=9\\.5\\.1"><\\/script>/);
+  assert.match(index, /<script src="js\\/catalogos\\.js\\?v=20261016\\.5"><\\/script>/);
+  assert.match(index, /<script src="js\\/hotfix-configuracion-20260902\\.js\\?v=20261020\\.1"><\\/script>/);
+  assert.match(index, /<script src="js\\/mi-cuenta\\.js\\?v=1\\.1"><\\/script>/);
+  assert.match(index, /<script src="app\\.js\\?v=9\\.5\\.1"><\\/script>/);
+  assert.match(sw, /\\.\\/js\\/mi-cuenta\\.js\\?v=1\\.1/);
+  assert.match(sw, /\\.\\/js\\/hotfix-configuracion-20260902\\.js\\?v=20261020\\.1/);
+
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
   const config = fs.readFileSync('public/js/configuracion.js', 'utf8');
-  assert.match(networkCore, /window\.__BC_BACKEND_PROBE__/);
-  assert.match(networkCore, /registrarDiagnosticoSondeo\("offline", "timeout"/);
+  assert.match(networkCore, /window\\.__BC_BACKEND_PROBE__/);
+  assert.match(networkCore, /registrarDiagnosticoSondeo\\("offline", "timeout"/);
   assert.match(config, /cfg-backend-probe-note/);
+  assert.match(config, /await sondearBackend\\(\\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.1"><\/script>/);
-  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/);
-  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.1/);
-  assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.1/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.1"><\/script>/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.1['"]\);/);
+  assert.match(m68, /const VER = String\\(window\\.__BC_VERSION__ \\|\\| ['"]9\\.5\\.1['"]\\);/);
 });
