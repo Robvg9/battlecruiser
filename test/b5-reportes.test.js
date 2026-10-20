@@ -218,7 +218,10 @@ test("B5.4: filtros se aplican al backend (fecha + almacén)", async () => {
   document.getElementById("rep-filtro-hasta").value = "2026-08-31";
   document.getElementById("rep-filtro-almacen").value = "a1";
   document.getElementById("rep-aplicar-btn").click();
-  await esperar(30);
+  assert.ok(
+    await esperarHasta(() => client.__rpcCalls.some((c) => c.nombre === "reporte_resumen_ejecutivo")),
+    "debe llamar al RPC de resumen dentro de 2 s"
+  );
   const callResumen = client.__rpcCalls.find((c) => c.nombre === "reporte_resumen_ejecutivo");
   assert.ok(callResumen, "debe llamar al RPC de resumen");
   assert.strictEqual(callResumen.params.p_desde, "2026-08-01", "filtro desde aplicado");
