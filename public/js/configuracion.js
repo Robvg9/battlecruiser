@@ -80,7 +80,14 @@ safeInit("config-mantenimiento", function () {
   var btnUp = document.getElementById("cfg-actualizar-app");
   if (btnUp) btnUp.addEventListener("click", function () { var existente = document.getElementById("update-app-btn"); if (existente) { existente.click(); return; } if (typeof actualizarApp === "function") actualizarApp(btnUp); else setMsg("msg-config-diag", "No se encontró la función de actualizar app.", false); });
   var btnRef = document.getElementById("cfg-refrescar-diag");
-  if (btnRef) btnRef.addEventListener("click", function () { renderDiagnosticoConfig(); setMsg("msg-config-diag", "Diagnóstico actualizado.", true); });
+  if (btnRef) btnRef.addEventListener("click", async function () {
+    var respondio = false;
+    if (typeof sondearBackend === "function") {
+      try { respondio = await sondearBackend(); } catch (e) { respondio = false; }
+    }
+    renderDiagnosticoConfig();
+    setMsg("msg-config-diag", respondio ? "El backend respondió al sondeo." : "El backend no respondió al sondeo. Revisa el último resultado.", respondio);
+  });
 });
 
 // Carga de la capa de UX sin alterar la arquitectura ni duplicar módulos de negocio.
