@@ -348,7 +348,7 @@
           return false;
         }
 
-        var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\\/+$/, "") : "";
+        var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\/+$/, "") : "";
         var apiKey = typeof SUPABASE_ANON_KEY === "string" ? SUPABASE_ANON_KEY : "";
         if (!baseUrl || !apiKey || typeof fetch !== "function") {
           registrarDiagnosticoSondeo("offline", "probe_config_missing", startedAt);
