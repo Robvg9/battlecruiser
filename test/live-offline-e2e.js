@@ -424,9 +424,35 @@ async function main() {
   assert(mobileContentLayout.footer.position === "static" &&
          mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,
     "El pie se superpone o abandona el flujo después del contenido móvil: " + JSON.stringify(mobileContentLayout));
-  const settingsButtonClicked = await evaluate("(()=>{const b=document.querySelector('#ajustes-btn');if(!b)return false;b.click();return true;})()");
-  assert(settingsButtonClicked, "No se encontró el botón Ajustes en el encabezado móvil.");
-  await waitUntil("pestaña Configuración visible, panel migrado y control Wi-Fi disponible", "(()=>{const t=document.querySelector('#tab-config');const p=document.querySelector('#bc-aj-panel');return !!(t&&t.classList.contains('visible')&&p&&p.parentElement===t&&document.querySelector('#bc-aj-sync-wifi')&&!document.body.classList.contains('bc-aj-open'))})()", 10000);
+  const settingsStructure = await evaluate("(()=>({legacyMenuAbsent:!document.querySelector('#ajustes-btn, #ajustes-menu, #bc-aj-panel'),connectivityTab:!!document.querySelector('#tabs .tab-btn[data-tab=conectividad]'),preferencesTab:!!document.querySelector('#tabs .tab-btn[data-tab=preferencias]'),accountButton:!!document.querySelector('#mi-cuenta-btn'),logoutButton:!!document.querySelector('#logout-btn')}))()");
+  report.evidence.settingsStructure = settingsStructure;
+  assert(settingsStructure.legacyMenuAbsent && settingsStructure.connectivityTab && settingsStructure.preferencesTab && settingsStructure.accountButton && settingsStructure.logoutButton,
+    "La estructura nueva debe quitar el menú Ajustes duplicado y conservar Mi Cuenta/Cerrar sesión: " + JSON.stringify(settingsStructure));
+
+  const connectivityClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=conectividad]');if(!b)return false;b.click();return true;})()");
+  assert(connectivityClicked, "No se encontró la sección Conectividad.");
+  await waitUntil("Conectividad con diagnóstico y actualización", "(()=>{const t=document.querySelector('#tab-conectividad');return !!(t&&t.classList.contains('visible')&&t.querySelector('#cfg-mantenimiento')&&t.querySelector('#cfg-refrescar-diag')&&t.querySelector('#cfg-actualizar-app'))})()", 10000);
+
+  const preferencesClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=preferencias]');if(!b)return false;b.click();return true;})()");
+  assert(preferencesClicked, "No se encontró la sección Preferencias.");
+  await waitUntil("Preferencias personales con control Wi-Fi", "(()=>{const t=document.querySelector('#tab-preferencias');const p=document.querySelector('#cfg-preferencias-personales');return !!(t&&t.classList.contains('visible')&&p&&p.parentElement===t&&t.querySelector('#cfg-aj-sync-wifi')&&!t.querySelector('#bc-aj-panel'))})()", 10000);
+
+  const configClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b)return false;b.click();return true;})()");
+  assert(configClicked, "No se encontró la sección Configuración.");
+  const configAdminReady = "(()=>{const t=document.querySelector('#tab-config');const b=document.querySelector('#tabs .tab-btn[data-tab=config]');const state={panelExists:!!t,panelVisible:!!(t&&t.classList.contains('visible')),panelClasses:t?t.className:null,panelDisplay:t?getComputedStyle(t).display:null,buttonExists:!!b,buttonClasses:b?b.className:null,buttonDisplay:b?getComputedStyle(b).display:null,buttonInlineDisplay:b?b.style.display:null,buttonPermit:b?b.getAttribute('data-bc-permiso'):null,roleEntry:!!(t&&t.querySelector('#bc-btn-config-roles')),roleFormMoved:!!document.querySelector('#bc-modal-nuevo-rol #form-nuevo-rol'),roleListMoved:!!document.querySelector('#bc-modal-roles-permisos #lista-roles'),categoryForm:!!(t&&t.querySelector('#form-categoria')),unitForm:!!(t&&t.querySelector('#form-unidad')),legacyPanel:!!(t&&t.querySelector('#bc-aj-panel')),activeTab:document.querySelector('#tabs .tab-btn.active')?.dataset.tab||null};window.__BC_CONFIG_ADMIN_TEST_STATE__=state;return !!(state.panelExists&&state.panelVisible&&state.roleEntry&&state.roleFormMoved&&state.roleListMoved&&state.categoryForm&&state.unitForm&&!state.legacyPanel);})()";
+  try {
+    await waitUntil("Configuración de administración y catálogos", configAdminReady, 10000);
+  } catch (error) {
+    report.evidence.configAdminFailureState = await evaluate("window.__BC_CONFIG_ADMIN_TEST_STATE__||null");
+    throw error;
+  }
+  const rolesOpened = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-btn-config-roles');if(!b)return {entry:false,opened:false};b.click();const m=document.querySelector('#bc-modal-roles-permisos');return {entry:true,opened:!!(m&&m.classList.contains('open')),listInsideModal:!!(m&&m.querySelector('#lista-roles'))}})()");
+  report.evidence.configRolesModal = rolesOpened;
+  assert(rolesOpened.entry && rolesOpened.opened && rolesOpened.listInsideModal,
+    "Configuración no abre el modal existente de Roles y Permisos: " + JSON.stringify(rolesOpened));
+  await evaluate("(()=>{const b=document.querySelector('#bc-modal-roles-permisos [data-bc-roles-close=\"1\"]');if(b)b.click();return true})()");
+  await waitUntil("cierre del modal Roles y Permisos", "(()=>{const m=document.querySelector('#bc-modal-roles-permisos');return !!(m&&!m.classList.contains('open'))})()", 3000);
+
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
   const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
@@ -468,10 +494,13 @@ async function main() {
     "El gesto vertical simulado no desplazó Configuración. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
       "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
 
-  const mobileSettingsReachability = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>{const panel=document.querySelector('#bc-aj-panel');const tab=document.querySelector('#tab-config');const body=document.querySelector('#bc-aj-panel .bc-aj-body');const control=document.querySelector('#bc-aj-sync-wifi');const row=control&&control.closest('.bc-aj-row');if(row&&typeof row.scrollIntoView==='function')row.scrollIntoView({block:'end',behavior:'instant'});requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height};};const br=box(body);const rr=box(row);const bodyLock=document.body.classList.contains('bc-aj-open');const bodyOverflowY=getComputedStyle(document.body).overflowY;resolve({configVisible:!!(tab&&tab.classList.contains('visible')),panelInsideConfig:!!(tab&&panel&&panel.parentElement===tab),bodyLock:bodyLock,bodyOverflowY:bodyOverflowY,found:!!control,body:br,row:rr,documentScrollY:window.scrollY,documentScrollHeight:document.documentElement.scrollHeight,bodyScrollTop:body?body.scrollTop:null,bodyScrollHeight:body?body.scrollHeight:null,bodyClientHeight:body?body.clientHeight:null,viewportHeight:innerHeight,fullyVisible:!!(tab&&tab.classList.contains('visible')&&panel&&panel.parentElement===tab&&!bodyLock&&bodyOverflowY!=='hidden'&&rr&&rr.top>=-1&&rr.bottom<=innerHeight+1)});});})))()");
+  const preferencesReopenedForReachability = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=preferencias]');if(!b)return false;b.click();return true})()");
+  assert(preferencesReopenedForReachability, "No se pudo volver a Preferencias para verificar el control Wi-Fi.");
+  await waitUntil("Preferencias activas después de Configuración", "(()=>{const t=document.querySelector('#tab-preferencias');return !!(t&&t.classList.contains('visible'))})()", 5000);
+  const mobileSettingsReachability = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>{const panel=document.querySelector('#cfg-preferencias-personales');const tab=document.querySelector('#tab-preferencias');const control=document.querySelector('#cfg-aj-sync-wifi');const row=control&&control.closest('.cfg-aj-row');if(row&&typeof row.scrollIntoView==='function')row.scrollIntoView({block:'end',behavior:'instant'});requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height};};const pr=box(panel);const rr=box(row);const bodyLock=document.body.classList.contains('bc-aj-open');const bodyOverflowY=getComputedStyle(document.body).overflowY;resolve({preferencesVisible:!!(tab&&tab.classList.contains('visible')),panelInsidePreferences:!!(tab&&panel&&panel.parentElement===tab),bodyLock:bodyLock,bodyOverflowY:bodyOverflowY,found:!!control,panel:pr,row:rr,documentScrollY:window.scrollY,documentScrollHeight:document.documentElement.scrollHeight,panelScrollTop:panel?panel.scrollTop:null,panelScrollHeight:panel?panel.scrollHeight:null,panelClientHeight:panel?panel.clientHeight:null,viewportHeight:innerHeight,fullyVisible:!!(tab&&tab.classList.contains('visible')&&panel&&panel.parentElement===tab&&!bodyLock&&bodyOverflowY!=='hidden'&&rr&&rr.top>=-1&&rr.bottom<=innerHeight+1)});});})))()");
   report.evidence.androidMobileSettingsReachability = mobileSettingsReachability;
   assert(mobileSettingsReachability.found && mobileSettingsReachability.fullyVisible,
-    "El control “Sincronizar solo en Wi‑Fi” no puede llevarse completamente a vista con el scroll móvil: " + JSON.stringify(mobileSettingsReachability));
+    "El control Wi-Fi de Preferencias no puede llevarse completamente a vista con el scroll móvil: " + JSON.stringify(mobileSettingsReachability));
   await evaluate("(()=>{const s=document.querySelector('#app-shell');const l=document.querySelector('#login-form');if(s)s.classList.remove('visible');if(l)l.classList.remove('hidden');return true})()");
   await cdpCommand("Emulation.clearDeviceMetricsOverride");
   report.evidence.phase = "online_initial";

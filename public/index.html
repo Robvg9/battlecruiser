@@ -78,7 +78,7 @@
       <button type="button" class="login-utility" id="password-recovery-request-btn">Enviar correo de recuperación</button>
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote app-version-label">v9.5.4 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.5 — BattleCruiser</p>
     </form>
   </div>
 
@@ -107,6 +107,8 @@
         <button class="tab-btn" data-tab="operacion">Operación</button>
         <button class="tab-btn" data-tab="comunicacion">Comunicación <span id="com-tab-badge" class="pendientes-tab-badge hidden"></span></button>
         <button class="tab-btn" data-tab="mando">Centro de Mando</button>
+        <button class="tab-btn" data-tab="conectividad">Conectividad</button>
+        <button class="tab-btn" data-tab="preferencias">Preferencias</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Configuración</button>
       </nav>
@@ -126,13 +128,6 @@
         <span id="cola-pendientes-badge" class="cola-badge hidden"></span>
         <span id="user-email"></span>
         <button id="mi-cuenta-btn" type="button" aria-haspopup="dialog" aria-controls="bc-mi-cuenta-modal" aria-expanded="false">Mi Cuenta</button>
-        <div class="ajustes-wrap">
-          <button id="ajustes-btn" type="button">Ajustes ▾</button>
-          <div class="ajustes-menu hidden" id="ajustes-menu">
-            <button type="button" id="change-pass-btn">Cambiar contraseña</button>
-            <button type="button" id="update-app-btn">Actualizar app / borrar caché</button>
-          </div>
-        </div>
         <button id="logout-btn" type="button">Cerrar sesión</button>
       </div>
     </header>
@@ -579,6 +574,10 @@
       <div id="lista-usuarios" class="lista"></div>
     </section>
 
+    <section id="tab-conectividad" class="tab-panel" aria-label="Conectividad y mantenimiento"></section>
+
+    <section id="tab-preferencias" class="tab-panel" aria-label="Preferencias personales"></section>
+
     <section id="tab-config" class="tab-panel">
       <div class="cc-bloque">
         <h3>Roles y permisos</h3>
@@ -607,18 +606,18 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.4 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.5 — BattleCruiser</span>
     </footer>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script src="js/core.js"></script>
-<script src="js/auth.js?v=9.5.4"></script>
+<script src="js/auth.js?v=9.5.5"></script>
 <script src="js/offline.js"></script>
-<script src="js/network-core.js?v=20261020.3"></script>
+<script src="js/network-core.js?v=20261020.4"></script>
 <script src="js/loading-guard.js"></script>
 <script src="js/centro-control.js"></script>
-<script src="js/navegacion.js"></script>
+<script src="js/navegacion.js?v=20261020.4"></script>
 <script src="js/productos.js?v=20261015.1"></script>
 <script src="js/presentaciones.js"></script>
 <script src="js/almacenes.js"></script>
@@ -635,8 +634,8 @@
 <script src="js/m18-ciclos-ux.js"></script>
 <script src="js/venta-turno-ui.js"></script>
 <script src="js/comunicacion.js"></script>
-<script src="js/hotfix-configuracion-20260902.js?v=20261020.3"></script>
-<script src="js/mi-cuenta.js?v=1.1"></script>
-<script src="app.js?v=9.5.4"></script>
+<script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
+<script src="js/mi-cuenta.js?v=1.2"></script>
+<script src="app.js?v=9.5.5"></script>
 </body>
 </html>

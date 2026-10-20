@@ -4,15 +4,15 @@
 // Solo panel de mantenimiento con datos reales y acciones ya existentes.
 
 function _cfgEnsurePanel() {
-  const tab = document.getElementById("tab-config");
+  const tab = document.getElementById("tab-conectividad");
   if (!tab || document.getElementById("cfg-mantenimiento")) return;
 
   const block = document.createElement("div");
   block.className = "cc-bloque";
   block.id = "cfg-mantenimiento";
   block.innerHTML =
-    "<h3>Mantenimiento y diagnóstico</h3>" +
-    '<p class="muted">Herramientas administrativas sobre la infraestructura existente. No hay respaldo/restauración de base de datos en el cliente.</p>' +
+    "<h3>Conectividad y mantenimiento</h3>" +
+    '<p class="muted">Estado de las rutas Auth y Data API, reintentos y mantenimiento. Un timeout aislado no demuestra una caída total.</p>' +
     '<div id="cfg-diag-grid" class="rep-grid"></div>' +
     '<div class="btn-row" style="margin-top:12px;flex-wrap:wrap;gap:8px">' +
     '<button type="button" id="cfg-ir-pendientes" class="cc-accion">Ir a Pendientes</button>' +
@@ -52,6 +52,8 @@ function renderDiagnosticoConfig() {
   const probe = window.__BC_BACKEND_PROBE__ || null;
   const probeLabel = !probe ? "Sin prueba"
     : probe.status === "online" ? "Respuesta recibida"
+    : probe.status === "degraded" && probe.reason === "timeout" ? "Conexión intermitente"
+    : probe.status === "degraded" ? "Sondeo degradado"
     : probe.reason === "timeout" ? "Tiempo agotado"
     : probe.reason === "network_error" ? "Error de red"
     : probe.reason === "device_offline" ? "Dispositivo offline"
@@ -62,12 +64,14 @@ function renderDiagnosticoConfig() {
   grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual") + card(probeLabel, "Último sondeo backend");
   const probeNote = document.getElementById("cfg-backend-probe-note");
   if (probeNote) {
-    const watcherNote = " Vigilancia automática: comprueba cada 30 s mientras la app está visible y reintenta en 3–30 s si falla; al volver desde otra app, comprueba de inmediato. Android puede pausar una PWA en segundo plano.";
-    if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. No se almacenan tokens ni datos de usuario." + watcherNote;
+    const watcherNote = " Vigilancia: consulta Auth y Data API, sondea cada 30 s en primer plano y reintenta en 3–30 s; al volver a la app comprueba de inmediato. Un fallo aislado se tolera; Android puede pausar la PWA en segundo plano.";
+    if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. Se revisan Auth y Data API sin registrar credenciales ni tokens." + watcherNote;
     else {
       const time = new Date(probe.checkedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       const httpStatus = typeof probe.httpStatus === "number" ? " · HTTP " + probe.httpStatus : "";
-      probeNote.textContent = "Último sondeo: " + probe.reason + httpStatus + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens." + watcherNote;
+      const service = probe.service ? " · ruta " + probe.service : "";
+      const failures = typeof probe.consecutiveFailures === "number" ? " · fallos seguidos " + probe.consecutiveFailures : "";
+      probeNote.textContent = "Último sondeo: " + probe.reason + service + httpStatus + " · " + probe.durationMs + " ms · " + time + failures + ". Diagnóstico sanitizado; no incluye credenciales ni tokens." + watcherNote;
     }
   }
   const nota = document.getElementById("cfg-backup-nota");
@@ -77,7 +81,7 @@ function renderDiagnosticoConfig() {
 }
 
 async function refrescarConfiguracion() {
-  if (!document.getElementById("tab-config")) return;
+  if (!document.getElementById("tab-conectividad")) return;
   renderDiagnosticoConfig();
 }
 
@@ -114,7 +118,7 @@ safeInit("config-mantenimiento", function () {
     if (document.getElementById("bc-config-ajustes-migrados-script")) return;
     var s = document.createElement("script");
     s.id = "bc-config-ajustes-migrados-script";
-    s.src = "js/configuracion-ajustes-migrados-20260903.js?v=1";
+    s.src = "js/configuracion-ajustes-migrados-20260903.js?v=2";
     s.defer = true;
     document.head.appendChild(s);
   }

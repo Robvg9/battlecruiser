@@ -9,7 +9,7 @@ const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "network-core.js"), "utf8");
 
 async function flushMicrotasks() {
-  for (let i = 0; i < 12; i += 1) await Promise.resolve();
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
 }
 
 function createHarness(responses, options = {}) {
@@ -96,38 +96,46 @@ function createHarness(responses, options = {}) {
 
   return {
     window: win, document: doc, navigator, timers, diagnosticEvents,
-    requestCount: () => requestCount, advanceNextTimer, setVisible, emit
+    requestCount: () => requestCount, advanceNextTimer, setVisible, emit, flushMicrotasks
   };
 }
 
-test("heartbeat runs in foreground at 30s and retries a failed probe with bounded 3s backoff", async () => {
+test("either a healthy Auth or Data API route keeps the app online; one failed probe is tolerated", async () => {
   const h = createHarness([
+    { ok: false, status: 503 },
     { ok: true, status: 200 },
+    { ok: false, status: 503 },
     new TypeError("Failed to fetch"),
+    { ok: true, status: 200 },
     { ok: true, status: 200 }
   ]);
 
   assert.equal(await h.advanceNextTimer(), 0);
-  assert.equal(h.requestCount(), 1);
+  assert.equal(h.requestCount(), 2, "The probe checks Auth and Data API in parallel.");
   assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "response_ok");
+  assert.equal(h.window.__BC_BACKEND_PROBE__.service, "data-api");
+  assert.equal(h.window.__TEST_CONNECTIVITY__, "online");
   assert.equal([...h.timers.values()][0].delay, 30000);
 
   assert.equal(await h.advanceNextTimer(), 30000);
-  assert.equal(h.requestCount(), 2);
-  assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "network_error");
+  assert.equal(h.requestCount(), 4);
+  assert.equal(h.window.__BC_BACKEND_PROBE__.status, "degraded");
+  assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "server_http_error");
+  assert.equal(h.window.__BC_BACKEND_PROBE__.consecutiveFailures, 1);
+  assert.equal(h.window.__TEST_CONNECTIVITY__, "online", "One isolated failed probe must not flip the app offline.");
   assert.equal([...h.timers.values()][0].delay, 3000);
 
   assert.equal(await h.advanceNextTimer(), 3000);
-  assert.equal(h.requestCount(), 3);
+  assert.equal(h.requestCount(), 6);
   assert.equal(h.window.__BC_BACKEND_PROBE__.status, "online");
   assert.equal(h.window.__BC_BACKEND_RECOVERY_PENDING__, false);
   assert.ok(h.diagnosticEvents.includes("bc:backend-reconnected"));
 });
 
-test("heartbeat stops when hidden and resumes with an immediate real probe", async () => {
+test("heartbeat stops when hidden and resumes with an immediate two-route probe", async () => {
   const h = createHarness([
-    { ok: true, status: 200 },
-    { ok: true, status: 200 }
+    { ok: true, status: 200 }, { ok: true, status: 200 },
+    { ok: true, status: 200 }, { ok: true, status: 200 }
   ]);
   h.setVisible(false);
   assert.equal(h.timers.size, 0, "No background polling timer should survive visibility:hidden.");
@@ -136,27 +144,34 @@ test("heartbeat stops when hidden and resumes with an immediate real probe", asy
   h.setVisible(true);
   assert.equal([...h.timers.values()][0].delay, 0, "Resume should trigger an immediate probe.");
   await h.advanceNextTimer();
-  assert.equal(h.requestCount(), 1);
+  assert.equal(h.requestCount(), 2);
   assert.equal([...h.timers.values()][0].delay, 30000);
 
   h.setVisible(false);
   assert.equal(h.timers.size, 0, "Hiding the PWA cancels its foreground heartbeat.");
   h.setVisible(true);
   await h.advanceNextTimer();
-  assert.equal(h.requestCount(), 2);
+  assert.equal(h.requestCount(), 4);
 });
 
-test("concurrent manual and automatic probes share one HTTP request", async () => {
-  let finishRequest;
+test("concurrent manual and automatic probes share one pair of HTTP requests", async () => {
   const h = createHarness([
-    () => new Promise((resolve) => { finishRequest = resolve; })
+    { ok: true, status: 200 }, { ok: true, status: 200 }
   ]);
   const first = h.window.sondearBackend();
   const second = h.window.sondearBackend();
-  assert.equal(h.requestCount(), 1, "Single-flight guard must prevent parallel HTTP probes.");
-  finishRequest({ ok: true, status: 200 });
+  await h.flushMicrotasks();
+  assert.equal(h.requestCount(), 2, "Single-flight guard shares one dual-route probe, not four requests.");
   assert.equal(await first, true);
   assert.equal(await second, true);
+});
+
+test("a known offline device fails immediately without issuing a probe", async () => {
+  const h = createHarness([], { online: false });
+  assert.equal(await h.window.sondearBackend(), false);
+  assert.equal(h.requestCount(), 0);
+  assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "device_offline");
+  assert.equal(h.window.__TEST_CONNECTIVITY__, "offline");
 });
 
 test("monitor documents foreground/background limits and queue recovery gating", () => {
@@ -167,7 +182,9 @@ test("monitor documents foreground/background limits and queue recovery gating",
   assert.match(source, /visibilitychange/);
   assert.match(source, /pageshow/);
   assert.match(source, /bc:backend-reconnected/);
+  assert.match(source, /PROBE_TIMEOUT_MS = 12000/);
+  assert.match(source, /controller\.abort\(\)/);
   assert.match(offline, /if \(!backendDisponible\)/);
   assert.match(offline, /recuperarColaTrasRespuestaConfirmada/);
-  assert.match(config, /Vigilancia automática/);
+  assert.match(config, /Vigilancia:/);
 });

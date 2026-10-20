@@ -90,16 +90,24 @@ test('navegación: guardia final garantiza botón Configuración aunque otra cap
   assert.match(guard, /MutationObserver/);
 });
 
-test('configuración: contiene el antiguo panel Ajustes con sus opciones principales', () => {
+test('preferencias y conectividad están separadas; Configuración no vuelve a alojar Ajustes', () => {
   const src = read('public/js/configuracion-ajustes-migrados-20260903.js');
+  const loader = read('public/js/configuracion.js');
+  const index = read('public/index.html');
   for (const token of [
-    'Ajustes básicos','Actualizar app / borrar caché','Modo oscuro','Modo claro',
-    'Actualización automática','Sincronización automática','Sincronizar al abrir app',
-    'Sincronizar solo en Wi‑Fi','Región / Conexión','Notificaciones','Modo compacto',
-    'Cambiar contraseña','Administrador de datos','Restaurar ajustes','Cerrar sesión',
+    'Preferencias personales','Modo oscuro','Modo claro',
+    'Actualización automática','Sincronización automática',
+    'Sincronizar al abrir app','Sincronizar solo en Wi‑Fi',
+    'Notificaciones','Modo compacto','Restaurar preferencias',
     'bc-ui-preferences-v2'
-  ]) assert.match(src, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
-  assert.match(src, /update-app-btn/);
-  assert.match(src, /change-pass-btn/);
-  assert.match(src, /logout-btn/);
+  ]) assert.ok(src.includes(token), `falta preferencia: ${token}`);
+  assert.match(src, /getElementById\("tab-preferencias"\)/);
+  assert.doesNotMatch(src, /Ajustes básicos|Región \/ Conexión|Cambiar contraseña|Administrador de datos|Cerrar sesión|Actualizar app \/ borrar caché|change-pass-btn|update-app-btn|logout-btn/);
+  assert.match(loader, /getElementById\("tab-conectividad"\)/);
+  assert.match(loader, /cfg-actualizar-app/);
+  assert.match(loader, /cfg-refrescar-diag/);
+  assert.match(index, /id="tab-preferencias"/);
+  assert.match(index, /id="tab-conectividad"/);
+  assert.match(index, /id="tab-config"/);
+  assert.doesNotMatch(index, /id="ajustes-btn"|id="ajustes-menu"|id="change-pass-btn"|id="update-app-btn"/);
 });

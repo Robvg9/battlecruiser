@@ -222,13 +222,24 @@
     var config = document.getElementById('tab-config');
     if (config) {
       config.querySelectorAll('h3').forEach(function (el) {
-        if (/Roles y permisos/i.test(el.textContent || '')) {
-          var bloque = el.closest('.cc-bloque');
-          if (bloque && !bloque.querySelector('#lista-categorias') && !bloque.querySelector('#form-categoria')) {
-            if (!bloque.contains(form) && !bloque.contains(lista)) bloque.style.display = 'none';
-            else el.remove();
-          } else el.remove();
+        if (!/Roles y permisos/i.test(el.textContent || '')) return;
+        var bloque = el.closest('.cc-bloque');
+        if (!bloque || bloque.querySelector('#lista-categorias') || bloque.querySelector('#form-categoria')) return;
+
+        // Roles stays discoverable under Configuración, while its existing form/list
+        // remain in the single established modal to avoid duplicate IDs or handlers.
+        bloque.style.display = '';
+        bloque.removeAttribute('aria-hidden');
+        var entry = document.getElementById('bc-btn-config-roles');
+        if (!entry) {
+          entry = document.createElement('button');
+          entry.type = 'button';
+          entry.id = 'bc-btn-config-roles';
+          entry.className = 'cc-accion ud-btn-secondary';
+          entry.textContent = 'Administrar roles y permisos';
+          entry.addEventListener('click', openRolesModal);
         }
+        if (entry.parentElement !== bloque) bloque.appendChild(entry);
       });
     }
     var legacy = document.getElementById('bc-roles-en-usuarios');

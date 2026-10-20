@@ -98,6 +98,8 @@ safeInit("tabs", function () {
         infoEl.textContent = "Sesión: " + (_usuarioActual.nombre || "") + (_usuarioActual.rol ? " · " + _usuarioActual.rol : "");
       }
       if (typeof refrescarUsuarios === "function") refrescarUsuarios();
+    } else if (t === "conectividad") {
+      if (typeof renderDiagnosticoConfig === "function") renderDiagnosticoConfig();
     } else if (t === "config") {
       if (typeof refrescarRolesAdmin === "function") refrescarRolesAdmin();
       if (typeof refrescarConfiguracion === "function") refrescarConfiguracion();

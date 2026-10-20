@@ -251,14 +251,19 @@
     } catch (e) {}
   }
 
-  function registrarDiagnosticoSondeo(status, reason, startedAt) {
-    // Only safe categories and timing are exposed; never record credentials, tokens, URLs, or user data.
-    window.__BC_BACKEND_PROBE__ = {
+  function registrarDiagnosticoSondeo(status, reason, startedAt, extra) {
+    // Safe diagnostics only: service label, HTTP status and timings. Never store keys or tokens.
+    var probe = {
       status: status,
       reason: reason,
       checkedAt: new Date().toISOString(),
       durationMs: Math.max(0, Date.now() - startedAt)
     };
+    if (extra && typeof extra.service === "string") probe.service = extra.service;
+    if (extra && typeof extra.httpStatus === "number") probe.httpStatus = extra.httpStatus;
+    if (extra && typeof extra.consecutiveFailures === "number") probe.consecutiveFailures = extra.consecutiveFailures;
+    if (extra && typeof extra.attemptedServices === "string") probe.attemptedServices = extra.attemptedServices;
+    window.__BC_BACKEND_PROBE__ = probe;
     if (status !== "online") window.__BC_BACKEND_RECOVERY_PENDING__ = true;
   }
 
@@ -269,68 +274,141 @@
       window.dispatchEvent(new Event("bc:backend-reconnected"));
       window.__BC_BACKEND_RECOVERY_PENDING__ = false;
     } catch (e) {
-      // Keep the recovery flag set so the next confirmed probe can retry the notification.
+      // Retry the notification after the next confirmed 2xx response.
     }
   }
 
-  // All callers share one real probe. This prevents the heartbeat, resume handlers,
-  // reconnection events and manual diagnostic button from firing parallel requests.
   var sondeoBackendEnCurso = null;
+  var fallosSondeoSeguidos = 0;
+  var PROBE_TIMEOUT_MS = 12000;
+
+  function sondearRuta(service, url, apiKey, controllers) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var controller = null;
+      try {
+        if (typeof AbortController === "function") {
+          controller = new AbortController();
+          controllers.push({
+            signal: controller.signal,
+            abort: function () {
+              if (!settled) {
+                settled = true;
+                window.clearTimeout(timer);
+                var cancelled = new Error("BACKEND_PROBE_CANCELLED");
+                cancelled.service = service;
+                reject(cancelled);
+              }
+              try { controller.abort(); } catch (e) {}
+            }
+          });
+        }
+      } catch (e) { controller = null; }
+
+      var timer = window.setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        if (controller) { try { controller.abort(); } catch (e) {} }
+        var timeoutError = crearErrorTimeout("sondearBackend:" + service);
+        timeoutError.service = service;
+        reject(timeoutError);
+      }, PROBE_TIMEOUT_MS);
+
+      function rejectOnce(error) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        if (controller) { try { controller.abort(); } catch (e) {} }
+        if (error && typeof error === "object") error.service = service;
+        reject(error instanceof Error ? error : new Error("BACKEND_PROBE_ERROR"));
+      }
+
+      var init = { method: "GET", headers: { apikey: apiKey, Accept: "application/json" }, cache: "no-store" };
+      if (controller) init.signal = controller.signal;
+      Promise.resolve().then(function () { return fetch(url, init); }).then(function (response) {
+        if (settled) return;
+        if (!response || typeof response.ok !== "boolean") {
+          rejectOnce(new Error("BACKEND_PROBE_INVALID_RESPONSE"));
+          return;
+        }
+        if (!response.ok) {
+          var httpError = new Error("BACKEND_PROBE_HTTP");
+          httpError.httpStatus = typeof response.status === "number" ? response.status : 0;
+          rejectOnce(httpError);
+          return;
+        }
+        settled = true;
+        window.clearTimeout(timer);
+        resolve({ service: service, response: response });
+      }).catch(function (error) {
+        rejectOnce(error);
+      });
+    });
+  }
+
+  // Either route's 2xx response proves reachability. A slow Auth endpoint will not
+  // mask a healthy Data API (and vice versa). Queue replay still needs confirmed 2xx.
   if (typeof window.sondearBackend === "function" && !window.sondearBackend.__bcF1Timed) {
     window.sondearBackend = function sondearBackendProtegido() {
       if (sondeoBackendEnCurso) return sondeoBackendEnCurso;
       var request = (async function () {
         var startedAt = Date.now();
         if (!navigator.onLine) {
+          fallosSondeoSeguidos = 0;
           registrarDiagnosticoSondeo("offline", "device_offline", startedAt);
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
+
+        var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\/+$/, "") : "";
+        var apiKey = typeof SUPABASE_ANON_KEY === "string" ? SUPABASE_ANON_KEY : "";
+        if (!baseUrl || !apiKey || typeof fetch !== "function") {
+          registrarDiagnosticoSondeo("offline", "probe_config_missing", startedAt);
+          if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+          return false;
+        }
+
+        var controllers = [];
         try {
-          // Probe Supabase Auth directly; getUser() may fail locally without an HTTP request.
-          var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\/+$/, "") : "";
-          var apiKey = typeof SUPABASE_ANON_KEY === "string" ? SUPABASE_ANON_KEY : "";
-          if (!baseUrl || !apiKey || typeof fetch !== "function") {
-            registrarDiagnosticoSondeo("offline", "probe_config_missing", startedAt);
-            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-            return false;
-          }
-          var response = await withNetworkTimeout(function () {
-            return fetch(baseUrl + "/auth/v1/health", {
-              method: "GET",
-              headers: { apikey: apiKey },
-              cache: "no-store"
-            });
-          }, Math.min(NETWORK_TIMEOUT_MS, 8000), "sondearBackend");
-          if (!response || typeof response.ok !== "boolean") throw new Error("BACKEND_PROBE_INVALID_RESPONSE");
-          if (!response.ok) {
-            registrarDiagnosticoSondeo("offline", "server_http_error", startedAt);
-            if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
-              window.__BC_BACKEND_PROBE__.httpStatus = response.status;
-            }
-            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-            return false;
-          }
-          registrarDiagnosticoSondeo("online", "response_ok", startedAt);
-          if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
-            window.__BC_BACKEND_PROBE__.httpStatus = response.status;
-          }
+          var success = await Promise.any([
+            sondearRuta("auth", baseUrl + "/auth/v1/health", apiKey, controllers),
+            sondearRuta("data-api", baseUrl + "/rest/v1/", apiKey, controllers)
+          ]);
+          controllers.forEach(function (controller) {
+            try { if (!controller.signal.aborted) controller.abort(); } catch (e) {}
+          });
+          fallosSondeoSeguidos = 0;
+          registrarDiagnosticoSondeo("online", "response_ok", startedAt, {
+            service: success.service,
+            httpStatus: typeof success.response.status === "number" ? success.response.status : 0,
+            attemptedServices: "auth+data-api"
+          });
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
           emitirRecuperacionBackendSiPendiente();
           return true;
-        } catch (e) {
-          if (esErrorTimeout(e)) {
-            registrarDiagnosticoSondeo("offline", "timeout", startedAt);
-            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-            return false;
+        } catch (error) {
+          controllers.forEach(function (controller) {
+            try { if (!controller.signal.aborted) controller.abort(); } catch (e) {}
+          });
+          var errors = error && Array.isArray(error.errors) ? error.errors : [error];
+          var httpError = errors.find(function (item) { return item && typeof item.httpStatus === "number"; });
+          var timedOut = errors.some(function (item) { return esErrorTimeout(item); });
+          var networkError = errors.some(function (item) {
+            try { return !!(window.esErrorDeRed && window.esErrorDeRed(item)); } catch (e) { return false; }
+          });
+          var reason = httpError ? "server_http_error" : timedOut ? "timeout" : networkError ? "network_error" : "probe_error";
+          fallosSondeoSeguidos += 1;
+          registrarDiagnosticoSondeo("degraded", reason, startedAt, {
+            service: httpError && httpError.service ? httpError.service : undefined,
+            httpStatus: httpError && typeof httpError.httpStatus === "number" && httpError.httpStatus > 0 ? httpError.httpStatus : undefined,
+            consecutiveFailures: fallosSondeoSeguidos,
+            attemptedServices: "auth+data-api"
+          });
+          // Ignore one missed probe while online; the watchdog retries quickly.
+          // Two consecutive failures are required before marking the backend offline.
+          if (fallosSondeoSeguidos >= 2 && typeof marcarConectividadReal === "function") {
+            marcarConectividadReal("offline");
           }
-          if (window.esErrorDeRed(e)) {
-            registrarDiagnosticoSondeo("offline", "network_error", startedAt);
-            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-            return false;
-          }
-          registrarDiagnosticoSondeo("offline", "probe_error", startedAt);
-          if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
       })();
@@ -361,9 +439,11 @@
     }
     function renderVisibleDiagnostic() {
       try {
-        var tab = typeof document.getElementById === "function" ? document.getElementById("tab-config") : null;
-        if (isVisible() && tab && tab.classList && tab.classList.contains("visible") &&
-            typeof renderDiagnosticoConfig === "function") renderDiagnosticoConfig();
+        var configTab = typeof document.getElementById === "function" ? document.getElementById("tab-config") : null;
+        var connectivityTab = typeof document.getElementById === "function" ? document.getElementById("tab-conectividad") : null;
+        var active = (configTab && configTab.classList && configTab.classList.contains("visible")) ||
+          (connectivityTab && connectivityTab.classList && connectivityTab.classList.contains("visible"));
+        if (isVisible() && active && typeof renderDiagnosticoConfig === "function") renderDiagnosticoConfig();
       } catch (e) {}
     }
     function scheduleProbe(ms) {

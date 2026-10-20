@@ -71,35 +71,40 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.4["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.4["']/);
+  assert.match(app, /const VERSION=["']9\.5\.5["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.5["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261016\.7"\]/);
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
-  assert.match(app, /\["ui-ajustes-panel\.js","96\.2"\]/);
-  assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.3"\]/);
-  assert.match(app, /\["mi-cuenta\.js","1\.1"\]/);
+  assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
+  assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
+  assert.match(app, /\["configuracion\.js","20261020\.4"\]/, "connectivity module must bypass stale cached settings");
+  assert.match(index, /<script src="js\/navegacion\.js\?v=20261020\.4"><\/script>/, "new navigation sections need a cache-busted script");
+  assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.4"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.5"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
-  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.3"><\/script>/);
-  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/);
-  assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.3"><\/script>/);
-  assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.3/);
+  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
+  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
+  assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
+  assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.4 — Android connection watchdog/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.4"><\/script>/);
-  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.1/);
-  assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.3/);
+  assert.match(app, /v9\.5\.5 — resilient network probes and separated settings/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.5"><\/script>/);
+  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
+  assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
   const config = fs.readFileSync('public/js/configuracion.js', 'utf8');
   assert.match(networkCore, /window\.__BC_BACKEND_PROBE__/);
-  assert.match(networkCore, /registrarDiagnosticoSondeo\("offline", "timeout"/);
+  assert.match(networkCore, /registrarDiagnosticoSondeo\("degraded", reason/);
+  assert.ok(networkCore.includes('baseUrl + "/rest/v1/"'), "Data API is the second real probe route");
+  assert.match(networkCore, /PROBE_TIMEOUT_MS = 12000/);
+  assert.match(networkCore, /fallosSondeoSeguidos >= 2/, "one isolated probe failure must not flip the app offline");
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.4['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.5['"]\);/);
 });

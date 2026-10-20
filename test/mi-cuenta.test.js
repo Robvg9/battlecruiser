@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
 
 test("Mi Cuenta muestra nombre, rol y estado del contexto sin revelar secretos", () => {
-  const dom = new JSDOM('<!doctype html><html><head></head><body><button id="mi-cuenta-btn" type="button" aria-expanded="false">Mi Cuenta</button><button id="change-pass-btn" type="button">Cambiar contraseña</button><div id="pass-panel" class="hidden"></div></body></html>', { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const dom = new JSDOM('<!doctype html><html><head></head><body><button id="mi-cuenta-btn" type="button" aria-expanded="false">Mi Cuenta</button><div id="pass-panel" class="hidden"></div></body></html>', { runScripts: "outside-only", url: "https://battlecruiser.test/" });
   try {
     const doc = dom.window.document;
     Object.defineProperty(doc, "readyState", { configurable: true, value: "complete" });
@@ -22,8 +22,6 @@ test("Mi Cuenta muestra nombre, rol y estado del contexto sin revelar secretos",
       access_token: "TEST_ACCESS_SECRET",
       refresh_token: "TEST_REFRESH_SECRET"
     };
-    let passwordActionCount = 0;
-    doc.getElementById("change-pass-btn").addEventListener("click", () => passwordActionCount++);
 
     dom.window.eval(read("public/js/mi-cuenta.js"));
     const button = doc.getElementById("mi-cuenta-btn");
@@ -39,7 +37,7 @@ test("Mi Cuenta muestra nombre, rol y estado del contexto sin revelar secretos",
     assert.equal(button.getAttribute("aria-expanded"), "true");
 
     doc.getElementById("bc-account-password").click();
-    assert.equal(passwordActionCount, 1);
+    assert.ok(!doc.getElementById("pass-panel").classList.contains("hidden"));
     assert.ok(modal.classList.contains("hidden"));
     assert.equal(button.getAttribute("aria-expanded"), "false");
 
@@ -69,10 +67,10 @@ test("Mi Cuenta is wired into the PWA header and mobile layout", () => {
   const app = read("public/app.js");
   const index = read("public/index.html");
   const css = read("public/style.css");
-  assert.ok(app.includes('["mi-cuenta.js","1.1"]'), "Mi Cuenta module must be listed at the current version");
+  assert.ok(app.includes('["mi-cuenta.js","1.2"]'), "Mi Cuenta module must be listed at the current version");
   assert.ok(index.includes('id="mi-cuenta-btn"'), "header must expose Mi Cuenta");
-  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.1"><\/script>/, "Mi Cuenta must bind directly from the shell, not depend on the slow dynamic loader");
-  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.3"><\/script>/, "critical Configuración scroll fix must load directly from the shell");
+  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/, "Mi Cuenta must bind directly from the shell, not depend on the slow dynamic loader");
+  assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/, "critical Configuración scroll fix must load directly from the shell");
   assert.ok(css.includes('"account settings"'), "mobile header must allocate space to Mi Cuenta");
   assert.ok(css.includes(".bc-account-overlay.hidden { display: none !important; }"), "hidden account modal must stay hidden");
 });
