@@ -28,7 +28,8 @@ test("the legacy header Ajustes dropdown and duplicate drawer are not rendered",
   assert.doesNotMatch(index, /id="ajustes-btn"|id="ajustes-menu"|id="change-pass-btn"|id="update-app-btn"/);
   assert.doesNotMatch(app, /ui-ajustes-panel\.js/);
   assert.doesNotMatch(preferences, /Ajustes básicos|Región \/ Conexión|cfg-aj-pass|cfg-aj-data|cfg-aj-update|cfg-aj-logout/);
-  assert.doesNotMatch(scrollFix, /trigger\.click\(\)|tab\.appendChild\(panel\)|bc-aj-panel/);
+  assert.doesNotMatch(scrollFix, /trigger\.click\(\)|tab\.appendChild\(panel\)/);
+  assert.match(scrollFix, /legacyPanel\.parentNode\.removeChild\(legacyPanel\)/, "stale cached drawer is actively removed");
 });
 
 test("account and logout actions remain in appropriate locations", () => {
