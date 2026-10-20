@@ -572,3 +572,31 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   .bc-account-card { padding: 17px; }
   .bc-account-title { font-size: 21px; }
 }
+
+/* Android regression guard: Configuración must remain document-scrollable even if a legacy drawer re-adds its lock. */
+@media (max-width: 759px) {
+  body.bc-config-scroll-unlocked {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    touch-action: pan-y;
+  }
+  body.bc-config-scroll-unlocked #app-shell.visible {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  body.bc-config-scroll-unlocked #app-shell.visible > main.main-content,
+  body.bc-config-scroll-unlocked #tab-config.visible,
+  body.bc-config-scroll-unlocked #tab-config #bc-aj-panel,
+  body.bc-config-scroll-unlocked #tab-config #bc-aj-panel .bc-aj-body {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    touch-action: pan-y;
+  }
+}
