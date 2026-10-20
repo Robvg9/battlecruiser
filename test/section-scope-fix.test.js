@@ -81,9 +81,9 @@ test('section guard isolates every real first-level PWA panel despite stale inli
 
 test('release loader places the section guard after legacy UI modules and invalidates the PWA shell', () => {
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
-  assert.ok(app.indexOf('["hotfix-secciones-visibles-20260903.js","20261016.7"]') <
+  assert.ok(app.indexOf('["hotfix-secciones-visibles-20260903.js","20261020.5"]') <
     app.indexOf('["section-scope-fix.js","20261016.1"]'),
     'the section guard must execute after the legacy visibility hotfix');
-  assert.match(app, /const VERSION=["']9\.5\.6["']/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.6"><\/script>/);
+  assert.match(app, /const VERSION=["']9\.5\.7["']/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.7"><\/script>/);
 });
