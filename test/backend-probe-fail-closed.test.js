@@ -96,6 +96,15 @@ test("navigator offline is reported distinctly without making a network request"
   assert.deepEqual(probe.connectivity, ["offline"]);
 });
 
+test("configuration shows health probe failures without mislabeling HTTP responses", () => {
+  const configSource = fs.readFileSync(path.join(__dirname, "..", "public", "js", "configuracion.js"), "utf8");
+  assert.match(configSource, /probe\.reason === "server_http_error" \? "Respuesta HTTP no válida"/);
+  assert.match(configSource, /probe\.reason === "probe_config_missing" \? "Sondeo sin configuración"/);
+  assert.match(configSource, /probe\.reason === "probe_error" \? "Error de sondeo"/);
+  assert.match(configSource, /probe\.httpStatus/);
+  assert.match(configSource, /Diagnóstico sanitizado; no incluye credenciales ni tokens/);
+});
+
 test("missing public endpoint configuration fails closed", async () => {
   let called = false;
   const probe = createProbe(async function () {
