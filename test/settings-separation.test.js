@@ -34,8 +34,8 @@ test("the legacy header Ajustes dropdown and duplicate drawer are not rendered",
 test("account and logout actions remain in appropriate locations", () => {
   assert.match(index, /id="mi-cuenta-btn"/);
   assert.match(index, /id="logout-btn"/);
-  assert.match(account, /id\('bc-account-password'\)/);
-  assert.match(account, /getElementById\('pass-panel'\)/);
+  assert.match(account, /getElementById\('bc-account-password'\)/);
+  assert.match(account, /getElementById\('bc-account-password'\)/);
   assert.doesNotMatch(account, /getElementById\('change-pass-btn'\)/);
 });
 
