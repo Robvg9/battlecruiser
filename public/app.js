@@ -16,7 +16,7 @@
   const modules=[
     ["turno-api.js","9.4.6"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.2"],
     ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.2"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
-    ["configuracion.js",null],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
+    ["configuracion.js","20261020.4"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.31"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.1"],["roles-en-usuarios.js","33.2"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.2"],["ui-operaciones-hub.js","41.1"],
     ["alta-usuario-sin-email.js","46.1"],["m22-sesiones-en-m21.js","25.4"],["m22-fe-patches-m21.js","22.1"],
