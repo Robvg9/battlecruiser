@@ -118,6 +118,8 @@ function esErrorDeRed(error) {
 let _conectividadReal = null; // null = todavía no se resolvió ninguna consulta real esta sesión
 
 function marcarConectividadReal(estado) {
+  // Any observed failure schedules queue recovery after the next confirmed backend response.
+  if (estado !== "online") window.__BC_BACKEND_RECOVERY_PENDING__ = true;
   if (_conectividadReal === estado) return;
   _conectividadReal = estado;
   actualizarIndicadorConexion();
@@ -1522,23 +1524,39 @@ async function marcarTituloUltimaActualizacion(nodos) {
 }
 
 safeInit("estado-conexion", () => {
+  var recuperacionBackendEnCurso = null;
+  function recuperarColaTrasRespuestaConfirmada() {
+    if (recuperacionBackendEnCurso) return recuperacionBackendEnCurso;
+    var tarea = (async function () {
+      await recuperarOperacionesAtrapadas();
+      await sincronizarCola();
+      if (appShell.classList.contains("visible")) await refrescarTrasReconexion();
+      else actualizarIndicadorConexion();
+      return true;
+    })();
+    var compartida = tarea.finally(function () {
+      if (recuperacionBackendEnCurso === compartida) recuperacionBackendEnCurso = null;
+    });
+    recuperacionBackendEnCurso = compartida;
+    return compartida;
+  }
   async function alReconectar() {
-    // Sondeo real + recuperar operaciones atrapadas en SINCRONIZANDO
-    // (p.ej. error de red a mitad de sincronizacion) antes de sincronizar.
-    await sondearBackend();
-    await recuperarOperacionesAtrapadas();
-    await sincronizarCola();
-    if (appShell.classList.contains("visible")) {
-      await refrescarTrasReconexion();
-    } else {
-      actualizarIndicadorConexion();
+    // navigator.onLine is only a hint: require a real Auth HTTP response before queue sync.
+    var backendDisponible = await sondearBackend();
+    if (!backendDisponible) { actualizarIndicadorConexion(); return false; }
+    return recuperarColaTrasRespuestaConfirmada();
+  }
+  // Recovery also works when Android resumes without emitting the browser "online" event.
+  window.addEventListener("bc:backend-reconnected", function () {
+    if (window.__BC_BACKEND_PROBE__ && window.__BC_BACKEND_PROBE__.status === "online") {
+      recuperarColaTrasRespuestaConfirmada().catch(function () { actualizarIndicadorConexion(); });
     }
-  }
-  window.addEventListener("online", alReconectar);
+  });
+  window.addEventListener("online", function () {
+    alReconectar().catch(function () { actualizarIndicadorConexion(); });
+  });
   window.addEventListener("offline", () => marcarConectividadReal("offline"));
-  // Al iniciar: si el dispositivo reporta online, sondear de verdad.
-  if (navigator.onLine) {
-    sondearBackend();
-  }
+  // At boot, verify reachability before reconciling queued work and refreshing live data.
+  if (navigator.onLine) sondearBackend().catch(function () { actualizarIndicadorConexion(); });
   actualizarIndicadorConexion();
-});
+});;

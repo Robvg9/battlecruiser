@@ -99,14 +99,14 @@ test('install precaches the document shell and essential static assets', async (
   for (const asset of [
     '/', '/index.html', '/app.js', '/style.css',
     '/manifest.json', '/favicon.png', '/icons/icon-192x192.png', '/icons/icon-512x512.png',
-    '/js/mi-cuenta.js', '/js/hotfix-configuracion-20260902.js'
+    '/js/mi-cuenta.js', '/js/offline.js', '/js/hotfix-configuracion-20260902.js'
   ]) {
     assert.ok(worker.precacheRequests.includes(asset), 'missing precache entry: ' + asset);
   }
   for (const asset of ['/', '/index.html', '/app.js', '/style.css']) {
     assert.ok(worker.entries.has(new URL(asset, ORIGIN).href), 'shell asset was not cached: ' + asset);
   }
-  for (const asset of ['/js/mi-cuenta.js?v=1.1', '/js/hotfix-configuracion-20260902.js?v=20261020.2']) {
+  for (const asset of ['/js/mi-cuenta.js?v=1.1', '/js/hotfix-configuracion-20260902.js?v=20261020.3']) {
     assert.ok(worker.entries.has(new URL(asset, ORIGIN).href), 'critical Android module was not cached: ' + asset);
   }
 });

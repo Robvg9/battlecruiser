@@ -259,76 +259,166 @@
       checkedAt: new Date().toISOString(),
       durationMs: Math.max(0, Date.now() - startedAt)
     };
+    if (status !== "online") window.__BC_BACKEND_RECOVERY_PENDING__ = true;
   }
 
+  function emitirRecuperacionBackendSiPendiente() {
+    if (!window.__BC_BACKEND_RECOVERY_PENDING__) return;
+    if (typeof window.dispatchEvent !== "function" || typeof Event !== "function") return;
+    try {
+      window.dispatchEvent(new Event("bc:backend-reconnected"));
+      window.__BC_BACKEND_RECOVERY_PENDING__ = false;
+    } catch (e) {
+      // Keep the recovery flag set so the next confirmed probe can retry the notification.
+    }
+  }
+
+  // All callers share one real probe. This prevents the heartbeat, resume handlers,
+  // reconnection events and manual diagnostic button from firing parallel requests.
+  var sondeoBackendEnCurso = null;
   if (typeof window.sondearBackend === "function" && !window.sondearBackend.__bcF1Timed) {
-    window.sondearBackend = async function () {
-      var startedAt = Date.now();
-      if (!navigator.onLine) {
-        registrarDiagnosticoSondeo("offline", "device_offline", startedAt);
-        if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-        return false;
-      }
-      try {
-        // Probe the Auth health endpoint directly. auth.getUser() can return
-        // AuthSessionMissingError locally when no session exists, without any HTTP request.
-        var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\/+$/, "") : "";
-        var apiKey = typeof SUPABASE_ANON_KEY === "string" ? SUPABASE_ANON_KEY : "";
-        if (!baseUrl || !apiKey || typeof fetch !== "function") {
-          registrarDiagnosticoSondeo("offline", "probe_config_missing", startedAt);
+    window.sondearBackend = function sondearBackendProtegido() {
+      if (sondeoBackendEnCurso) return sondeoBackendEnCurso;
+      var request = (async function () {
+        var startedAt = Date.now();
+        if (!navigator.onLine) {
+          registrarDiagnosticoSondeo("offline", "device_offline", startedAt);
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
-        var response = await withNetworkTimeout(
-          function () {
+        try {
+          // Probe Supabase Auth directly; getUser() may fail locally without an HTTP request.
+          var baseUrl = typeof SUPABASE_URL === "string" ? SUPABASE_URL.replace(/\/+$/, "") : "";
+          var apiKey = typeof SUPABASE_ANON_KEY === "string" ? SUPABASE_ANON_KEY : "";
+          if (!baseUrl || !apiKey || typeof fetch !== "function") {
+            registrarDiagnosticoSondeo("offline", "probe_config_missing", startedAt);
+            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+            return false;
+          }
+          var response = await withNetworkTimeout(function () {
             return fetch(baseUrl + "/auth/v1/health", {
               method: "GET",
               headers: { apikey: apiKey },
               cache: "no-store"
             });
-          },
-          Math.min(NETWORK_TIMEOUT_MS, 8000),
-          "sondearBackend"
-        );
-        if (!response || typeof response.ok !== "boolean") {
-          throw new Error("BACKEND_PROBE_INVALID_RESPONSE");
-        }
-        if (!response.ok) {
-          registrarDiagnosticoSondeo("offline", "server_http_error", startedAt);
+          }, Math.min(NETWORK_TIMEOUT_MS, 8000), "sondearBackend");
+          if (!response || typeof response.ok !== "boolean") throw new Error("BACKEND_PROBE_INVALID_RESPONSE");
+          if (!response.ok) {
+            registrarDiagnosticoSondeo("offline", "server_http_error", startedAt);
+            if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
+              window.__BC_BACKEND_PROBE__.httpStatus = response.status;
+            }
+            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+            return false;
+          }
+          registrarDiagnosticoSondeo("online", "response_ok", startedAt);
           if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
             window.__BC_BACKEND_PROBE__.httpStatus = response.status;
           }
+          if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+          emitirRecuperacionBackendSiPendiente();
+          return true;
+        } catch (e) {
+          if (esErrorTimeout(e)) {
+            registrarDiagnosticoSondeo("offline", "timeout", startedAt);
+            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+            return false;
+          }
+          if (window.esErrorDeRed(e)) {
+            registrarDiagnosticoSondeo("offline", "network_error", startedAt);
+            if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+            return false;
+          }
+          registrarDiagnosticoSondeo("offline", "probe_error", startedAt);
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
           return false;
         }
-        registrarDiagnosticoSondeo("online", "response_ok", startedAt);
-        if (typeof response.status === "number" && response.status >= 100 && response.status <= 599) {
-          window.__BC_BACKEND_PROBE__.httpStatus = response.status;
-        }
-        if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
-        return true;
-      } catch (e) {
-        if (esErrorTimeout(e)) {
-          registrarDiagnosticoSondeo("offline", "timeout", startedAt);
-          if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-          return false;
-        }
-        if (window.esErrorDeRed(e)) {
-          registrarDiagnosticoSondeo("offline", "network_error", startedAt);
-          if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-          return false;
-        }
-        // An unexpected fetch/runtime exception is not proof that the server responded.
-        registrarDiagnosticoSondeo("offline", "probe_error", startedAt);
-        if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
-        return false;
-      }
+      })();
+      var shared = request.finally(function () {
+        if (sondeoBackendEnCurso === shared) sondeoBackendEnCurso = null;
+      });
+      sondeoBackendEnCurso = shared;
+      return shared;
     };
     window.sondearBackend.__bcF1Timed = true;
-    try {
-      sondearBackend = window.sondearBackend;
-    } catch (e) {}
+    try { sondearBackend = window.sondearBackend; } catch (e) {}
   }
+
+  // Android may suspend a PWA in the background, so no browser timer can promise a permanent socket.
+  // Probe on resume, monitor every 30s while visible, and retry failures with bounded backoff.
+  function iniciarVigilanciaConectividad() {
+    if (window.__BC_CONNECTIVITY_WATCHDOG_INSTALLED__) return;
+    if (typeof document === "undefined" || typeof document.addEventListener !== "function") return;
+    if (typeof window.addEventListener !== "function" || typeof window.setTimeout !== "function") return;
+    if (typeof window.sondearBackend !== "function") return;
+    window.__BC_CONNECTIVITY_WATCHDOG_INSTALLED__ = true;
+    var timer = null, failures = 0, checking = false;
+    var POLL_INTERVAL_MS = 30000, FIRST_RETRY_MS = 3000, MAX_RETRY_MS = 30000;
+
+    function isVisible() { return document.hidden !== true && document.visibilityState !== "hidden"; }
+    function clearScheduledProbe() {
+      if (timer !== null) { window.clearTimeout(timer); timer = null; }
+    }
+    function renderVisibleDiagnostic() {
+      try {
+        var tab = typeof document.getElementById === "function" ? document.getElementById("tab-config") : null;
+        if (isVisible() && tab && tab.classList && tab.classList.contains("visible") &&
+            typeof renderDiagnosticoConfig === "function") renderDiagnosticoConfig();
+      } catch (e) {}
+    }
+    function scheduleProbe(ms) {
+      clearScheduledProbe();
+      if (!isVisible()) return;
+      timer = window.setTimeout(runProbe, Math.max(0, ms));
+    }
+    function runProbe() {
+      timer = null;
+      if (!isVisible()) return;
+      if (!navigator.onLine) {
+        Promise.resolve(window.sondearBackend()).then(renderVisibleDiagnostic, function () {});
+        return; // Wait for the browser "online" event rather than polling a known-offline device.
+      }
+      if (checking) { scheduleProbe(1000); return; }
+      checking = true;
+      Promise.resolve().then(function () { return window.sondearBackend(); }).then(function (online) {
+        renderVisibleDiagnostic();
+        if (online) {
+          failures = 0;
+          scheduleProbe(POLL_INTERVAL_MS);
+        } else {
+          failures += 1;
+          scheduleProbe(Math.min(FIRST_RETRY_MS * Math.pow(2, Math.min(failures - 1, 4)), MAX_RETRY_MS));
+        }
+      }, function () {
+        failures += 1;
+        renderVisibleDiagnostic();
+        scheduleProbe(Math.min(FIRST_RETRY_MS * Math.pow(2, Math.min(failures - 1, 4)), MAX_RETRY_MS));
+      }).then(function () { checking = false; });
+    }
+    function resumeProbe() {
+      if (isVisible()) { failures = 0; scheduleProbe(0); }
+    }
+
+    window.addEventListener("online", resumeProbe);
+    window.addEventListener("offline", function () {
+      clearScheduledProbe();
+      failures = 0;
+      window.__BC_BACKEND_RECOVERY_PENDING__ = true;
+      registrarDiagnosticoSondeo("offline", "device_offline", Date.now());
+      if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+      renderVisibleDiagnostic();
+    });
+    window.addEventListener("pageshow", resumeProbe);
+    window.addEventListener("focus", resumeProbe);
+    window.addEventListener("pagehide", clearScheduledProbe);
+    document.addEventListener("visibilitychange", function () {
+      if (isVisible()) resumeProbe();
+      else clearScheduledProbe();
+    });
+    scheduleProbe(0);
+  }
+  window.__BC_START_CONNECTIVITY_WATCHDOG__ = iniciarVigilanciaConectividad;
+  iniciarVigilanciaConectividad();
 
   if (typeof window.hideLoading === "function" && !window.hideLoading.__bcF1Display) {
     var hideOrig = window.hideLoading;
