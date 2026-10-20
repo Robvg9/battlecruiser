@@ -62,11 +62,12 @@ function renderDiagnosticoConfig() {
   grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual") + card(probeLabel, "Último sondeo backend");
   const probeNote = document.getElementById("cfg-backend-probe-note");
   if (probeNote) {
-    if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. No se almacenan tokens ni datos de usuario.";
+    const watcherNote = " Vigilancia automática: comprueba cada 30 s mientras la app está visible y reintenta en 3–30 s si falla; al volver desde otra app, comprueba de inmediato. Android puede pausar una PWA en segundo plano.";
+    if (!probe) probeNote.textContent = "Sondeo real de backend pendiente. No se almacenan tokens ni datos de usuario." + watcherNote;
     else {
       const time = new Date(probe.checkedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       const httpStatus = typeof probe.httpStatus === "number" ? " · HTTP " + probe.httpStatus : "";
-      probeNote.textContent = "Último sondeo: " + probe.reason + httpStatus + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens.";
+      probeNote.textContent = "Último sondeo: " + probe.reason + httpStatus + " · " + probe.durationMs + " ms · " + time + ". Diagnóstico sanitizado; no incluye credenciales ni tokens." + watcherNote;
     }
   }
   const nota = document.getElementById("cfg-backup-nota");
