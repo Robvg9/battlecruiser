@@ -77,6 +77,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
+  assert.match(app, /\["configuracion\.js","20261020\.4"\]/, "connectivity module must bypass stale cached settings");
+  assert.match(index, /<script src="js\/navegacion\.js\?v=20261020\.4"><\/script>/, "new navigation sections need a cache-busted script");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
