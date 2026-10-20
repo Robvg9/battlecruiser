@@ -36,6 +36,7 @@ test("Conectividad y Preferencias tienen iconos SVG, y el grupo tiene desplegabl
   const dom = new JSDOM(index, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
   const { window } = dom;
   window.eval(visual);
+  await new Promise(resolve => window.setTimeout(resolve, 25));
   const toggle = window.document.getElementById("nav-config-toggle");
   const group = window.document.getElementById("nav-config-group");
   assert.ok(toggle && group);
