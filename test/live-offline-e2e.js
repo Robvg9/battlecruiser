@@ -383,6 +383,30 @@ async function main() {
   };
 
 
+  // Login fits portrait and landscape phone viewports without hiding any form item.
+  report.evidence.phase = "login_viewport_fit";
+  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+  await cdpCommand("Emulation.setDeviceMetricsOverride", { width: 360, height: 640, deviceScaleFactor: 2, mobile: true });
+  const loginFitPortrait = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const f=document.querySelector('#login-form');const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right};};const fr=box(f);const children=Array.from(f?f.children:[]).filter(e=>getComputedStyle(e).display!=='none').map(e=>({name:e.id||e.className||e.tagName,box:box(e)}));const within=!!(f&&fr&&fr.top>=0&&fr.bottom<=innerHeight+1&&children.every(x=>x.box&&x.box.top>=fr.top-1&&x.box.bottom<=fr.bottom+1));resolve({viewportWidth:innerWidth,viewportHeight:innerHeight,form:fr,formScrollHeight:f?f.scrollHeight:null,formClientHeight:f?f.clientHeight:null,allChildrenWithinForm:within,offscreenChildren:children.filter(x=>!x.box||x.box.top<0||x.box.bottom>innerHeight+1),htmlScrollHeight:document.documentElement.scrollHeight,bodyOverflowY:getComputedStyle(document.body).overflowY});}))))()");
+  report.evidence.loginFitPortrait = loginFitPortrait;
+  assert(loginFitPortrait.viewportWidth === 360 && loginFitPortrait.viewportHeight === 640,
+    "Chromium no aplicó el viewport de login 360x640: " + JSON.stringify(loginFitPortrait));
+  assert(loginFitPortrait.form && loginFitPortrait.form.top >= 0 && loginFitPortrait.form.bottom <= 641 &&
+         loginFitPortrait.formScrollHeight <= loginFitPortrait.formClientHeight + 1 &&
+         loginFitPortrait.allChildrenWithinForm && loginFitPortrait.offscreenChildren.length === 0,
+    "El login necesita scroll o recorta controles/texto a 360x640: " + JSON.stringify(loginFitPortrait));
+
+  await cdpCommand("Emulation.setDeviceMetricsOverride", { width: 720, height: 360, deviceScaleFactor: 2, mobile: true });
+  const loginFitLandscape = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const f=document.querySelector('#login-form');const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right};};const fr=box(f);const children=Array.from(f?f.children:[]).filter(e=>getComputedStyle(e).display!=='none').map(e=>({name:e.id||e.className||e.tagName,box:box(e)}));const within=!!(f&&fr&&fr.top>=0&&fr.bottom<=innerHeight+1&&children.every(x=>x.box&&x.box.top>=fr.top-1&&x.box.bottom<=fr.bottom+1));resolve({viewportWidth:innerWidth,viewportHeight:innerHeight,form:fr,formScrollHeight:f?f.scrollHeight:null,formClientHeight:f?f.clientHeight:null,allChildrenWithinForm:within,offscreenChildren:children.filter(x=>!x.box||x.box.top<0||x.box.bottom>innerHeight+1),htmlScrollHeight:document.documentElement.scrollHeight,orientation:matchMedia('(orientation: landscape)').matches});}))))()");
+  report.evidence.loginFitLandscape = loginFitLandscape;
+  assert(loginFitLandscape.viewportWidth === 720 && loginFitLandscape.viewportHeight === 360,
+    "Chromium no aplicó el viewport horizontal de login 720x360: " + JSON.stringify(loginFitLandscape));
+  assert(loginFitLandscape.form && loginFitLandscape.form.top >= 0 && loginFitLandscape.form.bottom <= 361 &&
+         loginFitLandscape.formScrollHeight <= loginFitLandscape.formClientHeight + 1 &&
+         loginFitLandscape.allChildrenWithinForm && loginFitLandscape.offscreenChildren.length === 0,
+    "El login necesita scroll o recorta controles/texto a 720x360 horizontal: " + JSON.stringify(loginFitLandscape));
+  await cdpCommand("Emulation.setDeviceMetricsOverride", { width: 360, height: 800, deviceScaleFactor: 2, mobile: true });
+
   // Real Chromium mobile-emulation probe for the Android-first header.
   // This is a viewport E2E, not a claim of physical-device validation.
   report.evidence.phase = "android_mobile_header_layout";
@@ -405,6 +429,13 @@ async function main() {
   assert(Math.abs(mobileHeader.logout.top - mobileHeader.brand.top) <= 18,
     "Logout no está alineado en la fila superior con el título: " + JSON.stringify(mobileHeader));
 
+  const mobileMenuProbe = await evaluate("(()=>{const header=document.querySelector('.app-header');const toggle=document.querySelector('#sidebar-toggle-btn');const logout=document.querySelector('#logout-btn');const sidebar=document.querySelector('#sidebar');const backdrop=document.querySelector('#sidebar-backdrop');const rect=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};if(!header||!toggle||!logout||!sidebar||!backdrop)return {found:false};const hb=rect(header),tb=rect(toggle),lb=rect(logout);const display=getComputedStyle(toggle).display;toggle.click();const opened=sidebar.classList.contains('open')&&backdrop.classList.contains('visible')&&toggle.getAttribute('aria-expanded')==='true';const close=document.querySelector('#sidebar-close-btn');if(close)close.click();return {found:true,display:display,button:tb,logout:lb,header:hb,withinMargins:!!(tb&&lb&&hb&&tb.left>=hb.left+2&&lb.right<=hb.right-2),opened:opened,closed:!sidebar.classList.contains('open')&&!backdrop.classList.contains('visible')&&toggle.getAttribute('aria-expanded')==='false'};})()");
+  report.evidence.androidMenuToggle = mobileMenuProbe;
+  assert(mobileMenuProbe.found && mobileMenuProbe.display !== "none" &&
+         mobileMenuProbe.button.width >= 36 && mobileMenuProbe.button.height >= 36 &&
+         mobileMenuProbe.withinMargins && mobileMenuProbe.opened && mobileMenuProbe.closed,
+    "El menú lateral no es visible/usable, no tiene márgenes o no abre/cierra en móvil: " + JSON.stringify(mobileMenuProbe));
+
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
   fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
@@ -421,6 +452,11 @@ async function main() {
     "El panel principal sigue recortado en un scroll interno en móvil: " + JSON.stringify(mobileContentLayout));
   assert(mobileContentLayout.documentHeight > mobileContentLayout.viewportHeight,
     "El documento móvil no crece para alojar el contenido completo: " + JSON.stringify(mobileContentLayout));
+  const documentScrollProbe = await evaluate("(()=>new Promise(resolve=>{const max=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-innerHeight;window.scrollTo(0,Math.max(0,max));requestAnimationFrame(()=>{const moved=window.scrollY;window.scrollTo(0,0);resolve({maxScroll:max,scrollYAfterDown:moved,scrollable:moved>0});});}))()");
+  report.evidence.androidDocumentScroll = documentScrollProbe;
+  assert(documentScrollProbe.maxScroll > 0 && documentScrollProbe.scrollable,
+    "El dashboard móvil no responde al desplazamiento del documento: " + JSON.stringify(documentScrollProbe));
+
   assert(mobileContentLayout.footer.position === "static" &&
          mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,
     "El pie se superpone o abandona el flujo después del contenido móvil: " + JSON.stringify(mobileContentLayout));
