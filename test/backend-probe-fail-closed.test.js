@@ -11,6 +11,8 @@ const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "netwo
 function createProbe(fetchImpl, online = true, options = {}) {
   const connectivity = [];
   const window = {
+    setTimeout,
+    clearTimeout,
     sondearBackend: async function () { return true; },
     esErrorDeRed: function (error) {
       const message = String((error && (error.message || error.code || error.name)) || error || "").toLowerCase();
