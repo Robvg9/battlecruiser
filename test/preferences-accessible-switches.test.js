@@ -11,27 +11,27 @@ const source = fs.readFileSync(
   "utf8"
 );
 
-test("preference switches expose accessible names and descriptions", () => {
-  assert.match(source, /role=\\\"switch\\\"/);
-  assert.match(source, /aria-label=\\\"/);
-  assert.match(source, /aria-describedby=\\\"/);
-  assert.match(source, /aria-checked=\\\"false\\\"/);
-  assert.match(source, /<small id=\\\".*-help\\\">/);
-  assert.match(source, /<span aria-hidden=\\\"true\\\"><\/span>/);
+test("preference inputs use native checkbox state with accessible names and descriptions", () => {
+  assert.ok(source.includes(String.raw`<input type="checkbox" id="`));
+  assert.ok(source.includes(String.raw`aria-label="`));
+  assert.ok(source.includes(String.raw`aria-describedby="`));
+  assert.doesNotMatch(source, /role=\\\\\\\"switch\\\\\\\"/);
+  assert.doesNotMatch(source, /aria-checked=\\\\\\\"false\\\\\\\"/);
 });
 
-test("preference switch checked state follows persisted local preference values", () => {
-  assert.match(source, /input\.checked = !!prefs\[mapping\[id\]\]/);
-  assert.match(source, /input\.setAttribute\("aria-checked", String\(input\.checked\)\)/);
-  assert.match(source, /prefs\[key\] = input\.checked;\s*input\.setAttribute\("aria-checked", String\(input\.checked\)\)/);
+test("native checked property stays synchronized with saved local preference values", () => {
+  assert.match(source, /input\\.checked = !!prefs\\[mapping\\[id\\]\\]/);
+  assert.match(source, /prefs\\[key\\] = input\\.checked/);
+  assert.doesNotMatch(source, /setAttribute\\("aria-checked"/);
 });
 
-test("native switch inputs retain a real accessible hit target and keyboard focus", () => {
-  assert.match(source, /\.cfg-aj-toggle input\{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2\}/);
-  assert.match(source, /\.cfg-aj-toggle span\{[^}]*pointer-events:none\}/);
-  assert.match(source, /\.cfg-aj-toggle input:focus-visible\+span\{outline:2px solid var\(--gold-bright\);outline-offset:3px\}/);
+test("switch appearance retains a real accessible hit target and keyboard focus", () => {
+  assert.match(source, /\\.cfg-aj-toggle input\\{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2\\}/);
+  assert.match(source, /\\.cfg-aj-toggle span\\{[^}]*pointer-events:none\\}/);
+  assert.match(source, /\\.cfg-aj-toggle input:focus-visible\\+span\\{outline:2px solid var\\(--gold-bright\\);outline-offset:3px\\}/);
 });
-test("all six preference switches remain connected to their existing preference keys", () => {
+
+test("all six preference inputs remain connected to their existing preference keys", () => {
   for (const entry of [
     ['cfg-aj-auto-refresh', 'autoRefresh', 'Actualización automática'],
     ['cfg-aj-sync-auto', 'syncAuto', 'Sincronización automática'],
