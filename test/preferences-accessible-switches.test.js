@@ -32,10 +32,10 @@ test("native checked property stays synchronized with saved local preference val
 
 test("accessible textual option state follows the native checked property on load and change", () => {
   assert.ok(source.includes('"-help " + id + "-state'));
-  assert.ok(source.includes('class=\\\"cfg-aj-sr-only\\\">Estado de la opción: desactivada.'));
+  assert.ok(source.includes("Estado de la opción: desactivada.</span>"));
   assert.ok(source.includes('function updateToggleState(id, input)'));
   assert.ok(source.includes('state.textContent = "Estado de la opción: " + (input.checked ? "activada." : "desactivada.");'));
-  assert.equal((source.match(/updateToggleState\\(id, input\\);/g) || []).length, 2);
+  assert.equal(source.split("updateToggleState(id, input);").length - 1, 2);
   assert.ok(source.includes(".cfg-aj-sr-only{position:absolute"));
 });
 
