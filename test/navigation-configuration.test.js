@@ -93,7 +93,7 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.7 and load refreshed navigation modules", () => {
+test("app shell, application and Service Worker share 9.5.8 and load refreshed navigation modules", () => {
   assert.match(app, /const VERSION="9\.5\.7"/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.7"/);
   assert.match(index, /href="style\.css\?v=9\.5\.7"/);
