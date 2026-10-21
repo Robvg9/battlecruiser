@@ -26,6 +26,11 @@ test("preference switch checked state follows persisted local preference values"
   assert.match(source, /prefs\[key\] = input\.checked;\s*input\.setAttribute\("aria-checked", String\(input\.checked\)\)/);
 });
 
+test("native switch inputs retain a real accessible hit target and keyboard focus", () => {
+  assert.match(source, /\.cfg-aj-toggle input\{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2\}/);
+  assert.match(source, /\.cfg-aj-toggle span\{[^}]*pointer-events:none\}/);
+  assert.match(source, /\.cfg-aj-toggle input:focus-visible\+span\{outline:2px solid var\(--gold-bright\);outline-offset:3px\}/);
+});
 test("all six preference switches remain connected to their existing preference keys", () => {
   for (const entry of [
     ['cfg-aj-auto-refresh', 'autoRefresh', 'Actualización automática'],
