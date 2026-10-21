@@ -85,7 +85,6 @@
       input.onchange = function () {
         var prefs = loadPrefs();
         prefs[key] = input.checked;
-        input.setAttribute("aria-checked", String(input.checked));
         savePrefs(prefs);
         applyAppearance(prefs);
         setStatus("Preferencia guardada.", true);
@@ -133,7 +132,6 @@
       var input = document.getElementById(id);
       if (input) {
         input.checked = !!prefs[mapping[id]];
-        input.setAttribute("aria-checked", String(input.checked));
       }
     });
     document.querySelectorAll(".cfg-aj-app").forEach(function (button) {
