@@ -11,6 +11,10 @@ const source = fs.readFileSync(
   "utf8"
 );
 const escapedQuote = String.fromCharCode(92) + '"';
+const loader = fs.readFileSync(path.join(ROOT, "public/js/configuracion.js"), "utf8");
+const serviceWorker = fs.readFileSync(path.join(ROOT, "public/service-worker.js"), "utf8");
+const appSource = fs.readFileSync(path.join(ROOT, "public/app.js"), "utf8");
+const indexHtml = fs.readFileSync(path.join(ROOT, "public/index.html"), "utf8");
 
 test("preference inputs use native checkbox state with accessible names and descriptions", () => {
   assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " id=" + escapedQuote));
@@ -45,4 +49,21 @@ test("all six preference inputs remain connected to their existing preference ke
     assert.ok(source.includes('rowToggle("' + id + '", "' + label + '"'), 'missing switch: ' + id);
     assert.ok(source.includes('"' + id + '": "' + key + '"'), 'missing preference mapping: ' + id);
   }
+});
+
+test("PWA deployment invalidates the cached switch script and keeps shell versions aligned", () => {
+  const resource = "configuracion-ajustes-migrados-20260903.js";
+  assert.ok(loader.includes(resource + "?v=3"));
+  assert.ok(serviceWorker.includes("./js/" + resource + "?v=3"));
+  assert.ok(!loader.includes(resource + "?v=2"));
+  assert.ok(!serviceWorker.includes(resource + "?v=2"));
+  const appVersion = appSource.match(/const VERSION="([^"]+)"/);
+  const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
+  assert.ok(appVersion, "app version must be detectable");
+  assert.ok(workerVersion, "service-worker version must be detectable");
+  assert.equal(appVersion[1], "9.5.8");
+  assert.equal(workerVersion[1], appVersion[1]);
+  assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
+  assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));
+  assert.ok(indexHtml.includes("v" + appVersion[1] + " — BattleCruiser"));
 });

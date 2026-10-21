@@ -71,8 +71,8 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.7["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.7["']/);
+  assert.match(app, /const VERSION=["']9\.5\.8["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.8["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261020\.5"\]/);
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
@@ -84,15 +84,15 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.7"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.8"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.7 — immediate navigation and semantic configuration groups/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.7"><\/script>/);
+  assert.match(app, /v9\.5\.8 — immediate navigation and semantic configuration groups/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.8"><\/script>/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
@@ -106,5 +106,5 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.7['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.8['"]\);/);
 });
