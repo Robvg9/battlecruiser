@@ -30,6 +30,15 @@ test("native checked property stays synchronized with saved local preference val
   assert.ok(!source.includes('setAttribute("aria-checked"'));
 });
 
+test("accessible textual option state follows the native checked property on load and change", () => {
+  assert.ok(source.includes('"-help " + id + "-state'));
+  assert.ok(source.includes('class=\\\"cfg-aj-sr-only\\\">Estado de la opción: desactivada.'));
+  assert.ok(source.includes('function updateToggleState(id, input)'));
+  assert.ok(source.includes('state.textContent = "Estado de la opción: " + (input.checked ? "activada." : "desactivada.");'));
+  assert.equal((source.match(/updateToggleState\\(id, input\\);/g) || []).length, 2);
+  assert.ok(source.includes(".cfg-aj-sr-only{position:absolute"));
+});
+
 test("toggle appearance retains a real accessible hit target and keyboard focus", () => {
   assert.ok(source.includes(".cfg-aj-toggle input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}"));
   assert.ok(source.includes(".cfg-aj-toggle span{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;cursor:pointer;pointer-events:none}"));
