@@ -42,9 +42,10 @@
 
   function rowToggle(id, title, description) {
     return "<div class=\"cfg-aj-row\"><div><strong>" + title +
-      "</strong><small>" + description + "</small></div>" +
+      "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
       "<label class=\"cfg-aj-toggle\"><input type=\"checkbox\" id=\"" + id +
-      "\"><span></span></label></div>";
+      "\" role=\"switch\" aria-label=\"" + title +
+      "\" aria-describedby=\"" + id + "-help\" aria-checked=\"false\"><span aria-hidden=\"true\"></span></label></div>";
   }
 
   function ensurePanel() {
@@ -84,6 +85,7 @@
       input.onchange = function () {
         var prefs = loadPrefs();
         prefs[key] = input.checked;
+        input.setAttribute("aria-checked", String(input.checked));
         savePrefs(prefs);
         applyAppearance(prefs);
         setStatus("Preferencia guardada.", true);
@@ -129,7 +131,10 @@
     };
     Object.keys(mapping).forEach(function (id) {
       var input = document.getElementById(id);
-      if (input) input.checked = !!prefs[mapping[id]];
+      if (input) {
+        input.checked = !!prefs[mapping[id]];
+        input.setAttribute("aria-checked", String(input.checked));
+      }
     });
     document.querySelectorAll(".cfg-aj-app").forEach(function (button) {
       button.classList.toggle("active", button.getAttribute("data-app") === prefs.appearance);
