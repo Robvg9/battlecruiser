@@ -10,25 +10,26 @@ const source = fs.readFileSync(
   path.join(ROOT, "public/js/configuracion-ajustes-migrados-20260903.js"),
   "utf8"
 );
+const escapedQuote = String.fromCharCode(92) + '"';
 
 test("preference inputs use native checkbox state with accessible names and descriptions", () => {
-  assert.ok(source.includes(String.raw`<input type="checkbox" id="`));
-  assert.ok(source.includes(String.raw`aria-label="`));
-  assert.ok(source.includes(String.raw`aria-describedby="`));
-  assert.doesNotMatch(source, /role=\\\\\\\"switch\\\\\\\"/);
-  assert.doesNotMatch(source, /aria-checked=\\\\\\\"false\\\\\\\"/);
+  assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " id=" + escapedQuote));
+  assert.ok(source.includes("aria-label=" + escapedQuote));
+  assert.ok(source.includes("aria-describedby=" + escapedQuote));
+  assert.ok(!source.includes("role=" + escapedQuote + "switch" + escapedQuote));
+  assert.ok(!source.includes("aria-checked=" + escapedQuote + "false" + escapedQuote));
 });
 
 test("native checked property stays synchronized with saved local preference values", () => {
-  assert.match(source, /input\\.checked = !!prefs\\[mapping\\[id\\]\\]/);
-  assert.match(source, /prefs\\[key\\] = input\\.checked/);
-  assert.doesNotMatch(source, /setAttribute\\("aria-checked"/);
+  assert.ok(source.includes("input.checked = !!prefs[mapping[id]]"));
+  assert.ok(source.includes("prefs[key] = input.checked"));
+  assert.ok(!source.includes('setAttribute("aria-checked"'));
 });
 
-test("switch appearance retains a real accessible hit target and keyboard focus", () => {
-  assert.match(source, /\\.cfg-aj-toggle input\\{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2\\}/);
-  assert.match(source, /\\.cfg-aj-toggle span\\{[^}]*pointer-events:none\\}/);
-  assert.match(source, /\\.cfg-aj-toggle input:focus-visible\\+span\\{outline:2px solid var\\(--gold-bright\\);outline-offset:3px\\}/);
+test("toggle appearance retains a real accessible hit target and keyboard focus", () => {
+  assert.ok(source.includes(".cfg-aj-toggle input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}"));
+  assert.ok(source.includes(".cfg-aj-toggle span{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;cursor:pointer;pointer-events:none}"));
+  assert.ok(source.includes(".cfg-aj-toggle input:focus-visible+span{outline:2px solid var(--gold-bright);outline-offset:3px}"));
 });
 
 test("all six preference inputs remain connected to their existing preference keys", () => {
