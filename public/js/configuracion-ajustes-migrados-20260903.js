@@ -44,8 +44,8 @@
     return "<div class=\"cfg-aj-row\"><div><strong>" + title +
       "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
       "<label class=\"cfg-aj-toggle\"><input type=\"checkbox\" id=\"" + id +
-      "\" role=\"switch\" aria-label=\"" + title +
-      "\" aria-describedby=\"" + id + "-help\" aria-checked=\"false\"><span aria-hidden=\"true\"></span></label></div>";
+      "\" aria-label=\"" + title +
+      "\" aria-describedby=\"" + id + "-help\"><span aria-hidden=\"true\"></span></label></div>";
   }
 
   function ensurePanel() {
