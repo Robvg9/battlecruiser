@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.8 — immediate navigation and semantic configuration groups
+// v9.5.9 — accessible state descriptions for native preferences
 (function hotfixV9475(){
-  const VERSION="9.5.8";
+  const VERSION="9.5.9";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
