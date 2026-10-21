@@ -44,8 +44,8 @@
     return "<div class=\"cfg-aj-row\"><div><strong>" + title +
       "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
       "<label class=\"cfg-aj-toggle\"><input type=\"checkbox\" id=\"" + id +
-      "\" role=\"switch\" aria-label=\"" + title +
-      "\" aria-describedby=\"" + id + "-help\" aria-checked=\"false\"><span aria-hidden=\"true\"></span></label></div>";
+      "\" aria-label=\"" + title +
+      "\" aria-describedby=\"" + id + "-help\"><span aria-hidden=\"true\"></span></label></div>";
   }
 
   function ensurePanel() {
@@ -85,7 +85,6 @@
       input.onchange = function () {
         var prefs = loadPrefs();
         prefs[key] = input.checked;
-        input.setAttribute("aria-checked", String(input.checked));
         savePrefs(prefs);
         applyAppearance(prefs);
         setStatus("Preferencia guardada.", true);
@@ -133,7 +132,6 @@
       var input = document.getElementById(id);
       if (input) {
         input.checked = !!prefs[mapping[id]];
-        input.setAttribute("aria-checked", String(input.checked));
       }
     });
     document.querySelectorAll(".cfg-aj-app").forEach(function (button) {
