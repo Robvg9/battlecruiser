@@ -60,7 +60,9 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
   assert.equal((Date.parse(to + "T12:00:00Z") - Date.parse(from + "T12:00:00Z")) / 86400000, 6, "seven inclusive dates");
   const modal = window.document.getElementById("bc-m73-report-modal");
   assert.ok(modal && modal.querySelector("#rep-detalle"), "detail records move into their own modal");
-  assert.ok(!window.document.querySelector("#tab-reportes .bc-m42-detail"), "inline accordion removed");
+  const placeholder = window.document.querySelector("#tab-reportes .bc-m42-detail.bc-m73-modal-placeholder");
+  assert.ok(placeholder && placeholder.hidden, "only an empty hidden placeholder remains to prevent inline accordion recreation");
+  assert.equal(placeholder.querySelector("#rep-detalle"), null, "all report contents live in the modal");
 
   window.document.getElementById("bc-m42-open-details").click();
   await new Promise(resolve => window.setTimeout(resolve, 20));
