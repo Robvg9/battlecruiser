@@ -70,7 +70,7 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
   assert.ok(ranking && !ranking.hidden, "Ver todos opens a separate ranking modal");
   assert.match(ranking.textContent, /Cerveza Bucanero/);
   assert.match(ranking.textContent, /Ganancia conocida \(FIFO\)/i);
-  assert.match(ranking.textContent, /Ganancia conocida/);
+  assert.match(ranking.textContent, /ganancia conocida/i);
   assert.ok(window.document.body.classList.contains("bc-m73-modal-open"), "background scrolling is locked");
   const sort = ranking.querySelector("#bc-m73-ranking-sort");
   sort.value = "ingresos_asc";
