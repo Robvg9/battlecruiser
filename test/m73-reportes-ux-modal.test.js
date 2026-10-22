@@ -41,8 +41,8 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
   window.client = { rpc: async (name, params) => {
     calls.push({ name, params });
     return { error: null, data: [
-      { producto: "Cerveza Bucanero", unidades: 12, ingresos: 7800, ventas: 8 },
-      { producto: "Masareal", unidades: 2, ingresos: 400, ventas: 2 }
+      { producto: "Cerveza Bucanero", unidades: 12, ingresos: 7800, ventas: 8, ganancia_conocida: 2100, lineas_con_costo: 7, lineas_sin_costo: 1 },
+      { producto: "Masareal", unidades: 2, ingresos: 400, ventas: 2, ganancia_conocida: null, lineas_con_costo: 0, lineas_sin_costo: 2 }
     ] };
   } };
   const script = window.document.createElement("script");
@@ -67,13 +67,19 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
   const ranking = window.document.getElementById("bc-m73-ranking-modal");
   assert.ok(ranking && !ranking.hidden, "Ver todos opens a separate ranking modal");
   assert.match(ranking.textContent, /Cerveza Bucanero/);
-  assert.match(ranking.textContent, /ganancia real requiere costo histórico/i);
+  assert.match(ranking.textContent, /costo FIFO/i);
+  assert.match(ranking.textContent, /Ganancia conocida/);
   assert.ok(window.document.body.classList.contains("bc-m73-modal-open"), "background scrolling is locked");
   const sort = ranking.querySelector("#bc-m73-ranking-sort");
   sort.value = "ingresos_asc";
   sort.dispatchEvent(new window.Event("change", { bubbles: true }));
   await new Promise(resolve => window.setTimeout(resolve, 10));
-  assert.ok(calls.some(x => x.name === "reporte_productos_ventas" && x.params.p_orden === "ingresos_asc"), "ordering requests reach backend");
+  assert.ok(calls.some(x => x.name === "reporte_productos_ventas" && x.params.p_orden === "ingresos_asc"), "revenue ordering reaches backend");
+  sort.value = "ganancia_desc";
+  sort.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await new Promise(resolve => window.setTimeout(resolve, 10));
+  assert.ok(calls.some(x => x.name === "reporte_productos_ventas" && x.params.p_orden === "ganancia_desc"), "profit ranking reaches backend");
+  assert.match(ranking.textContent, /línea\(s\) con costo/i);
 
   window.document.querySelector(".bc-m45-quick-btn[data-rep=ventas]").click();
   await new Promise(resolve => window.setTimeout(resolve, 10));
