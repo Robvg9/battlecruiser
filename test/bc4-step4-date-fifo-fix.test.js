@@ -24,18 +24,18 @@ test("all date-filter RPCs use America/Havana calendar dates", () => {
     assert.match(migration, new RegExp("CREATE OR REPLACE FUNCTION public\\." + name + "\\("), name + " definition is present");
   }
   assert.match(migration, /AT TIME ZONE 'America\/Havana'/);
-  assert.doesNotMatch(migration, /\\b[a-z_][a-z0-9_]*\\.(?:fecha|fecha_compra)\\s*::\\s*date\\b/i);
+  assert.doesNotMatch(migration, /\b[a-z_][a-z0-9_]*\.(?:fecha|fecha_compra)\s*::\s*date\b/i);
 });
 
 test("single and multi-line purchases normalize pack cost to base-unit cost", () => {
-  assert.match(migration, /registrar_compra\\(/);
-  assert.match(migration, /registrar_compra_multiple\\(/);
+  assert.match(migration, /registrar_compra\(/);
+  assert.match(migration, /registrar_compra_multiple\(/);
   assert.match(migration, /v_costo_unitario_base := p_costo_unitario \/ \(v_cantidad_final \/ p_cantidad_presentacion\)/);
   assert.match(migration, /v_costo_unitario_base := v_costo \/ \(v_cantidad_final \/ v_cantidad_presentacion\)/);
   assert.match(migration, /cantidad_restante,costo_unitario,usuario_id\) values\(p_producto_id,p_almacen_id,v_cantidad_final,v_cantidad_final,v_costo_unitario_base,auth\.uid\(\)\)/);
   assert.match(migration, /cantidad_restante,costo_unitario,fecha_compra,origen,usuario_id,compra_id\) values\(v_producto_id,p_almacen_id,v_cantidad_final,v_cantidad_final,v_costo_unitario_base/);
   // Historical financial rows are intentionally not mutated by this migration.
-  assert.doesNotMatch(migration, /UPDATE public\\.lotes_compra\\s+SET\\s+costo_unitario/i);
+  assert.doesNotMatch(migration, /UPDATE public\.lotes_compra\s+SET\s+costo_unitario/i);
 });
 
 test("Reportes labels and all row renderers use explicit Cuba timezone", () => {
