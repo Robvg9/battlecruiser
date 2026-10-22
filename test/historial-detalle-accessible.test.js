@@ -43,6 +43,7 @@ test("report rows expose a concise visible summary in their accessible name", ()
   assert.match(accessibleName, /22\/10\/2026/);
   assert.match(accessibleName, /Total \$1,250\.00/);
   assert.match(accessibleName, /Café/);
+  assert.equal(accessibleName.includes("\n"), false, "row summaries normalize whitespace");
 
   assert.equal(
     emptyRow.getAttribute("aria-label"),
