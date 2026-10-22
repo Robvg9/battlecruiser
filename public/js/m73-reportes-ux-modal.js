@@ -506,7 +506,7 @@
         reportModal: !!document.querySelector('#bc-m73-report-modal'),
         rankingModal: !!document.querySelector('#bc-m73-ranking-modal'),
         reportRowsInsideModal: !!document.querySelector('#bc-m73-report-modal #rep-detalle'),
-        inlineAccordionRemoved: !document.querySelector('#tab-reportes .bc-m42-detail')
+        inlineAccordionRemoved: !document.querySelector('#tab-reportes .bc-m42-detail:not(.bc-m73-modal-placeholder)') && !!document.querySelector('#tab-reportes .bc-m42-detail.bc-m73-modal-placeholder[hidden]')
       };
     }
   };
