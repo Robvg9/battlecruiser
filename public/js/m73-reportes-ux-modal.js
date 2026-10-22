@@ -228,7 +228,7 @@
       topProductsObserver = new MutationObserver(function () {
         // M42 can rerender its legacy first-page ranking after its delayed boot.
         // Replace that snapshot with the database-wide aggregate if necessary.
-        if (!rankingBusy && !topList.querySelector('.bc-m73-ranking-row')) refreshTopProducts(true);
+        if (!rankingBusy && !topList.querySelector('.bc-m73-ranking-row') && !topList.querySelector('.bc-m73-empty')) refreshTopProducts(true);
       });
       topProductsObserver.observe(topList, { childList: true, subtree: true });
     }
