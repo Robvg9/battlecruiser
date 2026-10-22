@@ -1,10 +1,9 @@
 -- Step 4/15 — harmonize report-date semantics and purchase presentation costs
--- Date-only filters are interpreted in the application business timezone (America/Havana),
--- matching the dates rendered by the Reportes UI.
--- Purchase inputs with a selected presentation are costs PER PRESENTATION; lot costs must
--- be stored per base unit. This prevents multiplying the per-pack cost by the pack factor.
--- Deliberately does NOT rewrite historical lot/sale costs: those require governed reconciliation.
--- Generated from the currently installed function definitions and preserving function signatures.
+-- Date-only filters are interpreted in America/Havana, matching the Reportes UI.
+-- Purchase costs for a selected presentation are costs PER PRESENTATION; lot costs
+-- are stored per base unit. This avoids multiplying a pack cost by the pack factor.
+-- Historical lot/sale costs are intentionally not changed here; reconcile them under a governed financial review.
+-- Definitions were generated from live function definitions to preserve their signatures and access checks.
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.historial_compras(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_producto_id uuid DEFAULT NULL::uuid, p_almacen_id uuid DEFAULT NULL::uuid, p_limite integer DEFAULT 100, p_offset integer DEFAULT 0)
@@ -47,7 +46,7 @@ BEGIN
   ORDER BY lc.fecha_compra DESC
   LIMIT p_limite OFFSET p_offset;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.movimientos_producto(p_producto_id uuid DEFAULT NULL::uuid, p_almacen_id uuid DEFAULT NULL::uuid, p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_tipo text DEFAULT NULL::text, p_limite integer DEFAULT 100, p_offset integer DEFAULT 0)
  RETURNS TABLE(fecha timestamp with time zone, tipo text, producto text, almacen text, cantidad numeric, costo_unitario numeric, usuario text, operacion_id uuid)
@@ -134,7 +133,7 @@ BEGIN
     ORDER BY fecha DESC
     LIMIT p_limite OFFSET p_offset;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.registrar_compra(p_producto_id uuid, p_almacen_id uuid, p_cantidad numeric, p_costo_unitario numeric, p_presentacion_id uuid DEFAULT NULL::uuid, p_cantidad_presentacion numeric DEFAULT NULL::numeric, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS uuid
@@ -154,7 +153,7 @@ if p_presentacion_id is not null then
   v_costo_unitario_base := p_costo_unitario / (v_cantidad_final / p_cantidad_presentacion);
 else
   v_costo_unitario_base := p_costo_unitario;
-end if; if not exists(select 1 from public.almacenes where id=p_almacen_id) then raise exception 'Almacén no encontrado'; end if; if not exists(select 1 from public.productos where id=p_producto_id) then raise exception 'Producto no encontrado'; end if; insert into public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,usuario_id) values(p_producto_id,p_almacen_id,v_cantidad_final,v_cantidad_final,v_costo_unitario_base,auth.uid()) returning id into v_lote_id; insert into public.stock(producto_id,almacen_id,cantidad,minimo) values(p_producto_id,p_almacen_id,v_cantidad_final,0) on conflict(producto_id,almacen_id) do update set cantidad=public.stock.cantidad+excluded.cantidad,updated_at=now(); update private.operaciones_idempotencia set resultado_id=v_lote_id where idempotency_key=p_idempotency_key; return v_lote_id; end; $function$
+end if; if not exists(select 1 from public.almacenes where id=p_almacen_id) then raise exception 'Almacén no encontrado'; end if; if not exists(select 1 from public.productos where id=p_producto_id) then raise exception 'Producto no encontrado'; end if; insert into public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,usuario_id) values(p_producto_id,p_almacen_id,v_cantidad_final,v_cantidad_final,v_costo_unitario_base,auth.uid()) returning id into v_lote_id; insert into public.stock(producto_id,almacen_id,cantidad,minimo) values(p_producto_id,p_almacen_id,v_cantidad_final,0) on conflict(producto_id,almacen_id) do update set cantidad=public.stock.cantidad+excluded.cantidad,updated_at=now(); update private.operaciones_idempotencia set resultado_id=v_lote_id where idempotency_key=p_idempotency_key; return v_lote_id; end; $function$;
 
 CREATE OR REPLACE FUNCTION public.registrar_compra_multiple(p_almacen_id uuid, p_proveedor text DEFAULT NULL::text, p_fecha timestamp with time zone DEFAULT now(), p_lineas jsonb DEFAULT '[]'::jsonb, p_idempotency_key uuid DEFAULT NULL::uuid)
  RETURNS uuid
@@ -174,7 +173,7 @@ if v_presentacion_id is not null then
   v_costo_unitario_base := v_costo / (v_cantidad_final / v_cantidad_presentacion);
 else
   v_costo_unitario_base := v_costo;
-end if; insert into public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen,usuario_id,compra_id) values(v_producto_id,p_almacen_id,v_cantidad_final,v_cantidad_final,v_costo_unitario_base,coalesce(p_fecha,now()),'compra',v_uid,v_compra_id); insert into public.stock(producto_id,almacen_id,cantidad,minimo) values(v_producto_id,p_almacen_id,v_cantidad_final,0) on conflict(producto_id,almacen_id) do update set cantidad=public.stock.cantidad+excluded.cantidad,updated_at=now(); v_total:=v_total+(v_cantidad_documento*v_costo); end loop; update public.compras set total=v_total where id=v_compra_id; update private.operaciones_idempotencia set resultado_id=v_compra_id where idempotency_key=p_idempotency_key; return v_compra_id; end; $function$
+end if; insert into public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen,usuario_id,compra_id) values(v_producto_id,p_almacen_id,v_cantidad_final,v_cantidad_final,v_costo_unitario_base,coalesce(p_fecha,now()),'compra',v_uid,v_compra_id); insert into public.stock(producto_id,almacen_id,cantidad,minimo) values(v_producto_id,p_almacen_id,v_cantidad_final,0) on conflict(producto_id,almacen_id) do update set cantidad=public.stock.cantidad+excluded.cantidad,updated_at=now(); v_total:=v_total+(v_cantidad_documento*v_costo); end loop; update public.compras set total=v_total where id=v_compra_id; update private.operaciones_idempotencia set resultado_id=v_compra_id where idempotency_key=p_idempotency_key; return v_compra_id; end; $function$;
 
 CREATE OR REPLACE FUNCTION public.rentabilidad_ventas(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_producto_id uuid DEFAULT NULL::uuid, p_almacen_id uuid DEFAULT NULL::uuid, p_limite integer DEFAULT 100, p_offset integer DEFAULT 0)
  RETURNS TABLE(fecha timestamp with time zone, venta_id uuid, producto text, almacen text, cantidad numeric, precio_unitario numeric, ingreso numeric, costo_unitario_fifo numeric, costo_total numeric, margen numeric, margen_porcentaje numeric, costo_disponible boolean)
@@ -219,7 +218,7 @@ BEGIN
   ORDER BY v.fecha DESC
   LIMIT p_limite OFFSET p_offset;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.reporte_movimiento_inventario(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_producto_id uuid DEFAULT NULL::uuid, p_almacen_id uuid DEFAULT NULL::uuid, p_limite integer DEFAULT 100, p_offset integer DEFAULT 0)
  RETURNS TABLE(fecha timestamp with time zone, tipo text, producto text, almacen text, cantidad numeric, direccion text, operacion_id uuid)
@@ -232,7 +231,7 @@ SELECT v.fecha,'venta'::text,p.nombre,a.nombre,vl.cantidad,'salida'::text,v.id F
 UNION ALL SELECT t.fecha,'transferencia_salida'::text,p.nombre,o.nombre,tl.cantidad,'salida'::text,t.id FROM transferencias_lineas tl JOIN transferencias t ON t.id=tl.transferencia_id JOIN productos p ON p.id=tl.producto_id JOIN almacenes o ON o.id=t.almacen_origen_id WHERE (p_desde IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_producto_id IS NULL OR tl.producto_id=p_producto_id) AND (p_almacen_id IS NULL OR t.almacen_origen_id=p_almacen_id)
 UNION ALL SELECT t.fecha,'transferencia_entrada'::text,p.nombre,d.nombre,tl.cantidad,'entrada'::text,t.id FROM transferencias_lineas tl JOIN transferencias t ON t.id=tl.transferencia_id JOIN productos p ON p.id=tl.producto_id JOIN almacenes d ON d.id=t.almacen_destino_id WHERE (p_desde IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_producto_id IS NULL OR tl.producto_id=p_producto_id) AND (p_almacen_id IS NULL OR t.almacen_destino_id=p_almacen_id)
 UNION ALL SELECT vs.fecha,'vale'::text,p.nombre,a.nombre,vs.cantidad,'salida'::text,vs.id FROM vales_salida vs JOIN productos p ON p.id=vs.producto_id JOIN almacenes a ON a.id=vs.almacen_id WHERE (p_desde IS NULL OR (vs.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (vs.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_producto_id IS NULL OR vs.producto_id=p_producto_id) AND (p_almacen_id IS NULL OR vs.almacen_id=p_almacen_id)
-ORDER BY fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$
+ORDER BY fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$;
 
 CREATE OR REPLACE FUNCTION public.reporte_resumen_ejecutivo(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_almacen_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -308,7 +307,7 @@ BEGIN
     'margen', v_margen
   );
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.reporte_transferencias(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_origen_id uuid DEFAULT NULL::uuid, p_destino_id uuid DEFAULT NULL::uuid, p_estado text DEFAULT NULL::text, p_limite integer DEFAULT 50, p_offset integer DEFAULT 0)
  RETURNS TABLE(id uuid, fecha timestamp with time zone, origen text, destino text, estado text, unidades numeric, lineas jsonb)
@@ -316,7 +315,7 @@ CREATE OR REPLACE FUNCTION public.reporte_transferencias(p_desde date DEFAULT NU
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-BEGIN IF NOT public.tiene_permiso('reportes','ver') THEN RAISE EXCEPTION 'No tenés permiso para ver reportes.' USING ERRCODE='42501'; END IF; IF p_limite IS NULL OR p_limite>200 OR p_limite<1 THEN p_limite:=50; END IF; IF p_offset IS NULL OR p_offset<0 THEN p_offset:=0; END IF; RETURN QUERY SELECT t.id,t.fecha,o.nombre,d.nombre,t.estado,coalesce((SELECT sum(tl.cantidad) FROM transferencias_lineas tl WHERE tl.transferencia_id=t.id),0),coalesce((SELECT jsonb_agg(jsonb_build_object('producto_id',tl.producto_id,'producto',p.nombre,'cantidad',tl.cantidad)) FROM transferencias_lineas tl JOIN productos p ON p.id=tl.producto_id WHERE tl.transferencia_id=t.id),'[]'::jsonb) FROM transferencias t LEFT JOIN almacenes o ON o.id=t.almacen_origen_id LEFT JOIN almacenes d ON d.id=t.almacen_destino_id WHERE (p_desde IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_origen_id IS NULL OR t.almacen_origen_id=p_origen_id) AND (p_destino_id IS NULL OR t.almacen_destino_id=p_destino_id) AND (p_estado IS NULL OR p_estado='' OR t.estado=p_estado) ORDER BY t.fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$
+BEGIN IF NOT public.tiene_permiso('reportes','ver') THEN RAISE EXCEPTION 'No tenés permiso para ver reportes.' USING ERRCODE='42501'; END IF; IF p_limite IS NULL OR p_limite>200 OR p_limite<1 THEN p_limite:=50; END IF; IF p_offset IS NULL OR p_offset<0 THEN p_offset:=0; END IF; RETURN QUERY SELECT t.id,t.fecha,o.nombre,d.nombre,t.estado,coalesce((SELECT sum(tl.cantidad) FROM transferencias_lineas tl WHERE tl.transferencia_id=t.id),0),coalesce((SELECT jsonb_agg(jsonb_build_object('producto_id',tl.producto_id,'producto',p.nombre,'cantidad',tl.cantidad)) FROM transferencias_lineas tl JOIN productos p ON p.id=tl.producto_id WHERE tl.transferencia_id=t.id),'[]'::jsonb) FROM transferencias t LEFT JOIN almacenes o ON o.id=t.almacen_origen_id LEFT JOIN almacenes d ON d.id=t.almacen_destino_id WHERE (p_desde IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (t.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_origen_id IS NULL OR t.almacen_origen_id=p_origen_id) AND (p_destino_id IS NULL OR t.almacen_destino_id=p_destino_id) AND (p_estado IS NULL OR p_estado='' OR t.estado=p_estado) ORDER BY t.fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$;
 
 CREATE OR REPLACE FUNCTION public.reporte_vales(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_almacen_id uuid DEFAULT NULL::uuid, p_tipo text DEFAULT NULL::text, p_limite integer DEFAULT 50, p_offset integer DEFAULT 0)
  RETURNS TABLE(id uuid, fecha timestamp with time zone, producto text, almacen text, tipo text, cantidad numeric)
@@ -324,7 +323,7 @@ CREATE OR REPLACE FUNCTION public.reporte_vales(p_desde date DEFAULT NULL::date,
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-BEGIN IF NOT public.tiene_permiso('reportes','ver') THEN RAISE EXCEPTION 'No tenés permiso para ver reportes.' USING ERRCODE='42501'; END IF; IF p_limite IS NULL OR p_limite>200 OR p_limite<1 THEN p_limite:=50; END IF; IF p_offset IS NULL OR p_offset<0 THEN p_offset:=0; END IF; RETURN QUERY SELECT vs.id,vs.fecha,p.nombre,a.nombre,vs.tipo,vs.cantidad FROM vales_salida vs LEFT JOIN productos p ON p.id=vs.producto_id LEFT JOIN almacenes a ON a.id=vs.almacen_id WHERE (p_desde IS NULL OR (vs.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (vs.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_almacen_id IS NULL OR vs.almacen_id=p_almacen_id) AND (p_tipo IS NULL OR p_tipo='' OR vs.tipo=p_tipo) ORDER BY vs.fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$
+BEGIN IF NOT public.tiene_permiso('reportes','ver') THEN RAISE EXCEPTION 'No tenés permiso para ver reportes.' USING ERRCODE='42501'; END IF; IF p_limite IS NULL OR p_limite>200 OR p_limite<1 THEN p_limite:=50; END IF; IF p_offset IS NULL OR p_offset<0 THEN p_offset:=0; END IF; RETURN QUERY SELECT vs.id,vs.fecha,p.nombre,a.nombre,vs.tipo,vs.cantidad FROM vales_salida vs LEFT JOIN productos p ON p.id=vs.producto_id LEFT JOIN almacenes a ON a.id=vs.almacen_id WHERE (p_desde IS NULL OR (vs.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (vs.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_almacen_id IS NULL OR vs.almacen_id=p_almacen_id) AND (p_tipo IS NULL OR p_tipo='' OR vs.tipo=p_tipo) ORDER BY vs.fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$;
 
 CREATE OR REPLACE FUNCTION public.reporte_ventas(p_desde date DEFAULT NULL::date, p_hasta date DEFAULT NULL::date, p_almacen_id uuid DEFAULT NULL::uuid, p_producto_id uuid DEFAULT NULL::uuid, p_limite integer DEFAULT 50, p_offset integer DEFAULT 0)
  RETURNS TABLE(id uuid, fecha timestamp with time zone, almacen_id uuid, almacen text, total numeric, lineas jsonb)
@@ -333,6 +332,6 @@ CREATE OR REPLACE FUNCTION public.reporte_ventas(p_desde date DEFAULT NULL::date
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 BEGIN IF NOT public.tiene_permiso('reportes','ver') THEN RAISE EXCEPTION 'No tenés permiso para ver reportes.' USING ERRCODE='42501'; END IF; IF p_limite IS NULL OR p_limite>200 OR p_limite<1 THEN p_limite:=50; END IF; IF p_offset IS NULL OR p_offset<0 THEN p_offset:=0; END IF;
-RETURN QUERY SELECT v.id,v.fecha,v.almacen_id,a.nombre,v.total,coalesce((SELECT jsonb_agg(jsonb_build_object('producto_id',vl.producto_id,'producto',p.nombre,'cantidad',vl.cantidad,'precio_unitario',vl.precio_unitario,'subtotal',vl.cantidad*vl.precio_unitario)) FROM ventas_lineas vl JOIN productos p ON p.id=vl.producto_id WHERE vl.venta_id=v.id AND (p_producto_id IS NULL OR vl.producto_id=p_producto_id)),'[]'::jsonb) FROM ventas v LEFT JOIN almacenes a ON a.id=v.almacen_id WHERE (p_desde IS NULL OR (v.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (v.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_almacen_id IS NULL OR v.almacen_id=p_almacen_id) ORDER BY v.fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$
+RETURN QUERY SELECT v.id,v.fecha,v.almacen_id,a.nombre,v.total,coalesce((SELECT jsonb_agg(jsonb_build_object('producto_id',vl.producto_id,'producto',p.nombre,'cantidad',vl.cantidad,'precio_unitario',vl.precio_unitario,'subtotal',vl.cantidad*vl.precio_unitario)) FROM ventas_lineas vl JOIN productos p ON p.id=vl.producto_id WHERE vl.venta_id=v.id AND (p_producto_id IS NULL OR vl.producto_id=p_producto_id)),'[]'::jsonb) FROM ventas v LEFT JOIN almacenes a ON a.id=v.almacen_id WHERE (p_desde IS NULL OR (v.fecha AT TIME ZONE 'America/Havana')::date>=p_desde) AND (p_hasta IS NULL OR (v.fecha AT TIME ZONE 'America/Havana')::date<=p_hasta) AND (p_almacen_id IS NULL OR v.almacen_id=p_almacen_id) ORDER BY v.fecha DESC LIMIT p_limite OFFSET p_offset; END; $function$;
 
 COMMIT;
