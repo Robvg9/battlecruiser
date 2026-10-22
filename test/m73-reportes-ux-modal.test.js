@@ -5,7 +5,7 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 test("M73 reportes: siete días por defecto, ranking agregado y modales sin scroll de fondo", async () => {
-  const dom = new JSDOM(\`<!doctype html><html><head></head><body>
+  const dom = new JSDOM(`<!doctype html><html><head></head><body>
     <section id="tab-reportes" class="tab-panel">
       <div class="pendientes-header"><h3>Reportes</h3><span id="reportes-conn-info"></span></div>
       <div class="bc-m42-metrics"></div>
@@ -27,7 +27,7 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
           <div id="rep-detalle" class="lista"></div><div id="rep-paginacion"></div>
         </div>
       </div></div>
-    </section></body></html>\`, { runScripts: "dangerously", url: "https://app.test/" });
+    </section></body></html>`, { runScripts: "dangerously", url: "https://app.test/" });
   const { window } = dom;
   const calls = [];
   window.money = value => Number(value || 0).toFixed(2);
