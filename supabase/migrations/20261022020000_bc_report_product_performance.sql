@@ -50,5 +50,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.reporte_productos_ventas(date, date, uuid, text, int) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.reporte_productos_ventas(date, date, uuid, text, int) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.reporte_productos_ventas(date, date, uuid, text, int) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.reporte_productos_ventas(date, date, uuid, text, int) TO authenticated;
