@@ -61,8 +61,8 @@
   function getFilters() {
     var tab = reportTab();
     if (!tab) return { desde: null, hasta: null, almacen: null };
-    var from = tab.querySelector('#rep-filtro-desde');
-    var to = tab.querySelector('#rep-filtro-hasta');
+    var from = document.getElementById('rep-filtro-desde');
+    var to = document.getElementById('rep-filtro-hasta');
     var warehouse = tab.querySelector('#rep-filtro-almacen');
     return {
       desde: from && from.value ? from.value : null,
@@ -171,7 +171,7 @@
     return createModal('bc-m73-ranking-modal', 'Ranking de productos');
   }
   function normalizeRows() {
-    var detail = document.querySelector('#tab-reportes #rep-detalle');
+    var detail = document.querySelector('#bc-m73-report-modal #rep-detalle') || document.querySelector('#tab-reportes #rep-detalle');
     if (!detail) return;
     detail.querySelectorAll('.bc1715-ref').forEach(function (node) { node.remove(); });
     detail.querySelectorAll('.rep-fila:not(.rep-totales)').forEach(function (row) {
@@ -185,6 +185,9 @@
     var detail = tab.querySelector('.bc-m42-detail');
     var modal = getReportModal();
     var modalBody = modal.querySelector('.bc-m73-modal-body');
+    // Wait for the dashboard accordion to exist before moving its content; otherwise
+    // the dashboard's own initializer cannot discover the report block.
+    if (!detail && !modalBody.querySelector('#rep-detalle')) return false;
     if (detail) {
       var detailBody = detail.querySelector('.bc-m42-detail-body');
       if (detailBody && detailBody.querySelector('#rep-detalle')) {
@@ -192,7 +195,7 @@
         detail.remove();
       }
     }
-    var reportList = tab.querySelector('#rep-detalle');
+    var reportList = modalBody.querySelector('#rep-detalle') || tab.querySelector('#rep-detalle');
     var block = reportList && reportList.closest('.cc-bloque');
     if (block && !modalBody.contains(block)) modalBody.appendChild(block);
 
@@ -223,9 +226,9 @@
   function syncPeriodVisibility() {
     var tab = reportTab();
     if (!tab) return;
-    var select = tab.querySelector('#rep-filtro-periodo');
+    var select = document.getElementById('rep-filtro-periodo');
     var custom = !!(select && select.value === 'custom');
-    [tab.querySelector('#rep-filtro-desde'), tab.querySelector('#rep-filtro-hasta')].forEach(function (input) {
+    [document.getElementById('rep-filtro-desde'), document.getElementById('rep-filtro-hasta')].forEach(function (input) {
       var label = input && input.closest('label');
       if (label) label.classList.toggle('bc-m73-dates-hidden', !custom);
     });
@@ -233,9 +236,9 @@
   function applyPreset(preset, reload) {
     var tab = reportTab();
     if (!tab) return;
-    var select = tab.querySelector('#rep-filtro-periodo');
-    var from = tab.querySelector('#rep-filtro-desde');
-    var to = tab.querySelector('#rep-filtro-hasta');
+    var select = document.getElementById('rep-filtro-periodo');
+    var from = document.getElementById('rep-filtro-desde');
+    var to = document.getElementById('rep-filtro-hasta');
     if (select) select.value = preset;
     if (preset !== 'custom') {
       var range = rangeFor(preset);
@@ -248,7 +251,9 @@
   function ensurePeriodControls() {
     var tab = reportTab();
     if (!tab) return;
-    var filters = tab.querySelector('.bc-m42-filters') || tab.querySelector('#reportes-filtros');
+    var filters = document.querySelector('#bc-m73-report-modal .bc-m42-filters') ||
+      document.querySelector('#bc-m73-report-modal #reportes-filtros') ||
+      tab.querySelector('.bc-m42-filters') || tab.querySelector('#reportes-filtros');
     if (!filters) return;
     var field = filters.querySelector('.bc-m73-period-field');
     if (!field) {
@@ -268,13 +273,13 @@
       if (input && !input.dataset.bcM73Bound) {
         input.dataset.bcM73Bound = '1';
         input.addEventListener('change', function () {
-          var select = tab.querySelector('#rep-filtro-periodo');
+          var select = document.getElementById('rep-filtro-periodo');
           if (select) select.value = 'custom';
           syncPeriodVisibility();
         });
       }
     });
-    var selectNow = tab.querySelector('#rep-filtro-periodo');
+    var selectNow = document.getElementById('rep-filtro-periodo');
     if (selectNow && selectNow.dataset.bcM73Initialized !== '1') {
       selectNow.dataset.bcM73Initialized = '1';
       if ((!from || !from.value) && (!to || !to.value)) applyPreset('7', false);
@@ -305,8 +310,11 @@
     target.dataset.queryKey = thisKey;
     target.innerHTML = '<div class="bc-m73-empty">Calculando ranking de todo el período…</div>';
     try {
-      if (!window.client || typeof window.client.rpc !== 'function') throw new Error('Conexión de datos no disponible');
-      var response = await window.client.rpc('reporte_productos_ventas', {
+      var rpcClient = null;
+      try { if (typeof client !== 'undefined' && client) rpcClient = client; } catch (_) {}
+      if (!rpcClient && window.client) rpcClient = window.client;
+      if (!rpcClient || typeof rpcClient.rpc !== 'function') throw new Error('Conexión de datos no disponible');
+      var response = await rpcClient.rpc('reporte_productos_ventas', {
         p_desde: filters.desde || null,
         p_hasta: filters.hasta || null,
         p_almacen_id: filters.almacen || null,
@@ -351,7 +359,7 @@
     ensureReportModalLayout();
     var tab = reportTab();
     if (reporte && tab) {
-      var target = Array.prototype.slice.call(tab.querySelectorAll('.rep-tab-btn')).find(function (button) {
+      var target = Array.prototype.slice.call(document.querySelectorAll('#bc-m73-report-modal .rep-tab-btn, #tab-reportes .rep-tab-btn')).find(function (button) {
         return button.dataset.rep === reporte;
       });
       if (target && !target.classList.contains('active')) target.click();
@@ -430,7 +438,8 @@
     wrapRefresh();
     installCaptureHandlers();
     if (ready) {
-      var filters = reportTab().querySelector('#reportes-filtros, .bc-m42-filters');
+      var filters = document.querySelector('#bc-m73-report-modal #reportes-filtros, #bc-m73-report-modal .bc-m42-filters') ||
+        reportTab().querySelector('#reportes-filtros, .bc-m42-filters');
       if (filters && !filters.dataset.bcM73DefaultApply && typeof window.refrescarReportes === 'function') {
         filters.dataset.bcM73DefaultApply = '1';
         // Once the seven-day defaults are set, reload with this finite window.
