@@ -9,6 +9,7 @@
   var rankingBusy = '';
   var rankingSequence = 0;
   var reportBodyObserver = null;
+  var topProductsObserver = null;
 
   function safeText(v) { return String(v == null ? '' : v); }
   function esc(v) {
@@ -220,6 +221,15 @@
       reportBodyObserver = new MutationObserver(function () { normalizeRows(); });
       reportBodyObserver.observe(reportList, { childList: true, subtree: true });
     }
+    var topList = tab.querySelector('#bc-m42-top-products');
+    if (!topProductsObserver && topList && typeof MutationObserver !== 'undefined') {
+      topProductsObserver = new MutationObserver(function () {
+        // M42 can rerender its legacy first-page ranking after its delayed boot.
+        // Replace that snapshot with the database-wide aggregate if necessary.
+        if (!rankingBusy && !topList.querySelector('.bc-m73-ranking-row')) refreshTopProducts(true);
+      });
+      topProductsObserver.observe(topList, { childList: true, subtree: true });
+    }
     ensurePeriodControls();
     return !!(modalBody.querySelector('#rep-detalle'));
   }
@@ -416,9 +426,12 @@
       }
       if (target.id === 'rep-limpiar-btn') {
         event.preventDefault(); event.stopImmediatePropagation();
-        var warehouse = reportTab() && reportTab().querySelector('#rep-filtro-almacen');
-        if (warehouse) warehouse.value = '';
-        applyPreset('7', false);
+        if (typeof window.limpiarFiltrosReportes === 'function') window.limpiarFiltrosReportes();
+        else {
+          var warehouse = reportTab() && reportTab().querySelector('#rep-filtro-almacen');
+          if (warehouse) warehouse.value = '';
+          applyPreset('7', false);
+        }
         refreshReports();
       }
     }, true);
@@ -464,6 +477,8 @@
   window.BattleCruiserReportesM73 = {
     openReportModal: openReportModal,
     openRankingModal: openRankingModal,
+    applyPreset: applyPreset,
+    syncPeriodControls: syncPeriodVisibility,
     refreshTopProducts: refreshTopProducts,
     verify: function () {
       return {
