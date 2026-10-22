@@ -3,7 +3,7 @@
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
  */
-var BC_SW_VERSION = "9.5.10";
+var BC_SW_VERSION = "9.5.11";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_SHELL = ["./", "./index.html", "./app.js", "./style.css", "./js/offline.js", "./js/mi-cuenta.js?v=1.2", "./js/hotfix-configuracion-20260902.js?v=20261020.4", "./js/network-core.js?v=20261020.4", "./js/configuracion-ajustes-migrados-20260903.js?v=4"];
