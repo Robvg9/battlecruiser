@@ -97,7 +97,7 @@
       // An aria-label overrides the row's descendant text in accessibility trees.
       // Include a concise summary so Android/screen readers can still read the
       // visible row without opening its detail modal.
-      const summary=String(row.innerText||row.textContent||'').replace(/\\s+/g,' ').trim();
+      const summary=String(row.innerText||row.textContent||'').replace(/\s+/g,' ').trim();
       const accessibleName=summary?'Abrir detalle del registro: '+summary:'Abrir detalle del registro';
       row.setAttribute('aria-label',accessibleName.slice(0,420));
     });
