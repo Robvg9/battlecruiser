@@ -231,22 +231,23 @@ test("B5.4: filtros se aplican al backend (fecha + almacén)", async () => {
   assert.strictEqual(callResumen.params.p_almacen_id, "a1", "filtro almacén aplicado");
 });
 
-test("B5.4: limpiar filtros resetea los valores", async () => {
+test("B5.4: limpiar filtros restaura un período corto de siete días", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "reportes", accion: "ver" }],
   });
   marcarOnline(window);
   await esperar(80);
-  window._cache.almacenes = [{ id: "a1", nombre: "Caja 1" }];
-  document.getElementById("rep-filtro-desde").value = "2026-08-01";
-  document.getElementById("rep-filtro-almacen").value = "a1";
-  document.getElementById("rep-limpiar-btn").click();
-  await esperar(20);
-  assert.strictEqual(document.getElementById("rep-filtro-desde").value, "", "filtro desde limpiado");
-  assert.strictEqual(document.getElementById("rep-filtro-almacen").value, "", "filtro almacén limpiado");
+  const desde = document.getElementById("rep-filtro-desde");
+  const hasta = document.getElementById("rep-filtro-hasta");
+  desde.value = "2026-08-01";
+  hasta.value = "2026-08-31";
+  window.limpiarFiltrosReportes();
+  assert.match(desde.value, /^\d{4}-\d{2}-\d{2}$/, "fecha inicial válida");
+  assert.match(hasta.value, /^\d{4}-\d{2}-\d{2}$/, "fecha final válida");
+  const dias = (Date.parse(hasta.value + "T12:00:00Z") - Date.parse(desde.value + "T12:00:00Z")) / 86400000;
+  assert.strictEqual(dias, 6, "siete días inclusivos evitan recuperar el historial completo");
 });
-
 test("B5.20: no se crean stores/colas/cachés duplicados", async () => {
   const { window } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],

@@ -3,8 +3,9 @@
   'use strict';
   if (document.getElementById('bc-historial-detalle-style')) return;
   const style=document.createElement('style'); style.id='bc-historial-detalle-style'; style.textContent=`
-    #historial-detalle-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px}
+    #historial-detalle-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px}
     #historial-detalle-modal.hidden{display:none}
+    html.historial-detalle-abierto,body.historial-detalle-abierto{overflow:hidden!important;overscroll-behavior:none!important}
     .historial-detalle-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72)}
     .historial-detalle-card{position:relative;width:min(680px,100%);max-height:min(86vh,760px);overflow:auto;background:var(--void,#0c1c18);border:1px solid var(--gold-dim,#c9a24d55);border-radius:10px;box-shadow:0 18px 60px rgba(0,0,0,.45);padding:18px;color:var(--text,#eee)}
     .historial-detalle-card h2{margin:0 42px 16px 0;font-size:20px;color:var(--gold,#c9a24d)}
@@ -21,7 +22,7 @@
 
   const esc=v=>typeof escHtml==='function'?escHtml(String(v??'—')):String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const moneySafe=v=>typeof money==='function'?'$'+money(v):String(v??'—');
-  const labels={id:'Referencia',fecha:'Fecha y hora',fecha_compra:'Fecha de compra',almacen:'Almacén',origen:'Almacén origen',destino:'Almacén destino',estado:'Estado',tipo:'Tipo',producto:'Producto',categoria:'Categoría',cantidad:'Cantidad',cantidad_inicial:'Cantidad inicial',cantidad_restante:'Cantidad restante',minimo:'Mínimo',unidades:'Unidades',total:'Total',ingreso:'Ingreso',costo_total:'Costo total / CMV',costo_unitario:'Costo unitario',margen:'Ganancia',margen_porcentaje:'Margen %',direccion:'Dirección'};
+  const labels={fecha:'Fecha y hora',fecha_compra:'Fecha de compra',almacen:'Almacén',origen:'Almacén origen',destino:'Almacén destino',estado:'Estado',tipo:'Tipo',producto:'Producto',categoria:'Categoría',cantidad:'Cantidad',cantidad_inicial:'Cantidad inicial',cantidad_restante:'Cantidad restante',minimo:'Mínimo',unidades:'Unidades',total:'Total',ingreso:'Ingreso',costo_total:'Costo de productos',costo_unitario:'Costo unitario',margen:'Ganancia',margen_porcentaje:'Margen %',direccion:'Dirección',proveedor:'Proveedor',nota:'Nota',costo_disponible:'Costo histórico disponible',lineas_sin_costo:'Líneas sin costo histórico'};
   const tituloMap={ventas:'Venta',transferencias:'Transferencia',vales:'Vale de salida',stock:'Stock',movimiento:'Movimiento de inventario',compras:'Compra',rentabilidad:'Rentabilidad'};
 
   function fmt(key,v){
@@ -39,7 +40,7 @@
     el=document.createElement('div'); el.id='historial-detalle-modal'; el.className='hidden'; el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true');
     el.innerHTML='<div class="historial-detalle-backdrop"></div><section class="historial-detalle-card" tabindex="-1"><button type="button" class="historial-detalle-close" aria-label="Cerrar">×</button><h2></h2><div class="historial-detalle-body"></div></section>';
     document.body.appendChild(el);
-    const close=()=>{el.classList.add('hidden');document.body.classList.remove('historial-detalle-abierto');};
+    const close=()=>{el.classList.add('hidden');document.body.classList.remove('historial-detalle-abierto');document.documentElement.classList.remove('historial-detalle-abierto');const back=el._returnFocus;if(back&&back.isConnected&&typeof back.focus==='function')back.focus();};
     el.querySelector('.historial-detalle-close').onclick=close;
     el.querySelector('.historial-detalle-backdrop').onclick=close;
     el._close=close;
@@ -49,16 +50,17 @@
   function renderRow(row){
     const parts=[];
     Object.entries(row||{}).forEach(([k,v])=>{
-      if(['lineas','almacenes','productos'].includes(k)||v===null||v===undefined||v==='') return;
-      if(typeof v==='object') return;
-      parts.push('<div class="historial-detalle-row"><span>'+esc(labels[k]||k)+'</span><strong>'+esc(fmt(k,v))+'</strong></div>');
+      if(['lineas','almacenes','productos'].includes(k)||/^(id|.*_id|created_at|updated_at|created_by|updated_by)$/i.test(k)) return;
+      if(v===null||v===undefined||v===''||typeof v==='object') return;
+      if(!Object.prototype.hasOwnProperty.call(labels,k)) return;
+      parts.push('<div class="historial-detalle-row"><span>'+esc(labels[k])+'</span><strong>'+esc(fmt(k,v))+'</strong></div>');
     });
     if(row&&row.almacenes&&typeof row.almacenes==='object') parts.push('<div class="historial-detalle-row"><span>Almacén</span><strong>'+esc(row.almacenes.nombre||'—')+'</strong></div>');
     if(row&&row.productos&&typeof row.productos==='object') parts.push('<div class="historial-detalle-row"><span>Producto</span><strong>'+esc(row.productos.nombre||'—')+'</strong></div>');
     if(Array.isArray(row&&row.lineas)){
       parts.push('<div class="historial-detalle-section">Detalle de productos</div>');
       row.lineas.forEach((l,i)=>{
-        const nombre=l.producto||l.nombre||l.producto_nombre||l.productos?.nombre||l.producto_id||'Producto';
+        const nombre=l.producto||l.nombre||l.producto_nombre||l.productos?.nombre||'Producto';
         const vals=[]; if(l.cantidad!=null) vals.push(l.cantidad+' u'); if(l.precio_unitario!=null) vals.push(moneySafe(l.precio_unitario)); if(l.subtotal!=null) vals.push(moneySafe(l.subtotal));
         parts.push('<div class="historial-detalle-fila"><span>'+esc((i+1)+'. '+nombre)+'</span><strong>'+esc(vals.join(' · '))+'</strong></div>');
       });
@@ -85,12 +87,13 @@
     const modal=ensureModal(); const body=modal.querySelector('.historial-detalle-body'); const h2=modal.querySelector('h2');
     const sub=typeof _repSubreporte!=='undefined'?_repSubreporte:'movimiento';
     const rows=Array.from(document.querySelectorAll('#rep-detalle .rep-fila:not(.rep-totales)')); const index=rows.indexOf(row);
-    h2.textContent='Detalle · '+(tituloMap[sub]||'Registro'); body.innerHTML='<p class="lista-estado">Cargando detalle…</p>'; modal.classList.remove('hidden'); document.body.classList.add('historial-detalle-abierto'); modal.querySelector('.historial-detalle-card').focus();
-    try{const data=await obtenerFila(sub,index); if(!data) throw new Error('Registro no encontrado'); h2.textContent=(tituloMap[sub]||'Registro')+(data.id&&typeof idCorto==='function'?' #'+idCorto(data.id):''); body.innerHTML=renderRow(data);}catch(e){body.innerHTML='<p class="lista-estado">No se pudo cargar el detalle completo.</p>';console.warn('[Battlecruiser] historial detalle:',e);}
+    h2.textContent=tituloMap[sub]||'Detalle del registro'; body.innerHTML='<p class="lista-estado">Cargando información…</p>'; modal._returnFocus=row; modal.classList.remove('hidden'); document.body.classList.add('historial-detalle-abierto'); document.documentElement.classList.add('historial-detalle-abierto'); modal.querySelector('.historial-detalle-card').focus();
+    try{const data=await obtenerFila(sub,index); if(!data) throw new Error('Registro no encontrado'); h2.textContent=tituloMap[sub]||'Detalle del registro'; body.innerHTML=renderRow(data);}catch(e){body.innerHTML='<p class="lista-estado">No se pudo cargar el detalle completo.</p>';console.warn('[Battlecruiser] historial detalle:',e);}
   }
 
   function marcarFilas(){
     document.querySelectorAll('#rep-detalle .rep-fila:not(.rep-totales)').forEach(row=>{
+      row.querySelectorAll('.bc1715-ref').forEach(ref=>ref.remove());
       row.classList.add('lista-item-accion');
       row.setAttribute('role','button');
       row.setAttribute('tabindex','0');
