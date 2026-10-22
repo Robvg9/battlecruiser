@@ -77,8 +77,8 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
 
   window.document.querySelector(".bc-m45-quick-btn[data-rep=ventas]").click();
   await new Promise(resolve => window.setTimeout(resolve, 10));
-  assert.ok(!ranking.hidden, "quick report opens the detail modal independently");
-  assert.ok(!modal.hidden, "detail modal remains open");
+  assert.ok(ranking.hidden, "switching modal types closes the previous modal");
+  assert.ok(!modal.hidden, "quick action opens the detail modal");
   const close = modal.querySelector(".bc-m73-modal-close");
   close.click();
   assert.ok(modal.hidden, "modal can be closed");
