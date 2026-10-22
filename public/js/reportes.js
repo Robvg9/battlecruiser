@@ -22,6 +22,32 @@ function fechaHoraReporte(fecha) {
   });
 }
 
+// Fechas del negocio en zona horaria de Cuba.
+function fechaISOReportesActual() {
+  const p = {};
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(new Date()).forEach((x) => { if (x.type !== "literal") p[x.type] = x.value; });
+  return p.year + "-" + p.month + "-" + p.day;
+}
+function desplazarFechaISOReportes(value, dias) {
+  const p = String(value).split("-").map(Number);
+  const d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  d.setUTCDate(d.getUTCDate() + Number(dias || 0));
+  return d.toISOString().slice(0, 10);
+}
+function establecerUltimosSieteDiasReportes() {
+  const desde = document.getElementById("rep-filtro-desde");
+  const hasta = document.getElementById("rep-filtro-hasta");
+  const fin = fechaISOReportesActual();
+  if (desde) desde.value = desplazarFechaISOReportes(fin, -6);
+  if (hasta) hasta.value = fin;
+  const periodo = document.getElementById("rep-filtro-periodo");
+  if (periodo) periodo.value = "7";
+  if (window.BattleCruiserReportesM73 && typeof window.BattleCruiserReportesM73.applyPreset === "function") {
+    window.BattleCruiserReportesM73.applyPreset("7", false);
+  }
+}
+
 // Poblar el select de almacenes con los ya cacheados (sin consulta nueva).
 function poblarFiltrosReportes() {
   poblarSelectAlmacenes(document.getElementById("rep-filtro-almacen"));
@@ -39,12 +65,9 @@ function leerFiltrosReportes() {
 }
 
 function limpiarFiltrosReportes() {
-  const desde = document.getElementById("rep-filtro-desde");
-  const hasta = document.getElementById("rep-filtro-hasta");
   const almacen = document.getElementById("rep-filtro-almacen");
-  if (desde) desde.value = "";
-  if (hasta) hasta.value = "";
   if (almacen) almacen.value = "";
+  establecerUltimosSieteDiasReportes();
   _repPagina = 0;
 }
 
