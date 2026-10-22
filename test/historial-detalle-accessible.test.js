@@ -62,9 +62,9 @@ test("report rows expose a concise visible summary in their accessible name", ()
 
 
 test("report detail modal omits technical IDs and locks the underlying page", async () => {
-  const dom = new JSDOM(\`<!doctype html><html><head></head><body>
+  const dom = new JSDOM(`<!doctype html><html><head></head><body>
     <div id="rep-detalle"><div class="rep-fila">Venta visible</div></div>
-  </body></html>\`, { runScripts: "dangerously", url: "https://app.test/" });
+  </body></html>`, { runScripts: "dangerously", url: "https://app.test/" });
   const { window } = dom;
   window.safeInit = (_name, initialize) => initialize();
   window.leerFiltrosReportes = () => ({ desde: "2026-08-25", hasta: "2026-08-25", almacen: null });
