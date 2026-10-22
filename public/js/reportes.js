@@ -7,6 +7,21 @@ let _repSubreporte = "ventas";
 let _repPagina = 0;
 const _REP_POR_PAG = 25;
 
+// Date-only report filters are evaluated in the same business timezone as displayed dates.
+// Do not inherit the device timezone: Android/PC browser defaults can differ from Cuba.
+function fechaHoraReporte(fecha) {
+  if (!fecha) return "—";
+  const d = new Date(fecha);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleString("es", {
+    timeZone: "America/Havana",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // Poblar el select de almacenes con los ya cacheados (sin consulta nueva).
 function poblarFiltrosReportes() {
   poblarSelectAlmacenes(document.getElementById("rep-filtro-almacen"));
@@ -176,7 +191,7 @@ function renderVentas(filas) {
   filas.forEach((v) => {
     const div = document.createElement("div");
     div.className = "rep-fila";
-    const fecha = v.fecha ? fechaHora(v.fecha) : "—";
+    const fecha = v.fecha ? fechaHoraReporte(v.fecha) : "—";
     let lineasHtml = "";
     if (Array.isArray(v.lineas)) {
       lineasHtml = v.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + (l.cantidad || 0) + " u · $" + money(l.precio_unitario || 0) + " = $" + money(l.subtotal || 0) + "</div>").join("");
@@ -194,7 +209,7 @@ function renderTransferencias(filas) {
   filas.forEach((t) => {
     const div = document.createElement("div");
     div.className = "rep-fila";
-    const fecha = t.fecha ? fechaHora(t.fecha) : "—";
+    const fecha = t.fecha ? fechaHoraReporte(t.fecha) : "—";
     let lineasHtml = "";
     if (Array.isArray(t.lineas)) {
       lineasHtml = t.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + (l.cantidad || 0) + " u</div>").join("");
@@ -212,7 +227,7 @@ function renderVales(filas) {
   filas.forEach((va) => {
     const div = document.createElement("div");
     div.className = "rep-fila";
-    const fecha = va.fecha ? fechaHora(va.fecha) : "—";
+    const fecha = va.fecha ? fechaHoraReporte(va.fecha) : "—";
     div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(va.tipo || "—") + '</span><span class="muted">' + escHtml(va.producto || "—") + ' · ' + escHtml(va.almacen || "—") + ' · ' + (va.cantidad || 0) + ' u · ' + fecha + '</span></span>';
     el.appendChild(div);
   });
@@ -240,7 +255,7 @@ function renderMovimiento(filas) {
   filas.forEach((m) => {
     const div = document.createElement("div");
     div.className = "rep-fila rep-dir-" + (m.direccion || "");
-    const fecha = m.fecha ? fechaHora(m.fecha) : "—";
+    const fecha = m.fecha ? fechaHoraReporte(m.fecha) : "—";
     const icono = m.direccion === "entrada" ? "⬆️" : "⬇️";
     div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(m.tipo || "—") + '</span><span class="muted">' + escHtml(m.producto || "—") + ' · ' + escHtml(m.almacen || "—") + ' · ' + (m.cantidad || 0) + ' u · ' + fecha + '</span></span>';
     el.appendChild(div);
@@ -261,7 +276,7 @@ function renderCompras(filas) {
   filas.forEach((c) => {
     const div = document.createElement("div");
     div.className = "rep-fila";
-    const fecha = c.fecha_compra ? fechaHora(c.fecha_compra) : "—";
+    const fecha = c.fecha_compra ? fechaHoraReporte(c.fecha_compra) : "—";
     const estadoTxt = ESTADO_TXT[c.estado] || c.estado || "—";
     div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(c.producto || "—") + '</span><span class="muted">' + escHtml(c.almacen || "—") + ' · ' + fecha + ' · ' + (c.cantidad_restante ?? 0) + '/' + (c.cantidad_inicial ?? 0) + ' u (' + escHtml(estadoTxt) + ') · Costo unit. $' + money(c.costo_unitario || 0) + ' · Total $' + money(c.costo_total || 0) + '</span></span>';
     el.appendChild(div);
@@ -301,7 +316,7 @@ function renderRentabilidad(filas) {
     }
     const div = document.createElement("div");
     div.className = "rep-fila";
-    const fecha = r.fecha ? fechaHora(r.fecha) : "—";
+    const fecha = r.fecha ? fechaHoraReporte(r.fecha) : "—";
     div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(r.almacen || "—") + '</span><span class="muted">' + fecha + ' · Ing $' + money(ingresos) + ' · CMV ' + escHtml(cmvTxt) + ' · <b>Gan ' + escHtml(ganTxt) + '</b> (' + escHtml(margenTxt) + ')</span></span>';
     el.appendChild(div);
   });

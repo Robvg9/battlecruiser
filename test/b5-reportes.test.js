@@ -181,9 +181,11 @@ test("B5.6: estado vacío cuando no hay datos", async () => {
   marcarOnline(window);
   await esperar(80);
   await window.refrescarReportes();
-  await esperar(20);
   const detalle = document.getElementById("rep-detalle");
-  assert.ok(/Sin ventas/.test(detalle.innerHTML), "debe mostrar estado vacío");
+  assert.ok(
+    await esperarHasta(() => /Sin ventas/.test(detalle.innerHTML)),
+    "debe mostrar estado vacío dentro de 2 s"
+  );
 });
 
 test("B5.17: offline no inventa datos de reportes", async () => {
