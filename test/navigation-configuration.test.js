@@ -11,6 +11,47 @@ const visual = fs.readFileSync("public/js/ui-visual-salon.js", "utf8");
 const permissions = fs.readFileSync("public/js/permisos-navegacion.js", "utf8");
 const regression = fs.readFileSync("public/js/hotfix-regresiones-20260902.js", "utf8");
 
+const navigation = fs.readFileSync("public/js/navegacion.js", "utf8");
+const sectionVisibility = fs.readFileSync("public/js/hotfix-secciones-visibles-20260903.js", "utf8");
+const hideVales = fs.readFileSync("public/js/m12-fe5-hide-vales.js", "utf8");
+
+
+test("RWHT navigation contract: 19 logical routes, 16 visible destinations, hidden-route aliases preserved", () => {
+  const routeIds = [...index.matchAll(/<button\b[^>]*\bdata-tab="([^"]+)"/g)].map(match => match[1]);
+  const panelIds = [...index.matchAll(/<section\b[^>]*\bid="tab-([^"]+)"/g)].map(match => match[1]);
+  const expectedVisible = [
+    "resumen", "productos", "ventas", "almacenes", "pendientes", "reportes",
+    "inventario", "movimientos", "ciclos", "operacion", "comunicacion",
+    "mando", "usuarios", "config", "conectividad", "preferencias",
+  ];
+  const expectedHidden = ["transferencias", "vales", "turnos"];
+
+  assert.equal(routeIds.length, 19, "the source declares 19 logical navigation buttons");
+  assert.equal(new Set(routeIds).size, 19, "logical navigation IDs must be unique");
+  assert.equal(panelIds.length, 19, "the source declares 19 logical tab panels");
+  assert.deepEqual(
+    [...new Set(panelIds)].sort(),
+    [...new Set(routeIds)].sort(),
+    "each declared route must have exactly one matching tab panel"
+  );
+  assert.deepEqual(
+    routeIds.filter(id => !expectedHidden.includes(id)).sort(),
+    expectedVisible.slice().sort(),
+    "the visible route contract must be the documented 16 destinations"
+  );
+
+  for (const id of expectedHidden) {
+    assert.ok(routeIds.includes(id), "hidden/aliased logical route must remain explicit: " + id);
+  }
+  assert.match(permissions, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
+  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true \}/);
+  assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
+  assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
+  assert.match(app, /m12-fe5-hide-vales\.js/);
+  assert.match(hideVales, /removeChild\(panel\)/, "Vales panel is deliberately removed by the loaded module");
+});
+
+
 test("Configuración agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
   const normalizedIndex = index.replace(/\r\n/g, "\n");
   const groupStart = normalizedIndex.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
