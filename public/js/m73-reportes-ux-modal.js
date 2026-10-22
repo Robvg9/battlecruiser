@@ -334,18 +334,331 @@
       if (target.dataset.queryKey !== thisKey) return;
       if (response.error) throw response.error;
       var rows = Array.isArray(response.data) ? response.data : [];
+      var gainSort = order === 'ganancia_desc' || order === 'ganancia_asc';
+      var knownLines = rows.reduce(function (sum, row) { return sum + Number(row.lineas_con_costo || 0); }, 0);
+      var unknownLines = rows.reduce(function (sum, row) { return sum + Number(row.lineas_sin_costo || 0); }, 0);
       if (!rows.length) {
         target.innerHTML = '<div class="bc-m73-empty">No hay productos vendidos en el período seleccionado.</div>';
       } else {
         target.innerHTML = rows.map(function (row, index) {
+          var hasGain = row.ganancia_conocida !== null && row.ganancia_conocida !== undefined;
+          var amount = gainSort ? (hasGain ? '
+    } catch (error) {
+      if (target.dataset.queryKey !== thisKey) return;
+      target.innerHTML = '<div class="bc-m73-empty">El ranking necesita conexión y el RPC de ranking actualizado. No se sustituyen datos reales por estimaciones.</div>';
+      if (note) note.textContent = '';
+      console.warn('[BattleCruiser] ranking de productos:', error);
+    }
+  }
+  function openRankingModal() {
+    ensureReportModalLayout();
+    var modal = getRankingModal();
+    var body = modal.querySelector('.bc-m73-modal-body');
+    body.innerHTML = '<div class="bc-m73-ranking-controls"><div><label for="bc-m73-ranking-sort">Ordenar productos por</label><select id="bc-m73-ranking-sort"><option value="unidades_desc">Más unidades vendidas</option><option value="unidades_asc">Menos unidades vendidas</option><option value="ingresos_desc">Mayor facturación</option><option value="ingresos_asc">Menor facturación</option><option value="ganancia_desc" disabled>Mayor ganancia (costos históricos no disponibles)</option></select></div></div><p class="bc-m73-ranking-note">La ganancia real requiere costo histórico fiable por producto/lote. Mientras no exista, esta opción permanece desactivada para no mostrar beneficios falsos.</p><div class="bc-m73-ranking-list" id="bc-m73-ranking-list"></div>';
+    var select = body.querySelector('#bc-m73-ranking-sort');
+    var list = body.querySelector('#bc-m73-ranking-list');
+    var note = body.querySelector('.bc-m73-ranking-note');
+    select.addEventListener('change', function () { fetchRanking(select.value, 500, list, note); });
+    showModal(modal, 'Ranking de productos');
+    fetchRanking(select.value, 500, list, note);
+  }
+  function openReportModal(reporte) {
+    ensureReportModalLayout();
+    var tab = reportTab();
+    if (reporte && tab) {
+      var target = Array.prototype.slice.call(document.querySelectorAll('#bc-m73-report-modal .rep-tab-btn, #tab-reportes .rep-tab-btn')).find(function (button) {
+        return button.dataset.rep === reporte;
+      });
+      if (target && !target.classList.contains('active')) target.click();
+    }
+    var modal = getReportModal();
+    showModal(modal, 'Información detallada');
+    ensurePeriodControls();
+  }
+  function refreshTopProducts(force) {
+    var tab = reportTab();
+    var list = tab && tab.querySelector('#bc-m42-top-products');
+    var note = tab && tab.querySelector('#bc-m42-top-note');
+    if (!list) return Promise.resolve();
+    ensurePeriodControls();
+    var filters = currentReportFilters();
+    var key = JSON.stringify([filters.desde, filters.hasta, filters.almacen]);
+    if (!force && (list.dataset.bcM73Key === key || rankingBusy === key)) return Promise.resolve();
+    rankingBusy = key;
+    var request = ++rankingSequence;
+    list.innerHTML = '<div class="bc-m73-empty">Calculando los 5 productos más vendidos…</div>';
+    var promise = fetchRanking('unidades_desc', 5, list, note).then(function () {
+      if (request !== rankingSequence) return;
+      list.dataset.bcM73Key = key;
+      list.dataset.bcM73Loaded = '1';
+    }).finally(function () { if (rankingBusy === key) rankingBusy = ''; });
+    return promise;
+  }
+  function wrapRefresh() {
+    if (window.refrescarReportes && !window.refrescarReportes.__bcM73Wrapped) {
+      var original = window.refrescarReportes;
+      var wrapped = async function () {
+        var result = await original.apply(this, arguments);
+        await refreshTopProducts(true);
+        return result;
+      };
+      wrapped.__bcM73Wrapped = true;
+      window.refrescarReportes = wrapped;
+    }
+  }
+  function installCaptureHandlers() {
+    if (document.documentElement.dataset.bcM73Capture === '1') return;
+    document.documentElement.dataset.bcM73Capture = '1';
+    document.addEventListener('click', function (event) {
+      var target = event.target && event.target.closest ? event.target.closest('button') : null;
+      if (!target) return;
+      if (target.id === 'bc-m42-open-details') {
+        event.preventDefault(); event.stopImmediatePropagation(); openRankingModal(); return;
+      }
+      if (target.id === 'bc-m42-show-details' || target.id === 'bc-m73-open-report') {
+        event.preventDefault(); event.stopImmediatePropagation(); openReportModal(); return;
+      }
+      if (target.classList.contains('bc-m45-quick-btn')) {
+        event.preventDefault(); event.stopImmediatePropagation(); openReportModal(target.dataset.rep || 'ventas'); return;
+      }
+      if (target.id === 'rep-limpiar-btn') {
+        event.preventDefault(); event.stopImmediatePropagation();
+        if (typeof window.limpiarFiltrosReportes === 'function') window.limpiarFiltrosReportes();
+        else {
+          var warehouse = reportTab() && reportTab().querySelector('#rep-filtro-almacen');
+          if (warehouse) warehouse.value = '';
+          applyPreset('7', false);
+        }
+        refreshReports();
+      }
+    }, true);
+  }
+  function addQuickModalBehavior() {
+    // The original quick actions remain in place and retain their active styling.
+    var quick = reportTab() && reportTab().querySelector('.bc-m45-quick');
+    if (quick) quick.querySelectorAll('.bc-m45-quick-btn').forEach(function (button) {
+      button.setAttribute('aria-haspopup', 'dialog');
+    });
+  }
+  function install() {
+    injectCss();
+    var ready = ensureReportModalLayout();
+    ensurePeriodControls();
+    addQuickModalBehavior();
+    wrapRefresh();
+    installCaptureHandlers();
+    if (ready) {
+      var filters = document.querySelector('#bc-m73-report-modal #reportes-filtros, #bc-m73-report-modal .bc-m42-filters') ||
+        reportTab().querySelector('#reportes-filtros, .bc-m42-filters');
+      if (filters && !filters.dataset.bcM73DefaultApply && typeof window.refrescarReportes === 'function') {
+        filters.dataset.bcM73DefaultApply = '1';
+        // Once the seven-day defaults are set, reload with this finite window.
+        if (document.getElementById('rep-filtro-periodo') && document.getElementById('rep-filtro-periodo').value === '7') {
+          refreshReports();
+        }
+      }
+      refreshTopProducts(false);
+    }
+    return ready;
+  }
+  function boot() {
+    var attempts = 0;
+    function attempt() {
+      attempts += 1;
+      install();
+      if (attempts < 14 && !document.querySelector('#bc-m73-report-modal #rep-detalle')) window.setTimeout(attempt, 350);
+    }
+    attempt();
+  }
+
+  window.BattleCruiserReportesM73 = {
+    openReportModal: openReportModal,
+    openRankingModal: openRankingModal,
+    applyPreset: applyPreset,
+    syncPeriodControls: syncPeriodVisibility,
+    refreshTopProducts: refreshTopProducts,
+    verify: function () {
+      return {
+        loaded: true,
+        periodPreset: !!document.querySelector('#tab-reportes #rep-filtro-periodo'),
+        reportModal: !!document.querySelector('#bc-m73-report-modal'),
+        rankingModal: !!document.querySelector('#bc-m73-ranking-modal'),
+        reportRowsInsideModal: !!document.querySelector('#bc-m73-report-modal #rep-detalle'),
+        inlineAccordionRemoved: !document.querySelector('#tab-reportes .bc-m42-detail')
+      };
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+})();
+ + money(row.ganancia_conocida) : '—') : '
+    } catch (error) {
+      if (target.dataset.queryKey !== thisKey) return;
+      target.innerHTML = '<div class="bc-m73-empty">El ranking necesita conexión y el RPC de ranking actualizado. No se sustituyen datos reales por estimaciones.</div>';
+      if (note) note.textContent = '';
+      console.warn('[BattleCruiser] ranking de productos:', error);
+    }
+  }
+  function openRankingModal() {
+    ensureReportModalLayout();
+    var modal = getRankingModal();
+    var body = modal.querySelector('.bc-m73-modal-body');
+    body.innerHTML = '<div class="bc-m73-ranking-controls"><div><label for="bc-m73-ranking-sort">Ordenar productos por</label><select id="bc-m73-ranking-sort"><option value="unidades_desc">Más unidades vendidas</option><option value="unidades_asc">Menos unidades vendidas</option><option value="ingresos_desc">Mayor facturación</option><option value="ingresos_asc">Menor facturación</option><option value="ganancia_desc" disabled>Mayor ganancia (costos históricos no disponibles)</option></select></div></div><p class="bc-m73-ranking-note">La ganancia real requiere costo histórico fiable por producto/lote. Mientras no exista, esta opción permanece desactivada para no mostrar beneficios falsos.</p><div class="bc-m73-ranking-list" id="bc-m73-ranking-list"></div>';
+    var select = body.querySelector('#bc-m73-ranking-sort');
+    var list = body.querySelector('#bc-m73-ranking-list');
+    var note = body.querySelector('.bc-m73-ranking-note');
+    select.addEventListener('change', function () { fetchRanking(select.value, 500, list, note); });
+    showModal(modal, 'Ranking de productos');
+    fetchRanking(select.value, 500, list, note);
+  }
+  function openReportModal(reporte) {
+    ensureReportModalLayout();
+    var tab = reportTab();
+    if (reporte && tab) {
+      var target = Array.prototype.slice.call(document.querySelectorAll('#bc-m73-report-modal .rep-tab-btn, #tab-reportes .rep-tab-btn')).find(function (button) {
+        return button.dataset.rep === reporte;
+      });
+      if (target && !target.classList.contains('active')) target.click();
+    }
+    var modal = getReportModal();
+    showModal(modal, 'Información detallada');
+    ensurePeriodControls();
+  }
+  function refreshTopProducts(force) {
+    var tab = reportTab();
+    var list = tab && tab.querySelector('#bc-m42-top-products');
+    var note = tab && tab.querySelector('#bc-m42-top-note');
+    if (!list) return Promise.resolve();
+    ensurePeriodControls();
+    var filters = currentReportFilters();
+    var key = JSON.stringify([filters.desde, filters.hasta, filters.almacen]);
+    if (!force && (list.dataset.bcM73Key === key || rankingBusy === key)) return Promise.resolve();
+    rankingBusy = key;
+    var request = ++rankingSequence;
+    list.innerHTML = '<div class="bc-m73-empty">Calculando los 5 productos más vendidos…</div>';
+    var promise = fetchRanking('unidades_desc', 5, list, note).then(function () {
+      if (request !== rankingSequence) return;
+      list.dataset.bcM73Key = key;
+      list.dataset.bcM73Loaded = '1';
+    }).finally(function () { if (rankingBusy === key) rankingBusy = ''; });
+    return promise;
+  }
+  function wrapRefresh() {
+    if (window.refrescarReportes && !window.refrescarReportes.__bcM73Wrapped) {
+      var original = window.refrescarReportes;
+      var wrapped = async function () {
+        var result = await original.apply(this, arguments);
+        await refreshTopProducts(true);
+        return result;
+      };
+      wrapped.__bcM73Wrapped = true;
+      window.refrescarReportes = wrapped;
+    }
+  }
+  function installCaptureHandlers() {
+    if (document.documentElement.dataset.bcM73Capture === '1') return;
+    document.documentElement.dataset.bcM73Capture = '1';
+    document.addEventListener('click', function (event) {
+      var target = event.target && event.target.closest ? event.target.closest('button') : null;
+      if (!target) return;
+      if (target.id === 'bc-m42-open-details') {
+        event.preventDefault(); event.stopImmediatePropagation(); openRankingModal(); return;
+      }
+      if (target.id === 'bc-m42-show-details' || target.id === 'bc-m73-open-report') {
+        event.preventDefault(); event.stopImmediatePropagation(); openReportModal(); return;
+      }
+      if (target.classList.contains('bc-m45-quick-btn')) {
+        event.preventDefault(); event.stopImmediatePropagation(); openReportModal(target.dataset.rep || 'ventas'); return;
+      }
+      if (target.id === 'rep-limpiar-btn') {
+        event.preventDefault(); event.stopImmediatePropagation();
+        if (typeof window.limpiarFiltrosReportes === 'function') window.limpiarFiltrosReportes();
+        else {
+          var warehouse = reportTab() && reportTab().querySelector('#rep-filtro-almacen');
+          if (warehouse) warehouse.value = '';
+          applyPreset('7', false);
+        }
+        refreshReports();
+      }
+    }, true);
+  }
+  function addQuickModalBehavior() {
+    // The original quick actions remain in place and retain their active styling.
+    var quick = reportTab() && reportTab().querySelector('.bc-m45-quick');
+    if (quick) quick.querySelectorAll('.bc-m45-quick-btn').forEach(function (button) {
+      button.setAttribute('aria-haspopup', 'dialog');
+    });
+  }
+  function install() {
+    injectCss();
+    var ready = ensureReportModalLayout();
+    ensurePeriodControls();
+    addQuickModalBehavior();
+    wrapRefresh();
+    installCaptureHandlers();
+    if (ready) {
+      var filters = document.querySelector('#bc-m73-report-modal #reportes-filtros, #bc-m73-report-modal .bc-m42-filters') ||
+        reportTab().querySelector('#reportes-filtros, .bc-m42-filters');
+      if (filters && !filters.dataset.bcM73DefaultApply && typeof window.refrescarReportes === 'function') {
+        filters.dataset.bcM73DefaultApply = '1';
+        // Once the seven-day defaults are set, reload with this finite window.
+        if (document.getElementById('rep-filtro-periodo') && document.getElementById('rep-filtro-periodo').value === '7') {
+          refreshReports();
+        }
+      }
+      refreshTopProducts(false);
+    }
+    return ready;
+  }
+  function boot() {
+    var attempts = 0;
+    function attempt() {
+      attempts += 1;
+      install();
+      if (attempts < 14 && !document.querySelector('#bc-m73-report-modal #rep-detalle')) window.setTimeout(attempt, 350);
+    }
+    attempt();
+  }
+
+  window.BattleCruiserReportesM73 = {
+    openReportModal: openReportModal,
+    openRankingModal: openRankingModal,
+    applyPreset: applyPreset,
+    syncPeriodControls: syncPeriodVisibility,
+    refreshTopProducts: refreshTopProducts,
+    verify: function () {
+      return {
+        loaded: true,
+        periodPreset: !!document.querySelector('#tab-reportes #rep-filtro-periodo'),
+        reportModal: !!document.querySelector('#bc-m73-report-modal'),
+        rankingModal: !!document.querySelector('#bc-m73-ranking-modal'),
+        reportRowsInsideModal: !!document.querySelector('#bc-m73-report-modal #rep-detalle'),
+        inlineAccordionRemoved: !document.querySelector('#tab-reportes .bc-m42-detail')
+      };
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+})();
+ + money(row.ingresos || 0);
+          var amountLabel = gainSort ? (hasGain ? 'Ganancia conocida' : 'Sin costo FIFO') : 'Facturación';
+          var coverage = '';
+          if (gainSort) {
+            coverage = ' · ' + Number(row.lineas_con_costo || 0) + ' línea(s) con costo';
+            if (Number(row.lineas_sin_costo || 0) > 0) coverage += ' · ' + Number(row.lineas_sin_costo || 0) + ' sin costo';
+          }
           return '<article class="bc-m73-ranking-row"><span class="bc-m42-rank">' + (index + 1) +
             '</span><div><strong>' + esc(row.producto || 'Producto sin nombre') +
             '</strong><div class="rank-meta">' + money(row.unidades || 0) + ' unidades · ' +
-            money(row.ventas || 0) + ' ventas</div></div><div class="rank-amount">$' +
-            money(row.ingresos || 0) + '<small>Facturación</small></div></article>';
+            money(row.ventas || 0) + ' ventas' + esc(coverage) + '</div></div><div class="rank-amount">' +
+            amount + '<small>' + amountLabel + '</small></div></article>';
         }).join('');
       }
-      if (note) note.textContent = 'Importes = facturación histórica, no ganancias. Se ordena todo el período filtrado.';
+      if (note) {
+        note.textContent = gainSort
+          ? 'Ganancia conocida: ingresos menos costo FIFO sólo en líneas con costo registrado (' + knownLines + ' con costo; ' + unknownLines + ' sin costo en los productos mostrados). Las líneas sin costo no se cuentan como ganancia cero. Orden: ' + rankingLabel(order) + '.'
+          : 'Los importes son facturación histórica, no ganancia. Ranking de todas las ventas del período. Orden: ' + rankingLabel(order) + '.';
+      }
     } catch (error) {
       if (target.dataset.queryKey !== thisKey) return;
       target.innerHTML = '<div class="bc-m73-empty">El ranking necesita conexión y el RPC de ranking actualizado. No se sustituyen datos reales por estimaciones.</div>';
