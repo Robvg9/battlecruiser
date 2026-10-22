@@ -8,6 +8,10 @@ const migration = fs.readFileSync(
   path.join(__dirname, "..", "supabase", "migrations", "20261022040000_bc4_reconcile_masareal_fifo_historical_costs.sql"),
   "utf8"
 );
+const rollback = fs.readFileSync(
+  path.join(__dirname, "..", "supabase", "rollback", "20261022040000_bc4_reconcile_masareal_fifo_historical_costs.rollback.sql"),
+  "utf8"
+);
 
 test("reconciliation pins all seven reviewed lots and twelve sale lines", () => {
   for (const id of [
@@ -54,4 +58,14 @@ test("historical reconciliation never changes stock quantities or sale totals", 
   assert.match(migration, /UPDATE public\.ventas_lineas\s+SET costo_unitario_fifo=150/);
   assert.match(migration, /BEGIN;/);
   assert.match(migration, /COMMIT;/);
+});
+
+test("rollback restores only saved unit-cost fields and guards its before-image", () => {
+  assert.match(rollback, /jsonb_populate_recordset\(NULL::public\.lotes_compra, v_backup\.lots_before\)/);
+  assert.match(rollback, /jsonb_populate_recordset\(NULL::public\.ventas_lineas, v_backup\.sale_lines_before\)/);
+  assert.match(rollback, /Expected to restore 7 unit costs/);
+  assert.match(rollback, /Expected to restore 12 sale-line costs/);
+  assert.doesNotMatch(rollback, /UPDATE public\.stock\b/i);
+  assert.doesNotMatch(rollback, /UPDATE public\.ventas\s+SET/i);
+  assert.match(rollback, /Stock quantities and sale totals were not changed/);
 });
