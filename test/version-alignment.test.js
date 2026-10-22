@@ -84,16 +84,16 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.9"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.11"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.11 — accessible state descriptions for native preferences/);
+  assert.match(app, //v9\\\.5\\\.11 — report filters, ranking and modal details/g/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.11"><\/script>/);
-  assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
+  assert.match(index, /<script src="js\//reportes\\\.js\\\?v=20261022\\\.2/g"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
