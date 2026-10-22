@@ -89,7 +89,19 @@
     try{const data=await obtenerFila(sub,index); if(!data) throw new Error('Registro no encontrado'); h2.textContent=(tituloMap[sub]||'Registro')+(data.id&&typeof idCorto==='function'?' #'+idCorto(data.id):''); body.innerHTML=renderRow(data);}catch(e){body.innerHTML='<p class="lista-estado">No se pudo cargar el detalle completo.</p>';console.warn('[Battlecruiser] historial detalle:',e);}
   }
 
-  function marcarFilas(){document.querySelectorAll('#rep-detalle .rep-fila:not(.rep-totales)').forEach(row=>{row.classList.add('lista-item-accion');row.setAttribute('role','button');row.setAttribute('tabindex','0');row.setAttribute('aria-label','Abrir detalle del registro');});}
+  function marcarFilas(){
+    document.querySelectorAll('#rep-detalle .rep-fila:not(.rep-totales)').forEach(row=>{
+      row.classList.add('lista-item-accion');
+      row.setAttribute('role','button');
+      row.setAttribute('tabindex','0');
+      // An aria-label overrides the row's descendant text in accessibility trees.
+      // Include a concise summary so Android/screen readers can still read the
+      // visible row without opening its detail modal.
+      const summary=String(row.innerText||row.textContent||'').replace(/\s+/g,' ').trim();
+      const accessibleName=summary?'Abrir detalle del registro: '+summary:'Abrir detalle del registro';
+      row.setAttribute('aria-label',accessibleName.slice(0,420));
+    });
+  }
   function bind(){
     const lista=document.getElementById('rep-detalle'); if(!lista) return;
     lista.addEventListener('click',e=>{const row=e.target.closest('.rep-fila:not(.rep-totales)');if(row)openDetail(row);});
