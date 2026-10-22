@@ -82,7 +82,7 @@
     style.id = 'bc-m73-reportes-css';
     style.textContent = [
       'html.bc-m73-modal-open,body.bc-m73-modal-open{overflow:hidden!important;overscroll-behavior:none!important}',
-      '.bc-m73-modal{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:14px;overscroll-behavior:contain}',
+      '.bc-m42-detail.bc-m73-modal-placeholder{display:none!important}\n      .bc-m73-modal{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:14px;overscroll-behavior:contain}',
       '.bc-m73-modal[hidden]{display:none!important}',
       '.bc-m73-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.76);backdrop-filter:blur(3px)}',
       '.bc-m73-modal-card{position:relative;display:flex;flex-direction:column;width:min(1020px,100%);max-height:92vh;max-height:92dvh;min-height:0;overflow:hidden;background:var(--void,#0c1c18);border:1px solid rgba(212,176,92,.28);border-radius:14px;box-shadow:0 22px 80px rgba(0,0,0,.55);color:var(--text,#eee)}',
@@ -193,7 +193,9 @@
       var detailBody = detail.querySelector('.bc-m42-detail-body');
       if (detailBody && detailBody.querySelector('#rep-detalle')) {
         if (detailBody.parentElement !== modalBody) modalBody.appendChild(detailBody);
-        detail.remove();
+        detail.hidden = true;
+        detail.setAttribute('aria-hidden', 'true');
+        detail.classList.add('bc-m73-modal-placeholder');
       }
     }
     var reportList = modalBody.querySelector('#rep-detalle') || tab.querySelector('#rep-detalle');
@@ -311,7 +313,9 @@
       unidades_desc: 'Más unidades vendidas',
       unidades_asc: 'Menos unidades vendidas',
       ingresos_desc: 'Mayor facturación',
-      ingresos_asc: 'Menor facturación'
+      ingresos_asc: 'Menor facturación',
+      ganancia_desc: 'Mayor ganancia conocida (FIFO)',
+      ganancia_asc: 'Menor ganancia conocida (FIFO)'
     })[order] || 'Más unidades vendidas';
   }
   async function fetchRanking(order, limit, target, note) {
@@ -342,10 +346,28 @@
       } else {
         target.innerHTML = rows.map(function (row, index) {
           var hasGain = row.ganancia_conocida !== null && row.ganancia_conocida !== undefined;
-          var amount = gainSort ? (hasGain ? '
+          var amount = gainSort ? (hasGain ? '$' + money(row.ganancia_conocida) : '—') : '$' + money(row.ingresos || 0);
+          var amountLabel = gainSort ? (hasGain ? 'Ganancia conocida' : 'Sin costo FIFO') : 'Facturación';
+          var coverage = '';
+          if (gainSort) {
+            coverage = ' · ' + Number(row.lineas_con_costo || 0) + ' línea(s) con costo';
+            if (Number(row.lineas_sin_costo || 0) > 0) coverage += ' · ' + Number(row.lineas_sin_costo || 0) + ' sin costo';
+          }
+          return '<article class="bc-m73-ranking-row"><span class="bc-m42-rank">' + (index + 1) +
+            '</span><div><strong>' + esc(row.producto || 'Producto sin nombre') +
+            '</strong><div class="rank-meta">' + money(row.unidades || 0) + ' unidades · ' +
+            money(row.ventas || 0) + ' ventas' + esc(coverage) + '</div></div><div class="rank-amount">' +
+            amount + '<small>' + amountLabel + '</small></div></article>';
+        }).join('');
+      }
+      if (note) {
+        note.textContent = gainSort
+          ? 'Ganancia conocida = ingresos menos costo FIFO sólo en líneas con costo registrado (' + knownLines + ' con costo; ' + unknownLines + ' sin costo entre los productos mostrados). Las líneas sin costo no se cuentan como ganancia cero. Orden: ' + rankingLabel(order) + '.'
+          : 'Los importes son facturación histórica, no ganancia. Ranking de todas las ventas del período. Orden: ' + rankingLabel(order) + '.';
+      }
     } catch (error) {
       if (target.dataset.queryKey !== thisKey) return;
-      target.innerHTML = '<div class="bc-m73-empty">El ranking necesita conexión y el RPC de ranking actualizado. No se sustituyen datos reales por estimaciones.</div>';
+      target.innerHTML = '<div class="bc-m73-empty">No se pudo cargar el ranking. Comprueba la conexión y los permisos del informe.</div>';
       if (note) note.textContent = '';
       console.warn('[BattleCruiser] ranking de productos:', error);
     }
@@ -354,7 +376,7 @@
     ensureReportModalLayout();
     var modal = getRankingModal();
     var body = modal.querySelector('.bc-m73-modal-body');
-    body.innerHTML = '<div class="bc-m73-ranking-controls"><div><label for="bc-m73-ranking-sort">Ordenar productos por</label><select id="bc-m73-ranking-sort"><option value="unidades_desc">Más unidades vendidas</option><option value="unidades_asc">Menos unidades vendidas</option><option value="ingresos_desc">Mayor facturación</option><option value="ingresos_asc">Menor facturación</option><option value="ganancia_desc" disabled>Mayor ganancia (costos históricos no disponibles)</option></select></div></div><p class="bc-m73-ranking-note">La ganancia real requiere costo histórico fiable por producto/lote. Mientras no exista, esta opción permanece desactivada para no mostrar beneficios falsos.</p><div class="bc-m73-ranking-list" id="bc-m73-ranking-list"></div>';
+    body.innerHTML = '<div class="bc-m73-ranking-controls"><div><label for="bc-m73-ranking-sort">Ordenar productos por</label><select id="bc-m73-ranking-sort"><option value="unidades_desc">Más unidades vendidas</option><option value="unidades_asc">Menos unidades vendidas</option><option value="ingresos_desc">Mayor facturación</option><option value="ingresos_asc">Menor facturación</option><option value="ganancia_desc">Mayor ganancia conocida (FIFO)</option><option value="ganancia_asc">Menor ganancia conocida (FIFO)</option></select></div></div><p class="bc-m73-ranking-note">Ganancia conocida = ingreso menos costo FIFO en líneas con costo registrado. Las líneas sin costo se identifican y no se tratan como ganancia cero.</p><div class="bc-m73-ranking-list" id="bc-m73-ranking-list"></div>';
     var select = body.querySelector('#bc-m73-ranking-sort');
     var list = body.querySelector('#bc-m73-ranking-list');
     var note = body.querySelector('.bc-m73-ranking-note');
