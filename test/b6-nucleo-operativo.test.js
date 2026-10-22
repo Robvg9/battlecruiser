@@ -32,6 +32,15 @@ async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
   return Boolean(condicion());
 }
 
+async function esperarHastaAsync(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(await condicion());
+}
+
 // ---- Estado simulado de inventario (lotes + stock) en memoria ----
 // Refleja el comportamiento de los RPC de B6 para las pruebas de lógica.
 function crearEstadoInventarioMock() {
@@ -482,9 +491,20 @@ test("B6.19: operación offline sobrevive cierre/reapertura de la cola", async (
   await esperar(80);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const r = await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 });
-  // "Reabrir" leyendo todas las operaciones.
-  const todas = await window.obtenerTodasLasOperaciones();
-  assert.ok(todas.some((o) => o.id === r.operacion.id), "operación persiste en IndexedDB");
+  assert.ok(r && r.ok && r.offline && r.operacion && r.operacion.id, "operación offline confirmada para persistencia");
+
+  // A second IndexedDB read simulates reopening the queue. Poll the committed
+  // user-index query rather than assuming that opening the database/index is
+  // scheduled within a fixed 0-queue-delay window on every Windows runner.
+  const visibleEnCola = await esperarHastaAsync(async () => {
+    const todas = await window.obtenerTodasLasOperaciones();
+    return todas.some((o) => o.id === r.operacion.id);
+  }, 2000, 10);
+  const reabiertaPorId = await window.obtenerOperacionPendiente(r.operacion.id);
+  assert.ok(reabiertaPorId && reabiertaPorId.usuario_id === r.operacion.usuario_id,
+    "la operación original debe estar en IndexedDB con la misma identidad");
+  assert.ok(visibleEnCola,
+    "la operación persistida debe reaparecer en la lista de la cola del usuario tras reabrir IndexedDB");
 });
 
 test("B6.20: reconciliación tras operación exitosa marca refresco de stock", async () => {
