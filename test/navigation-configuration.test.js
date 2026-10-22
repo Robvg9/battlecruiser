@@ -17,8 +17,8 @@ const hideVales = fs.readFileSync("public/js/m12-fe5-hide-vales.js", "utf8");
 
 
 test("RWHT navigation contract: 19 logical routes, 16 visible destinations, hidden-route aliases preserved", () => {
-  const routeIds = [...index.matchAll(/<button\\b[^>]*\\bdata-tab="([^"]+)"/g)].map(match => match[1]);
-  const panelIds = [...index.matchAll(/<section\\b[^>]*\\bid="tab-([^"]+)"/g)].map(match => match[1]);
+  const routeIds = [...index.matchAll(/<button\b[^>]*\bdata-tab="([^"]+)"/g)].map(match => match[1]);
+  const panelIds = [...index.matchAll(/<section\b[^>]*\bid="tab-([^"]+)"/g)].map(match => match[1]);
   const expectedVisible = [
     "resumen", "productos", "ventas", "almacenes", "pendientes", "reportes",
     "inventario", "movimientos", "ciclos", "operacion", "comunicacion",
@@ -43,13 +43,14 @@ test("RWHT navigation contract: 19 logical routes, 16 visible destinations, hidd
   for (const id of expectedHidden) {
     assert.ok(routeIds.includes(id), "hidden/aliased logical route must remain explicit: " + id);
   }
-  assert.match(permissions, /tab === "transferencias" \\|\\| tab === "vales" \\|\\| tab === "turnos"/);
-  assert.match(sectionVisibility, /var KEEP_HIDDEN = \\{ transferencias:true, vales:true, turnos:true \\}/);
-  assert.match(sectionVisibility, /LABELS = \\{ config:'Administración', ciclos:'Turnos' \\}/);
-  assert.match(navigation, /if \\(tab === "turnos"\\) \\{\\s*var ciclosBtn = document\\.querySelector\\('\\.tab-btn\\[data-tab="ciclos"\\]'\\);\\s*if \\(ciclosBtn\\) tab = "ciclos";\\s*\\}/);
-  assert.match(app, /m12-fe5-hide-vales\\.js/);
-  assert.match(hideVales, /removeChild\\(panel\\)/, "Vales panel is deliberately removed by the loaded module");
+  assert.match(permissions, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
+  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true \}/);
+  assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
+  assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
+  assert.match(app, /m12-fe5-hide-vales\.js/);
+  assert.match(hideVales, /removeChild\(panel\)/, "Vales panel is deliberately removed by the loaded module");
 });
+
 
 test("Configuración agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
   const normalizedIndex = index.replace(/\r\n/g, "\n");
