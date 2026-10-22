@@ -443,7 +443,7 @@
       if (filters && !filters.dataset.bcM73DefaultApply && typeof window.refrescarReportes === 'function') {
         filters.dataset.bcM73DefaultApply = '1';
         // Once the seven-day defaults are set, reload with this finite window.
-        if (reportTab().querySelector('#rep-filtro-periodo') && reportTab().querySelector('#rep-filtro-periodo').value === '7') {
+        if (document.getElementById('rep-filtro-periodo') && document.getElementById('rep-filtro-periodo').value === '7') {
           refreshReports();
         }
       }
