@@ -289,8 +289,10 @@ test("B4.11: reconexión refresca el Centro de Mando", async () => {
   );
   window.__bcTestSyncState.markOnline();
   await window.refrescarCentroMando();
-  await esperar(20);
-  assert.ok(/Conectado/.test(conn.textContent), "debe mostrar conectado tras refrescar; estado observado: " + conn.textContent);
+  assert.ok(
+    await esperarHasta(() => /Conectado/.test(conn.textContent), 2000, 10),
+    "debe mostrar conectado tras refrescar; estado observado: " + conn.textContent
+  );
 });
 
 test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos", async () => {
