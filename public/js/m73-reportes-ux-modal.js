@@ -267,8 +267,8 @@
         applyPreset(select.value, true);
       });
     }
-    var from = tab.querySelector('#rep-filtro-desde');
-    var to = tab.querySelector('#rep-filtro-hasta');
+    var from = document.getElementById('rep-filtro-desde');
+    var to = document.getElementById('rep-filtro-hasta');
     [from, to].forEach(function (input) {
       if (input && !input.dataset.bcM73Bound) {
         input.dataset.bcM73Bound = '1';
