@@ -12,6 +12,14 @@ test("Step 6 keeps the movement RPC signatures and stable result schemas", () =>
   assert.match(sql, /RETURNS TABLE\(\s*fecha timestamptz,\s*tipo text,\s*producto text,\s*almacen text,\s*cantidad numeric,\s*direccion text,\s*operacion_id uuid/s);
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.movimientos_producto\(\s*p_producto_id uuid DEFAULT NULL,\s*p_almacen_id uuid DEFAULT NULL,\s*p_desde date DEFAULT NULL,\s*p_hasta date DEFAULT NULL,\s*p_tipo text DEFAULT NULL,\s*p_limite integer DEFAULT 100,\s*p_offset integer DEFAULT 0/s);
   assert.match(sql, /costo_unitario numeric,\s*usuario text,\s*operacion_id uuid/s);
+  assert.ok(sql.includes("CREATE OR REPLACE FUNCTION public.resolver_aprobacion_operativa("));
+  assert.ok(sql.includes("p_comentario text DEFAULT NULL"));
+  assert.ok(sql.includes("p_cantidad_real numeric DEFAULT NULL"));
+  assert.ok(sql.includes("p_monto_real numeric DEFAULT NULL"));
+  assert.ok(sql.includes("CREATE OR REPLACE FUNCTION public.registrar_cuadre("));
+  assert.ok(sql.includes("p_idempotency_key uuid DEFAULT NULL"));
+  assert.ok(sql.includes("p_observacion text DEFAULT NULL"));
+  assert.ok(sql.includes("CREATE OR REPLACE FUNCTION public.revisar_cuadre("));
   assert.match(sql, /SET search_path TO 'public', 'pg_temp'/);
   assert.match(sql, /REVOKE ALL ON FUNCTION public\.movimientos_producto[\s\S]*?FROM PUBLIC, anon/);
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.movimientos_producto[\s\S]*?TO authenticated, service_role/);
