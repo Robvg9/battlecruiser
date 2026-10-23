@@ -53,7 +53,7 @@ jobs:
           base="https://battlecruiser.robvg9.workers.dev"
           release_name="release-$GITHUB_SHA.json"
           app_version="$(node -e 'const s=require("fs").readFileSync("public/app.js","utf8"); const m=s.match(/const VERSION="([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
-          sw_version="$(node -e 'const s=require("fs").readFileSync("public/service-worker.js","utf8"); const m=s.match(/BC_SW_VERSION\\s*=\\s*"([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
+          sw_version="$(node -e 'const s=require("fs").readFileSync("public/service-worker.js","utf8"); const m=s.match(/BC_SW_VERSION\s*=\s*"([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error "$base/?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-index.html \
               && curl --fail --silent --show-error "$base/app.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-app.js \
