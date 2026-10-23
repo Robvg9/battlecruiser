@@ -148,10 +148,28 @@ function montarEntorno(opciones = {}) {
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
     .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
     .replace(/const RPC_POR_TIPO = \{/, "window.RPC_POR_TIPO = {");
+  appJs += `
+;window.__bcTestPermisosCargaExitosa = function () {
+  return typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa;
+};
+`;
   const s = window.document.createElement("script");
   s.textContent = appJs;
   window.document.body.appendChild(s);
   return { dom, window, document: window.document, client };
+}
+
+async function esperarContextoYPermisosB8(window, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const usuario = typeof window._usuarioActual === "function"
+      ? window._usuarioActual()
+      : window._usuarioActual;
+    if (usuario && typeof window.__bcTestPermisosCargaExitosa === "function"
+      && window.__bcTestPermisosCargaExitosa()) return;
+    await esperar(10);
+  }
+  assert.fail("el contexto autenticado y los permisos deben cargarse antes de validar B8.18");
 }
 
 function marcarOnline(window) {
@@ -304,7 +322,10 @@ test("B8.18: sin comunicacion.ver la pestaña es inspeccionable, pero conversaci
     permisos: [{ seccion: "ventas", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(120);
+  await esperarContextoYPermisosB8(window);
+  assert.equal(window.tienePermiso("ventas", "ver"), true, "el fixture concede ver en Ventas");
+  assert.equal(window.tienePermiso("comunicacion", "ver"), false, "el fixture no concede comunicacion.ver");
+  window.aplicarPermisosAInterfaz();
 
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
   assert.ok(btn, "la pestaña de inspección existe en el contrato de navegación");
