@@ -106,7 +106,7 @@ function crearClienteSupabaseMock() {
   const client = {
     auth: {
       getSession: async () => ({
-        data: { session: { user: { id: "user-step4-fixture", email: "owner@example.invalid" } },
+        data: { session: { user: { id: "user-step4-fixture", email: "owner@example.invalid" } } },
         error: null
       }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
