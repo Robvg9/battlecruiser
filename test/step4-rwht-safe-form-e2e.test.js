@@ -293,8 +293,12 @@ test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el 
   c.document.getElementById("prod-precio-mayorista").value = "";
   enviarSubmit(c, "form-producto");
 
-  assert.ok(await esperarHasta(() => nuevasEscrituras(c, base).some((call) => call.name === "crear_producto")),
-    "el submit real del DOM debe llegar a crear_producto en el cliente mock");
+  const reachedCreate = await esperarHasta(() => nuevasEscrituras(c, base).some((call) => call.name === "crear_producto"));
+  assert.ok(reachedCreate,
+    "el submit real del DOM debe llegar a crear_producto en el cliente mock; mensaje=" +
+    c.document.getElementById("msg-productos").textContent +
+    "; RPC recientes=" + JSON.stringify(c.client.__rpcCalls.slice(-12)) +
+    "; escrituras nuevas=" + JSON.stringify(nuevasEscrituras(c, base)));
   const call = nuevasEscrituras(c, base).find((item) => item.name === "crear_producto");
   assert.equal(call.params.p_nombre, "Producto UI fixture");
   assert.equal(call.params.p_unidad, "unidad");
