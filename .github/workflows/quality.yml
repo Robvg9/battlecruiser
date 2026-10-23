@@ -72,8 +72,10 @@ jobs:
 
       # Pull requests have not been deployed yet, so production must still serve the base release.
       # workflow_dispatch and workflow_run both verify the exact deployed version.
-      - name: Verify production serves current application version
+      - name: Verify production serves exact application release provenance
         if: github.event_name != 'pull_request'
+        env:
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
         shell: cmd
         run: node test/verify-production-version.js
 
