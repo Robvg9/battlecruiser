@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 
-const migration=fs.readFileSync(path.join(__dirname,"../supabase/migrations/20261023101500_step7_jornada_inventory_ui.sql"),"utf8");
+const migration=fs.readFileSync(path.join(__dirname,"../supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql"),"utf8");
 const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-jornada-ui.js"),"utf8");
 const app=fs.readFileSync(path.join(__dirname,"../public/app.js"),"utf8");
 const sw=fs.readFileSync(path.join(__dirname,"../public/service-worker.js"),"utf8");
