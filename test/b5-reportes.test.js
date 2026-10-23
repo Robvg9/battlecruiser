@@ -155,7 +155,7 @@ test("B5.5: el resumen ejecutivo se carga con datos reales del RPC", async () =>
 });
 
 test("B5.6: reporte de ventas muestra líneas reales con precio histórico", async () => {
-  const { window, document } = montarEntorno({
+  const { window, document, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "reportes", accion: "ver" }],
     ventas: [
@@ -164,10 +164,21 @@ test("B5.6: reporte de ventas muestra líneas reales con precio histórico", asy
   });
   marcarOnline(window);
   await esperar(80);
-  await window.refrescarReportes();
-  await esperar(20);
+
+  // Activa explícitamente el subreporte que se está verificando. El test
+  // anterior dependía del estado global predeterminado y fallaba de forma
+  // intermitente en Windows aunque la suite Linux pasara.
+  const pestañaVentas = document.querySelector('.rep-tab-btn[data-rep="ventas"]');
+  assert.ok(pestañaVentas, "debe existir la pestaña de subreporte Ventas");
+  pestañaVentas.click();
+
   const detalle = document.getElementById("rep-detalle");
-  assert.ok(detalle.innerHTML.includes("Caja 1"), "debe mostrar el almacén");
+  const renderizado = await esperarHasta(() => detalle.innerHTML.includes("Caja 1"), 2000);
+  assert.ok(
+    renderizado,
+    "debe mostrar el almacén; HTML observado: " + detalle.innerHTML +
+    "; RPCs observadas: " + JSON.stringify(client.__rpcCalls.map((c) => c.nombre))
+  );
   assert.ok(detalle.innerHTML.includes("Café"), "debe mostrar el producto de la línea");
   assert.ok(detalle.innerHTML.includes("125.00"), "debe mostrar el precio unitario histórico");
 });
