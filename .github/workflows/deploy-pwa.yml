@@ -35,41 +35,39 @@ jobs:
           grep -qi '<html' public/index.html
           grep -qi 'BattleCruiser' public/index.html
       - name: Prepare immutable release provenance
-        run: node scripts/write-release-manifest.js
+        run: |
+          node scripts/write-release-manifest.js
+          test -f "public/release-$GITHUB_SHA.json"
       - name: Deploy PWA
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$(grep '^account_id = ' wrangler.toml)"
           wrangler deploy --config wrangler.toml
-      - name: Smoke test — exact release provenance in existing PWA assets
+      - name: Smoke test — exact content-addressed release manifest
         run: |
           set -euo pipefail
           base="https://battlecruiser.robvg9.workers.dev"
+          release_name="release-$GITHUB_SHA.json"
           app_version="$(node -e 'const s=require("fs").readFileSync("public/app.js","utf8"); const m=s.match(/const VERSION="([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
-          sw_version="$(node -e 'const s=require("fs").readFileSync("public/service-worker.js","utf8"); const m=s.match(/BC_SW_VERSION\s*=\s*"([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
+          sw_version="$(node -e 'const s=require("fs").readFileSync("public/service-worker.js","utf8"); const m=s.match(/BC_SW_VERSION\\s*=\\s*"([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error "$base/?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-index.html \
               && curl --fail --silent --show-error "$base/app.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-app.js \
-              && curl --fail --silent --show-error "$base/service-worker.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-sw.js; then
+              && curl --fail --silent --show-error "$base/service-worker.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-sw.js \
+              && curl --fail --silent --show-error "$base/$release_name?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-release.json; then
               if grep -qi '<html' /tmp/bc-live-index.html \
                 && grep -qi 'BattleCruiser' /tmp/bc-live-index.html \
                 && grep -Fq "const VERSION=\"$app_version\"" /tmp/bc-live-app.js \
                 && grep -Fq "BC_SW_VERSION = \"$sw_version\"" /tmp/bc-live-sw.js \
-                && grep -Fq "BC_RELEASE_SOURCE_SHA=$GITHUB_SHA" /tmp/bc-live-app.js \
-                && grep -Fq "BC_RELEASE_SOURCE_SHA=$GITHUB_SHA" /tmp/bc-live-sw.js \
-                && grep -Fq "BC_RELEASE_APP_VERSION=$app_version" /tmp/bc-live-app.js \
-                && grep -Fq "BC_RELEASE_SERVICE_WORKER_VERSION=$sw_version" /tmp/bc-live-app.js \
-                && grep -Fq "BC_RELEASE_WORKFLOW_RUN_ID=$GITHUB_RUN_ID" /tmp/bc-live-app.js \
-                && grep -Fq "BC_RELEASE_WORKFLOW_RUN_ID=$GITHUB_RUN_ID" /tmp/bc-live-sw.js; then
-                echo "[deploy smoke] exact LIVE source SHA + provenance embedded in both existing assets PASS"
+                && BC_EXPECTED_RELEASE_SHA="$GITHUB_SHA" BC_EXPECTED_APP_VERSION="$app_version" BC_EXPECTED_SW_VERSION="$sw_version" BC_EXPECTED_RUN_ID="$GITHUB_RUN_ID" node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync("/tmp/bc-live-release.json","utf8")); const e={source_sha:process.env.BC_EXPECTED_RELEASE_SHA,app_version:process.env.BC_EXPECTED_APP_VERSION,service_worker_version:process.env.BC_EXPECTED_SW_VERSION,workflow_run_id:process.env.BC_EXPECTED_RUN_ID}; for(const k of Object.keys(e)){if(String(r[k])!==String(e[k])){console.error("[deploy smoke] manifest mismatch",k,{expected:e[k],actual:r[k]});process.exit(1)}} console.log("[deploy smoke] exact content-addressed manifest PASS",r.source_sha,r.app_version,r.workflow_run_id)'; then
                 echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS"
                 exit 0
               fi
             fi
-            echo "[deploy smoke] waiting for exact release assets ($attempt/30)"
+            echo "[deploy smoke] waiting for content-addressed release ($attempt/30)"
             sleep 2
           done
           echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=FAIL"
