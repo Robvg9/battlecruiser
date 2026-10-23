@@ -305,38 +305,35 @@ test("B8.18: sin comunicacion.ver bloquea lectura y escritura con permisos efect
   marcarOnline(window);
   await window.__BC_UI_READY__;
 
-  // Wait for the mocked profile permissions to finish loading. Do not rely
-  // on menu visibility, which is managed by a separate module in production.
-  let permisosListos = false;
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    if (window.tienePermiso("ventas", "ver") === true) {
-      permisosListos = true;
-      break;
-    }
-    await esperar(10);
-  }
-  assert.ok(permisosListos, "los permisos del perfil deben quedar cargados");
+  // The shared test bridge seeds a broad ACL to keep unrelated tests stable.
+  // Narrow the effective ACL here so this test specifically exercises denial.
+  const efectivos = window._permisosEfectivosRef();
+  assert.ok(efectivos && efectivos.comunicacion, "el test bridge debe exponer el ACL efectivo");
+  efectivos.comunicacion.ver = false;
+  efectivos.comunicacion.crear = false;
 
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
   assert.ok(btn, "la ruta lógica de Comunicación existe");
-  assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false, "el usuario carece de comunicacion.ver");
+  assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false,
+    "el usuario carece de comunicacion.ver");
 
-  // Regardless of how navigation is rendered, protected reads and writes must fail closed.
+  // Protected read and write paths must fail closed irrespective of navigation visibility.
   client.__rpcCalls.length = 0;
   await window.refrescarComunicacion();
   const lista = document.getElementById("lista-conversaciones");
   assert.match(lista.textContent, /No tenés permiso para ver comunicación/i,
     "el panel deniega el contenido sin permiso de lectura");
   assert.ok(document.getElementById("form-mensaje").classList.contains("hidden"),
-    "el formulario de mensajes queda oculto sin comunicacion.crear");
+    "el formulario queda oculto sin comunicacion.crear");
+
   const protectedReads = client.__rpcCalls.filter((call) => [
     "listar_conversaciones_usuario",
     "contar_no_leidos_global",
     "listar_mensajes_conversacion",
     "listar_usuarios_para_chat",
   ].includes(call.nombre));
-  assert.deepStrictEqual(protectedReads, [], "la vista no consulta RPC protegidas sin comunicacion.ver");
+  assert.deepStrictEqual(protectedReads, [],
+    "no se consultan RPC protegidas sin comunicacion.ver");
 
   const result = await window.crearConversacion("PRIVADA", "No autorizada", "u2");
   assert.strictEqual(result, null, "sin comunicacion.crear no crea conversaciones");
