@@ -84,5 +84,13 @@ test("post-deploy Chromium E2E strips only the known trailing provenance marker 
   assert.match(liveOfflineE2e, /BC_RELEASE_SOURCE_SHA/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
   assert.match(liveOfflineE2e, /normalizedSha256/);
+  assert.match(liveOfflineE2e, /maxAttempts = needsCurrentReleaseStamp \? 36 : 1/);
   assert.match(quality, /BC_EXPECTED_RELEASE_SHA:.*workflow_run\.head_sha/);
+  assert.match(quality, /needs: \[deploy-pr-preview, quality\]/);
+  assert.match(quality, /needs\.quality\.result == 'success'/);
+});
+
+test("post-deploy exact-SHA verifier retries long enough for Cloudflare release propagation", () => {
+  assert.match(verifier, /attempt <= 30/);
+  assert.match(verifier, /attempt < 30/);
 });
