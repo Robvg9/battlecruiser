@@ -316,7 +316,11 @@ test("B8.18: sin comunicacion.ver bloquea lectura y escritura con permisos ya ca
   }
   assert.ok(permisosListos, "los permisos del perfil deben quedar cargados");
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-  assert.ok(btn, "la ruta lógica de Comunicación existe");
+  assert.ok(btn, "la ruta de Comunicación está declarada");
+  assert.equal(btn.getAttribute("data-bc-permiso"), "0",
+    "el motor de permisos activo marcó la pestaña sin acceso de lectura");
+  assert.ok(btn.style.display === "none" || btn.classList.contains("hidden"),
+    "usuarios-permisos.js oculta Comunicación sin comunicacion.ver");
   assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false, "el usuario carece de comunicacion.ver");
 
   // The tab remains navigable, but its protected read layer must fail closed.
