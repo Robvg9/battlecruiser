@@ -17,7 +17,7 @@ const appSource = fs.readFileSync(path.join(ROOT, "public/app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(ROOT, "public/index.html"), "utf8");
 
 test("preference inputs use native checkbox state with accessible names and descriptions", () => {
-  assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " id=" + escapedQuote));
+  assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " role=" + escapedQuote + "switch" + escapedQuote + " id=" + escapedQuote));
   assert.ok(source.includes("aria-label=" + escapedQuote));
   assert.ok(source.includes("aria-describedby=" + escapedQuote));
   assert.ok(source.includes("role=" + escapedQuote + "switch" + escapedQuote));
