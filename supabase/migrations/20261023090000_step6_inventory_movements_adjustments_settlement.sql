@@ -116,7 +116,7 @@ BEGIN
     AND (p_producto_id IS NULL OR b.producto_id=p_producto_id)
     AND (p_almacen_id IS NULL OR b.almacen_id=p_almacen_id)
 
-  ORDER BY fecha DESC
+  ORDER BY 1 DESC
   LIMIT p_limite OFFSET p_offset;
 END;
 $function$;
@@ -251,7 +251,7 @@ BEGIN
     AND (p_almacen_id IS NULL OR b.almacen_id=p_almacen_id)
     AND (p_tipo IS NULL OR p_tipo='' OR p_tipo='baja')
 
-  ORDER BY fecha DESC
+  ORDER BY 1 DESC
   LIMIT p_limite OFFSET p_offset;
 END;
 $function$;
@@ -405,7 +405,7 @@ DECLARE
   c record;
   t record;
   diff numeric;
-  estado text;
+  v_estado_nuevo text;
   idem uuid;
 BEGIN
   uid:=public._validar_usuario_operacion('turnos','crear');
@@ -431,9 +431,9 @@ BEGIN
   END IF;
 
   diff:=p_dinero_declarado-c.dinero_esperado;
-  estado:=CASE WHEN diff=0 THEN 'CUADRADO' ELSE 'CON_DIFERENCIA' END;
+  v_estado_nuevo:=CASE WHEN diff=0 THEN 'CUADRADO' ELSE 'CON_DIFERENCIA' END;
   UPDATE public.cuadres
-  SET dinero_declarado=p_dinero_declarado,diferencia=diff,estado=estado,
+  SET dinero_declarado=p_dinero_declarado,diferencia=diff,estado=v_estado_nuevo,
       observacion=coalesce(p_observacion,observacion),actualizado_en=now()
   WHERE id=p_cuadre_id;
 
@@ -446,7 +446,7 @@ BEGIN
 
   UPDATE private.operaciones_idempotencia SET resultado_id=p_cuadre_id WHERE idempotency_key=p_idempotency_key;
   PERFORM public.registrar_auditoria('cuadre','Cuadre declarado','exito',p_cuadre_id::text,p_idempotency_key,NULL);
-  RETURN jsonb_build_object('id',p_cuadre_id,'estado',estado,'dinero_esperado',c.dinero_esperado,
+  RETURN jsonb_build_object('id',p_cuadre_id,'estado',v_estado_nuevo,'dinero_esperado',c.dinero_esperado,
                             'dinero_declarado',p_dinero_declarado,'diferencia',diff);
 END;
 $function$;
