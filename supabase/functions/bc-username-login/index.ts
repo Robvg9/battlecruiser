@@ -53,10 +53,29 @@ function clearRateLimit(ip: string): void {
   attempts.delete(ip);
 }
 
+function normalizeOrigin(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    // Origin should normally contain only scheme + host. Normalize defensively
+    // in case a trusted webview forwards a slash/path with the Origin value.
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req: Request) => {
-  const origin = req.headers.get("origin");
+  const origin = normalizeOrigin(req.headers.get("origin"));
+
+  // A CORS preflight may arrive without Origin on some intermediary/webview
+  // paths. Respond with the single fixed production origin; browsers from any
+  // other origin will reject that response. Actual POST requests still require
+  // the exact allowlisted origin below.
+  if (req.method === "OPTIONS") {
+    if (origin && origin !== APP_ORIGIN) return reply({ error: "Origen no permitido." }, 403);
+    return new Response(null, { status: 204, headers });
+  }
   if (origin !== APP_ORIGIN) return reply({ error: "Origen no permitido." }, 403);
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
   if (req.method !== "POST") return reply({ error: "Método no permitido." }, 405);
 
   const ip = clientIp(req);
