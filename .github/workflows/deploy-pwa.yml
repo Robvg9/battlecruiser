@@ -37,7 +37,7 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$(grep '^account_id = ' wrangler.toml)"
           wrangler deploy --config wrangler.toml
-      - name: Smoke test — exact release provenance
+      - name: Smoke test — exact release provenance in existing PWA assets
         run: |
           set -euo pipefail
           base="https://battlecruiser.robvg9.workers.dev"
@@ -46,13 +46,18 @@ jobs:
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error "$base/?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-index.html \
               && curl --fail --silent --show-error "$base/app.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-app.js \
-              && curl --fail --silent --show-error "$base/service-worker.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-sw.js \
-              && curl --fail --silent --show-error "$base/release.json?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-release.json; then
+              && curl --fail --silent --show-error "$base/service-worker.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-sw.js; then
               if grep -qi '<html' /tmp/bc-live-index.html \
                 && grep -qi 'BattleCruiser' /tmp/bc-live-index.html \
                 && grep -Fq "const VERSION=\"$app_version\"" /tmp/bc-live-app.js \
                 && grep -Fq "BC_SW_VERSION = \"$sw_version\"" /tmp/bc-live-sw.js \
-                && BC_EXPECTED_RELEASE_SHA="$GITHUB_SHA" BC_EXPECTED_APP_VERSION="$app_version" BC_EXPECTED_SW_VERSION="$sw_version" node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync("/tmp/bc-live-release.json","utf8")); const e={source_sha:process.env.BC_EXPECTED_RELEASE_SHA,app_version:process.env.BC_EXPECTED_APP_VERSION,service_worker_version:process.env.BC_EXPECTED_SW_VERSION}; if(r.source_sha!==e.source_sha||r.app_version!==e.app_version||r.service_worker_version!==e.service_worker_version){console.error("[deploy smoke] mismatch",{expected:e,actual:r});process.exit(1)} console.log("[deploy smoke] exact LIVE source SHA and app/SW versions PASS",r.source_sha,r.app_version)'; then
+                && grep -Fq "BC_RELEASE_SOURCE_SHA=$GITHUB_SHA" /tmp/bc-live-app.js \
+                && grep -Fq "BC_RELEASE_SOURCE_SHA=$GITHUB_SHA" /tmp/bc-live-sw.js \
+                && grep -Fq "BC_RELEASE_APP_VERSION=$app_version" /tmp/bc-live-app.js \
+                && grep -Fq "BC_RELEASE_SERVICE_WORKER_VERSION=$sw_version" /tmp/bc-live-app.js \
+                && grep -Fq "BC_RELEASE_WORKFLOW_RUN_ID=$GITHUB_RUN_ID" /tmp/bc-live-app.js \
+                && grep -Fq "BC_RELEASE_WORKFLOW_RUN_ID=$GITHUB_RUN_ID" /tmp/bc-live-sw.js; then
+                echo "[deploy smoke] exact LIVE source SHA + provenance embedded in both existing assets PASS"
                 echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS"
                 exit 0
               fi
