@@ -713,22 +713,26 @@ BEGIN
       motivo_ajuste=trim(p_motivo),actualizado_por=auth.uid(),actualizado_en=now()
   WHERE id=v_p.id RETURNING * INTO v_p;
   IF v_sesion.id IS NOT NULL THEN
-    IF v_activo.id IS NOT NULL THEN
-      UPDATE public.turno_asignaciones SET retirado_at=now(),motivo=trim(p_motivo)
-      WHERE id=v_activo.id AND retirado_at IS NULL;
-    END IF;
-    IF p_trabaja THEN
-      IF v_sesion.estado='CANCELADA' THEN
-        UPDATE public.turno_sesiones SET estado='PROGRAMADA',updated_at=now()
-        WHERE id=v_sesion.id;
+    -- Preserve the active assignment if this is only an audited reason/confirmation update.
+    IF p_trabaja AND v_activo.id IS NOT NULL
+       AND v_activo.usuario_id IS NOT DISTINCT FROM p_responsable_id THEN
+      NULL;
+    ELSE
+      IF v_activo.id IS NOT NULL THEN
+        UPDATE public.turno_asignaciones SET retirado_at=now(),motivo=trim(p_motivo)
+        WHERE id=v_activo.id AND retirado_at IS NULL;
       END IF;
-      IF v_activo.id IS NULL OR v_activo.usuario_id IS DISTINCT FROM p_responsable_id THEN
+      IF p_trabaja THEN
+        IF v_sesion.estado='CANCELADA' THEN
+          UPDATE public.turno_sesiones SET estado='PROGRAMADA',updated_at=now()
+          WHERE id=v_sesion.id;
+        END IF;
         INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
         VALUES (v_sesion.id,v_p.turno_id,p_responsable_id,auth.uid());
+      ELSE
+        UPDATE public.turno_sesiones SET estado='CANCELADA',updated_at=now()
+        WHERE id=v_sesion.id AND estado IN ('PENDIENTE','PROGRAMADA','CANCELADA');
       END IF;
-    ELSE
-      UPDATE public.turno_sesiones SET estado='CANCELADA',updated_at=now()
-      WHERE id=v_sesion.id AND estado IN ('PENDIENTE','PROGRAMADA','CANCELADA');
     END IF;
   ELSIF p_trabaja THEN
     INSERT INTO public.turno_sesiones
