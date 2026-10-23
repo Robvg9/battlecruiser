@@ -24,8 +24,11 @@ jobs:
         run: |
           test -f public/index.html
           test -f public/app.js
+          test -f public/service-worker.js
           grep -qi '<html' public/index.html
           grep -qi 'BattleCruiser' public/index.html
+      - name: Prepare immutable release provenance
+        run: node scripts/write-release-manifest.js
       - name: Deploy PWA
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -34,16 +37,28 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$(grep '^account_id = ' wrangler.toml)"
           wrangler deploy --config wrangler.toml
-      - name: Smoke test
+      - name: Smoke test — exact release provenance
         run: |
           set -euo pipefail
-          html=""
+          base="https://battlecruiser.robvg9.workers.dev"
+          app_version="$(node -e 'const s=require("fs").readFileSync("public/app.js","utf8"); const m=s.match(/const VERSION="([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
+          sw_version="$(node -e 'const s=require("fs").readFileSync("public/service-worker.js","utf8"); const m=s.match(/BC_SW_VERSION\s*=\s*"([^"]+)"/); if(!m) process.exit(1); process.stdout.write(m[1]);')"
           for attempt in $(seq 1 30); do
-            html="$(curl --fail --silent --show-error --retry 2 --retry-delay 1 'https://battlecruiser.robvg9.workers.dev/' 2>/dev/null || true)"
-            if grep -qi '<html' <<<"$html" && grep -qi 'BattleCruiser' <<<"$html"; then break; fi
-            test "$attempt" -lt 30 && sleep 2
+            if curl --fail --silent --show-error "$base/?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-index.html \
+              && curl --fail --silent --show-error "$base/app.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-app.js \
+              && curl --fail --silent --show-error "$base/service-worker.js?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-sw.js \
+              && curl --fail --silent --show-error "$base/release.json?bc_deploy_ready=$GITHUB_RUN_ID-$attempt" --output /tmp/bc-live-release.json; then
+              if grep -qi '<html' /tmp/bc-live-index.html \
+                && grep -qi 'BattleCruiser' /tmp/bc-live-index.html \
+                && grep -Fq "const VERSION=\"$app_version\"" /tmp/bc-live-app.js \
+                && grep -Fq "BC_SW_VERSION = \"$sw_version\"" /tmp/bc-live-sw.js \
+                && BC_EXPECTED_RELEASE_SHA="$GITHUB_SHA" BC_EXPECTED_APP_VERSION="$app_version" BC_EXPECTED_SW_VERSION="$sw_version" node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync("/tmp/bc-live-release.json","utf8")); const e={source_sha:process.env.BC_EXPECTED_RELEASE_SHA,app_version:process.env.BC_EXPECTED_APP_VERSION,service_worker_version:process.env.BC_EXPECTED_SW_VERSION}; if(r.source_sha!==e.source_sha||r.app_version!==e.app_version||r.service_worker_version!==e.service_worker_version){console.error("[deploy smoke] mismatch",{expected:e,actual:r});process.exit(1)} console.log("[deploy smoke] exact LIVE source SHA and app/SW versions PASS",r.source_sha,r.app_version)'; then
+                echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS"
+                exit 0
+              fi
+            fi
+            echo "[deploy smoke] waiting for exact release assets ($attempt/30)"
+            sleep 2
           done
-          test -n "$html"
-          grep -qi '<html' <<<"$html"
-          grep -qi 'BattleCruiser' <<<"$html"
-          echo BATTLECRUISER_PWA_LIVE=PASS
+          echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=FAIL"
+          exit 1
