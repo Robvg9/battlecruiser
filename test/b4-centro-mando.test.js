@@ -319,7 +319,12 @@ test("B4.9: cambio A → B no contamina el Centro de Mando", async () => {
     permisos: [{ seccion: "auditoria", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  const contextoAListo = await esperarHasta(
+    () => typeof window._usuarioActual === "function" && window._usuarioActual() && window._usuarioActual().nombre === "A",
+    5000,
+    10
+  );
+  assert.ok(contextoAListo, "el contexto inicial del usuario A debe estar cargado antes de verificar aislamiento");
   assert.ok(window._usuarioActual().nombre === "A");
   // Logout: limpiar contexto.
   window.limpiarContextoUsuario();
@@ -333,7 +338,12 @@ test("B4.9: cambio A → B no contamina el Centro de Mando", async () => {
     return { data: null, error: null };
   };
   await window.cargarContextoUsuario();
-  await esperar(20);
+  const contextoBListo = await esperarHasta(
+    () => typeof window._usuarioActual === "function" && window._usuarioActual() && window._usuarioActual().nombre === "B",
+    5000,
+    10
+  );
+  assert.ok(contextoBListo, "el contexto del usuario B debe cargar antes de comprobar que no hereda permisos");
   assert.strictEqual(window._usuarioActual().nombre, "B", "B carga su contexto");
   assert.strictEqual(window.tienePermiso("auditoria", "ver"), false, "B NO hereda permisos de A");
 });
