@@ -41,6 +41,7 @@
   }
 
   function updateToggleState(id, input) {
+    input.setAttribute("aria-checked", input.checked ? "true" : "false");
     var state = document.getElementById(id + "-state");
     if (state) {
       state.textContent = "Estado de la opción: " + (input.checked ? "activada." : "desactivada.");
@@ -50,9 +51,9 @@
   function rowToggle(id, title, description) {
     return "<div class=\"cfg-aj-row\"><div><strong>" + title +
       "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
-      "<label class=\"cfg-aj-toggle\"><input type=\"checkbox\" id=\"" + id +
+      "<label class=\"cfg-aj-toggle\"><input type=\"checkbox\" role=\"switch\" id=\"" + id +
       "\" aria-label=\"" + title +
-      "\" aria-describedby=\"" + id + "-help " + id + "-state\"><span aria-hidden=\"true\"></span></label>" +
+      "\" aria-checked=\"false\" aria-describedby=\"" + id + "-help " + id + "-state\"><span aria-hidden=\"true\"></span></label>" +
       "<span id=\"" + id + "-state\" class=\"cfg-aj-sr-only\">Estado de la opción: desactivada.</span></div>";
   }
 
