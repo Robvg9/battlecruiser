@@ -30,6 +30,7 @@ test("withCache persists read-only server data, serves cache offline and replace
 
   const prelude = [
     'let _usuarioActualId = "u-test";',
+    'function usuarioIdParaCola() { return _usuarioActualId; }',
     'let _cache = { productos: [], almacenes: [], presentaciones: [] };',
     'let appShell = { classList: { contains: () => false } };',
     'function safeInit(_name, fn) { try { fn(); } catch (_) {} }',
