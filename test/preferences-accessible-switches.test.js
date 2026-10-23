@@ -17,17 +17,17 @@ const appSource = fs.readFileSync(path.join(ROOT, "public/app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(ROOT, "public/index.html"), "utf8");
 
 test("preference inputs use native checkbox state with accessible names and descriptions", () => {
-  assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " id=" + escapedQuote));
+  assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " role=" + escapedQuote + "switch" + escapedQuote + " id=" + escapedQuote));
   assert.ok(source.includes("aria-label=" + escapedQuote));
   assert.ok(source.includes("aria-describedby=" + escapedQuote));
-  assert.ok(!source.includes("role=" + escapedQuote + "switch" + escapedQuote));
-  assert.ok(!source.includes("aria-checked=" + escapedQuote + "false" + escapedQuote));
+  assert.ok(source.includes("role=" + escapedQuote + "switch" + escapedQuote));
+  assert.ok(source.includes("aria-checked=" + escapedQuote + "false" + escapedQuote));
 });
 
 test("native checked property stays synchronized with saved local preference values", () => {
   assert.ok(source.includes("input.checked = !!prefs[mapping[id]]"));
   assert.ok(source.includes("prefs[key] = input.checked"));
-  assert.ok(!source.includes('setAttribute("aria-checked"'));
+  assert.ok(source.includes('input.setAttribute("aria-checked", input.checked ? "true" : "false");'));
 });
 
 test("accessible textual option state follows the native checked property on load and change", () => {
@@ -60,17 +60,53 @@ test("all six preference inputs remain connected to their existing preference ke
   }
 });
 
+
+test("switch semantics and aria-checked follow the saved state and user changes", async () => {
+  const { JSDOM } = require("jsdom");
+  const dom = new JSDOM(
+    '<!doctype html><html><head></head><body><section id="tab-preferencias"></section></body></html>',
+    { url: "https://battlecruiser.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  try {
+    window.eval(source);
+    await new Promise(resolve => window.setTimeout(resolve, 600));
+
+    const enabledByDefault = window.document.getElementById("cfg-aj-sync-auto");
+    const disabledByDefault = window.document.getElementById("cfg-aj-sync-wifi");
+    assert.ok(enabledByDefault && disabledByDefault);
+    assert.equal(enabledByDefault.getAttribute("role"), "switch");
+    assert.equal(enabledByDefault.getAttribute("aria-checked"), "true");
+    assert.equal(disabledByDefault.getAttribute("aria-checked"), "false");
+
+    disabledByDefault.checked = true;
+    disabledByDefault.dispatchEvent(new window.Event("change", { bubbles: true }));
+
+    assert.equal(disabledByDefault.getAttribute("aria-checked"), "true");
+    assert.match(
+      window.document.getElementById("cfg-aj-sync-wifi-state").textContent,
+      /activada/
+    );
+    assert.equal(
+      JSON.parse(window.localStorage.getItem("bc-ui-preferences-v2")).syncWifiOnly,
+      true
+    );
+  } finally {
+    window.close();
+  }
+});
+
 test("PWA deployment invalidates the cached switch script and keeps shell versions aligned", () => {
   const resource = "configuracion-ajustes-migrados-20260903.js";
-  assert.ok(loader.includes(resource + "?v=4"));
-  assert.ok(serviceWorker.includes("./js/" + resource + "?v=4"));
-  assert.ok(!loader.includes(resource + "?v=3"));
-  assert.ok(!serviceWorker.includes(resource + "?v=3"));
+  assert.ok(loader.includes(resource + "?v=5"));
+  assert.ok(serviceWorker.includes("./js/" + resource + "?v=5"));
+  assert.ok(!loader.includes(resource + "?v=4"));
+  assert.ok(!serviceWorker.includes(resource + "?v=4"));
   const appVersion = appSource.match(/const VERSION="([^"]+)"/);
   const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "app version must be detectable");
   assert.ok(workerVersion, "service-worker version must be detectable");
-  assert.equal(appVersion[1], "9.5.11");
+  assert.equal(appVersion[1], "9.5.12");
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));
