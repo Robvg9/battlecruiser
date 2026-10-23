@@ -419,6 +419,37 @@ async function main() {
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
 
+
+  // Step 4/15 — real Chromium check of the production-served Preferences module.
+  // The browser profile is disposable; no user session or business data is touched.
+  report.evidence.phase = "step4_preferences_switch_persistence";
+  const preferenceModulePath = "/js/configuracion-ajustes-migrados-20260903.js";
+  const preferenceSource = fs.readFileSync(path.join(PUBLIC_DIR, preferenceModulePath.slice(1)), "utf8");
+  const preferenceLive = await fetchText(BASE_URL + preferenceModulePath + "?bc_step4_probe=" + Date.now());
+  assert(preferenceLive.status === 200, "LIVE module de Preferencias devolvió HTTP " + preferenceLive.status);
+  assert(sha256(preferenceLive.body) === sha256(preferenceSource),
+    "El módulo de Preferencias LIVE no coincide con el source del checkout.");
+  report.evidence.step4PreferenceModule = {
+    httpStatus: preferenceLive.status,
+    sha256: sha256(preferenceLive.body),
+    sourceSha256: sha256(preferenceSource),
+  };
+
+  const preferenceProbeBefore = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab-preferencias ausente'};const login=document.querySelector('#login-form');if(login)login.classList.add('hidden');const shell=document.querySelector('#app-shell');if(shell)shell.classList.add('visible');tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_module='+Date.now());if(!r.ok)return {ready:false,reason:'módulo HTTP '+r.status};const src=await r.text();(0,eval)(src);}const controls=[{id:'cfg-aj-auto-refresh',key:'autoRefresh',label:'Actualización automática',defaultValue:true},{id:'cfg-aj-sync-auto',key:'syncAuto',label:'Sincronización automática',defaultValue:true},{id:'cfg-aj-sync-open',key:'syncOnOpen',label:'Sincronizar al abrir app',defaultValue:true},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly',label:'Sincronizar solo en Wi-Fi',defaultValue:false},{id:'cfg-aj-notify',key:'notifications',label:'Notificaciones',defaultValue:true},{id:'cfg-aj-compact',key:'compacto',label:'Modo compacto',defaultValue:false}];const panel=document.querySelector('#cfg-preferencias-personales');if(!panel)return {ready:false,reason:'panel no montado'};const initial=controls.map(c=>{const e=document.getElementById(c.id);return {id:c.id,key:c.key,exists:!!e,checked:e?e.checked:null,role:e&&e.getAttribute('role'),label:e&&e.getAttribute('aria-label')};});return {ready:true,version:window.__BC_VERSION__||null,controls,initial,profile:location.origin,hasLoginSession:!!(window.client&&window.client.auth)};})()");
+  assert(preferenceProbeBefore.ready && preferenceProbeBefore.initial.length === 6 &&
+    preferenceProbeBefore.initial.every(c => c.exists && c.role === "switch" && c.label),
+    "Los seis interruptores no están presentes/accesibles en Chromium: " + JSON.stringify(preferenceProbeBefore));
+
+  const preferenceChange = await evaluate("(()=>{const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const before=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');for(const item of items){const e=document.getElementById(item.id);if(!e)return {ok:false,reason:'missing '+item.id};e.click();}const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const after=items.map(item=>({id:item.id,key:item.key,checked:document.getElementById(item.id).checked,stored:stored[item.key],matches:stored[item.key]===document.getElementById(item.id).checked,changed:stored[item.key]!==before[item.key]}));return {ok:after.every(x=>x.matches&&x.changed),before,stored,after};})()");
+  assert(preferenceChange.ok, "Los interruptores LIVE no guardaron el estado pulsado en localStorage: " + JSON.stringify(preferenceChange));
+  report.evidence.step4PreferencesAfterChange = { before: preferenceChange.before, stored: preferenceChange.stored, states: preferenceChange.after };
+
+  await reloadAndWait(false);
+  const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const states=items.map(item=>({id:item.id,key:item.key,exists:!!document.getElementById(item.id),checked:document.getElementById(item.id)?.checked,stored:stored[item.key],matches:!!document.getElementById(item.id)&&stored[item.key]===document.getElementById(item.id).checked}));return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted:states.every(x=>x.exists&&x.matches)};})()");
+  assert(preferenceReload.ready && preferenceReload.allPersisted,
+    "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
+  report.evidence.step4PreferencesAfterReload = preferenceReload;
+
   // Reproduce en Chromium real la integración que antes quitaba M26:
   // el toolbar debe pertenecer al panel Productos y sobrevivir a abrir/cerrar.
   const nomenclatureInitial = await waitUntil(
