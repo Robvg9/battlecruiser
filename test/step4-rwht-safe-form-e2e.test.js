@@ -394,8 +394,16 @@ test("Paso 4 UI: transferencia con el mismo origen/destino se rechaza antes de c
   const base = c.client.__writeCalls.length;
   enviarSubmit(c, "form-transferencia");
 
-  assert.ok(await esperarHasta(() => /el origen y el destino no pueden ser el mismo almacén/i.test(c.document.getElementById("msg-transferencias").textContent)),
-    "la UI debe rechazar una transferencia con origen igual a destino");
+  const rejectedSameWarehouse = await esperarHasta(() => /el origen y el destino no pueden ser el mismo almacén/i.test(c.document.getElementById("msg-transferencias").textContent));
+  assert.ok(rejectedSameWarehouse,
+    "la UI debe rechazar una transferencia con origen igual a destino; msg=" +
+    c.document.getElementById("msg-transferencias").textContent +
+    "; origen=" + c.document.getElementById("trf-origen").value +
+    "; destino=" + c.document.getElementById("trf-destino").value +
+    "; producto=" + c.document.getElementById("trf-producto").value +
+    "; confirmCalls=" + confirmCalls +
+    "; writes=" + JSON.stringify(nuevasEscrituras(c, base)) +
+    "; rpcRecent=" + JSON.stringify(c.client.__rpcCalls.slice(-10)));
   assert.equal(confirmCalls, 0, "no debe solicitar confirmación para una combinación inválida");
   assert.equal(nuevasEscrituras(c, base).some((call) => call.name === "registrar_transferencia"), false,
     "no se llama al RPC de transferencia si origen=destino");
