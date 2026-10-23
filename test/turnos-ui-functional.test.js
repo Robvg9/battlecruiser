@@ -139,18 +139,22 @@ test("Paso 4 turnos: abrir requiere almacén y un alta válida actualiza los con
     "el cliente mock debe dejar un turno abierto tras el alta válida");
   assert.equal(c.operations[0].type, "turno");
   assert.equal(c.operations[0].params.p_almacen_id, "alm-1");
-  assert.equal(window.document.getElementById("btn-abrir-turno").classList.contains("hidden"), true);
-  assert.equal(window.document.getElementById("btn-cerrar-turno").classList.contains("hidden"), false);
-  assert.equal(window.document.getElementById("turno-almacen-abrir").classList.contains("hidden"), true);
+  assert.ok(await waitFor(() =>
+    window.document.getElementById("btn-abrir-turno").classList.contains("hidden") &&
+    !window.document.getElementById("btn-cerrar-turno").classList.contains("hidden") &&
+    window.document.getElementById("turno-almacen-abrir").classList.contains("hidden")),
+    "la UI debe mostrar el turno abierto después de terminar la consulta de estado");
 
   window.document.getElementById("btn-cerrar-turno").click();
   assert.ok(await waitFor(() => c.getCurrentTurn()?.estado === "CERRADO"),
     "cerrar turno debe llamar la operación mock usando el turno abierto");
   assert.equal(c.operations[1].type, "turno_cerrar");
   assert.equal(c.operations[1].params.p_turno_id, "turno-fixture-1");
-  assert.equal(window.document.getElementById("btn-abrir-turno").classList.contains("hidden"), false);
-  assert.equal(window.document.getElementById("btn-cerrar-turno").classList.contains("hidden"), true);
-  assert.equal(window.document.getElementById("turno-almacen-abrir").classList.contains("hidden"), false);
+  assert.ok(await waitFor(() =>
+    !window.document.getElementById("btn-abrir-turno").classList.contains("hidden") &&
+    window.document.getElementById("btn-cerrar-turno").classList.contains("hidden") &&
+    !window.document.getElementById("turno-almacen-abrir").classList.contains("hidden")),
+    "la UI debe regresar al estado sin turno después de completar el cierre");
 });
 
 test("Paso 4 turnos: el filtro de estado se envía al historial y Refrescar restablece el listado", async (t) => {
