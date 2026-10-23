@@ -155,15 +155,15 @@ test("theme buttons and Restore Preferences persist then reset isolated preferen
 
 test("PWA deployment invalidates the cached switch script and keeps shell versions aligned", () => {
   const resource = "configuracion-ajustes-migrados-20260903.js";
-  assert.ok(loader.includes(resource + "?v=7"));
-  assert.ok(serviceWorker.includes("./js/" + resource + "?v=7"));
+  assert.ok(loader.includes(resource + "?v=8"));
+  assert.ok(serviceWorker.includes("./js/" + resource + "?v=8"));
   assert.ok(!loader.includes(resource + "?v=6"));
   assert.ok(!serviceWorker.includes(resource + "?v=6"));
   const appVersion = appSource.match(/const VERSION="([^"]+)"/);
   const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "app version must be detectable");
   assert.ok(workerVersion, "service-worker version must be detectable");
-  assert.equal(appVersion[1], "9.5.16");
+  assert.equal(appVersion[1], "9.5.17");
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));

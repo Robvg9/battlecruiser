@@ -44,7 +44,7 @@ test("Paso 4: los seis interruptores son accesibles y persisten su estado", () =
     assert.ok(input, item.id + " debe existir");
     assert.equal(input.type, "checkbox", item.id + " debe ser un control checkbox");
     assert.equal(input.getAttribute("role"), "switch", item.id + " debe exponer rol switch");
-    assert.equal(input.getAttribute("aria-label"), item.label, item.id + " debe tener nombre accesible");
+    assert.equal(input.getAttribute("aria-label"), item.label + ", estado " + (item.defaultValue ? "activado" : "desactivado"), item.id + " debe incluir el estado en su nombre accesible");
     assert.ok(input.getAttribute("aria-describedby").includes(item.id + "-state"), item.id + " debe describir su estado");
     assert.equal(input.checked, item.defaultValue, item.id + " debe respetar el valor inicial");
 
@@ -55,6 +55,11 @@ test("Paso 4: los seis interruptores son accesibles y persisten su estado", () =
     assert.match(
       document.getElementById(item.id + "-state").textContent,
       new RegExp(!item.defaultValue ? "activada" : "desactivada")
+    );
+    assert.equal(
+      input.getAttribute("aria-label"),
+      item.label + ", estado " + (!item.defaultValue ? "activado" : "desactivado"),
+      item.id + " debe anunciar el estado nuevo en su nombre accesible"
     );
     persisted[item.key] = afterChange[item.key];
   }
@@ -68,6 +73,11 @@ test("Paso 4: los seis interruptores son accesibles y persisten su estado", () =
       reloaded.window.document.getElementById(item.id).checked,
       persisted[item.key],
       item.id + " debe conservar el estado después de reconstruir la página"
+    );
+    assert.equal(
+      reloaded.window.document.getElementById(item.id).getAttribute("aria-label"),
+      item.label + ", estado " + (persisted[item.key] ? "activado" : "desactivado"),
+      item.id + " debe conservar el estado accesible después de reconstruir la página"
     );
   }
   reloaded.window.close();
@@ -86,6 +96,11 @@ test("Paso 4: restaurar preferencias devuelve los seis interruptores a sus valor
       dom.window.document.getElementById(item.id).checked,
       item.defaultValue,
       item.id + " debe reflejar el valor predeterminado restaurado"
+    );
+    assert.equal(
+      dom.window.document.getElementById(item.id).getAttribute("aria-label"),
+      item.label + ", estado " + (item.defaultValue ? "activado" : "desactivado"),
+      item.id + " debe anunciar el estado predeterminado restaurado"
     );
   }
   assert.match(dom.window.document.getElementById("cfg-pref-status").textContent, /restauradas/i);

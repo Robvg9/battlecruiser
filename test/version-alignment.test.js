@@ -71,13 +71,13 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.16["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.16["']/);
+  assert.match(app, /const VERSION=["']9\.5\.17["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.17["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261020\.5"\]/);
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
-  assert.match(app, /\["configuracion\.js","20261023\.1"\]/, "connectivity module must bypass stale cached settings");
+  assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
   assert.match(index, /<script src="js\/navegacion\.js\?v=20261020\.4"><\/script>/, "new navigation sections need a cache-busted script");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.1"\]/, "the Step 7 jornada UI must be loaded dynamically");
@@ -85,15 +85,15 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
   assert.match(index, /<script src="js\/ventas\.js\?v=20261016\.1"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.16"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.17"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261016\.5"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.16 — UX Android: viewport seguro, foco y controles táctiles/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.16"><\/script>/);
+  assert.match(app, /v9\.5\.17 — UX Android: viewport seguro, foco y controles táctiles/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.17"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.1/, "the Step 7 workflow is available in the offline static cache");
@@ -109,5 +109,5 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.16['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.17['"]\);/);
 });

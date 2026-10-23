@@ -46,6 +46,11 @@
       : !!control.checked;
     control.checked = enabled;
 
+    // Android TalkBack may omit the native checked flag for this custom-styled
+    // switch. Keep the current state in the accessible name as a resilient fallback.
+    var accessibleTitle = control.getAttribute("data-a11y-label") || control.getAttribute("aria-label") || id;
+    control.setAttribute("aria-label", accessibleTitle + ", estado " + (enabled ? "activado" : "desactivado"));
+
     var state = document.getElementById(id + "-state");
     if (state) {
       state.textContent = "Estado de la opción: " + (enabled ? "activada." : "desactivada.");
@@ -56,6 +61,7 @@
     return "<div class=\"cfg-aj-row\"><div><strong>" + title +
       "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
       "<input type=\"checkbox\" class=\"cfg-aj-toggle\" role=\"switch\" id=\"" + id +
+      "\" data-a11y-label=\"" + title +
       "\" aria-label=\"" + title +
       "\" aria-describedby=\"" + id + "-help " + id + "-state\">" +
       "<span id=\"" + id + "-state\" class=\"cfg-aj-sr-only\">Estado de la opción: desactivada.</span></div>";
