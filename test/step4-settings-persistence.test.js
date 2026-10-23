@@ -29,7 +29,6 @@ function boot(savedPreferences) {
     dom.window.localStorage.setItem(PREFS_KEY, JSON.stringify(savedPreferences));
   }
   dom.window.eval(SOURCE);
-  // Trigger the same DOM-ready hook deterministically in jsdom.
   dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
   assert.ok(dom.window.document.getElementById("cfg-preferencias-personales"), "el panel de preferencias debe montarse");
   return dom;
@@ -53,7 +52,10 @@ test("Paso 4: los seis interruptores son accesibles y persisten su estado", () =
     input.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
     const afterChange = JSON.parse(dom.window.localStorage.getItem(PREFS_KEY));
     assert.equal(afterChange[item.key], !item.defaultValue, item.id + " debe guardar el nuevo valor");
-    assert.match(document.getElementById(item.id + "-state").textContent, new RegExp(!item.defaultValue ? "desactivada" : "activada"));
+    assert.match(
+      document.getElementById(item.id + "-state").textContent,
+      new RegExp(!item.defaultValue ? "activada" : "desactivada")
+    );
     persisted[item.key] = afterChange[item.key];
   }
 
