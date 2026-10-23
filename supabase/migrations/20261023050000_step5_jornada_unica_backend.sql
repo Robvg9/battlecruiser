@@ -982,6 +982,62 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.bc5_mis_jornadas(
+  p_fecha_inicio date,
+  p_fecha_fin date
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_result jsonb;
+  v_is_admin boolean;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE = '42501';
+  END IF;
+  IF p_fecha_inicio IS NULL OR p_fecha_fin IS NULL
+     OR p_fecha_fin < p_fecha_inicio OR p_fecha_fin - p_fecha_inicio > 30 THEN
+    RAISE EXCEPTION 'El rango de consulta debe contener entre 1 y 31 días.'
+      USING ERRCODE = '22023';
+  END IF;
+  v_is_admin := public.bc_actor_is_admin();
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id',p.id,'turno_id',p.turno_id,'almacen_id',p.almacen_id,
+      'numero_dia',p.numero_dia,'fecha',p.fecha,'trabaja',p.trabaja,
+      -- Workers never receive another person's user ID through this read RPC.
+      'responsable_id',CASE WHEN v_is_admin OR p.responsable_id=auth.uid()
+                            THEN p.responsable_id ELSE NULL END,
+      'hora_inicio_prevista',p.hora_inicio_prevista,
+      'hora_fin_prevista',p.hora_fin_prevista,'zona_horaria',p.zona_horaria,
+      'patron_id',p.patron_id,'estado',p.estado,'motivo_ajuste',p.motivo_ajuste,
+      'sesion_id',s.id,'sesion_estado',s.estado,
+      'es_responsable',p.responsable_id=auth.uid()
+    ) ORDER BY p.fecha,p.numero_dia
+  ),'[]'::jsonb)
+  INTO v_result
+  FROM public.turno_jornada_programacion p
+  LEFT JOIN public.turno_sesiones s ON s.jornada_programacion_id=p.id
+  WHERE p.fecha BETWEEN p_fecha_inicio AND p_fecha_fin
+    AND (
+      v_is_admin
+      OR p.responsable_id=auth.uid()
+      OR (
+        p.patron_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM public.turno_jornada_patron_dias d
+          WHERE d.patron_id=p.patron_id AND d.responsable_id=auth.uid()
+        )
+      )
+    );
+  RETURN v_result;
+END;
+$function$;
+
 -- The new tables are never directly writable/readable through the Data API.
 -- Use the SECURITY DEFINER RPCs above; RLS remains enabled as defense-in-depth.
 ALTER TABLE public.turno_jornada_configuracion ENABLE ROW LEVEL SECURITY;
@@ -1008,6 +1064,7 @@ REVOKE ALL ON FUNCTION public.bc5_listar_patrones_jornada(uuid) FROM PUBLIC, ano
 REVOKE ALL ON FUNCTION public.bc5_obtener_programacion_jornada(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.bc5_iniciar_jornada(uuid,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.bc5_cerrar_jornada(uuid,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.bc5_mis_jornadas(date,date) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.bc5_configurar_horario_jornada(uuid,time,time,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_obtener_configuracion_jornada(uuid) TO authenticated;
@@ -1019,5 +1076,6 @@ GRANT EXECUTE ON FUNCTION public.bc5_listar_patrones_jornada(uuid) TO authentica
 GRANT EXECUTE ON FUNCTION public.bc5_obtener_programacion_jornada(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_iniciar_jornada(uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_cerrar_jornada(uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc5_mis_jornadas(date,date) TO authenticated;
 
 COMMIT;
