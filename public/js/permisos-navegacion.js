@@ -41,7 +41,7 @@
   };
 
   var ORDEN_HOME = [
-    "resumen", "ventas", "comunicacion", "productos", "ciclos", "operacion",
+    "resumen", "jornada", "ventas", "comunicacion", "productos", "ciclos", "operacion",
     "almacenes", "transferencias", "compras", "reportes", "inventario",
     "movimientos", "usuarios", "mando", "config"
   ];
@@ -155,6 +155,22 @@
       if (tab === "transferencias" || tab === "vales" || tab === "turnos") {
         setTabVisible(btn, false);
         return;
+      }
+
+      // Jornada es la ruta ordinaria; los permisos de escritura se vuelven a validar en los RPC.
+      if (tab === "jornada") {
+        setTabVisible(btn, true);
+        return;
+      }
+
+      // El flujo POS legado se conserva para el dueño/historial, pero no es la ruta ordinaria de la dependienta.
+      if (tab === "ventas") {
+        var u = (typeof _usuarioActual !== "undefined" && _usuarioActual) || window.__bcUser || {};
+        var rol = String(u.rol || u.role_name || u.nombre_rol || u.role || "").toLowerCase();
+        if (rol.indexOf("dependienta") >= 0) {
+          setTabVisible(btn, false);
+          return;
+        }
       }
 
       if (tab === "config" || tab === "pendientes") {
