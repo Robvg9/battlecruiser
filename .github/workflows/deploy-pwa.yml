@@ -8,7 +8,7 @@ on:
       - 'wrangler.toml'
       - '.github/workflows/deploy-pwa.yml'
       # Release provenance and the gates that prove the deployed SHA must redeploy
-      # so the LIVE marker identifies the exact current main commit.
+      # so the LIVE content-addressed manifest identifies the exact current main commit.
       - '.github/workflows/quality.yml'
       - '.github/workflows/selfhosted-windows-test.yml'
       - 'scripts/write-release-manifest.js'
@@ -41,7 +41,7 @@ jobs:
           test -f "public/release-$GITHUB_SHA.json"
       - name: Deploy PWA
         env:
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
