@@ -6,7 +6,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
-const source = fs.readFileSync(path.join(__dirname, "../public/js/ventas.js"), "utf8");
+const fixtureProducts = [
+  { id: "p1", nombre: "Cerveza Bucanero" },
+  { id: "p2", nombre: "Cerveza Mayabe" },
+  { id: "p3", nombre: "Masareal" }
+];
+const source = fs.readFileSync(path.join(__dirname, "../public/js/ventas.js"), "utf8").replace(
+  'let ventaProductosLista = []; // lista completa de productos, para el buscador',
+  'let ventaProductosLista = window.__bcFixtureProductosLista = ' +
+    JSON.stringify(fixtureProducts) +
+    '; // lista completa de productos, para el buscador'
+);
 
 test("Ventas: product search filters by name, shows empty state, selects result and clears safely", () => {
   const dom = new JSDOM(`<!doctype html><html><head></head><body>
@@ -33,16 +43,10 @@ test("Ventas: product search filters by name, shows empty state, selects result 
     };
     window.actualizarStockDisponibleUI = () => { stockRefreshes++; };
     window.eval(source);
-    window.eval(`ventaProductosLista = [
-      { id: "p1", nombre: "Cerveza Bucanero" },
-      { id: "p2", nombre: "Cerveza Mayabe" },
-      { id: "p3", nombre: "Masareal" }
-    ]; `);
-
     const search = document.getElementById("venta-producto-buscar");
     const select = document.getElementById("venta-producto");
     const results = document.getElementById("venta-producto-resultados");
-    const initialProducts = window.eval("ventaProductosLista.map(p => p.id).join(',')");
+    const initialProducts = window.__bcFixtureProductosLista.map(p => p.id).join(',');
 
     search.value = "bUcAnErO";
     search.dispatchEvent(new window.Event("input", { bubbles: true }));
@@ -78,7 +82,7 @@ test("Ventas: product search filters by name, shows empty state, selects result 
       ["", "p1", "p2", "p3"],
       "clearing restores the entire product list"
     );
-    assert.equal(window.eval("ventaProductosLista.map(p => p.id).join(',')"), initialProducts,
+    assert.equal(window.__bcFixtureProductosLista.map(p => p.id).join(','), initialProducts,
       "search and restore must not mutate the base product array");
   } finally {
     dom.window.close();
