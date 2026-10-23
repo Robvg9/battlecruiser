@@ -52,7 +52,7 @@ test("Settlement functions reject null/invalid decisions and serialize against t
 });
 
 test("The migration is additive and does not delete or truncate production history", () => {
-  assert.match(sql, /^BEGIN;/);
+  assert.match(sql, /^-- Step 6[\\s\\S]*?\\r?\\nBEGIN;\\r?\\n/);
   assert.match(sql, /COMMIT;\s*$/);
   assert.doesNotMatch(sql, /\bDROP\s+TABLE\b/i);
   assert.doesNotMatch(sql, /\bTRUNCATE\s+(?:TABLE\s+)?public\./i);
