@@ -163,6 +163,9 @@ test("Paso 4 catálogos: error de duplicado se muestra sin limpiar ni ocultar el
 
 test("Paso 4 catálogos: activar/desactivar un elemento actualizado llama update con el id correcto", async (t) => {
   const c = setup(t);
+  assert.equal(typeof c.window._refrescarCatalogo_categorias, "function",
+    "el módulo debe exponer el refresco de categorías que invoca la pantalla de Configuración");
+  await c.window._refrescarCatalogo_categorias();
   assert.ok(await waitFor(() => c.window.document.querySelector("#lista-categorias .catalogo-toggle-btn")),
     "debe renderizar botón de estado");
   const button = c.window.document.querySelector("#lista-categorias .catalogo-toggle-btn");
