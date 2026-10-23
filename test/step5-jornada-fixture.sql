@@ -58,8 +58,8 @@ CREATE UNIQUE INDEX turno_asignacion_activa_unica
 CREATE TABLE public.turno_tramos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), turno_id uuid NOT NULL REFERENCES public.turnos(id),
   turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id),
-  usuario_id uuid REFERENCES auth.users(id), estado text NOT NULL,
-  inicio_at timestamptz NOT NULL DEFAULT now(), fin_at timestamptz,
+  usuario_id uuid REFERENCES auth.users(id), tipo text NOT NULL DEFAULT 'NORMAL',
+  estado text NOT NULL, inicio_at timestamptz NOT NULL DEFAULT now(), fin_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.turno_eventos (
