@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261023050000_step5_jornada_unica_backend.sql");
+const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261023053011_step5_jornada_unica_backend.sql");
 const sql = fs.readFileSync(migrationPath, "utf8");
 
 test("Step 5 adds a single 07:00–23:00 jornada with an explicit Cuban timezone default", () => {
