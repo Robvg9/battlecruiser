@@ -297,15 +297,14 @@ test("B8.17: conversación vinculada a responsabilidad", () => {
 // ============================================================
 // PRUEBAS — PERMISOS, OFFLINE, AUDITORÍA, INTEGRIDAD
 // ============================================================
-
-test("B8.18: sin comunicacion.ver conserva navegación visible pero no permite crear conversaciones", async () => {
+test("B8.18: sin comunicacion.ver mantiene navegación visible pero bloquea lectura y escritura", async () => {
   const { window, document, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "ventas", accion: "ver" }],
   });
   marcarOnline(window);
 
-  // Wait for the permission RPC to be loaded; a fixed sleep is flaky on Windows.
+  // Wait for effective permissions instead of assuming a fixed startup delay.
   let permisosListos = false;
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
@@ -316,16 +315,33 @@ test("B8.18: sin comunicacion.ver conserva navegación visible pero no permite c
     await esperar(10);
   }
   assert.ok(permisosListos, "los permisos efectivos deben terminar de cargar");
-  assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false, "el usuario realmente carece de comunicacion.ver");
+  assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false, "el usuario carece de comunicacion.ver");
 
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
   assert.ok(btn, "la ruta de Comunicación existe");
-  assert.notStrictEqual(btn.getAttribute("data-bc-permiso"), "0", "la política vigente mantiene las secciones visibles para revisión");
+  assert.ok(btn.style.display !== "none" && !btn.classList.contains("hidden"),
+    "la política vigente mantiene la sección visible para inspección");
+
+  // The tab remains navigable, but its protected read layer must fail closed.
+  client.__rpcCalls.length = 0;
+  await window.refrescarComunicacion();
+  const lista = document.getElementById("lista-conversaciones");
+  assert.match(lista.textContent, /No tenés permiso para ver comunicación/i,
+    "el panel deniega el contenido sin permiso de lectura");
+  const protectedReads = client.__rpcCalls.filter((call) => [
+    "listar_conversaciones_usuario",
+    "contar_no_leidos_global",
+    "listar_mensajes_conversacion",
+    "listar_usuarios_para_chat",
+  ].includes(call.nombre));
+  assert.deepStrictEqual(protectedReads, [], "la vista no consulta RPC protegidas sin comunicacion.ver");
 
   const result = await window.crearConversacion("PRIVADA", "No autorizada", "u2");
-  assert.strictEqual(result, null, "sin comunicacion.crear no debe crear una conversación");
-  assert.ok(document.getElementById("msg-nueva-conv").textContent.includes("No tenés permiso"), "se informa el rechazo de permiso");
-  assert.strictEqual(client.__rpcCalls.some((call) => call.nombre === "crear_conversacion"), false, "no se llama al RPC de escritura sin permiso");
+  assert.strictEqual(result, null, "sin comunicacion.crear no crea conversaciones");
+  assert.ok(document.getElementById("msg-nueva-conv").textContent.includes("No tenés permiso"),
+    "se informa el rechazo de escritura");
+  assert.strictEqual(client.__rpcCalls.some((call) => call.nombre === "crear_conversacion"), false,
+    "no se llama al RPC de escritura sin permiso");
 });
 
 test("B8.19: usuario inactivo no puede enviar mensaje", async () => {
