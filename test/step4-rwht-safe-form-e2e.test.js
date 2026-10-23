@@ -354,7 +354,8 @@ test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a
 test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t) => {
   const c = await contextoListo();
   t.after(() => c.dom.window.close());
-  c.document.getElementById("form-almacen").classList.remove("hidden");
+  // Submit a hidden form directly: visibility is irrelevant to required-field validation,
+  // and revealing the modal starts unrelated asynchronous stock refreshes in the full app harness.
   c.document.getElementById("alm-nombre").value = " ";
   c.document.getElementById("alm-tipo").value = "";
   const base = c.client.__writeCalls.length;
