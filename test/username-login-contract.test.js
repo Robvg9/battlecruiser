@@ -238,7 +238,7 @@ test("username recovery uses the server-side resolver, direct recovery redirect,
 test("login bridge handles preflight before enforcing the production origin and never opens POST to other origins", () => {
   const normalizeMatch = edge.match(/function normalizeOrigin\(value: string \| null\): string \| null \{[\s\S]*?\n\}/);
   assert.ok(normalizeMatch, "origin normalization must be available for the preflight contract");
-  const normalize = vm.runInNewContext("(" + normalizeMatch[0].replace("function normalizeOrigin(value: string | null): string | null", "function(value)") + ")");
+  const normalize = vm.runInNewContext("(" + normalizeMatch[0].replace("function normalizeOrigin(value: string | null): string | null", "function(value)") + ")", { URL });
   assert.equal(normalize("https://battlecruiser.robvg9.workers.dev"), "https://battlecruiser.robvg9.workers.dev");
   assert.equal(normalize("https://battlecruiser.robvg9.workers.dev/"), "https://battlecruiser.robvg9.workers.dev");
   assert.equal(normalize("https://evil.example/"), "https://evil.example");
