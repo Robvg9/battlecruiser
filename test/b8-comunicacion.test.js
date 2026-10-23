@@ -305,8 +305,18 @@ test("B8.18: sin comunicacion.ver bloquea lectura y escritura con permisos efect
   marcarOnline(window);
   await window.__BC_UI_READY__;
 
-  // The shared test bridge seeds a broad ACL to keep unrelated tests stable.
-  // Narrow the effective ACL here so this test specifically exercises denial.
+  // Wait until the mocked profile ACL is loaded, then narrow only this test's
+  // effective permission object. The common harness intentionally seeds a broad ACL.
+  let permisosListos = false;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    if (window.tienePermiso("ventas", "ver") === true) {
+      permisosListos = true;
+      break;
+    }
+    await esperar(10);
+  }
+  assert.ok(permisosListos, "los permisos de la fixture deben cargarse antes de probar la denegación");
   const efectivos = window._permisosEfectivosRef();
   assert.ok(efectivos && efectivos.comunicacion, "el test bridge debe exponer el ACL efectivo");
   efectivos.comunicacion.ver = false;
