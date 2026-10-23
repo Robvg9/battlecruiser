@@ -49,12 +49,12 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const RELEASE_MARKER_RE = /\n\n\/\* BC_RELEASE_SOURCE_SHA=([0-9a-f]{40}); BC_RELEASE_APP_VERSION=([^;\s]+); BC_RELEASE_SERVICE_WORKER_VERSION=([^;\s]+); BC_RELEASE_WORKFLOW_RUN_ID=(\d+) \*\/\n?$/;
+const RELEASE_MARKER_RE = /\n\n<!-- BC_RELEASE_SOURCE_SHA=([0-9a-f]{40}); BC_RELEASE_APP_VERSION=([^;\s]+); BC_RELEASE_SERVICE_WORKER_VERSION=([^;\s]+); BC_RELEASE_WORKFLOW_RUN_ID=(\d+) -->\n?$/;
 
-function normalizeReleaseStampedAsset(liveSource, sourceReference, assetName, expectedSha, expectedAppVersion, expectedSwVersion) {
+function normalizeReleaseStampedHtml(liveSource, sourceReference, expectedSha, expectedAppVersion, expectedSwVersion) {
   const text = String(liveSource);
   const match = text.match(RELEASE_MARKER_RE);
-  assert(match, "LIVE " + assetName + " no tiene la huella de release al final del asset.");
+  assert(match, "LIVE index.html no tiene la huella de release al final del documento.");
   const provenance = {
     source_sha: match[1].toLowerCase(),
     app_version: match[2],
@@ -62,14 +62,11 @@ function normalizeReleaseStampedAsset(liveSource, sourceReference, assetName, ex
     workflow_run_id: match[4],
   };
   assert(!expectedSha || provenance.source_sha === String(expectedSha).toLowerCase(),
-    "LIVE " + assetName + " SHA de release distinto: esperado " + expectedSha + ", recibido " + provenance.source_sha + ".");
+    "LIVE index.html SHA de release distinto: esperado " + expectedSha + ", recibido " + provenance.source_sha + ".");
   assert(provenance.app_version === expectedAppVersion,
-    "LIVE " + assetName + " app version de release inesperada: " + provenance.app_version + ".");
+    "LIVE index.html app version de release inesperada: " + provenance.app_version + ".");
   assert(provenance.service_worker_version === expectedSwVersion,
-    "LIVE " + assetName + " Service Worker version de release inesperada: " + provenance.service_worker_version + ".");
-  // The deploy-time stamp trims the source's terminal whitespace before adding
-  // the comment. Restore exactly the checked-out source's tail so the original
-  // byte-for-byte comparison still covers every byte outside this one marker.
+    "LIVE index.html Service Worker version de release inesperada: " + provenance.service_worker_version + ".");
   const sourceText = String(sourceReference);
   const sourceTailMatch = sourceText.match(/\s*$/);
   const sourceTail = sourceTailMatch ? sourceTailMatch[0] : "";
@@ -248,7 +245,7 @@ async function main() {
     assert(/^[0-9a-f]{40}$/.test(expectedReleaseSha), "BC_EXPECTED_RELEASE_SHA no es un SHA Git completo.");
   }
   for (const assetPath of assetPaths) {
-    const needsCurrentReleaseStamp = isProductionBase && (assetPath === "/app.js" || assetPath === "/service-worker.js");
+    const needsCurrentReleaseStamp = isProductionBase && assetPath === "/index.html";
     const maxAttempts = needsCurrentReleaseStamp ? 36 : 1;
     let live = null;
     let lastError = null;
@@ -259,13 +256,12 @@ async function main() {
           lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
         } else if (needsCurrentReleaseStamp) {
           const marker = String(candidate.body).match(RELEASE_MARKER_RE);
-          const expectedAssetVersion = assetPath === "/app.js" ? expectedVersion : swVersionMatch[1];
           if (!marker) {
-            lastError = new Error("LIVE " + assetPath + " todavía no expone la huella de release esperada.");
+            lastError = new Error("LIVE index.html todavía no expone la huella de release esperada.");
           } else if (expectedReleaseSha && marker[1].toLowerCase() !== expectedReleaseSha) {
-            lastError = new Error("LIVE " + assetPath + " sigue en SHA " + marker[1] + "; se espera " + expectedReleaseSha + ".");
-          } else if (marker[2] !== expectedVersion || marker[3] !== swVersionMatch[1] || marker[2] !== expectedAssetVersion) {
-            lastError = new Error("LIVE " + assetPath + " expone versiones de release distintas a las fuentes.");
+            lastError = new Error("LIVE index.html sigue en SHA " + marker[1] + "; se espera " + expectedReleaseSha + ".");
+          } else if (marker[2] !== expectedVersion || marker[3] !== swVersionMatch[1]) {
+            lastError = new Error("LIVE index.html expone versiones de release distintas a las fuentes.");
           } else {
             live = candidate;
             break;
@@ -288,35 +284,23 @@ async function main() {
     };
   }
 
-  let integrityAppSource = liveAssetBodies["/app.js"];
-  let integritySwSource = liveAssetBodies["/service-worker.js"];
-  if (BASE_URL === "https://battlecruiser.robvg9.workers.dev") {
-    const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
-    if (expectedReleaseSha) {
-      assert(/^[0-9a-f]{40}$/.test(expectedReleaseSha), "BC_EXPECTED_RELEASE_SHA no es un SHA Git completo.");
-    }
-    const appRelease = normalizeReleaseStampedAsset(
-      integrityAppSource, appSource, "app.js", expectedReleaseSha, expectedVersion, swVersionMatch[1]
+  let integrityIndexSource = liveAssetBodies["/index.html"];
+  if (isProductionBase) {
+    const htmlRelease = normalizeReleaseStampedHtml(
+      integrityIndexSource, sourceIndex, expectedReleaseSha, expectedVersion, swVersionMatch[1]
     );
-    const swRelease = normalizeReleaseStampedAsset(
-      integritySwSource, swSource, "service-worker.js", expectedReleaseSha, expectedVersion, swVersionMatch[1]
-    );
-    assert(JSON.stringify(appRelease.provenance) === JSON.stringify(swRelease.provenance),
-      "La huella de release de app.js no coincide con la del Service Worker.");
-    report.evidence.releaseProvenance = appRelease.provenance;
-    integrityAppSource = appRelease.normalizedSource;
-    integritySwSource = swRelease.normalizedSource;
+    report.evidence.releaseProvenance = htmlRelease.provenance;
+    integrityIndexSource = htmlRelease.normalizedSource;
   } else {
-    assert(!integrityAppSource.includes("BC_RELEASE_SOURCE_SHA=") && !integritySwSource.includes("BC_RELEASE_SOURCE_SHA="),
+    assert(!integrityIndexSource.includes("BC_RELEASE_SOURCE_SHA="),
       "El preview aislado no debe llevar una huella de release de producción.");
   }
 
-  assert(sha256(integrityAppSource) === sha256(appSource), "El app.js de LIVE no coincide byte a byte con la fuente después de retirar únicamente la huella de release (LF normalizado).");
-  assert(sha256(integritySwSource) === sha256(swSource), "El Service Worker LIVE no coincide byte a byte con la fuente después de retirar únicamente la huella de release (LF normalizado).");
-  assert(liveAssetEvidence["/index.html"].sha256 === sha256(sourceIndex), "index.html LIVE no coincide con la fuente; no se ejecutará el E2E sobre una build no alineada.");
+  assert(sha256(liveAssetBodies["/app.js"]) === sha256(appSource), "El app.js de LIVE no coincide byte a byte con la fuente (LF normalizado).");
+  assert(sha256(liveAssetBodies["/service-worker.js"]) === sha256(swSource), "El Service Worker LIVE no coincide byte a byte con la fuente (LF normalizado).");
+  assert(sha256(integrityIndexSource) === sha256(sourceIndex), "index.html LIVE no coincide byte a byte con la fuente después de retirar únicamente la huella de release (LF normalizado).");
   assert(liveAssetEvidence["/style.css"].sha256 === sha256(sourceCss), "style.css LIVE no coincide con la fuente; no se ejecutará el E2E sobre una build no alineada.");
-  liveAssetEvidence["/app.js"].normalizedSha256 = sha256(integrityAppSource);
-  liveAssetEvidence["/service-worker.js"].normalizedSha256 = sha256(integritySwSource);
+  liveAssetEvidence["/index.html"].normalizedSha256 = sha256(integrityIndexSource);
   report.evidence.liveAssets = liveAssetEvidence;
 
   const browserPath = findBrowser();
