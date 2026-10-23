@@ -9,6 +9,7 @@ const { buildReleaseManifest, releaseManifestFilename } = require("../scripts/wr
 const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
 const quality = fs.readFileSync(path.join(root, ".github/workflows/quality.yml"), "utf8");
+const selfHosted = fs.readFileSync(path.join(root, ".github/workflows/selfhosted-windows-test.yml"), "utf8");
 const verifier = fs.readFileSync(path.join(__dirname, "verify-production-version.js"), "utf8");
 const liveOfflineE2e = fs.readFileSync(path.join(__dirname, "live-offline-e2e.js"), "utf8");
 
@@ -62,6 +63,8 @@ test("post-deploy Quality compares the content-addressed manifest with workflow_
   assert.match(quality, /github\.event\.workflow_run\.head_sha/);
   assert.match(quality, /BC_EXPECTED_RELEASE_SHA/);
   assert.match(quality, /github\.sha/);
+  assert.match(selfHosted, /BC_EXPECTED_RELEASE_SHA:.*github\.sha/);
+  assert.match(deploy, /selfhosted-windows-test\.yml/);
   assert.match(verifier, /releaseManifestFilename\(expectedSha\)/);
   assert.match(verifier, /source_sha/);
   assert.match(verifier, /EXACT_SHA=PASS/);
