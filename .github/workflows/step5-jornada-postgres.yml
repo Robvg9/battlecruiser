@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'supabase/migrations/20261023050000_step5_jornada_unica_backend.sql'
+      - 'supabase/migrations/20261023053011_step5_jornada_unica_backend.sql'
       - 'test/step5-jornada-fixture.sql'
       - 'test/step5-jornada-contract.sql'
       - 'test/step5-jornada-contract.test.js'
@@ -58,7 +58,7 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_test
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023050000_step5_jornada_unica_backend.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023053011_step5_jornada_unica_backend.sql
 
       - name: Verify jornada and rest scheduling, conflicts, historic preservation, and grants
         env:
