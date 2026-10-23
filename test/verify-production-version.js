@@ -23,6 +23,7 @@ if (expectedSha && !/^[0-9a-f]{40}$/.test(expectedSha)) {
   throw new Error("BC_EXPECTED_RELEASE_SHA must be a full 40-character commit SHA.");
 }
 const baseUrl = "https://battlecruiser.robvg9.workers.dev";
+const PROVENANCE_RE = /BC_RELEASE_SOURCE_SHA=([0-9a-f]{40});\s*BC_RELEASE_APP_VERSION=([^;\s]+);\s*BC_RELEASE_SERVICE_WORKER_VERSION=([^;\s]+);\s*BC_RELEASE_WORKFLOW_RUN_ID=(\d+)/;
 
 function describeError(error) {
   if (!error) return "unknown error";
@@ -79,12 +80,21 @@ async function request(url) {
   }
   return requestWithHttps(url);
 }
+function readProvenance(source, assetName) {
+  const match = String(source).match(PROVENANCE_RE);
+  if (!match) throw new Error("LIVE " + assetName + " is missing valid embedded release provenance.");
+  return {
+    source_sha: match[1].toLowerCase(),
+    app_version: match[2],
+    service_worker_version: match[3],
+    workflow_run_id: match[4],
+  };
+}
 async function verifyOnce(attempt) {
   const stamp = Date.now() + "-" + attempt;
-  const [liveApp, liveSw, manifestBody] = await Promise.all([
+  const [liveApp, liveSw] = await Promise.all([
     request(baseUrl + "/app.js?bc_verify=" + stamp + "-app"),
     request(baseUrl + "/service-worker.js?bc_verify=" + stamp + "-sw"),
-    request(baseUrl + "/release.json?bc_verify=" + stamp + "-release"),
   ]);
   const liveAppMatch = liveApp.match(/const VERSION=["']([^"']+)["']/);
   const liveSwMatch = liveSw.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);
@@ -96,25 +106,21 @@ async function verifyOnce(attempt) {
   if (liveSwMatch[1] !== expectedSwVersion) {
     throw new Error("LIVE Service Worker mismatch: expected " + expectedSwVersion + ", got " + liveSwMatch[1]);
   }
-  let release;
-  try { release = JSON.parse(manifestBody); }
-  catch (_) { throw new Error("LIVE release.json is not valid JSON."); }
-  if (!release || !/^[0-9a-f]{40}$/i.test(String(release.source_sha || ""))) {
-    throw new Error("LIVE release.json has no valid 40-character source_sha.");
+  const appRelease = readProvenance(liveApp, "app.js");
+  const swRelease = readProvenance(liveSw, "service-worker.js");
+  if (JSON.stringify(appRelease) !== JSON.stringify(swRelease)) {
+    throw new Error("LIVE app and Service Worker provenance disagree: " + JSON.stringify({appRelease, swRelease}));
   }
-  if (release.app_version !== expectedAppVersion || release.service_worker_version !== expectedSwVersion) {
-    throw new Error("LIVE release metadata version mismatch: " + JSON.stringify({
-      expectedAppVersion, expectedSwVersion,
-      actualAppVersion: release.app_version,
-      actualServiceWorkerVersion: release.service_worker_version,
-    }));
+  if (appRelease.app_version !== expectedAppVersion || appRelease.service_worker_version !== expectedSwVersion) {
+    throw new Error("LIVE embedded release versions mismatch: " + JSON.stringify({appRelease, expectedAppVersion, expectedSwVersion}));
   }
-  if (expectedSha && String(release.source_sha).toLowerCase() !== expectedSha) {
-    throw new Error("LIVE source SHA mismatch: expected " + expectedSha + ", got " + release.source_sha);
+  if (expectedSha && appRelease.source_sha !== expectedSha) {
+    throw new Error("LIVE source SHA mismatch: expected " + expectedSha + ", got " + appRelease.source_sha);
   }
-  console.log("[production-release] PASS — app=" + expectedAppVersion + ", service-worker=" + expectedSwVersion + ", source_sha=" + release.source_sha);
+  console.log("[production-release] PASS — app=" + expectedAppVersion + ", service-worker=" + expectedSwVersion
+    + ", source_sha=" + appRelease.source_sha + ", workflow_run_id=" + appRelease.workflow_run_id);
   if (expectedSha) console.log("[production-release] EXACT_SHA=PASS");
-  else console.log("[production-release] SHA metadata observed; exact comparison omitted for manual dispatch.");
+  else console.log("[production-release] SHA observed; exact comparison omitted for manual dispatch.");
 }
 (async () => {
   for (let attempt = 1; attempt <= 8; attempt += 1) {
@@ -126,7 +132,7 @@ async function verifyOnce(attempt) {
     }
     if (attempt < 8) await new Promise((resolve) => setTimeout(resolve, 10000));
   }
-  throw new Error("Production is not serving the expected app/SW release metadata.");
+  throw new Error("Production is not serving the expected app/Service Worker release provenance.");
 })().catch((error) => {
   console.error("[production-release] FAIL", error);
   process.exitCode = 1;
