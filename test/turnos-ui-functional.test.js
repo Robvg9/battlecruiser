@@ -80,7 +80,7 @@ function setup(t, initialTurns = []) {
   window.client = {
     rpc: async (name, params = {}) => {
       rpcCalls.push({ name, params: { ...params } });
-      if (name === "turno_actual_usuario") return { data: currentTurn ? { ...currentTurn } : null, error: null };
+      if (name === "turno_actual_usuario") return { data: currentTurn && currentTurn.estado === "ABIERTO" ? { ...currentTurn } : null, error: null };
       if (name === "listar_turnos") {
         const rows = params.p_estado ? turns.filter((row) => row.estado === params.p_estado) : turns;
         return { data: rows.map((row) => ({ ...row })), error: null };
