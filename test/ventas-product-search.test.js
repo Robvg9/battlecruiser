@@ -23,7 +23,7 @@ test("Ventas: product search filters by name, shows empty state, selects result 
     <input id="venta-producto-buscar" type="search">
     <select id="venta-producto"><option value="">Elegí un producto…</option></select>
     <div id="venta-producto-resultados" class="hidden"></div>
-  </body></html>`, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  </body></html>`, { runScripts: "dangerously", url: "https://battlecruiser.test/" });
   const { window } = dom;
   const document = window.document;
   let stockRefreshes = 0;
@@ -41,8 +41,12 @@ test("Ventas: product search filters by name, shows empty state, selects result 
         select.appendChild(option);
       }
     };
+    const script = document.createElement("script");
+    script.textContent = source;
+    document.body.appendChild(script);
+    // Observe the loaded production global; the pre-load stub would be
+    // replaced by the real function declaration when the script executes.
     window.actualizarStockDisponibleUI = () => { stockRefreshes++; };
-    window.eval(source);
     const search = document.getElementById("venta-producto-buscar");
     const select = document.getElementById("venta-producto");
     const results = document.getElementById("venta-producto-resultados");
