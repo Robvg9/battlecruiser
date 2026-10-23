@@ -127,3 +127,20 @@ test("Paso 4 movimientos: búsqueda se aplica a los datos cargados y muestra est
   assert.ok(window.document.getElementById("mov-empty-clear"),
     "el estado vacío ofrece una ruta para limpiar filtros");
 });
+
+test("Paso 4 movimientos: rango Desde/Hasta filtra días frontera y envía ambos parámetros", async (t) => {
+  const c = setup(t);
+  const { window, rpcCalls } = c;
+  assert.ok(await waitFor(() => visibleRows(window).length === 4),
+    "la carga inicial debe pintar los cuatro movimientos fixture");
+  window.document.getElementById("mov-filtro-desde").value = "2026-10-20";
+  window.document.getElementById("mov-filtro-hasta").value = "2026-10-20";
+  window.document.getElementById("mov-refrescar-btn").click();
+  assert.ok(await waitFor(() => visibleRows(window).length === 2),
+    "el intervalo de un solo día debe incluir todos los movimientos de ese día y excluir los posteriores");
+  const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
+  assert.equal(latest.params.p_desde, "2026-10-20");
+  assert.equal(latest.params.p_hasta, "2026-10-20");
+  assert.match(visibleRows(window)[0], /Agua/);
+  assert.doesNotMatch(window.document.getElementById("mov-detalle").textContent, /Azúcar|Harina/);
+});
