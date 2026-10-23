@@ -33,7 +33,7 @@
     reportes: "reportes",
     inventario: "reportes",
     movimientos: "reportes",
-    turnos: "turnos",
+    turnos: "turnos",\n    jornada: "turnos",
     ciclos: "turnos",
     comunicacion: "comunicacion",
     mando: "auditoria",
