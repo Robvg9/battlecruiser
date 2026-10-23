@@ -185,6 +185,89 @@ BEGIN
 END
 $test$;
 
+-- Real journey start/close RPCs: off-window actions require an explicit auditable reason.
+SELECT public.bc5_configurar_horario_jornada(
+  '10000000-0000-0000-0000-000000000003',
+  CASE WHEN (now() AT TIME ZONE 'America/Havana')::time < TIME '12:00' THEN TIME '12:00' ELSE TIME '00:00' END,
+  CASE WHEN (now() AT TIME ZONE 'America/Havana')::time < TIME '12:00' THEN TIME '13:00' ELSE TIME '01:00' END,
+  'America/Havana'
+);
+CREATE TEMP TABLE _bc5_today AS
+SELECT public.bc5_crear_jornada_unica(
+  '10000000-0000-0000-0000-000000000003',
+  (now() AT TIME ZONE 'America/Havana')::date,
+  1,
+  '[{"numero_dia":1,"trabaja":true,"responsable_id":"20000000-0000-0000-0000-000000000002"}]'::jsonb,
+  'CI: today-only isolated journey'
+) AS result;
+CREATE TEMP TABLE _bc5_today_session AS
+SELECT (result->>'turno_id')::uuid AS turno_id,
+  (SELECT s.id FROM public.turno_sesiones s
+   WHERE s.turno_id=(result->>'turno_id')::uuid AND s.bloque='JORNADA') AS sesion_id
+FROM _bc5_today;
+
+SELECT set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false);
+SELECT set_config('test.bc_admin','false',false);
+DO $test$
+DECLARE v_sesion uuid := (SELECT sesion_id FROM _bc5_today_session);
+BEGIN
+  BEGIN
+    PERFORM public.bc5_iniciar_jornada(v_sesion,NULL);
+    RAISE EXCEPTION 'Off-schedule opening without a reason was accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$test$;
+CREATE TEMP TABLE _bc5_today_tramo AS
+SELECT (public.bc5_iniciar_jornada(
+  (SELECT sesion_id FROM _bc5_today_session),
+  'CI: test opening outside the configured window'
+)).id AS tramo_id;
+
+INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda)
+SELECT turno_id,sesion_id,tramo_id,'20000000-0000-0000-0000-000000000002',0,'CUP'
+FROM _bc5_today_session CROSS JOIN _bc5_today_tramo;
+
+DO $test$
+DECLARE v_sesion uuid := (SELECT sesion_id FROM _bc5_today_session);
+BEGIN
+  BEGIN
+    PERFORM public.bc5_cerrar_jornada(v_sesion,NULL);
+    RAISE EXCEPTION 'Off-schedule close without a reason was accepted';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$test$;
+SELECT public.bc5_cerrar_jornada(
+ (SELECT sesion_id FROM _bc5_today_session),
+ 'CI: test closure outside the configured window'
+);
+
+DO $test$
+DECLARE v_sesion uuid := (SELECT sesion_id FROM _bc5_today_session);
+DECLARE v_tramo uuid := (SELECT tramo_id FROM _bc5_today_tramo);
+BEGIN
+  IF (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion) <> 'COMPLETADA' THEN
+    RAISE EXCEPTION 'Jornada close did not complete the session';
+  END IF;
+  IF (SELECT estado FROM public.turno_tramos WHERE id=v_tramo) <> 'COMPLETADO' THEN
+    RAISE EXCEPTION 'Jornada close did not complete the active tramo';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.turno_jornada_eventos
+    WHERE programacion_id=(SELECT id FROM public.turno_jornada_programacion
+      WHERE turno_id=(SELECT turno_id FROM _bc5_today_session))
+      AND tipo='JORNADA_INICIADA_CON_EXCEPCION') THEN
+    RAISE EXCEPTION 'Auditable exceptional opening event missing';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.turno_jornada_eventos
+    WHERE programacion_id=(SELECT id FROM public.turno_jornada_programacion
+      WHERE turno_id=(SELECT turno_id FROM _bc5_today_session))
+      AND tipo='JORNADA_CERRADA_CON_EXCEPCION') THEN
+    RAISE EXCEPTION 'Auditable exceptional closure event missing';
+  END IF;
+END
+$test$;
+
 -- Admin authorization and explicit RPC/table privilege boundaries.
 SELECT set_config('test.bc_admin','false',false);
 DO $test$
