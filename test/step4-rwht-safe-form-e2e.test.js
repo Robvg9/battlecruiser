@@ -394,7 +394,7 @@ test("Paso 4 UI: transferencia con el mismo origen/destino se rechaza antes de c
   const base = c.client.__writeCalls.length;
   enviarSubmit(c, "form-transferencia");
 
-  assert.ok(await esperarHasta(() => /origen y destino no pueden ser el mismo almacén/i.test(c.document.getElementById("msg-transferencias").textContent)),
+  assert.ok(await esperarHasta(() => /el origen y el destino no pueden ser el mismo almacén/i.test(c.document.getElementById("msg-transferencias").textContent)),
     "la UI debe rechazar una transferencia con origen igual a destino");
   assert.equal(confirmCalls, 0, "no debe solicitar confirmación para una combinación inválida");
   assert.equal(nuevasEscrituras(c, base).some((call) => call.name === "registrar_transferencia"), false,
