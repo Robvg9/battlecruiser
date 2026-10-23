@@ -55,6 +55,6 @@ test("LIVE verifier checks source SHA and both deployed app/SW versions", () => 
   assert.match(verifier, /release\.json\?bc_verify=/);
   assert.match(verifier, /source_sha/);
   assert.match(verifier, /expectedSha/);
-  assert.match(verifier, /app version mismatch/);
+  assert.match(verifier, /app\.js version mismatch/);
   assert.match(verifier, /Service Worker mismatch/);
 });
