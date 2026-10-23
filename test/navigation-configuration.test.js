@@ -37,7 +37,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   assert.deepEqual(
     routeIds.filter(id => !expectedHidden.includes(id)).sort(),
     expectedVisible.slice().sort(),
-    "the visible route contract must be the documented 16 destinations"
+    "the visible route contract must be the documented 17 destinations"
   );
 
   for (const id of expectedHidden) {
@@ -141,6 +141,7 @@ test("app shell, application and Service Worker share 9.5.15 and load refreshed 
   assert.match(index, /href="style\.css\?v=9\.5\.15"/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.15"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.4"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.1"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261020\.5"\]/);
