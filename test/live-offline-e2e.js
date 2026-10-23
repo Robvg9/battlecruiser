@@ -449,6 +449,15 @@ async function main() {
   assert(preferenceReload.ready && preferenceReload.allPersisted,
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
 
+  // The shared E2E harness reloads unauthenticated production and may hide
+  // the app shell/panels by design. For this isolated semantic probe only,
+  // explicitly render the existing preference panel so AX does not report
+  // "notRendered" simply because its parent panel is inactive after reload.
+  const renderPreferencePanel = await evaluate("(()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false};const touched=[];for(let n=tab;n&&n!==document.body;n=n.parentElement){const cs=getComputedStyle(n);const hidden=n.classList.contains('hidden')||n.hasAttribute('hidden')||cs.display==='none'||cs.visibility==='hidden';n.classList.remove('hidden');n.removeAttribute('hidden');n.style.setProperty('display','block','important');n.style.setProperty('visibility','visible','important');n.style.setProperty('opacity','1','important');if(hidden)touched.push({tag:n.tagName,id:n.id||null,classes:typeof n.className==='string'?n.className:null});}tab.classList.add('active');tab.style.setProperty('display','block','important');return {ready:true,touched,tabClass:tab.className,tabDisplay:getComputedStyle(tab).display,tabRect:{width:tab.getBoundingClientRect().width,height:tab.getBoundingClientRect().height}};})()");
+  assert(renderPreferencePanel.ready && renderPreferencePanel.tabRect.width > 0 && renderPreferencePanel.tabRect.height > 0,
+    "No se pudo renderizar el panel para la prueba semántica aislada: " + JSON.stringify(renderPreferencePanel));
+  report.evidence.step4ChromiumPreferencePanelRendering = renderPreferencePanel;
+
   // Step 4/15 — Intento 3: inspeccionar el árbol de accesibilidad AX de Chromium
   // directamente mediante CDP. Esto separa semántica web de la traducción nativa
   // Android; el resultado NO se considera por sí solo prueba de Android físico.
