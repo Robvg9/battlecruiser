@@ -305,12 +305,18 @@ test("B8.18: sin comunicacion.ver bloquea lectura y escritura con permisos efect
   marcarOnline(window);
   await window.__BC_UI_READY__;
 
-  // The shared test bridge intentionally seeds an all-permissions ACL for
-  // the rest of the suite. This case narrows the effective ACL explicitly.
-  const efectivos = window._permisosEfectivosRef();
-  assert.ok(efectivos && efectivos.comunicacion, "the test bridge must expose effective permissions");
-  efectivos.comunicacion.ver = false;
-  efectivos.comunicacion.crear = false;
+  // Wait for the mocked profile permissions to finish loading. Do not rely
+  // on menu visibility, which is managed by a separate module in production.
+  let permisosListos = false;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    if (window.tienePermiso("ventas", "ver") === true) {
+      permisosListos = true;
+      break;
+    }
+    await esperar(10);
+  }
+  assert.ok(permisosListos, "los permisos del perfil deben quedar cargados");
 
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
   assert.ok(btn, "la ruta lógica de Comunicación existe");
