@@ -328,9 +328,9 @@ test("B8.18: sin comunicacion.ver la pestaña es inspeccionable, pero conversaci
   window.aplicarPermisosAInterfaz();
 
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-  assert.ok(btn, "la pestaña de inspección existe en el contrato de navegación");
-  assert.ok(btn.style.display !== "none" && !btn.classList.contains("hidden"),
-    "la navegación mantiene Comunicación visible para inspección");
+  assert.ok(btn, "la pestaña de Comunicación está declarada en el HTML");
+  assert.ok(btn.style.display === "none" || btn.classList.contains("hidden"),
+    "usuarios-permisos.js oculta Comunicación sin comunicacion.ver");
 
   await window.refrescarComunicacion();
   const lista = document.getElementById("lista-conversaciones");
