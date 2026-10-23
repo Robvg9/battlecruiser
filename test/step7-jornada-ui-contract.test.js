@@ -8,6 +8,7 @@ const migration=fs.readFileSync(path.join(__dirname,"../supabase/migrations/2026
 const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-jornada-ui.js"),"utf8");
 const app=fs.readFileSync(path.join(__dirname,"../public/app.js"),"utf8");
 const sw=fs.readFileSync(path.join(__dirname,"../public/service-worker.js"),"utf8");
+const nav=fs.readFileSync(path.join(__dirname,"../public/js/permisos-navegacion.js"),"utf8");
 
 test("Step 7 has session-scoped, immutable inventory snapshots and gates start/close server-side",()=>{
   assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_inventario_cortes/);
@@ -31,6 +32,9 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/dataset\.bc7Busy/);
   assert.match(ui,/navigator\.onLine/);
   assert.match(ui,/data-tab="jornada"/);
+  assert.match(nav,/if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/, "jornada navigation must remain visible; write permissions are server-gated");
+  assert.match(nav,/rol\.indexOf\("dependienta"\) >= 0[\s\S]*?setTabVisible\(btn, false\)/, "the ordinary sales tab is hidden only for dependienta role");
+  assert.match(nav,/jornada: "turnos"/);
   assert.match(ui,/data-tab=.?ventas/);
 });
 
