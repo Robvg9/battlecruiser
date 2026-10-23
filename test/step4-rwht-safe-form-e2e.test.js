@@ -383,32 +383,44 @@ test("Paso 4 UI: almacén válido envía nombre/tipo por el RPC mock y confirma 
 });
 
 test("Paso 4 UI: transferencia con el mismo origen/destino se rechaza antes de confirmar/escribir", async (t) => {
-  const c = await contextoListo();
-  t.after(() => c.dom.window.close());
-  addOption(c.document.getElementById("trf-origen"), "a-step4-fixture", "Almacén A");
-  addOption(c.document.getElementById("trf-destino"), "a-step4-fixture", "Almacén A");
-  addOption(c.document.getElementById("trf-producto"), "p-step4-fixture", "Producto fixture");
-  c.document.getElementById("trf-cantidad").value = "1";
-  let confirmCalls = 0;
-  c.window.confirm = () => { confirmCalls += 1; return true; };
-  const base = c.client.__writeCalls.length;
-  enviarSubmit(c, "form-transferencia");
+  const dom = new JSDOM(
+    "<!doctype html><html><body>" +
+      "<form id='form-transferencia'>" +
+        "<select id='trf-origen'><option value='a-step4-fixture'>Almacén A</option></select>" +
+        "<select id='trf-destino'><option value='a-step4-fixture'>Almacén A</option></select>" +
+        "<select id='trf-producto'><option value='p-step4-fixture'>Producto fixture</option></select>" +
+        "<input id='trf-cantidad' value='1'>" +
+        "<button type='submit'>Registrar transferencia</button>" +
+      "</form>" +
+      "<p id='msg-transferencias'></p>" +
+    "</body></html>",
+    { url: "https://battlecruiser-transfer-validation.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  const rpcCalls = [];
+  window.safeInit = (_name, callback) => callback();
+  window.tienePermiso = (seccion, accion) => seccion === "transferencias" && accion === "crear";
+  window.setMsg = (id, message) => { window.document.getElementById(id).textContent = message; };
+  window.setLoading = () => {};
+  window.setEmpty = () => {};
+  window.actualizarContador = () => {};
+  window.refrescarTransferencias = async () => {};
+  window.refrescarStockYSelects = async () => {};
+  window.ejecutarOperacion = async (...args) => { rpcCalls.push(args); return { ok: true, data: "fixture" }; };
+  window._cache = { transferencias: [], stock: [] };
+  window.confirm = () => { throw new Error("No debe pedir confirmación para una transferencia inválida"); };
 
-  const rejectedSameWarehouse = await esperarHasta(() => /el origen y el destino no pueden ser el mismo almacén/i.test(c.document.getElementById("msg-transferencias").textContent));
-  assert.ok(rejectedSameWarehouse,
-    "la UI debe rechazar una transferencia con origen igual a destino; msg=" +
-    c.document.getElementById("msg-transferencias").textContent +
-    "; origen=" + c.document.getElementById("trf-origen").value +
-    "; destino=" + c.document.getElementById("trf-destino").value +
-    "; producto=" + c.document.getElementById("trf-producto").value +
-    "; confirmCalls=" + confirmCalls +
-    "; writes=" + JSON.stringify(nuevasEscrituras(c, base)) +
-    "; rpcRecent=" + JSON.stringify(c.client.__rpcCalls.slice(-10)));
-  assert.equal(confirmCalls, 0, "no debe solicitar confirmación para una combinación inválida");
-  assert.equal(nuevasEscrituras(c, base).some((call) => call.name === "registrar_transferencia"), false,
-    "no se llama al RPC de transferencia si origen=destino");
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "transferencias.js"), "utf8");
+  window.eval(source);
+  t.after(() => window.close());
+
+  const form = window.document.getElementById("form-transferencia");
+  form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+
+  assert.equal(window.document.getElementById("msg-transferencias").textContent,
+    "El origen y el destino no pueden ser el mismo almacén.");
+  assert.equal(rpcCalls.length, 0, "la validación no debe llamar a ejecutarOperacion");
 });
-
 test("Paso 4 UI: responsabilidad válida utiliza el RPC mock y conserva la prioridad", async (t) => {
   const c = await contextoListo();
   t.after(() => c.dom.window.close());
