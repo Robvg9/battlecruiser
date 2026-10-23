@@ -38,7 +38,7 @@ test("Inventory adjustment approvals are least-privilege, reasoned and bounded",
   assert.match(sql, /p_tipo IN \('merma','baja'\)/);
   assert.match(sql, /v_cant_real<=0 OR v_cant_real>v_cant/);
   assert.match(sql, /public\._aplicar_salida_aprobada\(v_alm,v_prod,v_cant_real\)/);
-  assert.match(sql, /p_decision='RECHAZAR' AND NULLIF\(btrim\(p_comentario\),' '\) IS NULL|p_decision='RECHAZAR' AND NULLIF\(btrim\(p_comentario\),' '\) IS NULL|p_decision='RECHAZAR' AND NULLIF\(btrim\(p_comentario\),' '\) IS NULL|p_decision='RECHAZAR' AND NULLIF\(btrim\(p_comentario\),' '\) IS NULL|p_decision='RECHAZAR' AND NULLIF\(btrim\(p_comentario\),' '\) IS NULL|p_decision='RECHAZAR' AND NULLIF\(btrim\(p_comentario\),' '\) IS NULL/);
+  assert.ok(sql.includes("p_decision='RECHAZAR' AND NULLIF(btrim(p_comentario),'') IS NULL"));
 });
 
 test("Settlement functions reject null/invalid decisions and serialize against the target row", () => {
