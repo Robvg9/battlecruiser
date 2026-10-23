@@ -20,7 +20,7 @@ test("personal preferences belong to their own section, not Configuration or the
   assert.doesNotMatch(index, /id="ajustes-btn"|id="ajustes-menu"|id="change-pass-btn"|id="update-app-btn"/);
   assert.doesNotMatch(app, /ui-ajustes-panel\.js/);
   assert.match(loader, /getElementById\("tab-conectividad"\)/);
-  assert.match(loader, /configuracion-ajustes-migrados-20260903\.js\?v=5/);
+  assert.match(loader, /configuracion-ajustes-migrados-20260903\.js\?v=6/);
   assert.match(src, /getElementById\("tab-preferencias"\)/);
 
   for (const token of [
