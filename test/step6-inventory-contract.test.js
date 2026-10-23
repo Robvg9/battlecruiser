@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261023090000_step6_inventory_movements_adjustments_settlement.sql");
+const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261023091903_step6_inventory_movements_adjustments_settlement.sql");
 const sql = fs.readFileSync(migrationPath, "utf8");
 
 test("Step 6 keeps the movement RPC signatures and stable result schemas", () => {
