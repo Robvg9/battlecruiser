@@ -859,17 +859,17 @@ textarea:focus-visible {
   }
 
   /* Keep tap targets usable on compact screens without changing desktop styling. */
-  button,
-  [role="button"],
-  input,
-  select,
-  textarea {
+  body:has(#app-shell.visible) button,
+  body:has(#app-shell.visible) [role="button"],
+  body:has(#app-shell.visible) input,
+  body:has(#app-shell.visible) select,
+  body:has(#app-shell.visible) textarea {
     min-height: 44px;
   }
 
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  select,
-  textarea {
+  body:has(#app-shell.visible) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  body:has(#app-shell.visible) select,
+  body:has(#app-shell.visible) textarea {
     font-size: 16px !important;
     scroll-margin-block: 12px;
   }
