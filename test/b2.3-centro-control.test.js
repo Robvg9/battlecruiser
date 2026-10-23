@@ -275,7 +275,7 @@ test("B2.3-D: el detalle muestra idempotency_key, tipo, estado, fecha e intentos
 });
 
 test("B2.3-C: acciones bloqueadas para SINCRONIZANDO (no reintento paralelo)", async () => {
-  const { window } = montarEntorno();
+  const { window, client } = montarEntorno();
   marcarOnline(window);
   assert.ok(await esperarSyncIdle(window), "the startup sync must settle before testing the action guard");
 
