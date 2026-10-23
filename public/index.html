@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.14">
+<link rel="stylesheet" href="style.css?v=9.5.15">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 .venta-almacen-operativo{margin-bottom:12px;padding:12px 14px;border-radius:8px;background:var(--stone);border:1px solid var(--gold-dim);display:flex;flex-direction:column;gap:4px}
@@ -78,7 +78,7 @@
       <button type="button" class="login-utility" id="password-recovery-request-btn">Enviar correo de recuperación</button>
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote app-version-label">v9.5.14 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.15 — BattleCruiser</p>
     </form>
   </div>
 
@@ -102,7 +102,7 @@
         <button class="tab-btn" data-tab="reportes">Reportes</button>
         <button class="tab-btn" data-tab="inventario">Inventario</button>
         <button class="tab-btn" data-tab="movimientos">Movimientos</button>
-        <button class="tab-btn" data-tab="turnos">Turnos</button>
+        <button class="tab-btn" data-tab="turnos">Turnos</button>\n        <button class="tab-btn" data-tab="jornada">Jornada e inventario</button>
         <button class="tab-btn" data-tab="ciclos">Ciclos Operativos</button>
         <button class="tab-btn" data-tab="operacion">Operación</button>
         <button class="tab-btn" data-tab="comunicacion">Comunicación <span id="com-tab-badge" class="pendientes-tab-badge hidden"></span></button>
@@ -477,7 +477,7 @@
       <div class="cc-bloque"><h3>Cuadres</h3><div id="lista-cuadres" class="lista"></div><p class="msg" id="msg-cuadre"></p></div>
     </section>
 
-    <section id="tab-ciclos" class="tab-panel">
+    <section id="tab-jornada" class="tab-panel"></section>\n\n    <section id="tab-ciclos" class="tab-panel">
       <div class="pendientes-header"><h3>Ciclos Operativos</h3><span id="ciclos-conn-info" class="muted"></span></div>
       <p class="muted">Una guía simple: ciclo → sesión → trabajar → cerrar.</p>
       <div id="ciclos-m18-root" class="m18-wrap"></div>
@@ -617,13 +617,13 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.14 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.15 — BattleCruiser</span>
     </footer>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script src="js/core.js"></script>
-<script src="js/auth.js?v=9.5.14"></script>
+<script src="js/auth.js?v=9.5.15"></script>
 <script src="js/offline.js"></script>
 <script src="js/network-core.js?v=20261020.4"></script>
 <script src="js/loading-guard.js"></script>
@@ -648,6 +648,6 @@
 <script src="js/comunicacion.js"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.14"></script>
+<script src="app.js?v=9.5.15"></script>
 </body>
 </html>
