@@ -304,21 +304,22 @@ test("B8.18: sin comunicacion.ver mantiene navegación visible pero bloquea lect
   });
   marcarOnline(window);
 
-  // Wait for effective permissions instead of assuming a fixed startup delay.
-  let permisosListos = false;
+  // Wait for both the permission RPC and the navigation observer. Those
+  // settle in separate async phases on Windows; a fixed sleep is unreliable.
+  const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
+  assert.ok(btn, "la ruta de Comunicación existe");
+  let politicaLista = false;
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
-    if (window.tienePermiso("ventas", "ver") === true) {
-      permisosListos = true;
+    if (window.tienePermiso("ventas", "ver") === true &&
+        btn.getAttribute("data-bc-permiso") === "1") {
+      politicaLista = true;
       break;
     }
     await esperar(10);
   }
-  assert.ok(permisosListos, "los permisos efectivos deben terminar de cargar");
+  assert.ok(politicaLista, "permisos y política de navegación deben quedar resueltos");
   assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false, "el usuario carece de comunicacion.ver");
-
-  const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-  assert.ok(btn, "la ruta de Comunicación existe");
   assert.ok(btn.style.display !== "none" && !btn.classList.contains("hidden"),
     "la política vigente mantiene la sección visible para inspección");
 
