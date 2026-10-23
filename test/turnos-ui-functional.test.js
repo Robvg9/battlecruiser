@@ -144,6 +144,8 @@ test("Paso 4 turnos: abrir requiere almacén y un alta válida actualiza los con
     !window.document.getElementById("btn-cerrar-turno").classList.contains("hidden") &&
     window.document.getElementById("turno-almacen-abrir").classList.contains("hidden")),
     "la UI debe mostrar el turno abierto después de terminar la consulta de estado");
+  assert.match(window.document.getElementById("turno-actual").textContent, /Turno ABIERTO/,
+    "la tarjeta debe presentar el estado ABIERTO");
 
   window.document.getElementById("btn-cerrar-turno").click();
   assert.ok(await waitFor(() => c.getCurrentTurn()?.estado === "CERRADO"),
@@ -155,6 +157,8 @@ test("Paso 4 turnos: abrir requiere almacén y un alta válida actualiza los con
     window.document.getElementById("btn-cerrar-turno").classList.contains("hidden") &&
     !window.document.getElementById("turno-almacen-abrir").classList.contains("hidden")),
     "la UI debe regresar al estado sin turno después de completar el cierre");
+  assert.match(window.document.getElementById("turno-actual").textContent, /No tenés turno abierto/i,
+    "la tarjeta debe volver a estado sin turno tras el cierre");
 });
 
 test("Paso 4 turnos: el filtro de estado se envía al historial y Refrescar restablece el listado", async (t) => {
