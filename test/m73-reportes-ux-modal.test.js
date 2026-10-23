@@ -122,11 +122,16 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
     const quick = window.document.querySelector('.bc-m45-quick-btn[data-rep="' + report + '"]');
     assert.ok(quick, "quick action exists for " + report);
     assert.equal(quick.getAttribute("aria-haspopup"), "dialog", "quick action declares dialog behavior: " + report);
+    const alreadySelected = modal.querySelector(".rep-tab-btn.active")?.dataset.rep === report;
+    const previousSelectionCount = selectedTabs.length;
     quick.click();
     await new Promise(resolve => window.setTimeout(resolve, 10));
     assert.ok(!modal.hidden, "quick action opens the detail modal: " + report);
     assert.equal(modal.querySelector(".rep-tab-btn.active")?.dataset.rep, report, "quick action selects the matching report: " + report);
-    assert.ok(selectedTabs.includes(report), "matching report-tab click was dispatched: " + report);
+    if (!alreadySelected) {
+      assert.equal(selectedTabs.length, previousSelectionCount + 1, "a different report dispatches one tab click: " + report);
+      assert.equal(selectedTabs[selectedTabs.length - 1], report, "the dispatched tab matches the quick action: " + report);
+    }
     close.click();
     assert.ok(modal.hidden, "the modal closes after the case: " + report);
   }
