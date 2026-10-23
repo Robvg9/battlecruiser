@@ -185,6 +185,44 @@ BEGIN
 END
 $test$;
 
+-- Read-only journey access: workers can see their own assigned schedule/pattern
+-- but not another worker's UUID. Admin sees all rows in the chosen date interval.
+SELECT set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',false);
+SELECT set_config('test.bc_admin','false',false);
+DO $test$
+DECLARE v_rows jsonb; v_count integer;
+BEGIN
+  v_rows := public.bc5_mis_jornadas(DATE '2030-01-01',DATE '2030-01-03');
+  v_count := jsonb_array_length(v_rows);
+  IF v_count<>3 THEN RAISE EXCEPTION 'Pattern owner should see all three days in their rotation, got %',v_count; END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_rows) AS x(value)
+    WHERE x.value->>'responsable_id'='20000000-0000-0000-0000-000000000002'
+  ) THEN RAISE EXCEPTION 'Worker schedule response leaked another responsible user ID'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_rows) AS x(value)
+     WHERE x.value->>'estado'='DESCANSO' AND coalesce((x.value->>'trabaja')::boolean,true)=false) THEN
+    RAISE EXCEPTION 'Worker pattern read did not include the rest day';
+  END IF;
+  BEGIN
+    PERFORM public.bc5_mis_jornadas(DATE '2030-01-01',DATE '2030-02-02');
+    RAISE EXCEPTION 'Schedule read accepted more than 31 days';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+END
+$test$;
+SELECT set_config('test.bc_admin','true',false);
+DO $test$
+DECLARE v_rows jsonb;
+BEGIN
+  v_rows := public.bc5_mis_jornadas(DATE '2030-01-01',DATE '2030-01-03');
+  IF jsonb_array_length(v_rows)<>3 THEN RAISE EXCEPTION 'Admin should see the complete scheduled range'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_rows) AS x(value)
+    WHERE x.value->>'responsable_id'='20000000-0000-0000-0000-000000000002') THEN
+    RAISE EXCEPTION 'Admin should see the assigned replacement UUID';
+  END IF;
+END
+$test$;
+
 -- Real journey start/close RPCs: off-window actions require an explicit auditable reason.
 SELECT public.bc5_configurar_horario_jornada(
   '10000000-0000-0000-0000-000000000003',
