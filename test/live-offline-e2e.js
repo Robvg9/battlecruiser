@@ -448,6 +448,66 @@ async function main() {
   const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const states=items.map(item=>({id:item.id,key:item.key,exists:!!document.getElementById(item.id),checked:document.getElementById(item.id)?.checked,stored:stored[item.key],matches:!!document.getElementById(item.id)&&stored[item.key]===document.getElementById(item.id).checked}));return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted:states.every(x=>x.exists&&x.matches)};})()");
   assert(preferenceReload.ready && preferenceReload.allPersisted,
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
+
+  // Step 4/15 — Intento 3: inspeccionar el árbol de accesibilidad AX de Chromium
+  // directamente mediante CDP. Esto separa semántica web de la traducción nativa
+  // Android; el resultado NO se considera por sí solo prueba de Android físico.
+  await cdpCommand("Accessibility.enable");
+  const preferenceDom = await cdpCommand("DOM.getDocument", { depth: -1, pierce: true });
+  const preferenceAxItems = [
+    { id: "cfg-aj-auto-refresh", key: "autoRefresh", label: "Actualización automática" },
+    { id: "cfg-aj-sync-auto", key: "syncAuto", label: "Sincronización automática" },
+    { id: "cfg-aj-sync-open", key: "syncOnOpen", label: "Sincronizar al abrir app" },
+    { id: "cfg-aj-sync-wifi", key: "syncWifiOnly", label: "Sincronizar solo en Wi-Fi" },
+    { id: "cfg-aj-notify", key: "notifications", label: "Notificaciones" },
+    { id: "cfg-aj-compact", key: "compacto", label: "Modo compacto" },
+  ];
+  const preferenceAxStates = [];
+  for (const item of preferenceAxItems) {
+    const query = await cdpCommand("DOM.querySelector", {
+      nodeId: preferenceDom.root.nodeId,
+      selector: "#" + item.id,
+    });
+    assert(query.nodeId, "DOM/CDP no encontró el control " + item.id);
+    const described = await cdpCommand("DOM.describeNode", { nodeId: query.nodeId });
+    const partial = await cdpCommand("Accessibility.getPartialAXTree", {
+      backendNodeId: described.node.backendNodeId,
+      fetchRelatives: false,
+    });
+    const node = (partial.nodes || [])[0] || null;
+    const checkedProp = node && (node.properties || []).find((property) => property.name === "checked");
+    const rawChecked = checkedProp && checkedProp.value
+      ? checkedProp.value.value
+      : undefined;
+    const checked = typeof rawChecked === "boolean"
+      ? rawChecked
+      : rawChecked === "true" ? true
+      : rawChecked === "false" ? false
+      : null;
+    const domState = preferenceReload.states.find((state) => state.id === item.id);
+    preferenceAxStates.push({
+      id: item.id,
+      key: item.key,
+      label: item.label,
+      role: node && node.role ? node.role.value : null,
+      accessibleName: node && node.name ? node.name.value : null,
+      checkedPropertyPresent: !!checkedProp,
+      checkedRaw: rawChecked === undefined ? null : rawChecked,
+      checked,
+      domChecked: domState ? domState.checked : null,
+      matchesDOM: checked !== null && !!domState && checked === domState.checked,
+    });
+  }
+  report.evidence.step4ChromiumAccessibilityTree = {
+    method: "CDP Accessibility.getPartialAXTree per DOM backendNodeId",
+    scope: "Chromium runner only; not the Android native AccessibilityNodeInfo tree",
+    states: preferenceAxStates,
+    allStatesAgree: preferenceAxStates.length === 6 && preferenceAxStates.every((state) =>
+      state.role === "switch" && state.checkedPropertyPresent && state.matchesDOM),
+  };
+  assert(report.evidence.step4ChromiumAccessibilityTree.allStatesAgree,
+    "El árbol AX de Chromium no expone checked coherente para los seis switches: "
+      + JSON.stringify(preferenceAxStates));
   report.evidence.step4PreferencesAfterReload = preferenceReload;
 
   // Reproduce en Chromium real la integración que antes quitaba M26:
