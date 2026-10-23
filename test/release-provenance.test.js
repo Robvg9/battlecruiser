@@ -81,7 +81,7 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
 
 test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact core asset checks", () => {
   assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}/);
-  assert.match(liveOfflineE2e, /test-results", "release", releaseFilename/);
+  assert.match(liveOfflineE2e, /path\.join\(OUTPUT_DIR, "release", releaseFilename\)/);
   assert.match(liveOfflineE2e, /workflow_run_id: expectedRunId/);
   assert.match(liveOfflineE2e, /sha256\(candidate\.body\) !== sha256\(sourceReference\)/);
   assert.doesNotMatch(liveOfflineE2e, /fetchText\(BASE_URL \+ "\/" \+ releaseFilename/);
