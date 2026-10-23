@@ -320,6 +320,45 @@ test("B5.10: sub-reportes se cambian correctamente", async () => {
 // B5.3 R1 — Rentabilidad: NULL/costo no disponible ≠ 0
 // ============================================================
 
+test("B5.10: las siete pestañas de subreportes llaman al RPC correcto y renderizan sus filas", async () => {
+  const { window, document, client } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "reportes", accion: "ver" }],
+    ventas: [{ id: "v-step4", fecha: "2026-08-15T10:00:00Z", almacen: "VENTA_FIXTURE", total: 100, lineas: [] }],
+    transferencias: [{ id: "t-step4", fecha: "2026-08-15T11:00:00Z", origen: "TRF_ORIGEN_FIXTURE", destino: "TRF_DESTINO_FIXTURE", estado: "completada", unidades: 2, lineas: [] }],
+    vales: [{ id: "vale-step4", fecha: "2026-08-15T12:00:00Z", tipo: "Merma", producto: "VALE_FIXTURE", almacen: "ALM_FIXTURE", cantidad: 1 }],
+    stock: [{ producto: "STOCK_FIXTURE", almacen: "ALM_FIXTURE", categoria: "TEST", cantidad: 3, minimo: 1, estado: "normal" }],
+    movimiento: [{ id: "mov-step4", fecha: "2026-08-15T13:00:00Z", tipo: "Compra", producto: "MOV_FIXTURE", almacen: "ALM_FIXTURE", cantidad: 3, direccion: "entrada" }],
+    compras: [{ id: "compra-step4", fecha_compra: "2026-08-15T14:00:00Z", producto: "COMPRA_FIXTURE", almacen: "ALM_FIXTURE", cantidad_restante: 3, cantidad_inicial: 3, costo_unitario: 20, costo_total: 60, estado: "disponible" }],
+    rentabilidad: [{ id: "rent-step4", fecha: "2026-08-15T15:00:00Z", almacen: "RENT_FIXTURE", ingreso: 100, costo_disponible: true, costo_total: 60, margen: 40, margen_porcentaje: 40 }],
+  });
+  marcarOnline(window);
+  await esperar(80);
+  const detalle = document.getElementById("rep-detalle");
+  const casos = [
+    ["ventas", "reporte_ventas", "VENTA_FIXTURE"],
+    ["compras", "historial_compras", "COMPRA_FIXTURE"],
+    ["rentabilidad", "rentabilidad_ventas", "RENT_FIXTURE"],
+    ["transferencias", "reporte_transferencias", "TRF_ORIGEN_FIXTURE"],
+    ["vales", "reporte_vales", "VALE_FIXTURE"],
+    ["stock", "reporte_stock", "STOCK_FIXTURE"],
+    ["movimiento", "reporte_movimiento_inventario", "MOV_FIXTURE"],
+  ];
+  for (const [tab, rpc, marker] of casos) {
+    const button = document.querySelector('.rep-tab-btn[data-rep="' + tab + '"]');
+    assert.ok(button, "debe existir la pestaña " + tab);
+    button.click();
+    assert.ok(
+      await esperarHasta(() => detalle.innerHTML.includes(marker), 2000),
+      tab + " debe renderizar su fixture; HTML=" + detalle.innerHTML
+    );
+    assert.ok(
+      client.__rpcCalls.some((call) => call.nombre === rpc),
+      tab + " debe llamar " + rpc
+    );
+  }
+});
+
 test("B5.3 R1: venta con costo real muestra CMV, ganancia y margen", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
