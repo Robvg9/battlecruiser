@@ -225,6 +225,11 @@ function crearContexto() {
   script.textContent = appJs;
   document.body.appendChild(script);
 
+  // This suite checks form submits/payloads, not async stock refreshes.
+  // Keep unrelated background refresh callbacks from outliving JSDOM windows.
+  window.cargarStockAlmacenes = async () => [];
+  window.refrescarStockYSelects = async () => ({});
+
   const shell = document.getElementById("app-shell");
   if (shell) shell.classList.add("visible");
 
@@ -354,7 +359,7 @@ test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a
 test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t) => {
   const c = await contextoListo();
   t.after(async () => { await esperar(500); c.dom.window.close(); });
-  c.document.getElementById("form-almacen").classList.remove("hidden");
+  // Form visibility is unrelated to required-field validation; avoid modal boot side effects.
   c.document.getElementById("alm-nombre").value = " ";
   c.document.getElementById("alm-tipo").value = "";
   const base = c.client.__writeCalls.length;
