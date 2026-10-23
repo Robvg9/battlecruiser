@@ -11,6 +11,7 @@ const css = read("public/style.css");
 const index = read("public/index.html");
 const app = read("public/app.js");
 const sw = read("public/service-worker.js");
+const account = read("public/js/mi-cuenta.js");
 
 test("Step 8 release version is aligned across the PWA and Service Worker shell", () => {
   assert.match(index, /href="style\.css\?v=9\.5\.16"/);
@@ -50,5 +51,5 @@ test("Account dialog remains scrollable on a short Android visual viewport", () 
   assert.match(step8, /max-height:\s*calc\(100vh\s*-\s*24px\)/);
   assert.match(step8, /max-height:\s*calc\(100dvh\s*-\s*24px\)/);
   assert.match(index, /aria-controls="bc-mi-cuenta-modal"/);
-  assert.match(index, /id="bc-mi-cuenta-modal"/);
+  assert.ok(/modal\.id\s*=\s*['"]bc-mi-cuenta-modal['"]/.test(account), "Mi Cuenta creates its accessible dialog dynamically");
 });
