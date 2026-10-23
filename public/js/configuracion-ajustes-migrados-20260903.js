@@ -45,7 +45,7 @@
       ? checked
       : !!control.checked;
     control.checked = enabled;
-    control.setAttribute("aria-checked", enabled ? "true" : "false");
+
     var state = document.getElementById(id + "-state");
     if (state) {
       state.textContent = "Estado de la opción: " + (enabled ? "activada." : "desactivada.");
@@ -57,7 +57,7 @@
       "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
       "<input type=\"checkbox\" class=\"cfg-aj-toggle\" role=\"switch\" id=\"" + id +
       "\" aria-label=\"" + title +
-      "\" aria-checked=\"false\" aria-describedby=\"" + id + "-help " + id + "-state\">" +
+      "\" aria-describedby=\"" + id + "-help " + id + "-state\">" +
       "<span id=\"" + id + "-state\" class=\"cfg-aj-sr-only\">Estado de la opción: desactivada.</span></div>";
   }
 
