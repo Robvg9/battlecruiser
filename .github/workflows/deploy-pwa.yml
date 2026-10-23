@@ -64,6 +64,9 @@ jobs:
                 && grep -Fq "const VERSION=\"$app_version\"" /tmp/bc-live-app.js \
                 && grep -Fq "BC_SW_VERSION = \"$sw_version\"" /tmp/bc-live-sw.js \
                 && BC_EXPECTED_RELEASE_SHA="$GITHUB_SHA" BC_EXPECTED_APP_VERSION="$app_version" BC_EXPECTED_SW_VERSION="$sw_version" BC_EXPECTED_RUN_ID="$GITHUB_RUN_ID" node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync("/tmp/bc-live-release.json","utf8")); const e={source_sha:process.env.BC_EXPECTED_RELEASE_SHA,app_version:process.env.BC_EXPECTED_APP_VERSION,service_worker_version:process.env.BC_EXPECTED_SW_VERSION,workflow_run_id:process.env.BC_EXPECTED_RUN_ID}; for(const k of Object.keys(e)){if(String(r[k])!==String(e[k])){console.error("[deploy smoke] manifest mismatch",k,{expected:e[k],actual:r[k]});process.exit(1)}} console.log("[deploy smoke] exact content-addressed manifest PASS",r.source_sha,r.app_version,r.workflow_run_id)'; then
+                mkdir -p test-results/release
+                cp /tmp/bc-live-release.json "test-results/release/$release_name"
+                echo "[deploy smoke] persisted the exact LIVE manifest into test-results/release/$release_name"
                 echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS"
                 exit 0
               fi
@@ -73,3 +76,11 @@ jobs:
           done
           echo "BATTLECRUISER_PWA_LIVE_EXACT_SHA=FAIL"
           exit 1
+
+      - name: Persist LIVE-verified release provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-release-provenance-${{ github.run_id }}
+          path: test-results/release/release-*.json
+          if-no-files-found: error
+          retention-days: 90
