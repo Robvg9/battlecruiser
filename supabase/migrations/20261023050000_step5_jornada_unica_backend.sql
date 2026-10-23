@@ -752,6 +752,74 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.bc5_listar_patrones_jornada(p_almacen_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE v_result jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN autenticado puede consultar patrones de jornada.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.almacenes WHERE id=p_almacen_id) THEN
+    RAISE EXCEPTION 'Almacén inexistente.' USING ERRCODE = '23503';
+  END IF;
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id',p.id,'almacen_id',p.almacen_id,'nombre',p.nombre,
+      'largo_ciclo',p.largo_ciclo,'fecha_ancla',p.fecha_ancla,
+      'activo',p.activo,'creado_por',p.creado_por,'creado_en',p.creado_en,
+      'dias',coalesce((
+        SELECT jsonb_agg(jsonb_build_object(
+          'numero_dia',d.numero_dia,'trabaja',d.trabaja,'responsable_id',d.responsable_id
+        ) ORDER BY d.numero_dia)
+        FROM public.turno_jornada_patron_dias d WHERE d.patron_id=p.id
+      ),'[]'::jsonb)
+    ) ORDER BY p.activo DESC,p.creado_en DESC
+  ),'[]'::jsonb)
+  INTO v_result
+  FROM public.turno_jornada_patrones p
+  WHERE p.almacen_id=p_almacen_id;
+  RETURN v_result;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.bc5_obtener_programacion_jornada(p_turno_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE v_result jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN autenticado puede consultar la programación de jornada.'
+      USING ERRCODE = '42501';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.turnos WHERE id=p_turno_id AND dias_turno IS NOT NULL) THEN
+    RAISE EXCEPTION 'Turno de jornada no encontrado.' USING ERRCODE = 'P0002';
+  END IF;
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id',p.id,'turno_id',p.turno_id,'almacen_id',p.almacen_id,
+      'numero_dia',p.numero_dia,'fecha',p.fecha,'trabaja',p.trabaja,
+      'responsable_id',p.responsable_id,'hora_inicio_prevista',p.hora_inicio_prevista,
+      'hora_fin_prevista',p.hora_fin_prevista,'zona_horaria',p.zona_horaria,
+      'patron_id',p.patron_id,'estado',p.estado,'motivo_ajuste',p.motivo_ajuste,
+      'sesion_id',s.id,'sesion_estado',s.estado
+    ) ORDER BY p.fecha,p.numero_dia
+  ),'[]'::jsonb)
+  INTO v_result
+  FROM public.turno_jornada_programacion p
+  LEFT JOIN public.turno_sesiones s ON s.jornada_programacion_id=p.id
+  WHERE p.turno_id=p_turno_id;
+  RETURN v_result;
+END;
+$function$;
+
 -- The new tables are never directly writable/readable through the Data API.
 -- Use the SECURITY DEFINER RPCs above; RLS remains enabled as defense-in-depth.
 ALTER TABLE public.turno_jornada_configuracion ENABLE ROW LEVEL SECURITY;
@@ -774,6 +842,8 @@ REVOKE ALL ON FUNCTION public.bc5_guardar_patron_jornada(uuid,text,date,jsonb) F
 REVOKE ALL ON FUNCTION public.bc5_previsualizar_jornada(uuid,date,integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.bc5_crear_jornada_unica(uuid,date,integer,jsonb,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.bc5_reprogramar_jornada(uuid,boolean,uuid,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.bc5_listar_patrones_jornada(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.bc5_obtener_programacion_jornada(uuid) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.bc5_configurar_horario_jornada(uuid,time,time,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_obtener_configuracion_jornada(uuid) TO authenticated;
@@ -781,5 +851,7 @@ GRANT EXECUTE ON FUNCTION public.bc5_guardar_patron_jornada(uuid,text,date,jsonb
 GRANT EXECUTE ON FUNCTION public.bc5_previsualizar_jornada(uuid,date,integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_crear_jornada_unica(uuid,date,integer,jsonb,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_reprogramar_jornada(uuid,boolean,uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc5_listar_patrones_jornada(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc5_obtener_programacion_jornada(uuid) TO authenticated;
 
 COMMIT;
