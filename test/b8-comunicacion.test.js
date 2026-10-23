@@ -317,11 +317,6 @@ test("B8.18: sin comunicacion.ver bloquea lectura y escritura con permisos efect
     await esperar(10);
   }
   assert.ok(permisosListos, "los permisos de la fixture deben cargarse antes de probar la denegación");
-  const efectivos = window._permisosEfectivosRef();
-  assert.ok(efectivos && efectivos.comunicacion, "el test bridge debe exponer el ACL efectivo");
-  efectivos.comunicacion.ver = false;
-  efectivos.comunicacion.crear = false;
-
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
   assert.ok(btn, "la ruta lógica de Comunicación existe");
   assert.strictEqual(window.tienePermiso("comunicacion", "ver"), false,
@@ -352,6 +347,7 @@ test("B8.18: sin comunicacion.ver bloquea lectura y escritura con permisos efect
   assert.strictEqual(client.__rpcCalls.some((call) => call.nombre === "crear_conversacion"), false,
     "no se llama al RPC de escritura sin permiso");
 });
+
 
 test("B8.19: usuario inactivo no puede enviar mensaje", async () => {
   const { window } = montarEntorno({
