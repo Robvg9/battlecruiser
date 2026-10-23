@@ -122,6 +122,8 @@ test("Paso 4 inventario: búsqueda y limpiar devuelven la vista y filtros a Todo
   assert.deepEqual(visibleIds(window), ["p-bajo"]);
   chooseState(window, "bajo");
   window.document.getElementById("inv-limpiar-btn").click();
+  assert.ok(await waitFor(() => visibleIds(window).length === 3),
+    "limpiar debe repoblar la lista después de refrescar inventario");
   assert.deepEqual(visibleIds(window), ["p-normal", "p-bajo", "p-agotado"]);
   assert.equal(window.document.getElementById("inv-buscar").value, "");
   assert.equal(window.document.getElementById("inv-filtro-estado-select").value, "todos");
