@@ -298,17 +298,30 @@ test("B8.17: conversación vinculada a responsabilidad", () => {
 // PRUEBAS — PERMISOS, OFFLINE, AUDITORÍA, INTEGRIDAD
 // ============================================================
 
-test("B8.18: usuario sin permiso comunicacion.ver no ve la pestaña", async () => {
-  const { window, document } = montarEntorno({
+test("B8.18: sin comunicacion.ver la pestaña es inspeccionable, pero conversaciones/RPC quedan protegidas", async () => {
+  const { window, document, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "ventas", accion: "ver" }],
   });
   marcarOnline(window);
   await esperar(120);
-  const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-  assert.ok(btn.style.display === "none" || btn.classList.contains("hidden"), "Comunicación oculta sin permiso");
-});
 
+  const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
+  assert.ok(btn, "la pestaña de inspección existe en el contrato de navegación");
+  assert.ok(btn.style.display !== "none" && !btn.classList.contains("hidden"),
+    "la navegación mantiene Comunicación visible para inspección");
+
+  await window.refrescarComunicacion();
+  const lista = document.getElementById("lista-conversaciones");
+  const formMensaje = document.getElementById("form-mensaje");
+  assert.match(lista.textContent, /No tenés permiso para ver comunicación/i,
+    "el panel deniega contenido cuando falta comunicacion.ver");
+  assert.ok(formMensaje.classList.contains("hidden"),
+    "el envío permanece oculto cuando no hay comunicacion.crear");
+  assert.equal(client.__rpcCalls.some(c =>
+    c.nombre === "listar_conversaciones_usuario" || c.nombre === "contar_no_leidos_global"
+  ), false, "la vista sin permiso no consulta RPC protegidas");
+});
 test("B8.19: usuario inactivo no puede enviar mensaje", async () => {
   const { window } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Inactivo", activo: false, role_id: "r2", rol: "Dep" }],
