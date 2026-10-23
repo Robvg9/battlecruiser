@@ -27,7 +27,9 @@ CREATE TABLE public.turnos (
   almacen_id uuid NOT NULL REFERENCES public.almacenes(id), fecha date NOT NULL,
   estado text NOT NULL CHECK (estado IN ('PROGRAMADO','ABIERTO','CERRADO','CANCELADO')),
   creado_por uuid NOT NULL REFERENCES auth.users(id), created_by uuid NOT NULL REFERENCES auth.users(id),
-  estado_maestro text, dias_turno integer, actualizado_en timestamptz NOT NULL DEFAULT now()
+  estado_maestro text, dias_turno integer,
+  apertura_real timestamptz, cierre_real timestamptz,
+  actualizado_en timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX ux_turnos_maestro_unico_activo_por_almacen
   ON public.turnos(almacen_id)
