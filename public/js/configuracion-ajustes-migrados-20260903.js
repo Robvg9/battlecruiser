@@ -43,8 +43,9 @@
   function updateToggleState(id, control, checked) {
     var enabled = typeof checked === "boolean"
       ? checked
-      : control.getAttribute("aria-checked") === "true";
-    control.setAttribute("aria-checked", enabled ? "true" : "false");
+      : !!control.checked;
+    control.checked = enabled;
+
     var state = document.getElementById(id + "-state");
     if (state) {
       state.textContent = "Estado de la opción: " + (enabled ? "activada." : "desactivada.");
@@ -54,9 +55,9 @@
   function rowToggle(id, title, description) {
     return "<div class=\"cfg-aj-row\"><div><strong>" + title +
       "</strong><small id=\"" + id + "-help\">" + description + "</small></div>" +
-      "<button type=\"button\" class=\"cfg-aj-toggle\" role=\"switch\" id=\"" + id +
+      "<input type=\"checkbox\" class=\"cfg-aj-toggle\" role=\"switch\" id=\"" + id +
       "\" aria-label=\"" + title +
-      "\" aria-checked=\"false\" aria-describedby=\"" + id + "-help " + id + "-state\"><span aria-hidden=\"true\"></span></button>" +
+      "\" aria-describedby=\"" + id + "-help " + id + "-state\">" +
       "<span id=\"" + id + "-state\" class=\"cfg-aj-sr-only\">Estado de la opción: desactivada.</span></div>";
   }
 
@@ -94,9 +95,9 @@
     function wireToggle(id, key) {
       var input = document.getElementById(id);
       if (!input) return;
-      input.onclick = function () {
+      input.onchange = function () {
         var prefs = loadPrefs();
-        var checked = input.getAttribute("aria-checked") !== "true";
+        var checked = !!input.checked;
         prefs[key] = checked;
         updateToggleState(id, input, checked);
         savePrefs(prefs);
@@ -157,7 +158,7 @@
   var style = document.createElement("style");
   style.id = "bc-preferencias-personales-css";
   style.textContent =
-    ".cfg-aj-sec{margin-top:18px}.cfg-aj-sec h4{margin:0 0 10px;color:var(--gold-bright);font-size:12px;letter-spacing:.04em}.cfg-aj-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}.cfg-aj-row strong{display:block;font-size:13.5px;color:var(--text)}.cfg-aj-row small{display:block;margin-top:2px;font-size:11.5px;line-height:1.35;color:var(--mist)}.cfg-aj-toggle{appearance:none;-webkit-appearance:none;position:relative;display:block;width:46px;height:26px;flex:0 0 auto;margin:0;padding:0;border:0;background:transparent;border-radius:999px;color:inherit;cursor:pointer}.cfg-aj-toggle span{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;cursor:pointer;pointer-events:none}.cfg-aj-toggle:focus-visible span{outline:2px solid var(--gold-bright);outline-offset:3px}.cfg-aj-toggle span:before{content:\"\";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}.cfg-aj-toggle[aria-checked=\"true\"] span{background:rgba(201,162,77,.55)}.cfg-aj-toggle[aria-checked=\"true\"] span:before{transform:translateX(20px)}.cfg-aj-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}.cfg-aj-appearance{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cfg-aj-app{padding:11px;border-radius:10px;border:1px solid rgba(201,162,77,.2);background:rgba(12,28,24,.4);color:var(--mist);cursor:pointer}.cfg-aj-app.active{border-color:rgba(201,162,77,.5);background:rgba(201,162,77,.12);color:var(--gold-bright)}@media(max-width:650px){.cfg-aj-appearance{grid-template-columns:1fr}}";
+    ".cfg-aj-sec{margin-top:18px}.cfg-aj-sec h4{margin:0 0 10px;color:var(--gold-bright);font-size:12px;letter-spacing:.04em}.cfg-aj-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)}.cfg-aj-row strong{display:block;font-size:13.5px;color:var(--text)}.cfg-aj-row small{display:block;margin-top:2px;font-size:11.5px;line-height:1.35;color:var(--mist)}.cfg-aj-toggle{appearance:none;-webkit-appearance:none;position:relative;display:block;width:46px;height:26px;flex:0 0 auto;margin:0;padding:0;border:0;background:rgba(255,255,255,.12);border-radius:999px;color:inherit;cursor:pointer;transition:background .2s}.cfg-aj-toggle:focus-visible{outline:2px solid var(--gold-bright);outline-offset:3px}.cfg-aj-toggle:before{content:\"\";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s}.cfg-aj-toggle:checked{background:rgba(201,162,77,.55)}.cfg-aj-toggle:checked:before{transform:translateX(20px)}.cfg-aj-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}.cfg-aj-appearance{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cfg-aj-app{padding:11px;border-radius:10px;border:1px solid rgba(201,162,77,.2);background:rgba(12,28,24,.4);color:var(--mist);cursor:pointer}.cfg-aj-app.active{border-color:rgba(201,162,77,.5);background:rgba(201,162,77,.12);color:var(--gold-bright)}@media(max-width:650px){.cfg-aj-appearance{grid-template-columns:1fr}}";
   if (!document.getElementById(style.id)) document.head.appendChild(style);
 
   function run() { ensurePanel(); }
