@@ -7,6 +7,13 @@ on:
       - 'public/**'
       - 'wrangler.toml'
       - '.github/workflows/deploy-pwa.yml'
+      # Release provenance and the gates that prove the deployed SHA must redeploy
+      # so the LIVE marker identifies the exact current main commit.
+      - '.github/workflows/quality.yml'
+      - 'scripts/write-release-manifest.js'
+      - 'test/verify-production-version.js'
+      - 'test/live-offline-e2e.js'
+      - 'test/release-provenance.test.js'
   workflow_dispatch:
 
 permissions:
