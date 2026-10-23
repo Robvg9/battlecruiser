@@ -58,7 +58,9 @@ CREATE UNIQUE INDEX turno_asignacion_activa_unica
 CREATE TABLE public.turno_tramos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), turno_id uuid NOT NULL REFERENCES public.turnos(id),
   turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id),
-  usuario_id uuid REFERENCES auth.users(id), estado text NOT NULL, inicio_at timestamptz NOT NULL DEFAULT now()
+  usuario_id uuid REFERENCES auth.users(id), estado text NOT NULL,
+  inicio_at timestamptz NOT NULL DEFAULT now(), fin_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.turno_eventos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), turno_id uuid NOT NULL REFERENCES public.turnos(id),
@@ -68,6 +70,50 @@ CREATE TABLE public.turno_eventos (
 CREATE OR REPLACE FUNCTION public.bc_actor_is_admin()
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
 AS $fn$ SELECT coalesce(current_setting('test.bc_admin',true),'false')='true' $fn$;
+
+CREATE TABLE public.turno_declaraciones (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  turno_id uuid NOT NULL REFERENCES public.turnos(id),
+  turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id),
+  turno_tramo_id uuid NOT NULL REFERENCES public.turno_tramos(id),
+  usuario_id uuid NOT NULL REFERENCES auth.users(id),
+  monto numeric NOT NULL, moneda text NOT NULL DEFAULT 'CUP',
+  declarado_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
+  estado_aprobacion text DEFAULT 'PENDIENTE', aprobado_por uuid, aprobado_at timestamptz
+);
+
+CREATE OR REPLACE FUNCTION public.bc_cerrar_turno_sesion(p_turno_sesion_id uuid)
+RETURNS public.turno_sesiones
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public','pg_temp'
+AS $fn$
+DECLARE v_sesion public.turno_sesiones; v_tramo public.turno_tramos; v_result public.turno_sesiones;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_sesion FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Sesión no encontrada.' USING ERRCODE='23503'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.turno_asignaciones a
+    WHERE a.turno_sesion_id=v_sesion.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL) THEN
+    RAISE EXCEPTION 'Solo la persona asignada puede cerrar.' USING ERRCODE='42501';
+  END IF;
+  IF v_sesion.estado<>'EN_CURSO' THEN RAISE EXCEPTION 'Sesión no activa.' USING ERRCODE='P0001'; END IF;
+  SELECT * INTO v_tramo FROM public.turno_tramos
+  WHERE turno_sesion_id=v_sesion.id AND estado='ACTIVO'
+  ORDER BY inicio_at DESC,created_at DESC LIMIT 1 FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No hay tramo activo.' USING ERRCODE='P0001'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.turno_declaraciones d
+    WHERE d.turno_tramo_id=v_tramo.id AND d.usuario_id=auth.uid()) THEN
+    RAISE EXCEPTION 'Antes de cerrar debés declarar el dinero.' USING ERRCODE='23514';
+  END IF;
+  UPDATE public.turno_tramos SET estado='COMPLETADO',fin_at=now() WHERE id=v_tramo.id;
+  UPDATE public.turno_sesiones SET estado='COMPLETADA',updated_at=now()
+  WHERE id=v_sesion.id RETURNING * INTO v_result;
+  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',actualizado_en=now()
+  WHERE id=v_sesion.turno_id;
+  INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo)
+  VALUES(v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),'SESION_CERRADA');
+  RETURN v_result;
+END
+$fn$;
 
 INSERT INTO public.almacenes(id,nombre,tipo,activo) VALUES
  ('10000000-0000-0000-0000-000000000001','Almacén de prueba A','VENTA',true),
