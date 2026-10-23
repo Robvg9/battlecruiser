@@ -10,6 +10,7 @@ const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
 const quality = fs.readFileSync(path.join(root, ".github/workflows/quality.yml"), "utf8");
 const verifier = fs.readFileSync(path.join(__dirname, "verify-production-version.js"), "utf8");
+const liveOfflineE2e = fs.readFileSync(path.join(__dirname, "live-offline-e2e.js"), "utf8");
 
 test("release manifest records the exact source SHA, run ID, and aligned app/SW versions", () => {
   const sha = "abcdef0123456789abcdef0123456789abcdef01";
@@ -76,4 +77,12 @@ test("LIVE verifier checks embedded source SHA in both deployed app/SW assets", 
   assert.match(verifier, /expectedSha/);
   assert.match(verifier, /app\.js version mismatch/);
   assert.match(verifier, /Service Worker mismatch/);
+});
+
+test("post-deploy Chromium E2E strips only the known trailing provenance marker before source integrity comparison", () => {
+  assert.match(liveOfflineE2e, /normalizeReleaseStampedAsset/);
+  assert.match(liveOfflineE2e, /BC_RELEASE_SOURCE_SHA/);
+  assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
+  assert.match(liveOfflineE2e, /normalizedSha256/);
+  assert.match(quality, /BC_EXPECTED_RELEASE_SHA:.*workflow_run\.head_sha/);
 });
