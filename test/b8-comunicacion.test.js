@@ -329,6 +329,8 @@ test("B8.18: sin comunicacion.ver mantiene navegación visible pero bloquea lect
   const lista = document.getElementById("lista-conversaciones");
   assert.match(lista.textContent, /No tenés permiso para ver comunicación/i,
     "el panel deniega el contenido sin permiso de lectura");
+  assert.ok(document.getElementById("form-mensaje").classList.contains("hidden"),
+    "el formulario de mensajes queda oculto sin comunicacion.crear");
   const protectedReads = client.__rpcCalls.filter((call) => [
     "listar_conversaciones_usuario",
     "contar_no_leidos_global",
