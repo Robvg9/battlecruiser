@@ -141,6 +141,7 @@ function crearClienteSupabaseMock() {
       if (WRITE_RPCS.has(name)) {
         validaciones.push({ name, params });
         idSequence += 1;
+        if (name === "crear_producto") return { data: "p-created-fixture", error: null };
         return { data: Object.assign({}, writes[name], { fixture_sequence: idSequence }), error: null };
       }
       if (name.startsWith("listar_") || name.startsWith("reporte_")) return { data: [], error: null };
@@ -291,6 +292,10 @@ test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el 
   c.document.getElementById("prod-unidad").value = "unidad";
   c.document.getElementById("prod-precio-normal").value = "12.50";
   c.document.getElementById("prod-precio-mayorista").value = "";
+  const presentacionMinorista = c.document.getElementById("prod-pres-min");
+  assert.ok(presentacionMinorista, "la UI debe exponer la presentación minorista obligatoria");
+  addOption(presentacionMinorista, "pres-min-fixture", "Unidad fixture");
+  presentacionMinorista.value = "pres-min-fixture";
   enviarSubmit(c, "form-producto");
 
   const reachedCreate = await esperarHasta(() => nuevasEscrituras(c, base).some((call) => call.name === "crear_producto"));
@@ -304,7 +309,7 @@ test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el 
   assert.equal(call.params.p_unidad, "unidad");
   assert.equal(call.params.p_precio_normal, 12.5);
   assert.ok(call.params.p_idempotency_key, "el RPC debe recibir la clave de idempotencia");
-  assert.ok(await esperarHasta(() => /Producto creado\./i.test(c.document.getElementById("msg-productos").textContent)),
+  assert.ok(await esperarHasta(() => /Producto creado con presentación minorista/i.test(c.document.getElementById("msg-productos").textContent)),
     "la UI debe anunciar éxito tras la respuesta mock");
   assert.equal(c.document.getElementById("prod-nombre").value, "", "el formulario debe resetearse tras éxito");
 });
