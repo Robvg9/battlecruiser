@@ -16,19 +16,19 @@ const sectionVisibility = fs.readFileSync("public/js/hotfix-secciones-visibles-2
 const hideVales = fs.readFileSync("public/js/m12-fe5-hide-vales.js", "utf8");
 
 
-test("RWHT navigation contract: 19 logical routes, 16 visible destinations, hidden-route aliases preserved", () => {
+test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidden-route aliases preserved", () => {
   const routeIds = [...index.matchAll(/<button\b[^>]*\bdata-tab="([^"]+)"/g)].map(match => match[1]);
   const panelIds = [...index.matchAll(/<section\b[^>]*\bid="tab-([^"]+)"/g)].map(match => match[1]);
   const expectedVisible = [
-    "resumen", "productos", "ventas", "almacenes", "pendientes", "reportes",
+    "resumen", "jornada", "productos", "ventas", "almacenes", "pendientes", "reportes",
     "inventario", "movimientos", "ciclos", "operacion", "comunicacion",
     "mando", "usuarios", "config", "conectividad", "preferencias",
   ];
   const expectedHidden = ["transferencias", "vales", "turnos"];
 
-  assert.equal(routeIds.length, 19, "the source declares 19 logical navigation buttons");
-  assert.equal(new Set(routeIds).size, 19, "logical navigation IDs must be unique");
-  assert.equal(panelIds.length, 19, "the source declares 19 logical tab panels");
+  assert.equal(routeIds.length, 20, "the source declares 20 logical navigation buttons");
+  assert.equal(new Set(routeIds).size, 20, "logical navigation IDs must be unique");
+  assert.equal(panelIds.length, 20, "the source declares 20 logical tab panels");
   assert.deepEqual(
     [...new Set(panelIds)].sort(),
     [...new Set(routeIds)].sort(),
@@ -37,13 +37,14 @@ test("RWHT navigation contract: 19 logical routes, 16 visible destinations, hidd
   assert.deepEqual(
     routeIds.filter(id => !expectedHidden.includes(id)).sort(),
     expectedVisible.slice().sort(),
-    "the visible route contract must be the documented 16 destinations"
+    "the visible route contract must be the documented 17 destinations"
   );
 
   for (const id of expectedHidden) {
     assert.ok(routeIds.includes(id), "hidden/aliased logical route must remain explicit: " + id);
   }
   assert.match(permissions, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
+  assert.match(permissions, /if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/);
   assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true \}/);
   assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
@@ -134,12 +135,13 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.14 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.14"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.14"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.14"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.14"><\/script>/);
-  assert.match(app, /\["permisos-navegacion\.js","67\.3"\]/);
+test("app shell, application and Service Worker share 9.5.15 and load refreshed navigation modules", () => {
+  assert.match(app, /const VERSION="9\.5\.15"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.15"/);
+  assert.match(index, /href="style\.css\?v=9\.5\.15"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.15"><\/script>/);
+  assert.match(app, /\["permisos-navegacion\.js","67\.4"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.1"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261020\.5"\]/);
