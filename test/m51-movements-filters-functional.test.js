@@ -46,10 +46,15 @@ async function boot(t) {
   window.esRpcFaltante = () => false;
   window.poblarSelectAlmacenes = (select) => {
     if (!select) return;
+    const previous = select.value || "";
     select.innerHTML =
       "<option value=''>Todos los almacenes</option>" +
       "<option value='alm-a'>Principal</option>" +
       "<option value='alm-b'>Reserva</option>";
+    // Mirror the real warehouse selector contract: refreshes must retain the chosen filter.
+    if (Array.from(select.options).some((option) => option.value === previous)) {
+      select.value = previous;
+    }
   };
 
   const rpcCalls = [];
