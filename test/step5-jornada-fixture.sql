@@ -117,7 +117,8 @@ $fn$;
 
 INSERT INTO public.almacenes(id,nombre,tipo,activo) VALUES
  ('10000000-0000-0000-0000-000000000001','Almacén de prueba A','VENTA',true),
- ('10000000-0000-0000-0000-000000000002','Almacén de prueba B','VENTA',true);
+ ('10000000-0000-0000-0000-000000000002','Almacén de prueba B','VENTA',true),
+ ('10000000-0000-0000-0000-000000000003','Almacén de prueba C','VENTA',true);
 INSERT INTO auth.users(id) VALUES
  ('20000000-0000-0000-0000-000000000001'),
  ('20000000-0000-0000-0000-000000000002');
