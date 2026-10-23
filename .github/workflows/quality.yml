@@ -17,6 +17,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   quality:
@@ -72,10 +73,21 @@ jobs:
 
       # Pull requests have not been deployed yet, so production must still serve the base release.
       # workflow_dispatch and workflow_run both verify the exact deployed version.
+      - name: Download LIVE-verified release manifest from the deploy run
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: battlecruiser-release-provenance-${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: test-results/release
+
       - name: Verify production serves exact application release provenance
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_run'
         env:
-          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event.workflow_run.id }}
         shell: cmd
         run: node test/verify-production-version.js
 
@@ -130,7 +142,7 @@ jobs:
 
   live-offline-e2e:
     needs: [deploy-pr-preview, quality]
-    if: ${{ always() && needs.quality.result == 'success' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && (github.event_name != 'pull_request' || needs.deploy-pr-preview.result == 'success') }}
+    if: ${{ always() && needs.quality.result == 'success' && ((github.event_name == 'pull_request' && needs.deploy-pr-preview.result == 'success') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
     name: LIVE offline recovery — Chromium
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -145,10 +157,21 @@ jobs:
         with:
           node-version: 24.19.0
 
+      - name: Download LIVE-verified release manifest from the deploy run
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: battlecruiser-release-provenance-${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          path: test-results/release
+
       - name: Run real-browser LIVE offline E2E
         env:
           BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && format('https://bc-pr-{0}-battlecruiser.robvg9.workers.dev', github.event.number) || 'https://battlecruiser.robvg9.workers.dev' }}
-          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
         run: node test/live-offline-e2e.js
 
       - name: Persist LIVE offline E2E evidence
