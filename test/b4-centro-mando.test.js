@@ -236,7 +236,12 @@ test("B4.4: trazabilidad — operación exitosa registra auditoría con idempote
     permisos: [{ seccion: "ventas", accion: "crear" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  const permisoListo = await esperarHasta(
+    () => window.tienePermiso("ventas", "crear") === true,
+    5000,
+    10
+  );
+  assert.ok(permisoListo, "el contexto y ventas.crear deben cargarse antes de ejecutar la venta");
   client.__rpcCalls.length = 0;
   // El mock debe devolver éxito para registrar_venta (el RPC real de venta).
   const rpcOrig = client.rpc;
@@ -257,6 +262,7 @@ test("B4.4: trazabilidad — operación exitosa registra auditoría con idempote
   const audCall = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
   assert.ok(!audCall, "venta NO debe registrar auditoría (trigger lo cubre)");
 });
+
 
 test("B4.8: offline no inventa datos de auditoría", async () => {
   const { window, document } = montarEntorno({
