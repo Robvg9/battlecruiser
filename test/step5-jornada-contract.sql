@@ -1,5 +1,7 @@
 -- Behavioral integration tests for 20261023050000_step5_jornada_unica_backend.sql.
 -- Runs only against the disposable PostgreSQL CI service.
+SELECT set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',false);
+SELECT set_config('test.bc_admin','true',false);
 SELECT public.bc5_configurar_horario_jornada(
   '10000000-0000-0000-0000-000000000001','07:00','23:00','America/Havana'
 );
