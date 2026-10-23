@@ -125,7 +125,6 @@ BEGIN
     IF NEW.estado='EN_CURSO' AND OLD.estado IN ('PENDIENTE','PROGRAMADA') THEN
       IF NOT EXISTS (
         SELECT 1 FROM public.turno_jornada_inventario_cortes c
-        JOIN public.turno_jornada_inventario_lineas l ON l.corte_id=c.id
         WHERE c.turno_sesion_id=NEW.id AND c.tipo='INICIAL' AND c.estado='CONFIRMADO'
       ) THEN
         RAISE EXCEPTION 'Antes de abrir la jornada debes confirmar el inventario inicial.' USING ERRCODE='23514';
@@ -133,7 +132,6 @@ BEGIN
     ELSIF NEW.estado='COMPLETADA' AND OLD.estado='EN_CURSO' THEN
       IF NOT EXISTS (
         SELECT 1 FROM public.turno_jornada_inventario_cortes c
-        JOIN public.turno_jornada_inventario_lineas l ON l.corte_id=c.id
         WHERE c.turno_sesion_id=NEW.id AND c.tipo='FINAL' AND c.estado='CONFIRMADO'
       ) THEN
         RAISE EXCEPTION 'Antes de cerrar la jornada debes confirmar el inventario final.' USING ERRCODE='23514';
@@ -174,7 +172,7 @@ BEGIN
   IF v_tipo NOT IN ('INICIAL','FINAL') THEN
     RAISE EXCEPTION 'Tipo de inventario inválido.' USING ERRCODE='22023';
   END IF;
-  IF jsonb_typeof(p_lineas)<>'array' THEN
+  IF p_lineas IS NULL OR jsonb_typeof(p_lineas)<>'array' THEN
     RAISE EXCEPTION 'El conteo debe ser una lista de productos y cantidades.' USING ERRCODE='22023';
   END IF;
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
@@ -187,6 +185,13 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Solo el responsable asignado puede registrar este inventario.' USING ERRCODE='42501';
   END IF;
+  SELECT * INTO v_existing FROM public.turno_jornada_inventario_cortes
+  WHERE turno_sesion_id=v_s.id AND tipo=v_tipo FOR UPDATE;
+  IF FOUND THEN
+    -- Repeated delivery is safe, including a delayed retry after the session changed state.
+    RETURN jsonb_build_object('id',v_existing.id,'tipo',v_existing.tipo,'estado',v_existing.estado,'idempotente',true,
+      'mensaje','El conteo ya estaba confirmado; no se sobrescribió.');
+  END IF;
   IF v_tipo='INICIAL' AND v_s.estado NOT IN ('PENDIENTE','PROGRAMADA') THEN
     RAISE EXCEPTION 'El inventario inicial debe confirmarse antes de abrir la jornada.' USING ERRCODE='23514';
   END IF;
@@ -195,14 +200,6 @@ BEGIN
   END IF;
   IF NULLIF(btrim(coalesce(p_observacion,'')),'') IS NOT NULL AND length(p_observacion)>1000 THEN
     RAISE EXCEPTION 'La observación no puede superar 1000 caracteres.' USING ERRCODE='22023';
-  END IF;
-
-  SELECT * INTO v_existing FROM public.turno_jornada_inventario_cortes
-  WHERE turno_sesion_id=v_s.id AND tipo=v_tipo FOR UPDATE;
-  IF FOUND THEN
-    -- Repeated delivery is safe: a confirmed snapshot is immutable and returned as already stored.
-    RETURN jsonb_build_object('id',v_existing.id,'tipo',v_existing.tipo,'estado',v_existing.estado,'idempotente',true,
-      'mensaje','El conteo ya estaba confirmado; no se sobrescribió.');
   END IF;
 
   SELECT count(*) INTO v_expected FROM public.stock s
