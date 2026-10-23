@@ -17,6 +17,15 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 3000, intervaloMs = 10) {
+  const limite = Date.now() + timeoutMs;
+  while (Date.now() < limite) {
+    if (condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(condicion());
+}
+
 // ---- Estado simulado de conversaciones/mensajes ----
 function crearEstadoB8() {
   const st = { conversaciones: {}, participantes: {}, mensajes: {}, seq: 0, uid: "u-test" };
@@ -304,7 +313,8 @@ test("B8.18: sin comunicacion.ver la pestaña de inspección no expone conversac
     permisos: [{ seccion: "ventas", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(120);
+  assert.ok(await esperarHasta(() => window.tienePermiso("ventas", "ver")),
+    "los permisos de la fixture deben terminar de cargar antes de evaluar Comunicación");
 
   const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
   assert.ok(btn, "la ruta lógica de Comunicación sigue declarada");
