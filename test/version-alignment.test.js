@@ -79,7 +79,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261023\.1"\]/, "connectivity module must bypass stale cached settings");
   assert.match(index, /<script src="js\/navegacion\.js\?v=20261020\.4"><\/script>/, "new navigation sections need a cache-busted script");
-  assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);\n  assert.match(app, /\["bc7-jornada-ui\.js","7\.1"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.1"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
@@ -91,10 +92,11 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.15 — report filters, ranking and modal details/);
+  assert.match(app, /v9\.5\.15 — jornada única, inventario físico y cierre/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.15"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
-  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);\n  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.1/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.1/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
