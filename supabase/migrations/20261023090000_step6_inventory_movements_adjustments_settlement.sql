@@ -3,12 +3,12 @@
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.reporte_movimiento_inventario(
-  p_desde date,
-  p_hasta date,
-  p_producto_id uuid,
-  p_almacen_id uuid,
-  p_limite integer,
-  p_offset integer
+  p_desde date DEFAULT NULL,
+  p_hasta date DEFAULT NULL,
+  p_producto_id uuid DEFAULT NULL,
+  p_almacen_id uuid DEFAULT NULL,
+  p_limite integer DEFAULT 100,
+  p_offset integer DEFAULT 0
 )
 RETURNS TABLE(
   fecha timestamptz,
@@ -122,13 +122,13 @@ END;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.movimientos_producto(
-  p_producto_id uuid,
-  p_almacen_id uuid,
-  p_desde date,
-  p_hasta date,
-  p_tipo text,
-  p_limite integer,
-  p_offset integer
+  p_producto_id uuid DEFAULT NULL,
+  p_almacen_id uuid DEFAULT NULL,
+  p_desde date DEFAULT NULL,
+  p_hasta date DEFAULT NULL,
+  p_tipo text DEFAULT NULL,
+  p_limite integer DEFAULT 100,
+  p_offset integer DEFAULT 0
 )
 RETURNS TABLE(
   fecha timestamptz,
