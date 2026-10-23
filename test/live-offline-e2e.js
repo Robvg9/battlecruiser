@@ -253,36 +253,30 @@ async function main() {
 
   if (isProductionBase) {
     const releaseFilename = "release-" + expectedReleaseSha + ".json";
-    let release = null;
-    let lastReleaseError = null;
-    for (let attempt = 1; attempt <= 30; attempt += 1) {
-      try {
-        const response = await fetchText(BASE_URL + "/" + releaseFilename + "?bc_live_release_e2e=" + Date.now() + "-" + attempt);
-        assert(response.status >= 200 && response.status < 300,
-          "LIVE " + releaseFilename + " devolvió HTTP " + response.status + ".");
-        const parsed = JSON.parse(response.body);
-        const expected = {
-          source_sha: expectedReleaseSha,
-          app_version: expectedVersion,
-          service_worker_version: swVersionMatch[1],
-        };
-        for (const key of Object.keys(expected)) {
-          assert(String(parsed[key] || "").toLowerCase() === String(expected[key]).toLowerCase(),
-            "LIVE " + releaseFilename + " no coincide en " + key + ": esperado " + expected[key] + ", recibido " + parsed[key] + ".");
-        }
-        assert(/^\d+$/.test(String(parsed.workflow_run_id || "")),
-          "LIVE " + releaseFilename + " no trae workflow_run_id válido.");
-        release = parsed;
-        report.evidence.releaseManifestUrl = BASE_URL + "/" + releaseFilename;
-        break;
-      } catch (error) {
-        lastReleaseError = error;
-      }
-      if (attempt < 30) await delay(3000);
+    const expectedRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
+    assert(/^\d+$/.test(expectedRunId), "BC_EXPECTED_DEPLOY_RUN_ID debe ser el ID numérico del deploy LIVE.");
+    const releasePath = path.join(OUTPUT_DIR, "release", releaseFilename);
+    assert(fs.existsSync(releasePath), "No se descargó el artefacto validado por Deploy: " + releasePath);
+    let release;
+    try {
+      release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+    } catch (error) {
+      throw new Error("El manifiesto persistido por Deploy no es JSON válido: " + releasePath + "; " + String(error));
     }
-    assert(release, "No se obtuvo el manifiesto de release esperado " + releaseFilename + ". Último error: "
-      + (lastReleaseError ? lastReleaseError.message : "desconocido"));
+    const expected = {
+      source_sha: expectedReleaseSha,
+      app_version: expectedVersion,
+      service_worker_version: swVersionMatch[1],
+      workflow_run_id: expectedRunId,
+    };
+    for (const key of Object.keys(expected)) {
+      assert(String(release[key] || "").toLowerCase() === String(expected[key]).toLowerCase(),
+        "El manifiesto validado por Deploy " + releaseFilename + " no coincide en " + key
+          + ": esperado " + expected[key] + ", recibido " + release[key] + ".");
+    }
     report.evidence.releaseProvenance = release;
+    report.evidence.releaseManifestArtifact = releasePath;
+    report.evidence.releaseManifestSource = "Artifact uploaded by the exact Deploy workflow run after its LIVE smoke test fetched and validated this manifest.";
   }
 
   assert(liveAssetEvidence["/app.js"].sha256 === sha256(appSource), "El app.js de LIVE no coincide byte a byte con la fuente (LF normalizado).");
