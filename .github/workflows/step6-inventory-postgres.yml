@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'supabase/migrations/20261023090000_step6_inventory_movements_adjustments_settlement.sql'
+      - 'supabase/migrations/20261023091903_step6_inventory_movements_adjustments_settlement.sql'
       - 'test/step6-inventory-fixture.sql'
       - 'test/step6-inventory-contract.sql'
       - 'test/step6-inventory-contract.test.js'
@@ -52,7 +52,7 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_step6_test
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023090000_step6_inventory_movements_adjustments_settlement.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023091903_step6_inventory_movements_adjustments_settlement.sql
       - name: Verify movement ledger, adjustments, ACL, and settlement transitions
         env:
           PGHOST: localhost
