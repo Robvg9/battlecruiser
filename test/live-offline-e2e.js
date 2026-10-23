@@ -451,11 +451,13 @@ async function main() {
 
   // The shared E2E harness reloads unauthenticated production and may hide
   // the app shell/panels by design. For this isolated semantic probe only,
-  // explicitly render the existing preference panel so AX does not report
-  // "notRendered" simply because its parent panel is inactive after reload.
-  const renderPreferencePanel = await evaluate("(()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false};const touched=[];for(let n=tab;n&&n!==document.body;n=n.parentElement){const cs=getComputedStyle(n);const hidden=n.classList.contains('hidden')||n.hasAttribute('hidden')||cs.display==='none'||cs.visibility==='hidden';n.classList.remove('hidden');n.removeAttribute('hidden');n.style.setProperty('display','block','important');n.style.setProperty('visibility','visible','important');n.style.setProperty('opacity','1','important');if(hidden)touched.push({tag:n.tagName,id:n.id||null,classes:typeof n.className==='string'?n.className:null});}tab.classList.add('active');tab.style.setProperty('display','block','important');return {ready:true,touched,tabClass:tab.className,tabDisplay:getComputedStyle(tab).display,tabRect:{width:tab.getBoundingClientRect().width,height:tab.getBoundingClientRect().height}};})()");
-  assert(renderPreferencePanel.ready && renderPreferencePanel.tabRect.width > 0 && renderPreferencePanel.tabRect.height > 0,
-    "No se pudo renderizar el panel para la prueba semántica aislada: " + JSON.stringify(renderPreferencePanel));
+  // temporarily mount the actual Preferences panel directly under <body> so its
+  // controls are rendered in AX. Restore the original parent immediately after
+  // the read; no production code or data is changed.
+  const renderPreferencePanel = await evaluate("(()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false};const parent=tab.parentElement;const next=tab.nextSibling;window.__BC_STEP4_AX_RESTORE__=()=>{if(parent){if(next&&next.parentNode===parent)parent.insertBefore(tab,next);else parent.appendChild(tab);}};document.body.appendChild(tab);tab.classList.remove('hidden');tab.removeAttribute('hidden');tab.classList.add('active');tab.style.setProperty('display','block','important');tab.style.setProperty('visibility','visible','important');tab.style.setProperty('opacity','1','important');const panel=tab.querySelector('#cfg-preferencias-personales');if(panel){panel.classList.remove('hidden');panel.style.setProperty('display','block','important');panel.style.setProperty('visibility','visible','important');panel.style.setProperty('opacity','1','important');}return {ready:true,mountedDirectlyUnderBody:tab.parentElement===document.body,tabClass:tab.className,tabDisplay:getComputedStyle(tab).display,tabRect:{width:tab.getBoundingClientRect().width,height:tab.getBoundingClientRect().height},panelExists:!!panel,panelRect:panel?{width:panel.getBoundingClientRect().width,height:panel.getBoundingClientRect().height}:null};})()");
+  assert(renderPreferencePanel.ready && renderPreferencePanel.tabRect.width > 0 && renderPreferencePanel.tabRect.height > 0 &&
+    renderPreferencePanel.panelExists && renderPreferencePanel.panelRect && renderPreferencePanel.panelRect.width > 0,
+    "No se pudo montar el panel para la prueba semántica aislada: " + JSON.stringify(renderPreferencePanel));
   report.evidence.step4ChromiumPreferencePanelRendering = renderPreferencePanel;
 
   // Step 4/15 — Intento 3: inspeccionar el árbol de accesibilidad AX de Chromium
@@ -521,6 +523,9 @@ async function main() {
     allStatesAgree: preferenceAxStates.length === 6 && preferenceAxStates.every((state) =>
       state.role === "switch" && state.checkedPropertyPresent && state.matchesDOM),
   };
+  report.evidence.step4ChromiumAccessibilityTree.pass = report.evidence.step4ChromiumAccessibilityTree.allStatesAgree;
+  report.evidence.step4ChromiumAccessibilityTree.diagnosticOnly = true;
+  await evaluate("(()=>{if(typeof window.__BC_STEP4_AX_RESTORE__==='function'){window.__BC_STEP4_AX_RESTORE__();delete window.__BC_STEP4_AX_RESTORE__;}return true;})()");
   assert(report.evidence.step4ChromiumAccessibilityTree.allStatesAgree,
     "El árbol AX de Chromium no expone checked coherente para los seis switches: "
       + JSON.stringify(preferenceAxStates));
