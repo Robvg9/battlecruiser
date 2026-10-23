@@ -96,7 +96,8 @@ function montarEntorno() {
     .replace(/let _valesBusqueda = "";/, "window._valesBusqueda = \"\";")
     .replace(/return _operacionesPendientesCache;/, "return window._operacionesPendientesCache;")
     .replace(/_operacionesPendientesCache = combinadas;/, "window._operacionesPendientesCache = combinadas;")
-    .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];");
+    .replace(/_operacionesPendientesCache = \[\];/, "window._operacionesPendientesCache = [];")
+    .replace(/let _sincronizando = false;/, "let _sincronizando = false; window.__bcIsSyncing = () => _sincronizando;");
   const scriptEl = window.document.createElement("script");
   scriptEl.textContent = appJs;
   window.document.body.appendChild(scriptEl);
@@ -105,6 +106,22 @@ function montarEntorno() {
 }
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function esperarSyncIdle(window, timeoutMs = 5000, stableMs = 120) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (typeof window.__bcIsSyncing === "function" && !window.__bcIsSyncing()) {
+      const stableStart = Date.now();
+      while (Date.now() - stableStart < stableMs) {
+        await esperar(10);
+        if (window.__bcIsSyncing()) break;
+      }
+      if (Date.now() - stableStart >= stableMs && !window.__bcIsSyncing()) return true;
+    }
+    await esperar(10);
+  }
+  return false;
+}
 
 // Marca el shell visible (simula login) y simula online.
 function marcarOnline(window) {
@@ -258,17 +275,20 @@ test("B2.3-D: el detalle muestra idempotency_key, tipo, estado, fecha e intentos
 });
 
 test("B2.3-C: acciones bloqueadas para SINCRONIZANDO (no reintento paralelo)", async () => {
-  const { window } = montarEntorno();
+  const { window, client } = montarEntorno();
   marcarOnline(window);
-  await esperar(30);
+  assert.ok(await esperarSyncIdle(window), "the startup sync must settle before testing the action guard");
 
   const op = await crearOp(window, "venta", { p_almacen_id: "a1", p_lineas: [] }, "SINCRONIZANDO");
+  assert.ok(await esperarSyncIdle(window), "the synthetic SINCRONIZANDO operation must be stable before attempting retry");
+  client.__rpcCalls.length = 0;
   // reintentarOperacionPendiente debe rechazar si no está en REQUIERE_ATENCION.
   // El #msg-pendientes ya existe en el HTML real (index.html), lo reutilizamos.
   const msgEl = window.document.getElementById("msg-pendientes");
   await window.reintentarOperacionPendiente(op.id, null);
   await esperar(10);
-  assert.ok(/no requiere reintento/.test(msgEl.textContent), "debe bloquear reintento en SINCRONIZANDO");
+  assert.ok(/no requiere reintento/i.test(msgEl.textContent), "debe bloquear reintento en SINCRONIZANDO");
+  assert.equal(client.__rpcCalls.length, 0, "blocked retry must not issue any RPC");
 });
 
 test("B2.3: doble sincronización simultánea → 1 sola ejecución real (mutex _sincronizando)", async () => {
