@@ -27,35 +27,41 @@ function buildReleaseManifest({ appSource, swSource, sourceSha, workflowRunId })
   };
 }
 
-function stampReleaseSources({ appSource, swSource, sourceSha, workflowRunId }) {
+function stampReleaseHtml({ indexSource, appSource, swSource, sourceSha, workflowRunId }) {
   const manifest = buildReleaseManifest({ appSource, swSource, sourceSha, workflowRunId });
-  if (String(appSource).includes("BC_RELEASE_SOURCE_SHA=") || String(swSource).includes("BC_RELEASE_SOURCE_SHA=")) {
-    throw new Error("Source files already contain release provenance; refusing to append a duplicate marker.");
+  const html = String(indexSource);
+  if (html.includes("BC_RELEASE_SOURCE_SHA=")) {
+    throw new Error("index.html already contains release provenance; refusing to append a duplicate marker.");
   }
-  const marker = "/* BC_RELEASE_SOURCE_SHA=" + manifest.source_sha
+  if (String(appSource).includes("BC_RELEASE_SOURCE_SHA=") || String(swSource).includes("BC_RELEASE_SOURCE_SHA=")) {
+    throw new Error("Source JavaScript already contains release provenance; refusing to stamp cached JS assets.");
+  }
+  const marker = "<!-- BC_RELEASE_SOURCE_SHA=" + manifest.source_sha
     + "; BC_RELEASE_APP_VERSION=" + manifest.app_version
     + "; BC_RELEASE_SERVICE_WORKER_VERSION=" + manifest.service_worker_version
-    + "; BC_RELEASE_WORKFLOW_RUN_ID=" + manifest.workflow_run_id + " */";
+    + "; BC_RELEASE_WORKFLOW_RUN_ID=" + manifest.workflow_run_id + " -->";
   return {
     manifest,
-    appSource: String(appSource).replace(/\s*$/, "") + "\n\n" + marker + "\n",
-    swSource: String(swSource).replace(/\s*$/, "") + "\n\n" + marker + "\n",
+    indexSource: html.replace(/\s*$/, "") + "\n\n" + marker + "\n",
+    appSource: String(appSource),
+    swSource: String(swSource),
   };
 }
 
 function writeReleaseManifest() {
   const root = path.join(__dirname, "..");
+  const indexPath = path.join(root, "public", "index.html");
   const appPath = path.join(root, "public", "app.js");
   const swPath = path.join(root, "public", "service-worker.js");
-  const stamped = stampReleaseSources({
+  const stamped = stampReleaseHtml({
+    indexSource: fs.readFileSync(indexPath, "utf8"),
     appSource: fs.readFileSync(appPath, "utf8"),
     swSource: fs.readFileSync(swPath, "utf8"),
     sourceSha: process.env.GITHUB_SHA,
     workflowRunId: process.env.GITHUB_RUN_ID,
   });
-  fs.writeFileSync(appPath, stamped.appSource, "utf8");
-  fs.writeFileSync(swPath, stamped.swSource, "utf8");
-  console.log("[release] source provenance stamped into app.js and service-worker.js: "
+  fs.writeFileSync(indexPath, stamped.indexSource, "utf8");
+  console.log("[release] exact source provenance stamped in index.html (JS/SW left byte-identical): "
     + stamped.manifest.source_sha + " app=" + stamped.manifest.app_version
     + " run=" + stamped.manifest.workflow_run_id);
   return stamped.manifest;
@@ -69,4 +75,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildReleaseManifest, stampReleaseSources, writeReleaseManifest };
+module.exports = { buildReleaseManifest, stampReleaseHtml, writeReleaseManifest };
