@@ -97,8 +97,7 @@ jobs:
           if errorlevel 1 exit /b 1
           set "NODE_OPTIONS="
 
-      - name: Verify production serves exact content-addressed release
-        env:
-          BC_EXPECTED_RELEASE_SHA: ${{ github.sha }}
-        shell: cmd
-        run: node test/verify-production-version.js
+      # Exact LIVE SHA verification is serialized in quality.yml's workflow_run,
+      # after Deploy BattleCruiser PWA has finished and uploaded its verified manifest.
+      # This push-triggered self-hosted workflow runs in parallel with deploy and must
+      # not race production's release asset publication.

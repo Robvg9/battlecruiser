@@ -51,38 +51,50 @@ test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run 
   }), /numeric GitHub Actions run ID/);
 });
 
-test("deploy writes and smoke-tests the unique current release manifest", () => {
+test("deploy smoke validates the exact LIVE manifest and persists that fetched body as an artifact", () => {
   assert.match(deploy, /node scripts\/write-release-manifest\.js/);
   assert.match(deploy, /release-\$GITHUB_SHA\.json/);
-  assert.match(deploy, /release-\$GITHUB_SHA\.json/);
   assert.match(deploy, /BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS/);
+  assert.match(deploy, /cp \/tmp\/bc-live-release\.json "test-results\/release\/\$release_name"/);
+  assert.match(deploy, /name: battlecruiser-release-provenance-\$\{\{ github\.run_id \}\}/);
+  assert.match(deploy, /if-no-files-found: error/);
   assert.match(deploy, /workflow_run_id/);
-  assert.match(deploy, /BC_SW_VERSION\\s\*=\\s\*"/);
-  assert.doesNotMatch(deploy, /BC_SW_VERSION\\\\s\*=\\\\s\*"/);
 });
 
-test("post-deploy Quality compares the content-addressed manifest with workflow_run.head_sha", () => {
-  assert.match(quality, /github\.event\.workflow_run\.head_sha/);
-  assert.match(quality, /BC_EXPECTED_RELEASE_SHA/);
-  assert.match(quality, /github\.sha/);
-  assert.match(selfHosted, /BC_EXPECTED_RELEASE_SHA:.*github\.sha/);
-  assert.match(deploy, /selfhosted-windows-test\.yml/);
-  assert.match(verifier, /releaseManifestFilename\(expectedSha\)/);
-  assert.match(verifier, /source_sha/);
+test("post-deploy Quality downloads the provenance artifact from the exact Deploy workflow_run", () => {
+  assert.match(quality, /actions: read/);
+  assert.match(quality, /actions\/download-artifact@v4/);
+  assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}/);
+  assert.match(quality, /run-id: \$\{\{ github\.event\.workflow_run\.id \}\}/);
+  assert.match(quality, /BC_EXPECTED_RELEASE_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(quality, /BC_EXPECTED_DEPLOY_RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
+  assert.match(quality, /if: github\.event_name == 'workflow_run'/);
+});
+
+test("LIVE release verifier checks the downloaded artifact against exact SHA, versions and deploy run ID", () => {
+  assert.match(verifier, /test-results", "release", releaseFilename/);
+  assert.match(verifier, /source_sha: expectedSha/);
+  assert.match(verifier, /workflow_run_id: expectedRunId/);
   assert.match(verifier, /EXACT_SHA=PASS/);
+  assert.doesNotMatch(verifier, /request\(baseUrl \+ "\/" \+ releaseFilename/);
 });
 
-test("LIVE Chromium E2E keeps byte-for-byte source checks and verifies the content-addressed manifest", () => {
-  assert.doesNotMatch(liveOfflineE2e, /normalizeReleaseStampedAsset/);
-  assert.match(liveOfflineE2e, /release-" \+ expectedReleaseSha \+ "\.json/);
+test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact core asset checks", () => {
+  assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}/);
+  assert.match(liveOfflineE2e, /path\.join\(OUTPUT_DIR, "release", releaseFilename\)/);
+  assert.match(liveOfflineE2e, /workflow_run_id: expectedRunId/);
   assert.match(liveOfflineE2e, /sha256\(candidate\.body\) !== sha256\(sourceReference\)/);
+  assert.doesNotMatch(liveOfflineE2e, /fetchText\(BASE_URL \+ "\/" \+ releaseFilename/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
-  assert.match(quality, /BC_EXPECTED_RELEASE_SHA:.*workflow_run\.head_sha/);
+  assert.match(liveOfflineE2e, /BC_EXPECTED_DEPLOY_RUN_ID/);
+  assert.match(liveOfflineE2e, /const maxAttempts = isProductionBase && isMainJs \? 30 : 4/);
+  assert.match(liveOfflineE2e, /timeoutMs = 20000/);
+  assert.match(liveOfflineE2e, /isProductionBase \? 20000 : 35000/);
   assert.match(quality, /needs: \[deploy-pr-preview, quality\]/);
-  assert.match(quality, /needs\.quality\.result == 'success'/);
+  assert.match(quality, /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.conclusion == 'success'/);
 });
 
-test("post-deploy verifier retries content-addressed release propagation", () => {
-  assert.match(verifier, /attempt <= 30/);
-  assert.match(verifier, /attempt < 30/);
+test("self-hosted push workflow does not race exact-SHA release verification against deploy", () => {
+  assert.match(selfHosted, /Exact LIVE SHA verification is serialized in quality\.yml's workflow_run/);
+  assert.doesNotMatch(selfHosted, /node test\/verify-production-version\.js/);
 });

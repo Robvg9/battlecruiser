@@ -14,9 +14,14 @@ if (!swMatch) throw new Error("Could not determine expected Service Worker versi
 const expectedAppVersion = appMatch[1];
 const expectedSwVersion = swMatch[1];
 if (expectedAppVersion !== expectedSwVersion) throw new Error("Local app and Service Worker versions are not aligned.");
+
 const expectedSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
 if (!/^[0-9a-f]{40}$/.test(expectedSha)) throw new Error("BC_EXPECTED_RELEASE_SHA must be a full 40-character git SHA.");
+const expectedRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
+if (!/^\d+$/.test(expectedRunId)) throw new Error("BC_EXPECTED_DEPLOY_RUN_ID must be the numeric ID of the deploy workflow run.");
+
 const releaseFilename = releaseManifestFilename(expectedSha);
+const releasePath = path.join(process.cwd(), "test-results", "release", releaseFilename);
 const baseUrl = "https://battlecruiser.robvg9.workers.dev";
 
 function describeError(error) {
@@ -26,7 +31,6 @@ function describeError(error) {
   if (error.code) parts.push("code=" + error.code);
   if (error.errno) parts.push("errno=" + error.errno);
   if (error.syscall) parts.push("syscall=" + error.syscall);
-  if (error.hostname) parts.push("hostname=" + error.hostname);
   if (error.cause) parts.push("cause=" + describeError(error.cause));
   return parts.join(" | ") || String(error);
 }
@@ -64,41 +68,63 @@ async function request(url) {
   }
   return requestWithHttps(url);
 }
+function readVerifiedReleaseArtifact() {
+  if (!fs.existsSync(releasePath)) {
+    throw new Error("Missing deploy-verified release artifact: " + releasePath);
+  }
+  let release;
+  try {
+    release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
+  } catch (error) {
+    throw new Error("Invalid release artifact " + releasePath + ": " + describeError(error));
+  }
+  const expected = {
+    source_sha: expectedSha,
+    app_version: expectedAppVersion,
+    service_worker_version: expectedSwVersion,
+    workflow_run_id: expectedRunId,
+  };
+  for (const key of Object.keys(expected)) {
+    if (String(release[key] || "").toLowerCase() !== String(expected[key]).toLowerCase()) {
+      throw new Error("Verified release artifact mismatch for " + key + ": expected " + expected[key] + ", got " + release[key]);
+    }
+  }
+  return release;
+}
 async function verifyOnce(attempt) {
   const stamp = Date.now() + "-" + attempt;
-  const [liveApp, liveSw, releaseBody] = await Promise.all([
+  const [liveApp, liveSw] = await Promise.all([
     request(baseUrl + "/app.js?bc_verify=" + stamp + "-app"),
     request(baseUrl + "/service-worker.js?bc_verify=" + stamp + "-sw"),
-    request(baseUrl + "/" + releaseFilename + "?bc_verify=" + stamp + "-release"),
   ]);
   const liveAppMatch = liveApp.match(/const VERSION=["']([^"']+)["']/);
   const liveSwMatch = liveSw.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);
   if (!liveAppMatch) throw new Error("LIVE app.js has no readable VERSION.");
   if (!liveSwMatch) throw new Error("LIVE Service Worker has no readable version.");
-  if (liveAppMatch[1] !== expectedAppVersion) throw new Error("LIVE app.js version mismatch: expected " + expectedAppVersion + ", got " + liveAppMatch[1]);
-  if (liveSwMatch[1] !== expectedSwVersion) throw new Error("LIVE Service Worker mismatch: expected " + expectedSwVersion + ", got " + liveSwMatch[1]);
-  let release;
-  try { release = JSON.parse(releaseBody); }
-  catch (_) { throw new Error("LIVE " + releaseFilename + " is not valid JSON."); }
-  const expected = { source_sha: expectedSha, app_version: expectedAppVersion, service_worker_version: expectedSwVersion };
-  for (const key of Object.keys(expected)) {
-    if (String(release[key] || "").toLowerCase() !== String(expected[key]).toLowerCase()) {
-      throw new Error("LIVE release manifest mismatch for " + key + ": expected " + expected[key] + ", got " + release[key]);
-    }
+  if (liveAppMatch[1] !== expectedAppVersion) {
+    throw new Error("LIVE app.js version mismatch: expected " + expectedAppVersion + ", got " + liveAppMatch[1]);
   }
-  if (!/^\d+$/.test(String(release.workflow_run_id || ""))) throw new Error("LIVE release manifest has invalid workflow_run_id.");
-  console.log("[production-release] PASS — file=" + releaseFilename + ", app=" + expectedAppVersion
-    + ", service-worker=" + expectedSwVersion + ", source_sha=" + release.source_sha
-    + ", workflow_run_id=" + release.workflow_run_id);
-  console.log("[production-release] EXACT_SHA=PASS");
+  if (liveSwMatch[1] !== expectedSwVersion) {
+    throw new Error("LIVE Service Worker mismatch: expected " + expectedSwVersion + ", got " + liveSwMatch[1]);
+  }
+
+  const release = readVerifiedReleaseArtifact();
+  console.log("[production-release] PASS — manifest artifact=" + releaseFilename
+    + ", deploy_run=" + release.workflow_run_id
+    + ", app=" + expectedAppVersion
+    + ", service-worker=" + expectedSwVersion
+    + ", source_sha=" + release.source_sha);
+  console.log("[production-release] EXACT_SHA=PASS (artifact was fetched from LIVE and validated by deploy smoke test)");
 }
 (async () => {
-  for (let attempt = 1; attempt <= 30; attempt += 1) {
+  for (let attempt = 1; attempt <= 10; attempt += 1) {
     try { await verifyOnce(attempt); return; }
-    catch (error) { console.log("[production-release] attempt " + attempt + " failed: " + describeError(error)); }
-    if (attempt < 30) await new Promise(resolve => setTimeout(resolve, 3000));
+    catch (error) {
+      console.log("[production-release] attempt " + attempt + " failed: " + describeError(error));
+    }
+    if (attempt < 10) await new Promise(resolve => setTimeout(resolve, 3000));
   }
-  throw new Error("Production is not serving the expected content-addressed release manifest.");
+  throw new Error("Production release provenance verification failed.");
 })().catch(error => {
   console.error("[production-release] FAIL", error);
   process.exitCode = 1;
