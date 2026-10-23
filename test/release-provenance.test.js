@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { buildReleaseManifest, stampReleaseSources } = require("../scripts/write-release-manifest.js");
+const { buildReleaseManifest, stampReleaseHtml } = require("../scripts/write-release-manifest.js");
 
 const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
@@ -28,21 +28,21 @@ test("release manifest records the exact source SHA, run ID, and aligned app/SW 
   });
 });
 
-test("release SHA and run ID are embedded identically in the existing app and Service Worker assets", () => {
+test("release SHA is embedded only in index.html; app.js and Service Worker remain byte-identical", () => {
   const sha = "fedcba9876543210fedcba9876543210fedcba98";
-  const stamped = stampReleaseSources({
-    appSource: 'const VERSION="9.5.16";',
-    swSource: 'var BC_SW_VERSION = "9.5.16";',
-    sourceSha: sha,
-    workflowRunId: "40000000001",
+  const appSource = 'const VERSION="9.5.16";';
+  const swSource = 'var BC_SW_VERSION = "9.5.16";';
+  const indexSource = "<!doctype html>\\n<html><body>BattleCruiser</body></html>\\n";
+  const stamped = stampReleaseHtml({
+    indexSource, appSource, swSource, sourceSha: sha, workflowRunId: "40000000001",
   });
-  assert.match(stamped.appSource, new RegExp("BC_RELEASE_SOURCE_SHA=" + sha));
-  assert.match(stamped.swSource, new RegExp("BC_RELEASE_SOURCE_SHA=" + sha));
-  assert.match(stamped.appSource, /BC_RELEASE_WORKFLOW_RUN_ID=40000000001/);
-  assert.match(stamped.swSource, /BC_RELEASE_WORKFLOW_RUN_ID=40000000001/);
+  assert.match(stamped.indexSource, new RegExp("BC_RELEASE_SOURCE_SHA=" + sha));
+  assert.match(stamped.indexSource, /BC_RELEASE_WORKFLOW_RUN_ID=40000000001/);
   assert.equal(stamped.manifest.source_sha, sha);
-  assert.equal(stamped.appSource.match(/BC_RELEASE_SOURCE_SHA=/g).length, 1);
-  assert.equal(stamped.swSource.match(/BC_RELEASE_SOURCE_SHA=/g).length, 1);
+  assert.equal(stamped.indexSource.includes("BC_RELEASE_APP_VERSION=9.5.16"), true);
+  assert.equal(stamped.appSource, appSource);
+  assert.equal(stamped.swSource, swSource);
+  assert.equal(stamped.indexSource.replace(/\\s*<!-- BC_RELEASE_SOURCE_SHA=.*? -->\\n?$/, "\\n"), indexSource);
 });
 
 test("manifest generation rejects mismatched versions or a non-full git SHA", () => {
@@ -79,10 +79,11 @@ test("LIVE verifier checks embedded source SHA in both deployed app/SW assets", 
   assert.match(verifier, /Service Worker mismatch/);
 });
 
-test("post-deploy Chromium E2E strips only the known trailing provenance marker before source integrity comparison", () => {
-  assert.match(liveOfflineE2e, /normalizeReleaseStampedAsset/);
+test("post-deploy Chromium E2E normalizes only the trailing HTML marker before exact source integrity comparison", () => {
+  assert.match(liveOfflineE2e, /normalizeReleaseStampedHtml/);
   assert.match(liveOfflineE2e, /BC_RELEASE_SOURCE_SHA/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
+  assert.match(liveOfflineE2e, /index.html LIVE no coincide byte a byte/);
   assert.match(liveOfflineE2e, /normalizedSha256/);
   assert.match(liveOfflineE2e, /maxAttempts = needsCurrentReleaseStamp \? 36 : 1/);
   assert.match(quality, /BC_EXPECTED_RELEASE_SHA:.*workflow_run\.head_sha/);
