@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'supabase/migrations/20261023101500_step7_jornada_inventory_ui.sql'
+      - 'supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql'
       - 'supabase/migrations/20261023053011_step5_jornada_unica_backend.sql'
       - 'test/step7-jornada-fixture.sql'
       - 'test/step7-jornada-contract.sql'
@@ -61,7 +61,7 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_step7_test
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023101500_step7_jornada_inventory_ui.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql
       - name: Verify session inventory lifecycle and ACL
         env:
           PGHOST: localhost
