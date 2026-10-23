@@ -808,3 +808,98 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   }
   body:not(:has(#app-shell.visible)) #login-form:not(.hidden) .app-version-label { margin-top: 1px; font-size: 8px; }
 }
+
+
+/* STEP 8 — Android UX guardrails: safe viewport, reachable controls, readable focus. */
+:root {
+  scroll-padding-top: 12px;
+  scroll-padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold-bright) !important;
+  outline-offset: 3px;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  box-shadow: 0 0 0 2px var(--void);
+}
+
+@media (max-width: 759px), (hover: none) and (pointer: coarse) {
+  body:has(#app-shell.visible) {
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+  }
+
+  #app-shell.visible {
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Footer is content, never a fixed layer over the final settings/operation fields. */
+  .app-footer {
+    position: static !important;
+    inset: auto !important;
+    margin-top: 0;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .sidebar {
+    height: 100vh !important;
+    height: 100dvh !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Keep tap targets usable on compact screens without changing desktop styling. */
+  body:has(#app-shell.visible) button,
+  body:has(#app-shell.visible) [role="button"],
+  body:has(#app-shell.visible) input,
+  body:has(#app-shell.visible) select,
+  body:has(#app-shell.visible) textarea {
+    min-height: 44px;
+  }
+
+  body:has(#app-shell.visible) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  body:has(#app-shell.visible) select,
+  body:has(#app-shell.visible) textarea {
+    font-size: 16px !important;
+    scroll-margin-block: 12px;
+  }
+
+  /* A short visual viewport (keyboard or browser chrome) must not trap the account dialog. */
+  .bc-account-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .bc-account-card {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    margin: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
