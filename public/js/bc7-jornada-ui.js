@@ -209,7 +209,8 @@
       actionArea='<div class="bc7-card"><h4>Iniciar jornada</h4><p class="bc7-muted">El backend comprobará la fecha, el responsable asignado, la secuencia y las excepciones horarias.</p><label class="bc7-field">Motivo si abres antes/después de la hora prevista<input id="bc7-start-reason" maxlength="1000" placeholder="Deja vacío si abres exactamente a la hora programada"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Confirmar apertura</button></div><p class="bc7-msg" id="bc7-start-msg"></p></div>';
     } else if(status==='EN_CURSO'){
       const tramo=detail.tramo_activo;
-      actionArea='<div class="bc7-card"><h4>Declaración de dinero y cierre</h4><p class="bc7-muted">Introduce el efectivo real entregado, incluidos los valores cero si no hubo efectivo. El cierre mantiene la validación y aprobación existentes.</p><form data-bc7-close-form="'+esc(s.id)+'"><label class="bc7-field">Dinero declarado<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal"></label><label class="bc7-field">Motivo si cierras antes/después de hora o fecha<input id="bc7-close-reason" maxlength="1000" placeholder="Motivo de excepción (si aplica)"></label><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>Declarar dinero y cerrar jornada</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-note">El cierre está bloqueado hasta confirmar el inventario final.</p>')+'</form></div>';
+      const savedDeclaration=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
+      actionArea='<div class="bc7-card"><h4>Declaración de dinero y cierre</h4><p class="bc7-muted">'+(savedDeclaration?'La declaración de este tramo ya está guardada; no se repetirá al reintentar el cierre.':'Introduce el efectivo real entregado, incluidos los valores cero si no hubo efectivo.')+' El cierre mantiene la validación y aprobación existentes.</p><form data-bc7-close-form="'+esc(s.id)+'"><label class="bc7-field">Dinero declarado<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(savedDeclaration?esc(detail.declaracion_dinero.monto):'')+'" '+(savedDeclaration?'readonly':'')+'></label><label class="bc7-field">Motivo si cierras antes/después de hora o fecha<input id="bc7-close-reason" maxlength="1000" placeholder="Motivo de excepción (si aplica)"></label><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(savedDeclaration?'Cerrar jornada con declaración guardada':'Declarar dinero y cerrar jornada')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-note">El cierre está bloqueado hasta confirmar el inventario final.</p>')+'</form></div>';
     } else if(status==='COMPLETADA'){
       actionArea='<div class="bc7-note">Jornada completada. Los conteos confirmados y los movimientos permanecen como evidencia histórica.</div>';
     } else {
@@ -263,16 +264,23 @@
     const sessionId=form.dataset.bc7CloseForm;
     const amount=$('bc7-cash')?.value.trim();
     const msgEl=form.querySelector('[data-bc7-close-msg]');
-    if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
+    const tramoId=state.detail.tramo_activo.id;
+    const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+    if(saved){amount=String(state.detail.declaracion_dinero.monto);}
+    if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
     if(!confirm('Se registrará la declaración de dinero y, después, se solicitará el cierre. ¿El importe corresponde al efectivo realmente contado?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
-      await rpc('bc_declarar_dinero',{p_turno_tramo_id:state.detail.tramo_activo.id,p_monto:Number(amount)});
+      if(!saved) await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:Number(amount)});
       await rpc('bc5_cerrar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:$('bc7-close-reason')?.value||null});
       await loadCalendar();await openWorkspace(sessionId);setStatus('Cierre ejecutado y estado releído del backend.','ok');
-    }catch(e){msg(msgEl,'No se completó el cierre: '+e.message+'. Si la declaración llegó a guardarse, se conserva y puedes revisar el estado antes de repetir.','error');try{const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.detail=d; }catch(x){}}
+    }catch(e){
+      const errorText='No se completó el cierre: '+e.message+'. La pantalla releerá el estado antes de permitir otro intento.';
+      try{const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});renderWorkspace(d);msg(document.querySelector('[data-bc7-close-msg]'),errorText,'error');}
+      catch(x){msg(form.querySelector('[data-bc7-close-msg]'),errorText,'error');}
+    }
     finally{busy(btn,false);}
   }
   async function submitAdjustment(form){
