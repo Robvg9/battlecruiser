@@ -96,6 +96,17 @@ function marcarOnline(window) {
   if (shell) shell.classList.add("visible");
 }
 
+async function esperarPermisoReportes(window) {
+  const listo = await esperarHasta(() =>
+    typeof window._usuarioActual === "function" &&
+    Boolean(window._usuarioActual()) &&
+    typeof window.tienePermiso === "function" &&
+    window.tienePermiso("reportes", "ver"),
+    5000
+  );
+  assert.ok(listo, "el contexto autenticado y reportes.ver deben estar listos antes de probar Reportes");
+}
+
 // ---- tests ----
 
 test("B5.3: usuario con permiso reportes.ver ve la pestaña Reportes", async () => {
@@ -163,7 +174,7 @@ test("B5.6: reporte de ventas muestra líneas reales con precio histórico", asy
     ],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarPermisoReportes(window);
 
   // Activa explícitamente el subreporte que se está verificando. El test
   // anterior dependía del estado global predeterminado y fallaba de forma
@@ -333,7 +344,7 @@ test("B5.10: las siete pestañas de subreportes llaman al RPC correcto y renderi
     rentabilidad: [{ id: "rent-step4", fecha: "2026-08-15T15:00:00Z", almacen: "RENT_FIXTURE", ingreso: 100, costo_disponible: true, costo_total: 60, margen: 40, margen_porcentaje: 40 }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarPermisoReportes(window);
   const detalle = document.getElementById("rep-detalle");
   const casos = [
     ["ventas", "reporte_ventas", "VENTA_FIXTURE"],
