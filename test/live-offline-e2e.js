@@ -242,9 +242,44 @@ async function main() {
   const assetPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
   const liveAssetEvidence = {};
   const liveAssetBodies = {};
+  const isProductionBase = BASE_URL === "https://battlecruiser.robvg9.workers.dev";
+  const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
+  if (isProductionBase && expectedReleaseSha) {
+    assert(/^[0-9a-f]{40}$/.test(expectedReleaseSha), "BC_EXPECTED_RELEASE_SHA no es un SHA Git completo.");
+  }
   for (const assetPath of assetPaths) {
-    const live = await fetchText(BASE_URL + assetPath + "?bc_live_offline_e2e=" + Date.now());
-    assert(live.status >= 200 && live.status < 300, "LIVE " + assetPath + " devolvió HTTP " + live.status);
+    const needsCurrentReleaseStamp = isProductionBase && (assetPath === "/app.js" || assetPath === "/service-worker.js");
+    const maxAttempts = needsCurrentReleaseStamp ? 36 : 1;
+    let live = null;
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const candidate = await fetchText(BASE_URL + assetPath + "?bc_live_offline_e2e=" + Date.now() + "-" + attempt);
+        if (candidate.status < 200 || candidate.status >= 300) {
+          lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
+        } else if (needsCurrentReleaseStamp) {
+          const marker = String(candidate.body).match(RELEASE_MARKER_RE);
+          const expectedAssetVersion = assetPath === "/app.js" ? expectedVersion : swVersionMatch[1];
+          if (!marker) {
+            lastError = new Error("LIVE " + assetPath + " todavía no expone la huella de release esperada.");
+          } else if (expectedReleaseSha && marker[1].toLowerCase() !== expectedReleaseSha) {
+            lastError = new Error("LIVE " + assetPath + " sigue en SHA " + marker[1] + "; se espera " + expectedReleaseSha + ".");
+          } else if (marker[2] !== expectedVersion || marker[3] !== swVersionMatch[1] || marker[2] !== expectedAssetVersion) {
+            lastError = new Error("LIVE " + assetPath + " expone versiones de release distintas a las fuentes.");
+          } else {
+            live = candidate;
+            break;
+          }
+        } else {
+          live = candidate;
+          break;
+        }
+      } catch (error) {
+        lastError = error;
+      }
+      if (attempt < maxAttempts) await delay(5000);
+    }
+    assert(live, "No se pudo obtener el asset LIVE " + assetPath + " de la release esperada tras " + maxAttempts + " intentos. Último error: " + (lastError ? lastError.message : "desconocido"));
     liveAssetBodies[assetPath] = live.body;
     liveAssetEvidence[assetPath] = {
       httpStatus: live.status,

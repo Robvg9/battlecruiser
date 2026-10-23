@@ -123,14 +123,14 @@ async function verifyOnce(attempt) {
   else console.log("[production-release] SHA observed; exact comparison omitted for manual dispatch.");
 }
 (async () => {
-  for (let attempt = 1; attempt <= 8; attempt += 1) {
+  for (let attempt = 1; attempt <= 30; attempt += 1) {
     try {
       await verifyOnce(attempt);
       return;
     } catch (error) {
       console.log("[production-release] attempt " + attempt + " failed: " + describeError(error));
     }
-    if (attempt < 8) await new Promise((resolve) => setTimeout(resolve, 10000));
+    if (attempt < 30) await new Promise((resolve) => setTimeout(resolve, 10000));
   }
   throw new Error("Production is not serving the expected app/Service Worker release provenance.");
 })().catch((error) => {
