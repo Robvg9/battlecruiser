@@ -266,9 +266,9 @@ CREATE OR REPLACE FUNCTION public.resolver_aprobacion_operativa(
   p_tipo text,
   p_id uuid,
   p_decision text,
-  p_comentario text,
-  p_cantidad_real numeric,
-  p_monto_real numeric
+  p_comentario text DEFAULT NULL,
+  p_cantidad_real numeric DEFAULT NULL,
+  p_monto_real numeric DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -392,8 +392,8 @@ GRANT EXECUTE ON FUNCTION public.resolver_aprobacion_operativa(text,uuid,text,te
 CREATE OR REPLACE FUNCTION public.registrar_cuadre(
   p_cuadre_id uuid,
   p_dinero_declarado numeric,
-  p_idempotency_key uuid,
-  p_observacion text
+  p_idempotency_key uuid DEFAULT NULL,
+  p_observacion text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -457,8 +457,8 @@ GRANT EXECUTE ON FUNCTION public.registrar_cuadre(uuid,numeric,uuid,text) TO aut
 CREATE OR REPLACE FUNCTION public.revisar_cuadre(
   p_cuadre_id uuid,
   p_decision text,
-  p_comentario text,
-  p_idempotency_key uuid
+  p_comentario text DEFAULT NULL,
+  p_idempotency_key uuid DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
