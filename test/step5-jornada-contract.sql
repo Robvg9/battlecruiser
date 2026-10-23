@@ -76,6 +76,13 @@ BEGIN
   JOIN public.turno_sesiones s ON s.id=a.turno_sesion_id
   WHERE s.turno_id=v_turno AND a.retirado_at IS NULL;
   IF v_assigned<>2 THEN RAISE EXCEPTION 'Expected 2 active assignments, got %',v_assigned; END IF;
+  IF jsonb_array_length(public.bc5_listar_patrones_jornada(
+       '10000000-0000-0000-0000-000000000001')) <> 1 THEN
+    RAISE EXCEPTION 'Pattern read RPC did not return the saved rotation';
+  END IF;
+  IF jsonb_array_length(public.bc5_obtener_programacion_jornada(v_turno)) <> 3 THEN
+    RAISE EXCEPTION 'Schedule read RPC did not return all work/rest rows';
+  END IF;
 END
 $test$;
 
