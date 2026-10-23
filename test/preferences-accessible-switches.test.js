@@ -16,7 +16,7 @@ const serviceWorker = fs.readFileSync(path.join(ROOT, "public/service-worker.js"
 const appSource = fs.readFileSync(path.join(ROOT, "public/app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(ROOT, "public/index.html"), "utf8");
 
-test("preference inputs use native checkbox state with accessible names and descriptions", () => {
+test("preference switch buttons expose accessible names and descriptions", () => {
   assert.ok(source.includes("button type=" + escapedQuote + "button" + escapedQuote + " class=" + escapedQuote + "cfg-aj-toggle" + escapedQuote + " role=" + escapedQuote + "switch" + escapedQuote + " id=" + escapedQuote));
   assert.ok(source.includes("aria-label=" + escapedQuote));
   assert.ok(source.includes("aria-describedby=" + escapedQuote));
@@ -24,13 +24,13 @@ test("preference inputs use native checkbox state with accessible names and desc
   assert.ok(source.includes("aria-checked=" + escapedQuote + "false" + escapedQuote));
 });
 
-test("native checked property stays synchronized with saved local preference values", () => {
+test("aria-checked switch state stays synchronized with saved local preference values", () => {
   assert.ok(source.includes('control.setAttribute("aria-checked", enabled ? "true" : "false");'));
   assert.ok(source.includes('var checked = input.getAttribute("aria-checked") !== "true";'));
   assert.ok(source.includes("prefs[key] = checked;"));
 });
 
-test("accessible textual option state follows the native checked property on load and change", () => {
+test("accessible textual option state follows the saved switch state on load and change", () => {
   assert.ok(source.includes('"-help " + id + "-state'));
   assert.ok(source.includes("Estado de la opción: desactivada.</span>"));
   assert.ok(source.includes('function updateToggleState(id, control, checked)'));
@@ -42,7 +42,7 @@ test("accessible textual option state follows the native checked property on loa
 test("toggle appearance retains a real accessible hit target and keyboard focus", () => {
   assert.ok(source.includes(".cfg-aj-toggle:focus-visible span{outline:2px solid var(--gold-bright);outline-offset:3px}"));
   assert.ok(source.includes('.cfg-aj-toggle[aria-checked=' + escapedQuote + 'true' + escapedQuote + '] span:before{transform:translateX(20px)}'));
-  assert.ok(source.includes(".cfg-aj-toggle input:focus-visible+span{outline:2px solid var(--gold-bright);outline-offset:3px}"));
+  assert.ok(source.includes('.cfg-aj-toggle[aria-checked=' + escapedQuote + 'true' + escapedQuote + '] span{background:rgba(201,162,77,.55)}'));
 });
 
 test("all six preference inputs remain connected to their existing preference keys", () => {
