@@ -97,6 +97,8 @@ jobs:
           if errorlevel 1 exit /b 1
           set "NODE_OPTIONS="
 
-      - name: Verify production serves current application version
+      - name: Verify production serves exact content-addressed release
+        env:
+          BC_EXPECTED_RELEASE_SHA: ${{ github.sha }}
         shell: cmd
         run: node test/verify-production-version.js

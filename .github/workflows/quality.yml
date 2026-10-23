@@ -75,7 +75,7 @@ jobs:
       - name: Verify production serves exact application release provenance
         if: github.event_name != 'pull_request'
         env:
-          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         shell: cmd
         run: node test/verify-production-version.js
 
@@ -148,7 +148,7 @@ jobs:
       - name: Run real-browser LIVE offline E2E
         env:
           BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && format('https://bc-pr-{0}-battlecruiser.robvg9.workers.dev', github.event.number) || 'https://battlecruiser.robvg9.workers.dev' }}
-          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: node test/live-offline-e2e.js
 
       - name: Persist LIVE offline E2E evidence
