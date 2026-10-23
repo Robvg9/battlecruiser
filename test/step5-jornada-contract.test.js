@@ -68,6 +68,8 @@ test("privileged RPCs require authenticated ADMIN and deny anon/public execution
     "bc5_reprogramar_jornada",
     "bc5_listar_patrones_jornada",
     "bc5_obtener_programacion_jornada",
+    "bc5_iniciar_jornada",
+    "bc5_cerrar_jornada",
   ]) {
     assert.match(sql, new RegExp("REVOKE ALL ON FUNCTION public\\." + fn + "\\("));
     assert.match(sql, new RegExp("GRANT EXECUTE ON FUNCTION public\\." + fn + "\\([\\s\\S]*?TO authenticated;"));
