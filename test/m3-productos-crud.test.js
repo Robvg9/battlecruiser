@@ -213,3 +213,55 @@ test("M3/F2: sin permiso productos.editar, refrescarProductos no debe ofrecer bo
   lista.appendChild(div);
   assert.strictEqual(lista.querySelector(".btn-editar-producto"), null, "no debe haber botón Editar sin permiso");
 });
+
+test("M3/F4: búsqueda de Productos filtra por nombre, categoría y unidad; Ver todos restaura sin mutar caché", async () => {
+  const { window, document } = montarEntorno({
+    perfil: PERFIL_DUENO,
+    permisos: [{ seccion: "productos", accion: "ver" }, { seccion: "productos", accion: "editar" }],
+  });
+  marcarOnline(window);
+  assert.ok(
+    await esperarHasta(() => window.__bcTestPermisosCargaExitosa() && window.tienePermiso("productos", "ver"), 5000, 10),
+    "el contexto de Productos debe estar listo antes de comprobar los filtros"
+  );
+
+  const productos = [
+    { id: "p-cerveza", nombre: "Cerveza Bucanero", unidad: "botella", precio_normal: 100, precio_mayorista: 90, activo: true, categorias: { nombre: "Bebidas" }, presentaciones: null },
+    { id: "p-masareal", nombre: "Masareal", unidad: "unidad", precio_normal: 55, precio_mayorista: null, activo: true, categorias: { nombre: "Dulces artesanales" }, presentaciones: null },
+    { id: "p-arroz", nombre: "Arroz", unidad: "saco", precio_normal: 350, precio_mayorista: 330, activo: true, categorias: { nombre: "Abarrotes" }, presentaciones: null },
+  ];
+  const baseline = JSON.stringify(productos);
+  window._cache.productos = productos;
+  window._cache.stock = [];
+  window.renderProductosLista();
+
+  const visibleIds = () => Array.from(document.querySelectorAll("#lista-productos .lista-item"))
+    .map((node) => node.getAttribute("data-ctx-id"));
+
+  const input = document.getElementById("productos-buscar");
+  assert.ok(input, "el campo de búsqueda debe existir");
+
+  input.value = "bUcAnErO";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.deepStrictEqual(visibleIds(), ["p-cerveza"], "la búsqueda de nombre es insensible a mayúsculas");
+
+  input.value = "Dulces artesanales";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.deepStrictEqual(visibleIds(), ["p-masareal"], "la búsqueda también encuentra la categoría");
+
+  input.value = "unidad";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.deepStrictEqual(visibleIds(), ["p-masareal"], "la búsqueda también encuentra la unidad");
+
+  input.value = "sin-coincidencias";
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.match(document.querySelector("#lista-productos .lista-estado").textContent, /No encontramos productos/i);
+  const verTodos = document.querySelector("#lista-productos .mov-ver-todas-btn");
+  assert.ok(verTodos, "el estado vacío debe ofrecer restaurar Todos");
+  verTodos.click();
+
+  assert.strictEqual(input.value, "", "Ver todos limpia el campo de búsqueda");
+  assert.deepStrictEqual(visibleIds().sort(), ["p-arroz", "p-cerveza", "p-masareal"].sort(), "Ver todos restaura todos los productos");
+  assert.strictEqual(JSON.stringify(window._cache.productos), baseline, "filtrar y restaurar no debe mutar la caché base");
+});
+
