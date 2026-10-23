@@ -58,9 +58,9 @@ function writeReport() {
   report.evidence.consoleErrors = consoleErrors;
   fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2) + "\n", "utf8");
 }
-async function fetchText(url) {
+async function fetchText(url, timeoutMs = 20000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       headers: { "cache-control": "no-cache", pragma: "no-cache" },
@@ -220,7 +220,9 @@ async function main() {
 
   for (const assetPath of assetPaths) {
     const isMainJs = assetPath === "/app.js" || assetPath === "/service-worker.js";
-    const maxAttempts = isProductionBase && isMainJs ? 30 : 1;
+    // Preview workers can cold-start or briefly stall even after the preview smoke passes.
+    // Retry each asset instead of failing the whole PR E2E on one fetch timeout.
+    const maxAttempts = isProductionBase && isMainJs ? 30 : 4;
     const sourceReference = assetPath === "/app.js" ? appSource
       : assetPath === "/service-worker.js" ? swSource
       : assetPath === "/index.html" ? sourceIndex : sourceCss;
@@ -228,7 +230,10 @@ async function main() {
     let lastError = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        const candidate = await fetchText(BASE_URL + assetPath + "?bc_live_offline_e2e=" + Date.now() + "-" + attempt);
+        const candidate = await fetchText(
+          BASE_URL + assetPath + "?bc_live_offline_e2e=" + Date.now() + "-" + attempt,
+          isProductionBase ? 20000 : 35000
+        );
         if (candidate.status < 200 || candidate.status >= 300) {
           lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
         } else if (sha256(candidate.body) !== sha256(sourceReference)) {
