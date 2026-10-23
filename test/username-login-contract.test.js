@@ -234,3 +234,20 @@ test("username recovery uses the server-side resolver, direct recovery redirect,
   assert.ok(edge.includes("return reply({ accepted: true }, 200)"));
   assert.ok(!edge.includes("reply({ email"));
 });
+
+test("login bridge handles preflight before enforcing the production origin and never opens POST to other origins", () => {
+  const normalizeMatch = edge.match(/function normalizeOrigin\(value: string \| null\): string \| null \{[\s\S]*?\n\}/);
+  assert.ok(normalizeMatch, "origin normalization must be available for the preflight contract");
+  const normalize = vm.runInNewContext("(" + normalizeMatch[0].replace("function normalizeOrigin(value: string | null): string | null", "function") + ")");
+  assert.equal(normalize("https://battlecruiser.robvg9.workers.dev"), "https://battlecruiser.robvg9.workers.dev");
+  assert.equal(normalize("https://battlecruiser.robvg9.workers.dev/"), "https://battlecruiser.robvg9.workers.dev");
+  assert.equal(normalize("https://evil.example/"), "https://evil.example");
+  assert.equal(normalize(null), null);
+  const preflight = edge.indexOf('if (req.method === "OPTIONS")');
+  const strictPostOriginGate = edge.indexOf('if (origin !== APP_ORIGIN) return reply({ error: "Origen no permitido." }, 403);', preflight);
+  assert.ok(preflight > -1 && strictPostOriginGate > preflight,
+    "preflight handling must precede the mandatory origin check for actual requests");
+  assert.match(edge, /if \(origin && origin !== APP_ORIGIN\) return reply\(\{ error: "Origen no permitido\." \}, 403\)/);
+  assert.match(edge, /if \(origin !== APP_ORIGIN\) return reply\(\{ error: "Origen no permitido\." \}, 403\);/,
+    "all actual POST requests still require the exact production origin");
+});
