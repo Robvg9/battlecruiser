@@ -4,10 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const https = require("https");
 
-const appPath = path.join(__dirname, "..", "public", "app.js");
-const swPath = path.join(__dirname, "..", "public", "service-worker.js");
-const appSource = fs.readFileSync(appPath, "utf8");
-const swSource = fs.readFileSync(swPath, "utf8");
+const root = path.join(__dirname, "..");
+const appSource = fs.readFileSync(path.join(root, "public", "app.js"), "utf8");
+const swSource = fs.readFileSync(path.join(root, "public", "service-worker.js"), "utf8");
 const appMatch = appSource.match(/const VERSION=["']([^"']+)["']/);
 const swMatch = swSource.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);
 if (!appMatch) throw new Error("Could not determine expected app version from public/app.js.");
@@ -20,7 +19,7 @@ if (expectedAppVersion !== expectedSwVersion) {
 }
 const expectedSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
 if (expectedSha && !/^[0-9a-f]{40}$/.test(expectedSha)) {
-  throw new Error("BC_EXPECTED_RELEASE_SHA must be a full 40-character commit SHA.");
+  throw new Error("BC_EXPECTED_RELEASE_SHA must be a full 40-character git SHA.");
 }
 const baseUrl = "https://battlecruiser.robvg9.workers.dev";
 const PROVENANCE_RE = /BC_RELEASE_SOURCE_SHA=([0-9a-f]{40});\s*BC_RELEASE_APP_VERSION=([^;\s]+);\s*BC_RELEASE_SERVICE_WORKER_VERSION=([^;\s]+);\s*BC_RELEASE_WORKFLOW_RUN_ID=(\d+)/;
@@ -39,7 +38,7 @@ function describeError(error) {
 }
 function requestWithHttps(url) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }, (res) => {
+    const req = https.get(url, { headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }, agent: false }, (res) => {
       let body = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => { body += chunk; });
@@ -59,6 +58,7 @@ async function requestWithFetch(url) {
     const res = await fetch(url, {
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
       signal: controller.signal,
+      cache: "no-store",
     });
     if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
     return await res.text();
@@ -82,7 +82,12 @@ async function request(url) {
 }
 function readProvenance(source, assetName) {
   const match = String(source).match(PROVENANCE_RE);
-  if (!match) throw new Error("LIVE " + assetName + " is missing valid embedded release provenance.");
+  if (!match) {
+    const markerIndex = String(source).indexOf("BC_RELEASE_SOURCE_SHA=");
+    const tail = String(source).slice(-400).replace(/\s+/g, " ");
+    throw new Error("LIVE " + assetName + " is missing valid embedded release provenance (markerIndex="
+      + markerIndex + ", tail=" + tail + ").");
+  }
   return {
     source_sha: match[1].toLowerCase(),
     app_version: match[2],
@@ -92,7 +97,8 @@ function readProvenance(source, assetName) {
 }
 async function verifyOnce(attempt) {
   const stamp = Date.now() + "-" + attempt;
-  const [liveApp, liveSw] = await Promise.all([
+  const [liveIndex, liveApp, liveSw] = await Promise.all([
+    request(baseUrl + "/index.html?bc_verify=" + stamp + "-index"),
     request(baseUrl + "/app.js?bc_verify=" + stamp + "-app"),
     request(baseUrl + "/service-worker.js?bc_verify=" + stamp + "-sw"),
   ]);
@@ -106,19 +112,15 @@ async function verifyOnce(attempt) {
   if (liveSwMatch[1] !== expectedSwVersion) {
     throw new Error("LIVE Service Worker mismatch: expected " + expectedSwVersion + ", got " + liveSwMatch[1]);
   }
-  const appRelease = readProvenance(liveApp, "app.js");
-  const swRelease = readProvenance(liveSw, "service-worker.js");
-  if (JSON.stringify(appRelease) !== JSON.stringify(swRelease)) {
-    throw new Error("LIVE app and Service Worker provenance disagree: " + JSON.stringify({appRelease, swRelease}));
+  const release = readProvenance(liveIndex, "index.html");
+  if (release.app_version !== expectedAppVersion || release.service_worker_version !== expectedSwVersion) {
+    throw new Error("LIVE embedded release versions mismatch: " + JSON.stringify({release, expectedAppVersion, expectedSwVersion}));
   }
-  if (appRelease.app_version !== expectedAppVersion || appRelease.service_worker_version !== expectedSwVersion) {
-    throw new Error("LIVE embedded release versions mismatch: " + JSON.stringify({appRelease, expectedAppVersion, expectedSwVersion}));
-  }
-  if (expectedSha && appRelease.source_sha !== expectedSha) {
-    throw new Error("LIVE source SHA mismatch: expected " + expectedSha + ", got " + appRelease.source_sha);
+  if (expectedSha && release.source_sha !== expectedSha) {
+    throw new Error("LIVE source SHA mismatch: expected " + expectedSha + ", got " + release.source_sha);
   }
   console.log("[production-release] PASS — app=" + expectedAppVersion + ", service-worker=" + expectedSwVersion
-    + ", source_sha=" + appRelease.source_sha + ", workflow_run_id=" + appRelease.workflow_run_id);
+    + ", source_sha=" + release.source_sha + ", workflow_run_id=" + release.workflow_run_id);
   if (expectedSha) console.log("[production-release] EXACT_SHA=PASS");
   else console.log("[production-release] SHA observed; exact comparison omitted for manual dispatch.");
 }
