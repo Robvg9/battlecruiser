@@ -13,7 +13,15 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
         <div id="bc-m42-top-products"></div><span id="bc-m42-top-note"></span>
         <button type="button" id="bc-m42-open-details">Ver todos</button>
       </div>
-      <section class="bc-m45-quick"><button class="bc-m45-quick-btn" data-rep="ventas">Ventas</button></section>
+      <section class="bc-m45-quick">
+        <button class="bc-m45-quick-btn" data-rep="ventas">Ventas</button>
+        <button class="bc-m45-quick-btn" data-rep="compras">Compras</button>
+        <button class="bc-m45-quick-btn" data-rep="rentabilidad">Rentabilidad</button>
+        <button class="bc-m45-quick-btn" data-rep="transferencias">Transferencias</button>
+        <button class="bc-m45-quick-btn" data-rep="vales">Vales</button>
+        <button class="bc-m45-quick-btn" data-rep="stock">Stock</button>
+        <button class="bc-m45-quick-btn" data-rep="movimiento">Movimiento</button>
+      </section>
       <div class="bc-m42-detail"><summary>Información detallada</summary><div class="bc-m42-detail-body">
         <div class="bc-m42-filters" id="reportes-filtros">
           <label>Desde<input type="date" id="rep-filtro-desde"></label>
@@ -23,7 +31,15 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
           <button type="button" id="rep-limpiar-btn">Limpiar</button>
         </div>
         <div class="cc-bloque"><h3>Reportes detallados</h3>
-          <div class="rep-tabs"><button class="rep-tab-btn active" data-rep="ventas">Ventas</button><button class="rep-tab-btn" data-rep="compras">Compras</button></div>
+          <div class="rep-tabs">
+            <button class="rep-tab-btn active" data-rep="ventas">Ventas</button>
+            <button class="rep-tab-btn" data-rep="compras">Compras</button>
+            <button class="rep-tab-btn" data-rep="rentabilidad">Rentabilidad</button>
+            <button class="rep-tab-btn" data-rep="transferencias">Transferencias</button>
+            <button class="rep-tab-btn" data-rep="vales">Vales</button>
+            <button class="rep-tab-btn" data-rep="stock">Stock</button>
+            <button class="rep-tab-btn" data-rep="movimiento">Movimiento</button>
+          </div>
           <div id="rep-detalle" class="lista"></div><div id="rep-paginacion"></div>
         </div>
       </div></div>
@@ -45,6 +61,15 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
       { producto: "Masareal", unidades: 2, ingresos: 400, ventas: 2, ganancia_conocida: null, lineas_con_costo: 0, lineas_sin_costo: 2 }
     ] };
   } };
+  const selectedTabs = [];
+  window.document.querySelectorAll(".rep-tab-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      selectedTabs.push(button.dataset.rep);
+      window.document.querySelectorAll(".rep-tab-btn").forEach(other => {
+        other.classList.toggle("active", other === button);
+      });
+    });
+  });
   const script = window.document.createElement("script");
   script.textContent = fs.readFileSync(path.join(__dirname, "..", "public", "js", "m73-reportes-ux-modal.js"), "utf8");
   window.document.body.appendChild(script);
@@ -90,5 +115,20 @@ test("M73 reportes: siete días por defecto, ranking agregado y modales sin scro
   const close = modal.querySelector(".bc-m73-modal-close");
   close.click();
   assert.ok(modal.hidden, "modal can be closed");
+
+  // Quick-action controls are distinct from the internal tabs. Exercise all
+  // seven routes, including Vales, and ensure each selects the matching tab.
+  for (const report of ["ventas", "compras", "rentabilidad", "transferencias", "vales", "stock", "movimiento"]) {
+    const quick = window.document.querySelector('.bc-m45-quick-btn[data-rep="' + report + '"]');
+    assert.ok(quick, "quick action exists for " + report);
+    assert.equal(quick.getAttribute("aria-haspopup"), "dialog", "quick action declares dialog behavior: " + report);
+    quick.click();
+    await new Promise(resolve => window.setTimeout(resolve, 10));
+    assert.ok(!modal.hidden, "quick action opens the detail modal: " + report);
+    assert.equal(modal.querySelector(".rep-tab-btn.active")?.dataset.rep, report, "quick action selects the matching report: " + report);
+    assert.ok(selectedTabs.includes(report), "matching report-tab click was dispatched: " + report);
+    close.click();
+    assert.ok(modal.hidden, "the modal closes after the case: " + report);
+  }
   dom.window.close();
 });
