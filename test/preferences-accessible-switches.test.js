@@ -27,7 +27,7 @@ test("preference switch buttons expose accessible names and descriptions", () =>
 test("aria-checked switch state stays synchronized with saved local preference values", () => {
   assert.ok(source.includes("control.checked = enabled;"));
   assert.ok(source.includes('control.setAttribute("aria-checked", enabled ? "true" : "false");'));
-  assert.ok(source.includes('var checked = input.getAttribute("aria-checked") !== "true";'));
+  assert.ok(source.includes("var checked = !!input.checked;"));
   assert.ok(source.includes("prefs[key] = checked;"));
 });
 
