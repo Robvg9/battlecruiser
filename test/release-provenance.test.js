@@ -87,6 +87,9 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.doesNotMatch(liveOfflineE2e, /fetchText\(BASE_URL \+ "\/" \+ releaseFilename/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_DEPLOY_RUN_ID/);
+  assert.match(liveOfflineE2e, /const maxAttempts = isProductionBase && isMainJs \? 30 : 4/);
+  assert.match(liveOfflineE2e, /timeoutMs = 20000/);
+  assert.match(liveOfflineE2e, /isProductionBase \? 20000 : 35000/);
   assert.match(quality, /needs: \[deploy-pr-preview, quality\]/);
   assert.match(quality, /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.conclusion == 'success'/);
 });
