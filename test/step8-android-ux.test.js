@@ -33,8 +33,12 @@ test("Mobile footer stays in document flow and respects safe-area/real viewport 
 
 test("Mobile controls are reachable, readable and support visible keyboard focus", () => {
   const step8 = css.slice(css.lastIndexOf("STEP 8 — Android UX guardrails"));
+  assert.match(step8, /body:has\(#app-shell\.visible\) button/);
+  assert.match(step8, /body:has\(#app-shell\.visible\) input:not\(\[type="checkbox"\]\)/);
   assert.match(step8, /min-height:\s*44px/);
   assert.match(step8, /font-size:\s*16px\s*!important/);
+  assert.doesNotMatch(step8, /^\s*button,\s*$/m, "touch-target floor must not inflate compact unauthenticated login controls");
+  assert.match(css, /@media \(max-height: 480px\) and \(orientation: landscape\)[\s\S]*?#login-form:not\(\.hidden\) input \{[^}]*font-size: 12px/s);
   assert.match(step8, /:focus-visible/);
   assert.match(step8, /scroll-margin-block:\s*12px/);
   assert.match(step8, /prefers-reduced-motion:\s*reduce/);
