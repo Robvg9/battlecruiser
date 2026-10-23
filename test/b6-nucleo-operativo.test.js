@@ -265,6 +265,15 @@ function perfil(permisos = ["compras", "ventas", "transferencias", "vales", "rep
   };
 }
 
+async function esperarUsuarioOperativo(window) {
+  const listo = await esperarHastaAsync(async () => {
+    if (typeof window._usuarioActual !== "function" || typeof window.usuarioPuedeOperar !== "function") return false;
+    const usuario = window._usuarioActual();
+    return Boolean(usuario && usuario.id === "u-test" && await window.usuarioPuedeOperar());
+  }, 5000, 10);
+  assert.ok(listo, "el contexto del usuario activo debe estar listo antes de simular modo offline");
+}
+
 // ============================================================
 // PRUEBAS — LÓGICA DE NEGOCIO (FIFO, COSTOS, MARGEN)
 // ============================================================
@@ -462,7 +471,7 @@ test("B6.16: doble sincronización no ejecuta dos veces (mutex _sincronizando)",
 test("B6.17: error de red encola la operación (no error de negocio)", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(80);
+  await esperarUsuarioOperativo(window);
   // Simular: el RPC lanza (como un fetch rechazado).
   const originalRpc = window.supabase.createClient;
   // Forzar offline para encolar directamente.
@@ -475,7 +484,7 @@ test("B6.17: error de red encola la operación (no error de negocio)", async () 
 test("B6.18: reintento conserva la misma idempotency_key", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(80);
+  await esperarUsuarioOperativo(window);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const r = await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 });
   const keyOriginal = r.operacion.idempotency_key;
@@ -488,7 +497,7 @@ test("B6.18: reintento conserva la misma idempotency_key", async () => {
 test("B6.19: operación offline sobrevive cierre/reapertura de la cola", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(80);
+  await esperarUsuarioOperativo(window);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   const r = await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 });
   assert.ok(r && r.ok && r.offline && r.operacion && r.operacion.id, "operación offline confirmada para persistencia");
