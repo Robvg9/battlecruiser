@@ -225,6 +225,11 @@ function crearContexto() {
   script.textContent = appJs;
   document.body.appendChild(script);
 
+  // This suite tests form validation/payloads, not stock refresh side effects.
+  // Prevent background warehouse stock refreshes from outliving a JSDOM test context.
+  window.cargarStockAlmacenes = async () => [];
+  window.refrescarStockYSelects = async () => ({});
+
   const shell = document.getElementById("app-shell");
   if (shell) shell.classList.add("visible");
 
