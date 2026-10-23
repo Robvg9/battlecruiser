@@ -57,6 +57,8 @@ test("deploy writes and smoke-tests the unique current release manifest", () => 
   assert.match(deploy, /release-\$GITHUB_SHA\.json/);
   assert.match(deploy, /BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS/);
   assert.match(deploy, /workflow_run_id/);
+  assert.match(deploy, /BC_SW_VERSION\\s\*=\\s\*"/);
+  assert.doesNotMatch(deploy, /BC_SW_VERSION\\\\s\*=\\\\s\*"/);
 });
 
 test("post-deploy Quality compares the content-addressed manifest with workflow_run.head_sha", () => {
