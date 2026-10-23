@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.15 — jornada única, inventario físico y cierre
+// v9.5.16 — UX Android: viewport seguro, foco y controles táctiles
 (function hotfixV9475(){
-  const VERSION="9.5.15";
+  const VERSION="9.5.16";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
