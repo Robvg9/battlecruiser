@@ -129,8 +129,8 @@ jobs:
           exit 1
 
   live-offline-e2e:
-    needs: [deploy-pr-preview]
-    if: ${{ always() && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && (github.event_name != 'pull_request' || needs.deploy-pr-preview.result == 'success') }}
+    needs: [deploy-pr-preview, quality]
+    if: ${{ always() && needs.quality.result == 'success' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') && (github.event_name != 'pull_request' || needs.deploy-pr-preview.result == 'success') }}
     name: LIVE offline recovery — Chromium
     runs-on: ubuntu-latest
     timeout-minutes: 12
