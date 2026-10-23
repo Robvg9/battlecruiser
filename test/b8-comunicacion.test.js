@@ -298,17 +298,38 @@ test("B8.17: conversación vinculada a responsabilidad", () => {
 // PRUEBAS — PERMISOS, OFFLINE, AUDITORÍA, INTEGRIDAD
 // ============================================================
 
-test("B8.18: usuario sin permiso comunicacion.ver no ve la pestaña", async () => {
-  const { window, document } = montarEntorno({
+test("B8.18: sin comunicacion.ver la pestaña de inspección no expone conversaciones ni lecturas protegidas", async () => {
+  const { window, document, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "ventas", accion: "ver" }],
   });
   marcarOnline(window);
   await esperar(120);
-  const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
-  assert.ok(btn.style.display === "none" || btn.classList.contains("hidden"), "Comunicación oculta sin permiso");
-});
 
+  const btn = document.querySelector('.tab-btn[data-tab="comunicacion"]');
+  assert.ok(btn, "la ruta lógica de Comunicación sigue declarada");
+  // El contrato vigente permite inspeccionar la sección; lectura/datos se
+  // deben bloquear en la capa de permisos y no por esconder la pestaña.
+  assert.ok(btn.style.display !== "none" && !btn.classList.contains("hidden"),
+    "la pestaña de inspección se mantiene visible según la política de navegación");
+  assert.equal(window.tienePermiso("comunicacion", "ver"), false,
+    "el perfil no recibe permiso de lectura de Comunicación");
+
+  const list = document.getElementById("lista-conversaciones");
+  assert.ok(list, "la superficie protegida de conversaciones debe existir");
+  client.__rpcCalls.length = 0;
+  await window.refrescarComunicacion();
+  assert.match(list.textContent, /No tenés permiso para ver comunicación/i,
+    "la superficie explica que la lectura no está autorizada");
+  const protectedReads = client.__rpcCalls.filter(call => [
+    "listar_conversaciones_usuario",
+    "contar_no_leidos_global",
+    "listar_mensajes_conversacion",
+    "listar_usuarios_para_chat",
+  ].includes(call.nombre));
+  assert.deepEqual(protectedReads, [],
+    "el usuario sin permiso no provoca lecturas de conversaciones ni sus metadatos");
+});
 test("B8.19: usuario inactivo no puede enviar mensaje", async () => {
   const { window } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Inactivo", activo: false, role_id: "r2", rol: "Dep" }],
