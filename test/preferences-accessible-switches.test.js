@@ -16,33 +16,33 @@ const serviceWorker = fs.readFileSync(path.join(ROOT, "public/service-worker.js"
 const appSource = fs.readFileSync(path.join(ROOT, "public/app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(ROOT, "public/index.html"), "utf8");
 
-test("preference inputs use native checkbox state with accessible names and descriptions", () => {
-  assert.ok(source.includes("input type=" + escapedQuote + "checkbox" + escapedQuote + " role=" + escapedQuote + "switch" + escapedQuote + " id=" + escapedQuote));
+test("preference switch buttons expose accessible names and descriptions", () => {
+  assert.ok(source.includes("button type=" + escapedQuote + "button" + escapedQuote + " class=" + escapedQuote + "cfg-aj-toggle" + escapedQuote + " role=" + escapedQuote + "switch" + escapedQuote + " id=" + escapedQuote));
   assert.ok(source.includes("aria-label=" + escapedQuote));
   assert.ok(source.includes("aria-describedby=" + escapedQuote));
   assert.ok(source.includes("role=" + escapedQuote + "switch" + escapedQuote));
   assert.ok(source.includes("aria-checked=" + escapedQuote + "false" + escapedQuote));
 });
 
-test("native checked property stays synchronized with saved local preference values", () => {
-  assert.ok(source.includes("input.checked = !!prefs[mapping[id]]"));
-  assert.ok(source.includes("prefs[key] = input.checked"));
-  assert.ok(source.includes('input.setAttribute("aria-checked", input.checked ? "true" : "false");'));
+test("aria-checked switch state stays synchronized with saved local preference values", () => {
+  assert.ok(source.includes('control.setAttribute("aria-checked", enabled ? "true" : "false");'));
+  assert.ok(source.includes('var checked = input.getAttribute("aria-checked") !== "true";'));
+  assert.ok(source.includes("prefs[key] = checked;"));
 });
 
-test("accessible textual option state follows the native checked property on load and change", () => {
+test("accessible textual option state follows the saved switch state on load and change", () => {
   assert.ok(source.includes('"-help " + id + "-state'));
   assert.ok(source.includes("Estado de la opción: desactivada.</span>"));
-  assert.ok(source.includes('function updateToggleState(id, input)'));
-  assert.ok(source.includes('state.textContent = "Estado de la opción: " + (input.checked ? "activada." : "desactivada.");'));
-  assert.equal(source.split("updateToggleState(id, input);").length - 1, 2);
+  assert.ok(source.includes('function updateToggleState(id, control, checked)'));
+  assert.ok(source.includes('state.textContent = "Estado de la opción: " + (enabled ? "activada." : "desactivada.");'));
+  assert.equal(source.split("updateToggleState(id, input,").length - 1, 2);
   assert.ok(source.includes(".cfg-aj-sr-only{position:absolute"));
 });
 
 test("toggle appearance retains a real accessible hit target and keyboard focus", () => {
-  assert.ok(source.includes(".cfg-aj-toggle input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}"));
-  assert.ok(source.includes(".cfg-aj-toggle span{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;cursor:pointer;pointer-events:none}"));
-  assert.ok(source.includes(".cfg-aj-toggle input:focus-visible+span{outline:2px solid var(--gold-bright);outline-offset:3px}"));
+  assert.ok(source.includes(".cfg-aj-toggle:focus-visible span{outline:2px solid var(--gold-bright);outline-offset:3px}"));
+  assert.ok(source.includes('.cfg-aj-toggle[aria-checked=' + escapedQuote + 'true' + escapedQuote + '] span:before{transform:translateX(20px)}'));
+  assert.ok(source.includes('.cfg-aj-toggle[aria-checked=' + escapedQuote + 'true' + escapedQuote + '] span{background:rgba(201,162,77,.55)}'));
 });
 
 test("all six preference inputs remain connected to their existing preference keys", () => {
@@ -79,8 +79,7 @@ test("switch semantics and aria-checked follow the saved state and user changes"
     assert.equal(enabledByDefault.getAttribute("aria-checked"), "true");
     assert.equal(disabledByDefault.getAttribute("aria-checked"), "false");
 
-    disabledByDefault.checked = true;
-    disabledByDefault.dispatchEvent(new window.Event("change", { bubbles: true }));
+    disabledByDefault.click();
 
     assert.equal(disabledByDefault.getAttribute("aria-checked"), "true");
     assert.match(
@@ -123,10 +122,8 @@ test("theme buttons and Restore Preferences persist then reset isolated preferen
 
     const wifi = window.document.getElementById("cfg-aj-sync-wifi");
     const compact = window.document.getElementById("cfg-aj-compact");
-    wifi.checked = true;
-    wifi.dispatchEvent(new window.Event("change", { bubbles: true }));
-    compact.checked = true;
-    compact.dispatchEvent(new window.Event("change", { bubbles: true }));
+    wifi.click();
+    compact.click();
     const changed = JSON.parse(window.localStorage.getItem("bc-ui-preferences-v2"));
     assert.equal(changed.syncWifiOnly, true, "isolated test preference can be changed");
     assert.equal(changed.compacto, true, "isolated compact preference can be changed");
@@ -144,9 +141,8 @@ test("theme buttons and Restore Preferences persist then reset isolated preferen
       appearance: "dark",
     }, "Restore Preferences resets the complete isolated preference set to defaults");
     assert.ok(window.document.body.classList.contains("bc-theme-dark"), "restoring defaults applies dark appearance");
-    assert.equal(wifi.getAttribute("aria-checked"), "false", "reset synchronizes native switch state");
-    assert.equal(wifi.checked, false);
-    assert.equal(compact.checked, false);
+    assert.equal(wifi.getAttribute("aria-checked"), "false", "reset synchronizes switch state");
+    assert.equal(compact.getAttribute("aria-checked"), "false", "reset synchronizes compact state");
     assert.match(window.document.getElementById("cfg-pref-status").textContent, /Preferencias restauradas/);
   } finally {
     window.close();
@@ -155,15 +151,15 @@ test("theme buttons and Restore Preferences persist then reset isolated preferen
 
 test("PWA deployment invalidates the cached switch script and keeps shell versions aligned", () => {
   const resource = "configuracion-ajustes-migrados-20260903.js";
-  assert.ok(loader.includes(resource + "?v=5"));
-  assert.ok(serviceWorker.includes("./js/" + resource + "?v=5"));
-  assert.ok(!loader.includes(resource + "?v=4"));
-  assert.ok(!serviceWorker.includes(resource + "?v=4"));
+  assert.ok(loader.includes(resource + "?v=6"));
+  assert.ok(serviceWorker.includes("./js/" + resource + "?v=6"));
+  assert.ok(!loader.includes(resource + "?v=5"));
+  assert.ok(!serviceWorker.includes(resource + "?v=5"));
   const appVersion = appSource.match(/const VERSION="([^"]+)"/);
   const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "app version must be detectable");
   assert.ok(workerVersion, "service-worker version must be detectable");
-  assert.equal(appVersion[1], "9.5.12");
+  assert.equal(appVersion[1], "9.5.13");
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));
