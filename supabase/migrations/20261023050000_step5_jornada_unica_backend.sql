@@ -820,6 +820,168 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.bc5_iniciar_jornada(
+  p_turno_sesion_id uuid,
+  p_motivo_excepcion text DEFAULT NULL
+)
+RETURNS public.turno_tramos
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_sesion public.turno_sesiones;
+  v_programacion public.turno_jornada_programacion;
+  v_asignacion public.turno_asignaciones;
+  v_tramo public.turno_tramos;
+  v_turno public.turnos;
+  v_local timestamp without time zone;
+  v_ahora_minuto time;
+  v_anterior public.turno_sesiones;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO v_sesion FROM public.turno_sesiones
+  WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND OR v_sesion.bloque<>'JORNADA' OR v_sesion.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'No es una sesión de jornada única válida.' USING ERRCODE = '23503';
+  END IF;
+  SELECT * INTO v_programacion FROM public.turno_jornada_programacion
+  WHERE id=v_sesion.jornada_programacion_id FOR SHARE;
+  IF NOT FOUND OR v_programacion.estado<>'PROGRAMADA' OR NOT v_programacion.trabaja THEN
+    RAISE EXCEPTION 'La jornada no está programada para trabajar.' USING ERRCODE = '23514';
+  END IF;
+  SELECT * INTO v_turno FROM public.turnos WHERE id=v_sesion.turno_id FOR UPDATE;
+  IF NOT FOUND OR coalesce(v_turno.estado_maestro,v_turno.estado) NOT IN ('PROGRAMADO','EN_CURSO') THEN
+    RAISE EXCEPTION 'El Turno no está disponible para iniciar.' USING ERRCODE = '23514';
+  END IF;
+  SELECT * INTO v_asignacion FROM public.turno_asignaciones
+  WHERE turno_sesion_id=v_sesion.id AND usuario_id=auth.uid() AND retirado_at IS NULL
+  ORDER BY asignado_at DESC NULLS LAST,created_at DESC NULLS LAST LIMIT 1;
+  IF NOT FOUND OR v_asignacion.usuario_id IS DISTINCT FROM v_programacion.responsable_id THEN
+    RAISE EXCEPTION 'Solo el responsable actual programado puede iniciar esta jornada.' USING ERRCODE = '42501';
+  END IF;
+  IF v_sesion.estado NOT IN ('PENDIENTE','PROGRAMADA') THEN
+    RAISE EXCEPTION 'La jornada no está disponible para iniciar (estado: %).',v_sesion.estado
+      USING ERRCODE = '23514';
+  END IF;
+  v_local := now() AT TIME ZONE v_programacion.zona_horaria;
+  v_ahora_minuto := date_trunc('minute',v_local)::time;
+  IF v_local::date <> v_programacion.fecha THEN
+    RAISE EXCEPTION 'Esta jornada solo puede abrirse en la fecha local programada (%).',v_programacion.fecha
+      USING ERRCODE = '23514';
+  END IF;
+  IF v_ahora_minuto <> v_programacion.hora_inicio_prevista
+     AND trim(coalesce(p_motivo_excepcion,'')) = '' THEN
+    RAISE EXCEPTION 'Apertura anticipada o tardía: debe registrar un motivo antes de iniciar.'
+      USING ERRCODE = '23514';
+  END IF;
+  SELECT * INTO v_anterior FROM public.turno_sesiones s
+  WHERE s.turno_id=v_sesion.turno_id AND s.id<>v_sesion.id
+    AND s.numero_dia<v_sesion.numero_dia
+    AND s.estado NOT IN ('COMPLETADA','CANCELADA')
+  ORDER BY s.numero_dia DESC LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'No puede abrirse la jornada: el día operativo anterior sigue sin completar.'
+      USING ERRCODE = '23514';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.turno_tramos t
+      WHERE t.turno_sesion_id=v_sesion.id AND t.estado='ACTIVO') THEN
+    RAISE EXCEPTION 'La jornada ya tiene un tramo activo.' USING ERRCODE = '23505';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.turno_tramos t WHERE t.usuario_id=auth.uid() AND t.estado='ACTIVO') THEN
+    RAISE EXCEPTION 'La persona ya tiene otra jornada o sesión activa.' USING ERRCODE = '23505';
+  END IF;
+  INSERT INTO public.turno_tramos(turno_sesion_id,turno_id,usuario_id,tipo,estado)
+  VALUES (v_sesion.id,v_sesion.turno_id,auth.uid(),'NORMAL','ACTIVO')
+  RETURNING * INTO v_tramo;
+  UPDATE public.turno_sesiones SET estado='EN_CURSO',updated_at=now() WHERE id=v_sesion.id;
+  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',
+    apertura_real=coalesce(apertura_real,now()),actualizado_en=now()
+  WHERE id=v_sesion.turno_id;
+  INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo,payload)
+  VALUES (v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),
+    CASE WHEN v_ahora_minuto=v_programacion.hora_inicio_prevista
+      THEN 'JORNADA_INICIADA' ELSE 'JORNADA_INICIADA_CON_EXCEPCION' END,
+    jsonb_build_object('hora_programada',v_programacion.hora_inicio_prevista,
+      'hora_real',v_ahora_minuto,'zona_horaria',v_programacion.zona_horaria,
+      'motivo',nullif(trim(p_motivo_excepcion),'')));
+  INSERT INTO public.turno_jornada_eventos
+    (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES (v_programacion.almacen_id,v_programacion.id,auth.uid(),
+    CASE WHEN v_ahora_minuto=v_programacion.hora_inicio_prevista
+      THEN 'JORNADA_INICIADA' ELSE 'JORNADA_INICIADA_CON_EXCEPCION' END,
+    nullif(trim(p_motivo_excepcion),''),
+    jsonb_build_object('estado_sesion',v_sesion.estado),
+    jsonb_build_object('estado_sesion','EN_CURSO','tramo_id',v_tramo.id,'hora_real',v_ahora_minuto));
+  RETURN v_tramo;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.bc5_cerrar_jornada(
+  p_turno_sesion_id uuid,
+  p_motivo_excepcion text DEFAULT NULL
+)
+RETURNS public.turno_sesiones
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_sesion public.turno_sesiones;
+  v_programacion public.turno_jornada_programacion;
+  v_local timestamp without time zone;
+  v_ahora_minuto time;
+  v_result public.turno_sesiones;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO v_sesion FROM public.turno_sesiones
+  WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND OR v_sesion.bloque<>'JORNADA' OR v_sesion.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'No es una sesión de jornada única válida.' USING ERRCODE = '23503';
+  END IF;
+  SELECT * INTO v_programacion FROM public.turno_jornada_programacion
+  WHERE id=v_sesion.jornada_programacion_id FOR SHARE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Programación de jornada no encontrada.' USING ERRCODE = '23503'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.turno_asignaciones a
+    WHERE a.turno_sesion_id=v_sesion.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL) THEN
+    RAISE EXCEPTION 'Solo el responsable asignado puede cerrar esta jornada.' USING ERRCODE = '42501';
+  END IF;
+  IF v_sesion.estado<>'EN_CURSO' THEN
+    RAISE EXCEPTION 'La jornada no está en curso.' USING ERRCODE = '23514';
+  END IF;
+  v_local := now() AT TIME ZONE v_programacion.zona_horaria;
+  v_ahora_minuto := date_trunc('minute',v_local)::time;
+  IF (v_local::date<>v_programacion.fecha OR v_ahora_minuto<>v_programacion.hora_fin_prevista)
+     AND trim(coalesce(p_motivo_excepcion,'')) = '' THEN
+    RAISE EXCEPTION 'Cierre anticipado o tardío: debe registrar un motivo antes de cerrar.'
+      USING ERRCODE = '23514';
+  END IF;
+  -- Preserve the established declaration/approval rules: this RPC still requires the
+  -- real money declaration and lets the existing canonical close transition do the state change.
+  v_result := public.bc_cerrar_turno_sesion(p_turno_sesion_id);
+  INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,actor_user_id,tipo,payload)
+  VALUES (v_sesion.turno_id,v_sesion.id,auth.uid(),
+    CASE WHEN v_local::date=v_programacion.fecha AND v_ahora_minuto=v_programacion.hora_fin_prevista
+      THEN 'JORNADA_CERRADA' ELSE 'JORNADA_CERRADA_CON_EXCEPCION' END,
+    jsonb_build_object('hora_programada',v_programacion.hora_fin_prevista,
+      'hora_real',v_ahora_minuto,'fecha_real',v_local::date,
+      'zona_horaria',v_programacion.zona_horaria,'motivo',nullif(trim(p_motivo_excepcion),'')));
+  INSERT INTO public.turno_jornada_eventos
+    (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES (v_programacion.almacen_id,v_programacion.id,auth.uid(),
+    CASE WHEN v_local::date=v_programacion.fecha AND v_ahora_minuto=v_programacion.hora_fin_prevista
+      THEN 'JORNADA_CERRADA' ELSE 'JORNADA_CERRADA_CON_EXCEPCION' END,
+    nullif(trim(p_motivo_excepcion),''),
+    jsonb_build_object('estado_sesion',v_sesion.estado),
+    jsonb_build_object('estado_sesion',v_result.estado,'fecha_real',v_local::date,'hora_real',v_ahora_minuto));
+  RETURN v_result;
+END;
+$function$;
+
 -- The new tables are never directly writable/readable through the Data API.
 -- Use the SECURITY DEFINER RPCs above; RLS remains enabled as defense-in-depth.
 ALTER TABLE public.turno_jornada_configuracion ENABLE ROW LEVEL SECURITY;
@@ -844,6 +1006,8 @@ REVOKE ALL ON FUNCTION public.bc5_crear_jornada_unica(uuid,date,integer,jsonb,te
 REVOKE ALL ON FUNCTION public.bc5_reprogramar_jornada(uuid,boolean,uuid,text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.bc5_listar_patrones_jornada(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.bc5_obtener_programacion_jornada(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.bc5_iniciar_jornada(uuid,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.bc5_cerrar_jornada(uuid,text) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.bc5_configurar_horario_jornada(uuid,time,time,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_obtener_configuracion_jornada(uuid) TO authenticated;
@@ -853,5 +1017,7 @@ GRANT EXECUTE ON FUNCTION public.bc5_crear_jornada_unica(uuid,date,integer,jsonb
 GRANT EXECUTE ON FUNCTION public.bc5_reprogramar_jornada(uuid,boolean,uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_listar_patrones_jornada(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc5_obtener_programacion_jornada(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc5_iniciar_jornada(uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc5_cerrar_jornada(uuid,text) TO authenticated;
 
 COMMIT;
