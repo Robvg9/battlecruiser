@@ -103,9 +103,18 @@ BEGIN
       ORDER BY t.inicio_at DESC NULLS LAST,t.created_at DESC NULLS LAST LIMIT 1
     ),
     'declaracion_dinero',(
-      SELECT jsonb_build_object('id',d.id,'monto',d.monto,'estado_aprobacion',d.estado_aprobacion,'declarado_at',d.declarado_at)
+      SELECT jsonb_build_object('id',d.id,'turno_tramo_id',d.turno_tramo_id,'monto',d.monto,
+        'estado_aprobacion',d.estado_aprobacion,'declarado_at',d.declarado_at)
       FROM public.turno_declaraciones d
       WHERE d.turno_sesion_id=v_s.id
+        AND d.turno_tramo_id=coalesce(
+          (SELECT t.id FROM public.turno_tramos t
+           WHERE t.turno_sesion_id=v_s.id AND t.estado='ACTIVO'
+           ORDER BY t.inicio_at DESC NULLS LAST,t.created_at DESC NULLS LAST LIMIT 1),
+          (SELECT t.id FROM public.turno_tramos t
+           WHERE t.turno_sesion_id=v_s.id
+           ORDER BY t.inicio_at DESC NULLS LAST,t.created_at DESC NULLS LAST LIMIT 1)
+        )
       ORDER BY d.declarado_at DESC NULLS LAST,d.created_at DESC NULLS LAST LIMIT 1
     )
   ) INTO v_result;
