@@ -398,6 +398,15 @@
     }
     if(!users().length)setStatus('Acceso verificado. La lista local de usuarios aún no está cargada; las asignaciones seguirán validadas en servidor.','');
     if($('bc7-warehouse'))$('bc7-warehouse').addEventListener('change',loadHours);
+    // Catalog caches may finish loading just after auth/UI boot. Refresh their labels without changing any user selection.
+    const refreshCatalogs=()=>{
+      fillWarehouses();
+      document.querySelectorAll('#bc7-day-rows [data-bc7-person],#bc7-schedule-list [data-bc7-reperson]').forEach(sel=>{
+        const value=sel.value;sel.innerHTML=staffOptions(value);
+        if(value)sel.value=value;
+      });
+    };
+    setTimeout(refreshCatalogs,700);setTimeout(refreshCatalogs,1800);
     const listFrom=$('bc7-list-from');if(listFrom)listFrom.addEventListener('change',()=>{state.lastPreview=null;});
     await loadCalendar();
     window.addEventListener('online',()=>setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok'));
