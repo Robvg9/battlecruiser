@@ -285,9 +285,14 @@ BEGIN
     RAISE EXCEPTION 'No tienes permiso para registrar este tipo de ajuste.' USING ERRCODE='42501';
   END IF;
 
+  -- A duplicate network submission returns the original request and does not duplicate audit events.
   IF v_tipo='merma' THEN
+    SELECT id INTO v_id FROM public.mermas WHERE idempotency_key=p_idempotency_key AND creado_por=v_uid;
+    IF v_id IS NOT NULL THEN RETURN v_id; END IF;
     v_id:=public.crear_merma(v_s.almacen_id,p_producto_id,p_cantidad,btrim(p_motivo),NULL,v_s.id,p_idempotency_key);
   ELSE
+    SELECT id INTO v_id FROM public.bajas WHERE idempotency_key=p_idempotency_key AND creado_por=v_uid;
+    IF v_id IS NOT NULL THEN RETURN v_id; END IF;
     v_id:=public.crear_baja(v_s.almacen_id,p_producto_id,p_cantidad,btrim(p_motivo),NULL,v_s.id,p_idempotency_key);
   END IF;
   INSERT INTO public.turno_jornada_eventos
