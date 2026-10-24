@@ -72,7 +72,7 @@ jobs:
           set "NODE_OPTIONS="
 
       # Pull requests have not been deployed yet, so production must still serve the base release.
-      # workflow_dispatch and workflow_run both verify the exact deployed version.
+      # Keep release provenance verification post-deploy only.
       - name: Download LIVE-verified release manifest from the deploy run
         if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
@@ -91,22 +91,11 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
-  deploy-pr-preview:
-    if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 10
-    steps:
-      - name: Checkout PR source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
-
-      - name: Install Wrangler
-        shell: cmd
-        run: npm.cmd install --global wrangler@4.149.0
-
+      # Run preview deployment and browser E2E in this same self-hosted job.
+      # Splitting these into more jobs caused the single local runner to leave
+      # the dependent jobs queued after Quality had completed.
       - name: Deploy isolated PR preview
+        if: github.event_name == 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
@@ -114,10 +103,11 @@ jobs:
         run: |
           if not defined CLOUDFLARE_API_TOKEN exit /b 1
           if not defined BC_PREVIEW_NAME exit /b 1
-          wrangler.cmd deploy --config wrangler.toml --name "%BC_PREVIEW_NAME%"
+          node_modules\.bin\wrangler.cmd deploy --config wrangler.toml --name "%BC_PREVIEW_NAME%"
           if errorlevel 1 exit /b 1
 
       - name: Wait for isolated preview assets
+        if: github.event_name == 'pull_request'
         env:
           BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
         shell: pwsh
@@ -147,38 +137,13 @@ jobs:
           }
           throw "Preview assets failed to respond or versions did not align within 60 seconds."
 
-  live-offline-e2e:
-    needs: [deploy-pr-preview, quality]
-    if: ${{ always() && needs.quality.result == 'success' && ((github.event_name == 'pull_request' && needs.deploy-pr-preview.result == 'success') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
-    name: LIVE offline recovery — Chromium
-    runs-on: [self-hosted, Windows, X64]
-    timeout-minutes: 12
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24.19.0
-
-      - name: Download LIVE-verified release manifest from the deploy run
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: battlecruiser-release-provenance-${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ github.event.workflow_run.id }}
-          path: test-results/release
-
-      - name: Run real-browser LIVE offline E2E
+      - name: Run real-browser offline recovery E2E
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
         env:
           BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && format('https://bc-pr-{0}-battlecruiser.robvg9.workers.dev', github.event.number) || 'https://battlecruiser.robvg9.workers.dev' }}
           BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
           BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+        shell: cmd
         run: node test/live-offline-e2e.js
 
       - name: Persist LIVE offline E2E evidence
