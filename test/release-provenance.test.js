@@ -90,7 +90,12 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(liveOfflineE2e, /const maxAttempts = isProductionBase && isMainJs \? 30 : 4/);
   assert.match(liveOfflineE2e, /timeoutMs = 20000/);
   assert.match(liveOfflineE2e, /isProductionBase \? 20000 : 35000/);
-  assert.match(quality, /needs: \[deploy-pr-preview, quality\]/);
+  const suiteStep = quality.indexOf("- name: Full automated suite");
+  const deployStep = quality.indexOf("- name: Deploy isolated PR preview");
+  const assetsStep = quality.indexOf("- name: Wait for isolated preview assets");
+  const e2eStep = quality.indexOf("- name: Run real-browser offline recovery E2E");
+  assert.ok(suiteStep >= 0 && deployStep > suiteStep && assetsStep > deployStep && e2eStep > assetsStep);
+  assert.match(quality, /runs-on: \\[self-hosted, Windows, X64\\]/);
   assert.match(quality, /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.conclusion == 'success'/);
 });
 
