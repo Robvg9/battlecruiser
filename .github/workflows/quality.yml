@@ -54,6 +54,9 @@ jobs:
         run: |
           node --check public/app.js
           node --check public/service-worker.js
+          node --check test/verify-pr-preview-assets.js
+          node --check test/step7-jornada-postgres-windows-ci.js
+          node --check test/deploy-production-pwa.js
 
       - name: Focused B2.3
         shell: cmd
