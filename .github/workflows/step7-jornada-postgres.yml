@@ -8,6 +8,7 @@ on:
       - 'test/step7-jornada-fixture.sql'
       - 'test/step7-jornada-contract.sql'
       - 'test/step7-jornada-ui-contract.test.js'
+      - 'test/step7-jornada-postgres-windows-ci.js'
       - '.github/workflows/step7-jornada-postgres.yml'
   workflow_dispatch:
 permissions:
@@ -15,58 +16,30 @@ permissions:
 jobs:
   step7-postgres:
     name: Step 7 snapshot, gate and permission contract
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: battlecruiser_step7_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d battlecruiser_step7_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-client
-      - name: Build disposable fixture
+        with:
+          fetch-depth: 1
+          clean: true
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+      - name: PostgreSQL 17 disposable fixture, migrations and ACL contract
+        shell: cmd
         env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: battlecruiser_step7_test
-        run: psql -v ON_ERROR_STOP=1 -f test/step7-jornada-fixture.sql
-      - name: Apply Step 5 baseline
-        env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: battlecruiser_step7_test
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023053011_step5_jornada_unica_backend.sql
-      - name: Apply Step 7 contract
-        env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: battlecruiser_step7_test
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql
-      - name: Verify session inventory lifecycle and ACL
-        env:
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: postgres
-          PGPASSWORD: postgres
-          PGDATABASE: battlecruiser_step7_test
-        run: psql -v ON_ERROR_STOP=1 -f test/step7-jornada-contract.sql
+          BC_STEP7_POSTGRES_ROOT: D:\Databank\BattleCruiser-CI\Postgres17
+        run: node test/step7-jornada-postgres-windows-ci.js
+      - name: Persist PostgreSQL 17 contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-step7-postgres17-${{ github.run_id }}
+          path: |
+            test-results/step7-postgres-ci.log
+            test-results/step7-postgres-server.log
+          if-no-files-found: warn
+          retention-days: 90
