@@ -22,7 +22,7 @@ permissions:
 jobs:
   quality:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 35
 
     steps:
@@ -33,8 +33,8 @@ jobs:
           fetch-depth: 1
           clean: true
 
-      # Use hosted Windows so Quality does not depend on the physical ROBVG PC
-      # or Desktop Commander. Pin Node to the same 24.19.0 runtime.
+      # Use the repository's self-hosted Windows runner to avoid GitHub-hosted
+      # runner billing blocks. Keep the Node runtime pinned for reproducibility.
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -93,7 +93,7 @@ jobs:
 
   deploy-pr-preview:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 10
     steps:
       - name: Checkout PR source
@@ -103,48 +103,55 @@ jobs:
           fetch-depth: 1
 
       - name: Install Wrangler
-        run: npm install --global wrangler@4.149.0
+        shell: cmd
+        run: npm.cmd install --global wrangler@4.149.0
 
       - name: Deploy isolated PR preview
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+        shell: cmd
         run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN"
-          wrangler deploy --config wrangler.toml --name "$BC_PREVIEW_NAME"
+          if not defined CLOUDFLARE_API_TOKEN exit /b 1
+          if not defined BC_PREVIEW_NAME exit /b 1
+          wrangler.cmd deploy --config wrangler.toml --name "%BC_PREVIEW_NAME%"
+          if errorlevel 1 exit /b 1
 
       - name: Wait for isolated preview assets
         env:
           BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+        shell: pwsh
         run: |
-          set -euo pipefail
-          base="https://${BC_PREVIEW_NAME}.robvg9.workers.dev"
-          expected="$(grep -o 'const VERSION="[^"]*"' public/app.js | head -n 1)"
-          sw_expected="$(grep -o 'BC_SW_VERSION = "[^"]*"' public/service-worker.js | head -n 1)"
-          test -n "$expected"
-          test -n "$sw_expected"
-          for attempt in $(seq 1 30); do
-            index_status="$(curl --location --silent --output /tmp/bc-preview-index.html --write-out '%{http_code}' "$base/index.html?bc_preview_ready=$attempt" || true)"
-            app_status="$(curl --location --silent --output /tmp/bc-preview-app.js --write-out '%{http_code}' "$base/app.js?bc_preview_ready=$attempt" || true)"
-            sw_status="$(curl --location --silent --output /tmp/bc-preview-sw.js --write-out '%{http_code}' "$base/service-worker.js?bc_preview_ready=$attempt" || true)"
-            if [ "$index_status" = "200" ] && [ "$app_status" = "200" ] && [ "$sw_status" = "200" ] \
-              && grep -Fq "$expected" /tmp/bc-preview-app.js \
-              && grep -Fq "$sw_expected" /tmp/bc-preview-sw.js; then
-              echo "[preview] PASS — index.html, app.js, Service Worker reachable; $expected"
-              exit 0
-            fi
-            echo "[preview] attempt $attempt/30: index=$index_status app=$app_status service-worker=$sw_status"
-            sleep 2
-          done
-          echo "[preview] FAIL — candidate assets not reachable or version not aligned within 60 seconds"
-          exit 1
+          $ErrorActionPreference = "Stop"
+          $base = "https://$($env:BC_PREVIEW_NAME).robvg9.workers.dev"
+          $appText = Get-Content -Raw -Path "public/app.js"
+          $swText = Get-Content -Raw -Path "public/service-worker.js"
+          $expected = [regex]::Match($appText, 'const VERSION="([^"]*)"').Groups[1].Value
+          $swExpected = [regex]::Match($swText, 'BC_SW_VERSION = "([^"]*)"').Groups[1].Value
+          if (-not $expected -or -not $swExpected) { throw "Could not read app or Service Worker version from source." }
+          for ($attempt = 1; $attempt -le 30; $attempt++) {
+            try {
+              $index = Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 -Uri "$base/index.html?bc_preview_ready=$attempt"
+              $app = Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 -Uri "$base/app.js?bc_preview_ready=$attempt"
+              $sw = Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 -Uri "$base/service-worker.js?bc_preview_ready=$attempt"
+              $ok = ($index.StatusCode -eq 200) -and ($app.StatusCode -eq 200) -and ($sw.StatusCode -eq 200) -and $app.Content.Contains($expected) -and $sw.Content.Contains($swExpected)
+              if ($ok) {
+                Write-Host "[preview] PASS — index.html, app.js and Service Worker reachable; app=$expected sw=$swExpected"
+                exit 0
+              }
+              Write-Host "[preview] attempt $attempt/30: index=$($index.StatusCode) app=$($app.StatusCode) service-worker=$($sw.StatusCode)"
+            } catch {
+              Write-Host "[preview] attempt $attempt/30: $($_.Exception.Message)"
+            }
+            Start-Sleep -Seconds 2
+          }
+          throw "Preview assets failed to respond or versions did not align within 60 seconds."
 
   live-offline-e2e:
     needs: [deploy-pr-preview, quality]
     if: ${{ always() && needs.quality.result == 'success' && ((github.event_name == 'pull_request' && needs.deploy-pr-preview.result == 'success') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
     name: LIVE offline recovery — Chromium
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 12
     steps:
       - name: Checkout
