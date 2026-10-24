@@ -4,7 +4,7 @@ name: BattleCruiser Self-Hosted Windows Test
 on:
   workflow_dispatch:
   push:
-    branches: [main, "fix/step4-turnos-warehouse-filter-20261024"]
+    branches: [main]
     paths:
       - "public/**"
       - "test/**"
