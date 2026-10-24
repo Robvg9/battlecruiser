@@ -40,6 +40,9 @@ function run(executable, args, options = {}) {
     env: options.env || env,
     encoding: "utf8",
     windowsHide: true,
+    // pg_ctl start can launch postgres.exe, which inherits stdout/stderr handles.
+    // Allow callers to opt out of inherited pipes so spawnSync can return normally.
+    stdio: options.stdio || "pipe",
     timeout: options.timeout || 10 * 60 * 1000,
     maxBuffer: 20 * 1024 * 1024,
   });
