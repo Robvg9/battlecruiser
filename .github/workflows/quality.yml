@@ -113,7 +113,7 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
           $base = "https://$($env:BC_PREVIEW_NAME).robvg9.workers.dev"
