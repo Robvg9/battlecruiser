@@ -240,13 +240,16 @@ function applySql(file) {
       "--auth-host=trust",
     ], { env: { ...binEnv, PATH: pgBinDir + path.delimiter + process.env.PATH }, timeout: 3 * 60 * 1000 });
     pgCtl = pgExe("pg_ctl.exe");
+    // Mark before invoking pg_ctl: if the CLI child inherits server pipe handles and
+    // times out after PostgreSQL has actually started, the finally block must still
+    // stop the disposable server before deleting DATA_DIR.
+    serverStarted = true;
     run(pgCtl, [
       "-D", DATA_DIR,
       "-l", PG_SERVER_LOG,
       "-o", "-h 127.0.0.1 -p " + PG_PORT + " -c listen_addresses=127.0.0.1",
       "-w", "start",
-    ], { env: binEnv, timeout: 2 * 60 * 1000 });
-    serverStarted = true;
+    ], { env: binEnv, timeout: 2 * 60 * 1000, stdio: "ignore" });
 
     run(pgExe("createdb.exe"), ["-h", "127.0.0.1", "-p", PG_PORT, "-U", "postgres", "battlecruiser_step7_test"], {
       env: binEnv, timeout: 60 * 1000,
