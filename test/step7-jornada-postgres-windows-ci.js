@@ -6,7 +6,7 @@ const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { createWriteStream } = require("node:fs");
-const { Readable } = require("node:stream");
+const { Readable, Transform } = require("node:stream");
 const { pipeline } = require("node:stream/promises");
 
 const ROOT = process.cwd();
@@ -73,25 +73,77 @@ async function downloadVerifiedArchive() {
     fs.rmSync(ZIP_PATH, { force: true });
   }
 
-  log("[postgres] Downloading official EDB PostgreSQL " + PG_VERSION + " Windows x64 binaries ZIP.");
+  const partial = ZIP_PATH + ".part";
+  if (fs.existsSync(partial)) {
+    const partialHash = await sha256File(partial);
+    if (partialHash.toLowerCase() === PG_SHA256) {
+      fs.renameSync(partial, ZIP_PATH);
+      log("[postgres] Resumed file was already complete; checksum PASS: " + partialHash);
+      return;
+    }
+  }
+
+  const startingBytes = fs.existsSync(partial) ? fs.statSync(partial).size : 0;
+  const headers = { "user-agent": "BattleCruiser-Step7-CI/1.0" };
+  if (startingBytes > 0) headers.Range = "bytes=" + startingBytes + "-";
+  log("[postgres] Downloading official EDB PostgreSQL " + PG_VERSION +
+    " Windows x64 ZIP; existing partial bytes=" + startingBytes + "; timeout=15 minutes.");
   const response = await fetch(PG_URL, {
     redirect: "follow",
-    headers: { "user-agent": "BattleCruiser-Step7-CI/1.0" },
-    signal: AbortSignal.timeout(5 * 60 * 1000),
+    headers,
+    signal: AbortSignal.timeout(15 * 60 * 1000),
   });
   if (!response.ok || !response.body) throw new Error("EDB download failed: HTTP " + response.status);
-  const partial = ZIP_PATH + ".part";
-  fs.rmSync(partial, { force: true });
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(partial));
+
+  let append = false;
+  if (startingBytes > 0 && response.status === 206) {
+    const contentRange = response.headers.get("content-range") || "";
+    if (!contentRange.startsWith("bytes " + startingBytes + "-")) {
+      throw new Error("EDB resume response has an unexpected Content-Range: " + contentRange);
+    }
+    append = true;
+    log("[postgres] Resuming the archive from byte " + startingBytes + ".");
+  } else if (response.status === 200) {
+    if (startingBytes > 0) log("[postgres] Server did not accept Range; restarting archive download from byte 0.");
+    fs.rmSync(partial, { force: true });
+  } else {
+    throw new Error("Unexpected EDB download HTTP status: " + response.status);
+  }
+
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  const expectedTotalBytes = contentLength > 0 ? contentLength + (append ? startingBytes : 0) : null;
+  let received = append ? startingBytes : 0;
+  let nextReport = received + 25 * 1024 * 1024;
+  const meter = new Transform({
+    transform(chunk, encoding, callback) {
+      received += chunk.length;
+      if (received >= nextReport) {
+        log("[postgres] Download progress: " + (received / (1024 * 1024)).toFixed(1) +
+          " MiB" + (expectedTotalBytes ? " / " + (expectedTotalBytes / (1024 * 1024)).toFixed(1) + " MiB" : ""));
+        nextReport = received + 25 * 1024 * 1024;
+      }
+      callback(null, chunk);
+    },
+  });
+  await pipeline(
+    Readable.fromWeb(response.body),
+    meter,
+    createWriteStream(partial, { flags: append ? "a" : "w" })
+  );
+
+  const downloadedBytes = fs.statSync(partial).size;
+  if (expectedTotalBytes && downloadedBytes !== expectedTotalBytes) {
+    throw new Error("EDB archive download was incomplete: expected " + expectedTotalBytes +
+      " bytes, received " + downloadedBytes + "; partial file is preserved for resume.");
+  }
   const actualHash = await sha256File(partial);
   if (actualHash.toLowerCase() !== PG_SHA256) {
     fs.rmSync(partial, { force: true });
     throw new Error("EDB PostgreSQL ZIP SHA-256 mismatch; refusing to extract or execute it. Expected " + PG_SHA256 + ", got " + actualHash);
   }
   fs.renameSync(partial, ZIP_PATH);
-  log("[postgres] Download checksum PASS: " + actualHash);
+  log("[postgres] Download checksum PASS: " + actualHash + " (" + downloadedBytes + " bytes).");
 }
-
 function findFile(root, name, maxDepth = 5) {
   const queue = [{ dir: root, depth: 0 }];
   while (queue.length) {
