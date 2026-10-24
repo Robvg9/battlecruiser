@@ -113,32 +113,8 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          $base = "https://$($env:BC_PREVIEW_NAME).robvg9.workers.dev"
-          $appText = Get-Content -Raw -Path "public/app.js"
-          $swText = Get-Content -Raw -Path "public/service-worker.js"
-          $expected = [regex]::Match($appText, 'const VERSION="([^"]*)"').Groups[1].Value
-          $swExpected = [regex]::Match($swText, 'BC_SW_VERSION = "([^"]*)"').Groups[1].Value
-          if (-not $expected -or -not $swExpected) { throw "Could not read app or Service Worker version from source." }
-          for ($attempt = 1; $attempt -le 30; $attempt++) {
-            try {
-              $index = Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 -Uri "$base/index.html?bc_preview_ready=$attempt"
-              $app = Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 -Uri "$base/app.js?bc_preview_ready=$attempt"
-              $sw = Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 -Uri "$base/service-worker.js?bc_preview_ready=$attempt"
-              $ok = ($index.StatusCode -eq 200) -and ($app.StatusCode -eq 200) -and ($sw.StatusCode -eq 200) -and $app.Content.Contains($expected) -and $sw.Content.Contains($swExpected)
-              if ($ok) {
-                Write-Host "[preview] PASS — index.html, app.js and Service Worker reachable; app=$expected sw=$swExpected"
-                exit 0
-              }
-              Write-Host "[preview] attempt $attempt/30: index=$($index.StatusCode) app=$($app.StatusCode) service-worker=$($sw.StatusCode)"
-            } catch {
-              Write-Host "[preview] attempt $attempt/30: $($_.Exception.Message)"
-            }
-            Start-Sleep -Seconds 2
-          }
-          throw "Preview assets failed to respond or versions did not align within 60 seconds."
+        shell: cmd
+        run: node test/verify-pr-preview-assets.js
 
       - name: Run real-browser offline recovery E2E
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
