@@ -192,9 +192,11 @@ async function refrescarListaTurnos() {
   setLoading("lista-turnos", "Cargando turnos…");
   const estadoSel = document.getElementById("turno-filtro-estado");
   const estado = estadoSel ? (estadoSel.value || null) : null;
+  const almacenSel = document.getElementById("turno-filtro-almacen");
+  const almacenId = almacenSel ? ((almacenSel.value || "").trim() || null) : null;
   try {
     const { data, error } = await client.rpc("listar_turnos", {
-      p_estado: estado, p_limite: 50, p_offset: 0,
+      p_estado: estado, p_almacen_id: almacenId, p_limite: 50, p_offset: 0,
     });
     if (error) {
       const msg = String(error.message || error);
@@ -572,6 +574,9 @@ safeInit("b7-turnos", () => {
   // Filtro de estado del historial (no afecta apertura).
   const estadoSel = document.getElementById("turno-filtro-estado");
   if (estadoSel) estadoSel.addEventListener("change", () => refrescarListaTurnos());
+  // El filtro de almacén pertenece al historial; no afecta al almacén usado al abrir un turno.
+  const almacenFiltro = document.getElementById("turno-filtro-almacen");
+  if (almacenFiltro) almacenFiltro.addEventListener("change", () => refrescarListaTurnos());
   // Delegación de clicks en cuadres.
   const cuadresEl = document.getElementById("lista-cuadres");
   if (cuadresEl) {
