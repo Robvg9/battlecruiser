@@ -87,7 +87,7 @@ test("Paso 4 historial de Ventas: buscar por almacén filtra las ventas y actual
   assert.equal(visible.length, 1);
   assert.equal(visible[0].getAttribute("data-venta-id"), "sale-002");
   assert.match(visible[0].textContent, /Reserva/);
-  assert.equal(window.document.getElementById("ventas-contador").textContent, "1 de 2");
+  assert.equal(window.document.getElementById("ventas-contador").textContent, "Mostrando 1 de 2");
 });
 
 test("Paso 4 historial de Ventas: estado vacío y Ver todas recuperan la lista original", (t) => {
@@ -99,7 +99,7 @@ test("Paso 4 historial de Ventas: estado vacío y Ver todas recuperan la lista o
   reset.click();
   assert.equal(window.document.getElementById("ventas-buscar").value, "");
   assert.equal(cards(window, "lista-ventas", ".venta-item").length, 2);
-  assert.equal(window.document.getElementById("ventas-contador").textContent, "2 de 2");
+  assert.equal(window.document.getElementById("ventas-contador").textContent, "2 elementos");
 });
 
 test("Paso 4 historial de Transferencias: la búsqueda por estado muestra solo la transferencia coincidente", (t) => {
@@ -109,7 +109,7 @@ test("Paso 4 historial de Transferencias: la búsqueda por estado muestra solo l
   assert.equal(visible.length, 1);
   assert.equal(visible[0].getAttribute("data-trf-id"), "trf-002");
   assert.match(visible[0].textContent, /PENDIENTE/);
-  assert.equal(window.document.getElementById("trf-contador").textContent, "1 de 2");
+  assert.equal(window.document.getElementById("trf-contador").textContent, "Mostrando 1 de 2");
 });
 
 test("Paso 4 historial de Vales: la búsqueda por producto limita resultados y Ver todos limpia el filtro", (t) => {
@@ -126,5 +126,5 @@ test("Paso 4 historial de Vales: la búsqueda por producto limita resultados y V
   reset.click();
   assert.equal(window.document.getElementById("vales-buscar").value, "");
   assert.equal(cards(window, "lista-vales", ".vale-item").length, 2);
-  assert.equal(window.document.getElementById("vales-contador").textContent, "2 de 2");
+  assert.equal(window.document.getElementById("vales-contador").textContent, "2 elementos");
 });
