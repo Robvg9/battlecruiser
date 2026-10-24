@@ -225,6 +225,11 @@ function crearContexto() {
   script.textContent = appJs;
   document.body.appendChild(script);
 
+  // This suite checks form submits/payloads, not async stock refreshes.
+  // Keep unrelated background refresh callbacks from outliving JSDOM windows.
+  window.cargarStockAlmacenes = async () => [];
+  window.refrescarStockYSelects = async () => ({});
+
   const shell = document.getElementById("app-shell");
   if (shell) shell.classList.add("visible");
 
@@ -272,7 +277,7 @@ function nuevasEscrituras(context, baseIndex) {
 
 test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backend mock", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   const base = c.client.__writeCalls.length;
   c.document.getElementById("prod-nombre").value = "Producto inválido fixture";
   c.document.getElementById("prod-precio-normal").value = "0";
@@ -286,7 +291,7 @@ test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backen
 
 test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el formulario", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   const base = c.client.__writeCalls.length;
   c.document.getElementById("prod-nombre").value = "Producto UI fixture";
   c.document.getElementById("prod-unidad").value = "unidad";
@@ -316,7 +321,7 @@ test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el 
 
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   addOption(c.document.getElementById("compra-producto"), "p-step4-fixture", "Producto fixture");
   addOption(c.document.getElementById("compra-almacen"), "a-step4-fixture", "Almacén fixture");
   c.document.getElementById("compra-presentacion").value = "";
@@ -332,7 +337,7 @@ test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) 
 
 test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a producción", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   addOption(c.document.getElementById("compra-producto"), "p-step4-fixture", "Producto fixture");
   addOption(c.document.getElementById("compra-almacen"), "a-step4-fixture", "Almacén fixture");
   c.document.getElementById("compra-presentacion").value = "";
@@ -353,8 +358,8 @@ test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a
 
 test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
-  c.document.getElementById("form-almacen").classList.remove("hidden");
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Form visibility is unrelated to required-field validation; avoid modal boot side effects.
   c.document.getElementById("alm-nombre").value = " ";
   c.document.getElementById("alm-tipo").value = "";
   const base = c.client.__writeCalls.length;
@@ -367,7 +372,7 @@ test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t)
 
 test("Paso 4 UI: almacén válido envía nombre/tipo por el RPC mock y confirma resultado", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   c.document.getElementById("form-almacen").classList.remove("hidden");
   c.document.getElementById("alm-nombre").value = "Almacén UI fixture";
   c.document.getElementById("alm-tipo").value = "almacenamiento";
@@ -423,7 +428,7 @@ test("Paso 4 UI: transferencia con el mismo origen/destino se rechaza antes de c
 });
 test("Paso 4 UI: responsabilidad válida utiliza el RPC mock y conserva la prioridad", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   c.document.getElementById("resp-titulo").value = "Responsabilidad fixture";
   c.document.getElementById("resp-desc").value = "Descripción de prueba";
   c.document.getElementById("resp-prioridad").value = "alta";
@@ -441,7 +446,7 @@ test("Paso 4 UI: responsabilidad válida utiliza el RPC mock y conserva la prior
 
 test("Paso 4 UI: incidencia válida utiliza el RPC mock y envía tipo/descrición", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   c.document.getElementById("inc-tipo").value = "faltante";
   c.document.getElementById("inc-desc").value = "Incidencia fixture";
   const base = c.client.__writeCalls.length;
@@ -457,7 +462,7 @@ test("Paso 4 UI: incidencia válida utiliza el RPC mock y envía tipo/descrició
 
 test("Paso 4 UI: conversación privada sin participante se bloquea sin crear registro", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   c.document.getElementById("nueva-conv-tipo").value = "PRIVADA";
   c.document.getElementById("nueva-conv-usuario").value = "";
   c.document.getElementById("nueva-conv-titulo").value = "Privada incompleta fixture";
@@ -472,7 +477,7 @@ test("Paso 4 UI: conversación privada sin participante se bloquea sin crear reg
 
 test("Paso 4 UI: mensaje sin conversación seleccionada se bloquea sin enviar RPC", async (t) => {
   const c = await contextoListo();
-  t.after(() => c.dom.window.close());
+  t.after(async () => { await esperar(500); c.dom.window.close(); });
   c.document.getElementById("mensaje-input").value = "Mensaje fixture sin conversación";
   const base = c.client.__writeCalls.length;
   enviarSubmit(c, "form-mensaje");
