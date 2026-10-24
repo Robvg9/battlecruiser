@@ -60,7 +60,7 @@ test("production deploy uses the self-hosted Windows runner and persists the exa
   assert.ok(deploy.includes("test-results/deploy-pwa-log.txt"));
   assert.ok(deploy.includes("if-no-files-found: warn"));
   assert.ok(deployScript.includes("writeReleaseManifest()"));
-  assert.ok(deployScript.includes("release-" + " + expected.source_sha + ".json"));
+  assert.ok(deployScript.includes('const filename = "release-" + expected.source_sha + ".json";'));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
   assert.ok(deployScript.includes("workflow_run_id"));
   assert.ok(deployScript.includes("writeFileSync(path.join(artifactDir, filename)"));
