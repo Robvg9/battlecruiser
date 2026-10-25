@@ -195,3 +195,56 @@ test("Paso 4 reset: server rejection is shown and form contents remain for corre
   assert.equal(c.window.document.getElementById("pass-new").value, "validpass123");
   assert.equal(c.window.document.getElementById("pass-confirm").value, "validpass123");
 });
+
+
+test("Paso 4 reset: cada botón Mostrar contraseña controla solo su campo", (t) => {
+  const dom = new JSDOM(
+    "<!doctype html><html><body>" +
+    "<input id='pass-new' type='password'>" +
+    "<button class='pass-toggle' data-target='pass-new' aria-label='Mostrar contraseña'>ojo 1</button>" +
+    "<input id='pass-confirm' type='password'>" +
+    "<button class='pass-toggle' data-target='pass-confirm' aria-label='Mostrar contraseña'>ojo 2</button>" +
+    "</body></html>",
+    { url: "https://battlecruiser-password-visibility.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  t.after(() => dom.window.close());
+  window.safeInit = (name, callback) => {
+    if (name === "ojito-contraseña") callback();
+  };
+  const start = AUTH.indexOf("const OJO_ABIERTO_SVG");
+  const end = AUTH.indexOf('safeInit("menu-ajustes", () => {', start);
+  assert.ok(start >= 0 && end > start, "must find the production password-visibility handler");
+  window.eval(AUTH.slice(start, end));
+
+  const passNew = window.document.getElementById("pass-new");
+  const passConfirm = window.document.getElementById("pass-confirm");
+  const [newButton, confirmButton] = window.document.querySelectorAll(".pass-toggle");
+  newButton.click();
+  assert.equal(passNew.type, "text");
+  assert.equal(passConfirm.type, "password", "first toggle must not reveal the confirmation field");
+  assert.equal(newButton.getAttribute("aria-label"), "Ocultar contraseña");
+  confirmButton.click();
+  assert.equal(passConfirm.type, "text");
+  assert.equal(passNew.type, "text", "each toggle must control its own field");
+  newButton.click();
+  confirmButton.click();
+  assert.equal(passNew.type, "password");
+  assert.equal(passConfirm.type, "password");
+});
+
+test("Paso 4 reset: Cancelar limpia el formulario y cierra el panel sin llamar Auth", (t) => {
+  const c = passwordDom();
+  t.after(() => c.dom.window.close());
+  const { window } = c;
+  window.document.getElementById("pass-panel").classList.remove("hidden");
+  window.document.getElementById("pass-new").value = "validpass123";
+  window.document.getElementById("pass-confirm").value = "validpass123";
+  window.document.getElementById("msg-pass").textContent = "mensaje anterior";
+  window.document.getElementById("pass-cancel-btn").click();
+  assert.equal(window.document.getElementById("pass-new").value, "");
+  assert.equal(window.document.getElementById("pass-confirm").value, "");
+  assert.equal(window.document.getElementById("msg-pass").textContent, "");
+  assert.ok(window.document.getElementById("pass-panel").classList.contains("hidden"));
+  assert.equal(c.calls.length, 0, "cancel must not submit a password update");
+});
