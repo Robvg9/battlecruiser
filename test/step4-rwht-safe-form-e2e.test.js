@@ -279,7 +279,10 @@ function nuevasEscrituras(context, baseIndex) {
 
 test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backend mock", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  t.after(async () => { // Let initial catalog/product refreshes settle before teardown; this test targets only validation.
+    await esperar(1800);
+    c.dom.window.close();
+  });
   const base = c.client.__writeCalls.length;
   c.document.getElementById("prod-nombre").value = "Producto inválido fixture";
   c.document.getElementById("prod-precio-normal").value = "0";
@@ -360,7 +363,10 @@ test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a
 
 test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  t.after(async () => { // Keep JSDOM alive until startup refreshes settle; this test targets only validation.
+    await esperar(1800);
+    c.dom.window.close();
+  });
   // Form visibility is unrelated to required-field validation; avoid modal boot side effects.
   c.document.getElementById("alm-nombre").value = " ";
   c.document.getElementById("alm-tipo").value = "";
