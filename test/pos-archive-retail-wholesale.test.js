@@ -199,3 +199,31 @@ test("M74 does not flip Ventas during an async session refresh", async () => {
     dom.window.close();
   }
 });
+
+test("M74 blocks a click immediately after a wholesale session turns retail", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  const { dom, window, navigations } = createApp(
+    warehouses,
+    { estado: "ABIERTO", almacen_id: "tmo" }
+  );
+  try {
+    const button = window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "the open wholesale session exposes POS");
+
+    window._turnoActual = { estado: "ABIERTO", almacen_id: "cueva" };
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "the visual transition is intentionally debounced");
+    button.click();
+    await tick(window, 15);
+    assert.equal(navigations.includes("ventas"), false, "the current non-wholesale session blocks the click immediately");
+
+    await tick(window, 260);
+    assert.equal(window.__BC_POS_ARCHIVED__, true, "the visual state follows the settled retail session");
+    assert.ok(button.classList.contains("bc-pos-archived"));
+  } finally {
+    dom.window.close();
+  }
+});
