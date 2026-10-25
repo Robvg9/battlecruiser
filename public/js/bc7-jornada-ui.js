@@ -250,12 +250,32 @@
     catch(e){msg(form.querySelector('[data-bc7-count-msg]'),'No se confirmó el conteo: '+e.message,'error');}
     finally{busy(btn,false);}
   }
+  async function refreshPosArchiveAfterSessionStart() {
+    // Starting a jornada changes the authoritative active turn/warehouse.
+    // Re-read it before M74 decides whether the wholesale POS can be shown.
+    try {
+      if (typeof window.__BC_M25_refrescarTurno === 'function') {
+        await window.__BC_M25_refrescarTurno();
+      } else if (typeof window.refrescarTurnoActual === 'function') {
+        await window.refrescarTurnoActual();
+      }
+    } catch (e) {
+      try { console.warn('[BC7] No se pudo refrescar la sesión tras abrir la jornada.', e); } catch (ignored) {}
+    }
+    try {
+      if (typeof window.__BC_M74_SYNC_POS_ARCHIVE__ === 'function') {
+        window.__BC_M74_SYNC_POS_ARCHIVE__('jornada-started');
+      }
+    } catch (e) {}
+  }
+
   async function startSession(btn){
     const sessionId=btn.dataset.bc7Start;if(!busy(btn,true))return;
     try{
       const reason=$('bc7-start-reason')?.value||null;
       if(!confirm('¿Confirmas abrir esta jornada ahora? La fecha, la asignación y la secuencia volverán a validarse en el servidor.'))return;
       await rpc('bc5_iniciar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:reason});
+      await refreshPosArchiveAfterSessionStart();
       await loadCalendar();await openWorkspace(sessionId);setStatus('Jornada abierta; estado releído del backend.','ok');
     }catch(e){msg($('bc7-start-msg'),'No se abrió la jornada: '+e.message,'error');}
     finally{busy(btn,false);}
