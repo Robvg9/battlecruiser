@@ -103,4 +103,10 @@ test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén"
   assert.equal(root.querySelectorAll(".m29-card").length, 3, "limpiar ambos selectores restaura todas las tarjetas visibles");
   assert.ok(!Array.from(root.querySelectorAll(".m29-card")).some((card) => card.getAttribute("data-turno-id") === "turno-cerrado"),
     "la vista operativa conserva la regla de excluir turnos cerrados del resumen");
+
+  const opened = [];
+  window.__BC_M33 = { open: (id) => opened.push(id) };
+  const visibleCard = root.querySelector('.m29-card[data-turno-id="turno-principal"]');
+  visibleCard.click();
+  assert.deepEqual(opened, ["turno-principal"], "las tarjetas siguen abriendo el detalle después de re-renderizar filtros");
 });
