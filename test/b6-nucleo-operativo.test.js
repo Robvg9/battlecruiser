@@ -452,20 +452,33 @@ test("B6.15: idempotencia — misma key no duplica operación lógica", async ()
   }
 });
 
-test("B6.16: doble sincronización no ejecuta dos veces (mutex _sincronizando)", async () => {
-  const { window } = montarEntorno(perfil());
+test("B6.16: reconexión drena la cola una sola vez, conserva idempotency_key y elimina la operación sincronizada", async () => {
+  const { window, client } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(80);
-  // Forzar offline para encolar.
+  await esperarUsuarioOperativo(window);
+  // Encolar una operación con la app realmente en modo offline (sin tocar producción).
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
-  await window.ejecutarOperacion("compra", { p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1 });
-  // Volver online y disparar dos sincronizaciones concurrentes.
+  const offline = await window.ejecutarOperacion("compra", {
+    p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 1, p_costo_unitario: 1
+  });
+  assert.ok(offline.ok && offline.offline && offline.operacion,
+    "la operación debe quedar persistida en la cola mientras está offline");
+  const key = offline.operacion.idempotency_key;
+  assert.ok(key, "la operación offline debe tener idempotency_key");
+  assert.ok(await window.obtenerOperacionPendiente(offline.operacion.id),
+    "la operación debe seguir pendiente antes de reconectar");
+
+  // Reconectar y disparar dos sincronizaciones concurrentes: el mutex/FIFO debe drenar una sola vez.
   Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
-  const p1 = window.sincronizarCola();
-  const p2 = window.sincronizarCola();
-  await Promise.all([p1, p2]);
-  // _sincronizando impide la segunda: no debe lanzar ni duplicar.
-  assert.ok(true, "doble sincronización no rompe");
+  await Promise.all([window.sincronizarCola(), window.sincronizarCola()]);
+
+  const purchaseCalls = client.__rpcCalls.filter((call) => call.nombre === "registrar_compra");
+  assert.equal(purchaseCalls.length, 1,
+    "una sola escritura RPC debe procesar la operación encolada a pesar de dos sincronizaciones concurrentes");
+  assert.equal(purchaseCalls[0].params.p_idempotency_key, key,
+    "la misma idempotency_key debe viajar al backend en el reintento");
+  const persisted = await window.obtenerOperacionPendiente(offline.operacion.id);
+  assert.ok(!persisted, "tras el resultado satisfactorio, la operación debe desaparecer de la cola pendiente");
 });
 
 test("B6.17: error de red encola la operación (no error de negocio)", async () => {
