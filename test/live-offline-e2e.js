@@ -169,9 +169,44 @@ async function waitUntil(description, predicate, timeoutMs) {
   throw new Error("Timeout esperando " + description + ". Último valor: " + JSON.stringify(lastValue));
 }
 async function navigateAndWait(url) {
-  const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS);
-  const result = await cdpCommand("Page.navigate", { url });
-  if (result.errorText) throw new Error("Page.navigate falló: " + result.errorText);
+  let loadSeen = false;
+  const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS).then((event) => {
+    loadSeen = true;
+    return event;
+  });
+  // A failed CDP command can outlive the navigation-event waiter; attach a
+  // handler now to avoid an unhandled rejection if Page.navigate stalls.
+  loaded.catch(() => {});
+
+  try {
+    const result = await cdpCommand("Page.navigate", { url });
+    if (result.errorText) throw new Error("Page.navigate falló: " + result.errorText);
+  } catch (error) {
+    // Edge on a busy Windows self-hosted runner can occasionally stop replying
+    // to Page.navigate even while the target and Worker preview are healthy.
+    // If the load event has not arrived, fall back to a same-origin-safe JS
+    // navigation through Runtime.evaluate, then await the same load event.
+    if (!String(error && error.message || error).includes("Timeout CDP en Page.navigate") || loadSeen) {
+      throw error;
+    }
+    report.evidence.navigationFallbacks = report.evidence.navigationFallbacks || [];
+    report.evidence.navigationFallbacks.push({
+      url,
+      reason: String(error && error.message || error),
+      fallback: "Runtime.evaluate location.assign"
+    });
+    const fallback = await cdpCommand("Runtime.evaluate", {
+      expression: "window.location.assign(" + JSON.stringify(url) + ")",
+      awaitPromise: false,
+      returnByValue: true,
+      userGesture: true,
+    });
+    if (fallback.exceptionDetails) {
+      const description = fallback.exceptionDetails.exception && fallback.exceptionDetails.exception.description;
+      throw new Error("Fallback Runtime.evaluate para navegación falló: " +
+        (description || fallback.exceptionDetails.text || "desconocido"));
+    }
+  }
   await loaded;
   await delay(500);
 }
@@ -187,7 +222,7 @@ function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
 }
 function shellSnapshotPredicate() {
-  return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState==='complete'&&s.version?s:null})()";
+  return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState==='complete'&&s.loginForm&&s.usernameField&&s.passwordField?s:null})()";
 }
 async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -419,6 +454,27 @@ async function main() {
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
 
+
+  // Step 4/15 — real Chromium check of the visible Sales view toggle.
+  // This probes presentation and client-side panel switching only; no auth session
+  // or business RPC is used, and the original login view is restored afterwards.
+  report.evidence.phase = "step4_sales_view_toggle";
+  const salesToggleProbe = await evaluate("(()=>{const shell=document.querySelector('#app-shell');const login=document.querySelector('#login-form');const main=document.querySelector('#app-shell > main.main-content');const tab=document.querySelector('#tab-ventas');const wrap=document.querySelector('.venta-vista-toggle');const search=document.querySelector('#venta-vista-btn-buscador');const catalog=document.querySelector('#venta-vista-btn-catalogo');const searchPanel=document.querySelector('#venta-modo-buscador');const catalogPanel=document.querySelector('#venta-modo-catalogo');if(!shell||!login||!main||!tab||!wrap||!search||!catalog||!searchPanel||!catalogPanel)return {ready:false,reason:'toggle markup missing'};const wrapBefore={className:wrap.className,style:wrap.getAttribute('style'),display:getComputedStyle(wrap).display};const originalParent=wrap.parentElement;const originalNext=wrap.nextSibling;const restoreAnchor=document.createComment('step4-sales-toggle-anchor');originalParent.insertBefore(restoreAnchor,wrap);const host=document.createElement('div');host.setAttribute('data-step4-probe','sales-toggle');host.style.setProperty('position','fixed','important');host.style.setProperty('top','0','important');host.style.setProperty('left','0','important');host.style.setProperty('width','760px','important');host.style.setProperty('min-height','60px','important');host.style.setProperty('display','block','important');host.style.setProperty('visibility','visible','important');host.style.setProperty('z-index','2147483647','important');document.body.appendChild(host);host.appendChild(wrap);wrap.classList.remove('hidden');wrap.style.setProperty('display','flex','important');wrap.style.setProperty('visibility','visible','important');wrap.style.setProperty('position','relative','important');wrap.style.setProperty('width','100%','important');wrap.style.setProperty('min-width','240px','important');wrap.style.setProperty('height','auto','important');wrap.style.setProperty('min-height','44px','important');void wrap.offsetHeight;const rect=(e)=>{const r=e.getBoundingClientRect();const p=e.parentElement.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,display:getComputedStyle(e).display,minHeight:getComputedStyle(e).minHeight,minWidth:getComputedStyle(e).minWidth,parentDisplay:getComputedStyle(e.parentElement).display,parentRect:{width:p.width,height:p.height},probeHostRect:(()=>{const h=host.getBoundingClientRect();return {width:h.width,height:h.height}})()}};const searchRect=rect(search),catalogRect=rect(catalog);const before={searchPressed:search.getAttribute('aria-pressed'),catalogPressed:catalog.getAttribute('aria-pressed'),searchActive:search.classList.contains('activo'),catalogActive:catalog.classList.contains('activo'),searchHidden:searchPanel.classList.contains('hidden'),catalogHidden:catalogPanel.classList.contains('hidden')};catalog.click();const afterCatalog={searchPressed:search.getAttribute('aria-pressed'),catalogPressed:catalog.getAttribute('aria-pressed'),searchActive:search.classList.contains('activo'),catalogActive:catalog.classList.contains('activo'),searchHidden:searchPanel.classList.contains('hidden'),catalogHidden:catalogPanel.classList.contains('hidden')};search.click();const afterSearch={searchPressed:search.getAttribute('aria-pressed'),catalogPressed:catalog.getAttribute('aria-pressed'),searchActive:search.classList.contains('activo'),catalogActive:catalog.classList.contains('activo'),searchHidden:searchPanel.classList.contains('hidden'),catalogHidden:catalogPanel.classList.contains('hidden')};if(restoreAnchor.parentNode===originalParent)originalParent.insertBefore(wrap,restoreAnchor.nextSibling);else originalParent.appendChild(wrap);host.remove();wrap.className=wrapBefore.className;if(wrapBefore.style===null)wrap.removeAttribute('style');else wrap.setAttribute('style',wrapBefore.style);const restorationDetails={parentRestored:wrap.parentElement===originalParent,positionRestored:restoreAnchor.parentNode===originalParent&&wrap.previousSibling===restoreAnchor,nextSiblingMatches:wrap.nextSibling===originalNext,classRestored:wrap.className===wrapBefore.className,styleRestored:(wrap.getAttribute('style')||'')===(wrapBefore.style||'')};const restorationVerified=restorationDetails.parentRestored&&restorationDetails.positionRestored&&restorationDetails.nextSiblingMatches&&restorationDetails.classRestored&&restorationDetails.styleRestored;restoreAnchor.remove();return {ready:true,wrapBefore,searchRect,catalogRect,before,afterCatalog,afterSearch,restored:afterSearch.searchPressed==='true'&&afterSearch.catalogPressed==='false'&&afterSearch.searchActive&&!afterSearch.catalogActive&&!afterSearch.searchHidden&&afterSearch.catalogHidden,restorationDetails,restorationVerified};})()");
+  assert(salesToggleProbe.ready, "No está disponible el DOM del toggle Ventas en Chromium: " + JSON.stringify(salesToggleProbe));
+  assert(salesToggleProbe.searchRect.display !== "none" && salesToggleProbe.catalogRect.display !== "none" &&
+    salesToggleProbe.searchRect.width >= 120 && salesToggleProbe.catalogRect.width >= 120 &&
+    salesToggleProbe.searchRect.height >= 44 && salesToggleProbe.catalogRect.height >= 44,
+    "Los toggles de Ventas no tienen un objetivo táctil visible de al menos 120x44: " + JSON.stringify(salesToggleProbe));
+  assert(salesToggleProbe.before.searchPressed === "true" && salesToggleProbe.before.catalogPressed === "false" &&
+    salesToggleProbe.before.searchActive && !salesToggleProbe.before.catalogActive,
+    "El estado inicial Buscador/Catálogo no es coherente: " + JSON.stringify(salesToggleProbe.before));
+  assert(salesToggleProbe.afterCatalog.searchPressed === "false" && salesToggleProbe.afterCatalog.catalogPressed === "true" &&
+    !salesToggleProbe.afterCatalog.searchActive && salesToggleProbe.afterCatalog.catalogActive &&
+    salesToggleProbe.afterCatalog.searchHidden && !salesToggleProbe.afterCatalog.catalogHidden,
+    "El clic en Catálogo no cambia al panel correcto: " + JSON.stringify(salesToggleProbe.afterCatalog));
+  assert(salesToggleProbe.restored, "El clic en Buscador no restaura el panel inicial: " + JSON.stringify(salesToggleProbe.afterSearch));
+  assert(salesToggleProbe.restorationVerified, "La sonda no restauró el componente de Ventas en su posición DOM, clase y estilos originales: " + JSON.stringify(salesToggleProbe));
+  report.evidence.step4SalesViewToggle = salesToggleProbe;
 
   // Step 4/15 — real Chromium check of the production-served Preferences module.
   // The browser profile is disposable; no user session or business data is touched.

@@ -7,6 +7,13 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 const { IDBFactory } = require("fake-indexeddb");
 
+// Retain booted application JSDOMs until this isolated test process exits.
+// Startup catalog/center refreshes are independent async work; closing them in
+// per-test or file-level teardown can race those tasks. The test runner invokes
+// this file in a dedicated --test-force-exit process, so process teardown is the
+// deterministic cleanup boundary for these test-only browser contexts.
+const contextosJSDOM = new Set();
+
 const WRITE_RPCS = new Set([
   "crear_producto", "actualizar_producto", "registrar_compra", "registrar_venta",
   "crear_almacen", "editar_almacen", "activar_desactivar_almacen",
@@ -176,12 +183,11 @@ function crearContexto() {
     url: "https://battlecruiser-step4.test/",
     pretendToBeVisual: true
   });
+  contextosJSDOM.add(dom);
   const window = dom.window;
   const document = window.document;
-  global.window = window;
-  global.document = document;
-  global.navigator = window.navigator;
-  global.crypto = window.crypto || global.crypto;
+  // Keep each JSDOM realm isolated. Assigning these to Node global makes late
+  // startup callbacks from an earlier context use another test's document.
 
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window, "caches", {
@@ -279,7 +285,7 @@ function nuevasEscrituras(context, baseIndex) {
 
 test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backend mock", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   const base = c.client.__writeCalls.length;
   c.document.getElementById("prod-nombre").value = "Producto inválido fixture";
   c.document.getElementById("prod-precio-normal").value = "0";
@@ -293,7 +299,7 @@ test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backen
 
 test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el formulario", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   const base = c.client.__writeCalls.length;
   c.document.getElementById("prod-nombre").value = "Producto UI fixture";
   c.document.getElementById("prod-unidad").value = "unidad";
@@ -323,7 +329,7 @@ test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el 
 
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   addOption(c.document.getElementById("compra-producto"), "p-step4-fixture", "Producto fixture");
   addOption(c.document.getElementById("compra-almacen"), "a-step4-fixture", "Almacén fixture");
   c.document.getElementById("compra-presentacion").value = "";
@@ -339,7 +345,7 @@ test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) 
 
 test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a producción", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   addOption(c.document.getElementById("compra-producto"), "p-step4-fixture", "Producto fixture");
   addOption(c.document.getElementById("compra-almacen"), "a-step4-fixture", "Almacén fixture");
   c.document.getElementById("compra-presentacion").value = "";
@@ -360,7 +366,7 @@ test("Paso 4 UI: compra válida envía cantidades/costo al RPC simulado, nunca a
 
 test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   // Form visibility is unrelated to required-field validation; avoid modal boot side effects.
   c.document.getElementById("alm-nombre").value = " ";
   c.document.getElementById("alm-tipo").value = "";
@@ -374,7 +380,7 @@ test("Paso 4 UI: almacén rechaza nombre/tipo vacíos sin enviar RPC", async (t)
 
 test("Paso 4 UI: almacén válido envía nombre/tipo por el RPC mock y confirma resultado", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   c.document.getElementById("form-almacen").classList.remove("hidden");
   c.document.getElementById("alm-nombre").value = "Almacén UI fixture";
   c.document.getElementById("alm-tipo").value = "almacenamiento";
@@ -430,7 +436,7 @@ test("Paso 4 UI: transferencia con el mismo origen/destino se rechaza antes de c
 });
 test("Paso 4 UI: responsabilidad válida utiliza el RPC mock y conserva la prioridad", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   c.document.getElementById("resp-titulo").value = "Responsabilidad fixture";
   c.document.getElementById("resp-desc").value = "Descripción de prueba";
   c.document.getElementById("resp-prioridad").value = "alta";
@@ -448,7 +454,7 @@ test("Paso 4 UI: responsabilidad válida utiliza el RPC mock y conserva la prior
 
 test("Paso 4 UI: incidencia válida utiliza el RPC mock y envía tipo/descrición", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   c.document.getElementById("inc-tipo").value = "faltante";
   c.document.getElementById("inc-desc").value = "Incidencia fixture";
   const base = c.client.__writeCalls.length;
@@ -464,7 +470,7 @@ test("Paso 4 UI: incidencia válida utiliza el RPC mock y envía tipo/descrició
 
 test("Paso 4 UI: conversación privada sin participante se bloquea sin crear registro", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   c.document.getElementById("nueva-conv-tipo").value = "PRIVADA";
   c.document.getElementById("nueva-conv-usuario").value = "";
   c.document.getElementById("nueva-conv-titulo").value = "Privada incompleta fixture";
@@ -479,7 +485,7 @@ test("Paso 4 UI: conversación privada sin participante se bloquea sin crear reg
 
 test("Paso 4 UI: mensaje sin conversación seleccionada se bloquea sin enviar RPC", async (t) => {
   const c = await contextoListo();
-  t.after(async () => { await esperar(500); c.dom.window.close(); });
+  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
   c.document.getElementById("mensaje-input").value = "Mensaje fixture sin conversación";
   const base = c.client.__writeCalls.length;
   enviarSubmit(c, "form-mensaje");
