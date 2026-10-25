@@ -248,3 +248,43 @@ test("Paso 4 reset: Cancelar limpia el formulario y cierra el panel sin llamar A
   assert.ok(window.document.getElementById("pass-panel").classList.contains("hidden"));
   assert.equal(c.calls.length, 0, "cancel must not submit a password update");
 });
+
+
+test("Paso 4 auth: Cerrar sesión limpia el contexto local y llama signOut una sola vez", async (t) => {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><span id='user-email'>owner@example.invalid</span><button id='logout-btn'>Cerrar sesión</button></body></html>",
+    { url: "https://battlecruiser-logout.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  t.after(() => dom.window.close());
+  let resets = 0;
+  let contextClears = 0;
+  let signOutCalls = 0;
+  window.logoutBtn = window.document.getElementById("logout-btn");
+  window.userEmailEl = window.document.getElementById("user-email");
+  window._bcSesionActivaId = "fixture-session";
+  window._bcPendingSession = { id: "fixture-session" };
+  window.resetearNavegacionParaNuevaSesion = () => { resets += 1; };
+  window.limpiarContextoUsuario = () => { contextClears += 1; };
+  window.client = {
+    auth: {
+      signOut: async () => { signOutCalls += 1; return { error: null }; }
+    }
+  };
+  window.safeInit = (name, callback) => {
+    if (name === "logout") callback();
+  };
+  const start = AUTH.indexOf('safeInit("logout", () => {');
+  const end = AUTH.indexOf('\nsafeInit("nuevo-usuario", () => {', start);
+  assert.ok(start >= 0 && end > start, "must find the production logout handler");
+  window.eval(AUTH.slice(start, end));
+
+  window.logoutBtn.click();
+  assert.ok(await waitFor(() => signOutCalls === 1));
+  assert.equal(resets, 1, "logout must reset navigation state");
+  assert.equal(contextClears, 1, "logout must clear the prior user's context");
+  assert.equal(window.userEmailEl.textContent, "");
+  assert.equal(window._bcSesionActivaId, null);
+  assert.equal(window._bcPendingSession, null);
+  assert.equal(signOutCalls, 1, "one click must make exactly one signOut call");
+});
