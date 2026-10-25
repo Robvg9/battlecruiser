@@ -455,6 +455,26 @@ async function main() {
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
 
 
+  // Step 4/15 — real Chromium check of the visible Sales view toggle.
+  // This probes presentation and client-side panel switching only; no auth session
+  // or business RPC is used, and the original login view is restored afterwards.
+  report.evidence.phase = "step4_sales_view_toggle";
+  const salesToggleProbe = await evaluate("(()=>{const shell=document.querySelector('#app-shell');const login=document.querySelector('#login-form');const tab=document.querySelector('#tab-ventas');const wrap=document.querySelector('.venta-vista-toggle');const search=document.querySelector('#venta-vista-btn-buscador');const catalog=document.querySelector('#venta-vista-btn-catalogo');const searchPanel=document.querySelector('#venta-modo-buscador');const catalogPanel=document.querySelector('#venta-modo-catalogo');if(!shell||!login||!tab||!wrap||!search||!catalog||!searchPanel||!catalogPanel)return {ready:false,reason:'toggle markup missing'};const prior={shell:shell.classList.contains('visible'),loginHidden:login.classList.contains('hidden'),tab:tab.classList.contains('visible'),display:tab.style.display};shell.classList.add('visible');login.classList.add('hidden');tab.classList.add('visible');tab.style.display='block';const rect=(e)=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height,display:getComputedStyle(e).display,minHeight:getComputedStyle(e).minHeight,minWidth:getComputedStyle(e).minWidth}};const searchRect=rect(search),catalogRect=rect(catalog);const before={searchPressed:search.getAttribute('aria-pressed'),catalogPressed:catalog.getAttribute('aria-pressed'),searchActive:search.classList.contains('activo'),catalogActive:catalog.classList.contains('activo'),searchHidden:searchPanel.classList.contains('hidden'),catalogHidden:catalogPanel.classList.contains('hidden')};catalog.click();const afterCatalog={searchPressed:search.getAttribute('aria-pressed'),catalogPressed:catalog.getAttribute('aria-pressed'),searchActive:search.classList.contains('activo'),catalogActive:catalog.classList.contains('activo'),searchHidden:searchPanel.classList.contains('hidden'),catalogHidden:catalogPanel.classList.contains('hidden')};search.click();const afterSearch={searchPressed:search.getAttribute('aria-pressed'),catalogPressed:catalog.getAttribute('aria-pressed'),searchActive:search.classList.contains('activo'),catalogActive:catalog.classList.contains('activo'),searchHidden:searchPanel.classList.contains('hidden'),catalogHidden:catalogPanel.classList.contains('hidden')};if(prior.tab)tab.classList.add('visible');else tab.classList.remove('visible');if(prior.display)tab.style.display=prior.display;else tab.style.removeProperty('display');if(prior.shell)shell.classList.add('visible');else shell.classList.remove('visible');if(prior.loginHidden)login.classList.add('hidden');else login.classList.remove('hidden');return {ready:true,searchRect,catalogRect,before,afterCatalog,afterSearch,restored:afterSearch.searchPressed==='true'&&afterSearch.catalogPressed==='false'&&afterSearch.searchActive&&!afterSearch.catalogActive&&!afterSearch.searchHidden&&afterSearch.catalogHidden,prior};})()");
+  assert(salesToggleProbe.ready, "No está disponible el DOM del toggle Ventas en Chromium: " + JSON.stringify(salesToggleProbe));
+  assert(salesToggleProbe.searchRect.display !== "none" && salesToggleProbe.catalogRect.display !== "none" &&
+    salesToggleProbe.searchRect.width >= 120 && salesToggleProbe.catalogRect.width >= 120 &&
+    salesToggleProbe.searchRect.height >= 44 && salesToggleProbe.catalogRect.height >= 44,
+    "Los toggles de Ventas no tienen un objetivo táctil visible de al menos 120x44: " + JSON.stringify(salesToggleProbe));
+  assert(salesToggleProbe.before.searchPressed === "true" && salesToggleProbe.before.catalogPressed === "false" &&
+    salesToggleProbe.before.searchActive && !salesToggleProbe.before.catalogActive,
+    "El estado inicial Buscador/Catálogo no es coherente: " + JSON.stringify(salesToggleProbe.before));
+  assert(salesToggleProbe.afterCatalog.searchPressed === "false" && salesToggleProbe.afterCatalog.catalogPressed === "true" &&
+    !salesToggleProbe.afterCatalog.searchActive && salesToggleProbe.afterCatalog.catalogActive &&
+    salesToggleProbe.afterCatalog.searchHidden && !salesToggleProbe.afterCatalog.catalogHidden,
+    "El clic en Catálogo no cambia al panel correcto: " + JSON.stringify(salesToggleProbe.afterCatalog));
+  assert(salesToggleProbe.restored, "El clic en Buscador no restaura el panel inicial: " + JSON.stringify(salesToggleProbe.afterSearch));
+  report.evidence.step4SalesViewToggle = salesToggleProbe;
+
   // Step 4/15 — real Chromium check of the production-served Preferences module.
   // The browser profile is disposable; no user session or business data is touched.
   report.evidence.phase = "step4_preferences_switch_persistence";
