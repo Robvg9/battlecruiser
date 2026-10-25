@@ -186,10 +186,8 @@ function crearContexto() {
   contextosJSDOM.add(dom);
   const window = dom.window;
   const document = window.document;
-  global.window = window;
-  global.document = document;
-  global.navigator = window.navigator;
-  global.crypto = window.crypto || global.crypto;
+  // Keep each JSDOM realm isolated. Assigning these to Node global makes late
+  // startup callbacks from an earlier context use another test's document.
 
   Object.defineProperty(window, "indexedDB", { value: new IDBFactory(), configurable: true });
   Object.defineProperty(window, "caches", {
