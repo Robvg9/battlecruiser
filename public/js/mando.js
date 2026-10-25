@@ -281,7 +281,14 @@ async function refrescarAuditoria() {
 function renderAuditoria(filas) {
   const el = document.getElementById("mando-auditoria");
   if (!el) return;
-  if (!filas || filas.length === 0) {
+  // Supabase RPC contract: an audit page must be an array. Avoid a TypeError
+  // and distinguish a malformed response from a legitimate empty audit list.
+  if (!Array.isArray(filas)) {
+    el.innerHTML = '<p class="lista-estado">No se pudo cargar auditoría: respuesta inválida del servidor.</p>';
+    renderPaginacionAuditoria(0);
+    return;
+  }
+  if (filas.length === 0) {
     el.innerHTML = '<p class="lista-estado">Sin registros de auditoría.</p>';
     renderPaginacionAuditoria(0);
     return;
