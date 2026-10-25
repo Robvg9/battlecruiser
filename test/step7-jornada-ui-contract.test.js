@@ -39,8 +39,8 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
 });
 
 test("The Step 7 bundle is version aligned and available in the offline shell",()=>{
-  assert.match(app,/const VERSION=["']9\.5\.18["']/);
+  assert.match(app,/const VERSION=["']9\.5\.19["']/);
   assert.match(app,/\["bc7-jornada-ui\.js","7\.1"\]/);
-  assert.match(sw,/BC_SW_VERSION\s*=\s*["']9\.5\.18["']/);
+  assert.match(sw,/BC_SW_VERSION\s*=\s*["']9\.5\.19["']/);
   assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.1/);
 });

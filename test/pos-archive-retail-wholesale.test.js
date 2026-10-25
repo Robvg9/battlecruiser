@@ -16,6 +16,8 @@ function createApp(warehouses, turno) {
   window._turnoActual = turno;
   window.irATab = function (tab) { navigations.push(tab); return tab; };
   window.eval(archiveSource);
+  // In outside-only JSDOM, dispatch startup so the navigation guard is installed before direct calls.
+  window.document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   window.__BC_M74_SYNC_POS_ARCHIVE__();
   return { dom, window, navigations };
 }
