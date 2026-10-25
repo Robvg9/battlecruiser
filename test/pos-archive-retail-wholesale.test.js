@@ -8,12 +8,13 @@ const { JSDOM } = require("jsdom");
 const index = fs.readFileSync("public/index.html", "utf8");
 const archiveSource = fs.readFileSync("public/js/m74-pos-archive-retail.js", "utf8");
 
-function createApp(warehouses, turno) {
+function createApp(warehouses, turno, refreshTurno) {
   const dom = new JSDOM(index, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
   const window = dom.window;
   const navigations = [];
   window._cache = { almacenes: warehouses };
   window._turnoActual = turno;
+  if (typeof refreshTurno === "function") window.refrescarTurnoActual = refreshTurno;
   window.irATab = function (tab) { navigations.push(tab); return tab; };
   window.eval(archiveSource);
   // In outside-only JSDOM, dispatch startup so the navigation guard is installed before direct calls.
@@ -36,6 +37,8 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     assert.ok(button.classList.contains("bc-pos-archived"));
     assert.equal(button.getAttribute("data-bc-pos-availability"), "archived");
     assert.ok(panel.classList.contains("bc-pos-archived-panel"));
+    const archiveCss = window.document.getElementById("bc-m74-pos-archive-css").textContent;
+    assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
     assert.ok(panel.querySelector("#form-venta-linea"), "se conserva el formulario POS");
     assert.ok(panel.querySelector("#lista-ventas"), "se conserva el historial de ventas");
     assert.ok(index.includes('src="js/ventas.js?'), "el código histórico no se elimina");
@@ -69,6 +72,27 @@ test("el POS solo se habilita durante un turno ABIERTO de almacén mayorista", (
     const app = createApp(warehouses, turno);
     try { assert.equal(app.window.__BC_POS_ARCHIVED__, true); }
     finally { app.dom.window.close(); }
+  }
+});
+
+test("M74 espera al refresco async del turno antes de habilitar el POS mayorista", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  const { dom, window } = createApp(warehouses, null, async function () {
+    await new Promise(resolve => window.setTimeout(resolve, 10));
+    window._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
+    return window._turnoActual;
+  });
+  try {
+    const button = window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    assert.equal(window.__BC_POS_ARCHIVED__, true);
+    await window.refrescarTurnoActual();
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "visibility must be recalculated after the Promise resolves");
+    assert.equal(button.getAttribute("data-bc-pos-availability"), "wholesale");
+  } finally {
+    dom.window.close();
   }
 });
 

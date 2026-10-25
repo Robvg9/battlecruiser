@@ -41,7 +41,7 @@
     style.id = 'bc-m74-pos-archive-css';
     style.textContent =
       '#tabs .tab-btn[data-tab="ventas"].' + BUTTON_CLASS + '{display:none!important;visibility:hidden!important;pointer-events:none!important;height:0!important;max-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;border:0!important}' +
-      '#tab-ventas.bc-pos.' + PANEL_CLASS + ',#tab-ventas.bc-pos.visible.' + PANEL_CLASS + '{display:none!important;visibility:hidden!important;pointer-events:none!important}';
+      '#tab-ventas.' + PANEL_CLASS + ',#tab-ventas.' + PANEL_CLASS + '.visible{display:none!important;visibility:hidden!important;pointer-events:none!important}';
     document.head.appendChild(style);
   }
   function goToOperationalWorkspace() {
@@ -135,7 +135,7 @@
     ensureStyles();
     wrapNavigation();
     wrapRefresh('actualizarPanelAlmacenVenta');
-    wrapRefresh('refrescarTurnoActual');
+    wrapAsyncRefresh('refrescarTurnoActual');
     wrapAsyncRefresh('__BC_M25_refrescarTurno');
     document.addEventListener('click', function (event) {
       var target = event.target;
