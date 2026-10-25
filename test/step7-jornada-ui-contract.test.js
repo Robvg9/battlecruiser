@@ -38,9 +38,26 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/data-tab=.?ventas/);
 });
 
+
+test("iniciar una jornada relee la sesión mayorista y recalcula el archivo POS",()=>{
+  const helperAt=ui.indexOf("async function refreshPosArchiveAfterSessionStart()");
+  const startAt=ui.indexOf("async function startSession(btn)");
+  const closeAt=ui.indexOf("async function closeSession(form)",startAt);
+  assert.ok(helperAt>=0 && startAt>helperAt && closeAt>startAt,"la política de sesión debe tener helper dedicado junto a apertura");
+  const helper=ui.slice(helperAt,startAt);
+  const start=ui.slice(startAt,closeAt);
+  assert.match(helper,/await window\.__BC_M25_refrescarTurno\(\)/,"primero refresca el turno canónico cuando está disponible");
+  assert.match(helper,/await window\.refrescarTurnoActual\(\)/,"incluye la ruta de compatibilidad para refrescar el turno");
+  assert.match(helper,/window\.__BC_M74_SYNC_POS_ARCHIVE__\('jornada-started'\)/,"después de refrescar vuelve a evaluar el POS archivado");
+  const open=start.indexOf("await rpc('bc5_iniciar_jornada'");
+  const refresh=start.indexOf("await refreshPosArchiveAfterSessionStart()");
+  const reload=start.indexOf("await loadCalendar()");
+  assert.ok(open>=0 && refresh>open && reload>refresh,"la secuencia debe ser: backend abre, refrescar sesión/POS, recargar el workspace");
+});
+
 test("The Step 7 bundle is version aligned and available in the offline shell",()=>{
-  assert.match(app,/const VERSION=["']9\.5\.18["']/);
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.1"\]/);
-  assert.match(sw,/BC_SW_VERSION\s*=\s*["']9\.5\.18["']/);
-  assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.1/);
+  assert.match(app,/const VERSION=["']9\.5\.20["']/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.2"\]/);
+  assert.match(sw,/BC_SW_VERSION\s*=\s*["']9\.5\.20["']/);
+  assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.2/);
 });
