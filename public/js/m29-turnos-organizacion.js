@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.11';
+  var VERSION = '29.13';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -67,7 +67,7 @@
     return estado === 'PROGRAMADO' || estado === 'EN_CURSO' || estado === 'PENDIENTE_APROBACION';
   }
 
-  var state = { isAdmin: false, turnos: [], busy: false, errorMsg: '', loadOk: false };
+  var state = { isAdmin: false, turnos: [], busy: false, errorMsg: '', loadOk: false, filters: { almacenId: '', estado: '' } };
 
   function injectCss() {
     if (document.getElementById('bc-m29-turnos-css')) return;
@@ -82,6 +82,8 @@
       '.m29-hero p{margin:4px 0 0;opacity:.7;font-size:.9rem}',
       '.m29-btn-crear{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:600;font-size:.95rem;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,.35)}',
       '.m29-btn-crear:hover{filter:brightness(1.08)}','.m29-btn-crear:disabled{opacity:.5;cursor:not-allowed}',
+      '.m29-hero-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+      '.m29-btn-refresh{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:transparent;color:inherit;font-weight:600;font-size:.92rem;cursor:pointer}',
       '.m29-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}',
       '.m29-card{background:var(--card-bg,rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s}',
       '.m29-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.25)}',
@@ -95,6 +97,11 @@
       '.m29-meta span{opacity:.65}',
       '.m29-empty{text-align:center;padding:40px 16px;opacity:.65}',
       '.m29-empty.error{opacity:1;color:#f87171}',
+      '.m29-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:0 0 14px}',
+      '.m29-filter{display:block;font-size:.82rem;opacity:.85}',
+      '.m29-filter span{display:block;margin-bottom:5px}',
+      '.m29-filter select{width:100%;min-height:42px;padding:9px 10px;border:1px solid rgba(255,255,255,.16);border-radius:8px;background:var(--card-bg,rgba(255,255,255,.04));color:inherit}',
+      '.m29-filter select option{background:#1e293b;color:#fff}',
       '.m29-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}',
       '.m29-modal{background:#1e293b;border-radius:16px;width:100%;max-width:420px;padding:20px 22px;border:1px solid rgba(255,255,255,.08)}',
       '.m29-field{margin-bottom:12px}',
@@ -177,6 +184,70 @@
     return '<article class="m29-card" data-turno-id="' + esc(id) + '"><div class="m29-card-top"><div class="m29-card-alm">' + esc(alm) + '</div><span class="m29-badge ' + esc(estKey) + '">' + esc(est) + '</span></div><div class="m29-meta"><div><span>Inicio</span><br>' + esc(inicio) + '</div><div><span>Días</span><br>' + esc(dias) + '</div><div><span>Final</span><br>' + esc(fin) + '</div><div><span>Dependientas</span><br>' + esc(assigned != null && total != null ? assigned + '/' + total : 'Ver detalle') + '</div></div></article>';
   }
 
+  function filterWarehouses() {
+    var byId = new Map();
+    warehouses().forEach(function (a) {
+      if (a && a.id != null) byId.set(String(a.id), { id: String(a.id), nombre: a.nombre || a.id });
+    });
+    state.turnos.forEach(function (t) {
+      var id = t && t.almacen_id != null ? String(t.almacen_id) : '';
+      if (id && !byId.has(id)) byId.set(id, { id: id, nombre: t.almacen_nombre || t.almacen || id });
+    });
+    return Array.from(byId.values()).sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre)); });
+  }
+
+  function filteredTurnos() {
+    return state.turnos.filter(function (t) {
+      var almacenId = String(t.almacen_id || '');
+      var estado = normalizeEstado(t.estado_maestro || t.estado || t.status);
+      return (!state.filters.almacenId || almacenId === state.filters.almacenId) &&
+        (!state.filters.estado || estado === state.filters.estado);
+    });
+  }
+
+  function filtersHtml() {
+    var warehouseOptions = filterWarehouses().map(function (a) {
+      return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>';
+    }).join('');
+    return '<div class="m29-filters" aria-label="Filtros de turnos">' +
+      '<label class="m29-filter"><span>Estado del turno</span><select id="m29-filtro-estado" aria-label="Filtrar turnos por estado">' +
+        '<option value="">Todos los estados</option>' +
+        '<option value="EN_CURSO">En curso</option>' +
+        '<option value="PROGRAMADO">Programado</option>' +
+        '<option value="PENDIENTE_APROBACION">Pendiente de aprobación</option>' +
+      '</select></label>' +
+      '<label class="m29-filter"><span>Almacén</span><select id="m29-filtro-almacen" aria-label="Filtrar turnos por almacén">' +
+        '<option value="">Todos los almacenes</option>' + warehouseOptions +
+      '</select></label></div>';
+  }
+
+  function renderListBody() {
+    if (state.errorMsg) return '<div class="m29-empty error"><p>' + esc(state.errorMsg) + '</p></div>';
+    if (!state.turnos.length) return '<div class="m29-empty"><p>No existe ningún turno actualmente.</p></div>';
+    var visible = filteredTurnos();
+    if (!visible.length) return '<div class="m29-empty"><p>No hay turnos que coincidan con los filtros seleccionados.</p></div>';
+    return '<div class="m29-grid">' + visible.map(cardHtml).join('') + '</div>';
+  }
+
+  function bindCardClicks(container) {
+    if (!container) return;
+    container.querySelectorAll('.m29-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        var id = card.getAttribute('data-turno-id');
+        if (id) openDetalle(id, false);
+      });
+    });
+  }
+
+  function repaintListBody() {
+    var el = root();
+    var list = el && el.querySelector('#m29-list');
+    if (list) {
+      list.innerHTML = renderListBody();
+      bindCardClicks(list);
+    }
+  }
+
   async function renderHome() {
     var el = root();
     if (!el || window.__BC_M29_RENDERING) return;
@@ -191,21 +262,32 @@
       await loadTurnos();
       el.querySelectorAll('#m24-asig-panel,#m22-sesiones-panel,.m33-home,.tm-wrap').forEach(function (n) { n.remove(); });
       var btnHtml = state.isAdmin ? '<button type="button" class="m29-btn-crear" id="m29-btn-crear">+ Crear Turno</button>' : '';
-      var body;
-      if (state.errorMsg) body = '<div class="m29-empty error"><p>' + esc(state.errorMsg) + '</p></div>';
-      else if (!state.turnos.length) body = '<div class="m29-empty"><p>No existe ningún turno actualmente.</p></div>';
-      else body = '<div class="m29-grid">' + state.turnos.map(cardHtml).join('') + '</div>';
+      var refreshBtnHtml = '<button type="button" class="m29-btn-refresh" id="m29-btn-refrescar" aria-label="Actualizar lista de turnos">Refrescar</button>';
+      var filterHtml = state.turnos.length ? filtersHtml() : '';
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Turnos</h2><p>' +
         (state.isAdmin ? 'Centro de turnos operativos' : 'Tus turnos y sesiones de trabajo') +
-        '</p></div>' + btnHtml + '</div>' + body + '</div>';
+        '</p></div><div class="m29-hero-actions">' + btnHtml + refreshBtnHtml + '</div></div>' + filterHtml + '<div id="m29-list">' + renderListBody() + '</div></div>';
+      var estadoFilter = el.querySelector('#m29-filtro-estado');
+      if (estadoFilter) {
+        estadoFilter.value = state.filters.estado;
+        estadoFilter.addEventListener('change', function () {
+          state.filters.estado = estadoFilter.value;
+          repaintListBody();
+        });
+      }
+      var almacenFilter = el.querySelector('#m29-filtro-almacen');
+      if (almacenFilter) {
+        almacenFilter.value = state.filters.almacenId;
+        almacenFilter.addEventListener('change', function () {
+          state.filters.almacenId = almacenFilter.value;
+          repaintListBody();
+        });
+      }
       var btn = document.getElementById('m29-btn-crear');
       if (btn) btn.addEventListener('click', openCrearModal);
-      el.querySelectorAll('.m29-card').forEach(function (card) {
-        card.addEventListener('click', function () {
-          var id = card.getAttribute('data-turno-id');
-          if (id) openDetalle(id, false);
-        });
-      });
+      var refreshBtn = document.getElementById('m29-btn-refrescar');
+      if (refreshBtn) refreshBtn.addEventListener('click', function () { renderHome(); });
+      bindCardClicks(el);
     } finally {
       window.__BC_M29_RENDERING = false;
     }

@@ -87,7 +87,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ github.event.workflow_run.id }}
-          path: test-results/release
+          path: test-results
 
       - name: Verify production serves exact application release provenance
         if: github.event_name == 'workflow_run'
