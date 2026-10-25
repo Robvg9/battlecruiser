@@ -166,7 +166,7 @@ test("the sidebar does not render a literal backslash-n between Movimientos and 
   const start = index.indexOf('data-tab="movimientos"');
   const end = index.indexOf('data-tab="ciclos"');
   assert.ok(start >= 0 && end > start, "the operational menu entries must exist");
-  const navBlock = index.slice(start, end);
+  const navBlock = index.slice(start, end).replace(/\r\n/g, "\n");
   assert.equal(navBlock.includes("\\n"), false, "literal backslash-n must not appear in the menu");
   const expected = 'data-tab="movimientos">Movimientos</button>\n        <button class="tab-btn" data-tab="turnos">Turnos</button>\n        <button class="tab-btn" data-tab="jornada">Jornada e inventario</button>';
   assert.ok(navBlock.includes(expected), "the menu entries must be separate, normally spaced buttons");
