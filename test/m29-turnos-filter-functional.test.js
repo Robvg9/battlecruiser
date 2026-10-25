@@ -15,7 +15,17 @@ const APP_SOURCE = fs.readFileSync(
   "utf8"
 );
 
+async function waitFor(predicate, timeout = 1000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return Boolean(predicate());
+}
+
 function setup(t) {
+  let listCalls = 0;
   const turns = [
     {
       id: "turno-principal", dias_turno: 7, almacen_id: "alm-1", almacen_nombre: "Principal",
@@ -69,20 +79,21 @@ function setup(t) {
       PENDIENTE_APROBACION: "Pendiente de aprobación",
       EN_VALIDACION: "Pendiente de aprobación"
     })[value] || String(value || "-"),
-    listarTurnosMaestros: async () => turns.map((turno) => ({ ...turno }))
+    listarTurnosMaestros: async () => { listCalls += 1; return turns.map((turno) => ({ ...turno })); }
   };
   window.eval(SOURCE);
   t.after(() => window.close());
-  return { window, turns };
+  return { window, turns, getListCalls: () => listCalls };
 }
 
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
-  assert.match(SOURCE, /var VERSION = '29\.12';/);
-  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.12"\]/);
-  const { window } = setup(t);
+  assert.match(SOURCE, /var VERSION = '29\.13';/);
+  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.13"\]/);
+  const { window, getListCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
 
+  assert.ok(root.querySelector("#m29-btn-refrescar"), "la vista visible Turnos debe tener un botón de refresco");
   assert.ok(root.querySelector("#m29-filtro-estado"), "el filtro de estado debe estar en la vista visible Turnos");
   assert.ok(root.querySelector("#m29-filtro-almacen"), "el filtro de almacén debe estar en la vista visible Turnos");
   assert.equal(root.querySelectorAll(".m29-card").length, 3, "se muestran los turnos activos, programados o pendientes de aprobación");
@@ -110,9 +121,19 @@ test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén"
   assert.ok(!Array.from(root.querySelectorAll(".m29-card")).some((card) => card.getAttribute("data-turno-id") === "turno-cerrado"),
     "la vista operativa conserva la regla de excluir turnos cerrados del resumen");
 
+  almacen.value = "alm-2";
+  almacen.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal(root.querySelectorAll(".m29-card").length, 2);
+  const callsBeforeRefresh = getListCalls();
+  root.querySelector("#m29-btn-refrescar").click();
+  assert.ok(await waitFor(() => getListCalls() > callsBeforeRefresh && root.querySelectorAll(".m29-card").length === 2),
+    "Refrescar vuelve a consultar los datos y mantiene el filtro seleccionado");
+  assert.equal(root.querySelector("#m29-filtro-almacen").value, "alm-2");
+  assert.ok(Array.from(root.querySelectorAll(".m29-card")).every((card) => card.textContent.includes("Reserva")));
+
   const opened = [];
   window.__BC_M33 = { open: (id) => opened.push(id) };
-  const visibleCard = root.querySelector('.m29-card[data-turno-id="turno-principal"]');
+  const visibleCard = root.querySelector('.m29-card[data-turno-id="turno-reserva-programado"]');
   visibleCard.click();
-  assert.deepEqual(opened, ["turno-principal"], "las tarjetas siguen abriendo el detalle después de re-renderizar filtros");
+  assert.deepEqual(opened, ["turno-reserva-programado"], "las tarjetas siguen abriendo el detalle después de refrescar y filtrar");
 });

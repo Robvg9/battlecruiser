@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.12';
+  var VERSION = '29.13';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -82,6 +82,8 @@
       '.m29-hero p{margin:4px 0 0;opacity:.7;font-size:.9rem}',
       '.m29-btn-crear{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-weight:600;font-size:.95rem;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,.35)}',
       '.m29-btn-crear:hover{filter:brightness(1.08)}','.m29-btn-crear:disabled{opacity:.5;cursor:not-allowed}',
+      '.m29-hero-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+      '.m29-btn-refresh{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:transparent;color:inherit;font-weight:600;font-size:.92rem;cursor:pointer}',
       '.m29-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}',
       '.m29-card{background:var(--card-bg,rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s}',
       '.m29-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.25)}',
@@ -260,10 +262,11 @@
       await loadTurnos();
       el.querySelectorAll('#m24-asig-panel,#m22-sesiones-panel,.m33-home,.tm-wrap').forEach(function (n) { n.remove(); });
       var btnHtml = state.isAdmin ? '<button type="button" class="m29-btn-crear" id="m29-btn-crear">+ Crear Turno</button>' : '';
+      var refreshBtnHtml = '<button type="button" class="m29-btn-refresh" id="m29-btn-refrescar" aria-label="Actualizar lista de turnos">Refrescar</button>';
       var filterHtml = state.turnos.length ? filtersHtml() : '';
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Turnos</h2><p>' +
         (state.isAdmin ? 'Centro de turnos operativos' : 'Tus turnos y sesiones de trabajo') +
-        '</p></div>' + btnHtml + '</div>' + filterHtml + '<div id="m29-list">' + renderListBody() + '</div></div>';
+        '</p></div><div class="m29-hero-actions">' + btnHtml + refreshBtnHtml + '</div></div>' + filterHtml + '<div id="m29-list">' + renderListBody() + '</div></div>';
       var estadoFilter = el.querySelector('#m29-filtro-estado');
       if (estadoFilter) {
         estadoFilter.value = state.filters.estado;
@@ -282,6 +285,8 @@
       }
       var btn = document.getElementById('m29-btn-crear');
       if (btn) btn.addEventListener('click', openCrearModal);
+      var refreshBtn = document.getElementById('m29-btn-refrescar');
+      if (refreshBtn) refreshBtn.addEventListener('click', function () { renderHome(); });
       bindCardClicks(el);
     } finally {
       window.__BC_M29_RENDERING = false;
