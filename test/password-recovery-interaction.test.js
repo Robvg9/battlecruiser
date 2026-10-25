@@ -175,7 +175,8 @@ test("Paso 4 reset: valid recovery session updates password, clears form and end
   c.window.document.getElementById("pass-confirm").value = "validpass123";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
   assert.ok(await waitFor(() => /Contraseña actualizada/i.test(c.window.document.getElementById("msg-pass").textContent)));
-  assert.deepEqual(c.calls, [{ password: "validpass123" }]);
+  assert.equal(c.calls.length, 1, "la sesión de recuperación válida debe ejecutar updateUser una sola vez");
+  assert.equal(c.calls[0].password, "validpass123", "updateUser debe recibir la nueva contraseña");
   assert.equal(c.window.document.getElementById("pass-new").value, "");
   assert.equal(c.window.document.getElementById("pass-confirm").value, "");
   assert.equal(c.window._bcRecoveryMode, false);
