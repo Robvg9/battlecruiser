@@ -169,9 +169,44 @@ async function waitUntil(description, predicate, timeoutMs) {
   throw new Error("Timeout esperando " + description + ". Último valor: " + JSON.stringify(lastValue));
 }
 async function navigateAndWait(url) {
-  const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS);
-  const result = await cdpCommand("Page.navigate", { url });
-  if (result.errorText) throw new Error("Page.navigate falló: " + result.errorText);
+  let loadSeen = false;
+  const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS).then((event) => {
+    loadSeen = true;
+    return event;
+  });
+  // A failed CDP command can outlive the navigation-event waiter; attach a
+  // handler now to avoid an unhandled rejection if Page.navigate stalls.
+  loaded.catch(() => {});
+
+  try {
+    const result = await cdpCommand("Page.navigate", { url });
+    if (result.errorText) throw new Error("Page.navigate falló: " + result.errorText);
+  } catch (error) {
+    // Edge on a busy Windows self-hosted runner can occasionally stop replying
+    // to Page.navigate even while the target and Worker preview are healthy.
+    // If the load event has not arrived, fall back to a same-origin-safe JS
+    // navigation through Runtime.evaluate, then await the same load event.
+    if (!String(error && error.message || error).includes("Timeout CDP en Page.navigate") || loadSeen) {
+      throw error;
+    }
+    report.evidence.navigationFallbacks = report.evidence.navigationFallbacks || [];
+    report.evidence.navigationFallbacks.push({
+      url,
+      reason: String(error && error.message || error),
+      fallback: "Runtime.evaluate location.assign"
+    });
+    const fallback = await cdpCommand("Runtime.evaluate", {
+      expression: "window.location.assign(" + JSON.stringify(url) + ")",
+      awaitPromise: false,
+      returnByValue: true,
+      userGesture: true,
+    });
+    if (fallback.exceptionDetails) {
+      const description = fallback.exceptionDetails.exception && fallback.exceptionDetails.exception.description;
+      throw new Error("Fallback Runtime.evaluate para navegación falló: " +
+        (description || fallback.exceptionDetails.text || "desconocido"));
+    }
+  }
   await loaded;
   await delay(500);
 }
