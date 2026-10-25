@@ -38,7 +38,7 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     assert.equal(button.getAttribute("data-bc-pos-availability"), "archived");
     assert.ok(panel.classList.contains("bc-pos-archived-panel"));
     const archiveCss = window.document.getElementById("bc-m74-pos-archive-css").textContent;
-    assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
+    assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel,#tab-ventas.bc-pos-archived-panel.visible{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
     assert.ok(panel.querySelector("#form-venta-linea"), "se conserva el formulario POS");
     assert.ok(panel.querySelector("#lista-ventas"), "se conserva el historial de ventas");
     assert.ok(index.includes('src="js/ventas.js?'), "el código histórico no se elimina");
