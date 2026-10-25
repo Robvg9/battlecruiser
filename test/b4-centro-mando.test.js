@@ -368,3 +368,22 @@ test("B4.20: no se crean stores IndexedDB adicionales", async () => {
   // No existe un store de auditoría en IndexedDB (la auditoría es en Supabase).
   assert.strictEqual(window._auditoriaStore, undefined, "no hay store IndexedDB de auditoría");
 });
+
+test("B4.5: respuesta no-array de listar_auditoria_admin no rompe la UI ni se presenta como lista vacía", async () => {
+  const { window, document } = montarEntorno({
+    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
+    permisos: [{ seccion: "auditoria", accion: "ver" }],
+    auditoria: { message: "invalid rpc payload" },
+  });
+  marcarOnline(window);
+  await esperar(80);
+  await window.refrescarCentroMando();
+  await esperar(20);
+  const aud = document.getElementById("mando-auditoria");
+  assert.match(aud.textContent, /respuesta inválida del servidor/i,
+    "una respuesta no-array debe explicarse, no entrar en forEach ni fingir que no hay registros");
+  assert.equal(aud.querySelectorAll(".cc-actividad-item").length, 0,
+    "un payload inválido no puede renderizar filas inventadas");
+  assert.doesNotMatch(aud.textContent, /Sin registros de auditoría/i,
+    "payload inválido no equivale a una lista válida vacía");
+});
