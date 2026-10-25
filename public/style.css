@@ -194,6 +194,30 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
 .tab-panel.visible { display: block; }
 .tab-btn { padding: 10px 16px; background: transparent; color: var(--mist); border: none; cursor: pointer; }
 .tab-btn.active { color: var(--gold); }
+
+/* Step 4: make the Buscador/Catálogo mode switch visibly tappable and keyboard-accessible. */
+.venta-vista-toggle {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px;
+}
+.venta-vista-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-width: 120px; min-height: 44px; padding: 10px 14px;
+  background: var(--stone-2); color: var(--text);
+  border: 1px solid var(--gold-dim); border-radius: 8px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; touch-action: manipulation;
+}
+.venta-vista-btn:hover:not(:disabled) {
+  border-color: var(--gold); color: var(--gold-bright);
+}
+.venta-vista-btn.activo {
+  background: rgba(212,176,92,0.14); border-color: var(--gold);
+  color: var(--gold-bright); box-shadow: inset 0 0 0 1px rgba(212,176,92,0.18);
+}
+.venta-vista-btn:focus-visible {
+  outline: 2px solid var(--gold-bright); outline-offset: 2px;
+}
+.venta-vista-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .inline-form {
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
   background: var(--stone); border: 1px solid rgba(212,176,92,0.15); border-radius: 8px; padding: 14px;
