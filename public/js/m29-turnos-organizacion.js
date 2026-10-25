@@ -227,10 +227,23 @@
     return '<div class="m29-grid">' + visible.map(cardHtml).join('') + '</div>';
   }
 
+  function bindCardClicks(container) {
+    if (!container) return;
+    container.querySelectorAll('.m29-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        var id = card.getAttribute('data-turno-id');
+        if (id) openDetalle(id, false);
+      });
+    });
+  }
+
   function repaintListBody() {
     var el = root();
     var list = el && el.querySelector('#m29-list');
-    if (list) list.innerHTML = renderListBody();
+    if (list) {
+      list.innerHTML = renderListBody();
+      bindCardClicks(list);
+    }
   }
 
   async function renderHome() {
@@ -269,12 +282,7 @@
       }
       var btn = document.getElementById('m29-btn-crear');
       if (btn) btn.addEventListener('click', openCrearModal);
-      el.querySelectorAll('.m29-card').forEach(function (card) {
-        card.addEventListener('click', function () {
-          var id = card.getAttribute('data-turno-id');
-          if (id) openDetalle(id, false);
-        });
-      });
+      bindCardClicks(el);
     } finally {
       window.__BC_M29_RENDERING = false;
     }
