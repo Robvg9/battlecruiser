@@ -8,6 +8,7 @@ const { buildReleaseManifest, releaseManifestFilename } = require("../scripts/wr
 
 const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
+const deployScript = fs.readFileSync(path.join(__dirname, "deploy-production-pwa.js"), "utf8");
 const quality = fs.readFileSync(path.join(root, ".github/workflows/quality.yml"), "utf8");
 const selfHosted = fs.readFileSync(path.join(root, ".github/workflows/selfhosted-windows-test.yml"), "utf8");
 const verifier = fs.readFileSync(path.join(__dirname, "verify-production-version.js"), "utf8");
@@ -51,14 +52,19 @@ test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run 
   }), /numeric GitHub Actions run ID/);
 });
 
-test("deploy smoke validates the exact LIVE manifest and persists that fetched body as an artifact", () => {
-  assert.match(deploy, /node scripts\/write-release-manifest\.js/);
-  assert.match(deploy, /release-\$GITHUB_SHA\.json/);
-  assert.match(deploy, /BATTLECRUISER_PWA_LIVE_EXACT_SHA=PASS/);
-  assert.match(deploy, /cp \/tmp\/bc-live-release\.json "test-results\/release\/\$release_name"/);
-  assert.match(deploy, /name: battlecruiser-release-provenance-\$\{\{ github\.run_id \}\}/);
-  assert.match(deploy, /if-no-files-found: error/);
-  assert.match(deploy, /workflow_run_id/);
+test("production deploy uses the self-hosted Windows runner and persists the exact LIVE release manifest", () => {
+  assert.ok(deploy.includes("runs-on: [self-hosted, Windows, X64]"));
+  assert.ok(deploy.includes("run: node test/deploy-production-pwa.js"));
+  assert.ok(deploy.includes("test-results/release/release-*.json"));
+  assert.ok(deploy.includes("name: battlecruiser-release-provenance-${{ github.run_id }}"));
+  assert.ok(deploy.includes("test-results/deploy-pwa-log.txt"));
+  assert.ok(deploy.includes("if-no-files-found: warn"));
+  assert.ok(deployScript.includes("writeReleaseManifest()"));
+  assert.ok(deployScript.includes('const filename = "release-" + expected.source_sha + ".json";'));
+  assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
+  assert.ok(deployScript.includes("workflow_run_id"));
+  assert.ok(deployScript.includes("writeFileSync(path.join(artifactDir, filename)"));
+  assert.ok(deployScript.includes("CLOUDFLARE_API_TOKEN"));
 });
 
 test("post-deploy Quality downloads the provenance artifact from the exact Deploy workflow_run", () => {
@@ -90,7 +96,12 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(liveOfflineE2e, /const maxAttempts = isProductionBase && isMainJs \? 30 : 4/);
   assert.match(liveOfflineE2e, /timeoutMs = 20000/);
   assert.match(liveOfflineE2e, /isProductionBase \? 20000 : 35000/);
-  assert.match(quality, /needs: \[deploy-pr-preview, quality\]/);
+  const suiteStep = quality.indexOf("- name: Full automated suite");
+  const deployStep = quality.indexOf("- name: Deploy isolated PR preview");
+  const assetsStep = quality.indexOf("- name: Wait for isolated preview assets");
+  const e2eStep = quality.indexOf("- name: Run real-browser offline recovery E2E");
+  assert.ok(suiteStep >= 0 && deployStep > suiteStep && assetsStep > deployStep && e2eStep > assetsStep);
+  assert.ok(quality.includes("runs-on: [self-hosted, Windows, X64]"));
   assert.match(quality, /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.conclusion == 'success'/);
 });
 

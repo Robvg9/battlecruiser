@@ -225,8 +225,10 @@ function crearContexto() {
   script.textContent = appJs;
   document.body.appendChild(script);
 
-  // This suite checks form submits/payloads, not async stock refreshes.
-  // Keep unrelated background refresh callbacks from outliving JSDOM windows.
+  // These tests verify form validation/payloads, not background stock/connectivity updates.
+  // Override global callbacks before pending promise jobs execute and touch a closed JSDOM document.
+  window.marcarConectividadReal = () => {};
+  window.actualizarIndicadorConexion = () => {};
   window.cargarStockAlmacenes = async () => [];
   window.refrescarStockYSelects = async () => ({});
 
