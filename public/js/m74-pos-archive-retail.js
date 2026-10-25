@@ -7,6 +7,7 @@
   var PANEL_CLASS = 'bc-pos-archived-panel';
   var fallbackScheduled = false;
   var appliedAvailability = null;
+  var refreshDepth = 0;
   var pendingAvailability = null;
   var pendingVisibilityTimer = null;
   var VISIBILITY_SETTLE_MS = 220;
@@ -84,6 +85,13 @@
   }
   function sync(reason) {
     var available = hasActiveWholesaleSession();
+    if (refreshDepth > 0) {
+      if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+      pendingVisibilityTimer = null;
+      pendingAvailability = null;
+      if (appliedAvailability === null) applyAvailability(false);
+      return available;
+    }
     if (appliedAvailability === null) {
       if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
       pendingVisibilityTimer = null;
@@ -137,9 +145,16 @@
     var original = window[name];
     if (typeof original !== 'function' || original.__bcM74ArchiveWrapped) return;
     var wrapped = async function () {
-      var result = await original.apply(this, arguments);
-      sync('refresh:' + name);
-      return result;
+      refreshDepth += 1;
+      if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+      pendingVisibilityTimer = null;
+      pendingAvailability = null;
+      try {
+        return await original.apply(this, arguments);
+      } finally {
+        refreshDepth = Math.max(0, refreshDepth - 1);
+        if (!refreshDepth) sync('refresh:' + name);
+      }
     };
     wrapped.__bcM74ArchiveWrapped = true;
     window[name] = wrapped;
