@@ -501,9 +501,90 @@ async function main() {
   report.evidence.step4PreferencesAfterChange = { before: preferenceChange.before, stored: preferenceChange.stored, states: preferenceChange.after };
 
   await reloadAndWait(false);
-  const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const states=items.map(item=>({id:item.id,key:item.key,exists:!!document.getElementById(item.id),checked:document.getElementById(item.id)?.checked,stored:stored[item.key],matches:!!document.getElementById(item.id)&&stored[item.key]===document.getElementById(item.id).checked}));return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted:states.every(x=>x.exists&&x.matches)};})()");
+  const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};const login=document.querySelector('#login-form');if(login)login.classList.add('hidden');const shell=document.querySelector('#app-shell');if(shell)shell.classList.add('visible');const navButton=document.querySelector('#tabs [data-tab=preferencias]');if(navButton)navButton.click();await new Promise(r=>setTimeout(r,350));if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const ancestors=e=>{const out=[];for(let n=e;n&&out.length<8;n=n.parentElement){const s=getComputedStyle(n);out.push({tag:n.tagName,id:n.id||null,classes:typeof n.className==='string'?n.className:null,display:s.display,visibility:s.visibility,ariaHidden:n.getAttribute('aria-hidden'),rect:{width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height}});}return out;};const states=items.map(item=>{const e=document.getElementById(item.id);return {id:item.id,key:item.key,exists:!!e,checked:e?e.checked:null,stored:stored[item.key],matches:!!e&&stored[item.key]===e.checked,ancestors:e?ancestors(e):[]}});return {ready:true,version:window.__BC_VERSION__||null,navButtonFound:!!navButton,tabClass:tab.className,tabDisplay:getComputedStyle(tab).display,tabRect:{width:tab.getBoundingClientRect().width,height:tab.getBoundingClientRect().height},states,allPersisted:states.every(x=>x.exists&&x.matches)};})()");
   assert(preferenceReload.ready && preferenceReload.allPersisted,
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
+
+  // The shared E2E harness reloads unauthenticated production and may hide
+  // the app shell/panels by design. For this isolated semantic probe only,
+  // temporarily mount the actual Preferences panel directly under <body> so its
+  // controls are rendered in AX. Restore the original parent immediately after
+  // the read; no production code or data is changed.
+  const renderPreferencePanel = await evaluate("(()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false};const parent=tab.parentElement;const next=tab.nextSibling;window.__BC_STEP4_AX_RESTORE__=()=>{if(parent){if(next&&next.parentNode===parent)parent.insertBefore(tab,next);else parent.appendChild(tab);}};document.body.appendChild(tab);tab.classList.remove('hidden');tab.removeAttribute('hidden');tab.classList.add('active');tab.style.setProperty('display','block','important');tab.style.setProperty('visibility','visible','important');tab.style.setProperty('opacity','1','important');const panel=tab.querySelector('#cfg-preferencias-personales');if(panel){panel.classList.remove('hidden');panel.style.setProperty('display','block','important');panel.style.setProperty('visibility','visible','important');panel.style.setProperty('opacity','1','important');}return {ready:true,mountedDirectlyUnderBody:tab.parentElement===document.body,tabClass:tab.className,tabDisplay:getComputedStyle(tab).display,tabRect:{width:tab.getBoundingClientRect().width,height:tab.getBoundingClientRect().height},panelExists:!!panel,panelRect:panel?{width:panel.getBoundingClientRect().width,height:panel.getBoundingClientRect().height}:null};})()");
+  assert(renderPreferencePanel.ready && renderPreferencePanel.tabRect.width > 0 && renderPreferencePanel.tabRect.height > 0 &&
+    renderPreferencePanel.panelExists && renderPreferencePanel.panelRect && renderPreferencePanel.panelRect.width > 0,
+    "No se pudo montar el panel para la prueba semántica aislada: " + JSON.stringify(renderPreferencePanel));
+  report.evidence.step4ChromiumPreferencePanelRendering = renderPreferencePanel;
+
+  // Step 4/15 — Intento 3: inspeccionar el árbol de accesibilidad AX de Chromium
+  // directamente mediante CDP. Esto separa semántica web de la traducción nativa
+  // Android; el resultado NO se considera por sí solo prueba de Android físico.
+  await cdpCommand("Accessibility.enable");
+  const preferenceDom = await cdpCommand("DOM.getDocument", { depth: -1, pierce: true });
+  const preferenceAxItems = [
+    { id: "cfg-aj-auto-refresh", key: "autoRefresh", label: "Actualización automática" },
+    { id: "cfg-aj-sync-auto", key: "syncAuto", label: "Sincronización automática" },
+    { id: "cfg-aj-sync-open", key: "syncOnOpen", label: "Sincronizar al abrir app" },
+    { id: "cfg-aj-sync-wifi", key: "syncWifiOnly", label: "Sincronizar solo en Wi-Fi" },
+    { id: "cfg-aj-notify", key: "notifications", label: "Notificaciones" },
+    { id: "cfg-aj-compact", key: "compacto", label: "Modo compacto" },
+  ];
+  const fullAx = await cdpCommand("Accessibility.getFullAXTree");
+  const preferenceAxStates = [];
+  for (const item of preferenceAxItems) {
+    const query = await cdpCommand("DOM.querySelector", {
+      nodeId: preferenceDom.root.nodeId,
+      selector: "#" + item.id,
+    });
+    assert(query.nodeId, "DOM/CDP no encontró el control " + item.id);
+    const described = await cdpCommand("DOM.describeNode", { nodeId: query.nodeId });
+    const backendId = described.node.backendNodeId;
+    const candidates = (fullAx.nodes || []).filter((candidate) => candidate.backendDOMNodeId === backendId);
+    const partial = candidates.length ? { nodes: candidates } : await cdpCommand("Accessibility.getPartialAXTree", {
+      backendNodeId: backendId,
+      fetchRelatives: false,
+    });
+    const node = (partial.nodes || []).find((candidate) =>
+      candidate.backendDOMNodeId === backendId) ||
+      (partial.nodes || []).find((candidate) =>
+        candidate.role && ["switch", "checkbox"].includes(candidate.role.value) &&
+        (candidate.properties || []).some((property) => property.name === "checked")) ||
+      (partial.nodes || [])[0] || null;
+    const checkedProp = node && (node.properties || []).find((property) => property.name === "checked");
+    const rawChecked = checkedProp && checkedProp.value ? checkedProp.value.value : undefined;
+    const checked = typeof rawChecked === "boolean" ? rawChecked
+      : rawChecked === "true" ? true : rawChecked === "false" ? false : null;
+    const domState = preferenceReload.states.find((state) => state.id === item.id);
+    preferenceAxStates.push({
+      id: item.id,
+      key: item.key,
+      label: item.label,
+      backendDOMNodeId: backendId,
+      matchingAxNodes: candidates.length,
+      role: node && node.role ? node.role.value : null,
+      accessibleName: node && node.name ? node.name.value : null,
+      ignored: node && typeof node.ignored === "boolean" ? node.ignored : null,
+      ignoredReasons: node && node.ignoredReasons ? node.ignoredReasons : [],
+      checkedPropertyPresent: !!checkedProp,
+      checkedRaw: rawChecked === undefined ? null : rawChecked,
+      checked,
+      domChecked: domState ? domState.checked : null,
+      matchesDOM: checked !== null && !!domState && checked === domState.checked,
+    });
+  }
+  report.evidence.step4ChromiumAccessibilityTree = {
+    method: "CDP Accessibility.getPartialAXTree per DOM backendNodeId",
+    scope: "Chromium runner only; not the Android native AccessibilityNodeInfo tree",
+    states: preferenceAxStates,
+    allStatesAgree: preferenceAxStates.length === 6 && preferenceAxStates.every((state) =>
+      state.role === "switch" && state.checkedPropertyPresent && state.matchesDOM),
+  };
+  report.evidence.step4ChromiumAccessibilityTree.pass = report.evidence.step4ChromiumAccessibilityTree.allStatesAgree;
+  report.evidence.step4ChromiumAccessibilityTree.diagnosticOnly = true;
+  await evaluate("(()=>{if(typeof window.__BC_STEP4_AX_RESTORE__==='function'){window.__BC_STEP4_AX_RESTORE__();delete window.__BC_STEP4_AX_RESTORE__;}return true;})()");
+  assert(report.evidence.step4ChromiumAccessibilityTree.allStatesAgree,
+    "El árbol AX de Chromium no expone checked coherente para los seis switches: "
+      + JSON.stringify(preferenceAxStates));
   report.evidence.step4PreferencesAfterReload = preferenceReload;
 
   // Reproduce en Chromium real la integración que antes quitaba M26:
