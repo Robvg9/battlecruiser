@@ -72,6 +72,8 @@ test("post-deploy Quality downloads the provenance artifact from the exact Deplo
   assert.match(quality, /actions\/download-artifact@v4/);
   assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}/);
   assert.match(quality, /run-id: \$\{\{ github\.event\.workflow_run\.id \}\}/);
+  assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}[\s\S]*?path: test-results\s/);
+  assert.doesNotMatch(quality, /path: test-results\/release/, "download destination must preserve the artifact's release/ subfolder exactly once");
   assert.match(quality, /BC_EXPECTED_RELEASE_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
   assert.match(quality, /BC_EXPECTED_DEPLOY_RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
   assert.match(quality, /if: github\.event_name == 'workflow_run'/);
