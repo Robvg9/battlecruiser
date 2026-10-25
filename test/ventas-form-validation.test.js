@@ -46,12 +46,12 @@ function formDom() {
   window.ventaProductosLista = [];
 
   const formStart = VENTAS.indexOf('safeInit("form-venta-linea", () => {');
-  const formEnd = VENTAS.indexOf("\n\n// R10: buscadores de movimientos", formStart);
+  const formEnd = VENTAS.indexOf('safeInit("movimientos-buscadores", () => {', formStart);
   assert.ok(formStart >= 0 && formEnd > formStart, "must find the production sales-line form handler");
   window.eval(VENTAS.slice(formStart, formEnd));
 
   const confirmStart = VENTAS.indexOf('safeInit("confirmar-venta", () => {');
-  const confirmEnd = VENTAS.indexOf("\n\nasync function refrescarVentas()", confirmStart);
+  const confirmEnd = VENTAS.indexOf("async function refrescarVentas()", confirmStart);
   assert.ok(confirmStart >= 0 && confirmEnd > confirmStart, "must find the production sale confirmation handler");
   window.ejecutarOperacion = async (...args) => {
     saleCalls.push(args);
