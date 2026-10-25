@@ -10,6 +10,10 @@ const SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "m29-turnos-organizacion.js"),
   "utf8"
 );
+const APP_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "app.js"),
+  "utf8"
+);
 
 function setup(t) {
   const turns = [
@@ -73,6 +77,8 @@ function setup(t) {
 }
 
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
+  assert.match(SOURCE, /var VERSION = '29\\.12';/);
+  assert.match(APP_SOURCE, /\\["m29-turnos-organizacion\\.js","29\\.12"\\]/);
   const { window } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
