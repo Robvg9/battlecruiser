@@ -171,3 +171,31 @@ test("the sidebar does not render a literal backslash-n between Movimientos and 
   const expected = 'data-tab="movimientos">Movimientos</button>\n        <button class="tab-btn" data-tab="turnos">Turnos</button>\n        <button class="tab-btn" data-tab="jornada">Jornada e inventario</button>';
   assert.ok(navBlock.includes(expected), "the menu entries must be separate, normally spaced buttons");
 });
+
+test("M74 does not flip Ventas during an async session refresh", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  let appWindow;
+  let availabilityHeldDuringRefresh = false;
+  const { dom, window } = createApp(warehouses, { estado: "ABIERTO", almacen_id: "tmo" }, async function () {
+    appWindow._turnoActual = null;
+    appWindow.__BC_M74_SYNC_POS_ARCHIVE__();
+    await tick(appWindow, 260);
+    const button = appWindow.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    availabilityHeldDuringRefresh = appWindow.__BC_POS_ARCHIVED__ === false &&
+      !button.classList.contains("bc-pos-archived");
+    appWindow._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
+    return appWindow._turnoActual;
+  });
+  appWindow = window;
+  try {
+    await window.refrescarTurnoActual();
+    assert.equal(availabilityHeldDuringRefresh, true, "intermediate data must not hide the live wholesale POS during refresh");
+    assert.equal(window.__BC_POS_ARCHIVED__, false);
+    assert.equal(window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]').getAttribute("data-bc-pos-availability"), "wholesale");
+  } finally {
+    dom.window.close();
+  }
+});
