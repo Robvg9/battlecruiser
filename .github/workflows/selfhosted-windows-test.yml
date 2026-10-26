@@ -3,6 +3,14 @@ name: BattleCruiser Self-Hosted Windows Test
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "public/**"
+      - "test/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/selfhosted-windows-test.yml"
   push:
     branches: [main]
     paths:
