@@ -72,6 +72,7 @@
     if (button) {
       button.classList.toggle(BUTTON_CLASS, !available);
       button.setAttribute('data-bc-pos-availability', available ? 'wholesale' : 'archived');
+      button.disabled = !available;
       button.setAttribute('aria-disabled', available ? 'false' : 'true');
       if (available) button.removeAttribute('title');
       else button.setAttribute('title', 'Ventas requiere un turno abierto de almacén mayorista.');
