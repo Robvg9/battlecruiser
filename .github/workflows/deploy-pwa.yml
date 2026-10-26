@@ -23,7 +23,9 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, Windows, X64]
+    # Temporary resilience fallback: the registered self-hosted runner is stuck
+    # retrying the Actions broker. Use a clean hosted Windows runner for release.
+    runs-on: windows-latest
     timeout-minutes: 35
     steps:
       - name: Checkout
@@ -35,16 +37,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24.19.0
-      - name: Install Wrangler in the D-drive cache
+      - name: Install Wrangler in the runner temp cache
         shell: cmd
         env:
-          npm_config_cache: D:\Databank\npm-cache
-        run: npm.cmd install --prefix "D:\Databank\BattleCruiser-CI\Wrangler" --cache "D:\Databank\npm-cache" wrangler@4.151.0
+          npm_config_cache: ${{ runner.temp }}\npm-cache
+        run: npm.cmd install --prefix "%RUNNER_TEMP%\Wrangler" --cache "%RUNNER_TEMP%\npm-cache" wrangler@4.151.0
       - name: Deploy PWA and verify exact production release SHA
         shell: cmd
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          BC_WRANGLER_ROOT: D:\Databank\BattleCruiser-CI\Wrangler
+          BC_WRANGLER_ROOT: ${{ runner.temp }}\Wrangler
         run: node test/deploy-production-pwa.js
       - name: Persist LIVE-verified release provenance and deploy log
         if: always()
