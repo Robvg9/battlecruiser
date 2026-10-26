@@ -23,9 +23,9 @@ permissions:
 
 jobs:
   deploy:
-    # Temporary resilience fallback: the registered self-hosted runner is stuck
-    # retrying the Actions broker. Use a clean hosted Windows runner for release.
-    runs-on: windows-latest
+    # Use the registered BattleCruiser Windows runner, now proven to accept and
+    # complete the exact-SHA validation job. The hosted fallback failed before steps ran.
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 35
     steps:
       - name: Checkout
