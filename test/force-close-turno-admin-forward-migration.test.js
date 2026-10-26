@@ -45,6 +45,6 @@ test("PostgreSQL 17 disposable CI applies the forward migration and verifies its
   assert.match(sqlContract, /future turn must not be force-closed/);
   assert.match(sqlContract, /non-ADMIN call was not rejected/);
   assert.match(sqlContract, /fabricated a cash declaration or inventory cut/i);
-  assert.match(sqlContract, /DELETE FROM public\\.turnos/);
-  assert.match(sqlContract, /DELETE FROM public\\.almacenes/);
+  assert.ok(sqlContract.includes("DELETE FROM public.turnos"));
+  assert.ok(sqlContract.includes("DELETE FROM public.almacenes"));
 });
