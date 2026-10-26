@@ -45,7 +45,7 @@
     var style = document.createElement('style');
     style.id = 'bc-m74-pos-archive-css';
     style.textContent =
-      '#tabs .tab-btn[data-tab="ventas"].' + BUTTON_CLASS + '{display:none!important;visibility:hidden!important;pointer-events:none!important;height:0!important;max-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;border:0!important}' +
+      '#tabs .tab-btn[data-tab="ventas"].' + BUTTON_CLASS + '{opacity:.62!important;cursor:not-allowed!important;}' +
       '#tab-ventas.' + PANEL_CLASS + ',#tab-ventas.' + PANEL_CLASS + '.visible{display:none!important;visibility:hidden!important;pointer-events:none!important}';
     document.head.appendChild(style);
   }
@@ -72,6 +72,7 @@
     if (button) {
       button.classList.toggle(BUTTON_CLASS, !available);
       button.setAttribute('data-bc-pos-availability', available ? 'wholesale' : 'archived');
+      button.setAttribute('aria-disabled', available ? 'false' : 'true');
     }
     if (panel) {
       panel.classList.toggle(PANEL_CLASS, !available);
