@@ -55,6 +55,19 @@ BEGIN
     RETURN jsonb_build_object('id', p_turno_id, 'estado', 'CERRADO', 'ya_cerrado', true);
   END IF;
 
+  IF coalesce(v_turno.estado_maestro, v_turno.estado) NOT IN ('ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION')
+     AND coalesce(v_turno.estado, v_turno.estado_maestro) NOT IN ('ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION') THEN
+    RAISE EXCEPTION 'El turno no está en un estado operativo recuperable.' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_turno.fecha IS NULL OR v_turno.dias_turno IS NULL OR v_turno.dias_turno < 1 THEN
+    RAISE EXCEPTION 'No se puede forzar el cierre: falta un período de turno verificable.' USING ERRCODE = '22023';
+  END IF;
+
+  IF (v_turno.fecha + (greatest(coalesce(v_turno.dias_turno, 1) - 1, 0) * interval '1 day'))::date >= current_date THEN
+    RAISE EXCEPTION 'El turno todavía no está vencido. El cierre forzado se limita a períodos anteriores a hoy.' USING ERRCODE = '22023';
+  END IF;
+
   SELECT count(*) INTO v_sesiones_en_curso
   FROM public.turno_sesiones
   WHERE turno_id = p_turno_id AND estado = 'EN_CURSO';
@@ -106,6 +119,8 @@ BEGIN
       'tramos_activos_cerrados', v_tramos_cerrados,
       'declaraciones_dinero_creadas', 0,
       'conteos_inventario_creados', 0,
+      'turno_fecha_inicio', v_turno.fecha,
+      'turno_fecha_fin', (v_turno.fecha + greatest(coalesce(v_turno.dias_turno, 1) - 1, 0)),
       'requiere_revision_manual', true
     )
   );
