@@ -75,6 +75,8 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 test('M74 keeps Ventas navigable and applies the session guard inside the panel', () => {
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
+  assert.ok(app.includes('["turno-api.js","9.4.7"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
+  assert.ok(app.includes('["m33-turnos-final.js","33.5"]'), 'the turn detail modal cache key must load the audited recovery action');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
   assert.ok(m74.includes("window.__BC_POS_NEEDS_SESSION__"), 'the policy exposes a session-required hint');
