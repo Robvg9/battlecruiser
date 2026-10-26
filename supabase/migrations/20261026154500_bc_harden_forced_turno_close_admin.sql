@@ -1,0 +1,128 @@
+-- BattleCruiser — audited recovery for expired master turns.
+-- A force close is available only to ADMIN and requires a reason. It must
+-- close active work tramos, cancel sessions that never started, mark in-flight
+-- sessions as force-closed, and reconcile BOTH legacy and master state fields.
+-- It deliberately does not fabricate cash declarations or inventory counts.
+
+CREATE OR REPLACE FUNCTION public.bc_forzar_cierre_turno_admin(
+  p_turno_id uuid,
+  p_motivo text DEFAULT NULL::text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_turno public.turnos;
+  v_motivo text := NULLIF(btrim(coalesce(p_motivo, '')), '');
+  v_now timestamptz := now();
+  v_sesiones_en_curso integer := 0;
+  v_sesiones_canceladas integer := 0;
+  v_sesiones_afectadas integer := 0;
+  v_tramos_cerrados integer := 0;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN puede forzar el cierre de un turno.' USING ERRCODE = '42501';
+  END IF;
+
+  IF v_motivo IS NULL OR length(v_motivo) < 12 THEN
+    RAISE EXCEPTION 'El motivo del cierre forzado es obligatorio (mínimo 12 caracteres).' USING ERRCODE = '22023';
+  END IF;
+  IF length(v_motivo) > 1000 THEN
+    RAISE EXCEPTION 'El motivo del cierre forzado no puede superar 1000 caracteres.' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO v_turno
+  FROM public.turnos
+  WHERE id = p_turno_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Turno no encontrado.' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_turno.estado_maestro = 'CANCELADO' THEN
+    RETURN jsonb_build_object('id', p_turno_id, 'estado', 'CANCELADO', 'ya_cerrado', true);
+  END IF;
+
+  IF v_turno.estado = 'CERRADO' AND v_turno.estado_maestro = 'CERRADO' THEN
+    RETURN jsonb_build_object('id', p_turno_id, 'estado', 'CERRADO', 'ya_cerrado', true);
+  END IF;
+
+  SELECT count(*) INTO v_sesiones_en_curso
+  FROM public.turno_sesiones
+  WHERE turno_id = p_turno_id AND estado = 'EN_CURSO';
+
+  SELECT count(*) INTO v_sesiones_canceladas
+  FROM public.turno_sesiones
+  WHERE turno_id = p_turno_id AND estado IN ('PENDIENTE', 'PROGRAMADA');
+
+  -- Close only active tramos belonging to this master turn.
+  UPDATE public.turno_tramos
+  SET estado = 'COMPLETADO',
+      fin_at = coalesce(fin_at, v_now)
+  WHERE turno_id = p_turno_id AND estado = 'ACTIVO';
+  GET DIAGNOSTICS v_tramos_cerrados = ROW_COUNT;
+
+  -- Preserve completed history. Sessions not yet started are cancelled;
+  -- sessions in progress are marked completed with cierre_forzado=true.
+  UPDATE public.turno_sesiones
+  SET estado = CASE
+        WHEN estado IN ('PENDIENTE', 'PROGRAMADA') THEN 'CANCELADA'
+        WHEN estado = 'EN_CURSO' THEN 'COMPLETADA'
+        ELSE estado
+      END,
+      cierre_forzado = true,
+      updated_at = v_now
+  WHERE turno_id = p_turno_id
+    AND estado IN ('PENDIENTE', 'PROGRAMADA', 'EN_CURSO');
+  GET DIAGNOSTICS v_sesiones_afectadas = ROW_COUNT;
+
+  -- Both fields are part of the live/legacy bridge contract. Updating only
+  -- estado_maestro leaves turno_actual_usuario able to see a zombie ABIERTO.
+  UPDATE public.turnos
+  SET estado = 'CERRADO',
+      estado_maestro = 'CERRADO',
+      cierre_real = coalesce(cierre_real, v_now),
+      actualizado_en = v_now
+  WHERE id = p_turno_id;
+
+  INSERT INTO public.turno_eventos(turno_id, actor_user_id, tipo, payload)
+  VALUES (
+    p_turno_id,
+    v_uid,
+    'TURNO_CIERRE_FORZADO_ADMIN',
+    jsonb_build_object(
+      'motivo', v_motivo,
+      'sesiones_en_curso_cerradas', v_sesiones_en_curso,
+      'sesiones_pendientes_canceladas', v_sesiones_canceladas,
+      'sesiones_afectadas', v_sesiones_afectadas,
+      'tramos_activos_cerrados', v_tramos_cerrados,
+      'declaraciones_dinero_creadas', 0,
+      'conteos_inventario_creados', 0,
+      'requiere_revision_manual', true
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'id', p_turno_id,
+    'estado', 'CERRADO',
+    'forzado', true,
+    'motivo', v_motivo,
+    'sesiones_completadas', v_sesiones_en_curso,
+    'sesiones_canceladas', v_sesiones_canceladas,
+    'sesiones_afectadas', v_sesiones_afectadas,
+    'tramos_cerrados', v_tramos_cerrados,
+    'requiere_revision_manual', true
+  );
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.bc_forzar_cierre_turno_admin(uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.bc_forzar_cierre_turno_admin(uuid, text) TO authenticated;
