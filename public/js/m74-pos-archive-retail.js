@@ -6,6 +6,11 @@
   var BUTTON_CLASS = 'bc-pos-archived';
   var PANEL_CLASS = 'bc-pos-archived-panel';
   var fallbackScheduled = false;
+  var appliedAvailability = null;
+  var refreshDepth = 0;
+  var pendingAvailability = null;
+  var pendingVisibilityTimer = null;
+  var VISIBILITY_SETTLE_MS = 220;
 
   function norm(value) { return String(value == null ? '' : value).trim().toLowerCase(); }
   function warehouses() {
@@ -60,8 +65,7 @@
       goToOperationalWorkspace();
     }, 0);
   }
-  function sync(reason) {
-    var available = hasActiveWholesaleSession();
+  function applyAvailability(available) {
     window.__BC_POS_ARCHIVED__ = !available;
     var button = getButton('ventas');
     var panel = document.getElementById('tab-ventas');
@@ -77,13 +81,46 @@
         scheduleOperationalWorkspace();
       }
     }
+    appliedAvailability = available;
+  }
+  function sync(reason) {
+    var available = hasActiveWholesaleSession();
+    if (refreshDepth > 0) {
+      if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+      pendingVisibilityTimer = null;
+      pendingAvailability = null;
+      if (appliedAvailability === null) applyAvailability(false);
+      return available;
+    }
+    if (appliedAvailability === null) {
+      if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+      pendingVisibilityTimer = null;
+      pendingAvailability = null;
+      applyAvailability(available);
+      return available;
+    }
+    if (available === appliedAvailability) {
+      if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+      pendingVisibilityTimer = null;
+      pendingAvailability = null;
+      return available;
+    }
+    if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+    pendingAvailability = available;
+    pendingVisibilityTimer = window.setTimeout(function () {
+      pendingVisibilityTimer = null;
+      var desired = pendingAvailability;
+      pendingAvailability = null;
+      var confirmed = hasActiveWholesaleSession();
+      if (confirmed === desired && confirmed !== appliedAvailability) applyAvailability(confirmed);
+    }, VISIBILITY_SETTLE_MS);
     return available;
   }
   function wrapNavigation() {
     var original = window.irATab;
     if (typeof original !== 'function' || original.__bcM74ArchiveWrapped) return;
     var wrapped = function (tab) {
-      if (norm(tab) === 'ventas' && window.__BC_POS_ARCHIVED__ === true) {
+      if (norm(tab) === 'ventas' && !hasActiveWholesaleSession()) {
         scheduleOperationalWorkspace();
         return;
       }
@@ -108,9 +145,16 @@
     var original = window[name];
     if (typeof original !== 'function' || original.__bcM74ArchiveWrapped) return;
     var wrapped = async function () {
-      var result = await original.apply(this, arguments);
-      sync('refresh:' + name);
-      return result;
+      refreshDepth += 1;
+      if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
+      pendingVisibilityTimer = null;
+      pendingAvailability = null;
+      try {
+        return await original.apply(this, arguments);
+      } finally {
+        refreshDepth = Math.max(0, refreshDepth - 1);
+        if (!refreshDepth) sync('refresh:' + name);
+      }
     };
     wrapped.__bcM74ArchiveWrapped = true;
     window[name] = wrapped;
@@ -142,7 +186,7 @@
       var button = target && target.closest ? target.closest('#tabs .tab-btn[data-tab="ventas"]') : null;
       if (!button) return;
       sync('sales-tab-click');
-      if (!window.__BC_POS_ARCHIVED__) return;
+      if (hasActiveWholesaleSession()) return;
       event.preventDefault();
       event.stopPropagation();
       if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();

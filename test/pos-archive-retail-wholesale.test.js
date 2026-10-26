@@ -22,7 +22,7 @@ function createApp(warehouses, turno, refreshTurno) {
   window.__BC_M74_SYNC_POS_ARCHIVE__();
   return { dom, window, navigations };
 }
-function tick(window) { return new Promise(resolve => window.setTimeout(resolve, 10)); }
+function tick(window, ms = 10) { return new Promise(resolve => window.setTimeout(resolve, ms)); }
 
 test("La Cueva minorista se archiva aunque exista otro almacén mayorista", async () => {
   const warehouses = [
@@ -89,7 +89,8 @@ test("M74 espera al refresco async del turno antes de habilitar el POS mayorista
     const button = window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
     assert.equal(window.__BC_POS_ARCHIVED__, true);
     await window.refrescarTurnoActual();
-    assert.equal(window.__BC_POS_ARCHIVED__, false, "visibility must be recalculated after the Promise resolves");
+    await tick(window, 260);
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "visibility must be recalculated after the Promise resolves and stabilizes");
     assert.equal(button.getAttribute("data-bc-pos-availability"), "wholesale");
   } finally {
     dom.window.close();
@@ -106,6 +107,7 @@ test("la política reacciona al cambio de sesión sin borrar la sección ni el h
     const panel = window.document.getElementById("tab-ventas");
     window._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
     assert.equal(window.__BC_M74_SYNC_POS_ARCHIVE__(), true);
+    await tick(window, 260);
     assert.equal(button.classList.contains("bc-pos-archived"), false);
     window.irATab("ventas");
     assert.ok(navigations.includes("ventas"));
@@ -114,6 +116,7 @@ test("la política reacciona al cambio de sesión sin borrar la sección ni el h
     button.classList.add("active");
     window._turnoActual = { estado: "CERRADO", almacen_id: "tmo" };
     assert.equal(window.__BC_M74_SYNC_POS_ARCHIVE__(), false);
+    await tick(window, 260);
     assert.ok(button.classList.contains("bc-pos-archived"));
     assert.equal(button.classList.contains("active"), false);
     assert.equal(panel.classList.contains("visible"), false);
@@ -121,4 +124,106 @@ test("la política reacciona al cambio de sesión sin borrar la sección ni el h
     assert.ok(navigations.includes("jornada"), "al perder sesión mayorista, vuelve a Jornada");
     assert.ok(panel.querySelector("#lista-ventas"));
   } finally { dom.window.close(); }
+});
+
+test("M74 keeps Ventas stable across transient refresh states", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  const { dom, window } = createApp(warehouses, { estado: "ABIERTO", almacen_id: "cueva" });
+  try {
+    const button = window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    assert.equal(window.__BC_POS_ARCHIVED__, true);
+
+    window._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    window._turnoActual = null;
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    window._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+
+    assert.equal(window.__BC_POS_ARCHIVED__, true, "rapid intermediate states must not flip the menu");
+    assert.ok(button.classList.contains("bc-pos-archived"));
+    await tick(window, 260);
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "a stable wholesale session enables POS");
+    assert.equal(button.getAttribute("data-bc-pos-availability"), "wholesale");
+
+    window._cache.almacenes = [];
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "a transient empty cache must not hide POS immediately");
+    assert.equal(button.classList.contains("bc-pos-archived"), false);
+    window._cache.almacenes = warehouses;
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    await tick(window, 260);
+    assert.equal(window.__BC_POS_ARCHIVED__, false);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("the sidebar does not render a literal backslash-n between Movimientos and Jornada", () => {
+  const start = index.indexOf('data-tab="movimientos"');
+  const end = index.indexOf('data-tab="ciclos"');
+  assert.ok(start >= 0 && end > start, "the operational menu entries must exist");
+  const navBlock = index.slice(start, end).replace(/\r\n/g, "\n");
+  assert.equal(navBlock.includes("\\n"), false, "literal backslash-n must not appear in the menu");
+  const expected = 'data-tab="movimientos">Movimientos</button>\n        <button class="tab-btn" data-tab="turnos">Turnos</button>\n        <button class="tab-btn" data-tab="jornada">Jornada e inventario</button>';
+  assert.ok(navBlock.includes(expected), "the menu entries must be separate, normally spaced buttons");
+});
+
+test("M74 does not flip Ventas during an async session refresh", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  let appWindow;
+  let availabilityHeldDuringRefresh = false;
+  const { dom, window } = createApp(warehouses, { estado: "ABIERTO", almacen_id: "tmo" }, async function () {
+    appWindow._turnoActual = null;
+    appWindow.__BC_M74_SYNC_POS_ARCHIVE__();
+    await tick(appWindow, 260);
+    const button = appWindow.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    availabilityHeldDuringRefresh = appWindow.__BC_POS_ARCHIVED__ === false &&
+      !button.classList.contains("bc-pos-archived");
+    appWindow._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
+    return appWindow._turnoActual;
+  });
+  appWindow = window;
+  try {
+    await window.refrescarTurnoActual();
+    assert.equal(availabilityHeldDuringRefresh, true, "intermediate data must not hide the live wholesale POS during refresh");
+    assert.equal(window.__BC_POS_ARCHIVED__, false);
+    assert.equal(window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]').getAttribute("data-bc-pos-availability"), "wholesale");
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("M74 blocks a click immediately after a wholesale session turns retail", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  const { dom, window, navigations } = createApp(
+    warehouses,
+    { estado: "ABIERTO", almacen_id: "tmo" }
+  );
+  try {
+    const button = window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "the open wholesale session exposes POS");
+
+    window._turnoActual = { estado: "ABIERTO", almacen_id: "cueva" };
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    assert.equal(window.__BC_POS_ARCHIVED__, false, "the visual transition is intentionally debounced");
+    button.click();
+    await tick(window, 15);
+    assert.equal(navigations.includes("ventas"), false, "the current non-wholesale session blocks the click immediately");
+
+    await tick(window, 260);
+    assert.equal(window.__BC_POS_ARCHIVED__, true, "the visual state follows the settled retail session");
+    assert.ok(button.classList.contains("bc-pos-archived"));
+  } finally {
+    dom.window.close();
+  }
 });
