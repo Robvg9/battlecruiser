@@ -560,6 +560,8 @@ html.${POS_CLASS} .main-content > .rule-orn {
     grid-template-areas: "header" "main" !important;
   }
 
+}
+
 /*
  * Android scroll recovery (Deliverable 9).
  * The POS layout is fixed-height/overflow-hidden for desktop. On touch devices,
@@ -666,7 +668,7 @@ html.${POS_CLASS} .main-content > .rule-orn {
   }
 }
 
-}
+
 `;
 
   function injectCSS() {
