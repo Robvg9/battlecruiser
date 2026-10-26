@@ -150,6 +150,24 @@ BEGIN
   IF (SELECT estado FROM public.turno_sesiones WHERE id='91000000-0000-0000-0000-000000000046') IS DISTINCT FROM 'EN_CURSO' THEN
     RAISE EXCEPTION 'FAIL: rejected normal close mutated the modern session';
   END IF;
+
+  -- Merely setting cierre_forzado=true as a non-admin must not bypass Step 7.
+  PERFORM set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.bc_admin','false',false);
+  rejected := false;
+  BEGIN
+    UPDATE public.turno_sesiones
+       SET cierre_forzado=true, estado='COMPLETADA'
+     WHERE id='91000000-0000-0000-0000-000000000046';
+  EXCEPTION WHEN SQLSTATE '23514' THEN rejected := true;
+  END;
+  IF NOT rejected THEN RAISE EXCEPTION 'FAIL: non-ADMIN bypassed final inventory by setting cierre_forzado'; END IF;
+  IF (SELECT estado FROM public.turno_sesiones WHERE id='91000000-0000-0000-0000-000000000046') IS DISTINCT FROM 'EN_CURSO'
+     OR (SELECT cierre_forzado FROM public.turno_sesiones WHERE id='91000000-0000-0000-0000-000000000046') IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'FAIL: rejected non-admin bypass mutated modern session';
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',false);
+  PERFORM set_config('test.bc_admin','true',false);
 END;
 $modern_normal_guard$;
 
