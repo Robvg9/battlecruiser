@@ -3,6 +3,49 @@
 -- This migration replaces the RPC definition only; it changes no business rows.
 -- Preserve ADMIN, reason, state, period, expiry, audit and no-fabricated-data protections.
 
+CREATE OR REPLACE FUNCTION public.bc7_guard_jornada_inventory()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF NEW.bloque='JORNADA' AND NEW.jornada_programacion_id IS NOT NULL
+     AND OLD.estado IS DISTINCT FROM NEW.estado THEN
+    IF NEW.estado='EN_CURSO' AND OLD.estado IN ('PENDIENTE','PROGRAMADA') THEN
+      IF NOT EXISTS (
+        SELECT 1 FROM public.turno_jornada_inventario_cortes c
+        WHERE c.turno_sesion_id=NEW.id AND c.tipo='INICIAL' AND c.estado='CONFIRMADO'
+      ) THEN
+        RAISE EXCEPTION 'Antes de abrir la jornada debes confirmar el inventario inicial.' USING ERRCODE='23514';
+      END IF;
+    ELSIF NEW.estado='COMPLETADA' AND OLD.estado='EN_CURSO' THEN
+      -- Normal close still requires a final physical count. Only this ADMIN
+      -- transaction's explicitly audited, session-scoped recovery may bypass it.
+      IF NEW.cierre_forzado IS TRUE
+         AND auth.uid() IS NOT NULL
+         AND public.bc_actor_is_admin()
+         AND EXISTS (
+           SELECT 1 FROM public.turno_eventos e
+           WHERE e.turno_id=NEW.turno_id
+             AND e.actor_user_id=auth.uid()
+             AND e.tipo='TURNO_CIERRE_FORZADO_ADMIN'
+             AND e.payload->>'cierre_jornada_forzado_sin_conteo_final'='true'
+             AND coalesce(e.payload->'sesiones_en_curso_ids','[]'::jsonb) ? NEW.id::text
+         ) THEN
+        NULL;
+      ELSIF NOT EXISTS (
+        SELECT 1 FROM public.turno_jornada_inventario_cortes c
+        WHERE c.turno_sesion_id=NEW.id AND c.tipo='FINAL' AND c.estado='CONFIRMADO'
+      ) THEN
+        RAISE EXCEPTION 'Antes de cerrar la jornada debes confirmar el inventario final.' USING ERRCODE='23514';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.bc_forzar_cierre_turno_admin(
   p_turno_id uuid,
   p_motivo text DEFAULT NULL::text
@@ -67,6 +110,14 @@ BEGIN
     RAISE EXCEPTION 'El turno todavía no está vencido. El cierre forzado se limita a períodos anteriores a hoy.' USING ERRCODE = '22023';
   END IF;
 
+  -- Lock related rows so the session allowlist and event counts cannot drift.
+  PERFORM 1 FROM public.turno_sesiones
+  WHERE turno_id = p_turno_id
+  ORDER BY id FOR UPDATE;
+  PERFORM 1 FROM public.turno_tramos
+  WHERE turno_id = p_turno_id AND estado = 'ACTIVO'
+  ORDER BY id FOR UPDATE;
+
   SELECT count(*) INTO v_sesiones_en_curso
   FROM public.turno_sesiones
   WHERE turno_id = p_turno_id AND estado = 'EN_CURSO';
@@ -81,6 +132,33 @@ BEGIN
       fin_at = coalesce(fin_at, v_now)
   WHERE turno_id = p_turno_id AND estado = 'ACTIVO';
   GET DIAGNOSTICS v_tramos_cerrados = ROW_COUNT;
+
+  -- Insert the audit BEFORE completing any modern JORNADA session: its trigger
+  -- requires this session-scoped ADMIN event to authorize the no-final-count path.
+  INSERT INTO public.turno_eventos(turno_id, actor_user_id, tipo, payload)
+  VALUES (
+    p_turno_id,
+    v_uid,
+    'TURNO_CIERRE_FORZADO_ADMIN',
+    jsonb_build_object(
+      'motivo', v_motivo,
+      'sesiones_en_curso_cerradas', v_sesiones_en_curso,
+      'sesiones_pendientes_canceladas', v_sesiones_canceladas,
+      'sesiones_afectadas', v_sesiones_en_curso + v_sesiones_canceladas,
+      'sesiones_en_curso_ids', coalesce((
+        SELECT jsonb_agg(s.id::text ORDER BY s.id)
+        FROM public.turno_sesiones s
+        WHERE s.turno_id = p_turno_id AND s.estado = 'EN_CURSO'
+      ), '[]'::jsonb),
+      'cierre_jornada_forzado_sin_conteo_final', true,
+      'tramos_activos_cerrados', v_tramos_cerrados,
+      'declaraciones_dinero_creadas', 0,
+      'conteos_inventario_creados', 0,
+      'turno_fecha_inicio', v_turno.fecha,
+      'turno_fecha_fin', (v_turno.fecha + greatest(coalesce(v_turno.dias_turno, 1) - 1, 0)),
+      'requiere_revision_manual', true
+    )
+  );
 
   -- Preserve completed history. Sessions not yet started are cancelled;
   -- sessions in progress are marked completed with cierre_forzado=true.
@@ -105,24 +183,7 @@ BEGIN
       actualizado_en = v_now
   WHERE id = p_turno_id;
 
-  INSERT INTO public.turno_eventos(turno_id, actor_user_id, tipo, payload)
-  VALUES (
-    p_turno_id,
-    v_uid,
-    'TURNO_CIERRE_FORZADO_ADMIN',
-    jsonb_build_object(
-      'motivo', v_motivo,
-      'sesiones_en_curso_cerradas', v_sesiones_en_curso,
-      'sesiones_pendientes_canceladas', v_sesiones_canceladas,
-      'sesiones_afectadas', v_sesiones_afectadas,
-      'tramos_activos_cerrados', v_tramos_cerrados,
-      'declaraciones_dinero_creadas', 0,
-      'conteos_inventario_creados', 0,
-      'turno_fecha_inicio', v_turno.fecha,
-      'turno_fecha_fin', (v_turno.fecha + greatest(coalesce(v_turno.dias_turno, 1) - 1, 0)),
-      'requiere_revision_manual', true
-    )
-  );
+
 
   RETURN jsonb_build_object(
     'id', p_turno_id,

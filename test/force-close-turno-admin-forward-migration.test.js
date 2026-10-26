@@ -20,6 +20,9 @@ test("forward recovery migration enforces ADMIN, bounded reason, valid state and
   assert.match(migration, /v_turno\.fecha IS NULL OR v_turno\.dias_turno IS NULL/);
   assert.match(migration, /v_turno\.fecha[\s\S]*>= current_date/);
   assert.match(migration, /El turno todavía no está vencido/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc7_guard_jornada_inventory/);
+  assert.match(migration, /cierre_jornada_forzado_sin_conteo_final/);
+  assert.match(migration, /sesiones_en_curso_ids/);
 });
 
 test("forward migration keeps least-privilege ACL, dual-state reconciliation and no-fabrication audit", () => {
@@ -45,6 +48,9 @@ test("PostgreSQL 17 disposable CI applies the forward migration and verifies its
   assert.match(sqlContract, /future turn must not be force-closed/);
   assert.match(sqlContract, /non-ADMIN call was not rejected/);
   assert.match(sqlContract, /fabricated a cash declaration or inventory cut/i);
+  assert.match(sqlContract, /modern jornada normal close bypassed the final-inventory guard/);
+  assert.match(sqlContract, /audited modern jornada was not completed as force-closed/);
+  assert.match(sqlContract, /modern force-close fabricated a final inventory snapshot/);
   assert.ok(sqlContract.includes("DELETE FROM public.turnos"));
   assert.ok(sqlContract.includes("DELETE FROM public.almacenes"));
 });
