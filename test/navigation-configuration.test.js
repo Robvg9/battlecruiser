@@ -45,7 +45,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   }
   assert.match(permissions, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
   assert.match(permissions, /if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/);
-  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true \}/);
+  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true, ventas:true \}/);
   assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
   assert.match(app, /m12-fe5-hide-vales\.js/);
@@ -135,14 +135,14 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.21 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.21"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.21"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.21"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.21"><\/script>/);
+test("app shell, application and Service Worker share 9.5.22 and load refreshed navigation modules", () => {
+  assert.match(app, /const VERSION="9\.5\.22"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.22"/);
+  assert.match(index, /href="style\.css\?v=9\.5\.22"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.22"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.4"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.2"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261020\.5"\]/);
+  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
 });

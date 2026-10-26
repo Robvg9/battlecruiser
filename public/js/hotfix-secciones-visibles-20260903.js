@@ -4,7 +4,7 @@
   if (window.__BC_SECCIONES_VISIBLES_20260903__) return;
   window.__BC_SECCIONES_VISIBLES_20260903__ = true;
 
-  var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true };
+  var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true, ventas:true };
   var LABELS = { config:'Administración', ciclos:'Turnos' };
   var configSelectionRequested = false;
 
