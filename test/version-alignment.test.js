@@ -79,7 +79,7 @@ test('M74 archives retail POS by the active warehouse session and preserves the 
   assert.ok(m74.includes("function hasActiveWholesaleSession()"), 'the policy requires a wholesale session');
   assert.ok(m74.includes("window.__BC_POS_ARCHIVED__"), 'the policy exposes archive state');
   assert.ok(m74.includes("aria-disabled"), 'archived Ventas exposes an accessible disabled state without leaving the sidebar');
-  assert.doesNotMatch(m74, /#tabs \\.tab-btn\\[data-tab="ventas"\\]\\.bc-pos-archived\\{display:none/, 'M74 must never remove the Ventas row from the sidebar layout');
+  assert.ok(!m74.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{display:none'), 'M74 must never remove the Ventas row from the sidebar layout');
   assert.ok(visibilityNormalizer.includes('ventas:true'), 'the global visibility normalizer must leave Ventas styles to its own policy');
   assert.ok(index.includes('<section id="tab-ventas" class="tab-panel">'), 'the sales panel must remain in the application');
   assert.ok(index.includes('<div id="lista-ventas" class="lista"></div>'), 'the sales history container must be preserved');
@@ -109,7 +109,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.22 — menú Android estable y navegación sin escapes literales/);
+  assert.match(app, /v9\.5\.22 — menú lateral estable con estado POS accesible/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.22"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
