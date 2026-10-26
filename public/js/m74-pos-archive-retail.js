@@ -72,7 +72,10 @@
     if (button) {
       button.classList.toggle(BUTTON_CLASS, !available);
       button.setAttribute('data-bc-pos-availability', available ? 'wholesale' : 'archived');
+      button.disabled = !available;
       button.setAttribute('aria-disabled', available ? 'false' : 'true');
+      if (available) button.removeAttribute('title');
+      else button.setAttribute('title', 'Ventas requiere un turno abierto de almacén mayorista.');
     }
     if (panel) {
       panel.classList.toggle(PANEL_CLASS, !available);
@@ -121,10 +124,9 @@
     var original = window.irATab;
     if (typeof original !== 'function' || original.__bcM74ArchiveWrapped) return;
     var wrapped = function (tab) {
-      if (norm(tab) === 'ventas' && !hasActiveWholesaleSession()) {
-        scheduleOperationalWorkspace();
-        return;
-      }
+      // A disabled Ventas route is inert. Redirecting its tap to Jornada
+      // makes the UI look like it opened the wrong menu item.
+      if (norm(tab) === 'ventas' && !hasActiveWholesaleSession()) return;
       return original.apply(this, arguments);
     };
     wrapped.__bcM74ArchiveWrapped = true;
@@ -191,7 +193,9 @@
       event.preventDefault();
       event.stopPropagation();
       if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-      scheduleOperationalWorkspace();
+      // The option remains visible to preserve the sidebar layout, but a tap
+      // cannot navigate to an unrelated section. Auto-fallback to Jornada is
+      // reserved for a POS session that becomes unavailable while already open.
     }, true);
     document.addEventListener('click', function (event) {
       var target = event.target;

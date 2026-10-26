@@ -42,6 +42,8 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     assert.ok(archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{opacity:.62!important;cursor:not-allowed!important;}'), "archived Ventas remains in its fixed sidebar slot");
     assert.ok(!archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{display:none'), "Ventas must never use display:none or reflow the sidebar");
     assert.equal(button.getAttribute("aria-disabled"), "true");
+    assert.equal(button.disabled, true, "Ventas archived must be natively disabled, not redirect on tap");
+    assert.match(button.getAttribute("title"), /turno abierto de almacén mayorista/i);
     assert.equal(button.style.display, "", "M74 must not write a display style on the sidebar row");
     assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel,#tab-ventas.bc-pos-archived-panel.visible{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
     assert.ok(panel.querySelector("#form-venta-linea"), "se conserva el formulario POS");
@@ -50,11 +52,12 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
 
     window.irATab("ventas");
     await tick(window);
-    assert.ok(!navigations.includes("ventas"), "la navegación directa al POS debe quedar bloqueada");
-    assert.ok(navigations.includes("jornada"), "la navegación bloqueada dirige a Jornada");
+    assert.deepEqual(navigations, [], "la ruta Ventas deshabilitada debe ser inerte, sin redirección a Jornada");
     button.click();
     await tick(window);
-    assert.ok(!navigations.includes("ventas"), "un click programático tampoco abre el POS minorista");
+    assert.deepEqual(navigations, [], "tocar Ventas deshabilitada no debe activar Jornada ni otra sección");
+    assert.equal(button.getAttribute("aria-disabled"), "true");
+    assert.equal(button.disabled, true);
   } finally { dom.window.close(); }
 });
 
