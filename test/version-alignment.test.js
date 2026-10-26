@@ -74,8 +74,8 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('M74 archives retail POS by the active warehouse session and preserves the module', () => {
-  assert.ok(app.includes('["m74-pos-archive-retail.js","74.4"]'), 'M74 must load after the existing modules');
-  assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.4"), 'M74 must be precached for offline startup');
+  assert.ok(app.includes('["m74-pos-archive-retail.js","74.5"]'), 'M74 must load after the existing modules');
+  assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.5"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveWholesaleSession()"), 'the policy requires a wholesale session');
   assert.ok(m74.includes("window.__BC_POS_ARCHIVED__"), 'the policy exposes archive state');
   assert.ok(m74.includes("aria-disabled"), 'archived Ventas exposes an accessible disabled state without leaving the sidebar');
