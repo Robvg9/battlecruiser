@@ -42,6 +42,7 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     assert.ok(archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{opacity:.62!important;cursor:not-allowed!important;}'), "archived Ventas remains in its fixed sidebar slot");
     assert.ok(!archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{display:none'), "Ventas must never use display:none or reflow the sidebar");
     assert.equal(button.getAttribute("aria-disabled"), "true");
+    assert.equal(button.disabled, true, "Ventas archived must be natively disabled, not redirect on tap");
     assert.match(button.getAttribute("title"), /turno abierto de almacén mayorista/i);
     assert.equal(button.style.display, "", "M74 must not write a display style on the sidebar row");
     assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel,#tab-ventas.bc-pos-archived-panel.visible{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
@@ -56,6 +57,7 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     await tick(window);
     assert.deepEqual(navigations, [], "tocar Ventas deshabilitada no debe activar Jornada ni otra sección");
     assert.equal(button.getAttribute("aria-disabled"), "true");
+    assert.equal(button.disabled, true);
   } finally { dom.window.close(); }
 });
 
