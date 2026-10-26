@@ -40,7 +40,7 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     assert.ok(panel.classList.contains("bc-pos-archived-panel"));
     const archiveCss = window.document.getElementById("bc-m74-pos-archive-css").textContent;
     assert.ok(archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{opacity:.62!important;cursor:not-allowed!important;}'), "archived Ventas remains in its fixed sidebar slot");
-    assert.doesNotMatch(archiveCss, /#tabs \\.tab-btn\\[data-tab="ventas"\\]\\.bc-pos-archived\\{display:none/, "the sidebar row must never be display:none because the next item would shift into its place");
+    assert.ok(!archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{display:none'), "Ventas must never use display:none or reflow the sidebar");
     assert.equal(button.getAttribute("aria-disabled"), "true");
     assert.equal(button.style.display, "", "M74 must not write a display style on the sidebar row");
     assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel,#tab-ventas.bc-pos-archived-panel.visible{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
