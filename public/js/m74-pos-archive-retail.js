@@ -4,8 +4,6 @@
   window.__BC_M74_ARCHIVE_INSTALLED__ = true;
 
   var BUTTON_CLASS = 'bc-pos-archived';
-  var PANEL_CLASS = 'bc-pos-archived-panel';
-  var fallbackScheduled = false;
   var appliedAvailability = null;
   var refreshDepth = 0;
   var pendingAvailability = null;
@@ -22,9 +20,10 @@
     return window._turnoActual || null;
   }
 
-  // Preserve the POS and its records, but expose it only inside an open
-  // operational session whose warehouse is explicitly typed as mayorista.
-  function hasActiveWholesaleSession() {
+  // The sidebar route is always navigable. The POS's own controls and backend
+  // RPCs enforce the active-session requirement before any sale is written.
+  // Retail and wholesale sessions are both valid sales contexts.
+  function hasActiveSalesSession() {
     var turno = currentTurn();
     if (!turno || norm(turno.estado) !== 'abierto') return false;
     var warehouseId = turno.almacen_id || turno.almacenId || turno.id_almacen;
@@ -33,7 +32,8 @@
       return item && String(item.id) === String(warehouseId);
     });
     if (!warehouse || warehouse.activo === false || warehouse.archivado === true || norm(warehouse.estado) === 'archivado') return false;
-    return norm(warehouse.tipo || warehouse.tipo_almacen || warehouse.tipoAlmacen) === 'mayorista';
+    var type = norm(warehouse.tipo || warehouse.tipo_almacen || warehouse.tipoAlmacen);
+    return type === 'minorista' || type === 'mayorista';
   }
 
   function getButton(tab) {
@@ -45,50 +45,27 @@
     var style = document.createElement('style');
     style.id = 'bc-m74-pos-archive-css';
     style.textContent =
-      '#tabs .tab-btn[data-tab="ventas"].' + BUTTON_CLASS + '{opacity:.62!important;cursor:not-allowed!important;}' +
-      '#tab-ventas.' + PANEL_CLASS + ',#tab-ventas.' + PANEL_CLASS + '.visible{display:none!important;visibility:hidden!important;pointer-events:none!important}';
+      '#tabs .tab-btn[data-tab="ventas"].' + BUTTON_CLASS + '{opacity:1!important;cursor:pointer!important;}';
     document.head.appendChild(style);
   }
-  function goToOperationalWorkspace() {
-    var jornada = getButton('jornada');
-    var destination = jornada && !jornada.classList.contains('hidden') &&
-      !jornada.classList.contains('tab-sin-permiso') ? 'jornada' : 'resumen';
-    if (typeof window.irATab === 'function') { window.irATab(destination); return; }
-    var button = getButton(destination);
-    if (button) button.click();
-  }
-  function scheduleOperationalWorkspace() {
-    if (fallbackScheduled) return;
-    fallbackScheduled = true;
-    window.setTimeout(function () {
-      fallbackScheduled = false;
-      goToOperationalWorkspace();
-    }, 0);
-  }
   function applyAvailability(available) {
-    window.__BC_POS_ARCHIVED__ = !available;
+    // "Requires session" is not the same as "section unavailable":
+    // keep Ventas navigable and let venta-turno-ui.js display its safe empty state.
+    window.__BC_POS_ARCHIVED__ = !available; // legacy diagnostic alias
+    window.__BC_POS_NEEDS_SESSION__ = !available;
     var button = getButton('ventas');
-    var panel = document.getElementById('tab-ventas');
     if (button) {
       button.classList.toggle(BUTTON_CLASS, !available);
-      button.setAttribute('data-bc-pos-availability', available ? 'wholesale' : 'archived');
-      button.disabled = !available;
-      button.setAttribute('aria-disabled', available ? 'false' : 'true');
+      button.setAttribute('data-bc-pos-availability', available ? 'active-session' : 'session-required');
+      button.disabled = false;
+      button.setAttribute('aria-disabled', 'false');
       if (available) button.removeAttribute('title');
-      else button.setAttribute('title', 'Ventas requiere un turno abierto de almacén mayorista.');
-    }
-    if (panel) {
-      panel.classList.toggle(PANEL_CLASS, !available);
-      if (!available && panel.classList.contains('visible')) {
-        panel.classList.remove('visible');
-        if (button) button.classList.remove('active');
-        scheduleOperationalWorkspace();
-      }
+      else button.setAttribute('title', 'Puedes abrir Ventas; para registrar operaciones necesitas una sesión operativa abierta.');
     }
     appliedAvailability = available;
   }
   function sync(reason) {
-    var available = hasActiveWholesaleSession();
+    var available = hasActiveSalesSession();
     if (refreshDepth > 0) {
       if (pendingVisibilityTimer !== null) window.clearTimeout(pendingVisibilityTimer);
       pendingVisibilityTimer = null;
@@ -115,23 +92,10 @@
       pendingVisibilityTimer = null;
       var desired = pendingAvailability;
       pendingAvailability = null;
-      var confirmed = hasActiveWholesaleSession();
+      var confirmed = hasActiveSalesSession();
       if (confirmed === desired && confirmed !== appliedAvailability) applyAvailability(confirmed);
     }, VISIBILITY_SETTLE_MS);
     return available;
-  }
-  function wrapNavigation() {
-    var original = window.irATab;
-    if (typeof original !== 'function' || original.__bcM74ArchiveWrapped) return;
-    var wrapped = function (tab) {
-      // A disabled Ventas route is inert. Redirecting its tap to Jornada
-      // makes the UI look like it opened the wrong menu item.
-      if (norm(tab) === 'ventas' && !hasActiveWholesaleSession()) return;
-      return original.apply(this, arguments);
-    };
-    wrapped.__bcM74ArchiveWrapped = true;
-    window.irATab = wrapped;
-    try { irATab = wrapped; } catch (e) {}
   }
   function wrapRefresh(name) {
     var original = window[name];
@@ -180,7 +144,6 @@
   }
   function boot() {
     ensureStyles();
-    wrapNavigation();
     wrapRefresh('actualizarPanelAlmacenVenta');
     wrapAsyncRefresh('refrescarTurnoActual');
     wrapAsyncRefresh('__BC_M25_refrescarTurno');
@@ -188,14 +151,8 @@
       var target = event.target;
       var button = target && target.closest ? target.closest('#tabs .tab-btn[data-tab="ventas"]') : null;
       if (!button) return;
+      // Re-evaluate the hint, but never cancel navigation to the section.
       sync('sales-tab-click');
-      if (hasActiveWholesaleSession()) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-      // The option remains visible to preserve the sidebar layout, but a tap
-      // cannot navigate to an unrelated section. Auto-fallback to Jornada is
-      // reserved for a POS session that becomes unavailable while already open.
     }, true);
     document.addEventListener('click', function (event) {
       var target = event.target;
