@@ -7,6 +7,7 @@ const { JSDOM } = require("jsdom");
 
 const index = fs.readFileSync("public/index.html", "utf8");
 const archiveSource = fs.readFileSync("public/js/m74-pos-archive-retail.js", "utf8");
+const navVisibilitySource = fs.readFileSync("public/js/hotfix-secciones-visibles-20260903.js", "utf8");
 
 function createApp(warehouses, turno, refreshTurno) {
   const dom = new JSDOM(index, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
@@ -38,6 +39,10 @@ test("La Cueva minorista se archiva aunque exista otro almacén mayorista", asyn
     assert.equal(button.getAttribute("data-bc-pos-availability"), "archived");
     assert.ok(panel.classList.contains("bc-pos-archived-panel"));
     const archiveCss = window.document.getElementById("bc-m74-pos-archive-css").textContent;
+    assert.ok(archiveCss.includes('#tabs .tab-btn[data-tab="ventas"].bc-pos-archived{opacity:.62!important;cursor:not-allowed!important;}'), "archived Ventas remains in its fixed sidebar slot");
+    assert.doesNotMatch(archiveCss, /#tabs \\.tab-btn\\[data-tab="ventas"\\]\\.bc-pos-archived\\{display:none/, "the sidebar row must never be display:none because the next item would shift into its place");
+    assert.equal(button.getAttribute("aria-disabled"), "true");
+    assert.equal(button.style.display, "", "M74 must not write a display style on the sidebar row");
     assert.ok(archiveCss.includes("#tab-ventas.bc-pos-archived-panel,#tab-ventas.bc-pos-archived-panel.visible{display:none"), "the panel must stay hidden even if M68 POS layout has not initialized");
     assert.ok(panel.querySelector("#form-venta-linea"), "se conserva el formulario POS");
     assert.ok(panel.querySelector("#lista-ventas"), "se conserva el historial de ventas");
@@ -64,6 +69,7 @@ test("el POS solo se habilita durante un turno ABIERTO de almacén mayorista", (
     assert.equal(openWholesale.window.__BC_POS_ARCHIVED__, false);
     assert.equal(button.classList.contains("bc-pos-archived"), false);
     assert.equal(button.getAttribute("data-bc-pos-availability"), "wholesale");
+    assert.equal(button.getAttribute("aria-disabled"), "false");
     openWholesale.window.irATab("ventas");
     assert.deepEqual(openWholesale.navigations, ["ventas"]);
   } finally { openWholesale.dom.window.close(); }
@@ -92,6 +98,7 @@ test("M74 espera al refresco async del turno antes de habilitar el POS mayorista
     await tick(window, 260);
     assert.equal(window.__BC_POS_ARCHIVED__, false, "visibility must be recalculated after the Promise resolves and stabilizes");
     assert.equal(button.getAttribute("data-bc-pos-availability"), "wholesale");
+    assert.equal(button.getAttribute("aria-disabled"), "false");
   } finally {
     dom.window.close();
   }
@@ -148,6 +155,7 @@ test("M74 keeps Ventas stable across transient refresh states", async () => {
     await tick(window, 260);
     assert.equal(window.__BC_POS_ARCHIVED__, false, "a stable wholesale session enables POS");
     assert.equal(button.getAttribute("data-bc-pos-availability"), "wholesale");
+    assert.equal(button.getAttribute("aria-disabled"), "false");
 
     window._cache.almacenes = [];
     window.__BC_M74_SYNC_POS_ARCHIVE__();
@@ -223,6 +231,40 @@ test("M74 blocks a click immediately after a wholesale session turns retail", as
     await tick(window, 260);
     assert.equal(window.__BC_POS_ARCHIVED__, true, "the visual state follows the settled retail session");
     assert.ok(button.classList.contains("bc-pos-archived"));
+  } finally {
+    dom.window.close();
+  }
+});
+
+
+test("Ventas keeps a fixed sidebar slot while M74 and the global visibility normalizer run", async () => {
+  const warehouses = [
+    { id: "cueva", tipo: "minorista", activo: true },
+    { id: "tmo", tipo: "mayorista", activo: true }
+  ];
+  const { dom, window } = createApp(warehouses, { estado: "ABIERTO", almacen_id: "cueva" });
+  try {
+    const button = window.document.querySelector('#tabs .tab-btn[data-tab="ventas"]');
+    window.eval(navVisibilitySource);
+    window.document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
+    await tick(window, 60);
+
+    assert.equal(button.style.getPropertyValue("display"), "", "the normalizer must not force a competing display value onto Ventas");
+    assert.equal(button.classList.contains("hidden"), false);
+    assert.equal(button.getAttribute("aria-disabled"), "true");
+
+    window._turnoActual = { estado: "ABIERTO", almacen_id: "tmo" };
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    await tick(window, 260);
+    assert.equal(button.style.getPropertyValue("display"), "", "enabling POS must not change the row's layout slot");
+    assert.equal(button.getAttribute("aria-disabled"), "false");
+
+    window._turnoActual = null;
+    window.__BC_M74_SYNC_POS_ARCHIVE__();
+    await tick(window, 260);
+    assert.equal(button.style.getPropertyValue("display"), "", "disabling POS must not collapse the row or move the next entry");
+    assert.equal(button.classList.contains("hidden"), false);
+    assert.equal(button.getAttribute("aria-disabled"), "true");
   } finally {
     dom.window.close();
   }
