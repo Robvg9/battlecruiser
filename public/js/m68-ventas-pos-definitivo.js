@@ -559,6 +559,113 @@ html.${POS_CLASS} .main-content > .rule-orn {
     grid-template-columns: minmax(0, 1fr) !important;
     grid-template-areas: "header" "main" !important;
   }
+
+/*
+ * Android scroll recovery (Deliverable 9).
+ * The POS layout is fixed-height/overflow-hidden for desktop. On touch devices,
+ * make the whole Sales view document-scrollable so the cart and lower controls
+ * remain reachable; keep the product list and cart lines independently usable.
+ */
+@media (max-width: 1023px), (hover: none) and (pointer: coarse) {
+  html.${POS_CLASS},
+  body.${POS_CLASS} {
+    height: auto !important;
+    min-height: 100% !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y !important;
+  }
+
+  html.${POS_CLASS} .app-shell.visible,
+  body.${POS_CLASS} .app-shell.visible,
+  .app-shell.visible.${POS_CLASS} {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 100dvh !important;
+    max-height: none !important;
+    overflow: visible !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto !important;
+    grid-template-areas: none !important;
+  }
+
+  html.${POS_CLASS} .main-content,
+  body.${POS_CLASS} .main-content {
+    display: block !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    touch-action: pan-y !important;
+  }
+
+  #tab-ventas.bc-pos,
+  #tab-ventas.bc-pos.visible {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    touch-action: pan-y !important;
+  }
+
+  #tab-ventas.bc-pos #venta-operativa-bloque {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    grid-template-areas: "topbar" "catalog" "cart" !important;
+    flex: 0 0 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #tab-ventas.bc-pos .bc-venta-catalog-col {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #tab-ventas.bc-pos #${SCROLL_ID} {
+    flex: 0 1 auto !important;
+    height: auto !important;
+    min-height: 160px !important;
+    max-height: 52dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+    touch-action: pan-y !important;
+  }
+
+  #tab-ventas.bc-pos #${CART_ID} {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: 0 0 auto !important;
+  }
+
+  #tab-ventas.bc-pos #${CART_ID} #venta-lineas {
+    flex: 0 1 auto !important;
+    min-height: 0 !important;
+    max-height: 34dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+}
+
 }
 `;
 
