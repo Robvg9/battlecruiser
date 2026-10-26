@@ -126,9 +126,9 @@
         return;
       }
       const confirmed = window.confirm(
-        'CIERRE ADMINISTRATIVO IRREVERSIBLE\\n\\n' +
+        'CIERRE ADMINISTRATIVO IRREVERSIBLE\n\n' +
         'El turno vencido pasará a CERRADO. Los tramos activos se terminarán; las sesiones pendientes se cancelarán y las que estaban en curso se marcarán con cierre forzado. ' +
-        'No se crearán declaraciones de dinero ni conteos de inventario. Quedará una nota de auditoría que requiere revisión manual.\\n\\n¿Confirmas el cierre?'
+        'No se crearán declaraciones de dinero ni conteos de inventario. Quedará una nota de auditoría que requiere revisión manual.\n\n¿Confirmas el cierre?'
       );
       if (!confirmed) return;
 
