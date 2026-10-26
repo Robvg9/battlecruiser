@@ -30,7 +30,7 @@
     ["m27-6b-venta-payload-pres.js","27.6b1"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7d"],
     ["mision-d-stock-reposicion.js","D.10"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],["compra-multiple.js","27.8"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
-    ["m29-turnos-organizacion.js","29.13"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.5"],["m34-turnos-filter-final.js","34.3"],
+    ["m29-turnos-organizacion.js","29.13"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.5"],["hotfix-turno-forceclose-20260902.js","20261026.1"],["m34-turnos-filter-final.js","34.3"],
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.1"],
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
     ["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
