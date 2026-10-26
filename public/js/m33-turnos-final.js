@@ -8,7 +8,7 @@
 
   const ROOT_ID = 'ciclos-m18-root';
   const API = () => window.BattleCruiserTurnoAPI;
-  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false };
+  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, forceCloseMessage: '' };
   const root = () => document.getElementById(ROOT_ID);
   const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
   const date = v => {
@@ -121,9 +121,32 @@
   }
   function step3() { return '<div class="m33-muted">Movimientos del expediente (si hay datos).</div>'; }
   function step4() { return '<div class="m33-muted">Inventario del expediente (si hay datos).</div>'; }
+  function localDateKey() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
   function step5(t) {
     const st = String(t.estado_maestro || t.estado || '').toUpperCase();
-    return '<div class="m33-session-row"><span>Estado</span><b>' + esc(st) + '</b></div>';
+    let html = '<div class="m33-session-row"><span>Estado</span><b>' + esc(st) + '</b></div>';
+    const end = String(t.fecha_fin || '').slice(0, 10);
+    const canRecover = state.isAdmin &&
+      ['EN_CURSO', 'ABIERTO', 'PENDIENTE_APROBACION'].includes(st) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(end) && end < localDateKey();
+    if (state.forceCloseMessage) {
+      html += '<p class="m33-msg ok" id="m33-force-close-result">' + esc(state.forceCloseMessage) + '</p>';
+    }
+    if (canRecover) {
+      html += '<div class="m33-session" style="margin-top:16px">' +
+        '<h4>Recuperar turno vencido</h4>' +
+        '<p class="m33-muted">Este turno ya terminó en la fecha programada, pero continúa abierto. El cierre forzado cerrará tramos activos, marcará como completadas las sesiones que estaban en curso y cancelará las que no comenzaron. No crea declaraciones de dinero, conteos de inventario ni un cuadre ficticio. La acción queda auditada con el motivo indicado.</p>' +
+        '<label for="m33-force-close-reason">Motivo obligatorio del cierre administrativo</label>' +
+        '<textarea id="m33-force-close-reason" rows="3" maxlength="1000" placeholder="Describe por qué el turno vencido no pudo cerrarse por el flujo normal"></textarea>' +
+        '<div class="m33-actions" style="margin-top:10px"><button type="button" id="m33-force-close" class="danger" data-m33-force-close>Cerrar turno vencido (forzado y auditado)</button></div>' +
+        '<p class="m33-msg" id="m33-force-close-msg" role="status" aria-live="polite"></p>' +
+        '</div>';
+    }
+    return html;
   }
 
   function bodyDependienta(t) {
@@ -184,6 +207,43 @@
   }
 
   function close() { var bg = document.getElementById('m33-bg'); if (bg) bg.remove(); }
+  async function forceCloseOverdueTurn(button) {
+    if (!state.isAdmin || !state.turno || !state.turno.id) return;
+    const reasonEl = document.getElementById('m33-force-close-reason');
+    const msgEl = document.getElementById('m33-force-close-msg');
+    const reason = String(reasonEl && reasonEl.value || '').trim();
+    const end = String(state.turno.fecha_fin || '').slice(0, 10);
+    if (!end || end >= localDateKey()) {
+      if (msgEl) msgEl.textContent = 'El turno no figura vencido; se bloqueó la recuperación forzada.';
+      return;
+    }
+    if (reason.length < 12) {
+      if (msgEl) msgEl.textContent = 'Escribe un motivo concreto de al menos 12 caracteres.';
+      if (reasonEl) reasonEl.focus();
+      return;
+    }
+    if (!window.confirm('CONFIRMACIÓN FINAL: se cerrará el turno vencido y se cancelarán las sesiones que no comenzaron. Las sesiones en curso se marcarán como cierre forzado. No se crearán conteos ni declaraciones de dinero. ¿Continuar?')) return;
+    if (button) button.disabled = true;
+    if (msgEl) msgEl.textContent = 'Registrando cierre administrativo y auditoría…';
+    try {
+      const result = await API().forzarCierreAdmin(state.turno.id, reason);
+      const estado = String(result && result.estado || '').toUpperCase();
+      if (estado !== 'CERRADO' && !(result && result.ya_cerrado)) {
+        throw new Error('El backend no confirmó el estado CERRADO. No se dará por completada la recuperación.');
+      }
+      const completed = Number(result && result.sesiones_completadas || 0);
+      const cancelled = Number(result && result.sesiones_canceladas || 0);
+      state.forceCloseMessage = 'Cierre forzado registrado en auditoría. Sesiones en curso cerradas: ' + completed + '; sesiones pendientes/programadas canceladas: ' + cancelled + '. No se inventaron declaraciones ni conteos.';
+      await load(state.turno.id);
+      renderModal();
+    } catch (e) {
+      const currentMsg = document.getElementById('m33-force-close-msg');
+      if (currentMsg) currentMsg.textContent = 'No se cerró el turno: ' + String(e && e.message || e);
+      const currentButton = document.getElementById('m33-force-close');
+      if (currentButton) currentButton.disabled = false;
+    }
+  }
+
   async function deleteTurno() {
     if (!state.isAdmin) return;
     if (!confirm('¿Eliminar este Turno?')) return;
@@ -274,12 +334,14 @@
     var n = ov.querySelector('#m33-next'); if (n) n.onclick = function () { state.step++; renderModal(); };
     var cf = ov.querySelector('#m33-close-final'); if (cf) cf.onclick = close;
     var d = ov.querySelector('#m33-delete'); if (d) d.onclick = deleteTurno;
+    var forceClose = ov.querySelector('[data-m33-force-close]');
+    if (forceClose) forceClose.addEventListener('click', function () { forceCloseOverdueTurn(forceClose); });
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
     if (state.step === 2) bindAssignmentAutosave();
   }
 
   async function open(id) {
-    css(); state.step = 1; state.busy = true; await resolveAdmin();
+    css(); state.step = 1; state.busy = true; state.forceCloseMessage = ''; await resolveAdmin();
     const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
     try { await load(id); state.busy = false; renderModal(); }
     catch (e) { state.busy = false; ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>'; ov.querySelector('#m33-error-close').onclick = close; }
