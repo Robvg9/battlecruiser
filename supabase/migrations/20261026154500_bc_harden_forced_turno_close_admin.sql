@@ -55,8 +55,8 @@ BEGIN
     RETURN jsonb_build_object('id', p_turno_id, 'estado', 'CERRADO', 'ya_cerrado', true);
   END IF;
 
-  IF coalesce(v_turno.estado_maestro, v_turno.estado) NOT IN ('ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION')
-     AND coalesce(v_turno.estado, v_turno.estado_maestro) NOT IN ('ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION') THEN
+  IF coalesce(v_turno.estado_maestro, '') NOT IN ('ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION')
+     OR coalesce(v_turno.estado, '') NOT IN ('ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION') THEN
     RAISE EXCEPTION 'El turno no está en un estado operativo recuperable.' USING ERRCODE = 'P0001';
   END IF;
 
