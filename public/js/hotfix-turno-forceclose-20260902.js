@@ -62,10 +62,57 @@
     el.className = 'bc-force-close-msg m33-msg' + (isError ? ' error' : ' ok');
   }
 
+  function isSummaryStep(modal) {
+    if (!modal) return false;
+    const steps = modal.querySelectorAll('.m33-step');
+    const active = modal.querySelector('.m33-step.active');
+    return !!(steps.length && active && active === steps[steps.length - 1] &&
+      /resumen/i.test(active.textContent || ''));
+  }
+
+  function watchModal(turnoId, modal) {
+    if (!modal || modal.__bcForceCloseObserver) return;
+    const observer = new MutationObserver(function () {
+      if (!document.body.contains(modal)) {
+        observer.disconnect();
+        modal.__bcForceCloseObserver = null;
+        return;
+      }
+      addButton(turnoId).catch(function (e) {
+        console.warn('[BattleCruiser] No se pudo actualizar la recuperación en el paso actual:', e);
+      });
+    });
+    observer.observe(modal, { childList: true, subtree: true });
+    const detachObserver = new MutationObserver(function () {
+      if (document.body.contains(modal)) return;
+      observer.disconnect();
+      detachObserver.disconnect();
+      modal.__bcForceCloseObserver = null;
+    });
+    // Only watch direct body children for modal removal; do not observe the whole app subtree.
+    detachObserver.observe(document.body, { childList: true });
+    modal.__bcForceCloseObserver = observer;
+  }
+
   async function addButton(turnoId) {
     const modal = document.getElementById('m33-bg');
-    if (!modal || !turnoId || !(await isAdmin())) return;
-    if (modal.getAttribute('data-turno-id') === String(turnoId) && modal.querySelector('.bc-force-close-turno')) return;
+    if (!modal || !turnoId) return;
+    const existingButton = modal.querySelector('.bc-force-close-turno');
+    const existingMessage = modal.querySelector('.bc-force-close-msg');
+
+    // The action belongs in Resumen only. M33 replaces the entire footer as
+    // the user advances, so a MutationObserver re-evaluates each rendered step.
+    if (!isSummaryStep(modal)) {
+      if (existingButton) existingButton.remove();
+      if (existingMessage) existingMessage.remove();
+      return;
+    }
+    if (!(await isAdmin())) {
+      if (existingButton) existingButton.remove();
+      if (existingMessage) existingMessage.remove();
+      return;
+    }
+    if (modal.getAttribute('data-turno-id') === String(turnoId) && existingButton) return;
 
     let turn;
     try {
@@ -177,6 +224,8 @@
     const original = hub.open;
     const wrapped = async function (turnoId) {
       const result = await original.apply(this, arguments);
+      const modal = document.getElementById('m33-bg');
+      watchModal(turnoId, modal);
       await addButton(turnoId);
       return result;
     };
@@ -189,7 +238,10 @@
     wrapOpen();
     const active = document.getElementById('m33-bg');
     const id = active && active.getAttribute('data-turno-id');
-    if (id) addButton(id);
+    if (id) {
+      watchModal(id, active);
+      addButton(id);
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
