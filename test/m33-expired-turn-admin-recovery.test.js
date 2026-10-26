@@ -49,7 +49,7 @@ function setup(t, options = {}) {
   button.addEventListener("click", () => { closeClicks++; });
 
   window.tienePermiso = () => false;
-  window._usuarioActual = { id: "owner-fixture", rol: "Dueño" };
+  window._usuarioActual = { id: "owner-fixture", rol: options.admin === false ? "Dependienta" : "Dueño" };
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => options.admin !== false,
     obtenerExpedienteTurno: async (id) => {
