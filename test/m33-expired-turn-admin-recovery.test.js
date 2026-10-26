@@ -7,132 +7,161 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const source = fs.readFileSync(
-  path.join(__dirname, "..", "public", "js", "m33-turnos-final.js"),
-  "utf8"
-);
-const apiSource = fs.readFileSync(
-  path.join(__dirname, "..", "public", "js", "turno-api.js"),
+  path.join(__dirname, "..", "public", "js", "hotfix-turno-forceclose-20260902.js"),
   "utf8"
 );
 const migration = fs.readFileSync(
   path.join(__dirname, "..", "supabase", "migrations", "20261026154500_bc_harden_forced_turno_close_admin.sql"),
   "utf8"
 );
+const app = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
+const sw = fs.readFileSync(path.join(__dirname, "..", "public", "service-worker.js"), "utf8");
 
-async function waitFor(predicate, timeout) {
-  const deadline = Date.now() + (timeout || 1500);
-  while (Date.now() < deadline) {
-    if (predicate()) return true;
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  return Boolean(predicate());
-}
-
-function setup(t) {
-  const dom = new JSDOM(
-    "<!doctype html><html lang='es'><head></head><body><div id='ciclos-m18-root'></div></body></html>",
-    { url: "https://battlecruiser-turno-recovery.test/", runScripts: "outside-only", pretendToBeVisual: true }
-  );
-  const window = dom.window;
-  const calls = [];
-  let closed = false;
-  const turn = {
+function overdueTurn(overrides = {}) {
+  return {
     id: "turno-vencido-fixture",
-    almacen_id: "almacen-cueva",
-    almacen_nombre: "La Cueva",
-    fecha_inicio: "2000-01-01",
-    fecha_fin: "2000-01-07",
-    dias_turno: 7,
     estado: "ABIERTO",
     estado_maestro: "EN_CURSO",
-    sesiones: [{
-      id: "sesion-fixture",
-      numero_dia: 1,
-      bloque: "MANANA",
-      fecha: "2000-01-01",
-      estado: "EN_CURSO",
-      usuario_id: "dependienta-fixture",
-      usuario_nombre: "Dependienta",
-      dinero_declarado: false
-    }]
+    fecha_inicio: "2026-09-01",
+    fecha_fin: "2026-09-07",
+    dias_turno: 7,
+    almacen_nombre: "La Cueva",
+    sesiones: [{ estado: "EN_CURSO", dinero_declarado: false }],
+    ...overrides
   };
+}
 
-  window._usuarioActual = { id: "owner-fixture", nombre: "Dueño", rol: "Dueño" };
-  window.__bcUser = window._usuarioActual;
-  window._cache = { usuarios: [] };
-  window.tienePermiso = (resource, action) => resource === "turnos" && action === "editar_any";
-  window.confirm = () => true;
-  window.alert = () => {};
-  window.__BC_M29__ = { isAdmin: () => true, renderHome: () => {} };
+function setup(t, options = {}) {
+  const dom = new JSDOM(
+    "<!doctype html><html lang='es'><head></head><body>" +
+      "<div id='m33-bg' class='m33-bg'><div class='m33-modal'>" +
+      "<div class='m33-foot'><div></div><div><button type='button' id='m33-close-final'>Cerrar</button></div></div>" +
+      "</div></div></body></html>",
+    { url: "https://battlecruiser-force-close.test/", runScripts: "outside-only", pretendToBeVisual: true }
+  );
+  const window = dom.window;
+  const turn = options.turn || overdueTurn();
+  const calls = [];
+  const events = [];
+  let closeClicks = 0;
+  let refreshCalls = 0;
+  const button = window.document.getElementById("m33-close-final");
+  button.addEventListener("click", () => { closeClicks++; });
+
+  window.tienePermiso = () => false;
+  window._usuarioActual = { id: "owner-fixture", rol: "Dueño" };
   window.BattleCruiserTurnoAPI = {
-    actorIsAdmin: async () => true,
+    actorIsAdmin: async () => options.admin !== false,
     obtenerExpedienteTurno: async (id) => {
-      assert.equal(id, turn.id);
-      return structuredClone(turn);
-    },
-    forzarCierreAdmin: async (id, reason) => {
-      calls.push({ id, reason });
-      closed = true;
-      turn.estado = "CERRADO";
-      turn.estado_maestro = "CERRADO";
-      return {
-        id,
+      calls.push({ type: "read", id });
+      return { ...turn, id };
+    }
+  };
+  window.client = {
+    rpc: async (name, params) => {
+      calls.push({ type: "rpc", name, params: { ...params } });
+      return { data: {
+        id: params.p_turno_id,
         estado: "CERRADO",
         forzado: true,
         sesiones_completadas: 1,
         sesiones_canceladas: 13,
         sesiones_afectadas: 14,
         tramos_cerrados: 1,
-        requiere_revision_manual: true
-      };
+        requiere_revision_manual: true,
+        declaraciones_dinero_creadas: 0,
+        conteos_inventario_creados: 0
+      }, error: null };
     }
   };
+  window.prompt = () => options.reason === undefined ? "El turno venció y requiere recuperación administrativa." : options.reason;
+  window.confirm = () => options.confirm !== false;
+  window.refrescarTurnos = async () => { refreshCalls++; };
+  window.__BC_M29__ = { renderHome: async () => {} };
+  window.__BC_M33 = {
+    open: async (id) => {
+      window.document.getElementById("m33-bg").setAttribute("data-turno-id", id);
+      return { id };
+    }
+  };
+  window.addEventListener("bc-turno-force-closed", e => events.push(e.detail));
 
   window.eval(source);
-  if (window.document.readyState === "loading") {
-    window.document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
-  }
+  window.document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   t.after(() => window.close());
-  return { dom, window, calls, turn, isClosed: () => closed };
+
+  return {
+    window, dom, calls, events, turn,
+    get closeClicks() { return closeClicks; },
+    get refreshCalls() { return refreshCalls; }
+  };
 }
 
-test("el paso Resumen ofrece recuperación solo al ADMIN cuando el turno ya venció", async (t) => {
-  const c = setup(t);
-  await c.window.__BC_M33.open("turno-vencido-fixture");
-  for (let i = 0; i < 4; i++) {
-    const next = c.window.document.getElementById("m33-next");
-    assert.ok(next, "each of the first four steps must permit advancing");
-    next.click();
-  }
-  assert.ok(c.window.document.getElementById("m33-force-close"));
-  assert.ok(c.window.document.getElementById("m33-force-close-reason"));
-  assert.match(c.window.document.getElementById("m33-bg").textContent, /No crea declaraciones de dinero, conteos de inventario ni un cuadre ficticio/i);
-  assert.equal(c.calls.length, 0, "opening the detail must not mutate the turn");
+async function openExpiredTurn(context, id = "turno-vencido-fixture") {
+  await context.window.__BC_M33.open(id);
+  return context.window.document.querySelector(".bc-force-close-turno");
+}
+
+test("la PWA carga el hotfix de recuperación y lo deja disponible en la caché offline", () => {
+  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261026.1"]'));
+  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261026.1"));
 });
 
-test("el cierre forzado exige motivo, registra la RPC y actualiza el expediente", async (t) => {
+test("el paso Resumen muestra recuperación únicamente al ADMIN para un turno vencido", async (t) => {
   const c = setup(t);
-  await c.window.__BC_M33.open("turno-vencido-fixture");
-  for (let i = 0; i < 4; i++) c.window.document.getElementById("m33-next").click();
-
-  c.window.document.getElementById("m33-force-close").click();
-  await waitFor(() => !!c.window.document.getElementById("m33-force-close-msg")?.textContent);
-  assert.equal(c.calls.length, 0, "a missing reason must not call the backend");
-  assert.match(c.window.document.getElementById("m33-force-close-msg").textContent, /al menos 12 caracteres/i);
-
-  const reason = "El turno venció y no se pudo completar el cierre normal.";
-  c.window.document.getElementById("m33-force-close-reason").value = reason;
-  c.window.document.getElementById("m33-force-close").click();
-
-  assert.ok(await waitFor(() => c.calls.length === 1 && !!c.window.document.getElementById("m33-force-close-result"), 2500));
-  assert.deepEqual(c.calls, [{ id: "turno-vencido-fixture", reason }]);
-  assert.equal(c.isClosed(), true);
-  assert.match(c.window.document.getElementById("m33-force-close-result").textContent, /Cierre forzado registrado en auditoría/i);
-  assert.match(c.window.document.getElementById("m33-force-close-result").textContent, /No se inventaron declaraciones ni conteos/i);
-  assert.equal(c.window.document.querySelector("[data-m33-force-close]"), null, "the recovery action disappears after the backend reports CERRADO");
+  const button = await openExpiredTurn(c);
+  assert.ok(button);
+  assert.match(button.textContent, /turno vencido/i);
+  assert.ok(button.closest(".m33-foot"));
+  assert.match(button.title, /Solo ADMIN/i);
+  assert.equal(c.calls.filter(x => x.type === "rpc").length, 0, "abrir el expediente no modifica el turno");
 });
 
-test("la migración requiere motivo y termina tramos activos y sesiones pendientes de forma auditable", () => {
+test("un turno vigente o una cuenta sin ADMIN no ve el botón de recuperación", async (t) => {
+  const notExpired = setup(t, { turn: overdueTurn({ fecha_fin: "2099-12-31" }) });
+  assert.equal(await openExpiredTurn(notExpired), null);
+
+  const noAdmin = setup(t, { admin: false });
+  assert.equal(await openExpiredTurn(noAdmin), null);
+});
+
+test("el cierre exige motivo, confirmación y respuesta CERRADO; deja evidencia sin crear conteos", async (t) => {
+  const c = setup(t);
+  const button = await openExpiredTurn(c);
+  assert.ok(button);
+
+  button.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  const rpcCalls = c.calls.filter(x => x.type === "rpc");
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, "bc_forzar_cierre_turno_admin");
+  assert.equal(rpcCalls[0].params.p_turno_id, "turno-vencido-fixture");
+  assert.match(rpcCalls[0].params.p_motivo, /turno venció/i);
+  assert.equal(c.events.length, 1);
+  assert.equal(c.events[0].estado, "CERRADO");
+  assert.equal(c.events[0].declaracionesDineroCreadas, 0);
+  assert.equal(c.events[0].conteosInventarioCreados, 0);
+  assert.equal(c.refreshCalls, 1);
+  assert.equal(c.closeClicks, 1, "la UI cierra el detalle después de confirmar el cierre");
+});
+
+test("cancelar la confirmación o introducir un motivo corto no escribe al backend", async (t) => {
+  const cancelled = setup(t, { confirm: false });
+  const button1 = await openExpiredTurn(cancelled);
+  button1.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(cancelled.calls.filter(x => x.type === "rpc").length, 0);
+
+  const short = setup(t, { reason: "mal" });
+  const button2 = await openExpiredTurn(short);
+  button2.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(short.calls.filter(x => x.type === "rpc").length, 0);
+  assert.match(short.window.document.querySelector(".bc-force-close-msg").textContent, /12 y 1000 caracteres/i);
+});
+
+test("la migración reconcilia ambos estados, cierra tramos y audita sin fabricar cifras", () => {
   assert.match(migration, /IF NOT public\.bc_actor_is_admin\(\) THEN/);
   assert.match(migration, /length\(v_motivo\) < 12/);
   assert.match(migration, /UPDATE public\.turno_tramos[\s\S]*estado = 'COMPLETADO'[\s\S]*fin_at = coalesce\(fin_at, v_now\)/);
@@ -145,9 +174,4 @@ test("la migración requiere motivo y termina tramos activos y sesiones pendient
   assert.match(migration, /'conteos_inventario_creados', 0/);
   assert.match(migration, /REVOKE EXECUTE ON FUNCTION public\.bc_forzar_cierre_turno_admin\(uuid, text\) FROM PUBLIC, anon/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.bc_forzar_cierre_turno_admin\(uuid, text\) TO authenticated/);
-});
-
-test("la capa API usa solo el RPC administrativo existente y pasa el motivo íntegro", () => {
-  assert.match(apiSource, /forzarCierreAdmin:'bc_forzar_cierre_turno_admin'/);
-  assert.match(apiSource, /forzarCierreAdmin:\(t,m\)=>callRpc\(RPC\.forzarCierreAdmin,\{p_turno_id:t,p_motivo:m\}\)/);
 });
