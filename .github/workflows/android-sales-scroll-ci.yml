@@ -1,0 +1,29 @@
+name: Android Sales Scroll Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/js/m68-ventas-pos-definitivo.js'
+      - 'test/android-sales-scroll.test.js'
+      - '.github/workflows/android-sales-scroll-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-sales-scroll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+      - name: Check POS module syntax
+        run: node --check public/js/m68-ventas-pos-definitivo.js
+      - name: Run Android scroll regression tests
+        run: node --test test/android-sales-scroll.test.js
