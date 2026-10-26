@@ -8,6 +8,10 @@ on:
       - 'test/step7-jornada-fixture.sql'
       - 'test/step7-jornada-contract.sql'
       - 'test/step7-jornada-ui-contract.test.js'
+      - 'supabase/migrations/20261026170000_bc_force_close_admin_expiry_guard.sql'
+      - 'test/force-close-turno-admin-forward-migration.test.js'
+      - 'test/force-close-turno-admin-fixture.sql'
+      - 'test/force-close-turno-admin-contract.sql'
       - 'test/step7-jornada-postgres-windows-ci.js'
       - '.github/workflows/step7-jornada-postgres.yml'
   workflow_dispatch:

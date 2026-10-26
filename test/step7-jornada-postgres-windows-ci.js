@@ -258,13 +258,17 @@ function applySql(file) {
       env: binEnv, timeout: 60 * 1000,
     });
 
-    log("\r\n=== 1/4 Build disposable fixture (includes Step 5 base schema) ===");
+    log("\r\n=== 1/5 Build disposable fixture (includes Step 5 base schema) ===");
     applySql("test/step7-jornada-fixture.sql");
-    log("\r\n=== 2/4 Apply Step 5 baseline migration ===");
+    log("\r\n=== 2/5 Apply Step 5 baseline migration ===");
     applySql("supabase/migrations/20261023053011_step5_jornada_unica_backend.sql");
-    log("\r\n=== 3/4 Apply Step 7 inventory migration ===");
+    log("\r\n=== 3/5 Apply Step 7 inventory migration ===");
     applySql("supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql");
-    log("\r\n=== 4/4 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
+    log("\r\n=== 4/5 Apply forward expired-turn guard and exercise ADMIN recovery ===");
+    applySql("test/force-close-turno-admin-fixture.sql");
+    applySql("supabase/migrations/20261026170000_bc_force_close_admin_expiry_guard.sql");
+    applySql("test/force-close-turno-admin-contract.sql");
+    log("\r\n=== 5/5 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
     log("\r\nPASS Step 7 PostgreSQL 17 disposable fixture and ACL contract.");
   } catch (error) {
