@@ -52,8 +52,8 @@ test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run 
   }), /numeric GitHub Actions run ID/);
 });
 
-test("production deploy uses the self-hosted Windows runner and persists the exact LIVE release manifest", () => {
-  assert.ok(deploy.includes("runs-on: [self-hosted, Windows, X64]"));
+test("production deploy uses the hosted Windows fallback and persists the exact LIVE release manifest", () => {
+  assert.ok(deploy.includes("runs-on: windows-latest"));
   assert.ok(deploy.includes("run: node test/deploy-production-pwa.js"));
   assert.ok(deploy.includes("test-results/release/release-*.json"));
   assert.ok(deploy.includes("name: battlecruiser-release-provenance-${{ github.run_id }}"));
