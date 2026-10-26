@@ -24,6 +24,10 @@ jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 35
+    # The self-hosted runner inherited a Node heap cap of about 32 MB; npm ci
+    # and JSDOM suites then crash with out-of-memory before exercising the code.
+    env:
+      NODE_OPTIONS: --max-old-space-size=1536
 
     steps:
       - name: Checkout
@@ -70,7 +74,7 @@ jobs:
         shell: cmd
         run: |
           if not exist test-results mkdir test-results
-          set "NODE_OPTIONS=--require=./test/node-global-compat.js"
+          set "NODE_OPTIONS=--max-old-space-size=1536 --require=./test/node-global-compat.js"
           npm test > test-results\quality-suite.log 2>&1
           set "SUITE_EXIT=%ERRORLEVEL%"
           type test-results\quality-suite.log
