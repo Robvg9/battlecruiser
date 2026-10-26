@@ -164,6 +164,10 @@ test("cancelar la confirmación o introducir un motivo corto no escribe al backe
 test("la migración reconcilia ambos estados, cierra tramos y audita sin fabricar cifras", () => {
   assert.match(migration, /IF NOT public\.bc_actor_is_admin\(\) THEN/);
   assert.match(migration, /length\(v_motivo\) < 12/);
+  assert.match(migration, /v_turno\.fecha IS NULL OR v_turno\.dias_turno IS NULL/);
+  assert.match(migration, /v_turno\.fecha[\s\S]*>= current_date/);
+  assert.match(migration, /El turno todavía no está vencido/);
+  assert.match(migration, /coalesce\(v_turno\.estado_maestro, ''\)[\s\S]*OR coalesce\(v_turno\.estado, ''\)/);
   assert.match(migration, /UPDATE public\.turno_tramos[\s\S]*estado = 'COMPLETADO'[\s\S]*fin_at = coalesce\(fin_at, v_now\)/);
   assert.match(migration, /WHEN estado IN \('PENDIENTE', 'PROGRAMADA'\) THEN 'CANCELADA'/);
   assert.match(migration, /WHEN estado = 'EN_CURSO' THEN 'COMPLETADA'/);
