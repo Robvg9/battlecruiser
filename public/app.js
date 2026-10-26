@@ -36,7 +36,7 @@
     ["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.1"],["m52-movimientos-auth-retry.js","52.2"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.7"],["m57-turnos-sesion-ux-fix.js","57.5"],
     ["m68-ventas-pos-definitivo.js","9.5.24"],["hotfix-regresiones-20260902.js","20261020.5"],["hotfix-configuracion-20260902.js","20261020.4"],
-    ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-turno-forceclose-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
+    ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.1"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1"],["hotfix-17-2-productos-save-20260903.js","17.2"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.4"],["hotfix-17-5-compra-modal-controls-20260903.js","17.5"],["hotfix-17-6-presentaciones-visible-20260903.js","17.6"],["hotfix-17-final-loader-20260903.js","17.final"],
     ["hotfix-pulido-20260903.js","20260903.1"],["hotfix-pulido-20260903b.js","20260903.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20260903.4"],
