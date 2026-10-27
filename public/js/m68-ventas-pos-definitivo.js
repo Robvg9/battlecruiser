@@ -12,6 +12,10 @@
   const SCROLL_ID = 'bc-venta-productos-scroll';
   const LAYOUT_ID = 'bc-venta-pos-layout';
   const CART_ID = 'bc-venta-cart-panel';
+  const HISTORY_ENTRY_ID = 'bc-venta-historial-entry';
+  const HISTORY_BUTTON_ID = 'bc-venta-historial-btn';
+  const HISTORY_TOOLBAR_ID = 'bc-venta-history-toolbar';
+  const HISTORY_BACK_ID = 'bc-venta-history-back-btn';
   const STYLE_ID = 'm68-ventas-pos-css';
   const POS_CLASS = 'bc-ventas-activa';
 
@@ -532,17 +536,53 @@ html.${POS_CLASS} .main-content > .rule-orn {
   justify-content: center !important;
 }
 
-#tab-ventas.bc-pos .venta-vista-toggle,
-#tab-ventas.bc-pos h3,
-#tab-ventas.bc-pos .ventas-historial-controles,
-#tab-ventas.bc-pos #lista-ventas,
-#tab-ventas.bc-pos [id*="historial"],
-#tab-ventas.bc-pos .historial-ventas,
-#tab-ventas.bc-pos input[placeholder*="referencia"],
+#tab-ventas.bc-pos:not(.bc-history-view) .venta-vista-toggle,
+#tab-ventas.bc-pos:not(.bc-history-view) h3,
+#tab-ventas.bc-pos:not(.bc-history-view) .ventas-historial-controles,
+#tab-ventas.bc-pos:not(.bc-history-view) #lista-ventas,
+#tab-ventas.bc-pos:not(.bc-history-view) [id*="historial"],
+#tab-ventas.bc-pos:not(.bc-history-view) .historial-ventas,
+#tab-ventas.bc-pos:not(.bc-history-view) input[placeholder*="referencia"],
 #tab-ventas.bc-pos #venta-stock-disponible,
 #tab-ventas.bc-pos #bc-m275-policy {
   display: none !important;
 }
+
+/* El historial es una vista independiente y de solo lectura; no depende de un turno abierto. */
+#tab-ventas.bc-pos #bc-venta-historial-entry {
+  display: flex !important; justify-content: flex-end !important; align-items: center !important;
+  flex: 0 0 auto !important; width: 100% !important; margin: 0 0 8px !important;
+}
+#tab-ventas.bc-pos #bc-venta-historial-btn,
+#tab-ventas.bc-pos #bc-venta-history-back-btn {
+  min-height: 40px !important; padding: 0 14px !important; border-radius: 9px !important;
+  border: 1px solid rgba(180,160,100,.38) !important; background: #21362c !important;
+  color: #e8ece6 !important; font-size: 12px !important; font-weight: 700 !important;
+  cursor: pointer !important; touch-action: manipulation !important;
+}
+#tab-ventas.bc-pos #bc-venta-history-toolbar {
+  display: none !important; align-items: center !important; justify-content: flex-start !important;
+  margin: 0 0 10px !important; padding: 0 !important;
+}
+#tab-ventas.bc-pos.bc-history-view,
+#tab-ventas.bc-pos.bc-history-view.visible {
+  display: block !important; height: 100% !important; max-height: 100% !important;
+  min-height: 0 !important; overflow-x: hidden !important; overflow-y: auto !important;
+  padding: 14px !important; box-sizing: border-box !important;
+}
+#tab-ventas.bc-pos.bc-history-view #venta-operativa-bloque,
+#tab-ventas.bc-pos.bc-history-view #venta-sin-turno,
+#tab-ventas.bc-pos.bc-history-view #bc-venta-historial-entry { display: none !important; }
+#tab-ventas.bc-pos.bc-history-view #bc-venta-history-toolbar { display: flex !important; }
+#tab-ventas.bc-pos.bc-history-view h3 { display: block !important; visibility: visible !important; }
+#tab-ventas.bc-pos.bc-history-view .ventas-historial-controles {
+  display: flex !important; flex-wrap: wrap !important; gap: 8px !important; width: 100% !important;
+}
+#tab-ventas.bc-pos.bc-history-view #ventas-buscar {
+  display: block !important; width: 100% !important; min-width: 0 !important; box-sizing: border-box !important;
+}
+#tab-ventas.bc-pos.bc-history-view #lista-ventas { display: flex !important; }
+#tab-ventas.bc-pos.bc-history-view #venta-detalle:not(.hidden) { display: block !important; }
 
 #tab-ventas.bc-pos #venta-modo-catalogo {
   display: contents !important;
@@ -603,6 +643,13 @@ html.${POS_CLASS} .main-content > .rule-orn {
     max-height: none !important;
     overflow: visible !important;
     touch-action: pan-y !important;
+  }
+
+  #tab-ventas.bc-pos.bc-history-view,
+  #tab-ventas.bc-pos.bc-history-view.visible {
+    display: block !important; flex: 0 0 auto !important; width: 100% !important;
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    overflow: visible !important; touch-action: pan-y !important; padding: 12px !important;
   }
 
   #tab-ventas.bc-pos,
@@ -734,26 +781,55 @@ html.${POS_CLASS} .main-content > .rule-orn {
     } catch (e) {}
   }
 
-  function hideHistoryHard(tab) {
+  function showHistory(tab) {
     if (!tab) return;
     tab.querySelectorAll('h3').forEach(function (h) {
-      var t = (h.textContent || '').trim().toLowerCase();
-      if (t.indexOf('historial') !== -1) {
-        h.style.setProperty('display', 'none', 'important');
-        h.hidden = true;
+      if (/historial/i.test((h.textContent || '').trim())) {
+        h.style.removeProperty('display');
+        h.hidden = false;
+        h.removeAttribute('aria-hidden');
+        h.classList.remove('hidden');
       }
     });
-    ['lista-ventas', 'ventas-buscar', 'ventas-contador', 'venta-detalle'].forEach(function (id) {
+    ['lista-ventas', 'ventas-buscar', 'ventas-contador'].forEach(function (id) {
       var el = document.getElementById(id);
-      if (el) {
-        el.style.setProperty('display', 'none', 'important');
-        el.hidden = true;
-      }
+      if (!el) return;
+      el.style.removeProperty('display');
+      el.hidden = false;
+      el.removeAttribute('aria-hidden');
+      el.classList.remove('hidden');
     });
     tab.querySelectorAll('.ventas-historial-controles').forEach(function (el) {
-      el.style.setProperty('display', 'none', 'important');
-      el.hidden = true;
+      el.style.removeProperty('display');
+      el.hidden = false;
+      el.removeAttribute('aria-hidden');
+      el.classList.remove('hidden');
     });
+    // El detalle permanece oculto por su clase .hidden hasta que el usuario abre una venta.
+    var detail = document.getElementById('venta-detalle');
+    if (detail) {
+      detail.style.removeProperty('display');
+      detail.hidden = false;
+      detail.removeAttribute('aria-hidden');
+    }
+  }
+
+  function setHistoryView(show) {
+    var tab = document.getElementById('tab-ventas');
+    if (!tab) return;
+    var visible = !!show;
+    tab.classList.toggle('bc-history-view', visible);
+    var button = document.getElementById(HISTORY_BUTTON_ID);
+    if (button) {
+      button.setAttribute('aria-expanded', visible ? 'true' : 'false');
+      button.setAttribute('aria-label', visible ? 'Historial de ventas abierto' : 'Ver historial de ventas');
+    }
+    showHistory(tab);
+    if (visible && typeof window.refrescarVentasHistorial === 'function') {
+      Promise.resolve()
+        .then(function () { return window.refrescarVentasHistorial(); })
+        .catch(function (e) { console.warn('[M68] No se pudo refrescar el historial de ventas.', e); });
+    }
   }
 
   function norm(s) {
@@ -810,7 +886,7 @@ html.${POS_CLASS} .main-content > .rule-orn {
         try {
           ensureStructure();
           syncPosMode();
-          hideHistoryHard(document.getElementById('tab-ventas'));
+          showHistory(document.getElementById('tab-ventas'));
         } catch (e) {}
         return r;
       };
@@ -869,6 +945,38 @@ html.${POS_CLASS} .main-content > .rule-orn {
       bloque.insertBefore(top, bloque.firstChild);
     }
     if (top.parentNode !== bloque) safeMove(top, bloque, bloque.firstChild);
+
+    // Entrada persistente al historial: queda fuera del POS y funciona sin turno abierto.
+    var historyEntry = document.getElementById(HISTORY_ENTRY_ID);
+    if (!historyEntry) {
+      historyEntry = document.createElement('div');
+      historyEntry.id = HISTORY_ENTRY_ID;
+      historyEntry.className = 'bc-venta-history-entry';
+      var historyButton = document.createElement('button');
+      historyButton.id = HISTORY_BUTTON_ID;
+      historyButton.type = 'button';
+      historyButton.textContent = 'Historial de ventas';
+      historyButton.setAttribute('aria-label', 'Ver historial de ventas');
+      historyButton.setAttribute('aria-expanded', 'false');
+      historyEntry.appendChild(historyButton);
+    }
+    safeMove(historyEntry, tab, bloque);
+
+    var historyToolbar = document.getElementById(HISTORY_TOOLBAR_ID);
+    if (!historyToolbar) {
+      historyToolbar = document.createElement('div');
+      historyToolbar.id = HISTORY_TOOLBAR_ID;
+      var backButton = document.createElement('button');
+      backButton.id = HISTORY_BACK_ID;
+      backButton.type = 'button';
+      backButton.textContent = 'Volver al punto de venta';
+      backButton.setAttribute('aria-label', 'Volver al punto de venta');
+      historyToolbar.appendChild(backButton);
+    }
+    var historyTitle = Array.from(tab.querySelectorAll('h3')).find(function (h) {
+      return /historial/i.test(h.textContent || '');
+    });
+    safeMove(historyToolbar, tab, historyTitle || null);
 
     var ctx = document.getElementById('venta-almacen-operativo');
     if (ctx) {
@@ -947,7 +1055,7 @@ html.${POS_CLASS} .main-content > .rule-orn {
     var btnConf = document.getElementById('btn-confirmar-venta');
     if (btnConf && cart) safeMove(btnConf, cart);
 
-    hideHistoryHard(tab);
+    showHistory(tab);
     return true;
   }
 
@@ -978,6 +1086,20 @@ html.${POS_CLASS} .main-content > .rule-orn {
   } else {
     setTimeout(start, 160);
   }
+
+  document.addEventListener('click', function (e) {
+    var target = e.target;
+    if (!target || !target.closest) return;
+    if (target.closest('#' + HISTORY_BUTTON_ID)) {
+      e.preventDefault();
+      setHistoryView(true);
+      return;
+    }
+    if (target.closest('#' + HISTORY_BACK_ID)) {
+      e.preventDefault();
+      setHistoryView(false);
+    }
+  }, true);
 
   document.addEventListener('click', function (e) {
     var t = e.target;
