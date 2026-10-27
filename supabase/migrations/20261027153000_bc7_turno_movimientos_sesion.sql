@@ -24,8 +24,9 @@ BEGIN
     RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE = '42501';
   END IF;
 
-  IF NOT public.tiene_permiso('reportes', 'ver') THEN
-    RAISE EXCEPTION 'No tienes permiso para consultar movimientos.' USING ERRCODE = '42501';
+  IF NOT public.tiene_permiso('reportes', 'ver')
+     AND NOT public.tiene_permiso('turnos', 'ver') THEN
+    RAISE EXCEPTION 'No tienes permiso para consultar movimientos ni turnos.' USING ERRCODE = '42501';
   END IF;
 
   SELECT * INTO v_s
