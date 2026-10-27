@@ -170,8 +170,15 @@ test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando"
     permisos: [{ seccion: "ventas", accion: "ver" }], // sin auditoria.ver
   });
   marcarOnline(window);
-  await esperar(80);
   const btnMando = document.querySelector('.tab-btn[data-tab="mando"]');
+  assert.ok(await esperarHasta(
+    () => typeof window.tienePermiso === "function" &&
+      window.tienePermiso("ventas", "ver") === true &&
+      window.tienePermiso("auditoria", "ver") === false &&
+      !!btnMando && (btnMando.style.display === "none" || btnMando.classList.contains("hidden")),
+    5000,
+    10
+  ), "el contexto de permisos debe quedar listo y ocultar Centro de Mando sin auditoria.ver");
   assert.ok(btnMando.style.display === "none" || btnMando.classList.contains("hidden"), "Centro de Mando oculto sin permiso");
 });
 
@@ -181,8 +188,14 @@ test("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", a
     permisos: [{ seccion: "auditoria", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
   const btnMando = document.querySelector('.tab-btn[data-tab="mando"]');
+  assert.ok(await esperarHasta(
+    () => typeof window.tienePermiso === "function" &&
+      window.tienePermiso("auditoria", "ver") === true &&
+      !!btnMando && btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"),
+    5000,
+    10
+  ), "el contexto de permisos debe quedar listo y mostrar Centro de Mando con auditoria.ver");
   assert.ok(btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"), "Centro de Mando visible con permiso");
 });
 
