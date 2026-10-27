@@ -132,6 +132,7 @@ test("B5.3: usuario sin permiso reportes.ver conserva la pestaña de inspección
     Boolean(window._usuarioActual()) &&
     typeof window.tienePermiso === "function" &&
     client.__rpcCalls.some((c) => c.nombre === "permisos_usuario_actual") &&
+    window.tienePermiso("ventas", "ver") &&
     !window.tienePermiso("reportes", "ver"),
     5000
   );
