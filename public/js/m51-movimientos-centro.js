@@ -8,10 +8,12 @@
   const STYLE_ID = 'bc-m51-movimientos-css';
   const PAGE_SIZE = 40;
   const FETCH_LIMIT = 500;
+  const HISTORY_MAX_ROWS = 5000;
   const BUSINESS_TIME_ZONE = 'America/Havana';
 
   let _viewMode = 'today';
   let _expandedHistoryDays = new Set();
+  let _historyTruncated = false;
   let _allRows = [];
   let _filtered = [];
   let _page = 0;
@@ -440,6 +442,15 @@
       card('Transferencias', counts.transferencias) + card('Compras', counts.compras) + card('Ventas', counts.ventas);
   }
 
+  function appendHistoryLimitNotice(host) {
+    if (!_historyTruncated || !host) return;
+    const notice = document.createElement('div');
+    notice.className = 'bc-m51-empty';
+    notice.setAttribute('role', 'status');
+    notice.textContent = 'Se alcanzó el límite de seguridad de 5.000 registros. Para garantizar que no falte actividad, selecciona un rango de fechas más pequeño en Historial y pulsa Generar.';
+    host.appendChild(notice);
+  }
+
   function renderLista() {
     const el = document.getElementById('mov-detalle');
     const pag = document.getElementById('mov-paginacion');
@@ -453,6 +464,7 @@
       const hasF = !!(leerFiltros().desde || leerFiltros().hasta || leerFiltros().almacen || leerFiltros().tipo || _search);
       el.innerHTML = '<div class="bc-m51-empty"><strong>Sin movimientos</strong><br>No encontramos movimientos para los filtros seleccionados.' +
         (hasF ? '<br><button type="button" class="bc-m51-btn" id="mov-empty-clear" style="margin-top:10px">Limpiar filtros</button>' : '') + '</div>';
+      appendHistoryLimitNotice(el);
       if (pag) pag.innerHTML = ''; return;
     }
 
@@ -490,6 +502,7 @@
       html += _viewMode === 'history' ? '</details>' : '</div>';
     });
     el.innerHTML = html;
+    appendHistoryLimitNotice(el);
 
     if (pag) {
       pag.innerHTML = '';
@@ -568,26 +581,39 @@
     if (typeof window.poblarSelectAlmacenes === 'function') {
       window.poblarSelectAlmacenes(document.getElementById('mov-filtro-almacen'));
     }
-    _loading = true; _lastError = null; _selected = null; paint();
+    _loading = true; _lastError = null; _historyTruncated = false; _selected = null; paint();
     const f = leerFiltros();
     try {
       const client = window.client;
       if (!client) throw new Error('Cliente Supabase no disponible');
-      const res = await client.rpc('movimientos_producto', {
-        p_producto_id: null, p_almacen_id: f.almacen, p_desde: f.desde, p_hasta: f.hasta,
-        p_tipo: f.tipo, p_limite: FETCH_LIMIT, p_offset: 0
-      });
-      if (res.error) {
-        if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
-          _lastError = 'rpc_missing';
-          const el = document.getElementById('mov-detalle');
-          if (el) el.innerHTML = '<div class="bc-m51-error">Falta aplicar función movimientos_producto en Supabase.</div>';
-        } else {
-          _lastError = String(res.error.message || res.error.code || res.error);
+      const collected = [];
+      let offset = 0;
+      const maxRows = _viewMode === 'history' ? HISTORY_MAX_ROWS : FETCH_LIMIT;
+      while (true) {
+        const res = await client.rpc('movimientos_producto', {
+          p_producto_id: null, p_almacen_id: f.almacen, p_desde: f.desde, p_hasta: f.hasta,
+          p_tipo: f.tipo, p_limite: FETCH_LIMIT, p_offset: offset
+        });
+        if (res.error) {
+          if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
+            _lastError = 'rpc_missing';
+            const el = document.getElementById('mov-detalle');
+            if (el) el.innerHTML = '<div class="bc-m51-error">Falta aplicar función movimientos_producto en Supabase.</div>';
+          } else {
+            _lastError = String(res.error.message || res.error.code || res.error);
+          }
+          _allRows = []; _filtered = []; _loading = false; paint(); return;
         }
-        _allRows = []; _filtered = []; _loading = false; paint(); return;
+        const pageRows = Array.isArray(res.data) ? res.data : [];
+        collected.push.apply(collected, pageRows);
+        if (pageRows.length < FETCH_LIMIT) break;
+        if (collected.length >= maxRows) {
+          _historyTruncated = _viewMode === 'history';
+          break;
+        }
+        offset += pageRows.length;
       }
-      _allRows = Array.isArray(res.data) ? res.data : [];
+      _allRows = collected.slice(0, maxRows);
       _page = 0; applySearchAndPage(); _loading = false; _lastError = null; paint();
     } catch (e) {
       console.warn('[BattleCruiser] M51 movimientos_producto:', e);
