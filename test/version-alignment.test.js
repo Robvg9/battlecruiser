@@ -145,7 +145,7 @@ test('M68 provides an explicit, accessible route to Sales history from the POS',
   assert.match(m68, /aria-controls/, 'the History control must name the panel it opens');
   assert.match(m68, /aria-expanded/, 'the History control must expose its state');
   assert.match(m68, /function syncHistoryPanel\(tab\)/, 'repeated POS initialization must preserve the current view');
-  assert.match(m68, /#venta-detalle:not\\(\\.hidden\\)/, 'sale detail must stay hidden until a sale is selected');
+  assert.match(m68, /#venta-detalle:not\(\.hidden\)/, 'sale detail must stay hidden until a sale is selected');
   assert.doesNotMatch(m68, /function hideHistoryHard\(/, 'the old routine that permanently hides History must not return');
   assert.match(m68, /grid-template-areas:\s*"topbar"\s*"history"\s*"catalog"\s*"cart"/, 'mobile POS layout must provide room for the History control');
 });
