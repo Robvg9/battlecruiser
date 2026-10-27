@@ -8,7 +8,9 @@
   const STYLE_ID = 'bc-m51-movimientos-css';
   const PAGE_SIZE = 40;
   const FETCH_LIMIT = 500;
+  const BUSINESS_TIME_ZONE = 'America/Havana';
 
+  let _viewMode = 'today';
   let _allRows = [];
   let _filtered = [];
   let _page = 0;
@@ -49,11 +51,26 @@
       return String(f);
     }
   }
+  function fechaHoyNegocio() {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: BUSINESS_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    const p = {};
+    parts.forEach(function (x) { if (x.type !== 'literal') p[x.type] = x.value; });
+    return String(p.year) + '-' + String(p.month).padStart(2, '0') + '-' + String(p.day).padStart(2, '0');
+  }
+
   function fechaGrupoKey(f) {
     if (!f) return 'sin-fecha';
     try {
       const d = new Date(f);
-      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      if (Number.isNaN(d.getTime())) return 'sin-fecha';
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: BUSINESS_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(d);
+      const p = {};
+      parts.forEach(function (x) { if (x.type !== 'literal') p[x.type] = x.value; });
+      return String(p.year) + '-' + String(p.month).padStart(2, '0') + '-' + String(p.day).padStart(2, '0');
     } catch (_) {
       return 'sin-fecha';
     }
@@ -95,6 +112,20 @@
       "#tab-movimientos.bc-m51 .bc-m51-hero h3{margin:0;font-family:'Cormorant Garamond',serif;font-size:1.85rem;line-height:1.1;color:var(--text)}",
       '#tab-movimientos.bc-m51 .bc-m51-hero p{margin:4px 0 0;color:var(--mist);font-size:.8rem}',
       '#tab-movimientos.bc-m51 .bc-m51-status{font-size:.72rem;color:var(--mist);white-space:nowrap}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-switch{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 12px;padding:12px;border:1px solid rgba(212,176,92,.14);border-radius:10px;background:rgba(18,42,36,.5);min-width:0;box-sizing:border-box}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-copy{min-width:0;display:flex;flex-direction:column;gap:3px}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-copy strong{font-size:.84rem;color:var(--text)}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-copy span{font-size:.72rem;color:var(--mist);line-height:1.4}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-actions{display:flex;flex-wrap:wrap;gap:7px;min-width:0}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-btn{min-height:38px;max-width:100%;min-width:0;padding:8px 12px;border-radius:7px;border:1px solid var(--gold-dim);background:var(--stone-2);color:var(--mist);font-size:.75rem;font-weight:700;overflow-wrap:anywhere}',
+      '#tab-movimientos.bc-m51 .bc-m51-view-btn[aria-pressed="true"]{background:rgba(212,176,92,.12);border-color:var(--gold);color:var(--gold-bright)}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible{border:1px solid rgba(212,176,92,.13);border-radius:9px;overflow:hidden;margin:0 0 12px}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head{cursor:pointer;list-style:none;padding:10px 12px;margin:0;background:rgba(212,176,92,.045)}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head::-webkit-details-marker{display:none}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head:after{content:"＋";float:right;color:var(--gold)}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible[open]>.bc-m51-group-head:after{content:"−"}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-card{margin:8px;border-radius:8px}',
+      '@media(max-width:640px){#tab-movimientos.bc-m51 .bc-m51-view-switch{align-items:stretch;flex-direction:column}#tab-movimientos.bc-m51 .bc-m51-view-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#tab-movimientos.bc-m51 .bc-m51-view-btn{width:100%;box-sizing:border-box}}',
       '#tab-movimientos.bc-m51 .bc-m51-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}',
       '#tab-movimientos.bc-m51 .bc-m51-metric{min-width:0;padding:11px 12px;background:linear-gradient(180deg,rgba(26,56,48,.55),rgba(18,42,36,.88));border:1px solid rgba(212,176,92,.12);border-radius:10px}',
       '#tab-movimientos.bc-m51 .bc-m51-metric-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mist)}',
@@ -182,6 +213,14 @@
       hero.after(metrics);
     }
 
+    let viewSwitch = tab.querySelector('.bc-m51-view-switch');
+    if (!viewSwitch) {
+      viewSwitch = document.createElement('div');
+      viewSwitch.className = 'bc-m51-view-switch';
+      viewSwitch.innerHTML = '<div class="bc-m51-view-copy"><strong id="mov-view-title">Movimientos de hoy</strong><span id="mov-view-description">La pantalla principal solo muestra la actividad de hoy.</span></div><div class="bc-m51-view-actions" role="group" aria-label="Tipo de vista"><button type="button" id="mov-view-today" class="bc-m51-view-btn" aria-pressed="true">Movimientos de hoy</button><button type="button" id="mov-view-history" class="bc-m51-view-btn" aria-pressed="false">Historial</button></div>';
+      hero.after(viewSwitch);
+    }
+
     let filters = tab.querySelector('.bc-m51-filters');
     if (!filters) {
       const old = tab.querySelector('.mando-filtros');
@@ -232,6 +271,21 @@
       else tab.querySelector('.bc-m51-metrics').after(filters);
     }
 
+    if (!tab.dataset.m51DateModeReady) {
+      const from = document.getElementById('mov-filtro-desde');
+      const to = document.getElementById('mov-filtro-hasta');
+      const today = fechaHoyNegocio();
+      if (from && to && !from.value && !to.value) {
+        from.value = today;
+        to.value = today;
+        _viewMode = 'today';
+      } else {
+        _viewMode = from && to && from.value === today && to.value === today ? 'today' : 'history';
+      }
+      tab.dataset.m51DateModeReady = '1';
+    }
+    syncViewSwitch();
+
     if (!tab.querySelector('.bc-m51-chips')) {
       const chips = document.createElement('div');
       chips.className = 'bc-m51-chips'; chips.id = 'mov-chips-m51';
@@ -268,6 +322,39 @@
     return tab;
   }
 
+  function syncViewSwitch() {
+    const todayButton = document.getElementById('mov-view-today');
+    const historyButton = document.getElementById('mov-view-history');
+    const title = document.getElementById('mov-view-title');
+    const description = document.getElementById('mov-view-description');
+    const today = _viewMode === 'today';
+    if (todayButton) todayButton.setAttribute('aria-pressed', today ? 'true' : 'false');
+    if (historyButton) historyButton.setAttribute('aria-pressed', today ? 'false' : 'true');
+    if (title) title.textContent = today ? 'Movimientos de hoy' : 'Historial de movimientos';
+    if (description) description.textContent = today
+      ? 'Solo la actividad del día actual en Cuba. Los días anteriores quedan en Historial.'
+      : 'Consulta días anteriores con los filtros de fecha, almacén y tipo. Cada fecha se muestra en un grupo plegable.';
+  }
+
+  function cambiarVista(mode) {
+    const tab = document.getElementById('tab-movimientos');
+    const from = document.getElementById('mov-filtro-desde');
+    const to = document.getElementById('mov-filtro-hasta');
+    _viewMode = mode === 'history' ? 'history' : 'today';
+    if (_viewMode === 'today') {
+      const today = fechaHoyNegocio();
+      if (from) from.value = today;
+      if (to) to.value = today;
+    } else {
+      if (from) from.value = '';
+      if (to) to.value = '';
+    }
+    if (tab) tab.dataset.m51DateModeReady = '1';
+    _page = 0;
+    syncViewSwitch();
+    cargarMovimientos();
+  }
+
   function leerFiltros() {
     const desde = document.getElementById('mov-filtro-desde');
     const hasta = document.getElementById('mov-filtro-hasta');
@@ -286,7 +373,14 @@
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    _search = ''; _page = 0;
+    if (_viewMode === 'today') {
+      const today = fechaHoyNegocio();
+      const from = document.getElementById('mov-filtro-desde');
+      const to = document.getElementById('mov-filtro-hasta');
+      if (from) from.value = today;
+      if (to) to.value = today;
+    }
+    _search = ''; _page = 0; syncViewSwitch();
   }
 
   function renderChips() {
@@ -372,8 +466,13 @@
 
     let html = '';
     groups.forEach(function (g) {
-      html += '<div class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
-        '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
+      if (_viewMode === 'history') {
+        html += '<details class="bc-m51-group bc-m51-group-collapsible"><summary class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
+          '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></summary>';
+      } else {
+        html += '<div class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
+          '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
+      }
       g.items.forEach(function (entry) {
         const m = entry.m; const meta = metaTipo(m.tipo); const cant = absCant(m.cantidad);
         const sel = _selected && _selected.operacion_id === m.operacion_id && _selected.tipo === m.tipo &&
@@ -386,7 +485,7 @@
           ' u</div><div class="bc-m51-card-user">' + esc(m.usuario || '—') +
           ' <span class="bc-m51-card-chev">›</span></div></div></article>';
       });
-      html += '</div>';
+      html += _viewMode === 'history' ? '</details>' : '</div>';
     });
     el.innerHTML = html;
 
@@ -509,6 +608,8 @@
     if (!tab || tab.dataset.m51Bound) return;
     tab.dataset.m51Bound = '1';
     tab.addEventListener('click', function (e) {
+      if (e.target.closest('#mov-view-today')) { cambiarVista('today'); return; }
+      if (e.target.closest('#mov-view-history')) { cambiarVista('history'); return; }
       if (e.target.closest('#mov-retry-btn, #mov-empty-clear')) {
         if (e.target.closest('#mov-empty-clear')) limpiarFiltrosUI();
         cargarMovimientos(); return;
@@ -551,6 +652,15 @@
       const idx = Number(card.getAttribute('data-idx'));
       _selected = _filtered[idx] || null;
       renderLista(); renderDrawer();
+    });
+    tab.addEventListener('change', function (e) {
+      if (e.target && (e.target.id === 'mov-filtro-desde' || e.target.id === 'mov-filtro-hasta')) {
+        const from = document.getElementById('mov-filtro-desde');
+        const to = document.getElementById('mov-filtro-hasta');
+        const today = fechaHoyNegocio();
+        _viewMode = from && to && from.value === today && to.value === today ? 'today' : 'history';
+        syncViewSwitch();
+      }
     });
     tab.addEventListener('input', function (e) {
       if (e.target && e.target.id === 'mov-buscar') {
