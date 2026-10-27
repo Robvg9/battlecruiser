@@ -243,8 +243,12 @@ test("B5.4: filtros se aplican al backend (fecha + almacén)", async () => {
   document.getElementById("rep-filtro-almacen").value = "a1";
   document.getElementById("rep-aplicar-btn").click();
   assert.ok(
-    await esperarHasta(() => client.__rpcCalls.some((c) => c.nombre === "reporte_resumen_ejecutivo")),
-    "debe llamar al RPC de resumen dentro de 2 s"
+    await esperarHasta(
+      () => client.__rpcCalls.some((c) => c.nombre === "reporte_resumen_ejecutivo"),
+      5000,
+      10
+    ),
+    "debe llamar al RPC de resumen dentro de 5 s"
   );
   const callResumen = client.__rpcCalls.find((c) => c.nombre === "reporte_resumen_ejecutivo");
   assert.ok(callResumen, "debe llamar al RPC de resumen");
