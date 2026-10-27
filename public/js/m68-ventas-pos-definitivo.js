@@ -5,7 +5,7 @@
  */
 (function m68VentasPosDefinitivo() {
   'use strict';
-  const VER = String(window.__BC_VERSION__ || '9.5.24');
+  const VER = String(window.__BC_VERSION__ || '9.5.25');
   window.__BC_M68_LOADED__ = VER;
 
   const TOP_ID = 'bc-venta-topbar';
@@ -14,6 +14,8 @@
   const CART_ID = 'bc-venta-cart-panel';
   const STYLE_ID = 'm68-ventas-pos-css';
   const POS_CLASS = 'bc-ventas-activa';
+  const HISTORY_MODE_CLASS = 'bc-m68-history-mode';
+  const HISTORY_ACTIVE_CLASS = 'bc-ventas-historial-activa';
 
   const CSS = `
 /* ========== M68 v${VER} ========== */
@@ -95,9 +97,10 @@ html.${POS_CLASS} .main-content > .rule-orn {
 #tab-ventas.bc-pos #venta-operativa-bloque {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) 360px !important;
-  grid-template-rows: auto minmax(0, 1fr) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
   grid-template-areas:
     "topbar topbar"
+    "history history"
     "catalog cart" !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
@@ -114,6 +117,25 @@ html.${POS_CLASS} .main-content > .rule-orn {
   justify-items: stretch !important;
 }
 
+#tab-ventas.bc-pos #bc-m68-sales-history-toggle {
+  grid-area: history !important;
+  justify-self: end !important;
+  align-self: center !important;
+  min-height: 38px !important;
+  padding: 8px 13px !important;
+  margin: 0 !important;
+  border: 1px solid rgba(201,162,77,0.4) !important;
+  border-radius: 9px !important;
+  background: #15221c !important;
+  color: #e8d48a !important;
+  font: 700 12px/1.2 Inter, sans-serif !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+#tab-ventas.bc-pos #bc-m68-sales-history-toggle:focus-visible {
+  outline: 2px solid #e8d48a !important;
+  outline-offset: 2px !important;
+}
 #tab-ventas.bc-pos #${LAYOUT_ID} {
   display: contents !important;
 }
@@ -544,6 +566,98 @@ html.${POS_CLASS} .main-content > .rule-orn {
   display: none !important;
 }
 
+/* The history is hidden only while POS mode is active. */
+#tab-ventas.bc-pos.bc-m68-history-mode {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 14px !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode #venta-operativa-bloque {
+  display: none !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode #bc-m68-sales-history-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode #bc-m68-sales-history-panel h3 {
+  display: block !important;
+  visibility: visible !important;
+  height: auto !important;
+  margin: 0 0 4px !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode .ventas-historial-controles {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  visibility: visible !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode #ventas-buscar {
+  display: block !important;
+  width: 100% !important;
+  min-height: 42px !important;
+  visibility: visible !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode #lista-ventas {
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: visible !important;
+}
+#tab-ventas.bc-pos.bc-m68-history-mode #venta-detalle {
+  display: block !important;
+  visibility: visible !important;
+}
+#tab-ventas.bc-pos #bc-m68-sales-history-panel .bc-m68-history-back {
+  align-self: flex-start !important;
+  min-height: 40px !important;
+  padding: 9px 13px !important;
+  border: 1px solid rgba(201,162,77,0.35) !important;
+  border-radius: 8px !important;
+  background: #15221c !important;
+  color: #e8d48a !important;
+  font: 700 12px/1.2 Inter, sans-serif !important;
+  cursor: pointer !important;
+}
+html.${HISTORY_ACTIVE_CLASS},
+body.${HISTORY_ACTIVE_CLASS} {
+  height: auto !important;
+  min-height: 100% !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+html.${HISTORY_ACTIVE_CLASS} .app-shell.visible,
+body.${HISTORY_ACTIVE_CLASS} .app-shell.visible,
+.app-shell.visible.${HISTORY_ACTIVE_CLASS} {
+  display: block !important;
+  height: auto !important;
+  min-height: 100dvh !important;
+  max-height: none !important;
+  overflow: visible !important;
+  grid-template-rows: auto !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-areas: none !important;
+}
+html.${HISTORY_ACTIVE_CLASS} .main-content,
+body.${HISTORY_ACTIVE_CLASS} .main-content {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Return to the POS without submitting or mutating an order. */
 #tab-ventas.bc-pos #venta-modo-catalogo {
   display: contents !important;
 }
@@ -621,8 +735,8 @@ html.${POS_CLASS} .main-content > .rule-orn {
   #tab-ventas.bc-pos #venta-operativa-bloque {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-rows: auto auto auto !important;
-    grid-template-areas: "topbar" "catalog" "cart" !important;
+    grid-template-rows: auto auto auto auto !important;
+    grid-template-areas: "topbar" "history" "catalog" "cart" !important;
     flex: 0 0 auto !important;
     height: auto !important;
     min-height: 0 !important;
@@ -710,11 +824,19 @@ html.${POS_CLASS} .main-content > .rule-orn {
   }
 
   function syncPosMode() {
+    var tab = document.getElementById('tab-ventas');
     var on = ventasVisible();
-    document.documentElement.classList.toggle(POS_CLASS, on);
-    document.body.classList.toggle(POS_CLASS, on);
+    var history = !!(on && tab && tab.classList.contains(HISTORY_MODE_CLASS));
+    var posLayout = on && !history;
+    document.documentElement.classList.toggle(POS_CLASS, posLayout);
+    document.body.classList.toggle(POS_CLASS, posLayout);
+    document.documentElement.classList.toggle(HISTORY_ACTIVE_CLASS, history);
+    document.body.classList.toggle(HISTORY_ACTIVE_CLASS, history);
     var shell = document.getElementById('app-shell') || document.querySelector('.app-shell');
-    if (shell) shell.classList.toggle(POS_CLASS, on);
+    if (shell) {
+      shell.classList.toggle(POS_CLASS, posLayout);
+      shell.classList.toggle(HISTORY_ACTIVE_CLASS, history);
+    }
     hideFooterEl(document.querySelector('.app-footer'), on);
     document.querySelectorAll('footer').forEach(function (f) {
       if (f.classList.contains('app-footer') || /Salón Privado|BattleCruiser/i.test(f.textContent || '')) {
@@ -734,26 +856,106 @@ html.${POS_CLASS} .main-content > .rule-orn {
     } catch (e) {}
   }
 
-  function hideHistoryHard(tab) {
+  function ensureHistoryPanel(tab) {
+    if (!tab) return null;
+    var bloque = document.getElementById('venta-operativa-bloque');
+    var panel = document.getElementById('bc-m68-sales-history-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'bc-m68-sales-history-panel';
+      panel.className = 'bc-m68-sales-history-panel';
+      panel.setAttribute('role', 'region');
+      panel.setAttribute('aria-label', 'Historial de ventas');
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+    }
+    if (panel.parentNode !== tab) {
+      tab.insertBefore(panel, bloque && bloque.parentNode === tab ? bloque.nextSibling : null);
+    } else if (bloque && panel.previousElementSibling !== bloque) {
+      tab.insertBefore(panel, bloque.nextSibling);
+    }
+
+    var heading = Array.prototype.slice.call(tab.querySelectorAll('h3')).find(function (h) {
+      return (h.textContent || '').trim().toLowerCase().indexOf('historial de ventas') !== -1;
+    });
+    var controls = tab.querySelector('.ventas-historial-controles');
+    var lista = document.getElementById('lista-ventas');
+    var detalle = document.getElementById('venta-detalle');
+    if (heading && heading.parentNode !== panel) panel.insertBefore(heading, panel.firstChild);
+    if (heading) {
+      heading.id = heading.id || 'bc-m68-sales-history-title';
+      heading.setAttribute('tabindex', '-1');
+    }
+
+    var back = document.getElementById('bc-m68-history-back');
+    if (!back) {
+      back = document.createElement('button');
+      back.id = 'bc-m68-history-back';
+      back.type = 'button';
+      back.className = 'bc-m68-history-back';
+      back.textContent = '← Volver a vender';
+      back.setAttribute('aria-label', 'Volver al catálogo y carrito de ventas');
+    }
+    if (back.parentNode !== panel || (heading && heading.nextElementSibling !== back)) {
+      panel.insertBefore(back, heading ? heading.nextSibling : panel.firstChild);
+    }
+
+    [controls, lista, detalle].forEach(function (el) {
+      if (!el) return;
+      el.hidden = false;
+      el.removeAttribute('aria-hidden');
+      el.style.removeProperty('display');
+      safeMove(el, panel);
+    });
+
+    var toggle = document.getElementById('bc-m68-sales-history-toggle');
+    if (!toggle) {
+      toggle = document.createElement('button');
+      toggle.id = 'bc-m68-sales-history-toggle';
+      toggle.type = 'button';
+      toggle.className = 'bc-m68-history-toggle';
+      toggle.textContent = 'Historial de ventas';
+      toggle.setAttribute('aria-controls', 'bc-m68-sales-history-panel');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', 'Abrir historial de ventas');
+    }
+    if (bloque && toggle.parentNode !== bloque) bloque.appendChild(toggle);
+    if (!toggle.dataset.m68HistoryWired) {
+      toggle.dataset.m68HistoryWired = '1';
+      toggle.addEventListener('click', function () { setHistoryMode(tab, true); });
+    }
+    if (!back.dataset.m68HistoryWired) {
+      back.dataset.m68HistoryWired = '1';
+      back.addEventListener('click', function () { setHistoryMode(tab, false); });
+    }
+    return panel;
+  }
+
+  function setHistoryMode(tab, enabled) {
     if (!tab) return;
-    tab.querySelectorAll('h3').forEach(function (h) {
-      var t = (h.textContent || '').trim().toLowerCase();
-      if (t.indexOf('historial') !== -1) {
-        h.style.setProperty('display', 'none', 'important');
-        h.hidden = true;
-      }
-    });
-    ['lista-ventas', 'ventas-buscar', 'ventas-contador', 'venta-detalle'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) {
-        el.style.setProperty('display', 'none', 'important');
-        el.hidden = true;
-      }
-    });
-    tab.querySelectorAll('.ventas-historial-controles').forEach(function (el) {
-      el.style.setProperty('display', 'none', 'important');
-      el.hidden = true;
-    });
+    var panel = ensureHistoryPanel(tab);
+    if (!panel) return;
+    var open = !!enabled;
+    tab.classList.toggle(HISTORY_MODE_CLASS, open);
+    panel.hidden = !open;
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    var toggle = document.getElementById('bc-m68-sales-history-toggle');
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Historial de ventas abierto' : 'Abrir historial de ventas');
+    }
+    syncPosMode();
+  }
+
+  function syncHistoryPanel(tab) {
+    if (!tab) return;
+    var open = tab.classList.contains(HISTORY_MODE_CLASS);
+    var panel = ensureHistoryPanel(tab);
+    if (!panel) return;
+    panel.hidden = !open;
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    var toggle = document.getElementById('bc-m68-sales-history-toggle');
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
 
   function norm(s) {
@@ -810,7 +1012,7 @@ html.${POS_CLASS} .main-content > .rule-orn {
         try {
           ensureStructure();
           syncPosMode();
-          hideHistoryHard(document.getElementById('tab-ventas'));
+          syncHistoryPanel(document.getElementById('tab-ventas'));
         } catch (e) {}
         return r;
       };
@@ -947,7 +1149,7 @@ html.${POS_CLASS} .main-content > .rule-orn {
     var btnConf = document.getElementById('btn-confirmar-venta');
     if (btnConf && cart) safeMove(btnConf, cart);
 
-    hideHistoryHard(tab);
+    syncHistoryPanel(tab);
     return true;
   }
 
