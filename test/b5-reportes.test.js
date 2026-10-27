@@ -201,8 +201,10 @@ test("B5.6: estado vacío cuando no hay datos", async () => {
     ventas: [],
   });
   marcarOnline(window);
-  await esperar(80);
-  await window.refrescarReportes();
+  await esperarPermisoReportes(window);
+  const pestañaVentas = document.querySelector('.rep-tab-btn[data-rep="ventas"]');
+  assert.ok(pestañaVentas, "debe existir la pestaña de subreporte Ventas");
+  pestañaVentas.click();
   const detalle = document.getElementById("rep-detalle");
   assert.ok(
     await esperarHasta(() => /Sin ventas/.test(detalle.innerHTML), 5000, 10),

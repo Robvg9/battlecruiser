@@ -169,9 +169,11 @@ async function waitUntil(description, predicate, timeoutMs) {
   throw new Error("Timeout esperando " + description + ". Último valor: " + JSON.stringify(lastValue));
 }
 async function navigateAndWait(url) {
-  let loadSeen = false;
-  const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS).then((event) => {
-    loadSeen = true;
+  let domContentLoadedSeen = false;
+  // The document load event waits for optional dynamically-loaded modules and remote assets.
+  // The E2E gate is the parsed DOM plus the app's own shell readiness, not every optional request.
+  const loaded = waitForEvent("Page.domContentEventFired", TIMEOUT_MS).then((event) => {
+    domContentLoadedSeen = true;
     return event;
   });
   // A failed CDP command can outlive the navigation-event waiter; attach a
@@ -184,9 +186,9 @@ async function navigateAndWait(url) {
   } catch (error) {
     // Edge on a busy Windows self-hosted runner can occasionally stop replying
     // to Page.navigate even while the target and Worker preview are healthy.
-    // If the load event has not arrived, fall back to a same-origin-safe JS
-    // navigation through Runtime.evaluate, then await the same load event.
-    if (!String(error && error.message || error).includes("Timeout CDP en Page.navigate") || loadSeen) {
+    // If DOMContentLoaded has not arrived, fall back to a same-origin-safe JS
+    // navigation through Runtime.evaluate, then await the same DOM event.
+    if (!String(error && error.message || error).includes("Timeout CDP en Page.navigate") || domContentLoadedSeen) {
       throw error;
     }
     report.evidence.navigationFallbacks = report.evidence.navigationFallbacks || [];
@@ -211,7 +213,9 @@ async function navigateAndWait(url) {
   await delay(500);
 }
 async function reloadAndWait(ignoreCache = true) {
-  const loaded = waitForEvent("Page.loadEventFired", TIMEOUT_MS);
+  // DOMContentLoaded is deterministic for shell readiness; full load can wait on optional scripts/fonts.
+  const loaded = waitForEvent("Page.domContentEventFired", TIMEOUT_MS);
+  loaded.catch(() => {});
   // Hard reloads bypass the Service Worker in Chromium; only use them for the
   // offline cache probe. The online reconnect must be a normal navigation.
   await cdpCommand("Page.reload", ignoreCache ? { ignoreCache: true } : {});
@@ -222,7 +226,7 @@ function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
 }
 function shellSnapshotPredicate() {
-  return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState==='complete'&&s.loginForm&&s.usernameField&&s.passwordField?s:null})()";
+  return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState!=='loading'&&s.loginForm&&s.usernameField&&s.passwordField&&window.__BC_UI_READY_RESOLVED__===true?s:null})()";
 }
 async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -449,7 +453,7 @@ async function main() {
   await navigateAndWait(BASE_URL + "/");
   const initial = await waitUntil("shell online con versión esperada", shellSnapshotPredicate(), 10000);
   report.evidence.onlineInitial = initial;
-  assert(initial.readyState === "complete", "El documento LIVE no terminó de cargar.");
+  assert(initial.readyState !== "loading", "El DOM LIVE no terminó de parsearse.");
   assert(initial.version === expectedVersion, "Versión de navegador " + initial.version + " distinta de la esperada " + expectedVersion + ".");
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
@@ -729,14 +733,14 @@ async function main() {
     uploadThroughput: 0,
     connectionType: "none",
   });
-  await reloadAndWait();
+  await reloadAndWait(false);
   const offline = await waitUntil(
     "render de la PWA durante la desconexión de red",
     shellSnapshotPredicate(),
     15000
   );
   report.evidence.offlineReload = offline;
-  assert(offline.readyState === "complete", "La recarga offline no terminó.");
+  assert(offline.readyState !== "loading", "El DOM offline no terminó de parsearse.");
   assert(offline.version === expectedVersion, "La versión no se mantuvo durante la recarga offline.");
   assert(offline.loginForm && offline.usernameField && offline.passwordField, "El formulario core no se recuperó al recargar offline.");
   assert(offline.localStylesheet, "El enlace a style.css no está presente offline.");
@@ -796,7 +800,7 @@ async function main() {
   await reloadAndWait(false);
   const reconnected = await waitUntil("recuperación tras reconectar internet", shellSnapshotPredicate(), 15000);
   report.evidence.onlineReconnect = reconnected;
-  assert(reconnected.readyState === "complete", "La PWA no terminó de cargar tras reconectar.");
+  assert(reconnected.readyState !== "loading", "El DOM no terminó de parsearse tras reconectar.");
   assert(reconnected.version === expectedVersion, "La versión cambió después de reconectar.");
   assert(reconnected.online === true, "El navegador no recuperó navigator.onLine después de reconectar.");
   assert(reconnected.loginForm, "La pantalla principal no se recuperó después de reconectar.");

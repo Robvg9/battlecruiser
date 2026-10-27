@@ -79,6 +79,23 @@
       '.tm-meta b{color:var(--gold)}',
       '.tm-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}',
       '.tm-actions button{min-height:42px}',
+      '.tm-day-movimientos{display:block;flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;padding:12px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(7,20,16,.55)}',
+      '.tm-day-movimientos h5{margin:0 0 8px;color:var(--gold);font-size:13px}',
+      '.tm-day-movimientos .tm-mov-scroll{max-width:100%;overflow-x:auto}',
+      '.tm-day-movimientos table{width:100%;min-width:460px;border-collapse:collapse;font-size:11px}',
+      '.tm-day-movimientos th,.tm-day-movimientos td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--gold-dim);vertical-align:top}',
+      '.tm-day-movimientos th{color:var(--mist);font-weight:600}',
+      '.tm-day-movimientos .tm-mov-empty{padding:10px;border:1px dashed var(--gold-dim);border-radius:6px;color:var(--mist);font-size:12px;line-height:1.45}',
+      '.tm-day-movimientos[hidden]{display:none!important}',
+      '.tm-day-group{border-top:1px solid var(--gold-dim);padding:8px 0 4px}',
+      '.tm-day-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 0}',
+      '.tm-day-head b{color:var(--gold)}',
+      '.tm-day-head small{display:block;color:var(--mist);font-size:11px;margin-top:3px}',
+      '.tm-day-head button{min-height:42px;max-width:100%;white-space:normal}',
+      '.tm-day-sessions{border:1px solid var(--gold-dim);border-radius:8px;padding:0 10px}',
+      '.tm-day-sessions .tm-row{padding:11px 0}',
+      '.tm-day-movimientos{margin-top:10px}',
+
       '.tm-back{background:transparent!important}',
       '.tm-msg{min-height:20px;margin-top:10px}',
       '.tm-msg.ok{color:#8fc79d}',
@@ -97,7 +114,7 @@
       '.tm-modal .field{margin-bottom:10px}',
       '.tm-modal label{display:block;font-size:12px;color:var(--mist);margin-bottom:4px}',
       '.tm-modal input,.tm-modal select,.tm-modal textarea{width:100%;padding:9px 11px;background:var(--void);border:1px solid #c9a24d33;border-radius:5px;color:var(--text)}',
-      '@media(max-width:650px){.tm-grid{grid-template-columns:1fr}.tm-row{grid-template-columns:1fr}}'
+      '@media(max-width:650px){.tm-grid{grid-template-columns:1fr}.tm-row{grid-template-columns:1fr}.tm-day-head{align-items:stretch;flex-direction:column}.tm-day-head button{width:100%;box-sizing:border-box}}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -282,39 +299,62 @@
     if (!state.sesiones.length) {
       sesHtml = '<p class="muted">Sin sesiones cargadas (posible restricción RLS o Turno vacío).</p>';
     } else {
-      sesHtml = state.sesiones.map(function (s) {
-        const assigned = s.usuario_id || s.asignado_id || null;
-        const nombre = s.usuario_nombre || s.asignado_nombre || (assigned ? '—' : 'Sin asignar');
-        const se = String(s.estado || '').toUpperCase();
-        let actions = '';
-        if (!assigned && state.isAdmin && (se === 'PENDIENTE' || se === 'PROGRAMADA' || !se)) {
-          actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Asignar</button>';
-        }
-        if (assigned && state.isAdmin && (se === 'PENDIENTE' || se === 'PROGRAMADA')) {
-          actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Cambiar</button>';
-        }
-        const me = currentUserId();
-        const puedoIniciar = se === 'PENDIENTE' && assigned && me && String(assigned) === String(me);
-        if (puedoIniciar) {
-          actions += '<button type="button" class="cc-accion" data-tm-iniciar="' + esc(s.id) + '">Iniciar sesión</button>';
-        }
-        if (se === 'EN_CURSO' && assigned && me && String(assigned) === String(me)) {
-          actions += '<button type="button" class="cc-accion" data-tm-declarar="' + esc(s.id) + '">Declarar dinero</button>';
-          actions += '<button type="button" class="cc-accion" data-tm-cerrar-ses="' + esc(s.id) + '">Cerrar sesión</button>';
-          actions += '<button type="button" class="cc-accion" data-tm-interrumpir="' + esc(s.id) + '">Interrumpir / relevo</button>';
-        }
-        if (!assigned && se === 'PENDIENTE') {
-          actions += '<span class="muted">No puede comenzar: sin dependiente asignada.</span>';
-        }
-        if (assigned && me && String(assigned) !== String(me) && se === 'PENDIENTE' && !state.isAdmin) {
-          actions += '<span class="muted">Asignada a otro trabajador.</span>';
-        }
+      const dayGroups = Object.create(null);
+      state.sesiones.forEach(function (s) {
+        const day = s.dia_n || s.numero_dia || '—';
+        const date = String(s.fecha || '').slice(0, 10);
+        const dayKey = String(day) + '|' + date;
+        if (!dayGroups[dayKey]) dayGroups[dayKey] = { day: day, date: date, sessions: [] };
+        dayGroups[dayKey].sessions.push(s);
+      });
+
+      sesHtml = Object.keys(dayGroups).map(function (dayKey) {
+        const group = dayGroups[dayKey];
+        const sessionIds = group.sessions.map(function (s) { return String(s.id || ''); }).filter(Boolean).join('|');
+        const sessionRows = group.sessions.map(function (s) {
+          const assigned = s.usuario_id || s.asignado_id || null;
+          const nombre = s.usuario_nombre || s.asignado_nombre || (assigned ? '—' : 'Sin asignar');
+          const se = String(s.estado || '').toUpperCase();
+          let actions = '';
+          if (!assigned && state.isAdmin && (se === 'PENDIENTE' || se === 'PROGRAMADA' || !se)) {
+            actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Asignar</button>';
+          }
+          if (assigned && state.isAdmin && (se === 'PENDIENTE' || se === 'PROGRAMADA')) {
+            actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Cambiar</button>';
+          }
+          const me = currentUserId();
+          const puedoIniciar = se === 'PENDIENTE' && assigned && me && String(assigned) === String(me);
+          if (puedoIniciar) {
+            actions += '<button type="button" class="cc-accion" data-tm-iniciar="' + esc(s.id) + '">Iniciar sesión</button>';
+          }
+          if (se === 'EN_CURSO' && assigned && me && String(assigned) === String(me)) {
+            actions += '<button type="button" class="cc-accion" data-tm-declarar="' + esc(s.id) + '">Declarar dinero</button>';
+            actions += '<button type="button" class="cc-accion" data-tm-cerrar-ses="' + esc(s.id) + '">Cerrar sesión</button>';
+            actions += '<button type="button" class="cc-accion" data-tm-interrumpir="' + esc(s.id) + '">Interrumpir / relevo</button>';
+          }
+          if (!assigned && se === 'PENDIENTE') {
+            actions += '<span class="muted">No puede comenzar: sin dependiente asignada.</span>';
+          }
+          if (assigned && me && String(assigned) !== String(me) && se === 'PENDIENTE' && !state.isAdmin) {
+            actions += '<span class="muted">Asignada a otro trabajador.</span>';
+          }
+          return (
+            '<div class="tm-row" data-sesion-id="' + esc(s.id) + '">' +
+            '<div><b>Sesión · ' + esc(labelBloque(s.bloque)) + '</b>' +
+            '<small>' + esc(fmtDate(s.fecha)) + ' · ' + esc(nombre) + '</small>' +
+            '<span class="tm-status">' + esc(labelEstado(se)) + '</span></div>' +
+            '<div class="tm-actions">' + actions + '</div></div>'
+          );
+        }).join('');
         return (
-          '<div class="tm-row" data-sesion-id="' + esc(s.id) + '">' +
-          '<div><b>Día ' + esc(s.dia_n || s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) + '</b>' +
-          '<small>' + esc(fmtDate(s.fecha)) + ' · ' + esc(nombre) + '</small>' +
-          '<span class="tm-status">' + esc(labelEstado(se)) + '</span></div>' +
-          '<div class="tm-actions">' + actions + '</div></div>'
+          '<section class="tm-day-group">' +
+          '<header class="tm-day-head"><div><b>Día ' + esc(group.day) + '</b><small>' + esc(fmtDate(group.date)) + '</small></div>' +
+          '<button type="button" class="cc-accion" data-tm-mov-dia="' + esc(group.day) +
+          '" data-tm-mov-fecha="' + esc(group.date) + '" data-tm-sessions="' + esc(sessionIds) +
+          '" aria-expanded="false">Ver movimientos del día</button></header>' +
+          '<div class="tm-day-sessions">' + sessionRows + '</div>' +
+          '<div class="tm-day-movimientos" data-tm-movimientos-day-host hidden></div>' +
+          '</section>'
         );
       }).join('');
     }
@@ -645,6 +685,96 @@
   // ---------------------------------------------------------------------------
   // Eventos
   // ---------------------------------------------------------------------------
+  async function toggleDayMovements(button) {
+    const dayGroup = button && button.closest('.tm-day-group');
+    const host = dayGroup && dayGroup.querySelector('.tm-day-movimientos');
+    const sessionIds = String(button && button.dataset.tmSessions || '').split('|').filter(Boolean);
+    if (!host || !sessionIds.length) return;
+    if (host.dataset.loaded === '1') {
+      host.hidden = !host.hidden;
+      button.setAttribute('aria-expanded', host.hidden ? 'false' : 'true');
+      return;
+    }
+    if (!navigator.onLine) {
+      host.hidden = false;
+      host.innerHTML = '<div class="tm-mov-empty">Sin conexión: el archivo del día requiere consultar el servidor.</div>';
+      button.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    host.hidden = false;
+    host.innerHTML = '<div class="tm-mov-empty">Consultando las sesiones de este día…</div>';
+    button.disabled = true;
+    try {
+      const client = window.client;
+      if (!client || typeof client.rpc !== 'function') throw new Error('Cliente del servidor no disponible.');
+      const sessionsById = new Map((state.sesiones || []).map(function (s) { return [String(s.id), s]; }));
+      const rows = [];
+      let readableSessions = 0;
+      let deniedSessions = 0;
+      for (const sessionId of sessionIds) {
+        const session = sessionsById.get(String(sessionId));
+        try {
+          const result = await client.rpc('bc7_movimientos_sesion', { p_turno_sesion_id: sessionId });
+          if (result && result.error) throw result.error;
+          readableSessions += 1;
+          const items = Array.isArray(result && result.data) ? result.data : [];
+          items.forEach(function (row) {
+            rows.push(Object.assign({}, row, {
+              __sessionLabel: session ? labelBloque(session.bloque) : 'Sesión',
+              __sessionDay: session ? (session.dia_n || session.numero_dia || button.dataset.tmMovDia || '—') : (button.dataset.tmMovDia || '—')
+            }));
+          });
+        } catch (error) {
+          if (String(error && error.code || '') === '42501') {
+            deniedSessions += 1;
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      const title = '<h5>Movimientos del día ' + esc(button.dataset.tmMovDia || '—') +
+        ' · ' + esc(fmtDate(button.dataset.tmMovFecha || '')) + '</h5>';
+      if (!readableSessions) {
+        host.innerHTML = title + '<div class="tm-mov-empty">Tu perfil no tiene permiso para consultar las sesiones de este día.</div>';
+      } else if (!rows.length) {
+        host.innerHTML = title + '<div class="tm-mov-empty">No hay operaciones vinculadas de forma verificable a las sesiones que puedes consultar. Las operaciones sin atribución segura siguen en Movimientos → Historial general; no se asignan solo por compartir fecha.</div>';
+      } else {
+        rows.sort(function (a, b) { return new Date(b.fecha).getTime() - new Date(a.fecha).getTime(); });
+        const label = function(tipo) {
+          return ({
+            compra:'Compra / entrada', venta:'Venta / salida',
+            transferencia_salida:'Transferencia de salida',
+            transferencia_entrada:'Transferencia de entrada',
+            vale:'Vale de salida', merma:'Merma', baja:'Baja'
+          })[String(tipo || '').toLowerCase()] || String(tipo || '—');
+        };
+        const body = rows.map(function (row) {
+          const ref = String(row.operacion_id || '');
+          const shortRef = ref ? '#' + ref.slice(-6) : '—';
+          return '<tr><td>' + esc(String(row.fecha || '').replace('T', ' ').slice(0, 16)) +
+            '</td><td>' + esc(row.__sessionLabel || '—') +
+            '</td><td>' + esc(label(row.tipo)) +
+            '</td><td>' + esc(row.producto || '—') +
+            '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
+            '</td><td>' + esc(row.usuario || '—') +
+            '</td><td>' + esc(shortRef) + '</td></tr>';
+        }).join('');
+        host.innerHTML = title + '<div class="tm-mov-scroll"><table><thead><tr><th>Fecha/hora</th><th>Sesión</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' +
+          body + '</tbody></table></div>' +
+          (deniedSessions ? '<div class="tm-mov-empty" role="status">Algunas sesiones de este día no se muestran porque tu perfil no tiene permiso para consultarlas.</div>' : '');
+      }
+      host.dataset.loaded = '1';
+      button.setAttribute('aria-expanded', 'true');
+    } catch (error) {
+      host.innerHTML = '<div class="tm-mov-empty">No se pudo consultar el archivo de este día: ' +
+        esc(error && error.message ? error.message : error) + '.</div>';
+      button.setAttribute('aria-expanded', 'true');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function bind() {
     const r = root();
     if (!r || r.dataset.tmBound === '1') return;
@@ -653,6 +783,7 @@
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.tmHome != null) return home();
+      if (b.dataset.tmSessions != null) return toggleDayMovements(b);
       if (b.dataset.tmCreate) return createForm(b.dataset.tmCreate);
       if (b.dataset.tmConfirmCreate) return confirmCreate(b.dataset.tmConfirmCreate);
       if (b.dataset.tmOpen) return openTurno(b.dataset.tmOpen, b.dataset.legacy === '1');
