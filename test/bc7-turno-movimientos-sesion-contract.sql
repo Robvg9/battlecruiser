@@ -54,6 +54,12 @@ BEGIN
 
   PERFORM set_config('test.bc_admin','false',false);
   PERFORM set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000002',false);
+  PERFORM set_config('test.perms','turnos:ver',false);
+  SELECT count(*) INTO v_session_2_count
+  FROM public.bc7_movimientos_sesion('93000000-0000-0000-0000-000000000002');
+  IF v_session_2_count <> 1 THEN
+    RAISE EXCEPTION 'A session participant with turnos:ver must be able to see their own session archive.';
+  END IF;
   BEGIN
     PERFORM 1 FROM public.bc7_movimientos_sesion('93000000-0000-0000-0000-000000000001');
     RAISE EXCEPTION 'An unrelated authenticated user must not be able to read the session movement archive.';
