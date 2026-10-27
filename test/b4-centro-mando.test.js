@@ -196,7 +196,17 @@ test("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el
     permisos: [{ seccion: "productos", accion: "crear" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  // El perfil y los permisos se cargan de forma asíncrona. Esperar 80 ms
+  // provocaba una carrera: la operación se rechazaba correctamente si el
+  // contexto aún no estaba listo, aunque el mock tuviera permiso para crear.
+  assert.ok(
+    await esperarHasta(
+      () => typeof window.tienePermiso === "function" && window.tienePermiso("productos", "crear"),
+      5000,
+      10
+    ),
+    "el contexto debe cargar productos.crear antes de ejecutar la operación"
+  );
   const r = await window.ejecutarOperacion("producto", { p_nombre: "Test", p_categoria_id: "c1" });
   assert.ok(r.ok, "operación debe resolverse ok");
   assert.strictEqual(r.data, "prod-uuid-999", "data debe ser el uuid escalar devuelto por el RPC");
