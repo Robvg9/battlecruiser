@@ -374,7 +374,7 @@ test("Paso 4 Turnos: crear e iniciar un ciclo usa el almacén seleccionado y una
   assert.ok(createCall, "confirmar debe invocar el RPC de creación mock");
   assert.equal(createCall.params.p_almacen_id, "warehouse-mejor");
   assert.equal(createCall.params.p_cantidad_dias, 3);
-  assert.match(createCall.params.p_inicio_plan, /^\\d{4}-\\d{2}-\\d{2}$/);
+  assert.match(createCall.params.p_inicio_plan, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(createCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
 
   root.querySelector("[data-m21-start]").click();
