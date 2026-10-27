@@ -12,10 +12,9 @@ on:
       - '.github/workflows/quality.yml'
       - '.github/workflows/selfhosted-windows-test.yml'
       - 'scripts/write-release-manifest.js'
-      - 'test/verify-production-version.js'
-      - 'test/live-offline-e2e.js'
-      - 'test/release-provenance.test.js'
-      - 'test/deploy-production-pwa.js'
+      # Any test-only commit changes the canonical main SHA used by release provenance.
+      # Redeploy on all test changes so the LIVE manifest can certify that exact commit.
+      - 'test/**'
   workflow_dispatch:
 
 permissions:
