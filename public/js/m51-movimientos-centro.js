@@ -11,6 +11,7 @@
   const BUSINESS_TIME_ZONE = 'America/Havana';
 
   let _viewMode = 'today';
+  let _expandedHistoryDays = new Set();
   let _allRows = [];
   let _filtered = [];
   let _page = 0;
@@ -467,7 +468,8 @@
     let html = '';
     groups.forEach(function (g) {
       if (_viewMode === 'history') {
-        html += '<details class="bc-m51-group bc-m51-group-collapsible"><summary class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
+        const openAttr = _expandedHistoryDays.has(g.key) ? ' open' : '';
+        html += '<details class="bc-m51-group bc-m51-group-collapsible" data-day="' + esc(g.key) + '"' + openAttr + '><summary class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
           '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></summary>';
       } else {
         html += '<div class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
@@ -607,6 +609,14 @@
     const tab = document.getElementById('tab-movimientos');
     if (!tab || tab.dataset.m51Bound) return;
     tab.dataset.m51Bound = '1';
+    tab.addEventListener('toggle', function (e) {
+      const group = e.target;
+      if (!group || !group.matches || !group.matches('.bc-m51-group-collapsible')) return;
+      const day = group.getAttribute('data-day');
+      if (!day) return;
+      if (group.open) _expandedHistoryDays.add(day);
+      else _expandedHistoryDays.delete(day);
+    }, true);
     tab.addEventListener('click', function (e) {
       if (e.target.closest('#mov-view-today')) { cambiarVista('today'); return; }
       if (e.target.closest('#mov-view-history')) { cambiarVista('history'); return; }
