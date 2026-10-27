@@ -70,7 +70,7 @@ async function waitFor(predicate, timeout = 1500) {
   return Boolean(predicate());
 }
 
-function createContext(t) {
+function createContext(t, options = {}) {
   const dom = new JSDOM(
     "<!doctype html><html lang=\"es\"><head></head><body>" +
       "<button class=\"tab-btn\" data-tab=\"turnos\">Turnos legado</button>" +
@@ -98,6 +98,21 @@ function createContext(t) {
   });
 
   const rpcCalls = [];
+  const prompts = [...(options.prompts || [])];
+  const confirms = [...(options.confirms || [])];
+  const cycles = [{ ...CYCLE }];
+  const sessions = (options.sessions || SESSIONS).map((row) => ({ ...row }));
+  const deliveries = (options.deliveries || []).map((row) => ({ ...row }));
+  let inventory = options.inventory === undefined
+    ? {
+        entrega: { id: "inventory-fixture-1", estado: "ACEPTADA" },
+        lineas: [{
+          producto_nombre: "Producto fixture",
+          cantidad_base: 4,
+          presentacion_nombre: "unidad"
+        }]
+      }
+    : options.inventory;
   window._cache = {
     almacenes: [
       { id: "warehouse-cueva", nombre: "La Cueva", activo: true },
@@ -106,7 +121,7 @@ function createContext(t) {
     ]
   };
   window._usuarioActual = { id: "user-fixture", nombre: "Dueño fixture" };
-  window.tienePermiso = () => false;
+  window.tienePermiso = () => options.permissions === true;
   window.escHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (ch) => ({
     "&": "&amp;",
     "<": "&lt;",
@@ -121,32 +136,111 @@ function createContext(t) {
   window.resetLoadingOverlay = () => {};
   window.marcarConectividadReal = () => {};
   window.explicarError = (error) => String(error?.message || error || "error fixture");
+  window.prompt = () => prompts.length ? prompts.shift() : null;
+  window.confirm = () => confirms.length ? confirms.shift() : false;
   window.client = {
     rpc: async (name, params = {}) => {
       rpcCalls.push({ name, params: { ...params } });
       switch (name) {
         case "listar_ciclos_operativos":
-          return { data: [{ ...CYCLE }], error: null };
+          return { data: cycles.map((row) => ({ ...row })), error: null };
         case "listar_sesiones_operativas":
-          return { data: SESSIONS.map((row) => ({ ...row })), error: null };
+          return {
+            data: sessions.filter((row) => row.ciclo_id === params.p_ciclo_id)
+              .map((row) => ({ ...row })),
+            error: null
+          };
         case "listar_entregas_caja":
-          return { data: [], error: null };
+          return {
+            data: deliveries.filter((row) => row.ciclo_id === params.p_ciclo_id)
+              .map((row) => ({ ...row })),
+            error: null
+          };
+        case "crear_ciclo_operativo": {
+          const created = {
+            id: "cycle-created-fixture",
+            almacen_id: params.p_almacen_id,
+            almacen_nombre: "TuMejor Opción",
+            usuario_nombre: "Dueño fixture",
+            cantidad_dias: params.p_cantidad_dias,
+            inicio_plan: params.p_inicio_plan,
+            fin_plan: params.p_inicio_plan,
+            estado: "PLANIFICADO"
+          };
+          cycles.push(created);
+          sessions.push({
+            id: "session-created-fixture",
+            ciclo_id: created.id,
+            dia_n: 1,
+            bloque: "MANANA",
+            fecha: created.inicio_plan,
+            estado: "PENDIENTE",
+            usuario_nombre: "Responsable fixture"
+          });
+          return { data: { id: created.id }, error: null };
+        }
+        case "iniciar_ciclo_operativo": {
+          const cycle = cycles.find((row) => row.id === params.p_ciclo_id);
+          if (cycle) cycle.estado = "ACTIVO";
+          return { data: cycle ? { ...cycle } : {}, error: null };
+        }
+        case "declarar_entrega_caja": {
+          const created = {
+            id: "delivery-created-fixture",
+            ciclo_id: params.p_ciclo_id,
+            sesion_id: params.p_sesion_id,
+            estado: "DECLARADA",
+            declarado_por: "user-fixture",
+            monto_declarado: params.p_monto_declarado
+          };
+          deliveries.push(created);
+          return { data: { ...created }, error: null };
+        }
+        case "editar_entrega_caja": {
+          const delivery = deliveries.find((row) => row.id === params.p_entrega_id);
+          if (delivery) delivery.monto_declarado = params.p_monto_declarado;
+          return { data: delivery ? { ...delivery } : {}, error: null };
+        }
+        case "registrar_recepcion_entrega_caja": {
+          const delivery = deliveries.find((row) => row.id === params.p_entrega_id);
+          if (delivery) {
+            delivery.estado = "CONTADA";
+            delivery.monto_contado = params.p_monto_contado;
+          }
+          return { data: delivery ? { ...delivery } : {}, error: null };
+        }
+        case "revisar_entrega_caja": {
+          const delivery = deliveries.find((row) => row.id === params.p_entrega_id);
+          if (delivery) delivery.estado = params.p_decision === "aprobar" ? "APROBADA" : "RECHAZADA";
+          return { data: delivery ? { ...delivery } : {}, error: null };
+        }
         case "obtener_cuadre_turno_general":
           return { data: { ...CUADRE }, error: null };
         case "obtener_entrega_inventario_turno":
           return {
-            data: {
-              entrega: { id: "inventory-fixture-1", estado: "ACEPTADA" },
-              lineas: [{
-                producto_nombre: "Producto fixture",
-                cantidad_base: 4,
-                presentacion_nombre: "unidad"
-              }]
-            },
+            data: inventory === null
+              ? { entrega: null, lineas: [] }
+              : {
+                  entrega: inventory.entrega ? { ...inventory.entrega } : null,
+                  lineas: (inventory.lineas || []).map((row) => ({ ...row }))
+                },
             error: null
           };
         case "inventario_enriquecido":
           return { data: [], error: null };
+        case "declarar_entrega_inventario_turno":
+          inventory = {
+            entrega: { id: "inventory-created-fixture", estado: "PENDIENTE" },
+            lineas: [{
+              producto_nombre: "Producto fixture",
+              cantidad_base: 4,
+              presentacion_nombre: "unidad"
+            }]
+          };
+          return { data: { ...inventory.entrega }, error: null };
+        case "aceptar_entrega_inventario_turno":
+          if (inventory && inventory.entrega) inventory.entrega.estado = "ACEPTADA";
+          return { data: inventory ? { ...inventory.entrega } : {}, error: null };
         default:
           return { data: [], error: null };
       }
@@ -155,7 +249,7 @@ function createContext(t) {
 
   window.eval(SOURCE);
   t.after(() => window.close());
-  return { window, rpcCalls };
+  return { window, rpcCalls, dialogs: { prompts, confirms } };
 }
 
 function writeCalls(calls) {
@@ -262,4 +356,178 @@ test("Paso 4 Turnos: el recorrido por sesiones, dinero, validación, inventario 
   ]) {
     assert.ok(readNames.has(required), "debe invocar el RPC de lectura " + required);
   }
+});
+
+
+test("Paso 4 Turnos: crear e iniciar un ciclo usa el almacén seleccionado y una clave idempotente en RPC mock", async (t) => {
+  const c = createContext(t, { permissions: true });
+  const { window } = c;
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-create='warehouse-mejor']")));
+
+  root.querySelector("[data-m21-create='warehouse-mejor']").click();
+  root.querySelector("#m21-duration button[data-days='3']").click();
+  root.querySelector("[data-m21-confirm-create='warehouse-mejor']").click();
+
+  assert.ok(await waitFor(() => root.querySelector(".m21-card h4")?.textContent.includes("Turno · TuMejor Opción")));
+  const createCall = c.rpcCalls.find((call) => call.name === "crear_ciclo_operativo");
+  assert.ok(createCall, "confirmar debe invocar el RPC de creación mock");
+  assert.equal(createCall.params.p_almacen_id, "warehouse-mejor");
+  assert.equal(createCall.params.p_cantidad_dias, 3);
+  assert.match(createCall.params.p_inicio_plan, /^\\d{4}-\\d{2}-\\d{2}$/);
+  assert.match(createCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+
+  root.querySelector("[data-m21-start]").click();
+  assert.ok(await waitFor(() => c.rpcCalls.some((call) => call.name === "iniciar_ciclo_operativo")));
+  const startCall = c.rpcCalls.find((call) => call.name === "iniciar_ciclo_operativo");
+  assert.equal(startCall.params.p_ciclo_id, "cycle-created-fixture");
+  assert.match(startCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+  assert.ok(await waitFor(() => !root.querySelector("[data-m21-start]")),
+    "tras iniciar, el turno no debe seguir presentándose como planificado");
+  assert.deepEqual(writeCalls(c.rpcCalls).map((call) => call.name), [
+    "crear_ciclo_operativo",
+    "iniciar_ciclo_operativo"
+  ]);
+});
+
+test("Paso 4 Turnos: importe inválido se bloquea y declaración/edición del dinero usa RPC mock", async (t) => {
+  const c = createContext(t, { permissions: true, prompts: ["-1"] });
+  const { window } = c;
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-enter='cycle-fixture-1']")));
+  root.querySelector("[data-m21-enter='cycle-fixture-1']").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-step2]")));
+  root.querySelector("[data-m21-step2]").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-declare='session-fixture-1']")));
+
+  root.querySelector("[data-m21-declare='session-fixture-1']").click();
+  assert.ok(await waitFor(() => root.textContent.includes("Monto inválido")));
+  assert.deepEqual(writeCalls(c.rpcCalls), [],
+    "un importe negativo no debe enviar ninguna mutación");
+
+  c.dialogs.prompts.push("12.5");
+  root.querySelector("[data-m21-declare='session-fixture-1']").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-edit-money='delivery-created-fixture']")));
+  const declareCall = c.rpcCalls.find((call) => call.name === "declarar_entrega_caja");
+  assert.ok(declareCall);
+  assert.equal(declareCall.params.p_ciclo_id, "cycle-fixture-1");
+  assert.equal(declareCall.params.p_sesion_id, "session-fixture-1");
+  assert.equal(declareCall.params.p_monto_declarado, 12.5);
+  assert.equal(declareCall.params.p_turno_id, null);
+  assert.match(declareCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+
+  c.dialogs.prompts.push("13.5");
+  root.querySelector("[data-m21-edit-money='delivery-created-fixture']").click();
+  assert.ok(await waitFor(() => c.rpcCalls.some((call) => call.name === "editar_entrega_caja")));
+  const editCall = c.rpcCalls.find((call) => call.name === "editar_entrega_caja");
+  assert.equal(editCall.params.p_entrega_id, "delivery-created-fixture");
+  assert.equal(editCall.params.p_monto_declarado, 13.5);
+  assert.match(editCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+});
+
+test("Paso 4 Turnos: recepción y aprobación/rechazo del dinero respetan la puerta de confirmación", async (t) => {
+  const morning = { ...SESSIONS[0], estado: "EN_CURSO" };
+  const afternoon = {
+    ...SESSIONS[0],
+    id: "session-afternoon-fixture",
+    bloque: "TARDE",
+    fecha: "2026-10-20",
+    estado: "PENDIENTE"
+  };
+  const c = createContext(t, {
+    permissions: true,
+    sessions: [morning, afternoon],
+    deliveries: [
+      {
+        id: "delivery-morning-fixture",
+        ciclo_id: CYCLE.id,
+        sesion_id: morning.id,
+        estado: "DECLARADA",
+        declarado_por: "user-other",
+        monto_declarado: 12.5
+      },
+      {
+        id: "delivery-afternoon-fixture",
+        ciclo_id: CYCLE.id,
+        sesion_id: afternoon.id,
+        estado: "CONTADA",
+        declarado_por: "user-other",
+        monto_declarado: 18,
+        monto_contado: 18
+      }
+    ],
+    prompts: ["11.5", null],
+    confirms: [false]
+  });
+  const { window } = c;
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-enter='cycle-fixture-1']")));
+  root.querySelector("[data-m21-enter='cycle-fixture-1']").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-step2]")));
+  root.querySelector("[data-m21-step2]").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-receive='delivery-morning-fixture']")));
+  assert.ok(root.querySelector("[data-m21-review='delivery-afternoon-fixture']"));
+
+  root.querySelector("[data-m21-receive='delivery-morning-fixture']").click();
+  assert.ok(await waitFor(() => c.rpcCalls.some((call) => call.name === "registrar_recepcion_entrega_caja")));
+  const receiveCall = c.rpcCalls.find((call) => call.name === "registrar_recepcion_entrega_caja");
+  assert.equal(receiveCall.params.p_entrega_id, "delivery-morning-fixture");
+  assert.equal(receiveCall.params.p_monto_contado, 11.5);
+  assert.equal(receiveCall.params.p_observacion_conteo, null);
+  assert.match(receiveCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-review='delivery-afternoon-fixture']")));
+  root.querySelector("[data-m21-review='delivery-afternoon-fixture']").click();
+  assert.deepEqual(c.rpcCalls.filter((call) => call.name === "revisar_entrega_caja"), [],
+    "Cancelar el rechazo sin motivo no debe enviar revisión");
+  c.dialogs.confirms.push(true);
+  root.querySelector("[data-m21-review='delivery-afternoon-fixture']").click();
+  assert.ok(await waitFor(() => c.rpcCalls.some((call) => call.name === "revisar_entrega_caja")));
+  const reviewCall = c.rpcCalls.find((call) => call.name === "revisar_entrega_caja");
+  assert.equal(reviewCall.params.p_entrega_id, "delivery-afternoon-fixture");
+  assert.equal(reviewCall.params.p_decision, "aprobar");
+  assert.equal(reviewCall.params.p_comentario, null);
+  assert.match(reviewCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+});
+
+test("Paso 4 Turnos: entregar inventario exige confirmar la recepción antes de habilitar el cuadre final", async (t) => {
+  const c = createContext(t, {
+    permissions: true,
+    inventory: null,
+    confirms: [false]
+  });
+  const { window } = c;
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-enter='cycle-fixture-1']")));
+  root.querySelector("[data-m21-enter='cycle-fixture-1']").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-step2]")));
+  root.querySelector("[data-m21-step2]").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-step3]")));
+  root.querySelector("[data-m21-step3]").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-step4]")));
+  root.querySelector("[data-m21-step4]").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-deliver-inventory]")));
+
+  root.querySelector("[data-m21-deliver-inventory]").click();
+  assert.ok(await waitFor(() => root.querySelector("[data-m21-accept-inventory='inventory-created-fixture']")));
+  const deliverCall = c.rpcCalls.find((call) => call.name === "declarar_entrega_inventario_turno");
+  assert.ok(deliverCall);
+  assert.equal(deliverCall.params.p_ciclo_id, "cycle-fixture-1");
+  assert.equal(deliverCall.params.p_observacion, null);
+  assert.match(deliverCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+
+  const acceptButton = root.querySelector("[data-m21-accept-inventory='inventory-created-fixture']");
+  root.querySelector("[data-m21-accept-inventory='inventory-created-fixture']").click();
+  assert.deepEqual(c.rpcCalls.filter((call) => call.name === "aceptar_entrega_inventario_turno"), [],
+    "cancelar la recepción no debe aceptar el inventario");
+  c.dialogs.confirms.push(true);
+  acceptButton.click();
+  assert.ok(await waitFor(() => c.rpcCalls.some((call) => call.name === "aceptar_entrega_inventario_turno")));
+  const acceptCall = c.rpcCalls.find((call) => call.name === "aceptar_entrega_inventario_turno");
+  assert.equal(acceptCall.params.p_entrega_id, "inventory-created-fixture");
+  assert.equal(acceptCall.params.p_observacion, null);
+  assert.match(acceptCall.params.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+  assert.ok(await waitFor(() => root.querySelector(".m21-card h4")?.textContent.includes("Cuadre final")));
+  assert.ok(c.rpcCalls.some((call) => call.name === "obtener_cuadre_turno_general"),
+    "el cuadre final sigue siendo una lectura");
 });
