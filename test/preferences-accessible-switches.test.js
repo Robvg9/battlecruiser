@@ -109,10 +109,6 @@ test("native switch checked semantics follow saved state and user changes", asyn
       window.document.getElementById("cfg-aj-sync-wifi-state").textContent,
       /activada/
     );
-    assert.match(
-      window.document.getElementById("cfg-aj-sync-wifi-state").textContent,
-      /activada/
-    );
     assert.equal(
       JSON.parse(window.localStorage.getItem("bc-ui-preferences-v2")).syncWifiOnly,
       true
