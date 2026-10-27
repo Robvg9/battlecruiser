@@ -45,6 +45,8 @@
       ? checked
       : !!control.checked;
     control.checked = enabled;
+    // Keep ARIA switch state explicit as well as the native checkbox state.
+    control.setAttribute("aria-checked", enabled ? "true" : "false");
 
     // Android TalkBack may omit the native checked flag for this custom-styled
     // switch. Keep the current state in the accessible name as a resilient fallback.
