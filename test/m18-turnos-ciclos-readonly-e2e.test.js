@@ -235,7 +235,7 @@ test("Paso 4 Turnos: el recorrido por sesiones, dinero, validación, inventario 
   assert.deepEqual(writeCalls(c.rpcCalls), []);
 
   root.querySelector("[data-m21-step4]").click();
-  assert.ok(await waitFor(() => root.textContent.includes("Conteo y entrega")));
+  assert.ok(await waitFor(() => root.querySelector(".m21-card h4")?.textContent.includes("Inventario entregado")));
   assert.match(root.textContent, /Producto fixture/);
   assert.match(root.textContent, /Estado: ACEPTADA/);
   const finalButton = root.querySelector("[data-m21-step5]");
