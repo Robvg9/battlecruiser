@@ -38,7 +38,7 @@ test("Turnos ofrece archivo plegable por cada sesión y llama al RPC read-only p
   assert.match(TURNOS_UI, /data-tm-movimientos=/);
   assert.match(TURNOS_UI, /data-tm-movimientos-host=/);
   assert.match(TURNOS_UI, /client\.rpc\('bc7_movimientos_sesion', \{ p_turno_sesion_id: sessionId \}\)/);
-  assert.match(TURNOS_UI, /No se asignan solo por compartir fecha/);
+  assert.match(TURNOS_UI, /no se asignan solo por compartir fecha/i);
 });
 
 test("la vista de archivo por turno mantiene separado el histórico general de atribuciones inciertas", () => {
