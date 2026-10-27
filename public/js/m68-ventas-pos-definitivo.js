@@ -540,7 +540,6 @@ html.${POS_CLASS} .main-content > .rule-orn {
 #tab-ventas.bc-pos:not(.bc-history-view) h3,
 #tab-ventas.bc-pos:not(.bc-history-view) .ventas-historial-controles,
 #tab-ventas.bc-pos:not(.bc-history-view) #lista-ventas,
-#tab-ventas.bc-pos:not(.bc-history-view) [id*="historial"],
 #tab-ventas.bc-pos:not(.bc-history-view) .historial-ventas,
 #tab-ventas.bc-pos:not(.bc-history-view) input[placeholder*="referencia"],
 #tab-ventas.bc-pos #venta-stock-disponible,
