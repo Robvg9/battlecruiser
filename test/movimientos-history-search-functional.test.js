@@ -140,6 +140,7 @@ test("Paso 4 historial de Ventas: visible sin turno y accesible desde el POS", (
   assert.equal(M68_POS.includes("#tab-ventas.bc-pos h3,"), false);
   assert.equal(M68_POS.includes("#tab-ventas.bc-pos .ventas-historial-controles,"), false);
   assert.equal(M68_POS.includes("#tab-ventas.bc-pos #lista-ventas,"), false);
+  assert.equal(M68_POS.includes('[id*="historial"]'), false);
   assert.equal(M26_REPAIR.includes("#tab-ventas.bc-venta-sin-turno h3,"), false);
   assert.equal(M26_REPAIR.includes("#tab-ventas.bc-venta-sin-turno .ventas-historial-controles,"), false);
   assert.equal(M26_REPAIR.includes("#tab-ventas.bc-venta-sin-turno #lista-ventas,"), false);
