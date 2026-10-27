@@ -99,7 +99,9 @@ self.addEventListener("fetch", function(event) {
   }
 
   if (isAppShellRequest(url)) {
-    var freshRequest = new Request(request, { cache: "no-store" });
+    // Navigation requests use mode "navigate"; reconstructing them with a different cache mode can throw before respondWith is registered.
+    // Preserve the original navigation request and bypass HTTP cache only for ordinary shell asset requests.
+    var freshRequest = request.mode === "navigate" ? request : new Request(request, { cache: "no-store" });
     event.respondWith(fetch(freshRequest).then(function(response) {
       return cacheSuccessfulResponse(request, response);
     }).catch(function() {
