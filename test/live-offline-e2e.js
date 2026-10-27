@@ -729,7 +729,7 @@ async function main() {
     uploadThroughput: 0,
     connectionType: "none",
   });
-  await reloadAndWait();
+  await reloadAndWait(false);
   const offline = await waitUntil(
     "render de la PWA durante la desconexión de red",
     shellSnapshotPredicate(),
