@@ -12,7 +12,8 @@ const MIGRATION = fs.readFileSync(
 
 test("archivo por turno es una función de solo lectura y exige sesión autenticada", () => {
   assert.match(MIGRATION, /create or replace function public\.bc7_movimientos_sesion\(p_turno_sesion_id uuid\)/);
-  assert.match(MIGRATION, /auth\.uid\(\) is null/);
+  assert.match(MIGRATION, /v_uid uuid := auth\.uid\(\)/);
+  assert.match(MIGRATION, /if v_uid is null/);
   assert.match(MIGRATION, /tiene_permiso\('reportes', 'ver'\)[\s\S]*and not public\.tiene_permiso\('turnos', 'ver'\)/);
   assert.match(MIGRATION, /raise exception.*using errcode = '42501'/s);
   assert.match(MIGRATION, /returns table/);
