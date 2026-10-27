@@ -173,6 +173,7 @@
       else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
       return '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia || x.dia_n) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + ' · ' + esc(labelSt) + '</div></div><div>' + actions + '</div></div></div>';
     }).join('');
+    html += '<h4 style="margin:18px 0 8px">Archivo de movimientos por día</h4>' + step3();
     return html;
   }
 
@@ -376,6 +377,7 @@
       ov.innerHTML = '<div class="m33-modal"><div class="m33-head"><div class="m33-title"><div><h3>Tu turno · ' + esc(field(t.almacen_nombre || t.almacen)) + '</h3><div class="m33-muted">Sesión de trabajo</div></div><button type="button" id="m33-x">X</button></div></div><div class="m33-body">' + bodyDependienta(t) + '</div><div class="m33-foot"><div></div><div><button type="button" id="m33-close-final">Cerrar</button></div></div></div>';
       ov.querySelector('#m33-x').onclick = close;
       var c = ov.querySelector('#m33-close-final'); if (c) c.onclick = close;
+      bindArchiveButtons(ov);
       ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
       return;
     }

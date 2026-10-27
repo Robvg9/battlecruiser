@@ -51,7 +51,7 @@ function setup(t) {
   const turn = {
     id: "turno-closed-fixture", almacen_nombre: "La Cueva", almacen_id: "alm-1",
     estado: "CERRADO", estado_maestro: "CERRADO", dias_turno: 2, cantidad_dias: 2,
-    inicio_plan: "2026-10-20", fin_plan: "2026-10-21", sesiones
+    inicio_plan: "2026-10-20", fin_plan: "2026-10-21", sesiones: sessions
   };
   const rpcCalls = [];
   window._usuarioActual = { id: "owner-fixture", nombre: "Dueño fixture", rol: "dueño" };

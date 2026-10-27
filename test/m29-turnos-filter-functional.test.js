@@ -69,8 +69,17 @@ function setup(t) {
   };
   window.__bcUser = { rol: "dueño" };
   window.tienePermiso = () => true;
+  const closedListCalls = [];
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => true,
+    listarTurnos: async (options = {}) => {
+      closedListCalls.push({ ...options });
+      if (options.estado === 'CERRADO') return [{
+        id: 'turno-closed-history', almacen_id: 'alm-1', fecha: '2026-10-01',
+        apertura_real: '2026-10-01T08:00:00Z', cierre_real: '2026-10-02T17:00:00Z', estado: 'CERRADO'
+      }];
+      return [];
+    },
     labelEstado: (value) => ({
       EN_CURSO: "En curso",
       ACTIVO: "En curso",
@@ -81,14 +90,34 @@ function setup(t) {
     })[value] || String(value || "-"),
     listarTurnosMaestros: async () => { listCalls += 1; return turns.map((turno) => ({ ...turno })); }
   };
+  window.__m29ClosedListCalls = closedListCalls;
   window.eval(SOURCE);
   t.after(() => window.close());
   return { window, turns, getListCalls: () => listCalls };
 }
 
+test("Paso 4: el historial M29 permite reabrir un turno cerrado sin escribir datos", async (t) => {
+  const { window } = setup(t);
+  const opened = [];
+  window.__BC_M33 = { open: (id) => opened.push(id) };
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  const historyButton = root.querySelector("#m29-btn-historial");
+  assert.ok(historyButton, "Turnos debe ofrecer acceso al historial cerrado");
+  historyButton.click();
+  assert.ok(await waitFor(() => root.querySelector('[data-m29-closed-open="turno-closed-history"]')),
+    "el historial debe cargar el turno cerrado por lectura");
+  assert.match(root.textContent, /Historial de turnos/);
+  assert.match(root.textContent, /Principal/);
+  assert.ok(window.__m29ClosedListCalls.some((call) => call.estado === "CERRADO"));
+  assert.ok(window.__m29ClosedListCalls.some((call) => call.estado === "VALIDADO"));
+  root.querySelector('[data-m29-closed-open="turno-closed-history"]').click();
+  assert.deepEqual(opened, ["turno-closed-history"], "abrir el expediente reutiliza el turno existente");
+});
+
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
-  assert.match(SOURCE, /var VERSION = '29\.13';/);
-  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.13"\]/);
+  assert.match(SOURCE, /var VERSION = '29\.14';/);
+  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.14"\]/);
   const { window, getListCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
