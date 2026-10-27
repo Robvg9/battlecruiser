@@ -38,7 +38,7 @@
     ["m68-ventas-pos-definitivo.js","9.5.27"],["hotfix-regresiones-20260902.js","20261020.5"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.1"],["bc14-ventas-stock.js","2.1"],
-    ["hotfix-17-1-productos-import-flow-20260903.js","17.1"],["hotfix-17-2-productos-save-20260903.js","17.2"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.4"],["hotfix-17-5-compra-modal-controls-20260903.js","17.6"],["hotfix-17-6-presentaciones-visible-20260903.js","17.6"],["hotfix-17-final-loader-20260903.js","17.final"],
+    ["hotfix-17-1-productos-import-flow-20260903.js","17.1"],["hotfix-17-2-productos-save-20260903.js","17.2"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.4"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.6"],["hotfix-17-final-loader-20260903.js","17.final"],
     ["hotfix-pulido-20260903.js","20260903.1"],["hotfix-pulido-20260903b.js","20260903.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20260903.4"],
     ["hotfix-secciones-visibles-20260903.js","20261026.1"],["section-scope-fix.js","20261016.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"]
   ];
