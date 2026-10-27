@@ -246,7 +246,7 @@ test("Paso 4 Turnos: el recorrido por sesiones, dinero, validación, inventario 
     "abrir el conteo solo debe consultar el detalle del inventario");
 
   finalButton.click();
-  assert.ok(await waitFor(() => root.textContent.includes("Cuadre final")));
+  assert.ok(await waitFor(() => root.querySelector(".m21-card h4")?.textContent.includes("Cuadre final")));
   assert.match(root.textContent, /Diferencia/);
   assert.match(root.textContent, /0\.00 CUP/);
   assert.deepEqual(writeCalls(c.rpcCalls), [],
