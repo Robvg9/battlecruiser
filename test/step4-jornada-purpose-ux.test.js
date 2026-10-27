@@ -34,9 +34,11 @@ test("Jornada consulta movimientos por el ID exacto de sesión, nunca solo por f
   assert.match(loader, /renderMovementRows\(arr\(r\),detail\.sesion\)/);
 });
 
-test("Turnos ofrece archivo plegable por cada sesión y llama al RPC read-only por session ID", () => {
-  assert.match(TURNOS_UI, /data-tm-movimientos=/);
-  assert.match(TURNOS_UI, /data-tm-movimientos-host=/);
+test("Turnos agrupa el archivo por día y consulta cada sesión mediante el RPC protegido", () => {
+  assert.match(TURNOS_UI, /data-tm-mov-dia=/);
+  assert.match(TURNOS_UI, /data-tm-sessions=/);
+  assert.match(TURNOS_UI, /data-tm-movimientos-day-host/);
+  assert.match(TURNOS_UI, /const dayKey = String\(day\) \+ '\|' \+ date/);
   assert.match(TURNOS_UI, /client\.rpc\('bc7_movimientos_sesion', \{ p_turno_sesion_id: sessionId \}\)/);
   assert.match(TURNOS_UI, /no se asignan solo por compartir fecha/i);
 });
