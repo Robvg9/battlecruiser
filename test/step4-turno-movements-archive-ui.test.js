@@ -67,6 +67,12 @@ function setup(t) {
     configurable: true,
     value: "complete"
   });
+  // The archive is online-only. Make that condition deterministic in JSDOM,
+  // otherwise an environment without online state could take the offline branch.
+  Object.defineProperty(window.navigator, "onLine", {
+    configurable: true,
+    value: true
+  });
 
   const sessions = [
     session("session-day1-am", 1, "2026-10-20", "MANANA"),
@@ -90,7 +96,7 @@ function setup(t) {
     cantidad_dias: 2,
     inicio_plan: "2026-10-20",
     fin_plan: "2026-10-21",
-    sesiones
+    sesiones: sessions
   };
 
   window._usuarioActual = { id: "owner-fixture", nombre: "Dueño fixture" };
