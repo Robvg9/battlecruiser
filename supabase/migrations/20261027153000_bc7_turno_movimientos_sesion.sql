@@ -52,6 +52,12 @@ BEGIN
      )
      AND NOT EXISTS (
        SELECT 1
+       FROM public.turno_jornada_programacion p
+       WHERE p.id = v_s.jornada_programacion_id
+         AND p.responsable_id = v_uid
+     )
+     AND NOT EXISTS (
+       SELECT 1
        FROM public.turno_tramos tr
        WHERE tr.turno_sesion_id = v_s.id
          AND tr.usuario_id = v_uid
