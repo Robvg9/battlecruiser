@@ -136,3 +136,26 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /no incluye credenciales ni tokens/);
   assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.28['"]\);/);
 });
+
+
+test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precache offline", () => {
+  const assets = [
+    "./js/turno-api.js?v=9.4.7",
+    "./js/turnos-maestro.js?v=9.4.3",
+    "./js/m29-turnos-organizacion.js?v=29.14",
+    "./js/m33-turnos-final.js?v=33.8",
+    "./js/m54-movimientos-client-bridge.js?v=54.1",
+    "./js/m51-movimientos-centro.js?v=51.3",
+    "./js/m52-movimientos-auth-retry.js?v=52.2"
+  ];
+  for (const asset of assets) assert.ok(sw.includes(asset), "faltó el precache offline de " + asset);
+  for (const key of [
+    '["turno-api.js","9.4.7"]',
+    '["turnos-maestro.js","9.4.3"]',
+    '["m29-turnos-organizacion.js","29.14"]',
+    '["m33-turnos-final.js","33.8"]',
+    '["m54-movimientos-client-bridge.js","54.1"]',
+    '["m51-movimientos-centro.js","51.3"]',
+    '["m52-movimientos-auth-retry.js","52.2"]'
+  ]) assert.ok(app.includes(key), "el cargador debe conservar la versión " + key);
+});
