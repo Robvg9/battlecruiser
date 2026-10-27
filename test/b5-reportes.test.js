@@ -140,10 +140,14 @@ test("B5.3: usuario sin permiso reportes.ver conserva la pestaña de inspección
 
   const btn = document.querySelector('.tab-btn[data-tab="reportes"]');
   assert.ok(
-    btn && btn.style.display !== "none" && !btn.classList.contains("hidden"),
-    "Reportes permanece visible para inspección; la autorización efectiva sigue dependiendo de tienePermiso"
+    btn && (
+      btn.style.display === "none" ||
+      btn.classList.contains("hidden") ||
+      btn.classList.contains("tab-sin-permiso")
+    ),
+    "Reportes queda oculto cuando el usuario no tiene reportes.ver"
   );
-  assert.equal(window.tienePermiso("reportes", "ver"), false, "la pestaña visible no debe conceder reportes.ver");
+  assert.equal(window.tienePermiso("reportes", "ver"), false, "el usuario sin permiso no debe obtener reportes.ver");
 });
 
 test("B5.5: el resumen ejecutivo se carga con datos reales del RPC", async () => {
