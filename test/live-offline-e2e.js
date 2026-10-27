@@ -571,10 +571,23 @@ async function main() {
     deviceScaleFactor: 2,
     mobile: true,
   });
-  const mobileHeader = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,display:s.display,gridArea:s.gridArea};};const shell=document.querySelector('#app-shell');const login=document.querySelector('#login-form');const header=document.querySelector('.app-header');if(login)login.classList.add('hidden');if(shell)shell.classList.add('visible');const finish=()=>{const brand=header&&header.querySelector('.header-left');const logout=header&&header.querySelector('#logout-btn');resolve({ready:document.readyState==='complete',viewportWidth:innerWidth,viewportHeight:innerHeight,documentWidth:document.documentElement.scrollWidth,header:box(header),headerDisplay:header?getComputedStyle(header).display:null,brand:box(brand),title:box(header&&header.querySelector('h1')),logout:box(logout),rightOverflow:!!(header&&logout&&logout.getBoundingClientRect().right>header.getBoundingClientRect().right+1),brandLogoutOverlap:!!(brand&&logout&&logout.getBoundingClientRect().left<brand.getBoundingClientRect().right-1)});};requestAnimationFrame(finish);}))))()");
+  const mobileHeader = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,display:s.display,gridArea:s.gridArea};};const shell=document.querySelector('#app-shell');const login=document.querySelector('#login-form');const header=document.querySelector('.app-header');if(login)login.classList.add('hidden');if(shell)shell.classList.add('visible');const finish=()=>{const brand=header&&header.querySelector('.header-left');const logout=header&&header.querySelector('#logout-btn');resolve({ready:document.readyState!=='loading',readyState:document.readyState,href:location.href,uiReady:window.__BC_UI_READY_RESOLVED__===true,fontStatus:document.fonts?document.fonts.status:null,viewportWidth:innerWidth,viewportHeight:innerHeight,documentWidth:document.documentElement.scrollWidth,header:box(header),headerDisplay:header?getComputedStyle(header).display:null,brand:box(brand),title:box(header&&header.querySelector('h1')),logout:box(logout),rightOverflow:!!(header&&logout&&logout.getBoundingClientRect().right>header.getBoundingClientRect().right+1),brandLogoutOverlap:!!(brand&&logout&&logout.getBoundingClientRect().left<brand.getBoundingClientRect().right-1)});};requestAnimationFrame(finish);}))))()");
   report.evidence.androidMobileHeader = mobileHeader;
-  assert(mobileHeader.ready && mobileHeader.header && mobileHeader.brand && mobileHeader.logout,
-    "No se pudo medir el encabezado móvil en Chromium: " + JSON.stringify(mobileHeader));
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
+  fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
+  report.evidence.androidMobileHeader.screenshot = ANDROID_HEADER_SCREENSHOT_PATH;
+  report.evidence.androidMobileHeader.environment = "Chromium CDP mobile emulation 360x800 @ deviceScaleFactor 2; no es una prueba en Android físico.";
+  assert(mobileHeader.ready,
+    "DOM_NO_PREPARADO: document.readyState sigue en loading al medir el encabezado móvil: " +
+      JSON.stringify({readyState: mobileHeader.readyState, href: mobileHeader.href, uiReady: mobileHeader.uiReady, fontStatus: mobileHeader.fontStatus}));
+  const missingHeaderNodes = [
+    !mobileHeader.header && ".app-header",
+    !mobileHeader.brand && ".app-header .header-left",
+    !mobileHeader.logout && ".app-header #logout-btn",
+  ].filter(Boolean);
+  assert(missingHeaderNodes.length === 0,
+    "ELEMENTOS_AUSENTES: faltan nodos del encabezado móvil: " + JSON.stringify({missing: missingHeaderNodes, measurement: mobileHeader}));
   assert(mobileHeader.viewportWidth === 360, "Chromium no aplicó el viewport móvil 360px: " + JSON.stringify(mobileHeader));
   assert(mobileHeader.headerDisplay === "grid" && mobileHeader.logout.gridArea === "logout",
     "Logout no ocupa la celda superior derecha del grid móvil: " + JSON.stringify(mobileHeader));
@@ -591,11 +604,6 @@ async function main() {
          mobileMenuProbe.withinMargins && mobileMenuProbe.opened && mobileMenuProbe.closed,
     "El menú lateral no es visible/usable, no tiene márgenes o no abre/cierra en móvil: " + JSON.stringify(mobileMenuProbe));
 
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
-  fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
-  report.evidence.androidMobileHeader.screenshot = ANDROID_HEADER_SCREENSHOT_PATH;
-  report.evidence.androidMobileHeader.environment = "Chromium CDP mobile emulation 360x800 @ deviceScaleFactor 2; no es una prueba en Android físico.";
 
   // Verify mobile content uses page scrolling and critical settings remain reachable.
   const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowX:s.overflowX,overflowY:s.overflowY,cssHeight:s.height,maxHeight:s.maxHeight,flex:s.flex,inlineStyle:e.getAttribute('style'),clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,bodyComputedHeight:getComputedStyle(document.body).height,bodyDisplay:getComputedStyle(document.body).display,bodyOverflowY:getComputedStyle(document.body).overflowY,bodyClientHeight:document.body.clientHeight,htmlClientHeight:document.documentElement.clientHeight,shellDisplay:shell?getComputedStyle(shell).display:null,shell:box(shell),main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
