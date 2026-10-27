@@ -7,6 +7,8 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const JS_DIR = path.join(__dirname, "..", "public", "js");
+const M26_REPAIR = fs.readFileSync(path.join(JS_DIR, "m26-7-ventas-repair.js"), "utf8");
+const M68_POS = fs.readFileSync(path.join(JS_DIR, "m68-ventas-pos-definitivo.js"), "utf8");
 const SOURCE = [
   fs.readFileSync(path.join(JS_DIR, "transferencias.js"), "utf8"),
   fs.readFileSync(path.join(JS_DIR, "ventas.js"), "utf8")
@@ -127,4 +129,22 @@ test("Paso 4 historial de Vales: la búsqueda por producto limita resultados y V
   assert.equal(window.document.getElementById("vales-buscar").value, "");
   assert.equal(cards(window, "lista-vales", ".vale-item").length, 2);
   assert.equal(window.document.getElementById("vales-contador").textContent, "2 elementos");
+});
+
+test("Paso 4 historial de Ventas: visible sin turno y accesible desde el POS", () => {
+  assert.match(M68_POS, /bc-venta-historial-btn/);
+  assert.match(M68_POS, /bc-venta-history-back-btn/);
+  assert.match(M68_POS, /bc-history-view/);
+  assert.match(M68_POS, /function showHistory\(tab\)/);
+  assert.doesNotMatch(M68_POS, /hideHistoryHard/);
+  assert.doesNotMatch(M68_POS, /#tab-ventas\\.bc-pos h3,/);
+  assert.doesNotMatch(M68_POS, /#tab-ventas\\.bc-pos \\.ventas-historial-controles,/);
+  assert.doesNotMatch(M68_POS, /#tab-ventas\\.bc-pos #lista-ventas,/);
+  assert.doesNotMatch(M26_REPAIR, /#tab-ventas\\.bc-venta-sin-turno h3,/);
+  assert.doesNotMatch(M26_REPAIR, /#tab-ventas\\.bc-venta-sin-turno \\.ventas-historial-controles,/);
+  assert.doesNotMatch(M26_REPAIR, /#tab-ventas\\.bc-venta-sin-turno #lista-ventas,/);
+  const syncMatch = M26_REPAIR.match(/function syncHistorialVisibility\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(syncMatch, "debe existir el sincronizador de visibilidad del historial");
+  assert.doesNotMatch(syncMatch[1], /if\s*\(sinTurno\)/);
+  assert.match(syncMatch[1], /removeProperty\("display"\)/);
 });
