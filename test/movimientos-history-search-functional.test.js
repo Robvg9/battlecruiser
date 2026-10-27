@@ -137,12 +137,12 @@ test("Paso 4 historial de Ventas: visible sin turno y accesible desde el POS", (
   assert.match(M68_POS, /bc-history-view/);
   assert.match(M68_POS, /function showHistory\(tab\)/);
   assert.doesNotMatch(M68_POS, /hideHistoryHard/);
-  assert.doesNotMatch(M68_POS, /#tab-ventas\\.bc-pos h3,/);
-  assert.doesNotMatch(M68_POS, /#tab-ventas\\.bc-pos \\.ventas-historial-controles,/);
-  assert.doesNotMatch(M68_POS, /#tab-ventas\\.bc-pos #lista-ventas,/);
-  assert.doesNotMatch(M26_REPAIR, /#tab-ventas\\.bc-venta-sin-turno h3,/);
-  assert.doesNotMatch(M26_REPAIR, /#tab-ventas\\.bc-venta-sin-turno \\.ventas-historial-controles,/);
-  assert.doesNotMatch(M26_REPAIR, /#tab-ventas\\.bc-venta-sin-turno #lista-ventas,/);
+  assert.equal(M68_POS.includes("#tab-ventas.bc-pos h3,"), false);
+  assert.equal(M68_POS.includes("#tab-ventas.bc-pos .ventas-historial-controles,"), false);
+  assert.equal(M68_POS.includes("#tab-ventas.bc-pos #lista-ventas,"), false);
+  assert.equal(M26_REPAIR.includes("#tab-ventas.bc-venta-sin-turno h3,"), false);
+  assert.equal(M26_REPAIR.includes("#tab-ventas.bc-venta-sin-turno .ventas-historial-controles,"), false);
+  assert.equal(M26_REPAIR.includes("#tab-ventas.bc-venta-sin-turno #lista-ventas,"), false);
   const syncMatch = M26_REPAIR.match(/function syncHistorialVisibility\(\)\s*\{([\s\S]*?)\n  \}/);
   assert.ok(syncMatch, "debe existir el sincronizador de visibilidad del historial");
   assert.doesNotMatch(syncMatch[1], /if\s*\(sinTurno\)/);
