@@ -201,7 +201,7 @@ test("B5.6: estado vacío cuando no hay datos", async () => {
     ventas: [],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarPermisoReportes(window);
   await window.refrescarReportes();
   const detalle = document.getElementById("rep-detalle");
   assert.ok(
