@@ -35,7 +35,7 @@ async function waitFor(predicate, timeout = 1500) {
   return Boolean(predicate());
 }
 
-function setup(t) {
+function setup(t, fixtures = FIXTURES) {
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
       "<section id='tab-movimientos' class='tab-panel visible'>" +
@@ -61,13 +61,15 @@ function setup(t) {
     rpc: async (name, params) => {
       rpcCalls.push({ name, params: { ...params } });
       if (name !== "movimientos_producto") return { data: [], error: null };
-      const rows = FIXTURES.filter((row) =>
+      const rows = fixtures.filter((row) =>
         (!params.p_desde || row.fecha.slice(0, 10) >= params.p_desde) &&
         (!params.p_hasta || row.fecha.slice(0, 10) <= params.p_hasta) &&
         (!params.p_almacen_id || row.almacen_id === params.p_almacen_id) &&
         (!params.p_tipo || row.tipo === params.p_tipo)
       );
-      return { data: rows.map((row) => ({ ...row })), error: null };
+      const offset = Number(params.p_offset || 0);
+      const limit = Number(params.p_limite || 500);
+      return { data: rows.slice(offset, offset + limit).map((row) => ({ ...row })), error: null };
     }
   };
   // The M51 module uses timers only for idempotent UI setup in this isolated test.
@@ -124,3 +126,33 @@ test("Paso 4: regresar de Historial a hoy restaura el rango diario", async (t) =
   assert.match(rows(window)[0], /Bebida de hoy/);
   assert.doesNotMatch(window.document.getElementById("mov-detalle").textContent, /Venta de ayer|Vale antiguo/);
 });
+test("Paso 4: Historial pagina por offset y no se limita silenciosamente a 500 filas", async (t) => {
+  const many = Array.from({ length: 501 }, (_, i) => ({
+    producto: "Producto " + i, usuario: "Dueño", tipo: "compra",
+    almacen: "La Cueva", almacen_id: "alm-1", operacion_id: "op-" + i,
+    fecha: "2026-10-27T14:00:00Z", cantidad: 1, costo_unitario: 1
+  }));
+  const { window, rpcCalls } = setup(t, many);
+  assert.ok(await waitFor(() => rows(window).length === 40));
+  assert.ok(rpcCalls.some((call) => call.params.p_offset === 0));
+  assert.ok(rpcCalls.some((call) => call.params.p_offset === 500));
+  assert.equal(window.document.getElementById("mov-view-today").getAttribute("aria-pressed"), "true");
+  assert.equal(window.document.querySelector("#mov-paginacion").textContent.includes("501 registros"), true);
+});
+
+test("Paso 4: el límite de seguridad de 5.000 registros es visible y no afirma que el historial esté completo", async (t) => {
+  const many = Array.from({ length: 5001 }, (_, i) => ({
+    producto: "Producto " + i, usuario: "Dueño", tipo: "compra",
+    almacen: "La Cueva", almacen_id: "alm-1", operacion_id: "op-cap-" + i,
+    fecha: new Date(Date.UTC(2026, 9, 27, 14, 0, i % 60)).toISOString(),
+    cantidad: 1, costo_unitario: 1
+  }));
+  const { window, rpcCalls } = setup(t, many);
+  assert.ok(await waitFor(() => rows(window).length === 40));
+  assert.equal(window.document.querySelectorAll("#mov-detalle .bc-m51-card").length, 40);
+  assert.ok(rpcCalls.some((call) => call.params.p_offset === 4500));
+  assert.equal(rpcCalls.some((call) => call.params.p_offset === 5000), false);
+  assert.match(window.document.getElementById("mov-detalle").textContent, /límite de seguridad de 5\.000 registros/i);
+  assert.match(window.document.getElementById("mov-detalle").textContent, /Reduce el rango de fechas/i);
+});
+
