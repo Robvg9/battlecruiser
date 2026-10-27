@@ -97,7 +97,8 @@
     }
     if(!tab)return null;
     tab.innerHTML='<div class="bc7-wrap">'+
-      '<header class="bc7-hero"><div><h2>Jornada e inventario</h2><p>Una jornada diaria, un responsable asignado, conteos físicos y cierre con declaración de dinero. Los datos se guardan en el backend; no se simula el éxito.</p></div><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></header>'+
+      '<header class="bc7-hero"><div><h2>Jornada e inventario</h2><p>Controla qué persona trabaja cada día, el inventario físico inicial y final, y la declaración de dinero al cerrar.</p></div><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></header>'+
+      '<section class="bc7-card bc7-purpose" aria-labelledby="bc7-purpose-title"><h3 id="bc7-purpose-title">¿Para qué sirve esta sección?</h3><p class="bc7-muted">Una jornada es un día de trabajo de un almacén con responsable y horario definidos. Aquí se controla el inicio, el inventario contado físicamente, la actividad y el cierre; no es el historial general de todos los movimientos.</p><ol class="bc7-muted"><li>Consulta el calendario y abre la jornada que te corresponde.</li><li>Antes de empezar, confirma el inventario inicial contando la mercancía física.</li><li>Durante la jornada, registra las operaciones en sus secciones habituales.</li><li>Al terminar, confirma el inventario final y la declaración de dinero, y completa el cierre que autorice el servidor.</li></ol><p class="bc7-muted">Las operaciones se muestran dentro de un día del turno solo cuando existe un vínculo verificable con esa sesión. Las demás se conservan en Movimientos → Historial, organizadas por fecha y almacén.</p></section>'+
       '<section id="bc7-admin-panel" class="bc7-card" hidden>'+
        '<h3>Programación y responsable</h3><p class="bc7-muted">Define el horario, guarda una rotación explícita o programa fechas concretas. No se infieren descansos ni responsables.</p>'+
        '<div class="bc7-grid"><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><label class="bc7-field">Modo de programación<select id="bc7-plan-mode"><option value="explicit">Fechas explícitas</option><option value="pattern">Usar patrón activo</option></select></label></div>'+
@@ -162,7 +163,7 @@
     try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
       state.rows=data;
-      if(!data.length){host.innerHTML='<div class="bc7-empty">No hay jornadas visibles en este rango. Una lista vacía no significa que el backend esté caído.</div>';return;}
+      if(!data.length){host.innerHTML='<div class="bc7-empty"><strong>No hay jornadas visibles en este rango.</strong><p>Prueba a pulsar “Actualizar calendario” o amplía “Días a consultar”. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';return;}
       host.innerHTML=data.map(rowHtml).join('');
     }catch(e){host.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';msg($('bc7-list-msg'),e.message,'error');}
   }
@@ -185,17 +186,20 @@
     const table=products.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Conteo físico</th></tr></thead><tbody>'+products.map(p=>'<tr><td>'+esc(p.nombre)+'</td><td>'+esc(p.unidad||'ud')+'</td><td>'+esc(qty(p.stock_actual))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" placeholder="Contar"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">Este almacén no tiene productos activos con fila de stock registrada. Si se trata realmente de un almacén vacío, puedes confirmar el conteo de cero productos.</div>';
     return '<p class="bc7-muted">Cuenta físicamente cada producto del listado. El stock del sistema solo sirve como comparación; no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'">'+table+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
-  function renderMovementRows(rows){
-    if(!rows.length)return '<div class="bc7-empty">No hay movimientos devueltos para esta fecha, o el rol no puede consultar el reporte.</div>';
-    return '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Hora</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Usuario</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(String(r.fecha||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(r.tipo||'—')+'</td><td>'+esc(r.producto||'—')+'</td><td>'+esc(qty(r.cantidad))+'</td><td>'+esc(r.usuario||'—')+'</td></tr>').join('')+'</tbody></table></div>';
+  function renderMovementRows(rows,session){
+    const day=Number(session&&session.numero_dia||0);
+    const date=String(session&&session.fecha||'').slice(0,10);
+    const heading='<h4>Día '+esc(day||'—')+' · '+esc(date||'fecha no disponible')+'</h4>';
+    if(!rows.length)return heading+'<div class="bc7-empty">No hay movimientos vinculados de forma verificable a esta sesión y a su tramo horario. Las operaciones que no puedan asociarse con seguridad siguen en Movimientos → Historial general; no se asignan solo por compartir fecha.</div>';
+    return heading+'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Hora</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Usuario</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(String(r.fecha||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(r.tipo||'—')+'</td><td>'+esc(r.producto||'—')+'</td><td>'+esc(qty(r.cantidad))+'</td><td>'+esc(r.usuario||'—')+'</td></tr>').join('')+'</tbody></table></div>';
   }
   async function loadMovements(detail){
     const host=$('bc7-movements');if(!host)return;
-    host.innerHTML='<div class="bc7-empty">Consultando libro de movimientos del día…</div>';
+    host.innerHTML='<div class="bc7-empty">Consultando movimientos atribuidos al día y turno…</div>';
     try{
-      const r=await rpc('movimientos_producto',{p_producto_id:null,p_almacen_id:detail.sesion.almacen_id,p_desde:String(detail.sesion.fecha).slice(0,10),p_hasta:String(detail.sesion.fecha).slice(0,10),p_tipo:null,p_limite:100,p_offset:0});
-      host.innerHTML=renderMovementRows(arr(r));
-    }catch(e){host.innerHTML='<div class="bc7-empty">El libro de movimientos no está disponible para este rol o conexión: '+esc(e.message)+'. Las consultas no han modificado datos.</div>';}
+      const r=await rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id});
+      host.innerHTML=renderMovementRows(arr(r),detail.sesion);
+    }catch(e){host.innerHTML='<div class="bc7-empty">No se pudo consultar el archivo de esta sesión: '+esc(e.message)+'. No se han modificado datos.</div>';}
   }
   function renderWorkspace(detail){
     state.detail=detail;
@@ -424,7 +428,7 @@
       document.querySelectorAll('.tab-btn[data-tab="ventas"]').forEach(b=>{b.hidden=true;b.setAttribute('aria-hidden','true');b.title='El flujo ordinario pasa por Jornada e inventario; el historial legado permanece conservado.'});
       const sales=$('tab-ventas');if(sales&&sales.classList.contains('visible'))navTo('jornada');
     }
-    if(!users().length)setStatus('Acceso verificado. La lista local de usuarios aún no está cargada; las asignaciones seguirán validadas en servidor.','');
+    if(!users().length)setStatus('Acceso verificado. La lista local de personas aún se está cargando. Una asignación solo queda confirmada cuando la valida el servidor.','');
     if($('bc7-warehouse'))$('bc7-warehouse').addEventListener('change',loadHours);
     // Catalog caches may finish loading just after auth/UI boot. Refresh their labels without changing any user selection.
     const refreshCatalogs=()=>{
