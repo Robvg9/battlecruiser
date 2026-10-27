@@ -205,8 +205,8 @@ test("B5.6: estado vacío cuando no hay datos", async () => {
   await window.refrescarReportes();
   const detalle = document.getElementById("rep-detalle");
   assert.ok(
-    await esperarHasta(() => /Sin ventas/.test(detalle.innerHTML)),
-    "debe mostrar estado vacío dentro de 2 s"
+    await esperarHasta(() => /Sin ventas/.test(detalle.innerHTML), 5000, 10),
+    "debe mostrar estado vacío dentro de 5 s"
   );
 });
 

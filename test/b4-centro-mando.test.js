@@ -330,7 +330,20 @@ test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos",
     permisos: [{ seccion: "auditoria", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  const contextoListo = await esperarHasta(
+    () =>
+      typeof window._usuarioActual === "function" &&
+      Boolean(window._usuarioActual()) &&
+      typeof window.tienePermiso === "function" &&
+      window.tienePermiso("auditoria", "ver"),
+    5000,
+    10
+  );
+  assert.ok(contextoListo, "el contexto y permiso de auditoría deben estar listos antes de la prueba offline");
+  assert.ok(
+    await esperarHasta(() => !window.__bcTestSyncState.active, 2000, 10),
+    "la sincronización inicial debe terminar antes de probar la cola offline"
+  );
   // No existe refrescarCentroMando2 ni _sincronizando2 (no duplicados).
   assert.strictEqual(typeof window.refrescarCentroMando, "function");
   assert.strictEqual(window.refrescarCentroMando2, undefined);
