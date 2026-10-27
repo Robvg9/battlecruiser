@@ -447,7 +447,7 @@
     const notice = document.createElement('div');
     notice.className = 'bc-m51-empty';
     notice.setAttribute('role', 'status');
-    notice.textContent = 'Se alcanzó el límite de seguridad de 5.000 registros. Para garantizar que no falte actividad, selecciona un rango de fechas más pequeño en Historial y pulsa Generar.';
+    notice.textContent = 'Se alcanzó el límite de seguridad de 5.000 registros. Reduce el rango de fechas y pulsa Generar para garantizar que no falte actividad.';
     host.appendChild(notice);
   }
 
@@ -588,7 +588,7 @@
       if (!client) throw new Error('Cliente Supabase no disponible');
       const collected = [];
       let offset = 0;
-      const maxRows = _viewMode === 'history' ? HISTORY_MAX_ROWS : FETCH_LIMIT;
+      const maxRows = HISTORY_MAX_ROWS;
       while (true) {
         const res = await client.rpc('movimientos_producto', {
           p_producto_id: null, p_almacen_id: f.almacen, p_desde: f.desde, p_hasta: f.hasta,
@@ -608,7 +608,7 @@
         collected.push.apply(collected, pageRows);
         if (pageRows.length < FETCH_LIMIT) break;
         if (collected.length >= maxRows) {
-          _historyTruncated = _viewMode === 'history';
+          _historyTruncated = true;
           break;
         }
         offset += pageRows.length;
