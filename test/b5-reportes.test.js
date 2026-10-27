@@ -120,15 +120,29 @@ test("B5.3: usuario con permiso reportes.ver ve la pestaña Reportes", async () 
   assert.ok(btn.style.display !== "none" && !btn.classList.contains("hidden"), "Reportes visible con permiso");
 });
 
-test("B5.3: usuario sin permiso reportes.ver NO ve la pestaña", async () => {
-  const { window, document } = montarEntorno({
+test("B5.3: usuario sin permiso reportes.ver conserva la pestaña de inspección, pero no recibe el permiso", async () => {
+  const { window, document, client } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "ventas", accion: "ver" }], // sin reportes.ver
   });
   marcarOnline(window);
-  await esperar(80);
+
+  const contextoListo = await esperarHasta(() =>
+    typeof window._usuarioActual === "function" &&
+    Boolean(window._usuarioActual()) &&
+    typeof window.tienePermiso === "function" &&
+    client.__rpcCalls.some((c) => c.nombre === "permisos_usuario_actual") &&
+    !window.tienePermiso("reportes", "ver"),
+    5000
+  );
+  assert.ok(contextoListo, "el perfil autenticado y el contexto de permisos deben estar listos");
+
   const btn = document.querySelector('.tab-btn[data-tab="reportes"]');
-  assert.ok(btn.style.display === "none" || btn.classList.contains("hidden"), "Reportes oculto sin permiso");
+  assert.ok(
+    btn && btn.style.display !== "none" && !btn.classList.contains("hidden"),
+    "Reportes permanece visible para inspección; la autorización efectiva sigue dependiendo de tienePermiso"
+  );
+  assert.equal(window.tienePermiso("reportes", "ver"), false, "la pestaña visible no debe conceder reportes.ver");
 });
 
 test("B5.5: el resumen ejecutivo se carga con datos reales del RPC", async () => {
