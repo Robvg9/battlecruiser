@@ -12,6 +12,10 @@ on:
       - 'test/force-close-turno-admin-forward-migration.test.js'
       - 'test/force-close-turno-admin-fixture.sql'
       - 'test/force-close-turno-admin-contract.sql'
+      - 'supabase/migrations/20261027153000_bc7_turno_movimientos_sesion.sql'
+      - 'test/bc7-turno-movimientos-sesion-fixture.sql'
+      - 'test/bc7-turno-movimientos-sesion-contract.sql'
+      - 'test/bc7-turno-movimientos-sesion-contract.test.js'
       - 'test/step7-jornada-postgres-windows-ci.js'
       - '.github/workflows/step7-jornada-postgres.yml'
   workflow_dispatch:
