@@ -613,7 +613,7 @@ html.${POS_CLASS} .main-content > .rule-orn {
   flex-direction: column !important;
   visibility: visible !important;
 }
-#tab-ventas.bc-pos.bc-m68-history-mode #venta-detalle {
+#tab-ventas.bc-pos.bc-m68-history-mode #venta-detalle:not(.hidden) {
   display: block !important;
   visibility: visible !important;
 }
