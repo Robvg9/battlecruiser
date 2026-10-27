@@ -33,8 +33,8 @@ function setup(t) {
     "<section id='tab-movimientos' class='tab-panel visible'>" +
       "<div class='pendientes-header'><h3>Movimientos</h3><span id='mov-conn-info'></span></div>" +
       "<div class='mando-filtros'>" +
-        "<input id='mov-filtro-desde' type='date'>" +
-        "<input id='mov-filtro-hasta' type='date'>" +
+        "<input id='mov-filtro-desde' type='date' value='2026-10-20'>" +
+        "<input id='mov-filtro-hasta' type='date' value='2026-10-22'>" +
         "<select id='mov-filtro-almacen'>" +
           "<option value=''>Todos los almacenes</option>" +
           "<option value='alm-1'>Principal</option><option value='alm-2'>Reserva</option>" +
