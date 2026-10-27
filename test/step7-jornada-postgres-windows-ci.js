@@ -268,9 +268,13 @@ function applySql(file) {
     applySql("test/force-close-turno-admin-fixture.sql");
     applySql("supabase/migrations/20261026170000_bc_force_close_admin_expiry_guard.sql");
     applySql("test/force-close-turno-admin-contract.sql");
-    log("\r\n=== 5/5 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
+    log("\r\n=== 5/6 Verify read-only daily movement archive, session boundaries and ACL ===");
+    applySql("test/bc7-turno-movimientos-sesion-fixture.sql");
+    applySql("supabase/migrations/20261027153000_bc7_turno_movimientos_sesion.sql");
+    applySql("test/bc7-turno-movimientos-sesion-contract.sql");
+    log("\r\n=== 6/6 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
-    log("\r\nPASS Step 7 PostgreSQL 17 disposable fixture and ACL contract.");
+    log("\r\nPASS Step 7 + Step 4 PostgreSQL 17 disposable fixtures and ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
