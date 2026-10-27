@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   if(window.__BC175)return; window.__BC175=true;
-  function css(){if(document.getElementById('bc175-css'))return;var s=document.createElement('style');s.id='bc175-css';s.textContent='#bc165-overlay #tab-compras,#bc165-overlay #tab-compras *{pointer-events:auto!important}#bc165-overlay #tab-compras select,#bc165-overlay #tab-compras input,#bc165-overlay #tab-compras button{position:relative;z-index:2;pointer-events:auto!important}#bc165-overlay .bc165-modal{overflow:auto!important}';document.head.appendChild(s);}
+  function css(){if(document.getElementById('bc175-css'))return;var s=document.createElement('style');s.id='bc175-css';s.textContent='#bc165-overlay #tab-compras,#bc165-overlay #tab-compras *{pointer-events:auto!important}#bc165-overlay #tab-compras{display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;max-width:none!important}#bc165-overlay #tab-compras select,#bc165-overlay #tab-compras input,#bc165-overlay #tab-compras button{position:relative;z-index:2;pointer-events:auto!important}#bc165-overlay .bc165-modal{overflow:auto!important;box-sizing:border-box!important}';document.head.appendChild(s);}
   function repair(){
     css();
     var modal=document.getElementById('bc165-overlay');if(!modal)return false;
