@@ -654,7 +654,7 @@ async function main() {
 
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
-  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
+  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const before=tab.getBoundingClientRect();window.scrollTo(0,Math.max(0,Math.round(before.top+window.scrollY-8)));const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
   report.evidence.androidConfigScrollInitial = mobileConfigScrollInitial;
   assert(mobileConfigScrollInitial && mobileConfigScrollInitial.found &&
          mobileConfigScrollInitial.regionClass &&
