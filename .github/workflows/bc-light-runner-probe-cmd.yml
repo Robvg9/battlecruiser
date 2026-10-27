@@ -1,0 +1,27 @@
+name: LaCueva lightweight runner probe (CMD)
+
+on:
+  push:
+    branches:
+      - test/bc-light-runner-probe-cmd-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  prove-runner:
+    name: Verify LaCueva runner identity (CMD)
+    runs-on: bc-light
+    timeout-minutes: 3
+    steps:
+      - name: Verify runner identity without checkout or dependencies
+        shell: cmd
+        run: |
+          echo BC_LIGHT_PROBE_START=2026-10-27
+          echo RUNNER_NAME=%RUNNER_NAME%
+          echo RUNNER_OS=%RUNNER_OS%
+          echo RUNNER_ARCH=%RUNNER_ARCH%
+          if /I not "%RUNNER_NAME%"=="LACUEVA-BC" exit /b 1
+          if /I not "%RUNNER_OS%"=="Windows" exit /b 1
+          ver
+          echo BC_LIGHT_PROBE_RESULT=PASS
