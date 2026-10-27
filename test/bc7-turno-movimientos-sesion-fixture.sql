@@ -1,0 +1,121 @@
+-- Disposable-only fixture for the read-only session movement archive.
+-- Runs only inside the PostgreSQL 17 CI database; never against LIVE.
+ALTER TABLE public.usuarios ADD COLUMN IF NOT EXISTS nombre text;
+ALTER TABLE public.mermas
+  ADD COLUMN IF NOT EXISTS fecha_revision timestamptz,
+  ADD COLUMN IF NOT EXISTS actualizado_en timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS revisado_por uuid,
+  ADD COLUMN IF NOT EXISTS revisado_nombre text;
+ALTER TABLE public.bajas
+  ADD COLUMN IF NOT EXISTS fecha_revision timestamptz,
+  ADD COLUMN IF NOT EXISTS actualizado_en timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS revisado_por uuid,
+  ADD COLUMN IF NOT EXISTS revisado_nombre text;
+
+CREATE TABLE IF NOT EXISTS public.lotes_compra(
+  id uuid PRIMARY KEY,
+  producto_id uuid NOT NULL,
+  almacen_id uuid NOT NULL,
+  cantidad_inicial numeric NOT NULL,
+  cantidad_restante numeric NOT NULL,
+  costo_unitario numeric NOT NULL,
+  fecha_compra timestamptz NOT NULL,
+  origen text NOT NULL,
+  usuario_id uuid,
+  creado_en timestamptz NOT NULL DEFAULT now(),
+  compra_id uuid
+);
+CREATE TABLE IF NOT EXISTS public.ventas(
+  id uuid PRIMARY KEY,
+  almacen_id uuid NOT NULL,
+  fecha timestamptz NOT NULL,
+  creado_por uuid
+);
+CREATE TABLE IF NOT EXISTS public.ventas_lineas(
+  id uuid PRIMARY KEY,
+  venta_id uuid NOT NULL,
+  producto_id uuid NOT NULL,
+  cantidad numeric NOT NULL,
+  costo_unitario_fifo numeric
+);
+CREATE TABLE IF NOT EXISTS public.transferencias(
+  id uuid PRIMARY KEY,
+  almacen_origen_id uuid NOT NULL,
+  almacen_destino_id uuid NOT NULL,
+  fecha timestamptz NOT NULL,
+  creado_por uuid
+);
+CREATE TABLE IF NOT EXISTS public.transferencias_lineas(
+  id uuid PRIMARY KEY,
+  transferencia_id uuid NOT NULL,
+  producto_id uuid NOT NULL,
+  cantidad numeric NOT NULL
+);
+CREATE TABLE IF NOT EXISTS public.vales_salida(
+  id uuid PRIMARY KEY,
+  producto_id uuid NOT NULL,
+  almacen_id uuid NOT NULL,
+  tipo text NOT NULL,
+  cantidad numeric NOT NULL,
+  estado text NOT NULL DEFAULT 'REGISTRADO',
+  creado_por uuid,
+  fecha timestamptz NOT NULL
+);
+
+INSERT INTO auth.users(id) VALUES
+  ('91000000-0000-0000-0000-000000000001'),
+  ('91000000-0000-0000-0000-000000000002')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.turnos(
+  id, usuario_id, usuario_nombre, almacen_id, fecha, estado, creado_por, created_by, estado_maestro, dias_turno
+) VALUES (
+  '92000000-0000-0000-0000-000000000001',
+  '91000000-0000-0000-0000-000000000001',
+  'Propietario fixture',
+  '10000000-0000-0000-0000-000000000001',
+  '2026-10-27',
+  'ABIERTO',
+  '91000000-0000-0000-0000-000000000001',
+  '91000000-0000-0000-0000-000000000001',
+  'EN_CURSO',
+  1
+);
+
+INSERT INTO public.turno_sesiones(id,turno_id,almacen_id,numero_dia,bloque,fecha,estado)
+VALUES
+  ('93000000-0000-0000-0000-000000000001','92000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001',1,'MANANA','2026-10-27','COMPLETADA'),
+  ('93000000-0000-0000-0000-000000000002','92000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001',1,'TARDE','2026-10-27','COMPLETADA');
+
+INSERT INTO public.turno_tramos(
+  id,turno_id,turno_sesion_id,usuario_id,tipo,estado,inicio_at,fin_at,created_at
+) VALUES
+  ('94000000-0000-0000-0000-000000000001','92000000-0000-0000-0000-000000000001','93000000-0000-0000-0000-000000000001','91000000-0000-0000-0000-000000000001','NORMAL','COMPLETADO','2026-10-27 14:00:00+00','2026-10-27 16:00:00+00','2026-10-27 14:00:00+00'),
+  ('94000000-0000-0000-0000-000000000002','92000000-0000-0000-0000-000000000001','93000000-0000-0000-0000-000000000002','91000000-0000-0000-0000-000000000002','NORMAL','COMPLETADO','2026-10-27 16:30:00+00','2026-10-27 18:00:00+00','2026-10-27 16:30:00+00');
+
+INSERT INTO public.lotes_compra(
+  id,producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen,usuario_id
+) VALUES
+  ('95000000-0000-0000-0000-000000000001','31000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001',10,10,2,'2026-10-27 14:30:00+00','compra','91000000-0000-0000-0000-000000000001'),
+  ('95000000-0000-0000-0000-000000000002','31000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001',1,1,1,'2026-10-27 17:00:00+00','compra','91000000-0000-0000-0000-000000000002');
+
+INSERT INTO public.ventas(id,almacen_id,fecha,creado_por) VALUES
+  ('96000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','2026-10-27 15:00:00+00','91000000-0000-0000-0000-000000000001'),
+  ('96000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','2026-10-27 16:00:00+00','91000000-0000-0000-0000-000000000001');
+INSERT INTO public.ventas_lineas(id,venta_id,producto_id,cantidad,costo_unitario_fifo) VALUES
+  ('96100000-0000-0000-0000-000000000001','96000000-0000-0000-0000-000000000001','31000000-0000-0000-0000-000000000001',2,2),
+  ('96100000-0000-0000-0000-000000000002','96000000-0000-0000-0000-000000000002','31000000-0000-0000-0000-000000000001',1,2);
+
+INSERT INTO public.transferencias(id,almacen_origen_id,almacen_destino_id,fecha,creado_por)
+VALUES ('97000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','2026-10-27 15:15:00+00','91000000-0000-0000-0000-000000000001');
+INSERT INTO public.transferencias_lineas(id,transferencia_id,producto_id,cantidad)
+VALUES ('97100000-0000-0000-0000-000000000001','97000000-0000-0000-0000-000000000001','31000000-0000-0000-0000-000000000001',3);
+
+INSERT INTO public.vales_salida(id,producto_id,almacen_id,tipo,cantidad,creado_por,fecha)
+VALUES ('98000000-0000-0000-0000-000000000001','31000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','MERMA',1,'91000000-0000-0000-0000-000000000001','2026-10-27 15:30:00+00');
+
+INSERT INTO public.mermas(id,almacen_id,producto_id,cantidad,motivo,estado,creado_por,creado_nombre,fecha_revision,actualizado_en,revisado_por,revisado_nombre,creado_en)
+VALUES ('99000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','31000000-0000-0000-0000-000000000001',1,'fixture','APROBADA','91000000-0000-0000-0000-000000000001','Propietario fixture','2026-10-27 15:40:00+00','2026-10-27 15:40:00+00','91000000-0000-0000-0000-000000000001','Propietario fixture','2026-10-27 15:39:00+00');
+
+INSERT INTO public.bajas(id,almacen_id,producto_id,cantidad,motivo,estado,creado_por,creado_nombre,fecha_revision,actualizado_en,revisado_por,revisado_nombre,creado_en)
+VALUES ('99100000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','31000000-0000-0000-0000-000000000001',1,'fixture','APROBADA','91000000-0000-0000-0000-000000000001','Propietario fixture','2026-10-27 15:45:00+00','2026-10-27 15:45:00+00','91000000-0000-0000-0000-000000000001','Propietario fixture','2026-10-27 15:44:00+00','2026-10-27 15:44:00+00');
