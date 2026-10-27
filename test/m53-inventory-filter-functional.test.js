@@ -137,3 +137,59 @@ test("Paso 4 inventario: resultado vacío explica filtros y ofrece limpiarlos", 
   assert.match(window.document.getElementById("inv-detalle").textContent, /No hay productos que coincidan con los filtros/i);
   assert.ok(window.document.getElementById("inv-empty-clear"), "debe ofrecer limpiar filtros");
 });
+
+test("D13 inventario: al perder conexión se descartan filas antiguas y al reconectar se relee el servidor", async (t) => {
+  const { window } = await boot(t);
+  const previousRows = visibleIds(window);
+  assert.deepEqual(previousRows, ["p-normal", "p-bajo", "p-agotado"]);
+
+  // Simulate an authenticated app client at the RPC boundary. No production
+  // account, API credential, or business write is used by this regression.
+  let serverRows = [{
+    producto_id: "p-fresh",
+    producto: "Dato fresco del servidor",
+    almacen: "Principal",
+    estado: "normal",
+    cantidad: 13,
+    minimo: 2,
+    valor_inventario: 130
+  }];
+  const reads = [];
+  window.client.rpc = async (name, params) => {
+    reads.push({ name, params });
+    assert.equal(name, "inventario_enriquecido");
+    return { data: serverRows.map((row) => ({ ...row })), error: null };
+  };
+
+  Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+  await window.refrescarInventario();
+
+  assert.deepEqual(visibleIds(window), [],
+    "when offline, prior in-memory inventory rows must not remain visible");
+  assert.deepEqual(window._invFilas, [],
+    "the detail-modal row cache must also be cleared while offline");
+  assert.match(window.document.getElementById("inv-detalle").textContent, /Sin conexión/i);
+  assert.equal(reads.length, 0, "no server RPC is attempted while navigator.onLine is false");
+
+  // Simulate a server-side change that happened while this client was offline.
+  serverRows = [{
+    producto_id: "p-fresh-2",
+    producto: "Inventario actualizado tras reconectar",
+    almacen: "TuMejor Opción",
+    estado: "normal",
+    cantidad: 21,
+    minimo: 3,
+    valor_inventario: 420
+  }];
+  Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
+  await window.refrescarInventario();
+
+  assert.equal(reads.length, 1, "reconnect refresh must issue a new read-only Supabase RPC");
+  assert.equal(reads[0].name, "inventario_enriquecido");
+  assert.deepEqual(visibleIds(window), ["p-fresh-2"],
+    "the new server result must replace prior rows instead of rendering stale data");
+  assert.deepEqual(window._invFilas.map((row) => row.producto_id), ["p-fresh-2"]);
+  assert.doesNotMatch(window.document.getElementById("inv-detalle").textContent, /Café|Azúcar|Harina|Dato fresco del servidor/);
+  assert.match(window.document.getElementById("inv-conn-info").textContent, /Datos de Supabase/);
+  assert.equal(window.document.querySelectorAll("#inv-detalle [data-inv-producto]").length, 1);
+});
