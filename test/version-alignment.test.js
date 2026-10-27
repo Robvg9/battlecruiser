@@ -93,8 +93,8 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 });
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.26["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.26["']/);
+  assert.match(app, /const VERSION=["']9\.5\.27["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.27["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261026\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
