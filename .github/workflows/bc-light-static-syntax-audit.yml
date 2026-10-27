@@ -1,0 +1,55 @@
+name: LaCueva static syntax audit
+
+on:
+  push:
+    branches:
+      - audit/bc-light-static-syntax-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  static-syntax:
+    name: Check main SHA without full install
+    runs-on: bc-light
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact production source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: 16abda5f2cfd530f9d37a74b77a64c4927b49f98
+          fetch-depth: 1
+          clean: true
+
+      - name: Verify LaCueva and parse critical JavaScript
+        shell: cmd
+        run: |
+          echo BC_STATIC_AUDIT=START
+          echo RUNNER_NAME=%RUNNER_NAME%
+          echo RUNNER_OS=%RUNNER_OS%
+          echo RUNNER_ARCH=%RUNNER_ARCH%
+          if /I not "%RUNNER_NAME%"=="LACUEVA-BC" exit /b 1
+          if /I not "%RUNNER_OS%"=="Windows" exit /b 1
+          node --version
+          if errorlevel 1 exit /b 1
+          node --check public/app.js
+          if errorlevel 1 exit /b 1
+          node --check public/js/m68-ventas-pos-definitivo.js
+          if errorlevel 1 exit /b 1
+          node --check public/js/m74-pos-archive-retail.js
+          if errorlevel 1 exit /b 1
+          node --check public/js/bc7-jornada-ui.js
+          if errorlevel 1 exit /b 1
+          node --check public/js/operaciones-financieras.js
+          if errorlevel 1 exit /b 1
+          node --check public/js/operacion-humana.js
+          if errorlevel 1 exit /b 1
+          node --check test/navigation-configuration.test.js
+          if errorlevel 1 exit /b 1
+          node --check test/pos-archive-retail-wholesale.test.js
+          if errorlevel 1 exit /b 1
+          node --check test/step7-jornada-ui-contract.test.js
+          if errorlevel 1 exit /b 1
+          node --check test/live-offline-e2e.js
+          if errorlevel 1 exit /b 1
+          echo BC_STATIC_AUDIT_RESULT=PASS
