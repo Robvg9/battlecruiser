@@ -67,7 +67,7 @@
     if (document.getElementById('bc-m33-css')) return;
     const s = document.createElement('style');
     s.id = 'bc-m33-css';
-    s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px}.m33-modal{width:min(920px,100%);max-height:90vh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:20px 22px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:flex;gap:7px;margin-top:14px;overflow:auto}.m33-step{flex:1;min-width:100px;padding:7px 9px;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:20px 22px;overflow:auto}.m33-foot{padding:13px 22px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.m33-box{padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:10px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}@media(max-width:720px){.m33-summary{grid-template-columns:1fr 1fr}}';
+    s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px}.m33-modal{width:min(920px,100%);max-height:90vh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:20px 22px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:flex;gap:7px;margin-top:14px;overflow:auto}.m33-step{flex:1;min-width:100px;padding:7px 9px;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:20px 22px;overflow:auto}.m33-foot{padding:13px 22px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.m33-box{padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:10px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}.m33-archive{margin-top:10px}.m33-archive-day{margin:10px 0;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:10px}.m33-archive-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.m33-archive-head b{display:block}.m33-archive-head small{display:block;opacity:.65;margin-top:3px}.m33-archive-head button{min-height:40px;padding:9px 12px;border-radius:8px;border:1px solid rgba(59,130,246,.55);background:rgba(59,130,246,.12);color:inherit;font-weight:600}.m33-archive-head button:disabled{opacity:.55}.m33-archive-host{margin-top:10px}.m33-archive-host[hidden]{display:none}.m33-archive-scroll{max-width:100%;overflow-x:auto}.m33-archive-table{width:100%;min-width:640px;border-collapse:collapse;font-size:.78rem}.m33-archive-table th,.m33-archive-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}.m33-archive-table th{opacity:.65}.m33-archive-empty{padding:10px;border:1px dashed rgba(255,255,255,.16);border-radius:8px;opacity:.75;font-size:.84rem}@media(max-width:720px){.m33-summary{grid-template-columns:1fr 1fr}}';
     document.head.appendChild(s);
   }
 
@@ -119,7 +119,36 @@
       return '<div class="m33-session"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) + '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || '') + '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
     }).join('');
   }
-  function step3() { return '<div class="m33-muted">Movimientos del expediente (si hay datos).</div>'; }
+  function archiveSessionsForViewer() {
+    const sessions = state.sesiones || [];
+    return state.isAdmin ? sessions : sessions.filter(sesionAsignadaAMi);
+  }
+  function archiveDayGroups(sessions) {
+    const map = Object.create(null);
+    (sessions || []).forEach(function (session) {
+      const day = session.dia_n || session.numero_dia || '—';
+      const dayDate = String(session.fecha || '').slice(0, 10);
+      const key = String(day) + '|' + dayDate;
+      if (!map[key]) map[key] = { day: day, date: dayDate, sessions: [] };
+      map[key].sessions.push(session);
+    });
+    return Object.keys(map).map(function (key) { return map[key]; }).sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date)) || Number(a.day) - Number(b.day);
+    });
+  }
+  function step3() {
+    const groups = archiveDayGroups(archiveSessionsForViewer());
+    if (!groups.length) return '<div class="m33-archive-empty">No hay sesiones disponibles para consultar.</div>';
+    return '<div class="m33-archive"><p class="m33-muted">Archivo de solo lectura. Cada fecha consulta únicamente las sesiones de ese día; los registros no se modifican.</p>' +
+      groups.map(function (group) {
+        const ids = group.sessions.map(function (session) { return String(session.id || ''); }).filter(Boolean).join('|');
+        const action = ids
+          ? '<button type="button" data-m33-archive-sessions="' + esc(ids) + '" data-m33-archive-day="' + esc(group.day) + '" data-m33-archive-date="' + esc(group.date) + '" aria-expanded="false">Ver movimientos del día</button>'
+          : '<span class="m33-muted">Sesiones sin identificador consultable.</span>';
+        return '<section class="m33-archive-day"><div class="m33-archive-head"><div><b>Día ' + esc(group.day) + '</b><small>' + esc(date(group.date)) + '</small></div>' + action + '</div>' +
+          '<div class="m33-archive-host" data-m33-archive-host hidden></div></section>';
+      }).join('') + '</div>';
+  }
   function step4() { return '<div class="m33-muted">Inventario del expediente (si hay datos).</div>'; }
   function step5(t) {
     const st = String(t.estado_maestro || t.estado || '').toUpperCase();
@@ -253,6 +282,92 @@
     } catch (e) { setAsignacionMsg('No se pudieron guardar/verificar las asignaciones: ' + (e.message || e), false); }
   }
 
+  function archiveTypeLabel(type) {
+    return ({
+      compra: 'Compra / entrada',
+      venta: 'Venta / salida',
+      transferencia_salida: 'Transferencia de salida',
+      transferencia_entrada: 'Transferencia de entrada',
+      vale: 'Vale de salida',
+      merma: 'Merma',
+      baja: 'Baja'
+    })[String(type || '').toLowerCase()] || String(type || '—');
+  }
+  function bindArchiveButtons(overlay) {
+    overlay.querySelectorAll('[data-m33-archive-sessions]').forEach(function (button) {
+      button.addEventListener('click', function () { toggleArchiveDay(button); });
+    });
+  }
+  async function toggleArchiveDay(button) {
+    const group = button.closest('.m33-archive-day');
+    const host = group && group.querySelector('[data-m33-archive-host]');
+    if (!host) return;
+    if (host.dataset.loaded === '1') {
+      host.hidden = !host.hidden;
+      button.setAttribute('aria-expanded', host.hidden ? 'false' : 'true');
+      return;
+    }
+    host.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    const title = '<h5>Día ' + esc(button.dataset.m33ArchiveDay || '—') + ' · ' + esc(date(button.dataset.m33ArchiveDate || '')) + '</h5>';
+    if (!navigator.onLine) {
+      host.innerHTML = title + '<div class="m33-archive-empty">El archivo del día requiere conexión al servidor.</div>';
+      return;
+    }
+    const sessionIds = String(button.dataset.m33ArchiveSessions || '').split('|').filter(Boolean);
+    if (!sessionIds.length) {
+      host.innerHTML = title + '<div class="m33-archive-empty">No hay sesiones consultables para esta fecha.</div>';
+      return;
+    }
+    button.disabled = true;
+    host.innerHTML = title + '<div class="m33-archive-empty">Consultando movimientos…</div>';
+    try {
+      const rpcClient = window.client;
+      if (!rpcClient || typeof rpcClient.rpc !== 'function') throw new Error('Cliente del servidor no disponible.');
+      const sessionsById = new Map((state.sesiones || []).map(function (session) { return [String(session.id), session]; }));
+      const rows = [];
+      let readable = 0;
+      let denied = 0;
+      for (const sessionId of sessionIds) {
+        const response = await rpcClient.rpc('bc7_movimientos_sesion', { p_turno_sesion_id: sessionId });
+        if (response && response.error) {
+          if (String(response.error.code || '') === '42501') { denied += 1; continue; }
+          throw response.error;
+        }
+        readable += 1;
+        const data = Array.isArray(response && response.data) ? response.data : (response && response.data ? [response.data] : []);
+        data.forEach(function (row) {
+          const session = sessionsById.get(String(sessionId));
+          rows.push(Object.assign({}, row, { __sessionLabel: session ? labelBloque(session.bloque) : 'Sesión' }));
+        });
+      }
+      if (!readable && denied) {
+        host.innerHTML = title + '<div class="m33-archive-empty">Tu perfil no tiene permiso para consultar las sesiones de este día.</div>';
+      } else if (!rows.length) {
+        host.innerHTML = title + '<div class="m33-archive-empty">No hay operaciones vinculadas de forma verificable a las sesiones que puedes consultar. Las operaciones sin atribución segura permanecen en el Historial general.</div>';
+      } else {
+        rows.sort(function (a, b) { return new Date(b.fecha).getTime() - new Date(a.fecha).getTime(); });
+        const body = rows.map(function (row) {
+          const ref = String(row.operacion_id || '');
+          const shortRef = ref ? '#' + ref.slice(-6) : '—';
+          const timestamp = String(row.fecha || '').replace('T', ' ').slice(0, 19);
+          return '<tr><td>' + esc(timestamp || '—') + '</td><td>' + esc(row.__sessionLabel || '—') +
+            '</td><td>' + esc(archiveTypeLabel(row.tipo)) + '</td><td>' + esc(row.producto || '—') +
+            '</td><td>' + esc(row.almacen || '—') + '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
+            '</td><td>' + esc(row.usuario || '—') + '</td><td>' + esc(shortRef) + '</td></tr>';
+        }).join('');
+        host.innerHTML = title + '<div class="m33-archive-scroll"><table class="m33-archive-table"><thead><tr><th>Fecha/hora</th><th>Sesión</th><th>Tipo</th><th>Producto</th><th>Almacén</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+          (denied ? '<div class="m33-archive-empty" role="status">Algunas sesiones no se muestran porque tu perfil no tiene permiso para consultarlas.</div>' : '');
+      }
+      host.dataset.loaded = '1';
+    } catch (error) {
+      host.innerHTML = title + '<div class="m33-archive-empty">No se pudo consultar el archivo de este día: ' +
+        esc(error && error.message ? error.message : error) + '.</div>';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function renderModal() {
     const ov = document.getElementById('m33-bg');
     if (!ov) return;
@@ -276,6 +391,7 @@
     var d = ov.querySelector('#m33-delete'); if (d) d.onclick = deleteTurno;
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
     if (state.step === 2) bindAssignmentAutosave();
+    if (state.step === 3) bindArchiveButtons(ov);
   }
 
   async function open(id) {
@@ -295,6 +411,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.7-dep', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.8-dep', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
