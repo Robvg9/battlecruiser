@@ -127,7 +127,7 @@
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head::-webkit-details-marker{display:none}',
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head:after{content:"＋";float:right;color:var(--gold)}',
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible[open]>.bc-m51-group-head:after{content:"−"}',
-      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-card{margin:8px;border-radius:8px}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible .bc-m51-card{margin:8px;border-radius:8px}',
       '@media(max-width:640px){#tab-movimientos.bc-m51 .bc-m51-view-switch{align-items:stretch;flex-direction:column}#tab-movimientos.bc-m51 .bc-m51-view-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#tab-movimientos.bc-m51 .bc-m51-view-btn{width:100%;box-sizing:border-box}}',
       '#tab-movimientos.bc-m51 .bc-m51-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}',
       '#tab-movimientos.bc-m51 .bc-m51-metric{min-width:0;padding:11px 12px;background:linear-gradient(180deg,rgba(26,56,48,.55),rgba(18,42,36,.88));border:1px solid rgba(212,176,92,.12);border-radius:10px}',
