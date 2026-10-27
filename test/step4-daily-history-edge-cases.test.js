@@ -1,5 +1,8 @@
 "use strict";
 
+// Owner issue #194: exercise America/Havana day boundaries, empty history and filter preservation.
+// All RPC data below is mocked in memory; this test never writes business records.
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
