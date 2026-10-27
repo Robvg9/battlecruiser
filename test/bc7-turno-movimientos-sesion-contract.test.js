@@ -21,6 +21,8 @@ test("archivo por turno es una función de solo lectura y exige sesión autentic
 
 test("la atribución al turno requiere la sesión exacta, el usuario y el tramo temporal", () => {
   assert.match(MIGRATION, /tr\.turno_sesion_id = v_s\.id/);
+  assert.match(MIGRATION, /p\.responsable_id = v_uid/);
+  assert.match(MIGRATION, /p\.id = v_s\.jornada_programacion_id/);
   assert.match(MIGRATION, /tr\.usuario_id = v\.creado_por/);
   assert.match(MIGRATION, /tr\.usuario_id = t\.creado_por/);
   assert.match(MIGRATION, /tr\.inicio_at/);
