@@ -79,6 +79,14 @@
       '.tm-meta b{color:var(--gold)}',
       '.tm-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}',
       '.tm-actions button{min-height:42px}',
+      '.tm-session-movimientos{display:block;flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;padding:12px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(7,20,16,.55)}',
+      '.tm-session-movimientos h5{margin:0 0 8px;color:var(--gold);font-size:13px}',
+      '.tm-session-movimientos .tm-mov-scroll{max-width:100%;overflow-x:auto}',
+      '.tm-session-movimientos table{width:100%;min-width:460px;border-collapse:collapse;font-size:11px}',
+      '.tm-session-movimientos th,.tm-session-movimientos td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--gold-dim);vertical-align:top}',
+      '.tm-session-movimientos th{color:var(--mist);font-weight:600}',
+      '.tm-session-movimientos .tm-mov-empty{padding:10px;border:1px dashed var(--gold-dim);border-radius:6px;color:var(--mist);font-size:12px;line-height:1.45}',
+      '.tm-session-movimientos[hidden]{display:none!important}',
       '.tm-back{background:transparent!important}',
       '.tm-msg{min-height:20px;margin-top:10px}',
       '.tm-msg.ok{color:#8fc79d}',
@@ -309,12 +317,17 @@
         if (assigned && me && String(assigned) !== String(me) && se === 'PENDIENTE' && !state.isAdmin) {
           actions += '<span class="muted">Asignada a otro trabajador.</span>';
         }
+        actions += '<button type="button" class="cc-accion" data-tm-movimientos="' + esc(s.id) +
+          '" data-tm-mov-dia="' + esc(s.dia_n || s.numero_dia || '—') +
+          '" data-tm-mov-fecha="' + esc(s.fecha || '') + '" aria-expanded="false">Ver movimientos del día</button>';
         return (
           '<div class="tm-row" data-sesion-id="' + esc(s.id) + '">' +
           '<div><b>Día ' + esc(s.dia_n || s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) + '</b>' +
           '<small>' + esc(fmtDate(s.fecha)) + ' · ' + esc(nombre) + '</small>' +
           '<span class="tm-status">' + esc(labelEstado(se)) + '</span></div>' +
-          '<div class="tm-actions">' + actions + '</div></div>'
+          '<div class="tm-actions">' + actions +
+          '<div class="tm-session-movimientos" data-tm-movimientos-host="' + esc(s.id) + '" hidden></div>' +
+          '</div></div>'
         );
       }).join('');
     }
@@ -645,6 +658,68 @@
   // ---------------------------------------------------------------------------
   // Eventos
   // ---------------------------------------------------------------------------
+  async function toggleSessionMovements(button) {
+    const sessionId = String(button && button.dataset.tmMovimientos || '');
+    if (!sessionId) return;
+    const host = root() && root().querySelector('[data-tm-movimientos-host="' + sessionId + '"]');
+    if (!host) return;
+    if (host.dataset.loaded === '1') {
+      host.hidden = !host.hidden;
+      button.setAttribute('aria-expanded', host.hidden ? 'false' : 'true');
+      return;
+    }
+    if (!navigator.onLine) {
+      host.hidden = false;
+      host.innerHTML = '<div class="tm-mov-empty">Sin conexión: el archivo de este día requiere consultar el servidor.</div>';
+      button.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    host.hidden = false;
+    host.innerHTML = '<div class="tm-mov-empty">Consultando movimientos atribuidos a esta sesión y su tramo horario…</div>';
+    button.disabled = true;
+    try {
+      const client = window.client;
+      if (!client || typeof client.rpc !== 'function') throw new Error('Cliente del servidor no disponible.');
+      const result = await client.rpc('bc7_movimientos_sesion', { p_turno_sesion_id: sessionId });
+      if (result && result.error) throw result.error;
+      const rows = Array.isArray(result && result.data) ? result.data : [];
+      if (!rows.length) {
+        host.innerHTML = '<h5>Día ' + esc(button.dataset.tmMovDia || '—') + ' · ' + esc(fmtDate(button.dataset.tmMovFecha || '')) + '</h5>' +
+          '<div class="tm-mov-empty">No hay operaciones vinculadas de forma verificable a esta sesión y a su tramo horario. Las operaciones que no puedan asociarse con seguridad siguen en Movimientos → Historial general; no se asignan solo por compartir fecha.</div>';
+      } else {
+        const label = function(tipo) {
+          return ({
+            compra:'Compra / entrada', venta:'Venta / salida',
+            transferencia_salida:'Transferencia de salida',
+            transferencia_entrada:'Transferencia de entrada',
+            vale:'Vale de salida', merma:'Merma', baja:'Baja'
+          })[String(tipo || '').toLowerCase()] || String(tipo || '—');
+        };
+        const body = rows.map(function (row) {
+          const ref = String(row.operacion_id || '');
+          const shortRef = ref ? '#' + ref.slice(-6) : '—';
+          return '<tr><td>' + esc(String(row.fecha || '').replace('T', ' ').slice(0, 16)) +
+            '</td><td>' + esc(label(row.tipo)) +
+            '</td><td>' + esc(row.producto || '—') +
+            '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
+            '</td><td>' + esc(row.usuario || '—') +
+            '</td><td>' + esc(shortRef) + '</td></tr>';
+        }).join('');
+        host.innerHTML = '<h5>Día ' + esc(button.dataset.tmMovDia || '—') + ' · ' + esc(fmtDate(button.dataset.tmMovFecha || '')) +
+          '</h5><div class="tm-mov-scroll"><table><thead><tr><th>Fecha/hora</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' +
+          body + '</tbody></table></div>';
+      }
+      host.dataset.loaded = '1';
+      button.setAttribute('aria-expanded', 'true');
+    } catch (error) {
+      host.innerHTML = '<div class="tm-mov-empty">No se pudo consultar el archivo de esta sesión: ' +
+        esc(error && error.message ? error.message : error) + '.</div>';
+      button.setAttribute('aria-expanded', 'true');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function bind() {
     const r = root();
     if (!r || r.dataset.tmBound === '1') return;
@@ -653,6 +728,7 @@
       const b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.tmHome != null) return home();
+      if (b.dataset.tmMovimientos != null) return toggleSessionMovements(b);
       if (b.dataset.tmCreate) return createForm(b.dataset.tmCreate);
       if (b.dataset.tmConfirmCreate) return confirmCreate(b.dataset.tmConfirmCreate);
       if (b.dataset.tmOpen) return openTurno(b.dataset.tmOpen, b.dataset.legacy === '1');
