@@ -21,12 +21,12 @@ test("preference switches expose accessible names and descriptions", () => {
   assert.ok(source.includes("aria-label=" + escapedQuote));
   assert.ok(source.includes("aria-describedby=" + escapedQuote));
   assert.ok(source.includes("role=" + escapedQuote + "switch" + escapedQuote));
-  assert.ok(!source.includes("aria-checked=" + escapedQuote));
+  assert.ok(source.includes('control.setAttribute("aria-checked", enabled ? "true" : "false");'));
 });
 
 test("native checked state stays synchronized with saved local preference values", () => {
   assert.ok(source.includes("control.checked = enabled;"));
-  assert.ok(!source.includes("aria-checked"));
+  assert.ok(source.includes("aria-checked"));
   assert.ok(source.includes("var checked = !!input.checked;"));
   assert.ok(source.includes("prefs[key] = checked;"));
 });
@@ -76,16 +76,35 @@ test("native switch checked semantics follow saved state and user changes", asyn
     const enabledByDefault = window.document.getElementById("cfg-aj-sync-auto");
     const disabledByDefault = window.document.getElementById("cfg-aj-sync-wifi");
     assert.ok(enabledByDefault && disabledByDefault);
-    assert.equal(enabledByDefault.getAttribute("role"), "switch");
-    assert.equal(enabledByDefault.checked, true);
-    assert.equal(disabledByDefault.checked, false);
-    assert.equal(enabledByDefault.hasAttribute("aria-checked"), false);
-    assert.equal(disabledByDefault.hasAttribute("aria-checked"), false);
+    const expected = [
+      ["cfg-aj-auto-refresh", true],
+      ["cfg-aj-sync-auto", true],
+      ["cfg-aj-sync-open", true],
+      ["cfg-aj-sync-wifi", false],
+      ["cfg-aj-notify", true],
+      ["cfg-aj-compact", false]
+    ];
+    for (const [id, checked] of expected) {
+      const control = window.document.getElementById(id);
+      assert.ok(control, "missing native preference control " + id);
+      assert.equal(control.type, "checkbox", id + " must retain native checkbox semantics");
+      assert.equal(control.getAttribute("role"), "switch", id + " exposes switch role");
+      assert.equal(control.checked, checked, id + " native checked state matches stored default");
+      assert.equal(control.getAttribute("aria-checked"), String(checked), id + " explicit ARIA state matches native state");
+      assert.match(control.getAttribute("aria-label") || "", new RegExp("estado " + (checked ? "activado" : "desactivado") + "$", "i"),
+        id + " accessible name announces its current state");
+      assert.ok(control.getAttribute("aria-describedby"), id + " has an accessible description");
+      assert.ok(window.document.getElementById(id + "-help"), id + " help text exists");
+      assert.ok(window.document.getElementById(id + "-state"), id + " state text exists");
+      assert.match(window.document.getElementById(id + "-state").textContent,
+        new RegExp(checked ? "activada" : "desactivada", "i"));
+    }
 
     disabledByDefault.click();
 
     assert.equal(disabledByDefault.checked, true);
-    assert.equal(disabledByDefault.hasAttribute("aria-checked"), false);
+    assert.equal(disabledByDefault.getAttribute("aria-checked"), "true");
+    assert.match(disabledByDefault.getAttribute("aria-label"), /estado activado$/i);
     assert.match(
       window.document.getElementById("cfg-aj-sync-wifi-state").textContent,
       /activada/
@@ -155,15 +174,15 @@ test("theme buttons and Restore Preferences persist then reset isolated preferen
 
 test("PWA deployment invalidates the cached switch script and keeps shell versions aligned", () => {
   const resource = "configuracion-ajustes-migrados-20260903.js";
-  assert.ok(loader.includes(resource + "?v=8"));
-  assert.ok(serviceWorker.includes("./js/" + resource + "?v=8"));
+  assert.ok(loader.includes(resource + "?v=9"));
+  assert.ok(serviceWorker.includes("./js/" + resource + "?v=9"));
   assert.ok(!loader.includes(resource + "?v=6"));
   assert.ok(!serviceWorker.includes(resource + "?v=6"));
   const appVersion = appSource.match(/const VERSION="([^"]+)"/);
   const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "app version must be detectable");
   assert.ok(workerVersion, "service-worker version must be detectable");
-  assert.equal(appVersion[1], "9.5.25");
+  assert.equal(appVersion[1], "9.5.26");
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));

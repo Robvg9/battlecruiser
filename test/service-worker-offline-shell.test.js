@@ -106,7 +106,7 @@ test('install precaches the document shell and essential static assets', async (
   for (const asset of ['/', '/index.html', '/app.js', '/style.css']) {
     assert.ok(worker.entries.has(new URL(asset, ORIGIN).href), 'shell asset was not cached: ' + asset);
   }
-  for (const asset of ['/js/mi-cuenta.js?v=1.2', '/js/hotfix-configuracion-20260902.js?v=20261020.4', '/js/configuracion-ajustes-migrados-20260903.js?v=8', '/js/hotfix-secciones-visibles-20260903.js?v=20261026.1']) {
+  for (const asset of ['/js/mi-cuenta.js?v=1.2', '/js/hotfix-configuracion-20260902.js?v=20261020.4', '/js/configuracion-ajustes-migrados-20260903.js?v=9', '/js/hotfix-secciones-visibles-20260903.js?v=20261026.1']) {
     assert.ok(worker.entries.has(new URL(asset, ORIGIN).href), 'critical Android module was not cached: ' + asset);
   }
 });
