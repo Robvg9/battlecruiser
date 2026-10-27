@@ -79,7 +79,7 @@
       ".sidebar-backdrop{display:none!important}",
       "}",
 
-      /* Sin turno: ocultar historial operativo y todo el POS */
+      /* Sin turno: ocultar acciones del POS; conservar el historial de solo lectura. */
       "#tab-ventas.bc-venta-sin-turno #venta-operativa-bloque,",
       "#tab-ventas.bc-venta-sin-turno #bc-venta-carrito-bar,",
       "#tab-ventas.bc-venta-sin-turno #bc-venta-pos-layout,",
@@ -92,11 +92,7 @@
       "#tab-ventas.bc-venta-sin-turno #venta-total-wrap,",
       "#tab-ventas.bc-venta-sin-turno #btn-confirmar-venta,",
       "#tab-ventas.bc-venta-sin-turno #msg-venta,",
-      "#tab-ventas.bc-venta-sin-turno #msg-venta-linea,",
-      "#tab-ventas.bc-venta-sin-turno h3,",
-      "#tab-ventas.bc-venta-sin-turno .ventas-historial-controles,",
-      "#tab-ventas.bc-venta-sin-turno #lista-ventas,",
-      "#tab-ventas.bc-venta-sin-turno #venta-detalle{display:none!important}",
+      "#tab-ventas.bc-venta-sin-turno #msg-venta-linea{display:none!important}",
       "#tab-ventas.bc-venta-sin-turno #venta-sin-turno{display:block!important}",
 
       /* Layout POS: productos | carrito */
@@ -235,44 +231,34 @@
     }
   }
 
-  /* ---------- Historial solo con turno ---------- */
+  /* ---------- El historial es de solo lectura y permanece visible sin turno ---------- */
   function syncHistorialVisibility() {
     var tab = document.getElementById("tab-ventas");
     if (!tab) return;
-    var sinTurno = tab.classList.contains("bc-venta-sin-turno");
-    var ids = ["lista-ventas", "ventas-buscar", "ventas-contador", "venta-detalle"];
-    ids.forEach(function (id) {
+    ["lista-ventas", "ventas-buscar", "ventas-contador"].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
-      if (sinTurno) {
-        el.classList.add("hidden");
-        el.setAttribute("aria-hidden", "true");
-        el.style.setProperty("display", "none", "important");
-      } else {
-        el.classList.remove("hidden");
-        el.removeAttribute("aria-hidden");
-        el.style.removeProperty("display");
-      }
+      el.classList.remove("hidden");
+      el.removeAttribute("aria-hidden");
+      el.removeAttribute("hidden");
+      el.style.removeProperty("display");
     });
     tab.querySelectorAll("h3").forEach(function (h) {
       if (/Historial/i.test(h.textContent || "")) {
-        if (sinTurno) {
-          h.style.setProperty("display", "none", "important");
-          h.setAttribute("aria-hidden", "true");
-        } else {
-          h.style.removeProperty("display");
-          h.removeAttribute("aria-hidden");
-        }
+        h.classList.remove("hidden");
+        h.style.removeProperty("display");
+        h.removeAttribute("aria-hidden");
+        h.removeAttribute("hidden");
       }
     });
     var cont = tab.querySelector(".ventas-historial-controles");
     if (cont) {
-      if (sinTurno) {
-        cont.style.setProperty("display", "none", "important");
-      } else {
-        cont.style.removeProperty("display");
-      }
+      cont.classList.remove("hidden");
+      cont.style.removeProperty("display");
+      cont.removeAttribute("aria-hidden");
+      cont.removeAttribute("hidden");
     }
+    // No se altera .hidden de venta-detalle: solo se abre al seleccionar una venta.
   }
 
   /* ---------- Form "Agregar a la venta" → almacén del turno ---------- */
