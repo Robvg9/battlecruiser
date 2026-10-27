@@ -166,7 +166,7 @@ test("D13 inventario: al perder conexión se descartan filas antiguas y al recon
 
   assert.deepEqual(visibleIds(window), [],
     "when offline, prior in-memory inventory rows must not remain visible");
-  assert.deepEqual(window._invFilas, [],
+  assert.equal(window._invFilas.length, 0,
     "the detail-modal row cache must also be cleared while offline");
   assert.match(window.document.getElementById("inv-detalle").textContent, /Sin conexión/i);
   assert.equal(reads.length, 0, "no server RPC is attempted while navigator.onLine is false");
@@ -188,7 +188,8 @@ test("D13 inventario: al perder conexión se descartan filas antiguas y al recon
   assert.equal(reads[0].name, "inventario_enriquecido");
   assert.deepEqual(visibleIds(window), ["p-fresh-2"],
     "the new server result must replace prior rows instead of rendering stale data");
-  assert.deepEqual(window._invFilas.map((row) => row.producto_id), ["p-fresh-2"]);
+  assert.equal(window._invFilas.length, 1);
+  assert.equal(window._invFilas[0].producto_id, "p-fresh-2");
   assert.doesNotMatch(window.document.getElementById("inv-detalle").textContent, /Café|Azúcar|Harina|Dato fresco del servidor/);
   assert.match(window.document.getElementById("inv-conn-info").textContent, /Datos de Supabase/);
   assert.equal(window.document.querySelectorAll("#inv-detalle [data-inv-producto]").length, 1);
