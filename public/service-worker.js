@@ -1,9 +1,9 @@
-/* BattleCruiser Service Worker — v9.5.24
+/* BattleCruiser Service Worker — v9.5.25
  * App shell: network-first with a versioned offline cache fallback.
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
  */
-var BC_SW_VERSION = "9.5.24";
+var BC_SW_VERSION = "9.5.25";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_SHELL = ["./", "./index.html", "./app.js", "./style.css", "./js/offline.js", "./js/mi-cuenta.js?v=1.2", "./js/hotfix-configuracion-20260902.js?v=20261020.4", "./js/network-core.js?v=20261020.4", "./js/configuracion.js?v=20261023.2", "./js/bc7-jornada-ui.js?v=7.2", "./js/operacion-humana.js?v=20261024.1", "./js/hotfix-turno-forceclose-20260902.js?v=20261026.1", "./js/configuracion-ajustes-migrados-20260903.js?v=8", "./js/hotfix-secciones-visibles-20260903.js?v=20261026.1", "./js/m74-pos-archive-retail.js?v=74.6"];
