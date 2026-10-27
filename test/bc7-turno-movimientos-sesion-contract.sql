@@ -51,6 +51,15 @@ BEGIN
   IF NOT has_function_privilege('authenticated','public.bc7_movimientos_sesion(uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'authenticated must be allowed to execute the session movement RPC.';
   END IF;
+
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000002',false);
+  BEGIN
+    PERFORM 1 FROM public.bc7_movimientos_sesion('93000000-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'An unrelated authenticated user must not be able to read the session movement archive.';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
 END
 $test$;
 ROLLBACK;
