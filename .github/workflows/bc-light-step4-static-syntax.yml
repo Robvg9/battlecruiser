@@ -1,0 +1,28 @@
+name: LaCueva static test syntax audit
+
+on:
+  push:
+    branches:
+      - test/step4-daily-history-edge-cases-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Parse the isolated Step 4 test file
+    runs-on: bc-light
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          clean: true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+      - name: Syntax check only
+        shell: cmd
+        run: node --check test/step4-daily-history-edge-cases.test.js
