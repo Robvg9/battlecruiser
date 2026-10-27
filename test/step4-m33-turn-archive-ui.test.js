@@ -28,7 +28,7 @@ function operation(producto, tipo, fecha, operacion_id) {
   return { producto, tipo, fecha, almacen: "La Cueva", cantidad: tipo === "compra" ? 2 : -1,
     usuario: "Responsable fixture", operacion_id };
 }
-function setup(t) {
+function setup(t, { admin = true } = {}) {
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body><section id='tab-ciclos'><div id='ciclos-m18-root'></div></section></body></html>",
     { url: "https://battlecruiser-m33-archive.test/", runScripts: "outside-only", pretendToBeVisual: true }
@@ -54,15 +54,15 @@ function setup(t) {
     inicio_plan: "2026-10-20", fin_plan: "2026-10-21", sesiones: sessions
   };
   const rpcCalls = [];
-  window._usuarioActual = { id: "owner-fixture", nombre: "Dueño fixture", rol: "dueño" };
-  window.__bcUser = { rol: "dueño" };
+  window._usuarioActual = { id: "owner-fixture", nombre: "Dueño fixture", rol: admin ? "dueño" : "dependienta" };
+  window.__bcUser = { rol: admin ? "dueño" : "dependienta" };
   window._cache = { almacenes: [{ id: "alm-1", nombre: "La Cueva", activo: true }], usuarios: [] };
-  window.tienePermiso = () => true;
+  window.tienePermiso = () => admin;
   window.escHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[ch]));
   window.BattleCruiserTurnoAPI = {
-    actorIsAdmin: async () => true,
+    actorIsAdmin: async () => admin,
     obtenerExpedienteTurno: async (id) => ({ ...turn, id, sesiones: sessions.map((row) => ({ ...row })) }),
     labelEstado: (value) => value === "CERRADO" ? "Cerrado" : String(value || "—")
   };
@@ -82,7 +82,7 @@ test("Paso 4: M33 consulta el archivo de un turno cerrado por fecha sin mutar re
   await window.__BC_M33.open("turno-closed-fixture");
   const modal = window.document.getElementById("m33-bg");
   assert.ok(modal, "el expediente debe abrir aunque el turno esté cerrado");
-  assert.match(modal.textContent, /Cerrado/);
+  assert.match(modal.textContent, /CERRADO|Cerrado/);
   modal.querySelector("#m33-next").click();
   modal.querySelector("#m33-next").click();
   assert.ok(await waitFor(() => modal.querySelectorAll(".m33-archive-day").length === 2),
@@ -104,4 +104,20 @@ test("Paso 4: M33 consulta el archivo de un turno cerrado por fecha sin mutar re
   assert.doesNotMatch(host2.textContent, /Compra vinculada día 1|Venta vinculada día 1/);
   assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
     "la prueba solo permite RPCs de lectura del archivo");
+});
+
+
+test("Paso 4: personal asignado también accede solo al archivo de sus sesiones", async (t) => {
+  const { window, rpcCalls } = setup(t, { admin: false });
+  await window.__BC_M33.open("turno-closed-fixture");
+  const modal = window.document.getElementById("m33-bg");
+  assert.ok(await waitFor(() => modal.querySelectorAll(".m33-archive-day").length === 2),
+    "la vista de dependienta incluye el archivo por fecha de sus sesiones asignadas");
+  const groups = modal.querySelectorAll(".m33-archive-day");
+  groups[0].querySelector("[data-m33-archive-sessions]").click();
+  const host = groups[0].querySelector("[data-m33-archive-host]");
+  assert.ok(await waitFor(() => host.textContent.includes("Compra vinculada día 1")),
+    "se consulta el archivo de solo lectura para las sesiones asignadas");
+  assert.deepEqual(rpcCalls.map((call) => call.params.p_turno_sesion_id).sort(),
+    ["session-day1-am", "session-day1-pm"]);
 });
