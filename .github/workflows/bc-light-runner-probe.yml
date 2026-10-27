@@ -1,0 +1,35 @@
+name: LaCueva lightweight runner probe
+
+on:
+  push:
+    branches:
+      - test/bc-light-runner-probe-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  prove-runner:
+    name: Verify LaCueva runner identity
+    runs-on: bc-light
+    timeout-minutes: 3
+    steps:
+      - name: Verify runner identity without checkout or dependencies
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host 'BC_LIGHT_PROBE_START=2026-10-27'
+          Write-Host "RUNNER_NAME=$env:RUNNER_NAME"
+          Write-Host "RUNNER_OS=$env:RUNNER_OS"
+          Write-Host "RUNNER_ARCH=$env:RUNNER_ARCH"
+
+          if ($env:RUNNER_NAME -ne 'LACUEVA-BC') {
+            throw "Wrong runner selected: $env:RUNNER_NAME"
+          }
+          if ($env:RUNNER_OS -ne 'Windows') {
+            throw "Expected Windows runner, got: $env:RUNNER_OS"
+          }
+
+          $osCaption = (Get-CimInstance Win32_OperatingSystem).Caption
+          Write-Host "OS_CAPTION=$osCaption"
+          Write-Host 'BC_LIGHT_PROBE_RESULT=PASS'
