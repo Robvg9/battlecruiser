@@ -33,14 +33,14 @@
     ["m29-turnos-organizacion.js","29.15"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.8"],["hotfix-turno-forceclose-20260902.js","20261026.1"],["m34-turnos-filter-final.js","34.3"],
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.1"],
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
-    ["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.3"],["m52-movimientos-auth-retry.js","52.2"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.7"],
+    ["m49-turnos-layout-definitivo.js","49.4"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.3"],["m52-movimientos-auth-retry.js","52.2"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.8"],
     ["m53-inventario-centro.js","53.1"],["m55-productos-import.js","55.1"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.7"],["m57-turnos-sesion-ux-fix.js","57.5"],
     ["m68-ventas-pos-definitivo.js","9.5.30"],["hotfix-regresiones-20260902.js","20261020.5"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.1"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1"],["hotfix-17-2-productos-save-20260903.js","17.2"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.4"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.6"],["hotfix-17-final-loader-20260903.js","17.final"],
     ["hotfix-pulido-20260903.js","20260903.1"],["hotfix-pulido-20260903b.js","20260903.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20260903.4"],
-    ["hotfix-secciones-visibles-20260903.js","20261026.1"],["section-scope-fix.js","20261016.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"]
+    ["hotfix-secciones-visibles-20260903.js","20261028.1"],["section-scope-fix.js","20261016.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"]
   ];
   let resolveUIReady;window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});window.__BC_UI_READY_RESOLVED__=false;
   function cargarUno(name,version){return new Promise(resolve=>{if(document.querySelector('script[src*="'+name+'"]')){resolve();return;}const s=document.createElement("script");s.src="js/"+name+(version?"?v="+version:"");s.async=false;let terminado=false;const terminar=(estado)=>{if(terminado)return;terminado=true;if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);resolve();};s.onload=()=>terminar("ok");s.onerror=()=>terminar("error");setTimeout(()=>terminar("timeout"),4000);document.body.appendChild(s);});}
