@@ -1,0 +1,60 @@
+name: BattleCruiser Step 4 Focused UI Tests — LaCueva
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/js/m29-turnos-organizacion.js'
+      - 'public/js/m33-turnos-final.js'
+      - 'public/js/m51-movimientos-centro.js'
+      - 'public/service-worker.js'
+      - 'public/app.js'
+      - 'test/m29-turnos-filter-functional.test.js'
+      - 'test/step4-m33-turn-archive-ui.test.js'
+      - 'test/step4-turno-movements-archive-ui.test.js'
+      - 'test/step4-daily-history-edge-cases.test.js'
+      - 'test/movimientos-history-search-functional.test.js'
+      - 'test/version-alignment.test.js'
+      - '.github/workflows/step4-lacueva-focused.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: battlecruiser-step4-lacueva-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  focused-ui:
+    name: Focused Step 4 archive, history and cache tests
+    runs-on: [bc-light]
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=1024
+    steps:
+      - name: Checkout exact pull-request HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          clean: true
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Install dependencies
+        shell: cmd
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Run Step 4 focused regression tests
+        shell: cmd
+        run: |
+          if not exist test-results mkdir test-results
+          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
+          set TEST_EXIT=%ERRORLEVEL%
+          type test-results\step4-lacueva-focused.log
+          exit /b %TEST_EXIT%
+      - name: Persist focused test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-step4-lacueva-focused-${{ github.run_id }}
+          path: test-results/step4-lacueva-focused.log
+          if-no-files-found: warn
+          retention-days: 30

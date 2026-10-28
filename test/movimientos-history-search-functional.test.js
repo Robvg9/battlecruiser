@@ -114,6 +114,18 @@ test("Paso 4 historial de Transferencias: la búsqueda por estado muestra solo l
   assert.equal(window.document.getElementById("trf-contador").textContent, "Mostrando 1 de 2");
 });
 
+test("Paso 4 historial de Transferencias: estado vacío y Ver todas recuperan la lista original", (t) => {
+  const { window } = setup(t);
+  inputAndRender(window, "trf-buscar", "no-existe-fixture");
+  assert.match(window.document.getElementById("lista-transferencias").textContent, /No encontramos transferencias con esos criterios/i);
+  const reset = window.document.querySelector("#lista-transferencias .mov-ver-todas-btn");
+  assert.ok(reset, "la búsqueda vacía debe ofrecer Ver todas las transferencias");
+  reset.click();
+  assert.equal(window.document.getElementById("trf-buscar").value, "");
+  assert.equal(cards(window, "lista-transferencias", ".trf-item").length, 2);
+  assert.equal(window.document.getElementById("trf-contador").textContent, "2 elementos");
+});
+
 test("Paso 4 historial de Vales: la búsqueda por producto limita resultados y Ver todos limpia el filtro", (t) => {
   const { window } = setup(t);
   inputAndRender(window, "vales-buscar", "harina");

@@ -27,7 +27,7 @@ async function waitFor(predicate, timeout = 1200) {
   return Boolean(predicate());
 }
 
-function setup(t) {
+function setup(t, fixtures = FIXTURES) {
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
     "<section id='tab-movimientos' class='tab-panel visible'>" +
@@ -59,7 +59,7 @@ function setup(t) {
     rpc: async (name, params) => {
       rpcCalls.push({ name, params: { ...params } });
       if (name !== "movimientos_producto") return { data: [], error: null };
-      const rows = FIXTURES.filter((row) =>
+      const rows = fixtures.filter((row) =>
         (!params.p_tipo || row.tipo === params.p_tipo) &&
         (!params.p_almacen_id || row.almacen_id === params.p_almacen_id) &&
         (!params.p_desde || row.fecha.slice(0, 10) >= params.p_desde) &&
@@ -143,4 +143,29 @@ test("Paso 4 movimientos: rango Desde/Hasta filtra días frontera y envía ambos
   assert.equal(latest.params.p_hasta, "2026-10-20");
   assert.match(visibleRows(window)[0], /Agua/);
   assert.doesNotMatch(window.document.getElementById("mov-detalle").textContent, /Azúcar|Harina/);
+});
+
+
+test("Paso 4: Historial agrupa movimientos por fecha y almacén", async (t) => {
+  const fixtures = [
+    { producto: "Compra La Cueva", usuario: "Dueño", tipo: "compra", almacen: "La Cueva", almacen_id: "alm-1", operacion_id: "op-cueva", fecha: "2026-10-20T14:00:00Z", cantidad: 2, costo_unitario: 2 },
+    { producto: "Venta Reserva", usuario: "Dueño", tipo: "venta", almacen: "Reserva", almacen_id: "alm-2", operacion_id: "op-reserva", fecha: "2026-10-20T15:00:00Z", cantidad: -1, costo_unitario: 3 },
+    { producto: "Compra día siguiente", usuario: "Dueño", tipo: "compra", almacen: "La Cueva", almacen_id: "alm-1", operacion_id: "op-cueva-next", fecha: "2026-10-21T14:00:00Z", cantidad: 1, costo_unitario: 2 }
+  ];
+  const { window } = setup(t, fixtures);
+  const historyButton = window.document.getElementById("mov-view-history");
+  assert.ok(historyButton, "Historial debe estar disponible");
+  historyButton.click();
+  const detail = window.document.getElementById("mov-detalle");
+  assert.ok(await waitFor(() => detail.querySelectorAll(".bc-m51-card").length === 3),
+    "Historial debe cargar todas las operaciones de las fechas de prueba");
+  const dayOne = detail.querySelector('.bc-m51-group-collapsible[data-day="2026-10-20"]');
+  const dayTwo = detail.querySelector('.bc-m51-group-collapsible[data-day="2026-10-21"]');
+  assert.ok(dayOne && dayTwo, "las fechas deben conservar grupos independientes");
+  assert.equal(dayOne.querySelectorAll(".bc-m51-warehouse-group").length, 2);
+  assert.match(dayOne.querySelector('[data-warehouse="alm-1"]').textContent, /Compra La Cueva/);
+  assert.doesNotMatch(dayOne.querySelector('[data-warehouse="alm-1"]').textContent, /Venta Reserva/);
+  assert.match(dayOne.querySelector('[data-warehouse="alm-2"]').textContent, /Venta Reserva/);
+  assert.equal(dayTwo.querySelectorAll(".bc-m51-warehouse-group").length, 1);
+  assert.match(dayTwo.textContent, /Compra día siguiente/);
 });

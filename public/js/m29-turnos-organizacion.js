@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.13';
+  var VERSION = '29.15';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -97,6 +97,7 @@
       '.m29-meta span{opacity:.65}',
       '.m29-empty{text-align:center;padding:40px 16px;opacity:.65}',
       '.m29-empty.error{opacity:1;color:#f87171}',
+      '.m29-archive-list{display:grid;gap:10px}.m29-archive-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:var(--card-bg,rgba(255,255,255,.04))}.m29-archive-card small{display:block;opacity:.65;margin-top:4px}.m29-archive-card button{min-height:40px;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit;font-weight:600}.m29-archive-note{font-size:.82rem;opacity:.7;margin:10px 0}',
       '.m29-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:0 0 14px}',
       '.m29-filter{display:block;font-size:.82rem;opacity:.85}',
       '.m29-filter span{display:block;margin-bottom:5px}',
@@ -262,11 +263,12 @@
       await loadTurnos();
       el.querySelectorAll('#m24-asig-panel,#m22-sesiones-panel,.m33-home,.tm-wrap').forEach(function (n) { n.remove(); });
       var btnHtml = state.isAdmin ? '<button type="button" class="m29-btn-crear" id="m29-btn-crear">+ Crear Turno</button>' : '';
+      var historyBtnHtml = '<button type="button" class="m29-btn-refresh" id="m29-btn-historial">Historial cerrado</button>';
       var refreshBtnHtml = '<button type="button" class="m29-btn-refresh" id="m29-btn-refrescar" aria-label="Actualizar lista de turnos">Refrescar</button>';
       var filterHtml = state.turnos.length ? filtersHtml() : '';
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Turnos</h2><p>' +
         (state.isAdmin ? 'Centro de turnos operativos' : 'Tus turnos y sesiones de trabajo') +
-        '</p></div><div class="m29-hero-actions">' + btnHtml + refreshBtnHtml + '</div></div>' + filterHtml + '<div id="m29-list">' + renderListBody() + '</div></div>';
+        '</p></div><div class="m29-hero-actions">' + btnHtml + historyBtnHtml + refreshBtnHtml + '</div></div>' + filterHtml + '<div id="m29-list">' + renderListBody() + '</div></div>';
       var estadoFilter = el.querySelector('#m29-filtro-estado');
       if (estadoFilter) {
         estadoFilter.value = state.filters.estado;
@@ -287,16 +289,99 @@
       if (btn) btn.addEventListener('click', openCrearModal);
       var refreshBtn = document.getElementById('m29-btn-refrescar');
       if (refreshBtn) refreshBtn.addEventListener('click', function () { renderHome(); });
+      var historyBtn = document.getElementById('m29-btn-historial');
+      if (historyBtn) historyBtn.addEventListener('click', function () { openClosedHistory(); });
       bindCardClicks(el);
     } finally {
       window.__BC_M29_RENDERING = false;
     }
   }
 
-  function openDetalle(id, isLegacy) {
-    window.__BC_M29_VIEW = 'detalle';
+  async function openClosedHistory() {
+    var el = root();
+    var api = API();
+    if (!el) return;
+    window.__BC_M29_VIEW = 'closed-history';
+    if (offlineNow()) {
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty">El historial cerrado requiere conexión al servidor.</div></div>';
+      var offlineBack = el.querySelector('#m29-btn-history-back');
+      if (offlineBack) offlineBack.addEventListener('click', function () { renderHome(); });
+      return;
+    }
+    if (!api || typeof api.listarTurnosMaestros !== 'function') {
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">API de turnos no disponible.</div></div>';
+      var unavailableBack = el.querySelector('#m29-btn-history-back');
+      if (unavailableBack) unavailableBack.addEventListener('click', function () { renderHome(); });
+      return;
+    }
+    el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Los turnos cerrados conservan su expediente. Esta vista no crea ni modifica registros.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty">Consultando el historial…</div></div>';
+    try {
+      var all = [];
+      var seen = Object.create(null);
+      var truncated = false;
+      var offset = 0;
+      var pages = 0;
+      // Use the authorized master-turn endpoint; the legacy listing mixes session rows.
+      // Master rows include the immutable multi-day/date fields needed to reopen the record.
+      while (pages < 50) {
+        var batch = asArray(await api.listarTurnosMaestros({ limit: 100, offset: offset }));
+        batch.forEach(function (turn) {
+          var id = String(turn && (turn.id || turn.turno_id) || '');
+          var stateName = String(turn && (turn.estado_maestro || turn.estado || turn.status) || '').toUpperCase();
+          if (id && !seen[id] && (stateName === 'CERRADO' || stateName === 'VALIDADO')) {
+            seen[id] = true;
+            all.push(turn);
+          }
+        });
+        if (batch.length < 100) break;
+        offset += batch.length;
+        pages += 1;
+        if (pages >= 50) truncated = true;
+      }
+      all.sort(function (a, b) {
+        var dateA = String(a.cierre_real || a.fecha_fin || a.fin_plan || a.fecha || '');
+        var dateB = String(b.cierre_real || b.fecha_fin || b.fin_plan || b.fecha || '');
+        return dateB.localeCompare(dateA);
+      });
+      var cards = all.map(function (turn) {
+        var id = String(turn.id || turn.turno_id);
+        var warehouseId = String(turn.almacen_id || '');
+        var warehouse = warehouses().find(function (candidate) { return String(candidate.id) === warehouseId; });
+        var warehouseName = turn.almacen_nombre || turn.almacen || (warehouse && warehouse.nombre) || warehouseId || 'Almacén';
+        var start = turn.fecha_inicio || turn.inicio_plan || turn.fecha || turn.apertura_real;
+        var end = turn.fecha_fin || turn.fin_plan || turn.cierre_real || turn.fecha;
+        var stateName = String(turn.estado_maestro || turn.estado || turn.status || '').toUpperCase();
+        return '<article class="m29-archive-card"><div><b>' + esc(warehouseName) + '</b><small>' +
+          esc(fmtDate(start)) + ' → ' + esc(fmtDate(end)) + ' · ' + esc(labelEstado(stateName)) +
+          '</small></div><button type="button" data-m29-closed-open="' + esc(id) + '">Abrir expediente</button></article>';
+      }).join('');
+      var empty = '<div class="m29-empty">No hay turnos cerrados visibles para este usuario.</div>';
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura; los movimientos permanecen vinculados al turno original.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div>' +
+        (all.length ? '<div class="m29-archive-list">' + cards + '</div>' : empty) +
+        (truncated ? '<p class="m29-archive-note" role="status">Se alcanzó el límite de lectura segura; contacta al administrador para consultar el resto.</p>' : '') + '</div>';
+      el.querySelectorAll('[data-m29-closed-open]').forEach(function (button) {
+        button.addEventListener('click', function () { openDetalle(button.dataset.m29ClosedOpen, false, true); });
+      });
+    } catch (error) {
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">No se pudo cargar el historial: ' +
+        esc(error && error.message ? error.message : error) + '</div></div>';
+    }
+    var back = el.querySelector('#m29-btn-history-back');
+    if (back) back.addEventListener('click', function () { renderHome(); });
+  }
+
+  function openDetalle(id, isLegacy, readOnly) {
     var el = root();
     if (el) el.removeAttribute(HOME_MARK);
+    if (readOnly) {
+      window.__BC_M29_VIEW = 'closed-history';
+      // Never fall back to a potentially editable legacy detail from archive history.
+      if (window.__BC_M33 && typeof window.__BC_M33.open === 'function') {
+        window.__BC_M33.open(id, { readOnly: true });
+      }
+      return;
+    }
+    window.__BC_M29_VIEW = 'detalle';
     if (window.__BC_M33 && window.__BC_M33.open) {
       try { window.__BC_M33.open(id); return; } catch (e) {}
     }

@@ -15,6 +15,8 @@ const ANDROID_HEADER_SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-andr
 const CORE_PATHS = ["/", "/index.html", "/app.js", "/style.css"];
 const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js";
 const TIMEOUT_MS = 45000;
+const CDP_COMMAND_TIMEOUT_MS = 15000;
+const CDP_RUNTIME_EVALUATE_TIMEOUT_MS = 45000;
 
 const report = {
   test: "BattleCruiser LIVE offline recovery — real Chromium CDP",
@@ -113,16 +115,28 @@ async function localJson(url) {
   if (!response.ok) throw new Error("DevTools HTTP " + response.status + " al leer " + url);
   return response.json();
 }
-function cdpCommand(method, params) {
+function cdpCommand(method, params, timeoutOverrideMs) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error("DevTools WebSocket no está abierto."));
   const id = ++cdpId;
   const message = { id, method, params: params || {} };
+  const timeoutMs = Number.isFinite(timeoutOverrideMs)
+    ? Math.max(1, timeoutOverrideMs)
+    : (method === "Runtime.evaluate" ? CDP_RUNTIME_EVALUATE_TIMEOUT_MS : CDP_COMMAND_TIMEOUT_MS);
   return new Promise((resolve, reject) => {
+    const sentAt = Date.now();
     const timer = setTimeout(() => {
+      const phase = report.evidence.phase || "unknown";
+      const outstanding = Array.from(pendingCommands.entries()).map(([commandId, item]) => ({
+        id: commandId,
+        method: item.method,
+        ageMs: Date.now() - item.sentAt,
+      }));
+      report.evidence.cdpTimeouts = report.evidence.cdpTimeouts || [];
+      report.evidence.cdpTimeouts.push({ id, method, phase, timeoutMs, outstanding });
       pendingCommands.delete(id);
-      reject(new Error("Timeout CDP en " + method));
-    }, 15000);
-    pendingCommands.set(id, { resolve, reject, timer, method });
+      reject(new Error("Timeout CDP en " + method + " después de " + timeoutMs + " ms (fase: " + phase + ")"));
+    }, timeoutMs);
+    pendingCommands.set(id, { resolve, reject, timer, method, sentAt });
     socket.send(JSON.stringify(message));
   });
 }
@@ -143,13 +157,13 @@ function waitForEvent(method, timeoutMs) {
     eventListeners.get(method).add(listener);
   });
 }
-async function evaluate(expression) {
+async function evaluate(expression, timeoutOverrideMs) {
   const result = await cdpCommand("Runtime.evaluate", {
     expression,
     awaitPromise: true,
     returnByValue: true,
     userGesture: true,
-  });
+  }, timeoutOverrideMs);
   if (result.exceptionDetails) {
     const exception = result.exceptionDetails.exception && result.exceptionDetails.exception.description;
     throw new Error("Error JS en evaluación CDP: " + (exception || result.exceptionDetails.text || "desconocido"));
@@ -161,7 +175,7 @@ async function waitUntil(description, predicate, timeoutMs) {
   let lastValue;
   while (Date.now() < deadline) {
     try {
-      lastValue = await evaluate("(async()=>(" + predicate + "))()");
+      lastValue = await evaluate("(async()=>(" + predicate + "))()", Math.min(CDP_COMMAND_TIMEOUT_MS, Math.max(1, deadline - Date.now())));
       if (lastValue) return lastValue;
     } catch (_) {}
     await delay(250);
@@ -505,8 +519,8 @@ async function main() {
   report.evidence.step4PreferencesAfterChange = { before: preferenceChange.before, stored: preferenceChange.stored, states: preferenceChange.after };
 
   await reloadAndWait(false);
-  const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const states=items.map(item=>{const e=document.getElementById(item.id);return {id:item.id,key:item.key,exists:!!e,checked:e?e.checked:null,stored:stored[item.key],matches:!!e&&stored[item.key]===e.checked,ariaChecked:e&&e.getAttribute('aria-checked'),ariaMatches:!!e&&e.getAttribute('aria-checked')===String(e.checked),nameStateMatches:!!e&&(e.getAttribute('aria-label')||'').includes(e.checked?'estado activado':'estado desactivado')};});return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted:states.every(x=>x.exists&&x.matches&&x.ariaMatches&&x.nameStateMatches)};})()");
-  assert(preferenceReload.ready && preferenceReload.allPersisted,
+  const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};const originalClass=tab.getAttribute('class');const originalStyle=tab.getAttribute('style');tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const states=items.map(item=>{const e=document.getElementById(item.id);return {id:item.id,key:item.key,exists:!!e,checked:e?e.checked:null,stored:stored[item.key],matches:!!e&&stored[item.key]===e.checked,ariaChecked:e&&e.getAttribute('aria-checked'),ariaMatches:!!e&&e.getAttribute('aria-checked')===String(e.checked),nameStateMatches:!!e&&(e.getAttribute('aria-label')||'').includes(e.checked?'estado activado':'estado desactivado')};});const allPersisted=states.every(x=>x.exists&&x.matches&&x.ariaMatches&&x.nameStateMatches);if(originalClass===null)tab.removeAttribute('class');else tab.setAttribute('class',originalClass);if(originalStyle===null)tab.removeAttribute('style');else tab.setAttribute('style',originalStyle);const originalStyleCssText=(()=>{const probe=document.createElement('div');if(originalStyle!==null)probe.setAttribute('style',originalStyle);return probe.style.cssText;})();const restoration={originalClass,restoredClass:tab.getAttribute('class'),originalStyle,restoredStyle:tab.getAttribute('style'),originalStyleCssText,restoredStyleCssText:tab.style.cssText};const restored=restoration.restoredClass===restoration.originalClass&&restoration.restoredStyleCssText===restoration.originalStyleCssText;return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted,probeStateRestored:restored,probeRestoration:restoration};})()");
+  assert(preferenceReload.ready && preferenceReload.allPersisted && preferenceReload.probeStateRestored,
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
   report.evidence.step4PreferencesAfterReload = preferenceReload;
 
@@ -654,7 +668,7 @@ async function main() {
 
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
-  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
+  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const before=tab.getBoundingClientRect();window.scrollTo(0,Math.max(0,Math.round(before.top+window.scrollY-8)));const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
   report.evidence.androidConfigScrollInitial = mobileConfigScrollInitial;
   assert(mobileConfigScrollInitial && mobileConfigScrollInitial.found &&
          mobileConfigScrollInitial.regionClass &&

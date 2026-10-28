@@ -270,7 +270,7 @@ function applySql(file) {
     applySql("test/force-close-turno-admin-contract.sql");
     log("\r\n=== 5/6 Verify read-only daily movement archive, session boundaries and ACL ===");
     applySql("test/bc7-turno-movimientos-sesion-fixture.sql");
-    applySql("supabase/migrations/20261027153000_bc7_turno_movimientos_sesion.sql");
+    applySql("supabase/migrations/20261027184823_bc7_turno_movimientos_sesion_20261027.sql");
     applySql("test/bc7-turno-movimientos-sesion-contract.sql");
     log("\r\n=== 6/6 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");

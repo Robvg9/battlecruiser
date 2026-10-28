@@ -127,7 +127,7 @@
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head::-webkit-details-marker{display:none}',
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-group-head:after{content:"＋";float:right;color:var(--gold)}',
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible[open]>.bc-m51-group-head:after{content:"−"}',
-      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible>.bc-m51-card{margin:8px;border-radius:8px}',
+      '#tab-movimientos.bc-m51 .bc-m51-group-collapsible .bc-m51-card{margin:8px;border-radius:8px}',
       '@media(max-width:640px){#tab-movimientos.bc-m51 .bc-m51-view-switch{align-items:stretch;flex-direction:column}#tab-movimientos.bc-m51 .bc-m51-view-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#tab-movimientos.bc-m51 .bc-m51-view-btn{width:100%;box-sizing:border-box}}',
       '#tab-movimientos.bc-m51 .bc-m51-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}',
       '#tab-movimientos.bc-m51 .bc-m51-metric{min-width:0;padding:11px 12px;background:linear-gradient(180deg,rgba(26,56,48,.55),rgba(18,42,36,.88));border:1px solid rgba(212,176,92,.12);border-radius:10px}',
@@ -148,6 +148,8 @@
       '#tab-movimientos.bc-m51.bc-m51-detail-open .bc-m51-layout{grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:12px}',
       '#tab-movimientos.bc-m51 .bc-m51-list{min-width:0}',
       '#tab-movimientos.bc-m51 .bc-m51-group{margin-bottom:16px}',
+      '#tab-movimientos.bc-m51 .bc-m51-warehouse-group{margin:8px 0 12px;padding:8px;border:1px solid rgba(212,176,92,.12);border-radius:8px}',
+      '#tab-movimientos.bc-m51 .bc-m51-warehouse-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid rgba(212,176,92,.08);font-size:.72rem;color:var(--mist)}',
       '#tab-movimientos.bc-m51 .bc-m51-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(212,176,92,.1)}',
       "#tab-movimientos.bc-m51 .bc-m51-group-title{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--gold-bright);letter-spacing:.04em}",
       "#tab-movimientos.bc-m51 .bc-m51-group-count{font-size:.7rem;color:var(--mist);font-family:'IBM Plex Mono',monospace}",
@@ -487,17 +489,34 @@
         html += '<div class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
           '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
       }
+      const warehouseMap = Object.create(null);
+      const warehouseGroups = [];
       g.items.forEach(function (entry) {
-        const m = entry.m; const meta = metaTipo(m.tipo); const cant = absCant(m.cantidad);
-        const sel = _selected && _selected.operacion_id === m.operacion_id && _selected.tipo === m.tipo &&
-          String(_selected.fecha) === String(m.fecha) && _selected.producto === m.producto;
-        html += '<article class="bc-m51-card' + (sel ? ' is-selected' : '') + '" data-idx="' + entry.globalIdx +
-          '" role="button" tabindex="0"><div><h4 class="bc-m51-card-title">' + esc(m.producto || '—') +
-          '</h4><div class="bc-m51-card-tipo"><span class="bc-m51-badge bc-m51-badge-' + esc(meta.badge) + '">' + esc(meta.short) +
-          '</span></div><div class="bc-m51-card-meta">' + esc(m.almacen || '—') + ' · ' + fechaHoraFmt(m.fecha) +
-          '</div></div><div class="bc-m51-card-side"><div class="bc-m51-card-qty">' + cant +
-          ' u</div><div class="bc-m51-card-user">' + esc(m.usuario || '—') +
-          ' <span class="bc-m51-card-chev">›</span></div></div></article>';
+        const movement = entry.m;
+        const warehouseKey = String(movement.almacen_id || movement.almacen || 'sin-almacen');
+        if (!warehouseMap[warehouseKey]) {
+          warehouseMap[warehouseKey] = { key: warehouseKey, name: movement.almacen || 'Almacén sin identificar', items: [] };
+          warehouseGroups.push(warehouseMap[warehouseKey]);
+        }
+        warehouseMap[warehouseKey].items.push(entry);
+      });
+      warehouseGroups.forEach(function (warehouse) {
+        html += '<section class="bc-m51-warehouse-group" data-warehouse="' + esc(warehouse.key) + '">' +
+          '<div class="bc-m51-warehouse-head"><span>' + esc(warehouse.name) + '</span><span>' +
+          warehouse.items.length + ' movimiento' + (warehouse.items.length === 1 ? '' : 's') + '</span></div>';
+        warehouse.items.forEach(function (entry) {
+          const m = entry.m; const meta = metaTipo(m.tipo); const cant = absCant(m.cantidad);
+          const sel = _selected && _selected.operacion_id === m.operacion_id && _selected.tipo === m.tipo &&
+            String(_selected.fecha) === String(m.fecha) && _selected.producto === m.producto;
+          html += '<article class="bc-m51-card' + (sel ? ' is-selected' : '') + '" data-idx="' + entry.globalIdx +
+            '" role="button" tabindex="0"><div><h4 class="bc-m51-card-title">' + esc(m.producto || '—') +
+            '</h4><div class="bc-m51-card-tipo"><span class="bc-m51-badge bc-m51-badge-' + esc(meta.badge) + '">' + esc(meta.short) +
+            '</span></div><div class="bc-m51-card-meta">' + esc(m.almacen || '—') + ' · ' + fechaHoraFmt(m.fecha) +
+            '</div></div><div class="bc-m51-card-side"><div class="bc-m51-card-qty">' + cant +
+            ' u</div><div class="bc-m51-card-user">' + esc(m.usuario || '—') +
+            ' <span class="bc-m51-card-chev">›</span></div></div></article>';
+        });
+        html += '</section>';
       });
       html += _viewMode === 'history' ? '</details>' : '</div>';
     });
