@@ -360,7 +360,7 @@
         (all.length ? '<div class="m29-archive-list">' + cards + '</div>' : empty) +
         (truncated ? '<p class="m29-archive-note" role="status">Se alcanzó el límite de lectura segura; contacta al administrador para consultar el resto.</p>' : '') + '</div>';
       el.querySelectorAll('[data-m29-closed-open]').forEach(function (button) {
-        button.addEventListener('click', function () { openDetalle(button.dataset.m29ClosedOpen, false); });
+        button.addEventListener('click', function () { openDetalle(button.dataset.m29ClosedOpen, false, true); });
       });
     } catch (error) {
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">No se pudo cargar el historial: ' +
@@ -370,10 +370,18 @@
     if (back) back.addEventListener('click', function () { renderHome(); });
   }
 
-  function openDetalle(id, isLegacy) {
-    window.__BC_M29_VIEW = 'detalle';
+  function openDetalle(id, isLegacy, readOnly) {
     var el = root();
     if (el) el.removeAttribute(HOME_MARK);
+    if (readOnly) {
+      window.__BC_M29_VIEW = 'closed-history';
+      // Never fall back to a potentially editable legacy detail from archive history.
+      if (window.__BC_M33 && typeof window.__BC_M33.open === 'function') {
+        window.__BC_M33.open(id, { readOnly: true });
+      }
+      return;
+    }
+    window.__BC_M29_VIEW = 'detalle';
     if (window.__BC_M33 && window.__BC_M33.open) {
       try { window.__BC_M33.open(id); return; } catch (e) {}
     }
