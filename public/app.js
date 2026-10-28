@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.29 — Corrige cliente Supabase en calendario de Jornada
+// v9.5.29 — Movimientos diarios e historial por sesión/turno
 (function hotfixV9475(){
   const VERSION="9.5.29";
   window.__BC_VERSION__=VERSION;
