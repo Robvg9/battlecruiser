@@ -25,9 +25,16 @@ function setup(t) {
   );
   const { window } = dom;
   Object.defineProperty(window.document, "readyState", { configurable: true, value: "complete" });
+  const pendingTimers = [];
   window.setTimeout = (callback, delay) => {
     if (delay === 0) callback();
-    return 1;
+    else pendingTimers.push({ callback, delay });
+    return pendingTimers.length;
+  };
+  window.__BC165_runPendingTimers = () => {
+    const timers = pendingTimers.splice(0);
+    timers.forEach((timer) => timer.callback());
+    return timers.map((timer) => timer.delay);
   };
   window.clearTimeout = () => {};
   window.eval(SOURCE);
@@ -77,4 +84,43 @@ test("Paso 4: el cargador de la PWA incluye el módulo de operaciones flotantes 
   assert.notEqual(modalModule, -1, "app.js debe cargar el módulo que genera los dos botones");
   assert.notEqual(purchaseRepair, -1, "app.js debe cargar el reparador de controles de compra");
   assert.ok(modalModule < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
+});
+
+
+test("Paso 4 regresión: reintentos de inicialización no vacían un modal de transferencia abierto", (t) => {
+  const { window } = setup(t);
+  const trigger = window.document.querySelector('[data-bc165="transferencias"]');
+  trigger.click();
+  let modal = window.document.getElementById("bc165-overlay");
+  assert.ok(modal.querySelector("#transfer-test"), "el formulario de transferencia debe estar en el modal antes del reintento");
+
+  const delays = window.__BC165_runPendingTimers();
+  assert.ok(delays.includes(300), "la prueba debe reproducir el segundo intento de inicialización");
+  modal = window.document.getElementById("bc165-overlay");
+  assert.ok(modal, "el modal debe permanecer abierto");
+  assert.ok(modal.querySelector("#transfer-test"), "la inicialización repetida no debe ocultar ni sacar el formulario");
+  assert.equal(modal.querySelector("#tab-transferencias").classList.contains("bc165-placeholder"), false,
+    "un panel dentro del modal activo nunca debe volver al estado placeholder");
+
+  modal.querySelector(".bc165-close").click();
+  assert.equal(window.document.getElementById("tab-transferencias").parentElement.id, "panel-root",
+    "el panel debe volver a su padre original al cerrar");
+});
+
+test("Paso 4 regresión: reintentos de inicialización no vacían un modal de compra abierto", (t) => {
+  const { window } = setup(t);
+  window.document.querySelector('[data-bc165="compras"]').click();
+  let modal = window.document.getElementById("bc165-overlay");
+  assert.ok(modal.querySelector("#compra-test"), "el formulario de compra debe estar en el modal antes del reintento");
+
+  window.__BC165_runPendingTimers();
+  modal = window.document.getElementById("bc165-overlay");
+  assert.ok(modal, "el modal debe permanecer abierto");
+  assert.ok(modal.querySelector("#compra-test"), "la inicialización repetida no debe ocultar ni sacar el formulario");
+  assert.equal(modal.querySelector("#tab-compras").classList.contains("bc165-placeholder"), false,
+    "el panel de compra activo nunca debe volver al estado placeholder");
+
+  modal.querySelector(".bc165-close").click();
+  assert.equal(window.document.getElementById("tab-compras").parentElement.id, "panel-root",
+    "el panel debe volver a su padre original al cerrar");
 });
