@@ -495,3 +495,498 @@ test("Paso 4 UI: mensaje sin conversación seleccionada se bloquea sin enviar RP
   assert.equal(nuevasEscrituras(c, base).some((call) => call.name === "enviar_mensaje"), false,
     "no se envía mensaje si no hay conversación activa");
 });
+
+
+// RWHT-FIXTURE-BATCH-20261028
+// Additional isolated UI tests. All writes below terminate in in-memory mocks;
+// no test calls a production Supabase endpoint or changes live business data.
+
+function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result = { ok: true, data: "transfer-fixture" } } = {}) {
+  const dom = new JSDOM(
+    "<!doctype html><html><body>" +
+      "<form id='form-transferencia'>" +
+        "<select id='trf-origen'><option value='a-fixture'>Almacén A fixture</option></select>" +
+        "<select id='trf-destino'><option value='b-fixture'>Almacén B fixture</option></select>" +
+        "<select id='trf-producto'><option value='p-fixture'>Producto fixture</option></select>" +
+        "<input id='trf-cantidad' value='2'>" +
+        "<button type='submit'>Transferir</button>" +
+      "</form>" +
+      "<p id='trf-stock-disponible'></p><p id='msg-transferencias'></p>" +
+      "<div id='lista-transferencias'></div><span id='trf-contador'></span>" +
+    "</body></html>",
+    { url: "https://battlecruiser-transfer-fixture.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  const calls = [];
+  let confirmations = 0;
+  window.safeInit = (_selector, callback) => callback();
+  window.tienePermiso = (section, action) => section === "transferencias" && action === "crear";
+  window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.setLoading = () => {};
+  window.setEmpty = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.actualizarContador = () => {};
+  window.escHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  window.fechaCorta = (value) => String(value ?? "");
+  window.idCorto = (value) => String(value ?? "").slice(0, 8);
+  window.money = (value) => String(value ?? 0);
+  window.refrescarTransferencias = async () => {};
+  window.refrescarStockYSelects = async () => {};
+  window.refrescarOperacionesPendientesCache = async () => [];
+  // Post-submit UI refresh dependency; the test checks result payload/state, not summary rendering.
+  window.renderResumen = () => {};
+  window._cache = {
+    transferencias: [],
+    stock: [{ producto_id: "p-fixture", almacen_id: "a-fixture", cantidad: stock }]
+  };
+  // refrescarTransferencias performs a read after success; keep that path in-memory too.
+  window.client = {
+    from() {
+      const query = {
+        select() { return query; },
+        order() { return query; },
+        limit() { return Promise.resolve({ data: [], error: null }); }
+      };
+      return query;
+    }
+  };
+  window.confirm = () => { confirmations += 1; return confirm; };
+  window.ejecutarOperacion = async (type, payload) => {
+    calls.push({ type, payload });
+    return result;
+  };
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "transferencias.js"), "utf8");
+  window.eval(source);
+  return { dom, window, calls, get confirmations() { return confirmations; } };
+}
+
+test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad y solo un submit", async (t) => {
+  const c = crearContextoTransferenciaFixture();
+  t.after(() => c.dom.window.close());
+  const form = c.window.document.getElementById("form-transferencia");
+  const submit = form.querySelector("button[type='submit']");
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+
+  assert.ok(await esperarHasta(() => c.calls.length === 1), "un único submit debe llegar al ejecutor simulado");
+  assert.ok(await esperarHasta(() => /Transferencia registrada/i.test(c.window.document.getElementById("msg-transferencias").textContent)),
+    "la respuesta correcta debe quedar reflejada en la interfaz");
+  // Values originate inside the JSDOM realm; normalize to plain Node objects
+  // before structural comparison to avoid cross-realm prototype false negatives.
+  assert.deepEqual(JSON.parse(JSON.stringify(c.calls[0])), {
+    type: "transferencia",
+    payload: {
+      p_origen_id: "a-fixture",
+      p_destino_id: "b-fixture",
+      p_lineas: [{ producto_id: "p-fixture", cantidad: 2 }]
+    }
+  });
+  assert.equal(c.confirmations, 1, "la segunda pulsación no debe abrir otra confirmación");
+  assert.equal(submit.disabled, false, "el botón debe habilitarse al finalizar");
+  assert.equal(submit.textContent, "Transferir", "el texto original se debe restaurar");
+});
+
+test("Paso 4 RWHT: cantidad cero/negativa o superior al stock se bloquea sin confirmar ni ejecutar", async (t) => {
+  for (const caso of [
+    { cantidad: "0", stock: 8, esperado: /cantidad debe ser mayor a 0/i },
+    { cantidad: "-1", stock: 8, esperado: /cantidad debe ser mayor a 0/i },
+    { cantidad: "9", stock: 8, esperado: /stock insuficiente/i }
+  ]) {
+    const c = crearContextoTransferenciaFixture({ stock: caso.stock });
+    t.after(() => c.dom.window.close());
+    c.window.document.getElementById("trf-cantidad").value = caso.cantidad;
+    c.window.document.getElementById("form-transferencia").dispatchEvent(
+      new c.window.Event("submit", { bubbles: true, cancelable: true })
+    );
+    assert.ok(caso.esperado.test(c.window.document.getElementById("msg-transferencias").textContent),
+      "debe mostrar el rechazo correcto para cantidad=" + caso.cantidad);
+    assert.equal(c.calls.length, 0, "el dato inválido no debe llegar al ejecutor");
+    assert.equal(c.confirmations, 0, "el dato inválido no debe pedir confirmación");
+  }
+});
+
+function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
+  const dom = new JSDOM(
+    "<!doctype html><html><body>" +
+      "<section class='presentaciones-panel'>" +
+        "<form id='form-presentacion-nueva'><input id='pres-nombre-nueva'><button type='submit'>Crear presentación</button></form>" +
+        "<p id='msg-presentaciones'></p><div id='lista-presentaciones-catalogo'></div>" +
+        "<select id='pp-producto-select'><option value=''>Elegí producto</option><option value='p-fixture'>Producto fixture</option></select>" +
+        "<form id='form-pp-nueva' class='hidden'><select id='pp-presentacion-select'><option value=''>Elegí presentación</option></select>" +
+        "<input id='pp-factor' type='number'><button type='submit'>Agregar presentación al producto</button></form>" +
+        "<div id='pp-lista-asociaciones'></div>" +
+      "</section></body></html>",
+    { url: "https://battlecruiser-presentaciones-fixture.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  const database = {
+    presentaciones: presentaciones.map((p) => ({ ...p })),
+    producto_presentaciones: []
+  };
+  const inserts = [];
+  let sequence = 0;
+  window.safeInit = (_selector, callback) => callback();
+  window.tienePermiso = () => true;
+  window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.setLoading = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.setEmpty = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.mensajeListaVacia = (_key, message) => message;
+  window.escHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  window.fillSelect = (select, rows, valueKey, labelFn) => {
+    select.innerHTML = "";
+    const placeholder = window.document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Elegí…";
+    select.appendChild(placeholder);
+    (rows || []).forEach((row) => {
+      const option = window.document.createElement("option");
+      option.value = row[valueKey];
+      option.textContent = labelFn(row);
+      select.appendChild(option);
+    });
+  };
+  window.withCache = async (_key, callback) => {
+    const result = await callback();
+    return result?.data ?? [];
+  };
+  window.client = {
+    rpc: async () => ({ data: true, error: null }),
+    from(table) {
+      const query = {
+        select() { return query; },
+        order() { return query; },
+        eq() { return query; },
+        insert(payload) {
+          inserts.push({ table, payload: { ...payload } });
+          sequence += 1;
+          const row = { id: "presentation-write-fixture-" + sequence, ...payload, activo: true };
+          if (table === "presentaciones") database.presentaciones.push(row);
+          if (table === "producto_presentaciones") {
+            row.presentaciones = database.presentaciones.find((p) => p.id === payload.presentacion_id) || { nombre: "Presentación fixture" };
+            database.producto_presentaciones.push(row);
+          }
+          return Promise.resolve({ data: row, error: null });
+        },
+        then(resolve, reject) {
+          let rows = database[table] || [];
+          if (table === "producto_presentaciones") rows = rows.map((row) => ({
+            ...row,
+            presentaciones: row.presentaciones || database.presentaciones.find((p) => p.id === row.presentacion_id) || { nombre: "Presentación fixture" }
+          }));
+          return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+        }
+      };
+      return query;
+    }
+  };
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "presentaciones.js"), "utf8");
+  window.eval(source);
+  return { dom, window, database, inserts };
+}
+
+test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock", async (t) => {
+  const c = crearContextoPresentacionesFixture();
+  t.after(() => c.dom.window.close());
+  await c.window.inicializarPresentaciones();
+  const form = c.window.document.getElementById("form-presentacion-nueva");
+  const input = c.window.document.getElementById("pres-nombre-nueva");
+
+  input.value = "   ";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.equal(c.inserts.length, 0, "un nombre vacío no debe escribir");
+
+  input.value = "Caja fixture";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "presentaciones")),
+    "el formulario válido debe insertar en el cliente fixture");
+  assert.ok(await esperarHasta(() => /Presentación creada/i.test(
+    c.window.document.getElementById("msg-presentaciones").textContent
+  )), "la UI debe completar el éxito antes de comprobar el reset");
+  assert.deepEqual(c.inserts.find((x) => x.table === "presentaciones").payload, { nombre: "Caja fixture" });
+  assert.equal(input.value, "", "el formulario se limpia tras el éxito simulado");
+});
+
+test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor válido y envía payload al mock", async (t) => {
+  const c = crearContextoPresentacionesFixture({
+    presentaciones: [{ id: "pres-fixture", nombre: "Caja fixture", activo: true }]
+  });
+  t.after(() => c.dom.window.close());
+  await c.window.inicializarPresentaciones();
+  const form = c.window.document.getElementById("form-pp-nueva");
+  const product = c.window.document.getElementById("pp-producto-select");
+  const presentation = c.window.document.getElementById("pp-presentacion-select");
+  const factor = c.window.document.getElementById("pp-factor");
+  product.value = "p-fixture";
+  product.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => Array.from(presentation.options).some((o) => o.value === "pres-fixture")),
+    "la presentación fixture debe cargarse al elegir producto");
+  presentation.value = "pres-fixture";
+
+  factor.value = "0";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.equal(c.inserts.some((x) => x.table === "producto_presentaciones"), false,
+    "el factor cero debe bloquearse antes de escribir");
+
+  factor.value = "12";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "producto_presentaciones")),
+    "la asociación válida debe llegar al cliente fixture");
+  assert.ok(await esperarHasta(() => /Presentación agregada/i.test(
+    c.window.document.getElementById("msg-presentaciones").textContent
+  )), "la UI debe completar la asociación antes de comprobar el mensaje");
+  assert.deepEqual(c.inserts.find((x) => x.table === "producto_presentaciones").payload,
+    { producto_id: "p-fixture", presentacion_id: "pres-fixture", factor: 12 });
+});
+
+
+// RWHT-WAREHOUSE-MODAL-20261028
+async function cargarModalAlmacenFixture(context) {
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "public", "js", "m27-7-almacenes-modal.js"),
+    "utf8"
+  );
+  Object.defineProperty(context.document, "readyState", { value: "complete", configurable: true });
+  context.window.eval(source);
+  assert.equal(typeof context.window.__BC_M277_openCreateAlmacen, "function",
+    "el módulo real del modal de almacenes debe exponer el abridor en JSDOM");
+  assert.equal(typeof context.window.__BC_M277_openEditAlmacen, "function",
+    "el módulo real del modal de almacenes debe exponer el editor en JSDOM");
+}
+
+test("Paso 4 RWHT: modal de almacén rechaza nombre vacío y Cancelar no crea nada", async (t) => {
+  const c = await contextoListo();
+  await cargarModalAlmacenFixture(c);
+  assert.equal(typeof c.window.__BC_M277_openCreateAlmacen, "function",
+    "el runtime debe exponer el abridor del modal de alta");
+  c.window.__BC_M277_openCreateAlmacen();
+  const root = c.document.getElementById("bc-alm-modal");
+  const nombre = c.document.getElementById("bc-alm-modal-nombre");
+  const save = c.document.getElementById("bc-alm-modal-guardar");
+  assert.ok(root && root.classList.contains("open"), "el diálogo de alta debe abrirse");
+  assert.equal(c.document.getElementById("bc-alm-modal-title").textContent, "Nuevo almacén");
+  const base = c.client.__writeCalls.length;
+
+  nombre.value = "   ";
+  save.click();
+  assert.ok(await esperarHasta(() => /completá el nombre del almacén/i.test(
+    c.document.getElementById("bc-alm-modal-status").textContent
+  )), "el modal debe mostrar validación clara para nombre vacío");
+  assert.equal(nuevasEscrituras(c, base).length, 0, "un alta inválida no puede ejecutar RPC");
+
+  root.querySelector(".bc-alm-actions [data-bc-alm-close='1']").click();
+  assert.equal(root.classList.contains("open"), false, "Cancelar debe cerrar el modal");
+  assert.equal(nuevasEscrituras(c, base).length, 0, "Cancelar no puede crear almacén ni encolar operación");
+});
+
+test("Paso 4 RWHT: modal de almacén edita el ID fixture y envía cambios al RPC simulado", async (t) => {
+  const c = await contextoListo();
+  await cargarModalAlmacenFixture(c);
+  c.window._cache.almacenes = [
+    { id: "alm-edit-fixture", nombre: "Almacén original fixture", tipo: "almacenamiento", activo: true }
+  ];
+  assert.equal(typeof c.window.__BC_M277_openEditAlmacen, "function",
+    "el runtime debe exponer el abridor del modal de edición");
+  c.window.__BC_M277_openEditAlmacen("alm-edit-fixture");
+  const root = c.document.getElementById("bc-alm-modal");
+  const nombre = c.document.getElementById("bc-alm-modal-nombre");
+  const tipo = root.querySelector(".bc-alm-tipo[data-tipo='mayorista']");
+  assert.ok(root.classList.contains("open"), "la edición debe abrirse");
+  assert.equal(c.document.getElementById("bc-alm-modal-id").value, "alm-edit-fixture",
+    "el ID oculto debe conservar el registro que se está editando");
+  assert.equal(nombre.value, "Almacén original fixture");
+  nombre.value = "Almacén editado fixture";
+  tipo.click();
+
+  const base = c.client.__writeCalls.length;
+  c.document.getElementById("bc-alm-modal-guardar").click();
+  assert.ok(await esperarHasta(() => nuevasEscrituras(c, base).length > 0),
+    "el formulario válido debe llegar al ejecutor RPC simulado");
+  const call = nuevasEscrituras(c, base).find((item) => item.name === "editar_almacen");
+  assert.ok(call, "el flujo de edición debe invocar editar_almacen");
+  assert.equal(call.params.p_almacen_id, "alm-edit-fixture");
+  assert.equal(call.params.p_nombre, "Almacén editado fixture");
+  assert.equal(call.params.p_tipo, "mayorista");
+  assert.ok(await esperarHasta(() => /Almacén actualizado/i.test(c.document.getElementById("bc-alm-modal-status").textContent)),
+    "el modal debe anunciar el resultado correcto tras respuesta simulada");
+});
+
+
+// RWHT-UI-BATCH-20261028-B
+test("Paso 4 RWHT: filtro de Responsabilidades envía estado y restaura la lista", async (t) => {
+  const c = await contextoListo();
+  const originalRpc = c.client.rpc.bind(c.client);
+  const calls = [];
+  const rows = [
+    { id: "resp-pending-fixture", titulo: "Responsabilidad pendiente fixture", estado: "PENDIENTE", prioridad: "normal", descripcion: "fixture" },
+    { id: "resp-done-fixture", titulo: "Responsabilidad completada fixture", estado: "COMPLETADA", prioridad: "normal", descripcion: "fixture" }
+  ];
+  c.client.rpc = async (name, params) => {
+    if (name !== "listar_responsabilidades") return originalRpc(name, params);
+    calls.push({ ...params });
+    const filtered = params.p_estado ? rows.filter((r) => r.estado === params.p_estado) : rows;
+    return { data: filtered, error: null };
+  };
+  const filter = c.document.getElementById("resp-filtro-estado");
+  assert.ok(filter, "la UI debe exponer el filtro de estado");
+  filter.value = "COMPLETADA";
+  filter.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_estado === "COMPLETADA")),
+    "cambiar el filtro debe enviar el estado al RPC");
+  assert.ok(await esperarHasta(() => /Responsabilidad completada fixture/.test(
+    c.document.getElementById("lista-responsabilidades").textContent
+  )), "la lista debe mostrar el resultado filtrado");
+  assert.doesNotMatch(c.document.getElementById("lista-responsabilidades").textContent, /Responsabilidad pendiente fixture/);
+
+  filter.value = "";
+  filter.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_estado === null)),
+    "vaciar el filtro debe solicitar todos los estados");
+  assert.ok(await esperarHasta(() => {
+    const text = c.document.getElementById("lista-responsabilidades").textContent;
+    return /Responsabilidad pendiente fixture/.test(text) && /Responsabilidad completada fixture/.test(text);
+  }), "restaurar el filtro debe recuperar las dos filas fixture");
+});
+
+test("Paso 4 RWHT: filtros de Auditoría por tipo/estado y Limpiar restauran los resultados", async (t) => {
+  const c = await contextoListo();
+  const originalRpc = c.client.rpc.bind(c.client);
+  const calls = [];
+  const rows = [
+    { id: "audit-sale-fixture", tipo: "venta", estado: "exito", descripcion: "Auditoría venta fixture", usuario_nombre: "Usuario fixture", fecha: "2026-10-28T10:00:00Z" },
+    { id: "audit-transfer-fixture", tipo: "transferencia", estado: "error", descripcion: "Auditoría transferencia error fixture", usuario_nombre: "Usuario fixture", fecha: "2026-10-28T10:01:00Z" }
+  ];
+  c.client.rpc = async (name, params) => {
+    if (name !== "listar_auditoria_admin") return originalRpc(name, params);
+    calls.push({ ...params });
+    const filtered = rows.filter((r) =>
+      (!params.p_tipo || r.tipo === params.p_tipo) &&
+      (!params.p_estado || r.estado === params.p_estado)
+    );
+    return { data: filtered, error: null };
+  };
+  const type = c.document.getElementById("filtro-aud-tipo");
+  const state = c.document.getElementById("filtro-aud-estado");
+  const clear = c.document.getElementById("aud-limpiar-btn");
+  const list = c.document.getElementById("mando-auditoria");
+  assert.ok(type && state && clear && list, "la UI debe exponer filtros, Limpiar y resultados");
+  type.value = "venta";
+  type.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === "venta")),
+    "el selector de tipo debe volver a consultar con el valor seleccionado");
+  assert.ok(await esperarHasta(() => /Auditoría venta fixture/.test(list.textContent)),
+    "la lista debe mostrar la fila coincidente");
+  assert.doesNotMatch(list.textContent, /Auditoría transferencia error fixture/);
+
+  state.value = "error";
+  state.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === "venta" && p.p_estado === "error")),
+    "el selector de estado debe combinarse con el tipo activo");
+  assert.ok(await esperarHasta(() => /Sin registros de auditoría/i.test(list.textContent)),
+    "la combinación sin resultados debe mostrar el estado vacío, no datos incorrectos");
+
+  clear.click();
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === null && p.p_estado === null)),
+    "Limpiar debe pedir la lista sin filtros");
+  assert.ok(await esperarHasta(() => {
+    const text = list.textContent;
+    return /Auditoría venta fixture/.test(text) && /Auditoría transferencia error fixture/.test(text);
+  }), "Limpiar debe restaurar las dos filas fixture");
+});
+
+test("Paso 4 RWHT: Nueva conversación abre el formulario y Volver recupera la lista", async (t) => {
+  const c = await contextoListo();
+  const originalRpc = c.client.rpc.bind(c.client);
+  const calls = [];
+  c.client.rpc = async (name, params) => {
+    if (name === "listar_usuarios_para_chat") {
+      calls.push({ name, params: { ...params } });
+      return { data: [{ id: "chat-user-fixture", nombre: "Usuario chat fixture" }], error: null };
+    }
+    return originalRpc(name, params);
+  };
+  const panel = c.document.getElementById("com-nueva-panel");
+  const newButton = c.document.getElementById("com-nueva-btn");
+  const userSelect = c.document.getElementById("nueva-conv-usuario");
+  const listColumn = c.document.getElementById("com-col-lista");
+  const chatColumn = c.document.getElementById("com-col-chat");
+  const back = c.document.getElementById("com-volver-btn");
+  assert.ok(panel && newButton && userSelect && listColumn && chatColumn && back,
+    "la UI debe exponer los controles de conversación");
+  panel.classList.add("hidden");
+  newButton.click();
+  assert.ok(await esperarHasta(() => !panel.classList.contains("hidden")),
+    "Nueva debe mostrar el formulario");
+  assert.ok(await esperarHasta(() => calls.length > 0 && Array.from(userSelect.options).some((o) => o.value === "chat-user-fixture")),
+    "el formulario debe cargar el catálogo de usuarios desde el RPC simulado");
+
+  listColumn.classList.add("hidden");
+  chatColumn.classList.remove("hidden");
+  back.click();
+  assert.equal(listColumn.classList.contains("hidden"), false, "Volver debe recuperar el listado");
+  assert.equal(chatColumn.classList.contains("hidden"), true, "Volver debe ocultar el chat");
+});
+
+test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nunca Auth real", async (t) => {
+  const c = await contextoListo();
+  Object.defineProperty(c.document, "readyState", { value: "complete", configurable: true });
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "alta-usuario-sin-email.js"), "utf8");
+  c.window.eval(source);
+  assert.ok(await esperarHasta(() => {
+    const form = c.document.getElementById("form-nuevo-usuario");
+    return form && form.dataset.bcAltaSinEmail === "1" && c.document.getElementById("nuevo-usuario-rol");
+  }, 2200, 25), "el handler de alta sin correo debe quedar conectado al formulario");
+
+  const originalGetSession = c.client.auth.getSession.bind(c.client.auth);
+  c.client.auth.getSession = async () => ({
+    data: { session: { access_token: "fixture-only-token", user: { id: "user-owner-fixture" } } },
+    error: null
+  });
+  const invokes = [];
+  c.client.functions = {
+    invoke: async (name, args) => {
+      invokes.push({ name, body: { ...args.body } });
+      return { data: { ok: true, user: { id: "new-user-fixture" } }, error: null };
+    }
+  };
+  const form = c.document.getElementById("form-nuevo-usuario");
+  const name = c.document.getElementById("nuevo-usuario-nombre");
+  const password = c.document.getElementById("nuevo-usuario-password");
+  const role = c.document.getElementById("nuevo-usuario-rol");
+  const msg = c.document.getElementById("msg-nuevo-usuario");
+  const option = c.document.createElement("option");
+  option.value = "role-fixture";
+  option.textContent = "Rol fixture";
+  role.appendChild(option);
+
+  name.value = "";
+  password.value = "valid-pass-fixture";
+  role.value = "role-fixture";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /usuario es obligatorio/i.test(msg.textContent)),
+    "nombre vacío debe rechazarse");
+  assert.equal(invokes.length, 0, "la validación no debe invocar Edge Function");
+
+  name.value = "Usuario fixture";
+  password.value = "123";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /al menos 6 caracteres/i.test(msg.textContent)),
+    "contraseña corta debe rechazarse");
+  assert.equal(invokes.length, 0, "la validación de contraseña no debe invocar Edge Function");
+
+  password.value = "valid-pass-fixture";
+  role.value = "";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /seleccionar un rol/i.test(msg.textContent)),
+    "la ausencia de rol debe rechazarse");
+  assert.equal(invokes.length, 0, "el rol obligatorio debe validarse antes de invocar");
+
+  role.value = "role-fixture";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => invokes.length === 1), "la alta válida debe invocar el mock una sola vez");
+  assert.deepEqual(invokes[0], {
+    name: "crear-usuario-sin-email",
+    body: { nombre: "Usuario fixture", password: "valid-pass-fixture", role_id: "role-fixture" }
+  });
+  assert.ok(await esperarHasta(() => /Usuario creado correctamente/i.test(msg.textContent)),
+    "la UI debe anunciar el éxito de la Edge Function fixture");
+  assert.equal(name.value, "", "la UI debe limpiar el formulario tras el éxito");
+});
