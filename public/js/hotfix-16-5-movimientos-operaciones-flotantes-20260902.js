@@ -57,9 +57,23 @@ function close(type,ov){
  if(r&&r.panel){r.panel.classList.remove('visible');r.panel.classList.add('bc165-placeholder');}
  if(ov)ov.remove();
 }
+function bindCanonicalPurchaseRoute(){
+ if(window.__BC165_PURCHASE_REDIRECT_BOUND)return;
+ window.__BC165_PURCHASE_REDIRECT_BOUND=true;
+ document.addEventListener('click',function(e){
+   var trigger=e.target&&e.target.closest?e.target.closest('#btn-productos-ir-compras-movimientos'):null;
+   if(!trigger)return;
+   e.preventDefault();
+   var movButton=document.querySelector('.tab-btn[data-tab="movimientos"]');
+   if(movButton)movButton.click();
+   window.setTimeout(function(){
+     if(typeof window.__BC165_open==='function')window.__BC165_open('compras');
+   },120);
+ });
+}
 function install(){
  var mov=document.getElementById('tab-movimientos');if(!mov)return false;
- style();
+ style();bindCanonicalPurchaseRoute();
  captureTab('transferencias');captureTab('compras');
  var host=mov.querySelector('.bc-m51-hero')||mov.firstElementChild;if(!host)return false;
  var actions=host.querySelector('.bc165-actions');
