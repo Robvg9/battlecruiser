@@ -41,9 +41,12 @@ test("accessible textual option state follows the saved switch state on load and
 });
 
 test("toggle appearance retains a real accessible hit target and keyboard focus", () => {
-  assert.ok(source.includes(".cfg-aj-toggle:focus-visible{outline:2px solid var(--gold-bright);outline-offset:3px}"));
-  assert.ok(source.includes('.cfg-aj-toggle:checked:before{transform:translateX(20px)}'));
-  assert.ok(source.includes('.cfg-aj-toggle:checked{background:rgba(201,162,77,.55)}'));
+  assert.ok(source.includes("input.cfg-aj-toggle[type=checkbox]:focus-visible{outline:2px solid var(--gold-bright);outline-offset:3px}"));
+  assert.ok(source.includes('input.cfg-aj-toggle[type=checkbox]:checked:before{transform:translateX(21px);background:#fff}'));
+  assert.ok(source.includes('input.cfg-aj-toggle[type=checkbox]:checked{background:rgba(201,162,77,.75);border-color:rgba(201,162,77,.9)}'));
+  assert.ok(source.includes("width:42px;height:22px"));
+  assert.ok(source.includes("width:12px;height:14px"));
+  assert.ok(source.includes("border-radius:3px"), "the moving thumb must be rectangular, not a large circle");
 });
 
 test("all six preference inputs remain connected to their existing preference keys", () => {
@@ -182,9 +185,11 @@ test("PWA deployment invalidates the cached switch script and keeps shell versio
   const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "app version must be detectable");
   assert.ok(workerVersion, "service-worker version must be detectable");
-  assert.equal(appVersion[1], "9.5.32");
+  assert.equal(appVersion[1], "9.5.33");
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));
+  assert.ok(loader.includes('s.src = "js/configuracion-ajustes-migrados-20260903.js?v=9.1";'));
+  assert.ok(serviceWorker.includes("./js/configuracion-ajustes-migrados-20260903.js?v=9.1"));
   assert.ok(indexHtml.includes("v" + appVersion[1] + " — BattleCruiser"));
 });
