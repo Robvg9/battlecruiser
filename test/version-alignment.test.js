@@ -142,7 +142,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   const assets = [
     "./js/turno-api.js?v=9.4.7",
     "./js/turnos-maestro.js?v=9.4.3",
-    "./js/m29-turnos-organizacion.js?v=29.14",
+    "./js/m29-turnos-organizacion.js?v=29.15",
     "./js/m33-turnos-final.js?v=33.8",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
     "./js/m51-movimientos-centro.js?v=51.3",
@@ -152,7 +152,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   for (const key of [
     '["turno-api.js","9.4.7"]',
     '["turnos-maestro.js","9.4.3"]',
-    '["m29-turnos-organizacion.js","29.14"]',
+    '["m29-turnos-organizacion.js","29.15"]',
     '["m33-turnos-final.js","33.8"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
     '["m51-movimientos-centro.js","51.3"]',

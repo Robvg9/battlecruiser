@@ -43,9 +43,14 @@ function setup(t) {
       sesiones_asignadas: 1, sesiones_total: 3
     },
     {
-      id: "turno-cerrado", dias_turno: 1, almacen_id: "alm-1", almacen_nombre: "Principal",
+      id: "turno-closed-history", dias_turno: 1, almacen_id: "alm-1", almacen_nombre: "Principal",
       estado_maestro: "CERRADO", fecha_inicio: "2026-10-01", fecha_fin: "2026-10-02",
       sesiones_asignadas: 1, sesiones_total: 1
+    },
+    {
+      id: "turno-validated-history", dias_turno: 2, almacen_id: "alm-2", almacen_nombre: "Reserva",
+      estado_maestro: "VALIDADO", fecha_inicio: "2026-09-20", fecha_fin: "2026-09-21",
+      sesiones_asignadas: 2, sesiones_total: 2
     }
   ];
 
@@ -69,35 +74,39 @@ function setup(t) {
   };
   window.__bcUser = { rol: "dueño" };
   window.tienePermiso = () => true;
-  const closedListCalls = [];
+  const masterListCalls = [];
+  const legacyListCalls = [];
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => true,
-    listarTurnos: async (options = {}) => {
-      closedListCalls.push({ ...options });
-      if (options.estado === 'CERRADO') return [{
-        id: 'turno-closed-history', almacen_id: 'alm-1', fecha: '2026-10-01',
-        apertura_real: '2026-10-01T08:00:00Z', cierre_real: '2026-10-02T17:00:00Z', estado: 'CERRADO'
-      }];
-      return [];
-    },
+    // The archive must not query this legacy-session listing endpoint.
+    listarTurnos: async (options = {}) => { legacyListCalls.push({ ...options }); return []; },
     labelEstado: (value) => ({
       EN_CURSO: "En curso",
       ACTIVO: "En curso",
       PROGRAMADO: "Programado",
       PLANIFICADO: "Programado",
       PENDIENTE_APROBACION: "Pendiente de aprobación",
-      EN_VALIDACION: "Pendiente de aprobación"
+      EN_VALIDACION: "Pendiente de aprobación",
+      CERRADO: "Cerrado",
+      VALIDADO: "Validado"
     })[value] || String(value || "-"),
-    listarTurnosMaestros: async () => { listCalls += 1; return turns.map((turno) => ({ ...turno })); }
+    listarTurnosMaestros: async (options = {}) => {
+      listCalls += 1;
+      masterListCalls.push({ ...options });
+      const offset = Number(options.offset || 0);
+      const limit = Number(options.limit || 100);
+      return turns.slice(offset, offset + limit).map((turno) => ({ ...turno }));
+    }
   };
-  window.__m29ClosedListCalls = closedListCalls;
+  window.__m29ClosedListCalls = legacyListCalls;
+  window.__m29MasterListCalls = masterListCalls;
   window.eval(SOURCE);
   t.after(() => window.close());
-  return { window, turns, getListCalls: () => listCalls };
+  return { window, turns, getListCalls: () => listCalls, getMasterListCalls: () => listCalls };
 }
 
-test("Paso 4: el historial M29 abre un turno cerrado explícitamente en modo solo lectura", async (t) => {
-  const { window } = setup(t);
+test("Paso 4: el historial M29 consulta turnos maestros cerrados y los abre en solo lectura", async (t) => {
+  const { window, getMasterListCalls } = setup(t);
   const opened = [];
   const openedOptions = [];
   window.__BC_M33 = {
@@ -110,23 +119,30 @@ test("Paso 4: el historial M29 abre un turno cerrado explícitamente en modo sol
   const root = window.document.getElementById("ciclos-m18-root");
   const historyButton = root.querySelector("#m29-btn-historial");
   assert.ok(historyButton, "Turnos debe ofrecer acceso al historial cerrado");
+  const callsBeforeHistory = getMasterListCalls();
   historyButton.click();
   assert.ok(await waitFor(() => root.querySelector('[data-m29-closed-open="turno-closed-history"]')),
     "el historial debe cargar el turno cerrado por lectura");
   assert.match(root.textContent, /Historial de turnos/);
   assert.match(root.textContent, /Principal/);
-  assert.ok(window.__m29ClosedListCalls.some((call) => call.estado === "CERRADO"));
-  assert.ok(window.__m29ClosedListCalls.some((call) => call.estado === "VALIDADO"));
+  assert.ok(root.querySelector('[data-m29-closed-open="turno-validated-history"]'),
+    "el historial también debe incluir turnos maestros validados");
+  assert.ok(getMasterListCalls() > callsBeforeHistory, "el archivo debe releer la RPC de turnos maestros");
+  const archiveCalls = window.__m29MasterListCalls.slice(callsBeforeHistory);
+  assert.ok(archiveCalls.some((call) => call.limit === 100 && call.offset === 0),
+    "el archivo debe paginar la lista de turnos maestros");
+  assert.equal(window.__m29ClosedListCalls.length, 0,
+    "el historial no debe consultar listar_turnos, que mezcla expedientes legacy");
   root.querySelector('[data-m29-closed-open="turno-closed-history"]').click();
-  assert.deepEqual(opened, ["turno-closed-history"], "abrir el expediente reutiliza el turno existente");
+  assert.deepEqual(opened, ["turno-closed-history"], "abrir el expediente reutiliza el turno maestro existente");
   assert.equal(openedOptions.length, 1, "el historial debe abrir exactamente una vez");
   assert.equal(openedOptions[0]?.readOnly, true, "el historial debe abrir en modo solo lectura");
   assert.deepEqual(Object.keys(openedOptions[0] || {}).sort(), ["readOnly"], "el historial no debe pasar opciones editables adicionales");
 });
 
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
-  assert.match(SOURCE, /var VERSION = '29\.14';/);
-  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.14"\]/);
+  assert.match(SOURCE, /var VERSION = '29\.15';/);
+  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.15"\]/);
   const { window, getListCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
@@ -156,7 +172,7 @@ test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén"
   almacen.value = "";
   almacen.dispatchEvent(new window.Event("change", { bubbles: true }));
   assert.equal(root.querySelectorAll(".m29-card").length, 3, "limpiar ambos selectores restaura todas las tarjetas visibles");
-  assert.ok(!Array.from(root.querySelectorAll(".m29-card")).some((card) => card.getAttribute("data-turno-id") === "turno-cerrado"),
+  assert.ok(!Array.from(root.querySelectorAll(".m29-card")).some((card) => card.getAttribute("data-turno-id") === "turno-closed-history"),
     "la vista operativa conserva la regla de excluir turnos cerrados del resumen");
 
   almacen.value = "alm-2";

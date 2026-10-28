@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.14';
+  var VERSION = '29.15';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -308,7 +308,7 @@
       if (offlineBack) offlineBack.addEventListener('click', function () { renderHome(); });
       return;
     }
-    if (!api || typeof api.listarTurnos !== 'function') {
+    if (!api || typeof api.listarTurnosMaestros !== 'function') {
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">API de turnos no disponible.</div></div>';
       var unavailableBack = el.querySelector('#m29-btn-history-back');
       if (unavailableBack) unavailableBack.addEventListener('click', function () { renderHome(); });
@@ -319,24 +319,24 @@
       var all = [];
       var seen = Object.create(null);
       var truncated = false;
-      for (const status of ['CERRADO', 'VALIDADO']) {
-        var offset = 0;
-        var pages = 0;
-        while (pages < 50) {
-          var batch = asArray(await api.listarTurnos({ estado: status, limit: 100, offset: offset }));
-          batch.forEach(function (turn) {
-            var id = String(turn && (turn.id || turn.turno_id) || '');
-            var stateName = String(turn && (turn.estado_maestro || turn.estado || turn.status) || '').toUpperCase();
-            if (id && !seen[id] && (stateName === 'CERRADO' || stateName === 'VALIDADO')) {
-              seen[id] = true;
-              all.push(turn);
-            }
-          });
-          if (batch.length < 100) break;
-          offset += batch.length;
-          pages += 1;
-          if (pages >= 50) truncated = true;
-        }
+      var offset = 0;
+      var pages = 0;
+      // Use the authorized master-turn endpoint; the legacy listing mixes session rows.
+      // Master rows include the immutable multi-day/date fields needed to reopen the record.
+      while (pages < 50) {
+        var batch = asArray(await api.listarTurnosMaestros({ limit: 100, offset: offset }));
+        batch.forEach(function (turn) {
+          var id = String(turn && (turn.id || turn.turno_id) || '');
+          var stateName = String(turn && (turn.estado_maestro || turn.estado || turn.status) || '').toUpperCase();
+          if (id && !seen[id] && (stateName === 'CERRADO' || stateName === 'VALIDADO')) {
+            seen[id] = true;
+            all.push(turn);
+          }
+        });
+        if (batch.length < 100) break;
+        offset += batch.length;
+        pages += 1;
+        if (pages >= 50) truncated = true;
       }
       all.sort(function (a, b) {
         var dateA = String(a.cierre_real || a.fecha_fin || a.fin_plan || a.fecha || '');
