@@ -570,7 +570,9 @@ test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad
   assert.ok(await esperarHasta(() => c.calls.length === 1), "un único submit debe llegar al ejecutor simulado");
   assert.ok(await esperarHasta(() => /Transferencia registrada/i.test(c.window.document.getElementById("msg-transferencias").textContent)),
     "la respuesta correcta debe quedar reflejada en la interfaz");
-  assert.deepEqual(c.calls[0], {
+  // Values originate inside the JSDOM realm; normalize to plain Node objects
+  // before structural comparison to avoid cross-realm prototype false negatives.
+  assert.deepEqual(JSON.parse(JSON.stringify(c.calls[0])), {
     type: "transferencia",
     payload: {
       p_origen_id: "a-fixture",
