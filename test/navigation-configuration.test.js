@@ -45,7 +45,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   }
   assert.match(permissions, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
   assert.match(permissions, /if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/);
-  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true, ventas:true \}/);
+  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true, ventas:true, compras:true \}/);
   assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
   assert.match(app, /m12-fe5-hide-vales\.js/);
