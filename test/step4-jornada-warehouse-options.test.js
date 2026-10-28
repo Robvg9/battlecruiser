@@ -34,7 +34,6 @@ function createContext(t, { failCatalog = false } = {}) {
   const { window } = dom;
   Object.defineProperty(window.document, "readyState", { configurable: true, value: "complete" });
   Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
-  window.eval("const _cache = { almacenes: [], usuarios: [] };");
   assert.equal(window._cache, undefined, "el fixture debe reproducir la caché léxica real de core.js");
   window._usuarioActual = { id: "owner-fixture", rol: "Dueño" };
   window.tienePermiso = () => true;
@@ -60,7 +59,7 @@ function createContext(t, { failCatalog = false } = {}) {
     }
   };
 
-  window.eval(SOURCE);
+  window.eval("const _cache = { almacenes: [], usuarios: [] };\\n" + SOURCE);
   t.after(() => window.close());
   return { window, calls };
 }
