@@ -182,7 +182,7 @@ test("PWA deployment invalidates the cached switch script and keeps shell versio
   const workerVersion = serviceWorker.match(/var BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "app version must be detectable");
   assert.ok(workerVersion, "service-worker version must be detectable");
-  assert.equal(appVersion[1], "9.5.28");
+  assert.equal(appVersion[1], "9.5.29");
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(indexHtml.includes("style.css?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));
