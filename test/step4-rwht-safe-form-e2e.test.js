@@ -714,3 +714,60 @@ test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor vá
     { producto_id: "p-fixture", presentacion_id: "pres-fixture", factor: 12 });
   assert.match(c.window.document.getElementById("msg-presentaciones").textContent, /Presentación agregada/i);
 });
+
+
+// RWHT-WAREHOUSE-MODAL-20261028
+test("Paso 4 RWHT: modal de almacén rechaza nombre vacío y Cancelar no crea nada", async (t) => {
+  const c = await contextoListo();
+  assert.equal(typeof c.window.__BC_M277_openCreateAlmacen, "function",
+    "el runtime debe exponer el abridor del modal de alta");
+  c.window.__BC_M277_openCreateAlmacen();
+  const root = c.document.getElementById("bc-alm-modal");
+  const nombre = c.document.getElementById("bc-alm-modal-nombre");
+  const save = c.document.getElementById("bc-alm-modal-guardar");
+  assert.ok(root && root.classList.contains("open"), "el diálogo de alta debe abrirse");
+  assert.equal(c.document.getElementById("bc-alm-modal-title").textContent, "Nuevo almacén");
+  const base = c.client.__writeCalls.length;
+
+  nombre.value = "   ";
+  save.click();
+  assert.ok(await esperarHasta(() => /completá el nombre del almacén/i.test(
+    c.document.getElementById("bc-alm-modal-status").textContent
+  )), "el modal debe mostrar validación clara para nombre vacío");
+  assert.equal(nuevasEscrituras(c, base).length, 0, "un alta inválida no puede ejecutar RPC");
+
+  root.querySelector(".bc-alm-actions [data-bc-alm-close='1']").click();
+  assert.equal(root.classList.contains("open"), false, "Cancelar debe cerrar el modal");
+  assert.equal(nuevasEscrituras(c, base).length, 0, "Cancelar no puede crear almacén ni encolar operación");
+});
+
+test("Paso 4 RWHT: modal de almacén edita el ID fixture y envía cambios al RPC simulado", async (t) => {
+  const c = await contextoListo();
+  c.window._cache.almacenes = [
+    { id: "alm-edit-fixture", nombre: "Almacén original fixture", tipo: "almacenamiento", activo: true }
+  ];
+  assert.equal(typeof c.window.__BC_M277_openEditAlmacen, "function",
+    "el runtime debe exponer el abridor del modal de edición");
+  c.window.__BC_M277_openEditAlmacen("alm-edit-fixture");
+  const root = c.document.getElementById("bc-alm-modal");
+  const nombre = c.document.getElementById("bc-alm-modal-nombre");
+  const tipo = root.querySelector(".bc-alm-tipo[data-tipo='mayorista']");
+  assert.ok(root.classList.contains("open"), "la edición debe abrirse");
+  assert.equal(c.document.getElementById("bc-alm-modal-id").value, "alm-edit-fixture",
+    "el ID oculto debe conservar el registro que se está editando");
+  assert.equal(nombre.value, "Almacén original fixture");
+  nombre.value = "Almacén editado fixture";
+  tipo.click();
+
+  const base = c.client.__writeCalls.length;
+  c.document.getElementById("bc-alm-modal-guardar").click();
+  assert.ok(await esperarHasta(() => nuevasEscrituras(c, base).length > 0),
+    "el formulario válido debe llegar al ejecutor RPC simulado");
+  const call = nuevasEscrituras(c, base).find((item) => item.name === "editar_almacen");
+  assert.ok(call, "el flujo de edición debe invocar editar_almacen");
+  assert.equal(call.params.p_almacen_id, "alm-edit-fixture");
+  assert.equal(call.params.p_nombre, "Almacén editado fixture");
+  assert.equal(call.params.p_tipo, "mayorista");
+  assert.ok(await esperarHasta(() => /Almacén actualizado/i.test(c.document.getElementById("bc-alm-modal-status").textContent)),
+    "el modal debe anunciar el resultado correcto tras respuesta simulada");
+});
