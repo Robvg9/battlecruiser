@@ -493,7 +493,7 @@
     if($('bc7-start-date'))$('bc7-start-date').value=today;
     if($('bc7-list-from'))$('bc7-list-from').value=today;
     fillWarehouses();buildDayRows();
-    await ensureWarehouseCatalog();
+    ensureWarehouseCatalog();
     try{state.admin=!!(await rpc('bc_actor_is_admin',{}));}
     catch(e){state.admin=false;setStatus('No se verificó el rol: '+e.message,'error');}
     if($('bc7-admin-panel'))$('bc7-admin-panel').hidden=!state.admin;
