@@ -804,3 +804,185 @@ test("Paso 4 RWHT: modal de almacén edita el ID fixture y envía cambios al RPC
   assert.ok(await esperarHasta(() => /Almacén actualizado/i.test(c.document.getElementById("bc-alm-modal-status").textContent)),
     "el modal debe anunciar el resultado correcto tras respuesta simulada");
 });
+
+
+// RWHT-UI-BATCH-20261028-B
+test("Paso 4 RWHT: filtro de Responsabilidades envía estado y restaura la lista", async (t) => {
+  const c = await contextoListo();
+  const originalRpc = c.client.rpc.bind(c.client);
+  const calls = [];
+  const rows = [
+    { id: "resp-pending-fixture", titulo: "Responsabilidad pendiente fixture", estado: "PENDIENTE", prioridad: "normal", descripcion: "fixture" },
+    { id: "resp-done-fixture", titulo: "Responsabilidad completada fixture", estado: "COMPLETADA", prioridad: "normal", descripcion: "fixture" }
+  ];
+  c.client.rpc = async (name, params) => {
+    if (name !== "listar_responsabilidades") return originalRpc(name, params);
+    calls.push({ ...params });
+    const filtered = params.p_estado ? rows.filter((r) => r.estado === params.p_estado) : rows;
+    return { data: filtered, error: null };
+  };
+  const filter = c.document.getElementById("resp-filtro-estado");
+  assert.ok(filter, "la UI debe exponer el filtro de estado");
+  filter.value = "COMPLETADA";
+  filter.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_estado === "COMPLETADA")),
+    "cambiar el filtro debe enviar el estado al RPC");
+  assert.ok(await esperarHasta(() => /Responsabilidad completada fixture/.test(
+    c.document.getElementById("lista-responsabilidades").textContent
+  )), "la lista debe mostrar el resultado filtrado");
+  assert.doesNotMatch(c.document.getElementById("lista-responsabilidades").textContent, /Responsabilidad pendiente fixture/);
+
+  filter.value = "";
+  filter.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_estado === null)),
+    "vaciar el filtro debe solicitar todos los estados");
+  assert.ok(await esperarHasta(() => {
+    const text = c.document.getElementById("lista-responsabilidades").textContent;
+    return /Responsabilidad pendiente fixture/.test(text) && /Responsabilidad completada fixture/.test(text);
+  }), "restaurar el filtro debe recuperar las dos filas fixture");
+});
+
+test("Paso 4 RWHT: filtros de Auditoría por tipo/estado y Limpiar restauran los resultados", async (t) => {
+  const c = await contextoListo();
+  const originalRpc = c.client.rpc.bind(c.client);
+  const calls = [];
+  const rows = [
+    { id: "audit-sale-fixture", tipo: "venta", estado: "exito", descripcion: "Auditoría venta fixture", usuario_nombre: "Usuario fixture", fecha: "2026-10-28T10:00:00Z" },
+    { id: "audit-transfer-fixture", tipo: "transferencia", estado: "error", descripcion: "Auditoría transferencia error fixture", usuario_nombre: "Usuario fixture", fecha: "2026-10-28T10:01:00Z" }
+  ];
+  c.client.rpc = async (name, params) => {
+    if (name !== "listar_auditoria_admin") return originalRpc(name, params);
+    calls.push({ ...params });
+    const filtered = rows.filter((r) =>
+      (!params.p_tipo || r.tipo === params.p_tipo) &&
+      (!params.p_estado || r.estado === params.p_estado)
+    );
+    return { data: filtered, error: null };
+  };
+  const type = c.document.getElementById("filtro-aud-tipo");
+  const state = c.document.getElementById("filtro-aud-estado");
+  const clear = c.document.getElementById("aud-limpiar-btn");
+  const list = c.document.getElementById("mando-auditoria");
+  assert.ok(type && state && clear && list, "la UI debe exponer filtros, Limpiar y resultados");
+  type.value = "venta";
+  type.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === "venta")),
+    "el selector de tipo debe volver a consultar con el valor seleccionado");
+  assert.ok(await esperarHasta(() => /Auditoría venta fixture/.test(list.textContent)),
+    "la lista debe mostrar la fila coincidente");
+  assert.doesNotMatch(list.textContent, /Auditoría transferencia error fixture/);
+
+  state.value = "error";
+  state.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === "venta" && p.p_estado === "error")),
+    "el selector de estado debe combinarse con el tipo activo");
+  assert.ok(await esperarHasta(() => /Sin registros de auditoría/i.test(list.textContent)),
+    "la combinación sin resultados debe mostrar el estado vacío, no datos incorrectos");
+
+  clear.click();
+  assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === null && p.p_estado === null)),
+    "Limpiar debe pedir la lista sin filtros");
+  assert.ok(await esperarHasta(() => {
+    const text = list.textContent;
+    return /Auditoría venta fixture/.test(text) && /Auditoría transferencia error fixture/.test(text);
+  }), "Limpiar debe restaurar las dos filas fixture");
+});
+
+test("Paso 4 RWHT: Nueva conversación abre el formulario y Volver recupera la lista", async (t) => {
+  const c = await contextoListo();
+  const originalRpc = c.client.rpc.bind(c.client);
+  const calls = [];
+  c.client.rpc = async (name, params) => {
+    if (name === "listar_usuarios_para_chat") {
+      calls.push({ name, params: { ...params } });
+      return { data: [{ id: "chat-user-fixture", nombre: "Usuario chat fixture" }], error: null };
+    }
+    return originalRpc(name, params);
+  };
+  const panel = c.document.getElementById("com-nueva-panel");
+  const newButton = c.document.getElementById("com-nueva-btn");
+  const userSelect = c.document.getElementById("nueva-conv-usuario");
+  const listColumn = c.document.getElementById("com-col-lista");
+  const chatColumn = c.document.getElementById("com-col-chat");
+  const back = c.document.getElementById("com-volver-btn");
+  assert.ok(panel && newButton && userSelect && listColumn && chatColumn && back,
+    "la UI debe exponer los controles de conversación");
+  panel.classList.add("hidden");
+  newButton.click();
+  assert.ok(await esperarHasta(() => !panel.classList.contains("hidden")),
+    "Nueva debe mostrar el formulario");
+  assert.ok(await esperarHasta(() => calls.length > 0 && Array.from(userSelect.options).some((o) => o.value === "chat-user-fixture")),
+    "el formulario debe cargar el catálogo de usuarios desde el RPC simulado");
+
+  listColumn.classList.add("hidden");
+  chatColumn.classList.remove("hidden");
+  back.click();
+  assert.equal(listColumn.classList.contains("hidden"), false, "Volver debe recuperar el listado");
+  assert.equal(chatColumn.classList.contains("hidden"), true, "Volver debe ocultar el chat");
+});
+
+test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nunca Auth real", async (t) => {
+  const c = await contextoListo();
+  Object.defineProperty(c.document, "readyState", { value: "complete", configurable: true });
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "alta-usuario-sin-email.js"), "utf8");
+  c.window.eval(source);
+  assert.ok(await esperarHasta(() => {
+    const form = c.document.getElementById("form-nuevo-usuario");
+    return form && form.dataset.bcAltaSinEmail === "1" && c.document.getElementById("nuevo-usuario-rol");
+  }, 2200, 25), "el handler de alta sin correo debe quedar conectado al formulario");
+
+  const originalGetSession = c.client.auth.getSession.bind(c.client.auth);
+  c.client.auth.getSession = async () => ({
+    data: { session: { access_token: "fixture-only-token", user: { id: "user-owner-fixture" } } },
+    error: null
+  });
+  const invokes = [];
+  c.client.functions = {
+    invoke: async (name, args) => {
+      invokes.push({ name, body: { ...args.body } });
+      return { data: { ok: true, user: { id: "new-user-fixture" } }, error: null };
+    }
+  };
+  const form = c.document.getElementById("form-nuevo-usuario");
+  const name = c.document.getElementById("nuevo-usuario-nombre");
+  const password = c.document.getElementById("nuevo-usuario-password");
+  const role = c.document.getElementById("nuevo-usuario-rol");
+  const msg = c.document.getElementById("msg-nuevo-usuario");
+  const option = c.document.createElement("option");
+  option.value = "role-fixture";
+  option.textContent = "Rol fixture";
+  role.appendChild(option);
+
+  name.value = "";
+  password.value = "valid-pass-fixture";
+  role.value = "role-fixture";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /usuario es obligatorio/i.test(msg.textContent)),
+    "nombre vacío debe rechazarse");
+  assert.equal(invokes.length, 0, "la validación no debe invocar Edge Function");
+
+  name.value = "Usuario fixture";
+  password.value = "123";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /al menos 6 caracteres/i.test(msg.textContent)),
+    "contraseña corta debe rechazarse");
+  assert.equal(invokes.length, 0, "la validación de contraseña no debe invocar Edge Function");
+
+  password.value = "valid-pass-fixture";
+  role.value = "";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /seleccionar un rol/i.test(msg.textContent)),
+    "la ausencia de rol debe rechazarse");
+  assert.equal(invokes.length, 0, "el rol obligatorio debe validarse antes de invocar");
+
+  role.value = "role-fixture";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => invokes.length === 1), "la alta válida debe invocar el mock una sola vez");
+  assert.deepEqual(invokes[0], {
+    name: "crear-usuario-sin-email",
+    body: { nombre: "Usuario fixture", password: "valid-pass-fixture", role_id: "role-fixture" }
+  });
+  assert.ok(await esperarHasta(() => /Usuario creado correctamente/i.test(msg.textContent)),
+    "la UI debe anunciar el éxito de la Edge Function fixture");
+  assert.equal(name.value, "", "la UI debe limpiar el formulario tras el éxito");
+});
