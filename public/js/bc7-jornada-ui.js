@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.1 — usa contratos bc5_* + bc7_*; no borra ni reescribe históricos de ventas.
+// v7.5 — checkboxes compactos, contratos bc5_* + bc7_*; no borra ni reescribe históricos de ventas.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
