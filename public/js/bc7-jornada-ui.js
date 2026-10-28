@@ -77,7 +77,7 @@
       '#tab-jornada .bc7-table{width:100%;border-collapse:collapse;font-size:12px}',
       '#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:9px 7px;text-align:left;border-bottom:1px solid var(--gold-dim);white-space:nowrap}',
       '#tab-jornada .bc7-table th{color:var(--mist);font-weight:600}',
-      '#tab-jornada .bc7-table input{width:96px;max-width:100%;box-sizing:border-box;padding:8px;background:var(--void);color:var(--text);border:1px solid var(--gold-dim);border-radius:5px}',
+      '#tab-jornada .bc7-table input:not([type="checkbox"]){width:96px;max-width:100%;box-sizing:border-box;padding:8px;background:var(--void);color:var(--text);border:1px solid var(--gold-dim);border-radius:5px}#tab-jornada .bc7-table input[type="checkbox"]{appearance:auto;width:20px;height:20px;min-width:20px;min-height:20px;max-width:20px;padding:0;margin:0;accent-color:var(--gold-bright,#c9a24d);cursor:pointer;vertical-align:middle;box-sizing:border-box}',
       '#tab-jornada .bc7-diff{font-weight:700}',
       '#tab-jornada .bc7-diff.bad{color:#efaaa2}',
       '#tab-jornada .bc7-diff.good{color:#a0d7af}',
