@@ -119,7 +119,9 @@ test("Paso 4: el historial M29 abre un turno cerrado explícitamente en modo sol
   assert.ok(window.__m29ClosedListCalls.some((call) => call.estado === "VALIDADO"));
   root.querySelector('[data-m29-closed-open="turno-closed-history"]').click();
   assert.deepEqual(opened, ["turno-closed-history"], "abrir el expediente reutiliza el turno existente");
-  assert.deepEqual(openedOptions, [{ readOnly: true }], "el historial nunca debe abrir el expediente administrativo editable");
+  assert.equal(openedOptions.length, 1, "el historial debe abrir exactamente una vez");
+  assert.equal(openedOptions[0]?.readOnly, true, "el historial debe abrir en modo solo lectura");
+  assert.deepEqual(Object.keys(openedOptions[0] || {}).sort(), ["readOnly"], "el historial no debe pasar opciones editables adicionales");
 });
 
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
