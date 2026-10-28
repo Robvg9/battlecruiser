@@ -9,6 +9,11 @@ const JOURNADA_UI = fs.readFileSync(path.join(__dirname, "..", "public", "js", "
 const TURNOS_UI = fs.readFileSync(path.join(__dirname, "..", "public", "js", "turnos-maestro.js"), "utf8");
 const MIGRATION = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations", "20261027184823_bc7_turno_movimientos_sesion_20261027.sql"), "utf8");
 
+test("journey calendar checks the global lexical Supabase client", () => {
+  assert.ok(JOURNADA_UI.includes("typeof client===\'undefined\'"), "the UI must check the global lexical binding");
+  assert.ok(!JOURNADA_UI.includes("!window.client"), "it must not require client to be a window property");
+});
+
 test("Jornada e inventario explica el propósito y los pasos en lenguaje operativo", () => {
   assert.match(JOURNADA_UI, /¿Para qué sirve esta sección\?/);
   assert.match(JOURNADA_UI, /inventario físico inicial y final/i);
