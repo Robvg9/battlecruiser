@@ -4,7 +4,7 @@
   if (window.__BC_SECCIONES_VISIBLES_20260903__) return;
   window.__BC_SECCIONES_VISIBLES_20260903__ = true;
 
-  var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true, ventas:true };
+  var KEEP_HIDDEN = { transferencias:true, vales:true, turnos:true, ventas:true, compras:true };
   var LABELS = { config:'Administración', ciclos:'Turnos' };
   var configSelectionRequested = false;
 
@@ -55,7 +55,16 @@
     if (!tabs) return;
     tabs.querySelectorAll('.tab-btn[data-tab]').forEach(function(btn){
       var tab = btn.dataset.tab;
-      if (KEEP_HIDDEN[tab]) return;
+      if (KEEP_HIDDEN[tab]) {
+        btn.classList.add('hidden');
+        btn.setAttribute('aria-hidden','true');
+        setTabIndexIfNeeded(btn,-1);
+        setImportantStyle(btn,'display','none');
+        setImportantStyle(btn,'visibility','hidden');
+        setImportantStyle(btn,'opacity','0');
+        setImportantStyle(btn,'pointer-events','none');
+        return;
+      }
       removeClassIfPresent(btn, 'hidden');
       removeClassIfPresent(btn, 'tab-sin-permiso');
       removeAttributeIfPresent(btn, 'aria-hidden');
