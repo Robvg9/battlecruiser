@@ -10,6 +10,10 @@ const SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "m33-turnos-final.js"),
   "utf8"
 );
+const M29_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "m29-turnos-organizacion.js"),
+  "utf8"
+);
 
 async function waitFor(predicate, timeout = 2000) {
   const deadline = Date.now() + timeout;
@@ -61,10 +65,13 @@ function setup(t, { admin = true } = {}) {
   window.escHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[ch]));
+  const writeCalls = [];
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => admin,
     obtenerExpedienteTurno: async (id) => ({ ...turn, id, sesiones: sessions.map((row) => ({ ...row })) }),
-    labelEstado: (value) => value === "CERRADO" ? "Cerrado" : String(value || "—")
+    labelEstado: (value) => value === "CERRADO" ? "Cerrado" : String(value || "—"),
+    asignarSesion: async (...args) => { writeCalls.push({ method: "asignarSesion", args }); },
+    anularTurno: async (...args) => { writeCalls.push({ method: "anularTurno", args }); }
   };
   window.client = {
     rpc: async (name, params = {}) => {
@@ -75,7 +82,7 @@ function setup(t, { admin = true } = {}) {
   };
   window.eval(SOURCE);
   t.after(() => window.close());
-  return { window, rpcCalls };
+  return { window, rpcCalls, writeCalls, sessions };
 }
 test("Paso 4: M33 consulta el archivo de un turno cerrado por fecha sin mutar registros", async (t) => {
   const { window, rpcCalls } = setup(t);
@@ -120,4 +127,44 @@ test("Paso 4: personal asignado también accede solo al archivo de sus sesiones"
     "se consulta el archivo de solo lectura para las sesiones asignadas");
   assert.deepEqual(rpcCalls.map((call) => call.params.p_turno_sesion_id).sort(),
     ["session-day1-am", "session-day1-pm"]);
+});
+
+test("Paso 4: el historial cerrado abre M33 en modo de solo lectura, sin controles de escritura", async (t) => {
+  const { window, rpcCalls, writeCalls } = setup(t);
+  assert.match(M29_SOURCE, /openDetalle\(button\.dataset\.m29ClosedOpen, false, true\)/,
+    "el botón del historial debe pedir explícitamente el modo de solo lectura");
+  assert.match(M29_SOURCE, /window\.__BC_M33\.open\(id, \{ readOnly: true \}\)/,
+    "M29 debe pasar el modo de solo lectura a M33");
+  await window.__BC_M33.open("turno-closed-fixture", { readOnly: true });
+  const modal = window.document.getElementById("m33-bg");
+  assert.ok(modal);
+  assert.match(modal.textContent, /Expediente histórico.*Solo lectura/i);
+  modal.querySelector("#m33-next").click();
+  assert.match(modal.textContent, /asignaciones se muestran tal como quedaron registradas/i);
+  assert.equal(modal.querySelectorAll("select[data-m33-sid]").length, 0,
+    "las asignaciones históricas deben ser texto, nunca controles editables");
+  assert.equal(modal.querySelector("#m33-save"), null, "el expediente histórico no debe ofrecer Guardar");
+  assert.equal(modal.querySelector("#m33-delete"), null, "el expediente histórico no debe ofrecer Eliminar");
+  modal.querySelector("#m33-next").click();
+  assert.ok(await waitFor(() => modal.querySelectorAll(".m33-archive-day").length === 2),
+    "el historial debe conservar el archivo de movimientos por fecha");
+  modal.querySelector(".m33-archive-day [data-m33-archive-sessions]").click();
+  assert.ok(await waitFor(() => modal.querySelector(".m33-archive-host[data-loaded='1']")),
+    "el archivo debe poder consultarse sin salir del modo histórico");
+  assert.ok(rpcCalls.length > 0, "la vista de movimientos debe haber usado su RPC de lectura");
+  assert.equal(writeCalls.length, 0, "abrir y navegar por el expediente no debe llamar RPCs de escritura");
+  assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
+    "el archivo del historial solo puede consultar el RPC de lectura");
+});
+
+test("Paso 4: un expediente histórico de dependienta no permite abrir sesiones aunque estén pendientes", async (t) => {
+  const { window, sessions, writeCalls } = setup(t, { admin: false });
+  sessions[0].estado = "PENDIENTE";
+  await window.__BC_M33.open("turno-closed-fixture", { readOnly: true });
+  const modal = window.document.getElementById("m33-bg");
+  assert.ok(modal);
+  assert.match(modal.textContent, /modo de solo lectura/i);
+  assert.equal(modal.querySelector("[data-m33-abrir-sesion]"), null,
+    "el modo histórico debe ocultar Abrir sesión incluso si el estado de una sesión está pendiente");
+  assert.equal(writeCalls.length, 0);
 });
