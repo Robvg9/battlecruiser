@@ -1,0 +1,37 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const ROOT = path.resolve(__dirname, "..");
+const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
+const source = read("public/js/m33-turnos-final.js");
+const app = read("public/app.js");
+const sw = read("public/service-worker.js");
+
+test("turn detail preserves the five-step wizard in a compact grid", () => {
+  assert.ok(source.includes("const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];"));
+  assert.ok(source.includes("state.step < 5"));
+  assert.ok(source.includes(".m33-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px;overflow:visible}"));
+  assert.ok(source.includes(".m33-session-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;min-width:0}"));
+});
+
+test("turn detail reduces vertical padding and contains scrolling within the dialog", () => {
+  assert.ok(source.includes(".m33-modal{width:min(920px,100%);max-width:100%;box-sizing:border-box;max-height:94vh;max-height:94dvh;overflow:hidden"));
+  assert.ok(source.includes(".m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}"));
+  assert.ok(source.includes(".m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}"));
+  assert.ok(source.includes(".m33-box{padding:8px 9px;"));
+  assert.ok(source.includes(".m33-session{padding:7px 0;"));
+});
+
+test("turn detail mobile view wraps steps and session rows without a wide layout", () => {
+  assert.ok(source.includes("@media(max-width:720px){.m33-bg{padding:6px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.m33-session-grid{grid-template-columns:minmax(0,1fr)}"));
+  assert.ok(source.includes(".m33-head{padding:10px 12px 7px}.m33-body{padding:10px 12px;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 12px}"));
+});
+
+test("PWA loader and cache use the revised compact turn module", () => {
+  assert.ok(app.includes('["m33-turnos-final.js","33.9"]'));
+  assert.ok(sw.includes("./js/m33-turnos-final.js?v=33.9"));
+});
