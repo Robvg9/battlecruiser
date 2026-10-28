@@ -20,6 +20,8 @@ test("purchase registration has one user-facing route through Movimientos", () =
   assert.ok(purchase.includes("compra-multiple-confirmar"));
   assert.ok(movementModal.includes("ensure('compras','Nueva Compra')"));
   assert.ok(movementModal.includes("window.__BC165_open=open"));
+  assert.ok(purchase.includes("window.__BC_COMPRAS_ACTIVAR = cargarDatosYRender;"));
+  assert.ok(movementModal.includes("window.__BC_COMPRAS_ACTIVAR==='function'"));
 });
 
 test("Productos hides the duplicate legacy purchase form and points to the single route", () => {
