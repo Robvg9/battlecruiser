@@ -41,10 +41,10 @@ test("Productos no longer exposes the legacy second purchase form", () => {
     "older CSS must not make the hidden legacy purchase form visible");
 });
 
-test("single purchase route cache versions match release 9.5.32", () => {
+test("single purchase route cache versions match release 9.5.33", () => {
   assert.ok(app.includes('["compra-multiple.js","27.9"]'));
   assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.8"]'));
-  assert.ok(app.includes('const VERSION="9.5.32"'));
-  assert.ok(serviceWorker.includes('BC_SW_VERSION = "9.5.32"'));
+  assert.ok(app.includes('const VERSION="9.5.33"'));
+  assert.ok(serviceWorker.includes('BC_SW_VERSION = "9.5.33"'));
   assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.8"));
 });
