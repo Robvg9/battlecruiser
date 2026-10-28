@@ -1,0 +1,41 @@
+name: BattleCruiser Step 4 Movement Modal Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'public/service-worker.js'
+      - 'public/js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js'
+      - 'test/step4-movements-operations-modal.test.js'
+      - 'test/version-alignment.test.js'
+      - '.github/workflows/step4-movements-modal-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: battlecruiser-movement-modal-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  movement-modal-regression:
+    name: Movement modal race and release cache checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact pull-request HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Test transfer and purchase modal regressions
+        run: node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=60000 test/step4-movements-operations-modal.test.js test/version-alignment.test.js

@@ -135,11 +135,11 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.29 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.29"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.29"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.29"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.29"><\/script>/);
+test("app shell, application and Service Worker share 9.5.30 and load refreshed navigation modules", () => {
+  assert.match(app, /const VERSION="9\.5\.30"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.30"/);
+  assert.match(index, /href="style\.css\?v=9\.5\.30"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.30"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.4"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.4"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
