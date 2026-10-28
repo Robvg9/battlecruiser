@@ -96,10 +96,16 @@ function setup(t) {
   return { window, turns, getListCalls: () => listCalls };
 }
 
-test("Paso 4: el historial M29 permite reabrir un turno cerrado sin escribir datos", async (t) => {
+test("Paso 4: el historial M29 abre un turno cerrado explícitamente en modo solo lectura", async (t) => {
   const { window } = setup(t);
   const opened = [];
-  window.__BC_M33 = { open: (id) => opened.push(id) };
+  const openedOptions = [];
+  window.__BC_M33 = {
+    open: (id, options) => {
+      opened.push(id);
+      openedOptions.push(options || null);
+    }
+  };
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
   const historyButton = root.querySelector("#m29-btn-historial");
@@ -113,6 +119,7 @@ test("Paso 4: el historial M29 permite reabrir un turno cerrado sin escribir dat
   assert.ok(window.__m29ClosedListCalls.some((call) => call.estado === "VALIDADO"));
   root.querySelector('[data-m29-closed-open="turno-closed-history"]').click();
   assert.deepEqual(opened, ["turno-closed-history"], "abrir el expediente reutiliza el turno existente");
+  assert.deepEqual(openedOptions, [{ readOnly: true }], "el historial nunca debe abrir el expediente administrativo editable");
 });
 
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
