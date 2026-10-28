@@ -16,6 +16,8 @@ function setup(t) {
     "<!doctype html><html><head></head><body>" +
       '<button class="tab-btn" data-tab="transferencias"></button>' +
       '<button class="tab-btn" data-tab="compras"></button>' +
+      '<button class="tab-btn" data-tab="movimientos"></button>' +
+      '<button type="button" id="btn-productos-ir-compras-movimientos">Ir a Movimientos · Nueva compra</button>' +
       '<section id="tab-movimientos" class="tab-panel visible"><div class="bc-m51-hero"><div><h2>Movimientos</h2></div></div></section>' +
       '<div id="panel-root">' +
         '<section id="tab-transferencias" class="tab-panel"><form id="transfer-form"><input id="transfer-test" aria-label="Transferencia input"></form></section>' +
@@ -123,4 +125,21 @@ test("Paso 4 regresión: reintentos de inicialización no vacían un modal de co
   modal.querySelector(".bc165-close").click();
   assert.equal(window.document.getElementById("tab-compras").parentElement.id, "panel-root",
     "el panel debe volver a su padre original al cerrar");
+});
+
+
+test("Paso 4: la ruta heredada de Productos redirige al único formulario de compra en Movimientos", (t) => {
+  const { window } = setup(t);
+  const moveButton = window.document.querySelector('.tab-btn[data-tab="movimientos"]');
+  let moveClicks = 0;
+  moveButton.addEventListener("click", () => { moveClicks++; });
+
+  window.document.getElementById("btn-productos-ir-compras-movimientos").click();
+  assert.equal(moveClicks, 1, "la ruta de Productos debe navegar a Movimientos");
+  window.__BC165_runPendingTimers();
+
+  const modal = window.document.getElementById("bc165-overlay");
+  assert.ok(modal, "la navegación canónica debe abrir el modal de compra");
+  assert.ok(modal.querySelector("#tab-compras"), "el formulario único de compra debe estar dentro del modal");
+  assert.ok(modal.querySelector("#compra-test"), "el formulario único debe permitir introducir campos");
 });
