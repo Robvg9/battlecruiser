@@ -85,6 +85,6 @@ test('release loader places the section guard after legacy UI modules and invali
   assert.ok(visibilityHotfixIndex >= 0 && visibilityHotfixIndex <
     app.indexOf('["section-scope-fix.js","20261016.1"]'),
     'the section guard must execute after the current legacy visibility hotfix');
-  assert.match(app, /const VERSION=["']9\.5\.29["']/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.29"><\/script>/);
+  assert.match(app, /const VERSION=["']9\.5\.30["']/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.30"><\/script>/);
 });
