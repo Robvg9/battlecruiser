@@ -46,6 +46,9 @@ function open(type){
  ov.querySelector('.bc165-panel-host').appendChild(r.panel);
  r.panel.classList.remove('bc165-placeholder');
  r.panel.classList.add('visible');
+ if(type==='compras'&&typeof window.__BC_COMPRAS_ACTIVAR==='function'){
+   Promise.resolve().then(function(){return window.__BC_COMPRAS_ACTIVAR();}).catch(function(err){console.error('[BattleCruiser] No se pudo cargar el catálogo de compra',err);});
+ }
  ov.querySelector('.bc165-close').onclick=function(){close(type,ov);};
  ov.addEventListener('click',function(e){if(e.target===ov)close(type,ov);});
 }
