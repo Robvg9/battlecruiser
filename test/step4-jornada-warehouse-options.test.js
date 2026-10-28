@@ -34,7 +34,8 @@ function createContext(t, { failCatalog = false } = {}) {
   const { window } = dom;
   Object.defineProperty(window.document, "readyState", { configurable: true, value: "complete" });
   Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
-  window._cache = { almacenes: [], usuarios: [] };
+  window.eval("const _cache = { almacenes: [], usuarios: [] };");
+  assert.equal(window._cache, undefined, "el fixture debe reproducir la caché léxica real de core.js");
   window._usuarioActual = { id: "owner-fixture", rol: "Dueño" };
   window.tienePermiso = () => true;
   window.confirm = () => false;
