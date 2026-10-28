@@ -14,11 +14,11 @@ const sw = read("public/service-worker.js");
 const account = read("public/js/mi-cuenta.js");
 
 test("Step 8 release version is aligned across the PWA and Service Worker shell", () => {
-  assert.match(index, /href="style\.css\?v=9\.5\.29"/);
-  assert.match(index, /v9\.5\.29 — BattleCruiser/);
-  assert.match(index, /app\.js\?v=9\.5\.29/);
-  assert.match(app, /const VERSION=["']9\.5\.29["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.29["']/);
+  assert.match(index, /href="style\.css\?v=9\.5\.30"/);
+  assert.match(index, /v9\.5\.30 — BattleCruiser/);
+  assert.match(index, /app\.js\?v=9\.5\.30/);
+  assert.match(app, /const VERSION=["']9\.5\.30["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.30["']/);
   assert.match(sw, /\.\/style\.css/);
   assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.4/);
 });
