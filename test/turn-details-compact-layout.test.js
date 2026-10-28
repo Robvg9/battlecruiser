@@ -16,6 +16,8 @@ test("turn detail preserves its five-step wizard while using compact navigation"
   assert.ok(source.includes("state.step < 5"));
   assert.ok(source.includes(".m33-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px;overflow:visible}"));
   assert.ok(source.includes(".m33-step{min-width:0;padding:6px 4px;text-align:center;line-height:1.2;overflow-wrap:anywhere;"));
+  assert.ok(source.includes(".m33-session-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;min-width:0}"));
+  assert.ok(source.includes('<div class="m33-session-grid">'));
 });
 
 test("turn details reduce padding and keep scrolling inside the dialog body", () => {
@@ -27,7 +29,7 @@ test("turn details reduce padding and keep scrolling inside the dialog body", ()
 });
 
 test("mobile turn details wrap steps rather than forcing horizontal scrolling", () => {
-  assert.ok(source.includes("@media(max-width:720px){.m33-bg{padding:6px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}"));
+  assert.ok(source.includes("@media(max-width:720px){.m33-bg{padding:6px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.m33-session-grid{grid-template-columns:minmax(0,1fr)}"));
   assert.ok(source.includes(".m33-head{padding:10px 12px 7px}.m33-body{padding:10px 12px}.m33-foot{padding:9px 12px}"));
 });
 
