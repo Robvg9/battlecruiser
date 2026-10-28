@@ -223,21 +223,28 @@
         <span id="productos-contador" class="muted mov-contador"></span>
       </div>
       <div id="lista-productos" class="lista"></div>
-      <h3>Registrar compra (entrada de stock)</h3>
-      <form id="form-compra" class="inline-form">
-        <select id="compra-producto" required></select>
-        <select id="compra-almacen" required></select>
-        <select id="compra-presentacion"><option value="">Sin presentación / Unidad base</option></select>
-        <input id="compra-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad de unidades base" required>
-        <input id="compra-costo" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Costo unitario" required>
-        <div id="compra-resumen" class="compra-resumen hidden">
-          <div class="compra-resumen-linea"><span>Compra</span><span id="compra-resumen-cantidad"></span></div>
-          <div class="compra-resumen-linea"><span>Equivalente</span><span id="compra-resumen-equivalente"></span></div>
-          <div class="compra-resumen-linea"><span>Costo</span><span id="compra-resumen-costo"></span></div>
-          <div class="compra-resumen-linea compra-resumen-total"><span>Total</span><span id="compra-resumen-total"></span></div>
-        </div>
-        <button type="submit">Registrar compra</button>
-      </form>
+      <section id="productos-compra-legacy" hidden aria-hidden="true">
+        <h3>Registrar compra (entrada de stock)</h3>
+        <form id="form-compra" class="inline-form">
+          <select id="compra-producto" required></select>
+          <select id="compra-almacen" required></select>
+          <select id="compra-presentacion"><option value="">Sin presentación / Unidad base</option></select>
+          <input id="compra-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad de unidades base" required>
+          <input id="compra-costo" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Costo unitario" required>
+          <div id="compra-resumen" class="compra-resumen hidden">
+            <div class="compra-resumen-linea"><span>Compra</span><span id="compra-resumen-cantidad"></span></div>
+            <div class="compra-resumen-linea"><span>Equivalente</span><span id="compra-resumen-equivalente"></span></div>
+            <div class="compra-resumen-linea"><span>Costo</span><span id="compra-resumen-costo"></span></div>
+            <div class="compra-resumen-linea compra-resumen-total"><span>Total</span><span id="compra-resumen-total"></span></div>
+          </div>
+          <button type="submit">Registrar compra</button>
+        </form>
+      </section>
+      <div id="productos-compra-canonica" class="seccion-cuerpo">
+        <h3>Registrar compra</h3>
+        <p class="muted">Todas las compras se registran desde <strong>Movimientos → Nueva compra</strong>. Así quedan en un único historial y con un solo flujo.</p>
+        <button type="button" id="btn-productos-ir-compras-movimientos" class="cc-accion">Ir a Movimientos · Nueva compra</button>
+      </div>
       <p class="msg" id="msg-productos"></p>
       <div class="rule-orn"><svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg></div>
       <h3>Presentaciones comerciales</h3>
