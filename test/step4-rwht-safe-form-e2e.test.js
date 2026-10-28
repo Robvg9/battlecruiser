@@ -536,6 +536,17 @@ function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result =
     transferencias: [],
     stock: [{ producto_id: "p-fixture", almacen_id: "a-fixture", cantidad: stock }]
   };
+  // refrescarTransferencias performs a read after success; keep that path in-memory too.
+  window.client = {
+    from() {
+      const query = {
+        select() { return query; },
+        order() { return query; },
+        limit() { return Promise.resolve({ data: [], error: null }); }
+      };
+      return query;
+    }
+  };
   window.confirm = () => { confirmations += 1; return confirm; };
   window.ejecutarOperacion = async (type, payload) => {
     calls.push({ type, payload });
@@ -683,9 +694,11 @@ test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
   assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "presentaciones")),
     "el formulario válido debe insertar en el cliente fixture");
+  assert.ok(await esperarHasta(() => /Presentación creada/i.test(
+    c.window.document.getElementById("msg-presentaciones").textContent
+  )), "la UI debe completar el éxito antes de comprobar el reset");
   assert.deepEqual(c.inserts.find((x) => x.table === "presentaciones").payload, { nombre: "Caja fixture" });
   assert.equal(input.value, "", "el formulario se limpia tras el éxito simulado");
-  assert.match(c.window.document.getElementById("msg-presentaciones").textContent, /Presentación creada/i);
 });
 
 test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor válido y envía payload al mock", async (t) => {
@@ -699,6 +712,9 @@ test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor vá
   const presentation = c.window.document.getElementById("pp-presentacion-select");
   const factor = c.window.document.getElementById("pp-factor");
   product.value = "p-fixture";
+  product.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.ok(await esperarHasta(() => Array.from(presentation.options).some((o) => o.value === "pres-fixture")),
+    "la presentación fixture debe cargarse al elegir producto");
   presentation.value = "pres-fixture";
 
   factor.value = "0";
@@ -710,15 +726,31 @@ test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor vá
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
   assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "producto_presentaciones")),
     "la asociación válida debe llegar al cliente fixture");
+  assert.ok(await esperarHasta(() => /Presentación agregada/i.test(
+    c.window.document.getElementById("msg-presentaciones").textContent
+  )), "la UI debe completar la asociación antes de comprobar el mensaje");
   assert.deepEqual(c.inserts.find((x) => x.table === "producto_presentaciones").payload,
     { producto_id: "p-fixture", presentacion_id: "pres-fixture", factor: 12 });
-  assert.match(c.window.document.getElementById("msg-presentaciones").textContent, /Presentación agregada/i);
 });
 
 
 // RWHT-WAREHOUSE-MODAL-20261028
+async function cargarModalAlmacenFixture(context) {
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "public", "js", "m27-7-almacenes-modal.js"),
+    "utf8"
+  );
+  Object.defineProperty(context.document, "readyState", { value: "complete", configurable: true });
+  context.window.eval(source);
+  assert.equal(typeof context.window.__BC_M277_openCreateAlmacen, "function",
+    "el módulo real del modal de almacenes debe exponer el abridor en JSDOM");
+  assert.equal(typeof context.window.__BC_M277_openEditAlmacen, "function",
+    "el módulo real del modal de almacenes debe exponer el editor en JSDOM");
+}
+
 test("Paso 4 RWHT: modal de almacén rechaza nombre vacío y Cancelar no crea nada", async (t) => {
   const c = await contextoListo();
+  await cargarModalAlmacenFixture(c);
   assert.equal(typeof c.window.__BC_M277_openCreateAlmacen, "function",
     "el runtime debe exponer el abridor del modal de alta");
   c.window.__BC_M277_openCreateAlmacen();
@@ -743,6 +775,7 @@ test("Paso 4 RWHT: modal de almacén rechaza nombre vacío y Cancelar no crea na
 
 test("Paso 4 RWHT: modal de almacén edita el ID fixture y envía cambios al RPC simulado", async (t) => {
   const c = await contextoListo();
+  await cargarModalAlmacenFixture(c);
   c.window._cache.almacenes = [
     { id: "alm-edit-fixture", nombre: "Almacén original fixture", tipo: "almacenamiento", activo: true }
   ];
