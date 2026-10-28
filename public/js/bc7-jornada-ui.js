@@ -129,10 +129,11 @@
     if(retry)retry.hidden=!(text&&kind==='error')&&!(/No se encontraron almacenes activos/i.test(text||''));
   }
   function mergeWarehouseRows(rows){
-    if(!Array.isArray(rows)||!rows.length||typeof _cache==='undefined'||!_cache)return;
-    if(!Array.isArray(_cache.almacenes))_cache.almacenes=[];
+    const cache=window._cache;
+    if(!Array.isArray(rows)||!rows.length||!cache)return;
+    if(!Array.isArray(cache.almacenes))cache.almacenes=[];
     const byId=new Map();
-    _cache.almacenes.forEach(w=>{if(w&&w.id!=null)byId.set(String(w.id),w);});
+    cache.almacenes.forEach(w=>{if(w&&w.id!=null)byId.set(String(w.id),w);});
     rows.forEach(w=>{
       if(!w||w.id==null)return;
       const id=String(w.id);
@@ -144,7 +145,7 @@
         old.activo=active;
       }else if(active){
         const item={id:w.id,nombre:w.nombre||id,tipo:w.tipo||null,activo:true};
-        _cache.almacenes.push(item);byId.set(id,item);
+        cache.almacenes.push(item);byId.set(id,item);
       }
     });
   }
