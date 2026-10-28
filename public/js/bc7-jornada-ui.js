@@ -6,6 +6,7 @@
   window.__BC7_JORNADA_UI__=true;
 
   const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null};
+  let warehouseLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const arr=v=>Array.isArray(v)?v:(v==null?[]:[v]);
@@ -15,8 +16,12 @@
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
   function money(v){return typeof window.money==='function'?window.money(Number(v||0)):Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function currentUser(){return window._usuarioActual||window.__bcUser||window.usuarioActual||null;}
-  function warehouses(){return arr(window._cache&&window._cache.almacenes).filter(x=>x&&x.activo!==false);}
-  function users(){return arr(window._cache&&window._cache.usuarios).filter(x=>x&&x.activo!==false&&!x.archivado);}
+  function catalogCache(){
+    try{if(typeof _cache!=='undefined'&&_cache)return _cache;}catch(_){}
+    return window._cache||null;
+  }
+  function warehouses(){const cache=catalogCache();return arr(cache&&cache.almacenes).filter(x=>x&&x.activo!==false);}
+  function users(){const cache=catalogCache();return arr(cache&&cache.usuarios).filter(x=>x&&x.activo!==false&&!x.archivado);}
   function warehouseName(id){const w=warehouses().find(x=>String(x.id)===String(id));return w?w.nombre:('Almacén '+String(id||'').slice(0,8));}
   function userName(id){const u=users().find(x=>String(x.id)===String(id));return u?(u.nombre||u.nombre_usuario||u.email||'Responsable'):String(id||'Sin asignar');}
   function roleOf(u){return String(u&&(u.rol||u.role_name||u.nombre_rol||u.role)||'').toLowerCase();}
@@ -101,7 +106,7 @@
       '<section class="bc7-card bc7-purpose" aria-labelledby="bc7-purpose-title"><h3 id="bc7-purpose-title">¿Para qué sirve esta sección?</h3><p class="bc7-muted">Una jornada es un día de trabajo de un almacén con responsable y horario definidos. Aquí se controla el inicio, el inventario contado físicamente, la actividad y el cierre; no es el historial general de todos los movimientos.</p><ol class="bc7-muted"><li>Consulta el calendario y abre la jornada que te corresponde.</li><li>Antes de empezar, confirma el inventario inicial contando la mercancía física.</li><li>Durante la jornada, registra las operaciones en sus secciones habituales.</li><li>Al terminar, confirma el inventario final y la declaración de dinero, y completa el cierre que autorice el servidor.</li></ol><p class="bc7-muted">Las operaciones se muestran dentro de un día del turno solo cuando existe un vínculo verificable con esa sesión. Las demás se conservan en Movimientos → Historial, organizadas por fecha y almacén.</p></section>'+
       '<section id="bc7-admin-panel" class="bc7-card" hidden>'+
        '<h3>Programación y responsable</h3><p class="bc7-muted">Define el horario, guarda una rotación explícita o programa fechas concretas. No se infieren descansos ni responsables.</p>'+
-       '<div class="bc7-grid"><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><label class="bc7-field">Modo de programación<select id="bc7-plan-mode"><option value="explicit">Fechas explícitas</option><option value="pattern">Usar patrón activo</option></select></label></div>'+
+       '<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">Modo de programación<select id="bc7-plan-mode"><option value="explicit">Fechas explícitas</option><option value="pattern">Usar patrón activo</option></select></label></div>'+
        '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Zona horaria IANA<input id="bc7-timezone" value="America/Havana" required></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
        '<form id="bc7-pattern-form"><h4>Rotación configurable</h4><div class="bc7-grid"><label class="bc7-field">Nombre del patrón<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días de trabajo / 2 descanso" required></label><label class="bc7-field">Fecha ancla<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Días del ciclo<input id="bc7-days-count" type="number" min="1" max="31" value="7" required></label><label class="bc7-field">Inicio de programación<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Preparar días</button><button class="bc7-btn" type="submit">Guardar patrón</button></div><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Previsualizar patrón</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear jornadas</button></div><label class="bc7-field">Observación de programación (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+
@@ -114,8 +119,84 @@
   function fillWarehouses(){
     const sel=$('bc7-warehouse');if(!sel)return;
     const prev=sel.value;
-    sel.innerHTML='<option value="">Selecciona un almacén</option>'+warehouses().map(w=>'<option value="'+esc(w.id)+'">'+esc(w.nombre)+'</option>').join('');
-    if(warehouses().some(w=>String(w.id)===prev))sel.value=prev;
+    const list=warehouses();
+    sel.innerHTML='<option value="">'+(list.length?'Selecciona un almacén':'No hay almacenes cargados')+'</option>'+list.map(w=>'<option value="'+esc(w.id)+'">'+esc(w.nombre)+'</option>').join('');
+    if(list.some(w=>String(w.id)===prev))sel.value=prev;
+    sel.disabled=list.length===0;
+  }
+  function setWarehouseMessage(text,kind){
+    const el=$('bc7-warehouse-msg');
+    if(!el)return;
+    el.textContent=text||'';
+    el.className='bc7-msg '+(kind||'');
+    const retry=$('bc7-warehouse-retry');
+    if(retry)retry.hidden=!(text&&kind==='error')&&!(/No se encontraron almacenes activos/i.test(text||''));
+  }
+  function mergeWarehouseRows(rows){
+    const cache=catalogCache();
+    if(!Array.isArray(rows)||!rows.length||!cache)return;
+    if(!Array.isArray(cache.almacenes))cache.almacenes=[];
+    const byId=new Map();
+    cache.almacenes.forEach(w=>{if(w&&w.id!=null)byId.set(String(w.id),w);});
+    rows.forEach(w=>{
+      if(!w||w.id==null)return;
+      const id=String(w.id);
+      const active=w.activo!==false;
+      const old=byId.get(id);
+      if(old){
+        if(w.nombre!=null)old.nombre=w.nombre;
+        if(w.tipo!=null)old.tipo=w.tipo;
+        old.activo=active;
+      }else if(active){
+        const item={id:w.id,nombre:w.nombre||id,tipo:w.tipo||null,activo:true};
+        cache.almacenes.push(item);byId.set(id,item);
+      }
+    });
+  }
+  async function ensureWarehouseCatalog(){
+    fillWarehouses();
+    if(warehouses().length){setWarehouseMessage('');return warehouses();}
+    if(!navigator.onLine){
+      setWarehouseMessage('Sin conexión. Reconecta para cargar los almacenes y vuelve a intentarlo.','error');
+      return [];
+    }
+    if(warehouseLoadPromise)return warehouseLoadPromise;
+    const sel=$('bc7-warehouse');
+    const retry=$('bc7-warehouse-retry');
+    if(sel){sel.disabled=true;sel.innerHTML='<option value="">Cargando almacenes…</option>';}
+    if(retry)retry.hidden=true;
+    setWarehouseMessage('Cargando los almacenes disponibles…');
+    warehouseLoadPromise=(async()=>{
+      try{
+        let rows=[];
+        if(typeof window.asegurarAlmacenesParaTurnos==='function'){
+          try{rows=arr(await window.asegurarAlmacenesParaTurnos());}catch(_){}
+        }
+        if(!warehouses().length&&!rows.length){
+          rows=arr(await rpc('listar_almacenes_para_turnos',{}));
+        }
+        mergeWarehouseRows(rows);
+        fillWarehouses();
+        const list=warehouses();
+        if(!list.length){
+          setWarehouseMessage('No se encontraron almacenes activos para este usuario. Comprueba los permisos o vuelve a intentar.','');
+          if(retry)retry.hidden=false;
+        }else{
+          setWarehouseMessage('');
+          if(retry)retry.hidden=true;
+        }
+        return list;
+      }catch(e){
+        fillWarehouses();
+        setWarehouseMessage('No se pudieron cargar los almacenes. '+String(e&&e.message||e)+' Puedes reintentarlo.','error');
+        if(retry)retry.hidden=false;
+        return warehouses();
+      }finally{
+        warehouseLoadPromise=null;
+        fillWarehouses();
+      }
+    })();
+    return warehouseLoadPromise;
   }
   function staffOptions(selected){
     return '<option value="">Selecciona responsable</option>'+users().map(u=>'<option value="'+esc(u.id)+'"'+(String(u.id)===String(selected||'')?' selected':'')+'>'+esc(u.nombre||u.nombre_usuario||u.email||u.id)+'</option>').join('');
@@ -417,6 +498,7 @@
     if($('bc7-start-date'))$('bc7-start-date').value=today;
     if($('bc7-list-from'))$('bc7-list-from').value=today;
     fillWarehouses();buildDayRows();
+    ensureWarehouseCatalog();
     try{state.admin=!!(await rpc('bc_actor_is_admin',{}));}
     catch(e){state.admin=false;setStatus('No se verificó el rol: '+e.message,'error');}
     if($('bc7-admin-panel'))$('bc7-admin-panel').hidden=!state.admin;
@@ -441,9 +523,14 @@
     setTimeout(refreshCatalogs,700);setTimeout(refreshCatalogs,1800);
     const listFrom=$('bc7-list-from');if(listFrom)listFrom.addEventListener('change',()=>{state.lastPreview=null;});
     await loadCalendar();
-    window.addEventListener('online',()=>setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok'));
+    window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
+  document.addEventListener('click',function(e){
+    const t=e.target&&e.target.closest?e.target.closest('button,.tab-btn[data-tab="jornada"]'):null;if(!t)return;
+    if(t.id==='bc7-warehouse-retry'){e.preventDefault();ensureWarehouseCatalog();return;}
+    if(t.matches&&t.matches('.tab-btn[data-tab="jornada"]')){setTimeout(()=>{ensureWarehouseCatalog();},0);}
+  });
   document.addEventListener('click',async function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}

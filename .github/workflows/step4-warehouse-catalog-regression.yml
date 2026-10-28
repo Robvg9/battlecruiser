@@ -1,0 +1,60 @@
+name: BattleCruiser Step 4 Warehouse Catalog Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/js/bc7-jornada-ui.js'
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'public/service-worker.js'
+      - 'test/step4-jornada-warehouse-options.test.js'
+      - 'test/step4-jornada-purpose-ux.test.js'
+      - 'test/version-alignment.test.js'
+      - '.github/workflows/step4-warehouse-catalog-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: battlecruiser-step4-warehouse-catalog-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  warehouse-catalog-regression:
+    name: Jornada warehouse catalog and retry regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact pull-request HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Test warehouse catalog, recovery and cache alignment
+        shell: bash
+        run: |
+          mkdir -p test-results
+          set +e
+          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=60000 \
+            test/step4-jornada-warehouse-options.test.js \
+            test/step4-jornada-purpose-ux.test.js \
+            test/version-alignment.test.js > test-results/step4-warehouse-catalog-regression.log 2>&1
+          result=$?
+          cat test-results/step4-warehouse-catalog-regression.log
+          exit $result
+      - name: Persist warehouse catalog regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-step4-warehouse-catalog-${{ github.run_id }}
+          path: test-results/step4-warehouse-catalog-regression.log
+          if-no-files-found: warn
+          retention-days: 30
