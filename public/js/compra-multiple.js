@@ -419,34 +419,21 @@
     });
     confirmar.addEventListener('click', confirmarCompra);
 
-    function activar(){
-      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b === tab); });
-      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('visible', p === section); });
-      // Asegurar datos
-      Promise.resolve().then(async function(){
-        if (typeof cargarAlmacenes === 'function' && !almacenes().length) {
-          try { var a = await cargarAlmacenes(); if (Array.isArray(a)) _cache.almacenes = a; } catch (e) {}
-        }
-        if (typeof cargarProductos === 'function' && !productos().length) {
-          try { var p = await cargarProductos(); if (Array.isArray(p)) _cache.productos = p; } catch (e) {}
-        }
-        poblar();
-        render();
-        if (producto.value) cargarPresentaciones();
-        cargarHistorial();
-      });
+    async function cargarDatosYRender(){
+      if (typeof cargarAlmacenes === 'function' && !almacenes().length) {
+        try { var a = await cargarAlmacenes(); if (Array.isArray(a)) _cache.almacenes = a; } catch (e) {}
+      }
+      if (typeof cargarProductos === 'function' && !productos().length) {
+        try { var p = await cargarProductos(); if (Array.isArray(p)) _cache.productos = p; } catch (e) {}
+      }
+      poblar();
+      render();
+      if (producto.value) await cargarPresentaciones();
+      await cargarHistorial();
     }
-    tab.addEventListener('click', activar);
-
-    // Integrar con navegación global si usan irATab('compras')
-    var tabsEl = document.getElementById('tabs');
-    if (tabsEl && !tabsEl.dataset.bcComprasNav) {
-      tabsEl.dataset.bcComprasNav = '1';
-      tabsEl.addEventListener('click', function(e){
-        var btn = e.target.closest('.tab-btn[data-tab="compras"]');
-        if (btn) setTimeout(activar, 0);
-      });
-    }
+    // La única entrada visible es Movimientos → Nueva compra.
+    // El modal llama este hook cada vez que abre el panel para cargar catálogos e historial.
+    window.__BC_COMPRAS_ACTIVAR = cargarDatosYRender;
 
     poblar();
     render();
