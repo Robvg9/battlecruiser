@@ -67,6 +67,16 @@ test("Paso 4: abrir Nueva Transferencia muestra el formulario dentro del modal y
   assert.equal(window.document.getElementById("tab-transferencias").parentElement.id, "panel-root");
 });
 
+test("Paso 4: abrir Nueva Compra dispara la carga de catálogo e historial", async (t) => {
+  const { window } = setup(t);
+  let calls = 0;
+  window.__BC_COMPRAS_ACTIVAR = async () => { calls += 1; };
+  window.document.querySelector('[data-bc165="compras"]').click();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(calls, 1, "el modal debe activar la carga al abrirse");
+});
+
 test("Paso 4: abrir Nueva Compra muestra el formulario dentro del mismo modal identificable", (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="compras"]').click();
