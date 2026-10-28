@@ -59,7 +59,7 @@ function createContext(t, { failCatalog = false } = {}) {
     }
   };
 
-  window.eval("const _cache = { almacenes: [], usuarios: [] };\\n" + SOURCE);
+  window.eval("const _cache = { almacenes: [], usuarios: [] };\n" + SOURCE);
   t.after(() => window.close());
   return { window, calls };
 }
