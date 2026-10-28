@@ -112,7 +112,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.4"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.5"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
