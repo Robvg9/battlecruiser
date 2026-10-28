@@ -16,8 +16,12 @@
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
   function money(v){return typeof window.money==='function'?window.money(Number(v||0)):Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function currentUser(){return window._usuarioActual||window.__bcUser||window.usuarioActual||null;}
-  function warehouses(){return arr(window._cache&&window._cache.almacenes).filter(x=>x&&x.activo!==false);}
-  function users(){return arr(window._cache&&window._cache.usuarios).filter(x=>x&&x.activo!==false&&!x.archivado);}
+  function catalogCache(){
+    try{if(typeof _cache!=='undefined'&&_cache)return _cache;}catch(_){}
+    return window._cache||null;
+  }
+  function warehouses(){const cache=catalogCache();return arr(cache&&cache.almacenes).filter(x=>x&&x.activo!==false);}
+  function users(){const cache=catalogCache();return arr(cache&&cache.usuarios).filter(x=>x&&x.activo!==false&&!x.archivado);}
   function warehouseName(id){const w=warehouses().find(x=>String(x.id)===String(id));return w?w.nombre:('Almacén '+String(id||'').slice(0,8));}
   function userName(id){const u=users().find(x=>String(x.id)===String(id));return u?(u.nombre||u.nombre_usuario||u.email||'Responsable'):String(id||'Sin asignar');}
   function roleOf(u){return String(u&&(u.rol||u.role_name||u.nombre_rol||u.role)||'').toLowerCase();}
@@ -129,7 +133,7 @@
     if(retry)retry.hidden=!(text&&kind==='error')&&!(/No se encontraron almacenes activos/i.test(text||''));
   }
   function mergeWarehouseRows(rows){
-    const cache=window._cache;
+    const cache=catalogCache();
     if(!Array.isArray(rows)||!rows.length||!cache)return;
     if(!Array.isArray(cache.almacenes))cache.almacenes=[];
     const byId=new Map();
