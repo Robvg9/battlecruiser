@@ -12,7 +12,7 @@ on:
       - 'test/force-close-turno-admin-forward-migration.test.js'
       - 'test/force-close-turno-admin-fixture.sql'
       - 'test/force-close-turno-admin-contract.sql'
-      - 'supabase/migrations/20261027153000_bc7_turno_movimientos_sesion.sql'
+      - 'supabase/migrations/20261027184823_bc7_turno_movimientos_sesion_20261027.sql'
       - 'test/bc7-turno-movimientos-sesion-fixture.sql'
       - 'test/bc7-turno-movimientos-sesion-contract.sql'
       - 'test/bc7-turno-movimientos-sesion-contract.test.js'

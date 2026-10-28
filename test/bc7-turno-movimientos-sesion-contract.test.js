@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const MIGRATION = fs.readFileSync(
-  path.join(__dirname, "..", "supabase", "migrations", "20261027153000_bc7_turno_movimientos_sesion.sql"),
+  path.join(__dirname, "..", "supabase", "migrations", "20261027184823_bc7_turno_movimientos_sesion_20261027.sql"),
   "utf8"
 ).toLowerCase();
 
