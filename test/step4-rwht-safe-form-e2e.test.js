@@ -532,6 +532,8 @@ function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result =
   window.refrescarTransferencias = async () => {};
   window.refrescarStockYSelects = async () => {};
   window.refrescarOperacionesPendientesCache = async () => [];
+  // Post-submit UI refresh dependency; the test checks result payload/state, not summary rendering.
+  window.renderResumen = () => {};
   window._cache = {
     transferencias: [],
     stock: [{ producto_id: "p-fixture", almacen_id: "a-fixture", cantidad: stock }]
