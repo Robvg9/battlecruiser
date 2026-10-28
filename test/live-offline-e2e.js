@@ -619,6 +619,13 @@ async function main() {
     "El menú lateral no es visible/usable, no tiene márgenes o no abre/cierra en móvil: " + JSON.stringify(mobileMenuProbe));
 
 
+  // The login form is intentionally hidden for the header probe above. Re-open a real
+  // long-form panel before measuring document scrolling; otherwise an unauthenticated
+  // shell with no active tab measures only the header/footer and produces a false failure.
+  const mobileScrollPanelOpened = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b)return false;b.click();return true})()");
+  assert(mobileScrollPanelOpened, "No se encontró Configuración para medir el scroll del contenido móvil.");
+  await waitUntil("Configuración visible antes de medir el scroll móvil", "(()=>{const t=document.querySelector('#tab-config');return !!(t&&t.classList.contains('visible'))})()", 5000);
+
   // Verify mobile content uses page scrolling and critical settings remain reachable.
   const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowX:s.overflowX,overflowY:s.overflowY,cssHeight:s.height,maxHeight:s.maxHeight,flex:s.flex,inlineStyle:e.getAttribute('style'),clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,bodyComputedHeight:getComputedStyle(document.body).height,bodyDisplay:getComputedStyle(document.body).display,bodyOverflowY:getComputedStyle(document.body).overflowY,bodyClientHeight:document.body.clientHeight,htmlClientHeight:document.documentElement.clientHeight,shellDisplay:shell?getComputedStyle(shell).display:null,shell:box(shell),main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
   report.evidence.androidMobileContentLayout = mobileContentLayout;
