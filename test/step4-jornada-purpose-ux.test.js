@@ -24,6 +24,17 @@ test("el estado vacío del calendario propone siguientes pasos sin fingir éxito
   assert.match(JOURNADA_UI, /Una asignación solo queda confirmada cuando la valida el servidor/);
 });
 
+test("reintentar el cierre reutiliza la declaración guardada sin intentar registrarla otra vez", () => {
+  const start = JOURNADA_UI.indexOf("async function closeSession(form)");
+  const end = JOURNADA_UI.indexOf("async function submitAdjustment(form)", start);
+  assert.ok(start >= 0 && end > start, "closeSession debe existir en el bundle");
+  const close = JOURNADA_UI.slice(start, end);
+  assert.match(close, /let amount=\$\('bc7-cash'\)\?\.value\.trim\(\)/);
+  assert.match(close, /if\(saved\)\{amount=String\(state\.detail\.declaracion_dinero\.monto\);\}/);
+  assert.match(close, /if\(!saved\) await rpc\('bc_declarar_dinero'/);
+  assert.match(close, /await rpc\('bc5_cerrar_jornada'/);
+});
+
 test("Jornada consulta movimientos por el ID exacto de sesión, nunca solo por fecha", () => {
   const start = JOURNADA_UI.indexOf("async function loadMovements(detail)");
   const end = JOURNADA_UI.indexOf("function renderWorkspace(detail)", start);
