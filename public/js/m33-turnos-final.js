@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.7 — ADMIN: wizard completo · DEPENDIENTA: vista operativa · fechas civiles · asignación persistente inmediata
+// v33.8 — Wizard compacto de cinco pasos · dependienta operativa · fechas civiles · asignación persistente inmediata
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -427,6 +427,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.8-dep', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.9-dep', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
