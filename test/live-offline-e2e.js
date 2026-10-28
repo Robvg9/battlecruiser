@@ -15,6 +15,8 @@ const ANDROID_HEADER_SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-andr
 const CORE_PATHS = ["/", "/index.html", "/app.js", "/style.css"];
 const SUPABASE_CDN_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js";
 const TIMEOUT_MS = 45000;
+const CDP_COMMAND_TIMEOUT_MS = 15000;
+const CDP_RUNTIME_EVALUATE_TIMEOUT_MS = 45000;
 
 const report = {
   test: "BattleCruiser LIVE offline recovery — real Chromium CDP",
@@ -113,16 +115,28 @@ async function localJson(url) {
   if (!response.ok) throw new Error("DevTools HTTP " + response.status + " al leer " + url);
   return response.json();
 }
-function cdpCommand(method, params) {
+function cdpCommand(method, params, timeoutOverrideMs) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error("DevTools WebSocket no está abierto."));
   const id = ++cdpId;
   const message = { id, method, params: params || {} };
+  const timeoutMs = Number.isFinite(timeoutOverrideMs)
+    ? Math.max(1, timeoutOverrideMs)
+    : (method === "Runtime.evaluate" ? CDP_RUNTIME_EVALUATE_TIMEOUT_MS : CDP_COMMAND_TIMEOUT_MS);
   return new Promise((resolve, reject) => {
+    const sentAt = Date.now();
     const timer = setTimeout(() => {
+      const phase = report.evidence.phase || "unknown";
+      const outstanding = Array.from(pendingCommands.entries()).map(([commandId, item]) => ({
+        id: commandId,
+        method: item.method,
+        ageMs: Date.now() - item.sentAt,
+      }));
+      report.evidence.cdpTimeouts = report.evidence.cdpTimeouts || [];
+      report.evidence.cdpTimeouts.push({ id, method, phase, timeoutMs, outstanding });
       pendingCommands.delete(id);
-      reject(new Error("Timeout CDP en " + method));
-    }, 15000);
-    pendingCommands.set(id, { resolve, reject, timer, method });
+      reject(new Error("Timeout CDP en " + method + " después de " + timeoutMs + " ms (fase: " + phase + ")"));
+    }, timeoutMs);
+    pendingCommands.set(id, { resolve, reject, timer, method, sentAt });
     socket.send(JSON.stringify(message));
   });
 }
@@ -143,13 +157,13 @@ function waitForEvent(method, timeoutMs) {
     eventListeners.get(method).add(listener);
   });
 }
-async function evaluate(expression) {
+async function evaluate(expression, timeoutOverrideMs) {
   const result = await cdpCommand("Runtime.evaluate", {
     expression,
     awaitPromise: true,
     returnByValue: true,
     userGesture: true,
-  });
+  }, timeoutOverrideMs);
   if (result.exceptionDetails) {
     const exception = result.exceptionDetails.exception && result.exceptionDetails.exception.description;
     throw new Error("Error JS en evaluación CDP: " + (exception || result.exceptionDetails.text || "desconocido"));
@@ -161,7 +175,7 @@ async function waitUntil(description, predicate, timeoutMs) {
   let lastValue;
   while (Date.now() < deadline) {
     try {
-      lastValue = await evaluate("(async()=>(" + predicate + "))()");
+      lastValue = await evaluate("(async()=>(" + predicate + "))()", Math.min(CDP_COMMAND_TIMEOUT_MS, Math.max(1, deadline - Date.now())));
       if (lastValue) return lastValue;
     } catch (_) {}
     await delay(250);
