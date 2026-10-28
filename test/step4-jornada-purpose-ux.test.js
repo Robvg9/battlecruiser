@@ -7,7 +7,7 @@ const path = require("node:path");
 
 const JOURNADA_UI = fs.readFileSync(path.join(__dirname, "..", "public", "js", "bc7-jornada-ui.js"), "utf8");
 const TURNOS_UI = fs.readFileSync(path.join(__dirname, "..", "public", "js", "turnos-maestro.js"), "utf8");
-const MIGRATION = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations", "20261027153000_bc7_turno_movimientos_sesion.sql"), "utf8");
+const MIGRATION = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations", "20261027184823_bc7_turno_movimientos_sesion_20261027.sql"), "utf8");
 
 test("Jornada e inventario explica el propósito y los pasos en lenguaje operativo", () => {
   assert.match(JOURNADA_UI, /¿Para qué sirve esta sección\?/);
