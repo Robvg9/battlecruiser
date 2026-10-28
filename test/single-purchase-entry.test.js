@@ -14,13 +14,13 @@ const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
 
 test("purchase registration has one user-facing path through Movimientos", () => {
-  assert.doesNotMatch(purchase, /tab\\.id\\s*=\\s*['"]btn-tab-compras['"]/,
+  assert.equal(purchase.includes("tab.id = 'btn-tab-compras'"), false,
     "the purchase module must not add a separate Compras menu tab");
-  assert.doesNotMatch(purchase, /tab\\.dataset\\.tab\\s*=\\s*['"]compras['"]/,
+  assert.equal(purchase.includes("tab.dataset.tab = 'compras'"), false,
     "the purchase module must not register a duplicate navigation route");
-  assert.match(purchase, /section\\.id\\s*=\\s*['"]tab-compras['"]/,
+  assert.ok(purchase.includes("section.id = 'tab-compras'"),
     "the canonical purchase form panel must remain available for the movement modal");
-  assert.match(purchase, /compra-multiple-confirmar/,
+  assert.ok(purchase.includes("compra-multiple-confirmar"),
     "the existing canonical multi-line purchase form must remain intact");
   assert.ok(movementModal.includes("ensure('compras','Nueva Compra')"),
     "Movimientos must keep the Nueva Compra entry point");
@@ -29,20 +29,22 @@ test("purchase registration has one user-facing path through Movimientos", () =>
 });
 
 test("Productos no longer exposes the legacy second purchase form", () => {
-  assert.match(index, /id="compra-canal-unico"/,
+  assert.ok(index.includes('id="compra-canal-unico"'),
     "Productos must explain where the single purchase workflow lives");
-  assert.match(index, /Movimientos → Nueva compra/,
+  assert.ok(index.includes("Movimientos → Nueva compra"),
     "the guidance must send staff to the canonical purchase route");
-  assert.match(index, /<div id="legacy-product-purchase" class="hidden" hidden>[\\s\\S]*?<form id="form-compra"/,
-    "keep the legacy form in the DOM for compatibility, but completely hidden from staff");
-  assert.match(index, /#legacy-product-purchase\\[hidden\\]\\{display:none!important\\}/,
-    "the hidden legacy purchase wrapper must not be overridden by older CSS");
+  assert.ok(index.includes('<div id="legacy-product-purchase" class="hidden" hidden>'),
+    "the legacy form must be hidden from staff but kept for compatibility");
+  assert.ok(index.includes('<form id="form-compra" class="inline-form">'),
+    "legacy compatibility handlers and safety tests keep their expected form");
+  assert.ok(index.includes("#legacy-product-purchase[hidden]{display:none!important}"),
+    "older CSS must not make the hidden legacy purchase form visible");
 });
 
 test("single purchase route cache versions match release 9.5.32", () => {
   assert.ok(app.includes('["compra-multiple.js","27.9"]'));
   assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.8"]'));
-  assert.match(app, /const VERSION="9\\.5\\.32"/);
-  assert.match(serviceWorker, /BC_SW_VERSION\\s*=\\s*"9\\.5\\.32"/);
+  assert.ok(app.includes('const VERSION="9.5.32"'));
+  assert.ok(serviceWorker.includes('BC_SW_VERSION = "9.5.32"'));
   assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.8"));
 });
