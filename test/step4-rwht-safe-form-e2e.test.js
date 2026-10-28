@@ -495,3 +495,222 @@ test("Paso 4 UI: mensaje sin conversación seleccionada se bloquea sin enviar RP
   assert.equal(nuevasEscrituras(c, base).some((call) => call.name === "enviar_mensaje"), false,
     "no se envía mensaje si no hay conversación activa");
 });
+
+
+// RWHT-FIXTURE-BATCH-20261028
+// Additional isolated UI tests. All writes below terminate in in-memory mocks;
+// no test calls a production Supabase endpoint or changes live business data.
+
+function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result = { ok: true, data: "transfer-fixture" } } = {}) {
+  const dom = new JSDOM(
+    "<!doctype html><html><body>" +
+      "<form id='form-transferencia'>" +
+        "<select id='trf-origen'><option value='a-fixture'>Almacén A fixture</option></select>" +
+        "<select id='trf-destino'><option value='b-fixture'>Almacén B fixture</option></select>" +
+        "<select id='trf-producto'><option value='p-fixture'>Producto fixture</option></select>" +
+        "<input id='trf-cantidad' value='2'>" +
+        "<button type='submit'>Transferir</button>" +
+      "</form>" +
+      "<p id='trf-stock-disponible'></p><p id='msg-transferencias'></p>" +
+      "<div id='lista-transferencias'></div><span id='trf-contador'></span>" +
+    "</body></html>",
+    { url: "https://battlecruiser-transfer-fixture.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  const calls = [];
+  let confirmations = 0;
+  window.safeInit = (_selector, callback) => callback();
+  window.tienePermiso = (section, action) => section === "transferencias" && action === "crear";
+  window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.setLoading = () => {};
+  window.setEmpty = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.actualizarContador = () => {};
+  window.escHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  window.fechaCorta = (value) => String(value ?? "");
+  window.idCorto = (value) => String(value ?? "").slice(0, 8);
+  window.money = (value) => String(value ?? 0);
+  window.refrescarTransferencias = async () => {};
+  window.refrescarStockYSelects = async () => {};
+  window.refrescarOperacionesPendientesCache = async () => [];
+  window._cache = {
+    transferencias: [],
+    stock: [{ producto_id: "p-fixture", almacen_id: "a-fixture", cantidad: stock }]
+  };
+  window.confirm = () => { confirmations += 1; return confirm; };
+  window.ejecutarOperacion = async (type, payload) => {
+    calls.push({ type, payload });
+    return result;
+  };
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "transferencias.js"), "utf8");
+  window.eval(source);
+  return { dom, window, calls, get confirmations() { return confirmations; } };
+}
+
+test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad y solo un submit", async (t) => {
+  const c = crearContextoTransferenciaFixture();
+  t.after(() => c.dom.window.close());
+  const form = c.window.document.getElementById("form-transferencia");
+  const submit = form.querySelector("button[type='submit']");
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+
+  assert.ok(await esperarHasta(() => c.calls.length === 1), "un único submit debe llegar al ejecutor simulado");
+  assert.ok(await esperarHasta(() => /Transferencia registrada/i.test(c.window.document.getElementById("msg-transferencias").textContent)),
+    "la respuesta correcta debe quedar reflejada en la interfaz");
+  assert.deepEqual(c.calls[0], {
+    type: "transferencia",
+    payload: {
+      p_origen_id: "a-fixture",
+      p_destino_id: "b-fixture",
+      p_lineas: [{ producto_id: "p-fixture", cantidad: 2 }]
+    }
+  });
+  assert.equal(c.confirmations, 1, "la segunda pulsación no debe abrir otra confirmación");
+  assert.equal(submit.disabled, false, "el botón debe habilitarse al finalizar");
+  assert.equal(submit.textContent, "Transferir", "el texto original se debe restaurar");
+});
+
+test("Paso 4 RWHT: cantidad cero/negativa o superior al stock se bloquea sin confirmar ni ejecutar", async (t) => {
+  for (const caso of [
+    { cantidad: "0", stock: 8, esperado: /cantidad debe ser mayor a 0/i },
+    { cantidad: "-1", stock: 8, esperado: /cantidad debe ser mayor a 0/i },
+    { cantidad: "9", stock: 8, esperado: /stock insuficiente/i }
+  ]) {
+    const c = crearContextoTransferenciaFixture({ stock: caso.stock });
+    t.after(() => c.dom.window.close());
+    c.window.document.getElementById("trf-cantidad").value = caso.cantidad;
+    c.window.document.getElementById("form-transferencia").dispatchEvent(
+      new c.window.Event("submit", { bubbles: true, cancelable: true })
+    );
+    assert.ok(caso.esperado.test(c.window.document.getElementById("msg-transferencias").textContent),
+      "debe mostrar el rechazo correcto para cantidad=" + caso.cantidad);
+    assert.equal(c.calls.length, 0, "el dato inválido no debe llegar al ejecutor");
+    assert.equal(c.confirmations, 0, "el dato inválido no debe pedir confirmación");
+  }
+});
+
+function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
+  const dom = new JSDOM(
+    "<!doctype html><html><body>" +
+      "<section class='presentaciones-panel'>" +
+        "<form id='form-presentacion-nueva'><input id='pres-nombre-nueva'><button type='submit'>Crear presentación</button></form>" +
+        "<p id='msg-presentaciones'></p><div id='lista-presentaciones-catalogo'></div>" +
+        "<select id='pp-producto-select'><option value=''>Elegí producto</option><option value='p-fixture'>Producto fixture</option></select>" +
+        "<form id='form-pp-nueva' class='hidden'><select id='pp-presentacion-select'><option value=''>Elegí presentación</option></select>" +
+        "<input id='pp-factor' type='number'><button type='submit'>Agregar presentación al producto</button></form>" +
+        "<div id='pp-lista-asociaciones'></div>" +
+      "</section></body></html>",
+    { url: "https://battlecruiser-presentaciones-fixture.test/", runScripts: "outside-only" }
+  );
+  const { window } = dom;
+  const database = {
+    presentaciones: presentaciones.map((p) => ({ ...p })),
+    producto_presentaciones: []
+  };
+  const inserts = [];
+  let sequence = 0;
+  window.safeInit = (_selector, callback) => callback();
+  window.tienePermiso = () => true;
+  window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.setLoading = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.setEmpty = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
+  window.mensajeListaVacia = (_key, message) => message;
+  window.escHtml = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  window.fillSelect = (select, rows, valueKey, labelFn) => {
+    select.innerHTML = "";
+    const placeholder = window.document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Elegí…";
+    select.appendChild(placeholder);
+    (rows || []).forEach((row) => {
+      const option = window.document.createElement("option");
+      option.value = row[valueKey];
+      option.textContent = labelFn(row);
+      select.appendChild(option);
+    });
+  };
+  window.withCache = async (_key, callback) => {
+    const result = await callback();
+    return result?.data ?? [];
+  };
+  window.client = {
+    rpc: async () => ({ data: true, error: null }),
+    from(table) {
+      const query = {
+        select() { return query; },
+        order() { return query; },
+        eq() { return query; },
+        insert(payload) {
+          inserts.push({ table, payload: { ...payload } });
+          sequence += 1;
+          const row = { id: "presentation-write-fixture-" + sequence, ...payload, activo: true };
+          if (table === "presentaciones") database.presentaciones.push(row);
+          if (table === "producto_presentaciones") {
+            row.presentaciones = database.presentaciones.find((p) => p.id === payload.presentacion_id) || { nombre: "Presentación fixture" };
+            database.producto_presentaciones.push(row);
+          }
+          return Promise.resolve({ data: row, error: null });
+        },
+        then(resolve, reject) {
+          let rows = database[table] || [];
+          if (table === "producto_presentaciones") rows = rows.map((row) => ({
+            ...row,
+            presentaciones: row.presentaciones || database.presentaciones.find((p) => p.id === row.presentacion_id) || { nombre: "Presentación fixture" }
+          }));
+          return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+        }
+      };
+      return query;
+    }
+  };
+  const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "presentaciones.js"), "utf8");
+  window.eval(source);
+  return { dom, window, database, inserts };
+}
+
+test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock", async (t) => {
+  const c = crearContextoPresentacionesFixture();
+  t.after(() => c.dom.window.close());
+  await c.window.inicializarPresentaciones();
+  const form = c.window.document.getElementById("form-presentacion-nueva");
+  const input = c.window.document.getElementById("pres-nombre-nueva");
+
+  input.value = "   ";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.equal(c.inserts.length, 0, "un nombre vacío no debe escribir");
+
+  input.value = "Caja fixture";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "presentaciones")),
+    "el formulario válido debe insertar en el cliente fixture");
+  assert.deepEqual(c.inserts.find((x) => x.table === "presentaciones").payload, { nombre: "Caja fixture" });
+  assert.equal(input.value, "", "el formulario se limpia tras el éxito simulado");
+  assert.match(c.window.document.getElementById("msg-presentaciones").textContent, /Presentación creada/i);
+});
+
+test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor válido y envía payload al mock", async (t) => {
+  const c = crearContextoPresentacionesFixture({
+    presentaciones: [{ id: "pres-fixture", nombre: "Caja fixture", activo: true }]
+  });
+  t.after(() => c.dom.window.close());
+  await c.window.inicializarPresentaciones();
+  const form = c.window.document.getElementById("form-pp-nueva");
+  const product = c.window.document.getElementById("pp-producto-select");
+  const presentation = c.window.document.getElementById("pp-presentacion-select");
+  const factor = c.window.document.getElementById("pp-factor");
+  product.value = "p-fixture";
+  presentation.value = "pres-fixture";
+
+  factor.value = "0";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.equal(c.inserts.some((x) => x.table === "producto_presentaciones"), false,
+    "el factor cero debe bloquearse antes de escribir");
+
+  factor.value = "12";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "producto_presentaciones")),
+    "la asociación válida debe llegar al cliente fixture");
+  assert.deepEqual(c.inserts.find((x) => x.table === "producto_presentaciones").payload,
+    { producto_id: "p-fixture", presentacion_id: "pres-fixture", factor: 12 });
+  assert.match(c.window.document.getElementById("msg-presentaciones").textContent, /Presentación agregada/i);
+});
