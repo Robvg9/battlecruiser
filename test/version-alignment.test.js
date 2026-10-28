@@ -79,7 +79,7 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.7"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
   assert.ok(app.includes('["m33-turnos-final.js","33.8"]'), 'the turn detail modal cache key must load the audited recovery action');
-  assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261026\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
+  assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261028\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
   assert.ok(m74.includes("window.__BC_POS_NEEDS_SESSION__"), 'the policy exposes a session-required hint');
@@ -94,16 +94,16 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 
 
 test('movement operation modal cache key is refreshed for the race fix', () => {
-  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.7"\]/);
-  assert.match(sw, /\.\/js\/hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.7/);
+  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.8"\]/);
+  assert.match(sw, /\.\/js\/hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.8/);
 });
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.5\.30["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.30["']/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
-  assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261026\.1/, "the sidebar visibility policy must be available in the offline shell");
+  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261028\.1"\]/);
+  assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261028\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
