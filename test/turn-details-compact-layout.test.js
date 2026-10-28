@@ -20,7 +20,7 @@ test("turn detail preserves its five-step wizard while using compact navigation"
 
 test("turn details reduce padding and keep scrolling inside the dialog body", () => {
   assert.ok(source.includes("max-height:94vh;max-height:94dvh;overflow:hidden"));
-  assert.ok(source.includes(".m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain}"));
+  assert.ok(source.includes(".m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}"));
   assert.ok(source.includes(".m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}"));
   assert.ok(source.includes(".m33-box{padding:8px 9px;"));
   assert.ok(source.includes(".m33-session{padding:7px 0;"));
