@@ -20,7 +20,7 @@ test("Step 8 release version is aligned across the PWA and Service Worker shell"
   assert.match(app, /const VERSION=["']9\.5\.31["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.31["']/);
   assert.match(sw, /\.\/style\.css/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.4/);
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.5/);
 });
 
 test("Mobile footer stays in document flow and respects safe-area/real viewport height", () => {
