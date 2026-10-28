@@ -58,8 +58,6 @@
       '#tab-compras .compra-linea-editor{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}',
       '#tab-compras .compra-resumen-box{margin:12px 0;padding:12px;border:1px solid var(--gold-dim,#c9a24d33);border-radius:10px;background:var(--stone)}',
       '#tab-compras .compra-resumen-box .row{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}',
-      '#tab-productos #form-compra{opacity:.92}',
-      '#tab-productos h3:has(+ #form-compra),#tab-productos #form-compra + *{/* keep */}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -69,21 +67,10 @@
       // ya existe: reforzar wire si hace falta
       return;
     }
-    var tabs = document.getElementById('tabs');
     var main = document.querySelector('.main-content');
-    if (!tabs || !main) return;
+    if (!main) return;
 
     injectStyles();
-
-    var tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'tab-btn';
-    tab.id = 'btn-tab-compras';
-    tab.dataset.tab = 'compras';
-    tab.textContent = 'Compras';
-    var anchor = tabs.querySelector('[data-tab="transferencias"]');
-    if (anchor) tabs.insertBefore(tab, anchor);
-    else tabs.appendChild(tab);
 
     var section = document.createElement('section');
     section.id = 'tab-compras';
@@ -432,34 +419,21 @@
     });
     confirmar.addEventListener('click', confirmarCompra);
 
-    function activar(){
-      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b === tab); });
-      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('visible', p === section); });
-      // Asegurar datos
-      Promise.resolve().then(async function(){
-        if (typeof cargarAlmacenes === 'function' && !almacenes().length) {
-          try { var a = await cargarAlmacenes(); if (Array.isArray(a)) _cache.almacenes = a; } catch (e) {}
-        }
-        if (typeof cargarProductos === 'function' && !productos().length) {
-          try { var p = await cargarProductos(); if (Array.isArray(p)) _cache.productos = p; } catch (e) {}
-        }
-        poblar();
-        render();
-        if (producto.value) cargarPresentaciones();
-        cargarHistorial();
-      });
+    async function cargarDatosYRender(){
+      if (typeof cargarAlmacenes === 'function' && !almacenes().length) {
+        try { var a = await cargarAlmacenes(); if (Array.isArray(a)) _cache.almacenes = a; } catch (e) {}
+      }
+      if (typeof cargarProductos === 'function' && !productos().length) {
+        try { var p = await cargarProductos(); if (Array.isArray(p)) _cache.productos = p; } catch (e) {}
+      }
+      poblar();
+      render();
+      if (producto.value) await cargarPresentaciones();
+      await cargarHistorial();
     }
-    tab.addEventListener('click', activar);
-
-    // Integrar con navegación global si usan irATab('compras')
-    var tabsEl = document.getElementById('tabs');
-    if (tabsEl && !tabsEl.dataset.bcComprasNav) {
-      tabsEl.dataset.bcComprasNav = '1';
-      tabsEl.addEventListener('click', function(e){
-        var btn = e.target.closest('.tab-btn[data-tab="compras"]');
-        if (btn) setTimeout(activar, 0);
-      });
-    }
+    // La única entrada visible es Movimientos → Nueva compra.
+    // El modal llama este hook cada vez que abre el panel para cargar catálogos e historial.
+    window.__BC_COMPRAS_ACTIVAR = cargarDatosYRender;
 
     poblar();
     render();

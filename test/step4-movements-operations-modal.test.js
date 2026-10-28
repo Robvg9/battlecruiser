@@ -15,7 +15,6 @@ function setup(t) {
   const dom = new JSDOM(
     "<!doctype html><html><head></head><body>" +
       '<button class="tab-btn" data-tab="transferencias"></button>' +
-      '<button class="tab-btn" data-tab="compras"></button>' +
       '<section id="tab-movimientos" class="tab-panel visible"><div class="bc-m51-hero"><div><h2>Movimientos</h2></div></div></section>' +
       '<div id="panel-root">' +
         '<section id="tab-transferencias" class="tab-panel"><form id="transfer-form"><input id="transfer-test" aria-label="Transferencia input"></form></section>' +
@@ -46,6 +45,8 @@ test("Paso 4: los botones Nueva Transferencia y Nueva Compra se montan en Movimi
   const { window } = setup(t);
   assert.equal(window.__BC165_verify().newTransfer, true);
   assert.equal(window.__BC165_verify().newPurchase, true);
+  assert.equal(window.__BC165_verify().purchaseTabHidden, true, "Compras debe abrirse desde Movimientos y no como pestaña independiente");
+  assert.equal(window.document.querySelector('.tab-btn[data-tab="compras"]'), null);
   const css = window.document.getElementById("bc165-css").textContent;
   assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /flex-wrap:wrap/);
@@ -64,6 +65,16 @@ test("Paso 4: abrir Nueva Transferencia muestra el formulario dentro del modal y
   modal.querySelector(".bc165-close").click();
   assert.equal(window.document.getElementById("bc165-overlay"), null);
   assert.equal(window.document.getElementById("tab-transferencias").parentElement.id, "panel-root");
+});
+
+test("Paso 4: abrir Nueva Compra dispara la carga de catálogo e historial", async (t) => {
+  const { window } = setup(t);
+  let calls = 0;
+  window.__BC_COMPRAS_ACTIVAR = async () => { calls += 1; };
+  window.document.querySelector('[data-bc165="compras"]').click();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(calls, 1, "el modal debe activar la carga al abrirse");
 });
 
 test("Paso 4: abrir Nueva Compra muestra el formulario dentro del mismo modal identificable", (t) => {

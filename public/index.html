@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.31">
+<link rel="stylesheet" href="style.css?v=9.5.32">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 .venta-almacen-operativo{margin-bottom:12px;padding:12px 14px;border-radius:8px;background:var(--stone);border:1px solid var(--gold-dim);display:flex;flex-direction:column;gap:4px}
@@ -24,7 +24,7 @@
 #venta-almacen.hidden{display:none!important}
 #turno-acciones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 #turno-almacen-abrir{min-width:180px;flex:1 1 160px;padding:9px 11px;background:var(--void);border:1px solid #c9a24d33;border-radius:5px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px}
-#turno-almacen-abrir.hidden{display:none!important}
+#turno-almacen-abrir.hidden{display:none!important}#legacy-product-purchase[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -78,7 +78,7 @@
       <button type="button" class="login-utility" id="password-recovery-request-btn">Enviar correo de recuperación</button>
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote app-version-label">v9.5.31 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.32 — BattleCruiser</p>
     </form>
   </div>
 
@@ -223,6 +223,8 @@
         <span id="productos-contador" class="muted mov-contador"></span>
       </div>
       <div id="lista-productos" class="lista"></div>
+      <p id="compra-canal-unico" class="muted">Para registrar compras, abre <strong>Movimientos → Nueva compra</strong>. Todas las compras se registran desde ese único formulario.</p>
+      <div id="legacy-product-purchase" class="hidden" hidden>
       <h3>Registrar compra (entrada de stock)</h3>
       <form id="form-compra" class="inline-form">
         <select id="compra-producto" required></select>
@@ -238,6 +240,7 @@
         </div>
         <button type="submit">Registrar compra</button>
       </form>
+      </div>
       <p class="msg" id="msg-productos"></p>
       <div class="rule-orn"><svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg></div>
       <h3>Presentaciones comerciales</h3>
@@ -651,6 +654,6 @@
 <script src="js/comunicacion.js"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.31"></script>
+<script src="app.js?v=9.5.32"></script>
 </body>
 </html>

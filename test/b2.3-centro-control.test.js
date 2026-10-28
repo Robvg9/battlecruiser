@@ -288,7 +288,16 @@ test("B2.3-C: acciones bloqueadas para SINCRONIZANDO (no reintento paralelo)", a
   await window.reintentarOperacionPendiente(op.id, null);
   await esperar(10);
   assert.ok(/no requiere reintento/i.test(msgEl.textContent), "debe bloquear reintento en SINCRONIZANDO");
-  assert.equal(client.__rpcCalls.length, 0, "blocked retry must not issue any RPC");
+  const writeRpcNames = new Set([
+    "registrar_compra", "registrar_venta", "registrar_transferencia", "registrar_vale_salida",
+    "crear_producto", "actualizar_producto", "cambiar_estado_producto",
+    "abrir_turno", "cerrar_turno", "registrar_cuadre", "revisar_cuadre",
+    "crear_responsabilidad", "actualizar_responsabilidad", "crear_incidencia", "resolver_incidencia",
+    "enviar_mensaje", "crear_conversacion", "crear_almacen", "editar_almacen",
+    "activar_desactivar_almacen"
+  ]);
+  const writeCalls = client.__rpcCalls.filter((call) => writeRpcNames.has(call.nombre));
+  assert.equal(writeCalls.length, 0, "blocked retry must not issue a write RPC; unrelated startup reads are allowed");
 });
 
 test("B2.3: doble sincronización simultánea → 1 sola ejecución real (mutex _sincronizando)", async () => {

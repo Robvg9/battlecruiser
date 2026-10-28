@@ -46,6 +46,9 @@ function open(type){
  ov.querySelector('.bc165-panel-host').appendChild(r.panel);
  r.panel.classList.remove('bc165-placeholder');
  r.panel.classList.add('visible');
+ if(type==='compras'&&typeof window.__BC_COMPRAS_ACTIVAR==='function'){
+   Promise.resolve().then(function(){return window.__BC_COMPRAS_ACTIVAR();}).catch(function(err){console.error('[BattleCruiser] No se pudo cargar el catálogo de compra',err);});
+ }
  ov.querySelector('.bc165-close').onclick=function(){close(type,ov);};
  ov.addEventListener('click',function(e){if(e.target===ov)close(type,ov);});
 }
@@ -76,5 +79,5 @@ function install(){
 function boot(){[0,300,900,1800,3000,5000].forEach(function(ms){setTimeout(install,ms)});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.__BC165_open=open;window.__BC165_close=close;
-window.__BC165_verify=function(){return{transferTabHidden:!!document.querySelector('.tab-btn[data-tab="transferencias"].hidden')||!!document.querySelector('.tab-btn[data-tab="transferencias"].hidden'),purchaseTabHidden:!!document.querySelector('.tab-btn[data-tab="compras"].hidden'),newTransfer:!!document.querySelector('[data-bc165="transferencias"]'),newPurchase:!!document.querySelector('[data-bc165="compras"]'),transferPanelPresent:!!(refs.transferencias&&refs.transferencias.panel),purchasePanelPresent:!!(refs.compras&&refs.compras.panel)}};
+window.__BC165_verify=function(){return{transferTabHidden:!!document.querySelector('.tab-btn[data-tab="transferencias"].hidden')||!!document.querySelector('.tab-btn[data-tab="transferencias"].hidden'),purchaseTabHidden:!document.querySelector('.tab-btn[data-tab="compras"]')||!!document.querySelector('.tab-btn[data-tab="compras"].hidden'),newTransfer:!!document.querySelector('[data-bc165="transferencias"]'),newPurchase:!!document.querySelector('[data-bc165="compras"]'),transferPanelPresent:!!(refs.transferencias&&refs.transferencias.panel),purchasePanelPresent:!!(refs.compras&&refs.compras.panel)}};
 })();
