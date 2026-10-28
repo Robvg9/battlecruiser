@@ -70,16 +70,16 @@ test("la vista de archivo por turno mantiene separado el histórico general de a
 
 
 test("Jornada recupera el catálogo de almacenes cuando la caché está vacía", () => {
-  assert.match(JORNADA_UI, /async function ensureWarehouseCatalog\(\)/,
+  assert.match(JOURNADA_UI, /async function ensureWarehouseCatalog\(\)/,
     "Jornada debe tener una carga explícita del catálogo");
-  assert.match(JORNADA_UI, /rpc\('listar_almacenes_para_turnos',\{\}\)/,
+  assert.match(JOURNADA_UI, /rpc\('listar_almacenes_para_turnos',\{\}\)/,
     "el selector debe usar el RPC dedicado permitido para Turnos");
-  assert.match(JORNADA_UI, /mergeWarehouseRows\(rows\)/,
+  assert.match(JOURNADA_UI, /mergeWarehouseRows\(rows\)/,
     "las filas autorizadas deben incorporarse a la caché existente");
-  assert.match(JORNADA_UI, /ensureWarehouseCatalog\(\);/,
+  assert.match(JOURNADA_UI, /ensureWarehouseCatalog\(\);/,
     "la inicialización debe iniciar la carga del catálogo sin bloquear el arranque");
-  assert.match(JORNADA_UI, /bc7-warehouse-retry/,
+  assert.match(JOURNADA_UI, /bc7-warehouse-retry/,
     "si falla, debe existir una acción visible de reintento");
-  assert.match(JORNADA_UI, /\.tab-btn\[data-tab="jornada"\]/,
+  assert.match(JOURNADA_UI, /\.tab-btn\[data-tab="jornada"\]/,
     "al volver a abrir Jornada debe reintentarse la carga");
 });
