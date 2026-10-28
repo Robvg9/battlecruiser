@@ -8,7 +8,7 @@
 
   const ROOT_ID = 'ciclos-m18-root';
   const API = () => window.BattleCruiserTurnoAPI;
-  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false };
+  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false };
   const root = () => document.getElementById(ROOT_ID);
   const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
   const date = v => {
@@ -113,11 +113,23 @@
     return '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duración</span><b>' + esc(field(t.dias_turno)) + ' día(s)</b></div><div class="m33-box"><span>Sesiones</span><b>' + s.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + s.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + s.length + '</b></div></div><h4 style="margin:20px 0 8px">Sesiones</h4>' + (s.map(x => '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + '</div></div><div><span class="m33-pill ' + (x.usuario_id ? 'm33-ok' : 'm33-warn') + '">' + esc(x.usuario_nombre || (x.usuario_id ? 'Asignada' : 'Sin asignar')) + '</span></div></div></div>').join('') || '<div class="m33-muted">Sin sesiones.</div>');
   }
   function step2() {
+    if (state.readOnly) {
+      return '<p class="m33-muted" role="status">Expediente histórico en solo lectura. Las asignaciones se muestran tal como quedaron registradas.</p>' +
+        state.sesiones.map(function (session) {
+          const assigned = session.usuario_nombre || (session.usuario_id ? 'Asignada' : 'Sin asignar');
+          return '<div class="m33-session"><label>Día ' + esc(session.numero_dia) + ' · ' + esc(labelBloque(session.bloque)) +
+            '</label><div class="m33-muted" data-m33-readonly-assignment="' + esc(session.id) + '">' + esc(assigned) + '</div></div>';
+        }).join('');
+    }
     const us = users();
-    return '<p class="m33-muted">Asigna una trabajadora a cada sesión. Los cambios se guardan inmediatamente; el botón Guardar vuelve a verificar todo el bloque.</p>' + '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>' + state.sesiones.map(s => {
-      const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' + (String(u.id) === String(s.usuario_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.email || u.id) + '</option>').join('');
-      return '<div class="m33-session"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) + '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || '') + '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
-    }).join('');
+    return '<p class="m33-muted">Asigna una trabajadora a cada sesión. Los cambios se guardan inmediatamente; el botón Guardar vuelve a verificar todo el bloque.</p>' +
+      '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>' + state.sesiones.map(s => {
+        const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' +
+          (String(u.id) === String(s.usuario_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.email || u.id) + '</option>').join('');
+        return '<div class="m33-session"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) +
+          '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || '') +
+          '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
+      }).join('');
   }
   function archiveSessionsForViewer() {
     const sessions = state.sesiones || [];
@@ -158,7 +170,8 @@
   function bodyDependienta(t) {
     var me = currentUserId();
     var mias = state.sesiones.filter(sesionAsignadaAMi);
-    var html = '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado turno</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div>';
+    var html = state.readOnly ? '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>' : '';
+    html += '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado turno</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div>';
     html += '<h4 style="margin:18px 0 8px">Tus sesiones</h4>';
     html += '<p class="m33-muted">Solo ves las sesiones asignadas a vos. La secuencia la controla el sistema.</p>';
     html += '<p id="m33-dep-msg" class="m33-msg"></p>';
@@ -168,7 +181,8 @@
       var st = normEstadoSesion(x.estado);
       var labelSt = st === 'PENDIENTE' || st === 'PROGRAMADA' ? 'Sin comenzar' : st === 'EN_CURSO' ? 'En curso' : st === 'COMPLETADA' ? 'Completada' : (st || '—');
       var actions = '';
-      if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
+      if (state.readOnly) actions = '<span class="m33-pill">Solo lectura</span>';
+      else if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
       else if (st === 'EN_CURSO') actions = '<span class="m33-pill m33-ok">Sesión en curso</span>';
       else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
       return '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia || x.dia_n) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + ' · ' + esc(labelSt) + '</div></div><div>' + actions + '</div></div></div>';
@@ -187,7 +201,7 @@
   // Apertura de una sesión M29/turno_sesiones. La RPC dedicada valida asignación,
   // fecha de hoy, secuencia estricta y crea el tramo + ABIERTO legacy en la misma transacción.
   async function abrirSesionDependienta(sesionId, btn) {
-    if (!sesionId) return;
+    if (state.readOnly || !sesionId) return;
     if (btn && btn.dataset.bcBusy === '1') return;
     if (btn) { btn.dataset.bcBusy = '1'; btn.disabled = true; }
     setDepMsg('Abriendo sesión…', true);
@@ -215,7 +229,7 @@
 
   function close() { var bg = document.getElementById('m33-bg'); if (bg) bg.remove(); }
   async function deleteTurno() {
-    if (!state.isAdmin) return;
+    if (!state.isAdmin || state.readOnly) return;
     if (!confirm('¿Eliminar este Turno?')) return;
     try { await API().anularTurno(state.turno.id, 'Cancelado por ADMIN'); close(); if (window.__BC_M29__ && window.__BC_M29__.renderHome) window.__BC_M29__.renderHome(); }
     catch (e) { alert('No se pudo eliminar: ' + (e.message || e)); }
@@ -229,7 +243,7 @@
   }
 
   async function persistAssignmentSelect(sel) {
-    if (!state.isAdmin || !sel || !sel.dataset.m33Sid) return;
+    if (!state.isAdmin || state.readOnly || !sel || !sel.dataset.m33Sid) return;
     var next = sel.value || '';
     var prev = sel.dataset.bcPrev || '';
     if (next === prev) return;
@@ -266,7 +280,7 @@
   }
 
   async function saveAssignments() {
-    if (!state.isAdmin) return;
+    if (!state.isAdmin || state.readOnly) return;
     const ov = document.getElementById('m33-bg');
     const sels = [].slice.call(ov.querySelectorAll('select[data-m33-sid]'));
     try {
@@ -385,19 +399,19 @@
     const bodies = [step1(t), step2(), step3(), step4(), step5(t)];
     const prev = state.step > 1 ? '<button type="button" id="m33-prev">Atrás</button>' : '';
     const next = state.step < 5 ? '<button type="button" id="m33-next" class="primary">Avanzar</button>' : '<button type="button" id="m33-close-final">Cerrar</button>';
-    ov.innerHTML = '<div class="m33-modal"><div class="m33-head"><div class="m33-title"><div><h3>Turno · ' + esc(field(t.almacen_nombre || t.almacen)) + '</h3><div class="m33-muted">' + esc(titles[state.step - 1]) + '</div></div><button type="button" id="m33-x">X</button></div><div class="m33-steps">' + titles.map(function (x, i) { return '<div class="m33-step ' + (state.step === i + 1 ? 'active' : '') + '"><b>' + (i + 1) + '</b> · ' + x + '</div>'; }).join('') + '</div></div><div class="m33-body">' + bodies[state.step - 1] + '</div><div class="m33-foot"><div>' + (state.step === 1 && String(t.estado_maestro || t.estado || '').toUpperCase() === 'PROGRAMADO' ? '<button type="button" id="m33-delete" class="danger">Eliminar</button>' : '') + '</div><div>' + prev + (state.step === 2 ? '<button type="button" id="m33-save" style="margin-left:8px">Guardar</button>' : '') + next + '</div></div></div>';
+    ov.innerHTML = '<div class="m33-modal"><div class="m33-head"><div class="m33-title"><div><h3>Turno · ' + esc(field(t.almacen_nombre || t.almacen)) + '</h3><div class="m33-muted">' + esc(titles[state.step - 1]) + '</div></div><button type="button" id="m33-x">X</button></div><div class="m33-steps">' + titles.map(function (x, i) { return '<div class="m33-step ' + (state.step === i + 1 ? 'active' : '') + '"><b>' + (i + 1) + '</b> · ' + x + '</div>'; }).join('') + '</div></div><div class="m33-body">' + (state.readOnly ? '<p class="m33-muted" role="status">Expediente histórico · Solo lectura.</p>' : '') + bodies[state.step - 1] + '</div><div class="m33-foot"><div>' + (!state.readOnly && state.step === 1 && String(t.estado_maestro || t.estado || '').toUpperCase() === 'PROGRAMADO' ? '<button type="button" id="m33-delete" class="danger">Eliminar</button>' : '') + '</div><div>' + prev + (state.step === 2 && !state.readOnly ? '<button type="button" id="m33-save" style="margin-left:8px">Guardar</button>' : '') + next + '</div></div></div>';
     ov.querySelector('#m33-x').onclick = close;
     var p = ov.querySelector('#m33-prev'); if (p) p.onclick = function () { state.step--; renderModal(); };
     var n = ov.querySelector('#m33-next'); if (n) n.onclick = function () { state.step++; renderModal(); };
     var cf = ov.querySelector('#m33-close-final'); if (cf) cf.onclick = close;
     var d = ov.querySelector('#m33-delete'); if (d) d.onclick = deleteTurno;
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
-    if (state.step === 2) bindAssignmentAutosave();
+    if (state.step === 2 && !state.readOnly) bindAssignmentAutosave();
     if (state.step === 3) bindArchiveButtons(ov);
   }
 
-  async function open(id) {
-    css(); state.step = 1; state.busy = true; await resolveAdmin();
+  async function open(id, options) {
+    css(); state.step = 1; state.busy = true; state.readOnly = !!(options && options.readOnly === true); await resolveAdmin();
     const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
     try { await load(id); state.busy = false; renderModal(); }
     catch (e) { state.busy = false; ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>'; ov.querySelector('#m33-error-close').onclick = close; }
