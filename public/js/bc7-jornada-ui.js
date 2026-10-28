@@ -25,7 +25,7 @@
   function can(section,action){try{return typeof tienePermiso==='function'&&tienePermiso(section,action)}catch(e){return false}}
   async function rpc(name,params){
     if(!navigator.onLine)throw new Error('Estás sin conexión. Reconecta para consultar o guardar datos; nada se ha enviado.');
-    if(!window.client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
+    if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
     const r=await client.rpc(name,params||{});
     if(r&&r.error){const e=new Error(r.error.message||r.error.details||'La operación fue rechazada.');e.code=r.error.code;e.rpc=name;throw e;}
     return r?r.data:null;
