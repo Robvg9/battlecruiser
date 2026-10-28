@@ -58,8 +58,6 @@
       '#tab-compras .compra-linea-editor{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}',
       '#tab-compras .compra-resumen-box{margin:12px 0;padding:12px;border:1px solid var(--gold-dim,#c9a24d33);border-radius:10px;background:var(--stone)}',
       '#tab-compras .compra-resumen-box .row{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}',
-      '#tab-productos #form-compra{opacity:.92}',
-      '#tab-productos h3:has(+ #form-compra),#tab-productos #form-compra + *{/* keep */}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -69,21 +67,10 @@
       // ya existe: reforzar wire si hace falta
       return;
     }
-    var tabs = document.getElementById('tabs');
     var main = document.querySelector('.main-content');
-    if (!tabs || !main) return;
+    if (!main) return;
 
     injectStyles();
-
-    var tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'tab-btn';
-    tab.id = 'btn-tab-compras';
-    tab.dataset.tab = 'compras';
-    tab.textContent = 'Compras';
-    var anchor = tabs.querySelector('[data-tab="transferencias"]');
-    if (anchor) tabs.insertBefore(tab, anchor);
-    else tabs.appendChild(tab);
 
     var section = document.createElement('section');
     section.id = 'tab-compras';
