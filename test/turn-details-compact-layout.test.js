@@ -19,7 +19,7 @@ test("turn detail preserves its five-step wizard while using compact navigation"
 });
 
 test("turn details reduce padding and keep scrolling inside the dialog body", () => {
-  assert.ok(source.includes("max-height:94vh;max-height:94dvh;overflow:hidden"));
+  assert.ok(source.includes(".m33-modal{width:min(920px,100%);max-width:100%;box-sizing:border-box;max-height:94vh;max-height:94dvh;overflow:hidden"));
   assert.ok(source.includes(".m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}"));
   assert.ok(source.includes(".m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}"));
   assert.ok(source.includes(".m33-box{padding:8px 9px;"));
@@ -27,7 +27,7 @@ test("turn details reduce padding and keep scrolling inside the dialog body", ()
 });
 
 test("mobile turn details wrap steps rather than forcing horizontal scrolling", () => {
-  assert.ok(source.includes("@media(max-width:720px){.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}"));
+  assert.ok(source.includes("@media(max-width:720px){.m33-bg{padding:6px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}"));
   assert.ok(source.includes(".m33-head{padding:10px 12px 7px}.m33-body{padding:10px 12px}.m33-foot{padding:9px 12px}"));
 });
 
