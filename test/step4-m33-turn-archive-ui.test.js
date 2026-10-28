@@ -148,6 +148,10 @@ test("Paso 4: el historial cerrado abre M33 en modo de solo lectura, sin control
   modal.querySelector("#m33-next").click();
   assert.ok(await waitFor(() => modal.querySelectorAll(".m33-archive-day").length === 2),
     "el historial debe conservar el archivo de movimientos por fecha");
+  modal.querySelector(".m33-archive-day [data-m33-archive-sessions]").click();
+  assert.ok(await waitFor(() => modal.querySelector(".m33-archive-host[data-loaded='1']")),
+    "el archivo debe poder consultarse sin salir del modo histórico");
+  assert.ok(rpcCalls.length > 0, "la vista de movimientos debe haber usado su RPC de lectura");
   assert.equal(writeCalls.length, 0, "abrir y navegar por el expediente no debe llamar RPCs de escritura");
   assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
     "el archivo del historial solo puede consultar el RPC de lectura");
