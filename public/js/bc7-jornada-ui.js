@@ -286,7 +286,7 @@
   }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
-    const amount=$('bc7-cash')?.value.trim();
+    let amount=$('bc7-cash')?.value.trim();
     const msgEl=form.querySelector('[data-bc7-close-msg]');
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
     const tramoId=state.detail.tramo_activo.id;
