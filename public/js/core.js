@@ -99,3 +99,34 @@ safeInit("detalle-transferencia-click", function () {
     }
   });
 });
+
+// Vales de salida: las filas son botones accesibles, así que deben abrir el
+// detalle tanto con ratón como con teclado (Enter/Espacio), igual que transferencias.
+safeInit("detalle-vales-click", function () {
+  var lista = document.getElementById("lista-vales");
+  if (!lista || lista.dataset.bcValeDetalleClick === "1") return;
+  lista.dataset.bcValeDetalleClick = "1";
+
+  var abrir = function (target) {
+    var item = target && target.closest ? target.closest(".vale-item[data-vale-id]") : null;
+    if (!item) return;
+    var id = item.getAttribute("data-vale-id") || "";
+    if (!id || typeof mostrarDetalleVale !== "function") return;
+    try {
+      mostrarDetalleVale(id);
+    } catch (e) {
+      console.warn("[Battlecruiser] detalle vale", e);
+    }
+  };
+
+  lista.addEventListener("click", function (e) {
+    abrir(e.target);
+  });
+  lista.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var item = e.target && e.target.closest ? e.target.closest(".vale-item[data-vale-id]") : null;
+    if (!item) return;
+    abrir(e.target);
+    e.preventDefault();
+  });
+});
