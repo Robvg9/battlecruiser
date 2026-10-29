@@ -59,7 +59,10 @@ function setup(isOnline) {
   // Inject the online/offline state at the browser boundary. This isolates the
   // handler branch from Node/JSDOM navigator shims while retaining the real handler.
   const handlerSource = SOURCE.slice(BLOCK_START, BLOCK_END + 4)
-    .replace("!navigator.onLine", String(!isOnline));
+    .replace("!navigator.onLine", String(!isOnline))
+    .replace("sincronizarCola()", "window.sincronizarCola()")
+    .replace("refrescarPanelPendientes()", "window.refrescarPanelPendientes()")
+    .replaceAll('setMsg("msg-pendientes",', 'window.setMsg("msg-pendientes",');
   window.eval(handlerSource);
   return {
     dom, window, messages,
