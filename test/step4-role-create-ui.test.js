@@ -82,7 +82,8 @@ test("Paso 4 RWHT 111/112: el nombre vacío no crea un rol; el válido se recort
 
     const call = calls.find((item) => item.name === "crear_rol");
     assert.ok(call, "el formulario válido debe invocar crear_rol");
-    assert.deepEqual(call.params, { p_nombre: "Encargado de almacén" });
+    assert.equal(call.params.p_nombre, "Encargado de almacén");
+    assert.deepEqual(Object.keys(call.params), ["p_nombre"]);
     assert.match(window.document.getElementById("msg-roles").textContent, /Rol creado/i);
     assert.equal(nombre.value, "", "el formulario se limpia después del éxito simulado");
     assert.ok(calls.some((item) => item.name === "listar_roles_admin"),
