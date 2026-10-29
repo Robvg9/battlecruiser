@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   selfhosted-windows:
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: ${{ github.event_name == 'pull_request' && contains(fromJSON('["fix/quality-context-ready-tests-20261029","fix/ux-compact-preferences-turns-main-20261029"]'), github.head_ref) && fromJSON('["self-hosted","bc-light"]') || fromJSON('["self-hosted","Windows","X64"]') }}
     timeout-minutes: 35
 
     steps:
