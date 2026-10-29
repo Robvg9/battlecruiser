@@ -17,6 +17,16 @@ const path = require("path");
 
 function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
+  const limite = Date.now() + timeoutMs;
+  while (Date.now() < limite) {
+    if (await condicion()) return true;
+    await esperar(intervaloMs);
+  }
+  return Boolean(await condicion());
+}
+
+
 // ---- Estado simulado de conversaciones/mensajes ----
 function crearEstadoB8() {
   const st = { conversaciones: {}, participantes: {}, mensajes: {}, seq: 0, uid: "u-test" };
