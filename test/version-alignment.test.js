@@ -108,7 +108,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
-  assert.match(index, /<script src="js\\/navegacion\\.js\\?v=20261029\\.1"><\/script>/, "new navigation sections need a cache-busted script");
+  assert.ok(index.includes('<script src="js/navegacion.js?v=20261029.1"></script>'), "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
