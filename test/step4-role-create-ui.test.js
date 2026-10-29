@@ -33,6 +33,14 @@ function setup() {
   window.safeInit = (name, fn) => {
     if (name === "admin-roles") fn();
   };
+  // usuarios-permisos-rest.js is normally loaded after usuarios-permisos.js;
+  // provide that predecessor's public helpers in this isolated DOM harness.
+  window.cargarContextoUsuario = async () => {};
+  window.limpiarContextoUsuario = () => {};
+  window.contextoB3Disponible = () => true;
+  window.cambiarRolDesdeSelect = async () => {};
+  window.cambiarEstadoUsuario = async () => {};
+  window._usuarioActual = { id: "role-user-fixture", activo: true };
   window.tienePermiso = () => true;
   window.setMsg = (id, message, ok) => {
     const el = window.document.getElementById(id);
