@@ -135,7 +135,18 @@ safeInit("resumen-movs-accion", function () {
   var abrir = function (target) {
     var item = target.closest(".resumen-mov-item[data-mov-tab]");
     if (!item) return;
-    irATab(item.getAttribute("data-mov-tab"));
+    var tab = item.getAttribute("data-mov-tab");
+    var tipo = item.getAttribute("data-mov-tipo") || "";
+    var id = item.getAttribute("data-mov-id") || "";
+
+    // Transferencias y Vales están deliberadamente fuera del menú por política.
+    // Desde el resumen, conserva el ID y abre el historial autorizado de Movimientos.
+    if ((tab === "transferencias" || tab === "vales") && id) {
+      window.__BC_M51_PENDING_SUMMARY_MOVE = { tipo: tipo, id: id };
+      irATab("movimientos");
+      return;
+    }
+    irATab(tab);
   };
   movsEl.addEventListener("click", function (e) { abrir(e.target); });
   movsEl.addEventListener("keydown", function (e) {
