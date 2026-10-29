@@ -108,7 +108,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
-  assert.match(index, /<script src="js\/navegacion\.js\?v=20261020\.4"><\/script>/, "new navigation sections need a cache-busted script");
+  assert.match(index, /<script src="js\\/navegacion\\.js\\?v=20261029\\.1"><\/script>/, "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
@@ -152,7 +152,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     "./js/m29-turnos-organizacion.js?v=29.15",
     "./js/m33-turnos-final.js?v=33.10",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
-    "./js/m51-movimientos-centro.js?v=51.3",
+    "./js/m51-movimientos-centro.js?v=51.4",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
   ];
   for (const asset of assets) assert.ok(sw.includes(asset), "faltó el precache offline de " + asset);
@@ -162,7 +162,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     '["m29-turnos-organizacion.js","29.15"]',
     '["m33-turnos-final.js","33.10"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
-    '["m51-movimientos-centro.js","51.3"]',
+    '["m51-movimientos-centro.js","51.4"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
   ]) assert.ok(app.includes(key), "el cargador debe conservar la versión " + key);
 });
