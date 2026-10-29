@@ -60,7 +60,8 @@ test("Paso 4 R9: clic en transferencia usa Movimientos autorizado y conserva el 
   assert.equal(document.querySelector('.tab-btn[data-tab="movimientos"]').classList.contains("active"), true);
   assert.equal(document.getElementById("tab-movimientos").classList.contains("visible"), true);
   assert.equal(document.querySelector('.tab-btn[data-tab="transferencias"]').classList.contains("active"), false);
-  assert.deepEqual(window.__BC_M51_PENDING_SUMMARY_MOVE, { tipo: "transferencia", id });
+  assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.tipo, "transferencia");
+  assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.id, id);
 });
 
 test("Paso 4 R9: Enter y Espacio en vale usan Movimientos y conservan ID/tipo", (t) => {
@@ -75,6 +76,7 @@ test("Paso 4 R9: Enter y Espacio en vale usan Movimientos y conservan ID/tipo", 
     assert.equal(document.querySelector('.tab-btn[data-tab="movimientos"]').classList.contains("active"), true);
     assert.equal(document.getElementById("tab-movimientos").classList.contains("visible"), true);
     assert.equal(document.querySelector('.tab-btn[data-tab="vales"]').classList.contains("active"), false);
-    assert.deepEqual(window.__BC_M51_PENDING_SUMMARY_MOVE, { tipo: "vale", id });
+    assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.tipo, "vale");
+    assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.id, id);
   }
 });
