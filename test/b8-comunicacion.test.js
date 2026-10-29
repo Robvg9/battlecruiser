@@ -456,7 +456,13 @@ test("B8.25: Centro de Mando integra alertas de comunicación", async () => {
 test("B8.26: compatibilidad con B3 — tienePermiso para comunicacion", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(120);
+  const permisosListos = await esperarHasta(
+    () => window.tienePermiso("comunicacion", "ver") === true &&
+      window.tienePermiso("comunicacion", "crear") === true,
+    5000,
+    10
+  );
+  assert.strictEqual(permisosListos, true, "B3 debe terminar de resolver permisos antes de evaluarlos");
   assert.strictEqual(window.tienePermiso("comunicacion", "ver"), true);
   assert.strictEqual(window.tienePermiso("comunicacion", "crear"), true);
 });
