@@ -43,7 +43,7 @@ concurrency:
 jobs:
   focused-ui:
     name: Focused Step 4 archive, history and cache tests
-    runs-on: ${{ github.event_name == 'pull_request' && contains(fromJSON('["fix/step4-vale-detail-keyboard-20261029","fix/step4-summary-movement-route-20261029"]'), github.head_ref) && 'windows-latest' || fromJSON('["bc-light"]') }}
+    runs-on: ${{ github.event_name == 'pull_request' && contains(fromJSON('["fix/step4-vale-detail-keyboard-20261029","fix/step4-live-modal-pill-step2-20261029","fix/step4-summary-movement-route-20261029"]'), github.head_ref) && 'windows-latest' || fromJSON('["bc-light"]') }}
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=1024
