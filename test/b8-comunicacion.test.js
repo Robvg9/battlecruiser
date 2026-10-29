@@ -166,6 +166,12 @@ function perfil(extra = []) {
   const admin = [{ seccion: "turnos", accion: "editar_any" }];
   return { perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }], permisos: base.concat(ver).concat(admin).concat(extra) };
 }
+async function esperarUsuarioOperativo(window) {
+  const listo = await esperarHasta(() => typeof window._usuarioActual === "function" && Boolean(window._usuarioActual()) && typeof window.tienePermiso === "function" && window.tienePermiso("comunicacion", "crear"), 5000, 10);
+  assert.ok(listo, "el contexto y los permisos de Comunicación deben estar listos");
+  assert.ok(await window.usuarioPuedeOperar(), "el usuario activo debe poder operar en el fixture");
+}
+
 
 // ============================================================
 // PRUEBAS — LÓGICA DE NEGOCIO
@@ -363,7 +369,7 @@ test("B8.19: usuario inactivo no puede enviar mensaje", async () => {
 test("B8.20: mensaje offline se encola con idempotency_key", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(120);
+  await esperarUsuarioOperativo(window);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   // Necesitamos una conversación abierta en _comConvActual.
   window._comConvActual = "conv-test";
@@ -375,7 +381,7 @@ test("B8.20: mensaje offline se encola con idempotency_key", async () => {
 test("B8.21: reintento conserva la misma idempotency_key", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(120);
+  await esperarUsuarioOperativo(window);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   window._comConvActual = "conv-test";
   const r = await window.ejecutarOperacion("mensaje", { p_conversacion_id: "conv-test", p_contenido: "hola" });
@@ -400,7 +406,7 @@ test("B8.22: reconexión refresca el badge de no leídos", async () => {
 test("B8.23: error de servidor no finge envío", async () => {
   const { window, client } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(120);
+  await esperarUsuarioOperativo(window);
   // Forzar que enviar_mensaje devuelva un error de negocio.
   client.rpc = async (n, p) => {
     if (n === "perfil_usuario_actual") return { data: [{ id: "u-test", nombre: "R", activo: true, role_id: "r1", rol: "Dueño" }], error: null };
@@ -417,12 +423,12 @@ test("B8.23: error de servidor no finge envío", async () => {
 test("B8.24: auditoría se registra al enviar mensaje (reutiliza B4)", async () => {
   const { window, client } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(120);
+  await esperarUsuarioOperativo(window);
   // Crear conversación y enviar mensaje online.
   const conv = await client.rpc("crear_conversacion", { p_tipo: "PRIVADA", p_participante_id: "u2" });
   window._comConvActual = conv.data.id;
   await window.ejecutarOperacion("mensaje", { p_conversacion_id: conv.data.id, p_contenido: "hola" });
-  await esperar(30);
+  await esperarHasta(() => client.__rpcCalls.some((c) => c.nombre === "registrar_auditoria"), 2000, 10);
   const aud = client.__rpcCalls.find((c) => c.nombre === "registrar_auditoria");
   assert.ok(aud, "se llama a registrar_auditoria");
 });
