@@ -34,9 +34,9 @@ test("Productos hides the duplicate legacy purchase form and points to the singl
 
 test("purchase and movement modal cache keys match release 9.5.35", () => {
   assert.ok(app.includes('["compra-multiple.js","27.9"]'));
-  assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.8"]'));
+  assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.9"]'));
   assert.ok(app.includes('const VERSION="9.5.35"'));
   assert.ok(serviceWorker.includes('BC_SW_VERSION = "9.5.35"'));
-  assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.8"));
+  assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.9"));
   assert.ok(index.includes('app.js?v=9.5.35'));
 });
