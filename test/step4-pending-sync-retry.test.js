@@ -42,7 +42,6 @@ function setup(isOnline) {
 
   const messages = [];
   let syncCalls = 0;
-  let syncCallsForTest = 0;
   let refreshCalls = 0;
   let syncImpl = async () => { syncCalls += 1; };
   window.sincronizarCola = (...args) => syncImpl(...args);
@@ -66,7 +65,8 @@ function setup(isOnline) {
   window.eval(handlerSource);
   return {
     dom, window, messages,
-    get syncCalls() { return syncCalls + syncCallsForTest; },
+    get syncCalls() { return syncCalls; },
+    countSyncCall() { syncCalls += 1; },
     get refreshCalls() { return refreshCalls; },
     set syncImpl(value) { syncImpl = value; }
   };
@@ -81,7 +81,7 @@ test("Paso 4 RWHT 071: reintento manual online drena la cola, refresca el panel 
     let resolveSync;
     h.syncImpl = () => {
       // Count the call before holding it open to inspect the in-flight UI state.
-      syncCallsForTest += 1;
+      h.countSyncCall();
       return new Promise((resolve) => { resolveSync = resolve; });
     };
     btn.click();
