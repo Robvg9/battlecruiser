@@ -42,11 +42,10 @@ test("accessible textual option state follows the saved switch state on load and
 
 test("toggle appearance retains a real accessible hit target and keyboard focus", () => {
   assert.ok(source.includes("input.cfg-aj-toggle[type=checkbox]:focus-visible{outline:2px solid var(--gold-bright);outline-offset:3px}"));
-  assert.ok(source.includes("input.cfg-aj-toggle[type=checkbox]:checked:before{transform:translateX(22px);background:#fff}"));
+  assert.ok(source.includes("input.cfg-aj-toggle[type=checkbox]:checked:before{transform:translateX(25px);background:#fff}"));
   assert.ok(source.includes("input.cfg-aj-toggle[type=checkbox]:checked{background:rgba(201,162,77,.75);border-color:rgba(201,162,77,.9)}"));
   assert.ok(source.includes("width:44px;height:24px"));
   assert.ok(source.includes("width:12px;height:14px"));
-  assert.ok(source.includes("transform:translateX(25px)"), "checked thumb must align with the right inset");
   assert.ok(source.includes("border-radius:3px"), "the moving thumb must be rectangular, not circular");
 });
 
