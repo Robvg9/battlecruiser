@@ -35,7 +35,10 @@ function setup(isOnline) {
     { url: "https://battlecruiser-sync-step4.test/", runScripts: "outside-only" }
   );
   const { window } = dom;
-  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: isOnline });
+  Object.defineProperty(window, "navigator", {
+    configurable: true,
+    value: { onLine: isOnline }
+  });
 
   const messages = [];
   let syncCalls = 0;
@@ -66,6 +69,7 @@ test("Paso 4 RWHT 071: reintento manual online drena la cola, refresca el panel 
   try {
     const btn = h.window.document.getElementById("pendientes-refrescar-btn");
     const original = btn.textContent;
+    assert.equal(h.window.navigator.onLine, true, "el harness debe representar el estado online");
     let resolveSync;
     h.syncImpl = () => {
       // Count the call before holding it open to inspect the in-flight UI state.
