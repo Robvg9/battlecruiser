@@ -28,7 +28,7 @@ permissions:
 jobs:
   step7-postgres:
     name: Step 7 snapshot, gate and permission contract
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-expired-turn-recovery-ui-20261029' && 'windows-latest' || fromJSON('["self-hosted","Windows","X64"]') }}
     timeout-minutes: 35
     steps:
       - name: Checkout
