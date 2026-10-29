@@ -46,6 +46,7 @@ test("toggle appearance retains a real accessible hit target and keyboard focus"
   assert.ok(source.includes("input.cfg-aj-toggle[type=checkbox]:checked{background:rgba(201,162,77,.75);border-color:rgba(201,162,77,.9)}"));
   assert.ok(source.includes("width:44px;height:24px"));
   assert.ok(source.includes("width:12px;height:14px"));
+  assert.ok(source.includes("transform:translateX(25px)"), "checked thumb must align with the right inset");
   assert.ok(source.includes("border-radius:3px"), "the moving thumb must be rectangular, not circular");
 });
 
