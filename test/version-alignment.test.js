@@ -100,8 +100,8 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.33["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.33["']/);
+  assert.match(app, /const VERSION=["']9\.5\.34["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.34["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261026\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
@@ -124,8 +124,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.33 — Movimientos diarios e historial por sesión\/turno/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.33"><\/script>/);
+  assert.match(app, /v9\.5\.34 — Movimientos diarios e historial por sesión\/turno/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.34"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.5/, "the Step 7 workflow is available in the offline static cache");
@@ -141,7 +141,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.33['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.34['"]\);/);
 });
 
 
