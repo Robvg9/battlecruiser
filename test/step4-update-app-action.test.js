@@ -29,7 +29,7 @@ function createHarness() {
     ],
     delete: async (name) => { removed.push(name); return true; }
   };
-  const win = { __BC_VERSION__: "9.5.34", caches };
+  const win = { __BC_VERSION__: "9.5.35", caches };
   const nav = {
     serviceWorker: {
       getRegistrations: async () => registrations
