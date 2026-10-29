@@ -21,10 +21,17 @@
     } catch (e) {}
     try {
       if (typeof window.tienePermiso === 'function' && window.tienePermiso('turnos', 'editar_any')) return true;
-      const u = window._usuarioActual;
-      const r = String(u && (u.rol || u.role || u.rol_nombre) || '').toLowerCase();
-      return ['dueño', 'dueno', 'admin', 'administrador'].includes(r);
-    } catch (e) { return false; }
+    } catch (e) {}
+
+    // Match the role sources used by M29/M33. Some owner accounts expose the role
+    // as nombre_rol rather than rol/role/rol_nombre.
+    const users = [window.__bcUser, window._usuarioActual].filter(Boolean);
+    for (const user of users) {
+      if (user.is_admin === true || user.isAdmin === true) return true;
+      const role = String(user.rol || user.role || user.nombre_rol || user.rol_nombre || '').trim().toLowerCase();
+      if (role.indexOf('due') === 0 || role === 'admin' || role === 'administrador' || role === 'owner') return true;
+    }
+    return false;
   }
 
   async function readOverdueTurn(turnoId, refresh) {
@@ -37,7 +44,17 @@
       if (!turn || String(turn.id || '') !== String(turnoId)) return null;
 
       const status = String(turn.estado_maestro || turn.estado || '').toUpperCase();
-      const endDate = String(turn.fecha_fin || '').slice(0, 10);
+      let endDate = String(turn.fecha_fin || turn.fin_plan || turn.fecha_fin_plan || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        const startDate = String(turn.fecha_inicio || turn.inicio_plan || turn.fecha || '').slice(0, 10);
+        const days = Number(turn.dias_turno || turn.cantidad_dias || turn.dias);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(startDate) && Number.isInteger(days) && days >= 1) {
+          const parts = startDate.split('-').map(Number);
+          endDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days - 1)).toISOString().slice(0, 10);
+        } else {
+          endDate = '';
+        }
+      }
       const active = ['ABIERTO', 'EN_CURSO', 'PENDIENTE_APROBACION'].includes(status);
       const validDate = /^\d{4}-\d{2}-\d{2}$/.test(endDate);
       if (!active || !validDate || endDate >= localDateKey()) return null;
