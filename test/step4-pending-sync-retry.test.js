@@ -14,6 +14,15 @@ const BLOCK_START = SOURCE.indexOf('safeInit("panel-pendientes", () => {');
 const BLOCK_END = SOURCE.indexOf("\n});", BLOCK_START);
 assert.ok(BLOCK_START >= 0 && BLOCK_END > BLOCK_START, "se debe poder aislar el manejador real de reintento");
 
+async function waitUntil(condition, timeoutMs = 1500) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condition()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  return Boolean(condition());
+}
+
 function setup(isOnline) {
   const dom = new JSDOM(
     "<!doctype html><html><body>" +
@@ -63,13 +72,15 @@ test("Paso 4 RWHT 071: reintento manual online drena la cola, refresca el panel 
       return new Promise((resolve) => { resolveSync = resolve; });
     };
     btn.click();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(await waitUntil(() => h.syncCalls === 1), true,
+      "el click debe ejecutar el manejador de reintento online");
     assert.equal(h.syncCalls, 1);
     assert.equal(btn.disabled, true);
     assert.equal(btn.textContent, "Sincronizando…");
     assert.equal(h.refreshCalls, 0);
     resolveSync();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(await waitUntil(() => h.refreshCalls === 1), true,
+      "el reintento completado debe refrescar la lista");
     assert.equal(h.refreshCalls, 1);
     assert.equal(btn.disabled, false);
     assert.equal(btn.textContent, original);
