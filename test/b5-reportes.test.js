@@ -237,7 +237,7 @@ test("B5.17: offline no inventa datos de reportes", async () => {
     permisos: [{ seccion: "reportes", accion: "ver" }],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarPermisoReportes(window);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
   await window.refrescarReportes();
   await esperar(20);
@@ -255,7 +255,7 @@ test("B5.4: filtros se aplican al backend (fecha + almacén)", async () => {
     ventas: [],
   });
   marcarOnline(window);
-  await esperar(80);
+  await esperarPermisoReportes(window);
   // Poblar _cache.almacenes y el select antes de setear el value.
   window._cache.almacenes = [{ id: "a1", nombre: "Caja 1", tipo: "venta" }];
   window.poblarFiltrosReportes(); // rellenar el select con a1
