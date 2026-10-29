@@ -7,6 +7,9 @@ on:
       - 'public/js/bc7-jornada-ui.js'
       - 'public/js/m33-turnos-final.js'
       - 'public/js/m51-movimientos-centro.js'
+      - 'public/js/centro-control.js'
+      - 'public/js/navegacion.js'
+      - 'public/index.html'
       - 'public/js/core.js'
       - 'public/js/vales.js'
       - 'public/js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js'
@@ -26,6 +29,8 @@ on:
       - 'test/step4-role-create-ui.test.js'
       - 'test/step4-pending-sync-retry.test.js'
       - 'test/movimientos-history-search-functional.test.js'
+      - 'test/m51-movements-filters-functional.test.js'
+      - 'test/b2.3-centro-control.test.js'
       - 'test/version-alignment.test.js'
       - '.github/workflows/step4-lacueva-focused.yml'
   workflow_dispatch:
@@ -37,7 +42,7 @@ concurrency:
 jobs:
   focused-ui:
     name: Focused Step 4 archive, history and cache tests
-    runs-on: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-vale-detail-keyboard-20261029' && 'windows-latest' || fromJSON('["bc-light"]') }}
+    runs-on: ${{ github.event_name == 'pull_request' && contains(fromJSON('["fix/step4-vale-detail-keyboard-20261029","fix/step4-summary-movement-route-20261029"]'), github.head_ref) && 'windows-latest' || fromJSON('["bc-light"]') }}
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=1024
@@ -59,7 +64,7 @@ jobs:
         shell: cmd
         run: |
           if not exist test-results mkdir test-results
-          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/step4-jornada-purpose-ux.test.js test/step4-jornada-warehouse-options.test.js test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/step4-rwht-safe-form-e2e.test.js test/step4-movements-operations-modal.test.js test/step4-transfer-vale-details-accessible.test.js test/step4-product-edit-ui.test.js test/step4-update-app-action.test.js test/step4-role-create-ui.test.js test/step4-pending-sync-retry.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
+          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/step4-jornada-purpose-ux.test.js test/step4-jornada-warehouse-options.test.js test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/step4-rwht-safe-form-e2e.test.js test/step4-movements-operations-modal.test.js test/step4-transfer-vale-details-accessible.test.js test/step4-product-edit-ui.test.js test/step4-update-app-action.test.js test/step4-role-create-ui.test.js test/step4-pending-sync-retry.test.js test/m51-movements-filters-functional.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
           set TEST_EXIT=%ERRORLEVEL%
           type test-results\step4-lacueva-focused.log
           exit /b %TEST_EXIT%
