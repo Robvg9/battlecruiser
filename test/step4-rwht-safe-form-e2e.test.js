@@ -1113,3 +1113,30 @@ test("Paso 4 RWHT 092: Cerrar conversación envía el ID actual y vuelve a la li
   assert.equal(c.document.getElementById("com-col-chat").classList.contains("hidden"), true);
   assert.equal(c.document.getElementById("com-col-lista").classList.contains("hidden"), false);
 });
+
+
+// RWHT-ROLE-CREATE-20261029
+test("Paso 4 RWHT 111/112: Crear rol valida nombre y envía el valor normalizado al cliente fixture", async (t) => {
+  const c = await contextoListo();
+  const form = c.document.getElementById("form-nuevo-rol");
+  const nombre = c.document.getElementById("rol-nombre");
+  assert.ok(form && nombre, "la UI debe exponer el formulario real de alta de rol");
+  const base = c.client.__rpcCalls.length;
+
+  nombre.value = "   ";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  await esperar(30);
+  assert.equal(c.client.__rpcCalls.slice(base).some((call) => call.name === "crear_rol"), false,
+    "el nombre vacío no puede llamar al RPC");
+
+  nombre.value = "  Encargado de almacén  ";
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => c.client.__rpcCalls.slice(base).some((call) =>
+    call.name === "crear_rol"
+  )), "el alta válida debe llegar al RPC fixture");
+
+  const call = c.client.__rpcCalls.slice(base).find((item) => item.name === "crear_rol");
+  assert.deepEqual(call.params, { p_nombre: "Encargado de almacén" });
+  assert.ok(await esperarHasta(() => /Rol creado/i.test(c.document.getElementById("msg-roles").textContent)),
+    "la interfaz debe confirmar el resultado simulado");
+});
