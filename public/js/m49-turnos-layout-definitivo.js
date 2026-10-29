@@ -1,5 +1,5 @@
 // BattleCruiser — M49: layout definitivo de Turnos (Partes 1 y 2)
-// v49.4 — anula grid de m36 en Step2 + cards densas a ancho completo
+// v49.5 — Step2 compacto y controles alineados a ancho completo
 (function(){
   'use strict';
   // Permitir re-inyección de CSS aunque el flag exista (cache / hot reload)
@@ -80,7 +80,7 @@
       .m49-step2-control{
         grid-column:1/-1!important;
         margin:0 0 6px!important;
-        padding:14px 16px!important;
+        padding:10px 12px!important;
         border:1px solid rgba(212,176,92,.2)!important;
         border-radius:12px!important;
         background:rgba(212,176,92,.06)!important;
@@ -91,52 +91,13 @@
       }
       .m49-step2-label input{width:18px!important;height:18px!important;flex:0 0 auto!important}
       .m49-step2-hint{
-        margin:8px 0 0 28px!important;font-size:.75rem!important;line-height:1.45!important;color:var(--mist,#9aa3b2)!important
+        margin:5px 0 0 28px!important;font-size:.72rem!important;line-height:1.4!important;color:var(--mist,#9aa3b2)!important
       }
-      /* Step 2 cards: ocupan de verdad el ancho y se ven densas */
-      .m49-step2-card{
-        padding:18px 18px!important;
-        min-height:112px!important;
-        display:flex!important;
-        flex-direction:column!important;
-        justify-content:center!important;
-        gap:10px!important;
-        border:1px solid rgba(255,255,255,.12)!important;
-        background:rgba(255,255,255,.035)!important;
-        border-radius:14px!important;
-        flex:1 1 auto!important;
-      }
-      .m49-step2-card label{
-        display:block!important;
-        margin:0!important;
-        line-height:1.35!important;
-        font-size:.95rem!important;
-        font-weight:700!important;
-        letter-spacing:.02em!important;
-        color:var(--text,#f3f4f6)!important;
-        text-transform:uppercase!important;
-      }
-      .m49-step2-card select{
-        width:100%!important;
-        min-width:0!important;
-        max-width:100%!important;
-        box-sizing:border-box!important;
-        margin:0!important;
-        padding:14px 16px!important;
-        min-height:52px!important;
-        font-size:1rem!important;
-        font-weight:500!important;
-        border-radius:10px!important;
-        border:1px solid rgba(255,255,255,.16)!important;
-        background:var(--void,#0c1c18)!important;
-        color:inherit!important;
-        cursor:pointer!important;
-      }
-      .m49-step2-card select:focus{
-        outline:none!important;
-        border-color:rgba(59,130,246,.7)!important;
-        box-shadow:0 0 0 3px rgba(59,130,246,.22)!important;
-      }
+      /* Step 2: compact assignment rows, not oversized stacked cards */
+      .m49-step2-card{padding:10px 12px!important;min-height:0!important;display:grid!important;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr)!important;align-items:center!important;gap:8px!important;border:1px solid rgba(255,255,255,.12)!important;background:rgba(255,255,255,.035)!important;border-radius:10px!important;flex:1 1 auto!important}
+      .m49-step2-card label{display:block!important;margin:0!important;line-height:1.25!important;font-size:.76rem!important;font-weight:650!important;letter-spacing:0!important;color:var(--text,#f3f4f6)!important;text-transform:none!important}
+      .m49-step2-card select{width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0!important;padding:8px 10px!important;min-height:40px!important;font-size:.88rem!important;font-weight:500!important;border-radius:8px!important;border:1px solid rgba(255,255,255,.16)!important;background:var(--void,#0c1c18)!important;color:inherit!important;cursor:pointer!important}
+      .m49-step2-card select:focus{outline:none!important;border-color:rgba(59,130,246,.7)!important;box-shadow:0 0 0 3px rgba(59,130,246,.22)!important}
       .m49-step2-card .m36-offline{
         font-size:.72rem!important;
         opacity:.65!important;
@@ -152,8 +113,9 @@
       }
       @media(max-width:720px){
         .m49-session-grid{grid-template-columns:1fr!important;gap:14px!important}
-        .m49-step2-card{min-height:96px!important;padding:16px!important}
-        .m49-step2-card select{min-height:48px!important}
+        .m49-step2-card{grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr)!important;min-height:0!important;padding:9px!important;gap:7px!important}
+        .m49-step2-card label{font-size:.72rem!important}
+        .m49-step2-card select{min-height:40px!important;padding:8px!important;font-size:.86rem!important}
       }
     `;
     document.head.appendChild(s);

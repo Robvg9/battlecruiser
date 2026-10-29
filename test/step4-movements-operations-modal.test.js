@@ -17,8 +17,8 @@ function setup(t) {
       '<button class="tab-btn" data-tab="transferencias"></button>' +
       '<section id="tab-movimientos" class="tab-panel visible"><div class="bc-m51-hero"><div><h2>Movimientos</h2></div></div></section>' +
       '<div id="panel-root">' +
-        '<section id="tab-transferencias" class="tab-panel"><form id="transfer-form"><input id="transfer-test" aria-label="Transferencia input"></form></section>' +
-        '<section id="tab-compras" class="tab-panel"><form id="purchase-form"><input id="compra-test" aria-label="Compra input"></form></section>' +
+        '<section id="tab-transferencias" class="tab-panel" style="display:none!important;visibility:hidden!important;opacity:0!important"><form id="form-transferencia"><label for="trf-origen">Origen</label><select id="trf-origen"><option value="">Origen</option><option value="a">La Cueva</option></select><label for="trf-destino">Destino</label><select id="trf-destino"><option value="">Destino</option><option value="b">Tu mejor opción</option></select><label for="trf-producto">Producto</label><select id="trf-producto"><option value="">Producto</option><option value="p1">Producto 1</option></select><input id="trf-cantidad" type="number"><button type="submit">Transferir</button></form></section>' +
+        '<section id="tab-compras" class="tab-panel" style="display:none!important;visibility:hidden!important;opacity:0!important"><form id="purchase-form"><label for="compra-multiple-producto">Producto</label><select id="compra-multiple-producto"><option value="">Producto</option><option value="p1">Producto 1</option></select><button id="compra-multiple-confirmar" type="button">Registrar compra</button></form></section>' +
       "</div></body></html>",
     { runScripts: "outside-only", url: "https://battlecruiser.test/" }
   );
@@ -60,11 +60,15 @@ test("Paso 4: abrir Nueva Transferencia muestra el formulario dentro del modal y
   const modal = window.document.getElementById("bc165-overlay");
   assert.ok(modal, "el modal debe usar el ID que consumen los controles de reparación");
   assert.ok(modal.querySelector("#tab-transferencias"));
-  assert.ok(modal.querySelector("#transfer-test"));
+  assert.ok(modal.querySelector("#trf-origen"));
+  assert.equal(modal.querySelector("#tab-transferencias").style.getPropertyValue("display"), "block");
+  assert.equal(modal.querySelector("#tab-transferencias").style.getPropertyPriority("display"), "important");
   assert.equal(modal.querySelector("#tab-transferencias").classList.contains("visible"), true);
   modal.querySelector(".bc165-close").click();
   assert.equal(window.document.getElementById("bc165-overlay"), null);
   assert.equal(window.document.getElementById("tab-transferencias").parentElement.id, "panel-root");
+  assert.equal(window.document.getElementById("tab-transferencias").style.getPropertyValue("display"), "none");
+  assert.equal(window.document.getElementById("tab-transferencias").style.getPropertyPriority("display"), "important");
 });
 
 test("Paso 4: abrir Nueva Compra dispara la carga de catálogo e historial", async (t) => {
@@ -83,9 +87,14 @@ test("Paso 4: abrir Nueva Compra muestra el formulario dentro del mismo modal id
   const modal = window.document.getElementById("bc165-overlay");
   assert.ok(modal);
   assert.ok(modal.querySelector("#tab-compras"));
-  assert.ok(modal.querySelector("#compra-test"));
+  assert.ok(modal.querySelector("#compra-multiple-confirmar"));
+  assert.equal(modal.querySelector("#tab-compras").style.getPropertyValue("display"), "block");
+  assert.equal(modal.querySelector("#tab-compras").style.getPropertyPriority("display"), "important");
   const css = window.document.getElementById("bc165-css").textContent;
   assert.match(css, /\.bc165-overlay #tab-compras/);
+  modal.querySelector(".bc165-close").click();
+  assert.equal(window.document.getElementById("tab-compras").parentElement.id, "panel-root");
+  assert.equal(window.document.getElementById("tab-compras").style.getPropertyValue("display"), "none");
 });
 
 test("Paso 4: el cargador de la PWA incluye el módulo de operaciones flotantes antes del reparador de compra", () => {
@@ -103,13 +112,13 @@ test("Paso 4 regresión: reintentos de inicialización no vacían un modal de tr
   const trigger = window.document.querySelector('[data-bc165="transferencias"]');
   trigger.click();
   let modal = window.document.getElementById("bc165-overlay");
-  assert.ok(modal.querySelector("#transfer-test"), "el formulario de transferencia debe estar en el modal antes del reintento");
+  assert.ok(modal.querySelector("#trf-origen"), "el formulario de transferencia debe estar en el modal antes del reintento");
 
   const delays = window.__BC165_runPendingTimers();
   assert.ok(delays.includes(300), "la prueba debe reproducir el segundo intento de inicialización");
   modal = window.document.getElementById("bc165-overlay");
   assert.ok(modal, "el modal debe permanecer abierto");
-  assert.ok(modal.querySelector("#transfer-test"), "la inicialización repetida no debe ocultar ni sacar el formulario");
+  assert.ok(modal.querySelector("#trf-origen"), "la inicialización repetida no debe ocultar ni sacar el formulario");
   assert.equal(modal.querySelector("#tab-transferencias").classList.contains("bc165-placeholder"), false,
     "un panel dentro del modal activo nunca debe volver al estado placeholder");
 
@@ -122,16 +131,66 @@ test("Paso 4 regresión: reintentos de inicialización no vacían un modal de co
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="compras"]').click();
   let modal = window.document.getElementById("bc165-overlay");
-  assert.ok(modal.querySelector("#compra-test"), "el formulario de compra debe estar en el modal antes del reintento");
+  assert.ok(modal.querySelector("#compra-multiple-confirmar"), "el formulario de compra debe estar en el modal antes del reintento");
 
   window.__BC165_runPendingTimers();
   modal = window.document.getElementById("bc165-overlay");
   assert.ok(modal, "el modal debe permanecer abierto");
-  assert.ok(modal.querySelector("#compra-test"), "la inicialización repetida no debe ocultar ni sacar el formulario");
+  assert.ok(modal.querySelector("#compra-multiple-confirmar"), "la inicialización repetida no debe ocultar ni sacar el formulario");
   assert.equal(modal.querySelector("#tab-compras").classList.contains("bc165-placeholder"), false,
     "el panel de compra activo nunca debe volver al estado placeholder");
 
   modal.querySelector(".bc165-close").click();
   assert.equal(window.document.getElementById("tab-compras").parentElement.id, "panel-root",
     "el panel debe volver a su padre original al cerrar");
+});
+
+
+test("Paso 4: Transferencia recupera almacenes y productos al abrirse si los selectores están vacíos", async (t) => {
+  const { window } = setup(t);
+  ["trf-origen", "trf-destino", "trf-producto"].forEach((id) => {
+    window.document.getElementById(id).innerHTML = '<option value="">Selecciona…</option>';
+  });
+  let warehouseLoads = 0;
+  let productLoads = 0;
+  window.refrescarAlmacenes = async () => {
+    warehouseLoads += 1;
+    ["trf-origen", "trf-destino"].forEach((id) => {
+      window.document.getElementById(id).innerHTML = '<option value="">Selecciona…</option><option value="a">La Cueva</option><option value="b">Tu mejor opción</option>';
+    });
+  };
+  window.refrescarStockYSelects = async () => {
+    productLoads += 1;
+    window.document.getElementById("trf-producto").innerHTML = '<option value="">Selecciona…</option><option value="p1">Producto 1</option>';
+  };
+  window.document.querySelector('[data-bc165="transferencias"]').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(warehouseLoads, 1);
+  assert.equal(productLoads, 1);
+  assert.equal(window.document.querySelectorAll("#trf-origen option[value='a']").length, 1);
+  assert.equal(window.document.querySelectorAll("#trf-destino option[value='b']").length, 1);
+  assert.equal(window.document.querySelectorAll("#trf-producto option[value='p1']").length, 1);
+  const feedback = window.document.querySelector(".bc165-feedback");
+  assert.ok(!feedback || feedback.hidden || !feedback.textContent, "successful loading leaves no error text");
+});
+
+test("Paso 4: una transferencia sin catálogo visible informa del problema en vez de mostrar un modal vacío", async (t) => {
+  const { window } = setup(t);
+  ["trf-origen", "trf-destino", "trf-producto"].forEach((id) => {
+    window.document.getElementById(id).innerHTML = '<option value="">Selecciona…</option>';
+  });
+  window.document.querySelector('[data-bc165="transferencias"]').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const modal = window.document.getElementById("bc165-overlay");
+  assert.ok(modal.querySelector("#form-transferencia"), "the form itself remains visible");
+  assert.match(modal.querySelector(".bc165-feedback").textContent, /No se pudieron cargar almacenes y productos/);
+});
+
+test("Paso 4: la segunda sección de Turnos usa filas compactas en vez de tarjetas grandes", () => {
+  const layout = fs.readFileSync(path.join(__dirname, "..", "public", "js", "m49-turnos-layout-definitivo.js"), "utf8");
+  const app = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
+  assert.match(layout, /grid-template-columns:minmax\(0,\.72fr\) minmax\(0,1\.28fr\)!important/);
+  assert.match(layout, /padding:10px 12px!important/);
+  assert.match(layout, /min-height:0!important/);
+  assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.5"\]/);
 });
