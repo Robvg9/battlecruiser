@@ -27,7 +27,7 @@ async function waitFor(predicate, timeout = 1200) {
   return Boolean(predicate());
 }
 
-function setup(t, fixtures = FIXTURES) {
+function setup(t, fixtures = FIXTURES, pendingSummaryMove = null) {
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
     "<section id='tab-movimientos' class='tab-panel visible'>" +
@@ -69,6 +69,7 @@ function setup(t, fixtures = FIXTURES) {
     }
   };
   window.setTimeout = (callback) => { callback(); return 1; };
+  if (pendingSummaryMove) window.__BC_M51_PENDING_SUMMARY_MOVE = pendingSummaryMove;
   window.eval(SOURCE);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   t.after(() => window.close());
@@ -168,4 +169,57 @@ test("Paso 4: Historial agrupa movimientos por fecha y almacén", async (t) => {
   assert.match(dayOne.querySelector('[data-warehouse="alm-2"]').textContent, /Venta Reserva/);
   assert.equal(dayTwo.querySelectorAll(".bc-m51-warehouse-group").length, 1);
   assert.match(dayTwo.textContent, /Compra día siguiente/);
+});
+
+test("Paso 4 R9: navegación del resumen busca por ID y abre el detalle en Historial autorizado", async (t) => {
+  const fixture = {
+    producto: "Harina",
+    usuario: "Dueño",
+    tipo: "transferencia_salida",
+    almacen: "La Cueva",
+    almacen_id: "alm-la-cueva",
+    operacion_id: "transfer-summary-001",
+    fecha: "2026-08-15T11:00:00Z",
+    cantidad: 2,
+    costo_unitario: 3
+  };
+  const { window, rpcCalls } = setup(t, [fixture], {
+    tipo: "transferencia",
+    id: "transfer-summary-001"
+  });
+  assert.ok(await waitFor(() => window.document.querySelector("#mov-detalle .bc-m51-card.is-selected")),
+    "debe seleccionar la transferencia identificada por el resumen");
+  assert.ok(await waitFor(() => window.document.getElementById("tab-movimientos").classList.contains("bc-m51-detail-open")),
+    "debe abrir el panel de detalle");
+  assert.equal(window.document.getElementById("mov-filtro-desde").value, "");
+  assert.equal(window.document.getElementById("mov-filtro-hasta").value, "");
+  assert.equal(window.document.getElementById("mov-buscar").value, "transfer-summary-001");
+  assert.match(window.document.getElementById("mov-drawer-body").textContent, /transfer-summary-001/);
+  assert.match(window.document.getElementById("mov-drawer-body").textContent, /Harina/);
+  assert.ok(rpcCalls.some((call) => call.params.p_desde === null && call.params.p_hasta === null),
+    "debe consultar historial sin los límites del día actual");
+  assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE, null,
+    "el traspaso de navegación se consume tras abrir el registro");
+});
+
+test("Paso 4 R9: navegación desde el resumen conserva el tipo y selecciona un vale por ID", async (t) => {
+  const fixture = {
+    producto: "Azúcar",
+    usuario: "Dueño",
+    tipo: "vale",
+    almacen: "La Cueva",
+    almacen_id: "alm-la-cueva",
+    operacion_id: "vale-summary-001",
+    fecha: "2026-08-16T12:00:00Z",
+    cantidad: 1
+  };
+  const { window } = setup(t, [fixture], {
+    tipo: "vale",
+    id: "vale-summary-001"
+  });
+  assert.ok(await waitFor(() => window.document.querySelector("#mov-detalle .bc-m51-card.is-selected")),
+    "debe seleccionar el vale por ID");
+  assert.match(window.document.getElementById("mov-drawer-body").textContent, /vale-summary-001/);
+  assert.match(window.document.getElementById("mov-drawer-body").textContent, /Azúcar/);
+  assert.equal(window.document.getElementById("mov-filtro-tipo").value, "vale");
 });
