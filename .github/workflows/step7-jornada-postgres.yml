@@ -28,7 +28,7 @@ permissions:
 jobs:
   step7-postgres:
     name: Step 7 snapshot, gate and permission contract
-    runs-on: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-expired-turn-recovery-ui-20261029' && 'windows-latest' || fromJSON('["self-hosted","Windows","X64"]') }}
+    runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 35
     steps:
       - name: Checkout
@@ -43,7 +43,7 @@ jobs:
       - name: PostgreSQL 17 disposable fixture, migrations and ACL contract
         shell: cmd
         env:
-          BC_STEP7_POSTGRES_ROOT: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-expired-turn-recovery-ui-20261029' && runner.temp || 'D:/Databank/BattleCruiser-CI/Postgres17' }}
+          BC_STEP7_POSTGRES_ROOT: D:\Databank\BattleCruiser-CI\Postgres17
         run: node test/step7-jornada-postgres-windows-ci.js
       - name: Persist PostgreSQL 17 contract evidence
         if: always()
