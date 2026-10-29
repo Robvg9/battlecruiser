@@ -152,7 +152,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     "./js/m29-turnos-organizacion.js?v=29.15",
     "./js/m33-turnos-final.js?v=33.9",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
-    "./js/m51-movimientos-centro.js?v=51.3",
+    "./js/m51-movimientos-centro.js?v=51.4",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
   ];
   for (const asset of assets) assert.ok(sw.includes(asset), "faltó el precache offline de " + asset);
@@ -162,7 +162,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     '["m29-turnos-organizacion.js","29.15"]',
     '["m33-turnos-final.js","33.9"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
-    '["m51-movimientos-centro.js","51.3"]',
+    '["m51-movimientos-centro.js","51.4"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
   ]) assert.ok(app.includes(key), "el cargador debe conservar la versión " + key);
 });
