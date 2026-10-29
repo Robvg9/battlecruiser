@@ -56,10 +56,11 @@ function setup(isOnline) {
   window.safeInit = (id, init) => {
     if (window.document.getElementById(id)) init();
   };
-  // Set the network flag from inside the JSDOM realm so its global navigator
-  // cannot be shadowed by Node's compatibility shim.
-  window.eval("Object.defineProperty(navigator, 'onLine', { configurable: true, value: " + String(isOnline) + " })");
-  window.eval(SOURCE.slice(BLOCK_START, BLOCK_END + 4));
+  // Inject the online/offline state at the browser boundary. This isolates the
+  // handler branch from Node/JSDOM navigator shims while retaining the real handler.
+  const handlerSource = SOURCE.slice(BLOCK_START, BLOCK_END + 4)
+    .replace("!navigator.onLine", String(!isOnline));
+  window.eval(handlerSource);
   return {
     dom, window, messages,
     get syncCalls() { return syncCalls + syncCallsForTest; },
