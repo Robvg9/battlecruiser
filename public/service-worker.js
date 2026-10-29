@@ -1,9 +1,9 @@
-/* BattleCruiser Service Worker — v9.5.33
+/* BattleCruiser Service Worker — v9.5.34
  * App shell: network-first with a versioned offline cache fallback.
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
  */
-var BC_SW_VERSION = "9.5.33";
+var BC_SW_VERSION = "9.5.34";
 var BC_SHELL = "battlecruiser-shell-" + BC_SW_VERSION;
 var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;
 var PRECACHE_SHELL = ["./", "./index.html", "./app.js", "./style.css", "./js/offline.js", "./js/mi-cuenta.js?v=1.2", "./js/hotfix-configuracion-20260902.js?v=20261020.4", "./js/network-core.js?v=20261020.4", "./js/configuracion.js?v=20261023.2", "./js/bc7-jornada-ui.js?v=7.5", "./js/operacion-humana.js?v=20261024.1", "./js/hotfix-turno-forceclose-20260902.js?v=20261026.1", "./js/configuracion-ajustes-migrados-20260903.js?v=9.1", "./js/hotfix-secciones-visibles-20260903.js?v=20261026.1", "./js/m74-pos-archive-retail.js?v=74.6", "./js/turno-api.js?v=9.4.7", "./js/turnos-maestro.js?v=9.4.3", "./js/m29-turnos-organizacion.js?v=29.15", "./js/m33-turnos-final.js?v=33.9", "./js/m54-movimientos-client-bridge.js?v=54.1", "./js/m51-movimientos-centro.js?v=51.3", "./js/m52-movimientos-auth-retry.js?v=52.2", "./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.8"];

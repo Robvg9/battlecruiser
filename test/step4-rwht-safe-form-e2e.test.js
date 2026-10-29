@@ -990,3 +990,129 @@ test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nu
     "la UI debe anunciar el éxito de la Edge Function fixture");
   assert.equal(name.value, "", "la UI debe limpiar el formulario tras el éxito");
 });
+
+
+// RWHT-WAREHOUSE-ACTIONS-20261029
+test("Paso 4 RWHT 049-052/054: selector y menú de almacenes abren los modales reales con el ID seleccionado", async (t) => {
+  const c = await contextoListo();
+  const almacen = {
+    id: "alm-actions-fixture",
+    nombre: "Almacén acciones fixture",
+    tipo: "almacenamiento",
+    activo: true
+  };
+  c.window._cache.almacenes = [almacen];
+  assert.equal(typeof c.window.llenarSelectorAlmacenes, "function",
+    "el catálogo debe exponer su poblador de almacenes");
+  c.window.llenarSelectorAlmacenes([almacen]);
+
+  const selector = c.document.getElementById("alm-selector");
+  const menu = c.document.getElementById("alm-acciones-menu");
+  const abrirMenu = c.document.getElementById("alm-acciones-btn");
+  const crear = c.document.getElementById("alm-crear-btn");
+  const editar = c.document.getElementById("alm-editar-btn");
+  const toggle = c.document.getElementById("alm-toggle-btn");
+
+  assert.equal(selector.options.length, 2, "el selector debe incluir el fixture y la opción vacía");
+  assert.equal(editar.disabled, true, "Editar queda bloqueado antes de seleccionar un almacén");
+  assert.equal(toggle.disabled, true, "Activar/desactivar queda bloqueado antes de seleccionar un almacén");
+
+  selector.value = almacen.id;
+  selector.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+  assert.equal(selector.value, almacen.id, "el cambio conserva el ID seleccionado");
+  assert.equal(editar.disabled, false, "Editar se habilita con una selección válida");
+  assert.equal(toggle.disabled, false, "Activar/desactivar se habilita con una selección válida");
+  assert.match(toggle.textContent, /Desactivar almacén/i, "el texto coincide con el estado activo");
+
+  await cargarModalAlmacenFixture(c);
+  abrirMenu.click();
+  assert.equal(menu.classList.contains("hidden"), false, "Acciones abre el menú");
+  abrirMenu.click();
+  assert.equal(menu.classList.contains("hidden"), true, "Acciones vuelve a cerrar el menú");
+
+  abrirMenu.click();
+  crear.click();
+  assert.equal(menu.classList.contains("hidden"), true, "Crear cierra el menú");
+  assert.equal(c.document.getElementById("bc-alm-modal").classList.contains("open"), true,
+    "Crear abre el modal real, no el formulario inline oculto");
+  assert.equal(c.document.getElementById("bc-alm-modal-title").textContent, "Nuevo almacén");
+  c.document.querySelector("#bc-alm-modal [data-bc-alm-close='1']").click();
+
+  abrirMenu.click();
+  editar.click();
+  assert.equal(menu.classList.contains("hidden"), true, "Editar cierra el menú");
+  assert.equal(c.document.getElementById("bc-alm-modal").classList.contains("open"), true,
+    "Editar abre el modal real");
+  assert.equal(c.document.getElementById("bc-alm-modal-id").value, almacen.id,
+    "la edición conserva el ID seleccionado en el control oculto del modal");
+  assert.equal(c.document.getElementById("alm-editando-id").value, "",
+    "el ID del formulario inline heredado no se usa para la edición nueva");
+});
+
+test("Paso 4 RWHT 053: Activar/desactivar envía el almacén y el estado esperados al RPC mock", async (t) => {
+  const c = await contextoListo();
+  const almacen = {
+    id: "alm-toggle-fixture",
+    nombre: "Almacén toggle fixture",
+    tipo: "almacenamiento",
+    activo: true
+  };
+  c.window._cache.almacenes = [almacen];
+  c.window.llenarSelectorAlmacenes([almacen]);
+  const selector = c.document.getElementById("alm-selector");
+  selector.value = almacen.id;
+  selector.dispatchEvent(new c.window.Event("change", { bubbles: true }));
+
+  const base = c.client.__writeCalls.length;
+  c.document.getElementById("alm-toggle-btn").click();
+  assert.ok(await esperarHasta(() => nuevasEscrituras(c, base).some((call) =>
+    call.name === "activar_desactivar_almacen"
+  )), "el botón debe llamar a la operación de estado simulada");
+
+  const call = nuevasEscrituras(c, base).find((item) => item.name === "activar_desactivar_almacen");
+  assert.equal(call.params.p_almacen_id, almacen.id);
+  assert.equal(call.params.p_activo, false, "un almacén activo debe cambiar a inactivo");
+});
+
+
+// RWHT-COMMUNICATION-ACTIONS-20261029
+test("Paso 4 RWHT 090: Soporte inicia una conversación del tipo correcto desde el botón visible", async (t) => {
+  const c = await contextoListo();
+  const soporte = c.document.getElementById("com-soporte-btn");
+  assert.ok(soporte, "la acción Soporte debe existir en la interfaz");
+  const base = c.client.__writeCalls.length;
+  soporte.click();
+
+  assert.ok(await esperarHasta(() => nuevasEscrituras(c, base).some((call) =>
+    call.name === "crear_conversacion"
+  )), "el botón debe iniciar una operación de creación simulada");
+  const call = nuevasEscrituras(c, base).find((item) => item.name === "crear_conversacion");
+  assert.equal(call.params.p_tipo, "SOPORTE");
+  assert.equal(call.params.p_participante_id || null, null,
+    "Soporte no debe inventar un participante privado");
+  assert.ok(await esperarHasta(() =>
+    c.document.getElementById("com-cerrar-btn").classList.contains("hidden") === false
+  ), "al abrir soporte debe mostrarse el chat con su acción Cerrar");
+});
+
+test("Paso 4 RWHT 092: Cerrar conversación envía el ID actual y vuelve a la lista", async (t) => {
+  const c = await contextoListo();
+  const base = c.client.__rpcCalls.length;
+  c.window.abrirConversacion("conversation-close-fixture", "SOPORTE");
+  assert.ok(await esperarHasta(() =>
+    c.document.getElementById("com-cerrar-btn").classList.contains("hidden") === false
+  ), "abrir una conversación debe habilitar el botón Cerrar");
+
+  c.document.getElementById("com-cerrar-btn").click();
+  assert.ok(await esperarHasta(() => c.client.__rpcCalls.slice(base).some((call) =>
+    call.name === "cerrar_conversacion"
+  )), "Cerrar debe enviar la solicitud de cierre al cliente simulado");
+  const call = c.client.__rpcCalls.slice(base).find((item) => item.name === "cerrar_conversacion");
+  assert.equal(call.params.p_conversacion_id, "conversation-close-fixture");
+  assert.ok(await esperarHasta(() =>
+    c.document.getElementById("com-col-chat").classList.contains("hidden") === true &&
+    c.document.getElementById("com-col-lista").classList.contains("hidden") === false
+  ), "el cierre confirmado debe regresar del chat a la lista");
+});
+
+
