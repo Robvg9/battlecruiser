@@ -23,6 +23,7 @@ on:
       - 'test/step4-transfer-vale-details-accessible.test.js'
       - 'test/step4-product-edit-ui.test.js'
       - 'test/step4-update-app-action.test.js'
+      - 'test/step4-role-create-ui.test.js'
       - 'test/movimientos-history-search-functional.test.js'
       - 'test/version-alignment.test.js'
       - '.github/workflows/step4-lacueva-focused.yml'
@@ -57,7 +58,7 @@ jobs:
         shell: cmd
         run: |
           if not exist test-results mkdir test-results
-          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/step4-jornada-purpose-ux.test.js test/step4-jornada-warehouse-options.test.js test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/step4-rwht-safe-form-e2e.test.js test/step4-movements-operations-modal.test.js test/step4-transfer-vale-details-accessible.test.js test/step4-product-edit-ui.test.js test/step4-update-app-action.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
+          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/step4-jornada-purpose-ux.test.js test/step4-jornada-warehouse-options.test.js test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/step4-rwht-safe-form-e2e.test.js test/step4-movements-operations-modal.test.js test/step4-transfer-vale-details-accessible.test.js test/step4-product-edit-ui.test.js test/step4-update-app-action.test.js test/step4-role-create-ui.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
           set TEST_EXIT=%ERRORLEVEL%
           type test-results\step4-lacueva-focused.log
           exit /b %TEST_EXIT%
