@@ -19,6 +19,7 @@
   let _page = 0;
   let _search = '';
   let _selected = null;
+  let _pendingSummaryMove = null;
   let _loading = false;
   let _lastError = null;
 
@@ -578,8 +579,50 @@
     ensureShell(); renderChips(); renderResumen(); renderLista(); renderDrawer();
   }
 
+  function prepararNavegacionDesdeResumen() {
+    const pending = window.__BC_M51_PENDING_SUMMARY_MOVE;
+    if (!pending || !pending.id) return;
+    _pendingSummaryMove = { id: String(pending.id), tipo: normalizarTipo(pending.tipo) };
+    window.__BC_M51_PENDING_SUMMARY_MOVE = null;
+
+    // La navegación desde el resumen abre Historial sin filtros heredados.
+    _viewMode = 'history';
+    ['mov-filtro-desde', 'mov-filtro-hasta', 'mov-filtro-almacen'].forEach(function (id) {
+      const input = document.getElementById(id);
+      if (input) input.value = '';
+    });
+    const tipo = document.getElementById('mov-filtro-tipo');
+    if (tipo) tipo.value = _pendingSummaryMove.tipo === 'vale' ? 'vale' : '';
+    const buscar = document.getElementById('mov-buscar');
+    if (buscar) buscar.value = _pendingSummaryMove.id;
+    _search = _pendingSummaryMove.id;
+    _page = 0;
+    _selected = null;
+    syncViewSwitch();
+  }
+
+  function seleccionarNavegacionDesdeResumen() {
+    if (!_pendingSummaryMove) return;
+    const pending = _pendingSummaryMove;
+    const index = _filtered.findIndex(function (m) {
+      if (String(m.operacion_id || m.id || '') !== pending.id) return false;
+      const tipo = normalizarTipo(m.tipo);
+      if (pending.tipo === 'transferencia') {
+        return tipo === 'transferencia_salida' || tipo === 'transferencia_entrada';
+      }
+      return tipo === pending.tipo;
+    });
+    if (index >= 0) {
+      _page = Math.floor(index / PAGE_SIZE);
+      _selected = _filtered[index];
+    }
+    // Keep the exact ID in search even if no matching row exists in the current data.
+    _pendingSummaryMove = null;
+  }
+
   async function cargarMovimientos() {
     ensureShell();
+    prepararNavegacionDesdeResumen();
     const conn = document.getElementById('mov-conn-info');
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('reportes', 'ver')) {
       _allRows = []; _filtered = []; _lastError = null; _loading = false;
@@ -633,7 +676,10 @@
         offset += pageRows.length;
       }
       _allRows = collected.slice(0, maxRows);
-      _page = 0; applySearchAndPage(); _loading = false; _lastError = null; paint();
+      _page = 0;
+      applySearchAndPage();
+      seleccionarNavegacionDesdeResumen();
+      _loading = false; _lastError = null; paint();
     } catch (e) {
       console.warn('[BattleCruiser] M51 movimientos_producto:', e);
       _lastError = String(e && e.message ? e.message : e);
