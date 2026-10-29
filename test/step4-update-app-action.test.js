@@ -68,7 +68,7 @@ test("Paso 4 RWHT 006: Actualizar app desregistra Service Workers y borra solo l
   assert.equal(target.origin, "https://battlecruiser.robvg9.workers.dev");
   assert.equal(target.pathname, "/login");
   assert.equal(target.searchParams.get("campaign"), "step4", "conserva parámetros no relacionados");
-  assert.match(target.searchParams.get("bc_update") || "", /^9\.5\.34-\d+$/,
+  assert.match(target.searchParams.get("bc_update") || "", /^9\.5\.35-\d+$/,
     "la navegación debe invalidar la caché con la versión canónica");
 });
 
