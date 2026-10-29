@@ -730,6 +730,39 @@ test("R9: click en un movimiento navega al tab correspondiente", async () => {
   assert.ok(document.querySelector('.tab-btn[data-tab="ventas"]').classList.contains("active"), "navega al tab ventas");
 });
 
+test("R9: transferencia y vale del resumen navegan por Movimientos conservando el ID", async (t) => {
+  for (const fixture of [
+    { tipo: "transferencia", id: "transfer-summary-001", fecha: "2026-08-15T11:00:00Z", origen: { nombre: "A" }, destino: { nombre: "B" }, estado: "completada" },
+    { tipo: "vale", id: "vale-summary-001", fecha: "2026-08-15T12:00:00Z", cantidad: 3, tipo_vale: "merma", productos: { nombre: "P" }, almacenes: { nombre: "A" } }
+  ]) {
+    const { dom, window, document } = montarEntorno();
+    try {
+      marcarOnline(window);
+      await esperar(30);
+      window._cache.ventas = [];
+      window._cache.transferencias = fixture.tipo === "transferencia"
+        ? [{ id: fixture.id, fecha: fixture.fecha, origen: fixture.origen, destino: fixture.destino, estado: fixture.estado }]
+        : [];
+      window._cache.vales = fixture.tipo === "vale"
+        ? [{ id: fixture.id, fecha: fixture.fecha, tipo: "merma", cantidad: fixture.cantidad, productos: fixture.productos, almacenes: fixture.almacenes }]
+        : [];
+      window.renderResumen();
+      const row = document.querySelector('.resumen-mov-item[data-mov-tipo="' + fixture.tipo + '"]');
+      assert.ok(row, "debe existir la fila " + fixture.tipo);
+      const event = new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      row.dispatchEvent(event);
+      assert.equal(event.defaultPrevented, true, "Enter debe consumirse para " + fixture.tipo);
+      assert.ok(document.querySelector('.tab-btn[data-tab="movimientos"]').classList.contains("active"),
+        fixture.tipo + " debe usar el panel autorizado de Movimientos");
+      assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.tipo, fixture.tipo);
+      assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.id, fixture.id,
+        "la navegación debe conservar el ID " + fixture.id);
+    } finally {
+      dom.window.close();
+    }
+  }
+});
+
 
 // ============================================================
 // R10 — Filtros operativos en movimientos (transferencias + vales)
