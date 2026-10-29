@@ -439,7 +439,7 @@ test("B6.14: usuario inactivo no puede operar", async () => {
 test("B6.15: idempotencia — misma key no duplica operación lógica", async () => {
   const { window, client } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(80);
+  await esperarUsuarioOperativo(window);
   const r = await window.ejecutarOperacion("compra", {
     p_producto_id: "p1", p_almacen_id: "a1", p_cantidad: 10, p_costo_unitario: 5,
   });
@@ -559,7 +559,7 @@ test("B6.21: auditoría se registra en operación exitosa (reutiliza B4)", async
 test("B6.22: compatibilidad con B3 — tienePermiso y contexto de usuario funcionan", async () => {
   const { window } = montarEntorno(perfil());
   marcarOnline(window);
-  await esperar(120);
+  await esperarUsuarioOperativo(window);
   assert.strictEqual(typeof window.tienePermiso, "function");
   assert.strictEqual(window.tienePermiso("reportes", "ver"), true, "reportes.ver permitido");
   assert.strictEqual(window.tienePermiso("ventas", "crear"), true, "ventas.crear permitido");
