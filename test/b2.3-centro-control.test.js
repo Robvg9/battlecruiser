@@ -749,10 +749,13 @@ test("R9: transferencia y vale del resumen navegan por Movimientos conservando e
       window.renderResumen();
       const row = document.querySelector('.resumen-mov-item[data-mov-tipo="' + fixture.tipo + '"]');
       assert.ok(row, "debe existir la fila " + fixture.tipo);
+      // Capture the authorized route here; the full tab-load side effects are exercised
+      // in the M51 history harness, and should not leave background RPCs after this DOM closes.
+      window.irATab = (tab) => { window.__bcR9RequestedTab = tab; };
       const event = new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
       row.dispatchEvent(event);
       assert.equal(event.defaultPrevented, true, "Enter debe consumirse para " + fixture.tipo);
-      assert.ok(document.querySelector('.tab-btn[data-tab="movimientos"]').classList.contains("active"),
+      assert.equal(window.__bcR9RequestedTab, "movimientos",
         fixture.tipo + " debe usar el panel autorizado de Movimientos");
       assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.tipo, fixture.tipo);
       assert.equal(window.__BC_M51_PENDING_SUMMARY_MOVE?.id, fixture.id,
