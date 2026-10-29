@@ -1109,8 +1109,10 @@ test("Paso 4 RWHT 092: Cerrar conversación envía el ID actual y vuelve a la li
   )), "Cerrar debe enviar la solicitud de cierre al cliente simulado");
   const call = c.client.__rpcCalls.slice(base).find((item) => item.name === "cerrar_conversacion");
   assert.equal(call.params.p_conversacion_id, "conversation-close-fixture");
-  assert.equal(c.document.getElementById("com-col-chat").classList.contains("hidden"), true);
-  assert.equal(c.document.getElementById("com-col-lista").classList.contains("hidden"), false);
+  assert.ok(await esperarHasta(() =>
+    c.document.getElementById("com-col-chat").classList.contains("hidden") === true &&
+    c.document.getElementById("com-col-lista").classList.contains("hidden") === false
+  ), "el cierre confirmado debe regresar del chat a la lista");
 });
 
 
