@@ -10,6 +10,10 @@ const source = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "hotfix-turno-forceclose-20260902.js"),
   "utf8"
 );
+const M33_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "m33-turnos-final.js"),
+  "utf8"
+);
 const migration = fs.readFileSync(
   path.join(__dirname, "..", "supabase", "migrations", "20261026170000_bc_force_close_admin_expiry_guard.sql"),
   "utf8"
@@ -135,8 +139,8 @@ async function goToSummary(context) {
 }
 
 test("la PWA carga el hotfix de recuperación y lo deja disponible en la caché offline", () => {
-  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261029.2"]'));
-  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261029.2"));
+  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261029.3"]'));
+  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261029.3"));
 });
 
 test("el botón de recuperación aparece solo en Resumen, sobrevive a los cinco renders y solo para ADMIN", async (t) => {
@@ -219,4 +223,129 @@ test("la migración reconcilia ambos estados, cierra tramos y audita sin fabrica
   assert.match(migration, /'conteos_inventario_creados', 0/);
   assert.match(migration, /REVOKE EXECUTE ON FUNCTION public\.bc_forzar_cierre_turno_admin\(uuid, text\) FROM PUBLIC, anon/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.bc_forzar_cierre_turno_admin\(uuid, text\) TO authenticated/);
+});
+
+
+test("el hotfix reutiliza el gate ADMIN que habilita el expediente M33 real", async (t) => {
+  const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", {
+    url: "https://battlecruiser-real-m33-recovery.test/",
+    runScripts: "outside-only",
+    pretendToBeVisual: true
+  });
+  const { window } = dom;
+  window.setTimeout = (callback) => { callback(); return 1; };
+  window._cache = { usuarios: [] };
+  window._usuarioActual = { id: "owner-fixture", rol: "Operadora" };
+  window.tienePermiso = (resource, action) =>
+    resource === "ciclos" && action === "editar_any";
+  const rpcCalls = [];
+  window.BattleCruiserTurnoAPI = {
+    actorIsAdmin: async () => false,
+    obtenerExpedienteTurno: async (id) => ({
+      id,
+      estado: "ABIERTO",
+      estado_maestro: "EN_CURSO",
+      fecha: "2026-09-01",
+      fecha_inicio: "2026-09-01",
+      fecha_fin: "2026-09-07",
+      dias_turno: 7,
+      almacen_nombre: "La Cueva",
+      sesiones: []
+    })
+  };
+  window.client = {
+    rpc: async (name, params) => {
+      rpcCalls.push({ name, params });
+      return { data: { id: params.p_turno_id, estado: "CERRADO" }, error: null };
+    }
+  };
+  // This is the exact M29 admin gate consumed by M33.resolveAdmin().
+  window.__BC_M29__ = {
+    isAdmin: () => window.tienePermiso("ciclos", "editar_any")
+  };
+
+  window.eval(M33_SOURCE);
+  window.eval(source);
+  t.after(() => window.close());
+
+  await window.__BC_M33.open("turno-antiguo");
+  assert.ok(window.document.querySelector(".m33-step.active"),
+    "the real M33 ADMIN five-step expediente must render");
+
+  for (let i = 0; i < 4; i++) {
+    const next = window.document.querySelector("#m33-next");
+    assert.ok(next, "the real M33 expediente must expose its next-step control");
+    next.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  const button = window.document.querySelector(".bc-force-close-turno");
+  assert.ok(button, "the recovery button must follow the same M29 ADMIN gate as the real M33 summary");
+  assert.match(button.textContent, /Cierre forzado/i);
+  assert.equal(rpcCalls.length, 0, "showing the button must never close or modify the production turn");
+});
+
+
+test("el expediente M33 explica por qué no ofrece recuperación y el observador no entra en bucle", async (t) => {
+  const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", {
+    url: "https://battlecruiser-m33-current-turn.test/",
+    runScripts: "outside-only",
+    pretendToBeVisual: true
+  });
+  const { window } = dom;
+  window.setTimeout = (callback) => { callback(); return 1; };
+  window._cache = { usuarios: [] };
+  window._usuarioActual = { id: "owner-fixture", rol: "Operadora" };
+  window.tienePermiso = (resource, action) =>
+    resource === "ciclos" && action === "editar_any";
+  window.BattleCruiserTurnoAPI = {
+    actorIsAdmin: async () => false,
+    obtenerExpedienteTurno: async (id) => ({
+      id,
+      estado: "ABIERTO",
+      estado_maestro: "EN_CURSO",
+      fecha: "2099-12-01",
+      fecha_inicio: "2099-12-01",
+      fecha_fin: "2099-12-07",
+      dias_turno: 7,
+      almacen_nombre: "La Cueva",
+      sesiones: []
+    })
+  };
+  const rpcCalls = [];
+  window.client = { rpc: async (...args) => { rpcCalls.push(args); return { data: null, error: null }; } };
+  window.__BC_M29__ = {
+    isAdmin: () => window.tienePermiso("ciclos", "editar_any")
+  };
+
+  window.eval(M33_SOURCE);
+  window.eval(source);
+  t.after(() => window.close());
+
+  await window.__BC_M33.open("turno-vigente");
+  for (let i = 0; i < 4; i++) {
+    const next = window.document.querySelector("#m33-next");
+    assert.ok(next, "the real M33 admin expediente must render all five stages");
+    next.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  const modal = window.document.getElementById("m33-bg");
+  const changes = [];
+  const observer = new window.MutationObserver(records => changes.push(records.length));
+  observer.observe(modal, { childList: true, subtree: true });
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  assert.equal(window.document.querySelector(".bc-force-close-turno"), null,
+    "a current turn must never expose the irreversible recovery action");
+  const message = window.document.querySelector(".bc-force-close-msg");
+  assert.ok(message);
+  assert.match(message.textContent, /no confirma que el turno siga abierto y vencido/i);
+
+  const settledChanges = changes.length;
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(changes.length, settledChanges,
+    "updating its own eligibility message must not recursively trigger the observer");
+  observer.disconnect();
+  assert.equal(rpcCalls.length, 0, "eligibility checks must never call the close RPC");
 });

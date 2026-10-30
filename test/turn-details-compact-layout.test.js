@@ -37,8 +37,8 @@ test("M33 groups session cards on desktop and stacks them on mobile", () => {
 });
 
 test("application and Service Worker invalidate the compact turn view cache", () => {
-  assert.ok(app.includes('const VERSION="9.5.36"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.36"'));
+  assert.ok(app.includes('const VERSION="9.5.37"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.37"'));
   assert.ok(app.includes('["m33-turnos-final.js","33.10"]'));
   assert.ok(sw.includes("./js/m33-turnos-final.js?v=33.10"));
 });
