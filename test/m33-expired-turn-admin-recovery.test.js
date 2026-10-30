@@ -135,8 +135,8 @@ async function goToSummary(context) {
 }
 
 test("la PWA carga el hotfix de recuperación y lo deja disponible en la caché offline", () => {
-  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261029.2"]'));
-  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261029.2"));
+  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261030.1"]'));
+  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"));
 });
 
 test("el botón de recuperación aparece solo en Resumen, sobrevive a los cinco renders y solo para ADMIN", async (t) => {
