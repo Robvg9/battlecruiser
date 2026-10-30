@@ -94,6 +94,7 @@
     var s = String(b || '').toUpperCase();
     if (s === 'MANANA' || s === 'MAÑANA') return 'Mañana';
     if (s === 'TARDE') return 'Tarde';
+    if (s === 'JORNADA') return 'Jornada completa';
     return b || '-';
   }
   function normEstadoSesion(e) {
