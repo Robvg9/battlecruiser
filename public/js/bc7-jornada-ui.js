@@ -386,7 +386,6 @@
       const reread=await openWorkspace(sessionId);
       if(!reread){
         setStatus('La solicitud de cierre fue aceptada, pero no se pudo releer el resumen. Actualiza antes de repetir cualquier operación.','error');
-        msg($('bc7-status'),'El cierre no se declara verificado: falló la lectura posterior.','error');
         return;
       }
       const finalState=String(state.detail?.sesion?.estado||'').toUpperCase();
