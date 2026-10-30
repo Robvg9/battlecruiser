@@ -19,7 +19,7 @@ function fixture() {
   const panels = TAB_NAMES.map(name => {
     const style = ' style="display:block!important;visibility:visible!important;opacity:1!important"';
     if (name === 'productos') {
-      return '<section id="tab-productos" class="tab-panel visible"' + style + '>' +
+      return '<section id="tab-productos" class="tab-panel visible" data-bc-permiso="1"' + style + '>' +
         '<div id="productos-tools-nomenclatura"><button id="productos-nomenclatura-btn">Nomenclatura</button></div>' +
         '<div id="bc-productos-barra"><input id="productos-buscar"></div>' +
         '<div id="lista-productos">Productos reales</div>' +
@@ -80,10 +80,10 @@ test('section guard isolates every real first-level PWA panel despite stale inli
 });
 
 test('release loader places the section guard after legacy UI modules and invalidates the PWA shell', () => {
-  assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
+  assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
   const visibilityHotfixIndex = app.indexOf('["hotfix-secciones-visibles-20260903.js","20261026.1"]');
   assert.ok(visibilityHotfixIndex >= 0 && visibilityHotfixIndex <
-    app.indexOf('["section-scope-fix.js","20261016.1"]'),
+    app.indexOf('["section-scope-fix.js","20261030.1"]'),
     'the section guard must execute after the current legacy visibility hotfix');
   assert.match(app, /const VERSION=["']9\.5\.38["']/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
