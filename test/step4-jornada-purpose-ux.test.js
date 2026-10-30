@@ -94,5 +94,5 @@ test("el cierre solo informa éxito tras releer COMPLETADA y reconcilia respuest
   assert.match(close,/rereadState==='COMPLETADA'/);
   assert.match(close,/No se repitió la escritura/);
   assert.match(close,/No repitas la escritura todavía/);
-  assert.match(close,/No se pudo releer el resumen/);
+  assert.match(close,/no se pudo releer el resumen/i);
 });
