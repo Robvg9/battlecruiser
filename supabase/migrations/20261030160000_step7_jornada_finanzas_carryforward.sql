@@ -138,6 +138,9 @@ DECLARE
   v_t public.turno_tramos;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501'; END IF;
+  IF NOT public.tiene_permiso('turnos','ver') THEN
+    RAISE EXCEPTION 'No tienes permiso para operar dentro de jornadas.' USING ERRCODE='42501';
+  END IF;
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
   IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL
      OR v_s.estado<>'EN_CURSO' THEN
@@ -176,6 +179,8 @@ DECLARE
   v_s public.turno_sesiones;
   v_t public.turno_tramos;
   v_id uuid;
+  v_uid uuid:=auth.uid();
+  v_nombre text;
   v_existing_session uuid;
   v_existing_tramo uuid;
 BEGIN
@@ -188,10 +193,13 @@ BEGIN
   IF p_idempotency_key IS NULL THEN RAISE EXCEPTION 'Se requiere clave de idempotencia.' USING ERRCODE='22023'; END IF;
   v_t := public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  -- Serialize retries for this actor/key. Do not call crear_gasto here: that legacy RPC
+  -- infers an open turno_sesion_id from any active turn, which is unsafe for JORNADA.
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_uid::text||':'||p_idempotency_key::text,0));
   SELECT id,turno_sesion_id,turno_tramo_id
     INTO v_id,v_existing_session,v_existing_tramo
   FROM public.gastos
-  WHERE idempotency_key=p_idempotency_key AND creado_por=auth.uid()
+  WHERE idempotency_key=p_idempotency_key AND creado_por=v_uid
   LIMIT 1 FOR UPDATE;
   IF v_id IS NOT NULL THEN
     IF v_existing_session IS DISTINCT FROM v_s.id OR v_existing_tramo IS DISTINCT FROM v_t.id THEN
@@ -200,15 +208,14 @@ BEGIN
     RETURN v_id;
   END IF;
 
-  -- Reuse the established approval workflow; its legacy sesion_id remains NULL.
-  v_id := public.crear_gasto(
-    btrim(p_concepto),p_monto,NULLIF(btrim(coalesce(p_descripcion,'')),''),
-    v_s.almacen_id,NULL,NULL,p_idempotency_key
-  );
-  UPDATE public.gastos
-  SET turno_sesion_id=v_s.id,turno_tramo_id=v_t.id
-  WHERE id=v_id AND creado_por=auth.uid();
-  IF NOT FOUND THEN RAISE EXCEPTION 'No se pudo ligar el gasto a la jornada.' USING ERRCODE='23514'; END IF;
+  SELECT nombre INTO v_nombre FROM public.usuarios WHERE id=v_uid;
+  INSERT INTO public.gastos
+    (concepto,descripcion,monto,estado,almacen_id,ciclo_id,sesion_id,
+     creado_por,creado_nombre,idempotency_key,turno_sesion_id,turno_tramo_id)
+  VALUES
+    (btrim(p_concepto),NULLIF(btrim(coalesce(p_descripcion,'')),''),p_monto,'PENDIENTE',
+     v_s.almacen_id,NULL,NULL,v_uid,v_nombre,p_idempotency_key,v_s.id,v_t.id)
+  RETURNING id INTO v_id;
 
   INSERT INTO public.turno_jornada_eventos
     (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
@@ -223,8 +230,7 @@ CREATE OR REPLACE FUNCTION public.bc7_registrar_reinversion_jornada(
   p_turno_sesion_id uuid,
   p_lineas jsonb,
   p_idempotency_key uuid,
-  p_proveedor text DEFAULT NULL,
-  p_fecha timestamptz DEFAULT now()
+  p_proveedor text DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -261,8 +267,9 @@ BEGIN
 
   -- Reuse the current stock/FIFO/cash-ledger implementation in one transaction.
   -- The Jornada association is additional provenance, not a replacement for turno_id.
+  -- Use the server transaction time; a caller cannot backdate an active-tranche operation.
   v_id := public.registrar_reinversion_multiple(
-    v_s.almacen_id,NULL,coalesce(p_fecha,now()),p_lineas,NULL,NULL,v_s.turno_id,p_idempotency_key
+    v_s.almacen_id,NULL,now(),p_lineas,NULL,NULL,v_s.turno_id,p_idempotency_key
   );
   UPDATE public.reinversiones
   SET turno_sesion_id=v_s.id,turno_tramo_id=v_t.id
@@ -592,12 +599,12 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.bc7_validar_tramo_responsable_jornada(uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text,timestamptz) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_finanzas_jornada(uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_guard_gasto_jornada_link() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_guard_reinversion_jornada_link() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text,timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc7_finanzas_jornada(uuid) TO authenticated;
 
 COMMIT;
