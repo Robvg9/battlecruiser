@@ -14,12 +14,13 @@ const NAVIGATION = fs.readFileSync(
 function setup(t) {
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
+      "<div id='app-shell' class='visible' data-bc-permisos-cargados='1'></div>" +
       "<script data-bc-m18='1'></script>" +
       "<div id='tabs'>" +
-        "<button type='button' class='tab-btn active' data-tab='resumen'>Resumen</button>" +
-        "<button type='button' class='tab-btn' data-tab='movimientos'>Movimientos</button>" +
-        "<button type='button' class='tab-btn hidden' data-tab='transferencias'>Transferencias</button>" +
-        "<button type='button' class='tab-btn hidden' data-tab='vales'>Vales</button>" +
+        "<button type='button' class='tab-btn active' data-tab='resumen' data-bc-permiso='1'>Resumen</button>" +
+        "<button type='button' class='tab-btn' data-tab='movimientos' data-bc-permiso='1'>Movimientos</button>" +
+        "<button type='button' class='tab-btn hidden' data-tab='transferencias' data-bc-permiso='0'>Transferencias</button>" +
+        "<button type='button' class='tab-btn hidden' data-tab='vales' data-bc-permiso='0'>Vales</button>" +
       "</div>" +
       "<section id='tab-resumen' class='tab-panel visible'>" +
         "<div id='resumen-movs-lista'></div>" +
