@@ -81,6 +81,11 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(app.includes('["m33-turnos-final.js","33.12"]'), 'the turn detail modal cache key must load the audited recovery action');
   assert.ok(app.includes('["bc7-jornada-ui.js","7.6"]'), 'Step 7 must load the M33 session bridge');
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.6"), 'the updated Step 7 bundle must be offline-ready');
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.16"]'), 'M29 must load the full-day default creation flow');
+  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.16"), 'M29 full-day creation must be precached');
+  assert.ok(sw.includes("./js/m33-turnos-final.js?v=33.12"), 'M33 must precache the Jornada-to-Step-7 route');
+  assert.doesNotMatch(app, /\["m29-turnos-organizacion\.js","29\.15"\]/, 'the legacy M29 creation form must not be reused');
+  assert.doesNotMatch(app, /\["m33-turnos-final\.js","33\.11"\]/, 'the old M33 routing module must not be reused');
 
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
