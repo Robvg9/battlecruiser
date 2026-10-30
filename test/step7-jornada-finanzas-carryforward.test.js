@@ -81,7 +81,7 @@ test("Jornada finance read respects per-section view permissions", () => {
   const fn = MIGRATION.slice(start, end);
   assert.match(fn, /tiene_permiso\('turnos','ver'\)/);
   assert.match(fn, /a\.turno_sesion_id=v_s\.id AND a\.usuario_id=auth\.uid\(\) AND a\.retirado_at IS NULL/);
-  assert.doesNotMatch(fn, /turno_jornada_programacion p[\\s\\S]*responsable_id=auth\\.uid\\(\\)/, "finance history must not be readable from a stale scheduling row without an active assignment");
+  assert.doesNotMatch(fn, /responsable_id=auth\.uid\(\)/, "finance history must not be readable from a stale scheduling row without an active assignment");
   assert.match(fn, /tiene_permiso\('gastos','ver'\)/);
   assert.match(fn, /tiene_permiso\('reinversiones','ver'\)/);
   assert.match(fn, /'gastos',CASE WHEN/);
