@@ -925,6 +925,69 @@ test("Paso 4 RWHT: Nueva conversación abre el formulario y Volver recupera la l
   assert.equal(chatColumn.classList.contains("hidden"), true, "Volver debe ocultar el chat");
 });
 
+test("Paso 4 RWHT 097: el asunto de Nueva conversación llega al RPC con el texto exacto", async (t) => {
+  const c = await contextoListo();
+  const operationCalls = [];
+  assert.equal(typeof c.window.ejecutarOperacion, "function", "el helper real de operación debe estar disponible");
+  c.window.ejecutarOperacion = async (name, params) => {
+    operationCalls.push({ name, params: { ...params } });
+    return { ok: true, data: { id: "conversation-title-fixture" }, offline: false };
+  };
+  c.window.refrescarListaConversaciones = async () => {};
+  c.window.abrirConversacion = async () => {};
+
+  const panel = c.document.getElementById("com-nueva-panel");
+  const newButton = c.document.getElementById("com-nueva-btn");
+  const form = c.document.getElementById("form-nueva-conv");
+  const title = c.document.getElementById("nueva-conv-titulo");
+  const type = c.document.getElementById("nueva-conv-tipo");
+  const user = c.document.getElementById("nueva-conv-usuario");
+  assert.ok(panel && newButton && form && title && type && user, "el formulario y asunto deben existir");
+
+  panel.classList.add("hidden");
+  newButton.click();
+  assert.ok(await esperarHasta(() => !panel.classList.contains("hidden")), "Nueva debe abrir el formulario");
+  addOption(user, "chat-user-fixture", "Usuario fixture");
+  type.value = "PRIVADA";
+  title.value = "Apertura y cierre · La Cueva";
+  user.value = "chat-user-fixture";
+  enviarSubmit(c, "form-nueva-conv");
+
+  assert.ok(await esperarHasta(() => operationCalls.length === 1), "el envío debe llegar al helper real");
+  assert.equal(operationCalls[0].name, "conversacion");
+  assert.equal(operationCalls[0].params.p_tipo, "PRIVADA");
+  assert.equal(operationCalls[0].params.p_titulo, "Apertura y cierre · La Cueva");
+  assert.equal(operationCalls[0].params.p_participante_id, "chat-user-fixture");
+});
+
+test("Paso 4 RWHT 097: un asunto opcional vacío se normaliza a null antes de crear la conversación", async (t) => {
+  const c = await contextoListo();
+  const operationCalls = [];
+  c.window.ejecutarOperacion = async (name, params) => {
+    operationCalls.push({ name, params: { ...params } });
+    return { ok: true, data: { id: "conversation-no-title-fixture" }, offline: false };
+  };
+  c.window.refrescarListaConversaciones = async () => {};
+  c.window.abrirConversacion = async () => {};
+  const newButton = c.document.getElementById("com-nueva-btn");
+  const form = c.document.getElementById("form-nueva-conv");
+  const panel = c.document.getElementById("com-nueva-panel");
+  const type = c.document.getElementById("nueva-conv-tipo");
+  const title = c.document.getElementById("nueva-conv-titulo");
+  const user = c.document.getElementById("nueva-conv-usuario");
+  assert.ok(newButton && form && panel && type && title && user);
+  panel.classList.add("hidden");
+  newButton.click();
+  assert.ok(await esperarHasta(() => !panel.classList.contains("hidden")));
+  addOption(user, "chat-user-fixture", "Usuario fixture");
+  type.value = "PRIVADA";
+  title.value = "   ";
+  user.value = "chat-user-fixture";
+  enviarSubmit(c, "form-nueva-conv");
+  assert.ok(await esperarHasta(() => operationCalls.length === 1));
+  assert.equal(operationCalls[0].params.p_titulo, null, "el asunto opcional vacío se envía como null");
+});
+
 test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nunca Auth real", async (t) => {
   const c = await contextoListo();
   Object.defineProperty(c.document, "readyState", { value: "complete", configurable: true });
