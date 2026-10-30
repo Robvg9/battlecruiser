@@ -64,6 +64,9 @@ BEGIN
   IF NEW.turno_sesion_id IS NULL OR NEW.turno_tramo_id IS NULL THEN
     RAISE EXCEPTION 'El vínculo de gasto con jornada requiere sesión y tramo.' USING ERRCODE='23514';
   END IF;
+  IF NEW.sesion_id IS NOT NULL OR NEW.ciclo_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Un gasto JORNADA no puede reutilizar vínculos legacy de sesión/ciclo.' USING ERRCODE='23514';
+  END IF;
   SELECT s.almacen_id,s.bloque,tr.turno_sesion_id,tr.usuario_id
     INTO v_almacen,v_bloque,v_tramo_sesion,v_tramo_usuario
   FROM public.turno_sesiones s
@@ -94,6 +97,9 @@ BEGIN
   IF NEW.turno_sesion_id IS NULL AND NEW.turno_tramo_id IS NULL THEN RETURN NEW; END IF;
   IF NEW.turno_sesion_id IS NULL OR NEW.turno_tramo_id IS NULL THEN
     RAISE EXCEPTION 'El vínculo de reinversión con jornada requiere sesión y tramo.' USING ERRCODE='23514';
+  END IF;
+  IF NEW.sesion_id IS NOT NULL OR NEW.ciclo_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Una reinversión JORNADA no puede reutilizar vínculos legacy de sesión/ciclo.' USING ERRCODE='23514';
   END IF;
   SELECT s.almacen_id,s.bloque,tr.turno_sesion_id,tr.usuario_id
     INTO v_almacen,v_bloque,v_tramo_sesion,v_tramo_usuario
@@ -289,17 +295,22 @@ BEGIN
     RAISE EXCEPTION 'La sesión no corresponde a una jornada única.' USING ERRCODE='23503';
   END IF;
   IF NOT public.bc_actor_is_admin()
-     AND NOT EXISTS (
-       SELECT 1 FROM public.turno_asignaciones a
-       WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
-     ) AND NOT EXISTS (
-       SELECT 1 FROM public.turno_jornada_programacion p
-       WHERE p.id=v_s.jornada_programacion_id AND p.responsable_id=auth.uid()
+     AND (
+       NOT public.tiene_permiso('turnos','ver')
+       OR (
+         NOT EXISTS (
+           SELECT 1 FROM public.turno_asignaciones a
+           WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
+         ) AND NOT EXISTS (
+           SELECT 1 FROM public.turno_jornada_programacion p
+           WHERE p.id=v_s.jornada_programacion_id AND p.responsable_id=auth.uid()
+         )
+       )
      ) THEN
-    RAISE EXCEPTION 'Solo el responsable asignado o ADMIN puede consultar las finanzas de esta jornada.' USING ERRCODE='42501';
+    RAISE EXCEPTION 'Solo el responsable asignado con turnos.ver o ADMIN puede consultar estas finanzas.' USING ERRCODE='42501';
   END IF;
   SELECT jsonb_build_object(
-    'gastos',coalesce((
+    'gastos',CASE WHEN public.bc_actor_is_admin() OR public.tiene_permiso('gastos','ver') THEN coalesce((
       SELECT jsonb_agg(jsonb_build_object(
         'id',g.id,'concepto',g.concepto,'descripcion',g.descripcion,'monto',g.monto,
         'estado',g.estado,'creado_en',g.creado_en,'creado_nombre',g.creado_nombre,
@@ -308,8 +319,8 @@ BEGIN
       ) ORDER BY g.creado_en,g.id)
       FROM public.gastos g
       WHERE g.turno_sesion_id=v_s.id
-    ),'[]'::jsonb),
-    'reinversiones',coalesce((
+    ),'[]'::jsonb) ELSE '[]'::jsonb END,
+    'reinversiones',CASE WHEN public.bc_actor_is_admin() OR public.tiene_permiso('reinversiones','ver') THEN coalesce((
       SELECT jsonb_agg(jsonb_build_object(
         'id',r.id,'proveedor',r.proveedor,'fecha',r.fecha,'total',r.total,
         'usuario_nombre',r.usuario_nombre,
@@ -326,7 +337,7 @@ BEGIN
       ) ORDER BY r.fecha,r.id)
       FROM public.reinversiones r
       WHERE r.turno_sesion_id=v_s.id
-    ),'[]'::jsonb)
+    ),'[]'::jsonb) ELSE '[]'::jsonb END
   ) INTO v_result;
   RETURN v_result;
 END;
