@@ -204,7 +204,7 @@ function pgEnv(extra = {}) {
 function applySql(file) {
   run(pgExe("psql.exe"), ["-X", "-v", "ON_ERROR_STOP=1", "-f", file], {
     env: pgEnv(),
-    timeout: 3 * 60 * 1000,
+    timeout: 5 * 60 * 1000,
   });
 }
 
@@ -229,7 +229,7 @@ function applySql(file) {
     await downloadVerifiedArchive();
     ensureRuntime();
 
-    fs.rmSync(DATA_DIR, { recursive: true, force: true });
+    fs.rmSync(DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 1000 });
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.rmSync(PG_SERVER_LOG, { force: true });
     const binEnv = pgEnv();
@@ -241,7 +241,9 @@ function applySql(file) {
       "--locale=C",
       "--auth-local=trust",
       "--auth-host=trust",
-    ], { env: { ...binEnv, PATH: pgBinDir + path.delimiter + process.env.PATH }, timeout: 3 * 60 * 1000 });
+      // The cluster is disposable CI data; skipping fsync avoids slow per-file flushes on D:.
+      "--no-sync",
+    ], { env: { ...binEnv, PATH: pgBinDir + path.delimiter + process.env.PATH }, timeout: 10 * 60 * 1000 });
     pgCtl = pgExe("pg_ctl.exe");
     // Mark before invoking pg_ctl: if the CLI child inherits server pipe handles and
     // times out after PostgreSQL has actually started, the finally block must still
@@ -252,10 +254,10 @@ function applySql(file) {
       "-l", PG_SERVER_LOG,
       "-o", "-h 127.0.0.1 -p " + PG_PORT + " -c listen_addresses=127.0.0.1",
       "-w", "start",
-    ], { env: binEnv, timeout: 2 * 60 * 1000, stdio: "ignore" });
+    ], { env: binEnv, timeout: 5 * 60 * 1000, stdio: "ignore" });
 
     run(pgExe("createdb.exe"), ["-h", "127.0.0.1", "-p", PG_PORT, "-U", "postgres", "battlecruiser_step7_test"], {
-      env: binEnv, timeout: 60 * 1000,
+      env: binEnv, timeout: 2 * 60 * 1000,
     });
 
     log("\r\n=== 1/5 Build disposable fixture (includes Step 5 base schema) ===");
@@ -288,7 +290,7 @@ function applySql(file) {
         log("WARN Could not stop temporary PostgreSQL server cleanly: " + error.message);
       }
     }
-    try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (error) {
+    try { fs.rmSync(DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 1000 }); } catch (error) {
       log("WARN Could not remove disposable database directory: " + error.message);
     }
     if (logStream) {
