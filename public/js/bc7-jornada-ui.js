@@ -332,12 +332,13 @@
     const btn=form.querySelector('button[type="submit"]');
     if(!busy(btn,true))return;
     try{
+      let createdId=null;
       if(type==='gasto'){
         const concept=form.querySelector('[data-bc7-expense-concept]').value.trim();
         const amount=Number(form.querySelector('[data-bc7-expense-amount]').value);
         const description=form.querySelector('[data-bc7-expense-description]').value.trim();
         if(!concept||!Number.isFinite(amount)||amount<=0)throw new Error('Completa un concepto y un monto mayor que cero.');
-        await rpc('bc7_registrar_gasto_jornada',{
+        createdId=await rpc('bc7_registrar_gasto_jornada',{
           p_turno_sesion_id:sessionId,p_concepto:concept,p_monto:amount,
           p_descripcion:description||null,p_idempotency_key:key
         });
@@ -347,13 +348,21 @@
         const cost=Number(form.querySelector('[data-bc7-reinvestment-cost]').value);
         const supplier=form.querySelector('[data-bc7-reinvestment-provider]').value.trim();
         if(!product||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(cost)||cost<=0)throw new Error('Selecciona producto, cantidad positiva y costo total válido.');
-        await rpc('bc7_registrar_reinversion_jornada',{
+        createdId=await rpc('bc7_registrar_reinversion_jornada',{
           p_turno_sesion_id:sessionId,
           p_lineas:[{producto_id:product,presentacion_id:null,cantidad_presentacion:null,cantidad_base:quantity,costo_total:cost}],
           p_idempotency_key:key,p_proveedor:supplier||null,p_fecha:new Date().toISOString()
         });
       }else{
         throw new Error('Tipo de operación financiera desconocido.');
+      }
+      const canReadThisType=state.admin||(type==='gasto'?can('gastos','ver'):can('reinversiones','ver'));
+      if(!canReadThisType){
+        form.reset();keyField.value='';
+        msg(message,'El servidor aceptó la operación ('+String(createdId||'ID confirmado').slice(0,12)+'). No aparece en el historial de esta cuenta porque no tiene permiso de lectura; la aprobación de gastos sigue su flujo habitual.','ok');
+        await loadCalendar();
+        setStatus('Operación aceptada por el servidor. El historial requiere el permiso de lectura de la sección.','ok');
+        return;
       }
       const verified=await loadFinances(state.detail);
       if(!verified){
@@ -362,7 +371,7 @@
       }
       form.reset();
       keyField.value='';
-      msg(message,type==='gasto'?'Gasto guardado y visible en el expediente de la jornada. Su aprobación sigue pendiente.':'Reinversión registrada y visible en el expediente de la jornada.','ok');
+      msg(message,type==='gasto'?'Gasto guardado y releído. Su aprobación sigue pendiente.':'Reinversión registrada y releída en el expediente de la jornada.','ok');
       await loadCalendar();
       setStatus('Operación financiera registrada y leída desde el servidor.','ok');
     }catch(e){
