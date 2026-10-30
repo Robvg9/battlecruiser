@@ -362,9 +362,40 @@
       const reason=$('bc7-start-reason')?.value||null;
       if(!confirm('¿Confirmas abrir esta jornada ahora? La fecha, la asignación y la secuencia volverán a validarse en el servidor.'))return;
       await rpc('bc5_iniciar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:reason});
-      await refreshPosArchiveAfterSessionStart();
-      await loadCalendar();await openWorkspace(sessionId);setStatus('Jornada abierta; estado releído del backend.','ok');
-    }catch(e){msg($('bc7-start-msg'),'No se abrió la jornada: '+e.message,'error');}
+      let archiveRefreshFailed=false;
+      try{await refreshPosArchiveAfterSessionStart();}catch(e){archiveRefreshFailed=true;}
+      await loadCalendar();
+      const reread=await openWorkspace(sessionId);
+      if(!reread){
+        setStatus('La solicitud de inicio fue aceptada, pero no se pudo releer el estado. Actualiza antes de repetir la operación.','error');
+        return;
+      }
+      const currentState=String(state.detail?.sesion?.estado||'').toUpperCase();
+      if(currentState!=='EN_CURSO'){
+        setStatus('La respuesta de inicio llegó, pero el estado releído es '+(currentState||'desconocido')+'. No se confirma el inicio.','error');
+        return;
+      }
+      setStatus(archiveRefreshFailed
+        ? 'Jornada iniciada y estado EN_CURSO confirmado; no se pudo actualizar el archivo POS.'
+        : 'Jornada iniciada: estado EN_CURSO confirmado al releer el servidor.','ok');
+    }catch(e){
+      const errorText='La respuesta del inicio no fue concluyente: '+e.message+'. Se consultará el estado real antes de permitir otro intento.';
+      try{
+        const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
+        renderWorkspace(d);
+        const rereadState=String(d?.sesion?.estado||'').toUpperCase();
+        if(rereadState==='EN_CURSO'){
+          await loadCalendar();
+          setStatus('Inicio confirmado al releer el servidor: la jornada ya está EN_CURSO. No se repitió la escritura.','ok');
+        }else{
+          setStatus('El servidor aún no confirma el inicio. Estado releído: '+(rereadState||'desconocido')+'.','error');
+          msg($('bc7-start-msg'),errorText,'error');
+        }
+      }catch(x){
+        setStatus('No se pudo confirmar el estado del inicio por falta de lectura del servidor. No repitas la escritura todavía.','error');
+        msg($('bc7-start-msg'),errorText+' También falló la relectura: '+x.message,'error');
+      }
+    }
     finally{busy(btn,false);}
   }
   async function closeSession(form){
