@@ -59,6 +59,12 @@ CREATE TABLE public.reinversiones_lineas (
   costo_unitario numeric NOT NULL CHECK (costo_unitario>0)
 );
 
+ALTER TABLE public.gastos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reinversiones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reinversiones_lineas ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.gastos,public.reinversiones,public.reinversiones_lineas
+  FROM PUBLIC,anon,authenticated;
+
 CREATE TABLE public.lotes_compra (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   producto_id uuid NOT NULL REFERENCES public.productos(id),
