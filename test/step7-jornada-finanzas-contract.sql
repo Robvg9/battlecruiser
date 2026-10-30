@@ -182,14 +182,57 @@ BEGIN
     RAISE EXCEPTION 'FAIL: authorized finance history did not return both linked records';
   END IF;
 
-  -- An unrelated authenticated user with read grants cannot inspect someone else's finance.
+  -- View permission is section-scoped: neither section may leak the other section's rows.
+  PERFORM set_config('test.perms','turnos:ver,gastos:ver',false);
+  v_result:=public.bc7_finanzas_jornada(v_day2);
+  IF jsonb_array_length(v_result->'gastos')<>1 OR jsonb_array_length(v_result->'reinversiones')<>0 THEN
+    RAISE EXCEPTION 'FAIL: reinvestments leaked without reinversiones.ver';
+  END IF;
+  PERFORM set_config('test.perms','turnos:ver,reinversiones:ver',false);
+  v_result:=public.bc7_finanzas_jornada(v_day2);
+  IF jsonb_array_length(v_result->'gastos')<>0 OR jsonb_array_length(v_result->'reinversiones')<>1 THEN
+    RAISE EXCEPTION 'FAIL: expenses leaked without gastos.ver';
+  END IF;
+
+  -- An unrelated authenticated user cannot read or write this jornada by calling RPCs directly.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,gastos:ver,reinversiones:crear,reinversiones:ver',false);
   v_error:=false;
   BEGIN
     PERFORM public.bc7_finanzas_jornada(v_day2);
   EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unrelated user read another worker finance'; END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_gasto_jornada(
+      v_day2,'Gasto no asignado',10,NULL,'97000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unassigned authenticated user wrote a gasto through the RPC'; END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_reinversion_jornada(
+      v_day2,jsonb_build_array(jsonb_build_object(
+        'producto_id',v_pan,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+        'cantidad_base',1,'costo_total',5
+      )),'97000000-0000-0000-0000-000000000002','No autorizado'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unassigned authenticated user wrote a reinvestment through the RPC'; END IF;
+
+  IF has_function_privilege('anon','public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_finanzas_jornada(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: anon has execute privilege on a protected Jornada finance RPC';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_finanzas_jornada(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: authenticated is missing an intended Jornada finance RPC grant';
+  END IF;
 
   IF has_table_privilege('authenticated','public.gastos','SELECT')
      OR has_table_privilege('authenticated','public.gastos','INSERT')
