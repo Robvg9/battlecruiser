@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.10 — Asignaciones en filas compactas adaptadas a Android
+// v33.11 — Jornada única abre su workspace Step 7 desde M33
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -453,6 +453,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.10-dep', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.11-dep', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
