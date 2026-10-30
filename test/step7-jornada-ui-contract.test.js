@@ -60,8 +60,8 @@ test("iniciar una jornada relee la sesión mayorista y recalcula el archivo POS"
 });
 
 test("The Step 7 bundle is version aligned and available in the offline shell",()=>{
-  assert.match(app,/const VERSION=["']9\.5\.38["']/);
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.6"\]/);
-  assert.match(sw,/BC_SW_VERSION\s*=\s*["']9\.5\.38["']/);
-  assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.6/);
+  assert.match(app,/const VERSION=["']9\.5\.39["']/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.7"\]/);
+  assert.match(sw,/BC_SW_VERSION\s*=\s*["']9\.5\.39["']/);
+  assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.7/);
 });
