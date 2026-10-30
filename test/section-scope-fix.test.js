@@ -14,7 +14,7 @@ const wait = (window, ms = 35) => new Promise(resolve => window.setTimeout(resol
 function fixture() {
   const initialTab = TAB_NAMES[0];
   const buttons = TAB_NAMES.map(name =>
-    '<button class="tab-btn' + (name === initialTab ? ' active' : '') + '" data-tab="' + name + '">' + name + '</button>'
+    '<button class="tab-btn' + (name === initialTab ? ' active' : '') + '" data-tab="' + name + '" data-bc-permiso="1">' + name + '</button>'
   ).join('');
   const panels = TAB_NAMES.map(name => {
     const style = ' style="display:block!important;visibility:visible!important;opacity:1!important"';
@@ -28,9 +28,9 @@ function fixture() {
         '<div class="productos-buscador-controles">Buscador duplicado</div>' +
         '<span id="bc176-pres-anchor">Presentaciones disponibles</span></section>';
     }
-    return '<section id="tab-' + name + '" class="tab-panel"' + style + '>Panel ' + name + '</section>';
+    return '<section id="tab-' + name + '" class="tab-panel" data-bc-permiso="1"' + style + '>Panel ' + name + '</section>';
   }).join('');
-  return new JSDOM('<!doctype html><html><head></head><body><aside><nav id="tabs">' + buttons +
+  return new JSDOM('<!doctype html><html><head></head><body><div id="app-shell" class="visible" data-bc-permisos-cargados="1"></div><aside><nav id="tabs">' + buttons +
     '</nav></aside><main class="main-content">' + panels + '</main></body></html>',
     { runScripts: 'outside-only', url: 'https://battlecruiser.test/' });
 }
