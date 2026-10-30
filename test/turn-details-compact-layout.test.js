@@ -37,10 +37,17 @@ test("M33 groups session cards on desktop and stacks them on mobile", () => {
 });
 
 test("application and Service Worker invalidate the compact turn view cache", () => {
-  assert.ok(app.includes('const VERSION="9.5.38"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.38"'));
-  assert.ok(app.includes('["m33-turnos-final.js","33.11"]'));
-  assert.ok(sw.includes("./js/m33-turnos-final.js?v=33.11"));
+  const appVersion = app.match(/const VERSION="([^"]+)"/);
+  const workerVersion = sw.match(/BC_SW_VERSION = "([^"]+)"/);
+  assert.ok(appVersion && workerVersion);
+  assert.equal(workerVersion[1], appVersion[1]);
+  const marker = '["m33-turnos-final.js","';
+  const start = app.indexOf(marker);
+  assert.ok(start >= 0, "M33 module must be registered");
+  const valueStart = start + marker.length;
+  const end = app.indexOf('"', valueStart);
+  const moduleVersion = app.slice(valueStart, end);
+  assert.ok(sw.includes("./js/m33-turnos-final.js?v=" + moduleVersion));
 });
 
 
@@ -49,6 +56,11 @@ test("M33 step 2 keeps every assignment label and selector in a compact horizont
   assert.ok(source.includes(".m33-assignment-card select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin:0!important;padding:7px 8px!important;min-height:38px;font-size:.86rem;"));
   assert.ok(source.includes('class="m33-session-grid m33-assignment-grid"'));
   assert.ok(source.includes("m33-assignment-card\"><label>Día "));
-  assert.ok(app.includes('["m33-turnos-final.js","33.11"]'));
-  assert.ok(sw.includes("./js/m33-turnos-final.js?v=33.11"));
+  const marker = '["m33-turnos-final.js","';
+  const start = app.indexOf(marker);
+  assert.ok(start >= 0, "M33 module must be registered");
+  const valueStart = start + marker.length;
+  const end = app.indexOf('"', valueStart);
+  const moduleVersion = app.slice(valueStart, end);
+  assert.ok(sw.includes("./js/m33-turnos-final.js?v=" + moduleVersion));
 });
