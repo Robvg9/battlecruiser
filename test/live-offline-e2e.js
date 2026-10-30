@@ -747,12 +747,24 @@ async function main() {
     "El menú lateral no es visible/usable, no tiene márgenes o no abre/cierra en móvil: " + JSON.stringify(mobileMenuProbe));
 
 
-  // The login form is intentionally hidden for the header probe above. Re-open a real
-  // long-form panel before measuring document scrolling; otherwise an unauthenticated
-  // shell with no active tab measures only the header/footer and produces a false failure.
-  const mobileScrollPanelOpened = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b)return false;b.click();return true})()");
-  assert(mobileScrollPanelOpened, "No se encontró Configuración para medir el scroll del contenido móvil.");
-  await waitUntil("Configuración visible antes de medir el scroll móvil", "(()=>{const t=document.querySelector('#tab-config');return !!(t&&t.classList.contains('visible'))})()", 5000);
+  // The browser profile is deliberately unauthenticated. For this UI-only layout probe,
+  // install a synthetic in-memory permission context and let the real permission engine
+  // expose Administration. This does not create an auth session or write business data.
+  const mobileScrollPermissionFixture = await evaluate("(()=>{const shell=document.querySelector('#app-shell');const button=document.querySelector('#tabs .tab-btn[data-tab=config]');const panel=document.querySelector('#tab-config');if(!shell||!button||!panel||window.__BC_PERMISOS_CANONICO__!==true||typeof window.aplicarPermisosAInterfaz!=='function')return {ready:false,reason:'canonical permission engine unavailable'};_usuarioActual={id:'bc-e2e-layout-fixture',nombre:'E2E layout fixture',rol:'E2E'};_permisosEfectivos={categorias:{ver:true,crear:true},unidades:{ver:true,crear:true}};_permisosCargaExitosa=true;window.__BC_E2E_SYNTHETIC_PERMISSION_FIXTURE__=true;window.aplicarPermisosAInterfaz();return {ready:true,userId:_usuarioActual.id,permissionSections:Object.keys(_permisosEfectivos),shellReady:shell.getAttribute('data-bc-permisos-cargados'),buttonPermission:button.getAttribute('data-bc-permiso'),panelPermission:panel.getAttribute('data-bc-permiso'),buttonHidden:button.classList.contains('hidden'),panelHidden:panel.classList.contains('hidden'),panelVisible:panel.classList.contains('visible')};})()");
+  report.evidence.mobileScrollPermissionFixture = mobileScrollPermissionFixture;
+  assert(mobileScrollPermissionFixture.ready && mobileScrollPermissionFixture.shellReady === "1" &&
+         mobileScrollPermissionFixture.buttonPermission === "1" && mobileScrollPermissionFixture.panelPermission === "1" &&
+         !mobileScrollPermissionFixture.buttonHidden && !mobileScrollPermissionFixture.panelHidden,
+    "El motor real de permisos no habilitó Administración para el fixture UI sintético: " +
+      JSON.stringify(mobileScrollPermissionFixture));
+
+  const mobileScrollPanelOpened = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b||b.getAttribute('data-bc-permiso')!=='1')return false;b.click();return true})()");
+  assert(mobileScrollPanelOpened, "No se pudo abrir Configuración con el permiso sintético de UI.");
+  await waitUntil(
+    "Configuración autorizada visible antes de medir el scroll móvil",
+    "(()=>{const s=document.querySelector('#app-shell');const b=document.querySelector('#tabs .tab-btn[data-tab=config]');const t=document.querySelector('#tab-config');return !!(s&&s.getAttribute('data-bc-permisos-cargados')==='1'&&b&&b.getAttribute('data-bc-permiso')==='1'&&t&&t.getAttribute('data-bc-permiso')==='1'&&t.classList.contains('visible')&&getComputedStyle(t).display!=='none')})()",
+    5000
+  );
 
   // Verify mobile content uses page scrolling and critical settings remain reachable.
   const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowX:s.overflowX,overflowY:s.overflowY,cssHeight:s.height,maxHeight:s.maxHeight,flex:s.flex,inlineStyle:e.getAttribute('style'),clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,bodyComputedHeight:getComputedStyle(document.body).height,bodyDisplay:getComputedStyle(document.body).display,bodyOverflowY:getComputedStyle(document.body).overflowY,bodyClientHeight:document.body.clientHeight,htmlClientHeight:document.documentElement.clientHeight,shellDisplay:shell?getComputedStyle(shell).display:null,shell:box(shell),main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");
