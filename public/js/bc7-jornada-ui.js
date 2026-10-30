@@ -382,11 +382,37 @@
     try{
       if(!saved) await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:Number(amount)});
       await rpc('bc5_cerrar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:$('bc7-close-reason')?.value||null});
-      await loadCalendar();await openWorkspace(sessionId);setStatus('Cierre ejecutado y estado releído del backend.','ok');
+      await loadCalendar();
+      const reread=await openWorkspace(sessionId);
+      if(!reread){
+        setStatus('La solicitud de cierre fue aceptada, pero no se pudo releer el resumen. Actualiza antes de repetir cualquier operación.','error');
+        msg($('bc7-status'),'El cierre no se declara verificado: falló la lectura posterior.','error');
+        return;
+      }
+      const finalState=String(state.detail?.sesion?.estado||'').toUpperCase();
+      if(finalState!=='COMPLETADA'){
+        setStatus('La respuesta de cierre llegó, pero el estado releído es '+(finalState||'desconocido')+'. No se confirma el cierre final.','error');
+        return;
+      }
+      setStatus('Cierre confirmado: estado COMPLETADA y resumen releído del servidor.','ok');
     }catch(e){
-      const errorText='No se completó el cierre: '+e.message+'. La pantalla releerá el estado antes de permitir otro intento.';
-      try{const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});renderWorkspace(d);msg(document.querySelector('[data-bc7-close-msg]'),errorText,'error');}
-      catch(x){msg(form.querySelector('[data-bc7-close-msg]'),errorText,'error');}
+      const errorText='La respuesta del cierre no fue concluyente: '+e.message+'. Se consultará el estado real antes de permitir otro intento.';
+      try{
+        const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
+        renderWorkspace(d);
+        const rereadState=String(d?.sesion?.estado||'').toUpperCase();
+        if(rereadState==='COMPLETADA'){
+          await loadCalendar();
+          setStatus('Cierre confirmado al releer el servidor: la jornada ya está COMPLETADA. No se repitió la escritura.','ok');
+        }else{
+          setStatus('El servidor aún no confirma el cierre. Estado releído: '+(rereadState||'desconocido')+'.','error');
+          const currentMsg=document.querySelector('[data-bc7-close-msg]')||msgEl;
+          msg(currentMsg,errorText,'error');
+        }
+      }catch(x){
+        setStatus('No se pudo confirmar el estado del cierre por falta de lectura del servidor. No repitas la escritura todavía.','error');
+        msg(form.querySelector('[data-bc7-close-msg]')||msgEl,errorText+' También falló la relectura: '+x.message,'error');
+      }
     }
     finally{busy(btn,false);}
   }
