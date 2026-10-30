@@ -52,8 +52,8 @@ test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run 
   }), /numeric GitHub Actions run ID/);
 });
 
-test("production deploy uses the verified self-hosted Windows runner and persists the exact LIVE release manifest", () => {
-  assert.ok(deploy.includes("runs-on: [self-hosted, Windows, X64]"));
+test("production deploy uses standard hosted Windows and persists the exact LIVE release manifest", () => {
+  assert.match(deploy, /^    runs-on: windows-latest$/m);
   assert.ok(deploy.includes("run: node test/deploy-production-pwa.js"));
   assert.ok(deploy.includes("test-results/release/release-*.json"));
   assert.ok(deploy.includes("name: battlecruiser-release-provenance-${{ github.run_id }}"));
@@ -103,18 +103,18 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   const assetsStep = quality.indexOf("- name: Wait for isolated preview assets");
   const e2eStep = quality.indexOf("- name: Run real-browser offline recovery E2E");
   assert.ok(suiteStep >= 0 && deployStep > suiteStep && assetsStep > deployStep && e2eStep > assetsStep);
-  assert.ok(quality.includes("fromJSON('[\"self-hosted\",\"Windows\",\"X64\"]')"),
-    "main/post-deploy Quality must retain the self-hosted Windows runner");
-  assert.ok(quality.includes("'windows-latest'"),
-    "remediation PRs may use a standard hosted Windows runner");
-  assert.ok(quality.includes("github.head_ref") &&
-    quality.includes("fix/quality-context-ready-tests-20261029") &&
-    quality.includes("fix/ux-compact-preferences-turns-main-20261029"),
-    "hosted runner routing must be limited to the two remediation branches");
+  assert.match(quality, /^    runs-on: windows-latest$/m,
+    "Quality must run on a standard hosted Windows runner for PR and post-deploy verification");
+  assert.doesNotMatch(quality, /self-hosted|ROBVG/,
+    "product Quality must not depend on the local runner");
+  assert.match(selfHosted, /^    runs-on: windows-latest$/m,
+    "the Windows regression suite must run independently of the local runner");
+  assert.match(selfHosted, /- name: Full automated suite/,
+    "the hosted Windows regression must keep the complete application suite");
   assert.match(quality, /github\.event_name == 'workflow_run' && github\.event\.workflow_run\.conclusion == 'success'/);
 });
 
-test("self-hosted push workflow does not race exact-SHA release verification against deploy", () => {
+test("hosted Windows regression does not race exact-SHA release verification against deploy", () => {
   assert.match(selfHosted, /Exact LIVE SHA verification is serialized in quality\.yml's workflow_run/);
   assert.doesNotMatch(selfHosted, /node test\/verify-production-version\.js/);
 });
