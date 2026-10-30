@@ -14,6 +14,8 @@ const regression = fs.readFileSync("public/js/hotfix-regresiones-20260902.js", "
 const navigation = fs.readFileSync("public/js/navegacion.js", "utf8");
 const sectionVisibility = fs.readFileSync("public/js/hotfix-secciones-visibles-20260903.js", "utf8");
 const hideVales = fs.readFileSync("public/js/m12-fe5-hide-vales.js", "utf8");
+const fixPermissionLoad = fs.readFileSync("public/js/fix-permisos-carga.js", "utf8");
+const operationsHub = fs.readFileSync("public/js/ui-operaciones-hub.js", "utf8");
 
 
 test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidden-route aliases preserved", () => {
@@ -51,6 +53,10 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   assert.match(index, /data-bc-permisos-cargados="1"/);
   assert.match(index, /:not\(\[data-bc-permisos-cargados="1"\]\)/);
   assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
+  assert.match(navigation, /addEventListener\("click",[\s\S]*?true\);/);
+  assert.doesNotMatch(fixPermissionLoad, /permisoDegradado|__bcTienePermisoDegradacion/);
+  assert.match(operationsHub, /can\(seccion, 'ver'\) && can\(seccion, 'crear'\)/);
+  assert.match(operationsHub, /can\('gastos', 'ver'\) && can\('gastos', 'crear'\)/);
   assert.match(sectionVisibility, /LABELS = \{ config: "Administración", ciclos: "Turnos" \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
   assert.match(app, /m12-fe5-hide-vales\.js/);
