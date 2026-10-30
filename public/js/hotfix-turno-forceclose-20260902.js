@@ -13,6 +13,13 @@
   }
 
   async function isAdmin() {
+    // M33 renders its five-step ADMIN view from this same M29 gate. Reuse it
+    // first so a valid ADMIN reached through ciclos.editar_any is not hidden
+    // by this recovery control's narrower, duplicated permission check.
+    try {
+      const m29 = window.__BC_M29__;
+      if (m29 && typeof m29.isAdmin === 'function' && m29.isAdmin() === true) return true;
+    } catch (e) {}
     try {
       if (window.BattleCruiserTurnoAPI && typeof window.BattleCruiserTurnoAPI.actorIsAdmin === 'function') {
         const r = await window.BattleCruiserTurnoAPI.actorIsAdmin();
@@ -20,7 +27,8 @@
       }
     } catch (e) {}
     try {
-      if (typeof window.tienePermiso === 'function' && window.tienePermiso('turnos', 'editar_any')) return true;
+      if (typeof window.tienePermiso === 'function' &&
+          (window.tienePermiso('turnos', 'editar_any') || window.tienePermiso('ciclos', 'editar_any'))) return true;
     } catch (e) {}
 
     // Match the role sources used by M29/M33. Some owner accounts expose the role
@@ -73,8 +81,17 @@
   }
 
   function setMessage(modal, message, isError) {
-    const el = modal && modal.querySelector('.bc-force-close-msg');
-    if (!el) return;
+    if (!modal) return;
+    let el = modal.querySelector('.bc-force-close-msg');
+    if (!el) {
+      const host = modal.querySelector('.m33-body') || modal.querySelector('.m33-foot');
+      if (!host) return;
+      el = document.createElement('p');
+      el.className = 'bc-force-close-msg m33-msg';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      host.appendChild(el);
+    }
     el.textContent = message || '';
     el.className = 'bc-force-close-msg m33-msg' + (isError ? ' error' : ' ok');
   }
@@ -127,6 +144,7 @@
     if (!(await isAdmin())) {
       if (existingButton) existingButton.remove();
       if (existingMessage) existingMessage.remove();
+      setMessage(modal, 'Recuperación no disponible: esta sesión no está reconocida como ADMIN por el módulo de Turnos.', true);
       return;
     }
     if (modal.getAttribute('data-turno-id') === String(turnoId) && existingButton) return;
@@ -136,13 +154,20 @@
       turn = await readOverdueTurn(turnoId, false);
     } catch (e) {
       console.warn('[BattleCruiser] No se pudo comprobar si el turno venció; se omite la recuperación:', e);
+      setMessage(modal, 'Recuperación no disponible: falló la consulta del expediente. No se modificó ningún dato.', true);
       return;
     }
-    if (!turn) return;
+    if (!turn) {
+      setMessage(modal, 'Recuperación no disponible: el expediente no confirma que el turno siga abierto y vencido. No se modificó ningún dato.', true);
+      return;
+    }
 
     modal.setAttribute('data-turno-id', String(turnoId));
     const foot = modal.querySelector('.m33-foot');
-    if (!foot) return;
+    if (!foot) {
+      setMessage(modal, 'Recuperación no disponible: no se encontró el pie del paso Resumen.', true);
+      return;
+    }
     const existing = foot.querySelector('.bc-force-close-turno');
     if (existing) existing.remove();
 
@@ -174,7 +199,7 @@
         return;
       }
       if (!current) {
-        setMessage(modal, 'Este turno ya no aparece vencido y abierto. Se bloqueó el cierre forzado.', true);
+        setMessage(modal, 'Este turno ya no aparece abierto y vencido según el expediente actualizado. Se bloqueó el cierre forzado.', true);
         b.remove();
         return;
       }
