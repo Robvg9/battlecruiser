@@ -15,6 +15,9 @@
 <link rel="stylesheet" href="style.css?v=9.5.38">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
+#app-shell.visible:not([data-bc-permisos-cargados="1"]) #tabs .tab-btn[data-tab],
+#app-shell.visible:not([data-bc-permisos-cargados="1"]) .main-content > .tab-panel{display:none!important;visibility:hidden!important;pointer-events:none!important}
+#tabs .tab-btn[data-bc-permiso="0"],.main-content > .tab-panel[data-bc-permiso="0"]{display:none!important;visibility:hidden!important;pointer-events:none!important}
 .venta-almacen-operativo{margin-bottom:12px;padding:12px 14px;border-radius:8px;background:var(--stone);border:1px solid var(--gold-dim);display:flex;flex-direction:column;gap:4px}
 .venta-almacen-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mist);font-family:'IBM Plex Mono',monospace}
 .venta-almacen-nombre{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--gold)}
