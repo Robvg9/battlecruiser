@@ -74,8 +74,8 @@ test('index, Service Worker and offline E2E share the current Supabase UMD pin',
 
 
 test('M74 keeps Ventas navigable and applies the session guard inside the panel', () => {
-  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261029.2"]'), 'the overdue-turn recovery control must load after M33');
-  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261029.2"), 'the recovery control must be available in the offline shell');
+  assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261030.1"]'), 'the overdue-turn recovery control must load after M33');
+  assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"), 'the recovery control must be available in the offline shell');
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.7"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
   assert.ok(app.includes('["m33-turnos-final.js","33.10"]'), 'the turn detail modal cache key must load the audited recovery action');
