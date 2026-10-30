@@ -12,7 +12,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: battlecruiser-quality-${{ github.ref }}
+  group: battlecruiser-quality-${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.ref }}
   cancel-in-progress: true
 
 permissions:
