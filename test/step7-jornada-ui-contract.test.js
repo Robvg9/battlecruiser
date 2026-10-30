@@ -25,7 +25,7 @@ test("Step 7 has session-scoped, immutable inventory snapshots and gates start/c
 });
 
 test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write confirmations",()=>{
-  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
+  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
     assert.ok(ui.includes(rpc),`UI no wired to ${rpc}`);
   }
   assert.match(ui,/confirm\(/);
