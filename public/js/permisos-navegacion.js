@@ -236,7 +236,8 @@
       if (shell.classList.contains("visible")) {
         window.setTimeout(aplicarPermisosAInterfaz, 0);
       } else {
-        if (tabs) tabs.setAttribute("data-bc-permissions-ready", "0");
+        var navTabs = document.getElementById("tabs");
+        if (navTabs) navTabs.setAttribute("data-bc-permissions-ready", "0");
       }
     }).observe(shell, { attributes: true, attributeFilter: ["class"] });
   })();
