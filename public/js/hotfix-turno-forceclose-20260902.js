@@ -13,6 +13,23 @@
   }
 
   async function isAdmin() {
+    // M33 already resolves ADMIN before rendering its five-step wizard. Reuse
+    // that exact decision first so the recovery control cannot disagree with
+    // the authorization state that made Resumen available in the first place.
+    try {
+      const m29 = window.__BC_M29__;
+      if (m29 && typeof m29.isAdmin === 'function' && m29.isAdmin() === true) return true;
+    } catch (e) {}
+
+    // M33 renders the five-step navigation only in its ADMIN branch. This is
+    // a UI-visibility signal, not a security boundary: the RPC still validates
+    // the authenticated role again when a user explicitly confirms recovery.
+    try {
+      const modal = document.getElementById('m33-bg');
+      const steps = modal && modal.querySelectorAll('.m33-step');
+      if (steps && steps.length === 5 && modal.querySelector('.m33-step.active')) return true;
+    } catch (e) {}
+
     try {
       if (window.BattleCruiserTurnoAPI && typeof window.BattleCruiserTurnoAPI.actorIsAdmin === 'function') {
         const r = await window.BattleCruiserTurnoAPI.actorIsAdmin();
@@ -23,8 +40,7 @@
       if (typeof window.tienePermiso === 'function' && window.tienePermiso('turnos', 'editar_any')) return true;
     } catch (e) {}
 
-    // Match the role sources used by M29/M33. Some owner accounts expose the role
-    // as nombre_rol rather than rol/role/rol_nombre.
+    // Fallback for older sessions whose role is exposed directly on the user.
     const users = [window.__bcUser, window._usuarioActual].filter(Boolean);
     for (const user of users) {
       if (user.is_admin === true || user.isAdmin === true) return true;
@@ -114,22 +130,19 @@
   async function addButton(turnoId) {
     const modal = document.getElementById('m33-bg');
     if (!modal || !turnoId) return;
-    const existingButton = modal.querySelector('.bc-force-close-turno');
-    const existingMessage = modal.querySelector('.bc-force-close-msg');
+    const existingPanel = modal.querySelector('.bc-force-close-panel');
 
     // The action belongs in Resumen only. M33 replaces the entire footer as
     // the user advances, so a MutationObserver re-evaluates each rendered step.
     if (!isSummaryStep(modal)) {
-      if (existingButton) existingButton.remove();
-      if (existingMessage) existingMessage.remove();
+      if (existingPanel) existingPanel.remove();
       return;
     }
     if (!(await isAdmin())) {
-      if (existingButton) existingButton.remove();
-      if (existingMessage) existingMessage.remove();
+      if (existingPanel) existingPanel.remove();
       return;
     }
-    if (modal.getAttribute('data-turno-id') === String(turnoId) && existingButton) return;
+    if (modal.getAttribute('data-turno-id') === String(turnoId) && existingPanel) return;
 
     let turn;
     try {
@@ -143,21 +156,35 @@
     modal.setAttribute('data-turno-id', String(turnoId));
     const foot = modal.querySelector('.m33-foot');
     if (!foot) return;
-    const existing = foot.querySelector('.bc-force-close-turno');
+    const existing = foot.querySelector('.bc-force-close-panel');
     if (existing) existing.remove();
+
+    // Keep the recovery action in its own full-width footer row. The previous
+    // siblings competed for the same nowrap flex line and could place the
+    // control outside the visible mobile footer.
+    foot.style.flexWrap = 'wrap';
+    const panel = document.createElement('div');
+    panel.className = 'bc-force-close-panel';
+    panel.setAttribute('role', 'group');
+    panel.setAttribute('aria-label', 'Recuperación administrativa de turno vencido');
+    panel.style.cssText = 'box-sizing:border-box;display:flex;flex:0 0 100%;flex-direction:column;align-items:stretch;gap:6px;width:100%;max-width:100%;min-width:0;padding-top:6px;';
 
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'bc-force-close-turno danger';
     b.textContent = 'Cierre forzado (turno vencido)';
     b.title = 'Solo ADMIN. Requiere motivo y confirmación; no inventa dinero ni conteos de inventario.';
+    b.style.cssText = 'box-sizing:border-box;width:100%;max-width:100%;min-height:44px;white-space:normal;text-align:center;';
+
     const message = document.createElement('p');
     message.className = 'bc-force-close-msg m33-msg';
     message.setAttribute('role', 'status');
     message.setAttribute('aria-live', 'polite');
-    message.style.flexBasis = '100%';
-    foot.appendChild(b);
-    foot.appendChild(message);
+    message.style.cssText = 'box-sizing:border-box;width:100%;margin:0;';
+
+    panel.appendChild(b);
+    panel.appendChild(message);
+    foot.appendChild(panel);
 
     b.addEventListener('click', async function () {
       if (b.disabled) return;
