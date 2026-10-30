@@ -137,7 +137,7 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
 
 test("app shell, application and Service Worker share canonical release and module versions", () => {
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/);
-  const workerVersion = serviceWorker.match(/BC_SW_VERSION\\s*=\\s*["']([^"']+)["']/);
+  const workerVersion = serviceWorker.match(/BC_SW_VERSION =\\s*["']([^"']+)["']/);
   assert.ok(appVersion, "application release version must be detectable");
   assert.ok(workerVersion, "Service Worker release version must be detectable");
   assert.equal(workerVersion[1], appVersion[1]);
