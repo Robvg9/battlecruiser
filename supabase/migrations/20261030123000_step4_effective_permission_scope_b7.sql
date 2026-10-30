@@ -55,7 +55,7 @@ DECLARE
   v_resp record;
   v_es_admin boolean;
 BEGIN
-  IF p_estado NOT IN ('PENDIENTE','EN_PROGRESO','COMPLETADA','CANCELADA') THEN
+  IF p_estado IS NULL OR p_estado NOT IN ('PENDIENTE','EN_PROGRESO','COMPLETADA','CANCELADA') THEN
     RAISE EXCEPTION 'Estado de responsabilidad no válido.' USING ERRCODE = 'P0001';
   END IF;
   IF p_estado = 'CANCELADA' THEN
