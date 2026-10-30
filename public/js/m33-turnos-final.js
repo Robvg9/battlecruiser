@@ -182,6 +182,7 @@
       var labelSt = st === 'PENDIENTE' || st === 'PROGRAMADA' ? 'Sin comenzar' : st === 'EN_CURSO' ? 'En curso' : st === 'COMPLETADA' ? 'Completada' : (st || '—');
       var actions = '';
       if (state.readOnly) actions = '<span class="m33-pill">Solo lectura</span>';
+      else if (String(x.bloque || '').toUpperCase() === 'JORNADA') actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + esc(x.id) + '">Gestionar jornada</button>';
       else if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
       else if (st === 'EN_CURSO') actions = '<span class="m33-pill m33-ok">Sesión en curso</span>';
       else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
@@ -198,8 +199,27 @@
     el.className = 'm33-msg ' + (ok ? 'ok' : (text ? 'error' : ''));
   }
 
-  // Apertura de una sesión M29/turno_sesiones. La RPC dedicada valida asignación,
-  // fecha de hoy, secuencia estricta y crea el tramo + ABIERTO legacy en la misma transacción.
+  // Jornada única usa el workspace Step 7 y nunca la RPC legacy MANANA/TARDE.
+  async function abrirJornadaUnica(sesionId, btn) {
+    if (state.readOnly || !sesionId) return;
+    if (btn && btn.dataset.bcBusy === '1') return;
+    if (btn) { btn.dataset.bcBusy = '1'; btn.disabled = true; }
+    try {
+      if (!navigator.onLine) throw new Error('Necesitas conexión para gestionar esta jornada.');
+      var jornadaUI = window.__BC7_JORNADA__;
+      if (!jornadaUI || typeof jornadaUI.openForSession !== 'function') {
+        throw new Error('La interfaz de Jornada e inventario aún no está disponible. Actualiza la app y vuelve a abrir el turno.');
+      }
+      close();
+      var opened = await jornadaUI.openForSession(sesionId);
+      if (opened === false) throw new Error('No se pudo cargar la jornada desde el backend.');
+    } catch (e) {
+      setDepMsg('No se abrió la jornada: ' + String(e && e.message || e), false);
+      if (btn) { btn.disabled = false; btn.dataset.bcBusy = '0'; }
+    }
+  }
+
+  // Sesiones legacy MANANA/TARDE mantienen su apertura secuencial original.
   async function abrirSesionDependienta(sesionId, btn) {
     if (state.readOnly || !sesionId) return;
     if (btn && btn.dataset.bcBusy === '1') return;
@@ -393,6 +413,7 @@
       var c = ov.querySelector('#m33-close-final'); if (c) c.onclick = close;
       bindArchiveButtons(ov);
       ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
+      ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
       return;
     }
     const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];
