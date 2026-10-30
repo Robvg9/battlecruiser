@@ -37,7 +37,7 @@ jobs:
           clean: true
 
       # Standard hosted Windows is free for this public repository and keeps
-      # product CI independent of the local ROBVG runner's availability.
+      # product CI independent of local machine availability.
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
