@@ -341,7 +341,7 @@ async function refrescarTurnos() {
 async function refrescarListaResponsabilidades() {
   const el = document.getElementById("lista-responsabilidades");
   if (!el) return;
-  if (!tienePermiso("incidencias", "ver")) { el.innerHTML = ""; return; }
+  if (!tienePermiso("responsabilidades", "ver")) { el.innerHTML = ""; return; }
   if (!navigator.onLine) {
     el.innerHTML = '<p class="lista-estado">⚪ Sin conexión.</p>';
     return;
@@ -435,7 +435,7 @@ async function actualizarResponsabilidad(id, estado) {
 async function refrescarListaIncidencias() {
   const el = document.getElementById("lista-incidencias");
   if (!el) return;
-  if (!tienePermiso("turnos", "ver")) { el.innerHTML = ""; return; }
+  if (!tienePermiso("incidencias", "ver")) { el.innerHTML = ""; return; }
   if (!navigator.onLine) {
     el.innerHTML = '<p class="lista-estado">⚪ Sin conexión.</p>';
     return;
