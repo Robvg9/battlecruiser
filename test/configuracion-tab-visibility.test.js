@@ -6,83 +6,43 @@ const { JSDOM } = require('jsdom');
 
 const ROOT = path.resolve(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-const wait = (window, ms = 60) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-test('configuration tab obeys the shared active-tab visibility contract', () => {
-  const css = read('public/style.css');
-  const visibilityHotfix = read('public/js/hotfix-secciones-visibles-20260903.js');
-
-  assert.match(css, /\.tab-panel\s*\{\s*display:\s*none;\s*\}/);
-  assert.match(css, /\.tab-panel\.visible\s*\{\s*display:\s*block;\s*\}/);
-  assert.doesNotMatch(visibilityHotfix, /#tab-config\{[^}]*display:block!important/i);
-  assert.match(visibilityHotfix, /#tab-config\{visibility:visible!important;\}/);
-});
-
-test('active Configuración panel survives a legacy permission visibility reset', async () => {
-  const visibilityHotfix = read('public/js/hotfix-secciones-visibles-20260903.js');
-  const dom = new JSDOM(`<!doctype html>
-    <html><head><style>
-      .tab-panel { display:none; }
-      .tab-panel.visible { display:block; }
-      .hidden { display:none!important; }
-    </style></head><body>
-      <nav id="tabs">
-        <button class="tab-btn active" data-tab="config">Configuración</button>
-        <button class="tab-btn" data-tab="home">Centro de Control</button>
-      </nav>
-      <main>
-        <section id="tab-config" class="tab-panel"><h3>Roles y permisos</h3><p id="config-content">Categorías y unidades de medida</p></section>
-        <section id="tab-home" class="tab-panel visible">Dashboard</section>
-      </main>
-    </body></html>`, { runScripts: 'outside-only', url: 'https://app.test/' });
+test('legacy configuration label helpers never grant route visibility', async () => {
+  const labelHotfix = read('public/js/hotfix-secciones-visibles-20260903.js');
+  const adminLabel = read('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js');
+  const dom = new JSDOM('<!doctype html><html><head></head><body>' +
+    '<nav id="tabs"><button class="tab-btn hidden" data-tab="config" data-bc-permiso="0" aria-hidden="true">Config</button></nav>' +
+    '<main><section id="tab-config" class="tab-panel hidden" data-bc-permiso="0" hidden aria-hidden="true" style="display:none!important"></section></main>' +
+    '</body></html>', { runScripts: 'outside-only', url: 'https://app.test/' });
   const { window } = dom;
   try {
-    window.eval(visibilityHotfix);
-    // Let JSDOM dispatch DOMContentLoaded so the delegated click listener is installed.
-    await wait(window, 80);
-    const button = window.document.querySelector('.tab-btn[data-tab="config"]');
-    const homeButton = window.document.querySelector('.tab-btn[data-tab="home"]');
+    window.eval(labelHotfix);
+    window.eval(adminLabel);
+    await new Promise((resolve) => window.setTimeout(resolve, 30));
+    const button = window.document.querySelector('[data-tab="config"]');
     const panel = window.document.getElementById('tab-config');
-
-    // Record an explicit user selection; navigation's normal click handler owns the first activation.
-    button.click();
-    await wait(window);
-    assert.ok(panel.classList.contains('visible'), 'active panel receives visible class');
-    assert.equal(window.getComputedStyle(panel).display, 'block');
-    assert.ok(window.document.getElementById('config-content').textContent.includes('Categorías'));
-
-    // Simulate a legacy permission pass removing both the active state and panel visibility.
-    button.classList.remove('active');
-    panel.classList.remove('visible');
-    panel.classList.add('hidden');
-    panel.setAttribute('hidden', '');
-    panel.setAttribute('aria-hidden', 'true');
-    panel.style.setProperty('display', 'none', 'important');
-    await wait(window, 80);
-    assert.ok(button.classList.contains('active'), 'latest explicit selection remains active');
-    assert.ok(panel.classList.contains('visible'), 'observer restores active panel visibility');
-    assert.ok(!panel.classList.contains('hidden'));
-    assert.ok(!panel.hasAttribute('hidden'));
-    assert.ok(!panel.hasAttribute('aria-hidden'));
-    assert.equal(window.getComputedStyle(panel).display, 'block');
-
-    // A user selecting another tab must release the Configuración selection lock.
-    homeButton.click();
-    // Simulate the normal navigation handler switching active tab and panel.
-    button.classList.remove('active');
-    homeButton.classList.add('active');
-    window.document.getElementById('tab-home').classList.add('visible');
-    panel.classList.remove('visible');
-    panel.classList.add('hidden');
-    // Do not overwrite display here: the test must detect a leaked
-    // display:block!important from opening Configuración.
-    await wait(window, 80);
-    assert.ok(!panel.classList.contains('visible'));
-    assert.ok(panel.classList.contains('hidden'));
-    assert.equal(panel.style.getPropertyValue('display'), '', "leaving Configuración removes the inline display override");
-    assert.equal(panel.style.getPropertyPriority('display'), '');
-    assert.equal(window.getComputedStyle(panel).display, 'none');
+    assert.equal(button.getAttribute('data-bc-permiso'), '0');
+    assert.equal(button.classList.contains('hidden'), true);
+    assert.equal(button.getAttribute('aria-hidden'), 'true');
+    assert.equal(panel.getAttribute('data-bc-permiso'), '0');
+    assert.equal(panel.hasAttribute('hidden'), true);
+    assert.equal(panel.getAttribute('aria-hidden'), 'true');
+    assert.equal(panel.style.getPropertyValue('display'), 'none');
+    assert.equal(panel.style.getPropertyPriority('display'), 'important');
+    assert.match(button.textContent, /Administración/);
   } finally {
     window.close();
   }
+});
+
+test('the canonical permission engine owns Administración visibility', () => {
+  const permissions = read('public/js/permisos-navegacion.js');
+  const navigation = read('public/js/navegacion.js');
+  const labelHotfix = read('public/js/hotfix-secciones-visibles-20260903.js');
+  const adminLabel = read('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js');
+  assert.match(permissions, /if \(tab === "config"\)[\s\S]*?tienePermiso\("usuarios", "ver"\)[\s\S]*?tienePermiso\("categorias", "ver"\)[\s\S]*?tienePermiso\("unidades", "ver"\)/);
+  assert.match(permissions, /RUTAS_PERSONALES = \{ conectividad: true, preferencias: true \}/);
+  assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
+  assert.doesNotMatch(labelHotfix, /MutationObserver|setImportant|style\.display|setAttribute\(["']data-tab/);
+  assert.doesNotMatch(adminLabel, /MutationObserver|style\.display|removeAttribute\(["']hidden|setAttribute\(["']data-tab/);
 });
