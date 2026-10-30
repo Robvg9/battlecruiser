@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.39 — Jornada única: finanzas y traspaso auditado de inventario
+// v9.5.39 — Movimientos diarios e historial por sesión/turno + finanzas y carry-forward de Jornada
 (function hotfixV9475(){
   const VERSION="9.5.39";
   window.__BC_VERSION__=VERSION;
