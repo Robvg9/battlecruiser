@@ -581,11 +581,14 @@ BEGIN
   END IF;
   SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Programación no encontrada.' USING ERRCODE='23503'; END IF;
-  IF NOT public.bc_actor_is_admin() AND NOT EXISTS (
-    SELECT 1 FROM public.turno_asignaciones a
-    WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
+  IF NOT public.bc_actor_is_admin() AND (
+    NOT public.tiene_permiso('turnos','ver')
+    OR NOT EXISTS (
+      SELECT 1 FROM public.turno_asignaciones a
+      WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
+    )
   ) THEN
-    RAISE EXCEPTION 'Solo el responsable asignado puede consultar esta jornada.' USING ERRCODE='42501';
+    RAISE EXCEPTION 'Solo el responsable asignado con turnos.ver puede consultar esta jornada.' USING ERRCODE='42501';
   END IF;
 
   SELECT jsonb_build_object(
@@ -703,11 +706,14 @@ BEGIN
   IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
     RAISE EXCEPTION 'La sesión no corresponde al modelo de jornada única.' USING ERRCODE='23503';
   END IF;
-  IF NOT public.bc_actor_is_admin() AND NOT EXISTS (
-    SELECT 1 FROM public.turno_asignaciones a
-    WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=v_uid AND a.retirado_at IS NULL
+  IF NOT public.bc_actor_is_admin() AND (
+    NOT public.tiene_permiso('turnos','ver')
+    OR NOT EXISTS (
+      SELECT 1 FROM public.turno_asignaciones a
+      WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=v_uid AND a.retirado_at IS NULL
+    )
   ) THEN
-    RAISE EXCEPTION 'Solo el responsable asignado puede registrar este inventario.' USING ERRCODE='42501';
+    RAISE EXCEPTION 'Solo el responsable asignado con turnos.ver puede registrar este inventario.' USING ERRCODE='42501';
   END IF;
 
   SELECT * INTO v_existing FROM public.turno_jornada_inventario_cortes
