@@ -48,6 +48,75 @@ test("visibility hotfix never reopens a route denied by the permission engine", 
   }
 });
 
+test("the body observer does not rewrite an already-normalized Administration label", async () => {
+  const dom = new JSDOM(
+    '<!doctype html><html><head></head><body><nav id="tabs">' +
+      '<button class="tab-btn" data-tab="config"><span class="bc-nav-icon">⚙</span>' +
+      '<span class="bc-nav-label">Administración</span></button>' +
+    '</nav></body></html>',
+    { runScripts: "outside-only", url: "https://battlecruiser.test/", pretendToBeVisual: true }
+  );
+  const { window } = dom;
+  const nativeMutationObserver = window.MutationObserver;
+  const nativeObserver = new nativeMutationObserver(() => {});
+  const bodyObserverInstances = [];
+  const domReady = window.document.readyState === "loading"
+    ? new Promise(resolve => window.document.addEventListener("DOMContentLoaded", resolve, { once: true }))
+    : Promise.resolve();
+
+  nativeObserver.observe(window.document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+
+  window.MutationObserver = class CapturedMutationObserver {
+    constructor(callback) {
+      this.callback = callback;
+      bodyObserverInstances.push(this);
+    }
+    observe() {}
+    disconnect() {}
+  };
+
+  try {
+    window.eval(pulidoSource);
+    await domReady;
+    await new Promise(resolve => window.setTimeout(resolve, 0));
+
+    const bodyObserver = bodyObserverInstances[0];
+    assert.ok(bodyObserver, "the product polish body observer should be installed");
+    nativeObserver.takeRecords();
+
+    // Simulate unrelated body mutations waking the global observer.
+    bodyObserver.callback([]);
+    await new Promise(resolve => window.setTimeout(resolve, 0));
+    const firstPass = nativeObserver.takeRecords();
+
+    bodyObserver.callback([]);
+    await new Promise(resolve => window.setTimeout(resolve, 0));
+    const secondPass = nativeObserver.takeRecords();
+
+    assert.equal(
+      firstPass.length,
+      0,
+      "an already-correct Administration label must not create a new childList mutation"
+    );
+    assert.equal(
+      secondPass.length,
+      0,
+      "repeated observer callbacks must remain idempotent"
+    );
+    assert.equal(
+      window.document.querySelector(".bc-nav-label").textContent,
+      "Administración"
+    );
+  } finally {
+    nativeObserver.disconnect();
+    dom.window.close();
+  }
+});
+
 test("stock badge renderer avoids same-value DOM writes", () => {
   assert.match(
     pulidoSource,

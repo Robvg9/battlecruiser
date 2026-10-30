@@ -384,7 +384,7 @@
   function normalizarEtiquetaConfig(){
     var b=document.querySelector('#tabs [data-tab="config"]');if(!b)return;
     var label=b.querySelector('.bc-nav-label');
-    if(label){label.textContent='Administración';return;}
+    if(label){if(label.textContent!=='Administración')label.textContent='Administración';return;}
     if(b.querySelector('.bc-nav-icon')){var span=document.createElement('span');span.className='bc-nav-label';span.textContent='Administración';b.appendChild(span);}
     else if(b.textContent.trim()!=='Administración')b.textContent='Administración';
   }
