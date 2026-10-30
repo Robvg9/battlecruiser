@@ -1,4 +1,13 @@
 // ==== Battlecruiser · js/navegacion.js ====
+// Bloqueo en fase capture: ningún otro listener recibe una ruta sin permiso efectivo.
+document.addEventListener("click", function (event) {
+  var denied = event.target && event.target.closest
+    ? event.target.closest(".tab-btn[data-tab][data-bc-permiso]");
+  if (!denied || denied.getAttribute("data-bc-permiso") === "1") return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+}, true);
 // Navegación por tabs y menú lateral. Visibilidad = autoridad de aplicarPermisosAInterfaz.
 // v9.2.80 — M26.5-FE: almacenes carga stock; ventas sincroniza turno del usuario.
 
