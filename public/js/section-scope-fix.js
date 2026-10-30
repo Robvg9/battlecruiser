@@ -3,7 +3,7 @@
 // No toca permisos de datos ni operaciones de negocio.
 (function () {
   'use strict';
-  var VERSION = '20261016.1';
+  var VERSION = '20261030.1';
   if (window.__BC_SECTION_SCOPE_FIX__ === VERSION) return;
   window.__BC_SECTION_SCOPE_FIX__ = VERSION;
 
@@ -13,6 +13,11 @@
 
   function mainRoot() {
     return document.querySelector('.main-content');
+  }
+
+  function permissionsReady() {
+    var shell = document.getElementById('app-shell');
+    return !!(shell && shell.getAttribute('data-bc-permisos-cargados') === '1');
   }
 
   function panels() {
@@ -31,17 +36,22 @@
     );
     for (var i = buttons.length - 1; i >= 0; i--) {
       var btn = buttons[i];
-      if (btn.classList.contains('hidden') ||
+      if (btn.getAttribute('data-bc-permiso') !== '1' ||
+          btn.classList.contains('hidden') ||
           btn.classList.contains('tab-sin-permiso') ||
           btn.style.display === 'none') continue;
       var id = 'tab-' + btn.getAttribute('data-tab');
       var target = document.getElementById(id);
       if (target && target.parentElement === main &&
           target.classList.contains('tab-panel') &&
+          target.getAttribute('data-bc-permiso') === '1' &&
+          !target.hasAttribute('hidden') &&
           all.indexOf(target) !== -1) return target;
     }
     for (var j = 0; j < all.length; j++) {
       if (all[j].classList.contains('visible') &&
+          all[j].getAttribute('data-bc-permiso') === '1' &&
+          !all[j].hasAttribute('hidden') &&
           !all[j].classList.contains('hidden') &&
           !all[j].classList.contains('tab-sin-permiso')) return all[j];
     }
@@ -115,8 +125,23 @@
     var main = mainRoot();
     var all = panels();
     if (!main || !all.length) return;
+    if (!permissionsReady()) {
+      all.forEach(function (panel) {
+        if (panel.classList.contains('visible')) panel.classList.remove('visible');
+        setImportant(panel, 'display', 'none');
+        panel.setAttribute('aria-hidden', 'true');
+      });
+      return;
+    }
     var current = activePanel(all);
-    if (!current) return;
+    if (!current) {
+      all.forEach(function (panel) {
+        if (panel.classList.contains('visible')) panel.classList.remove('visible');
+        setImportant(panel, 'display', 'none');
+        panel.setAttribute('aria-hidden', 'true');
+      });
+      return;
+    }
     applying = true;
     try {
       all.forEach(function (panel) {
@@ -126,11 +151,13 @@
           setImportant(panel, 'display', 'block');
           setImportant(panel, 'visibility', 'visible');
           setImportant(panel, 'opacity', '1');
+          panel.setAttribute('aria-hidden', 'false');
         } else {
           if (panel.classList.contains('visible')) panel.classList.remove('visible');
           // Inline !important beats stale overrides from legacy scripts. On
           // selection, this same contract restores the active panel to block.
           setImportant(panel, 'display', 'none');
+          panel.setAttribute('aria-hidden', 'true');
         }
       });
       isolateProductExtras();
