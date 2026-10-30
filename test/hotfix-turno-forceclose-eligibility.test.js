@@ -22,6 +22,9 @@ function setup(t, options = {}) {
   window.tienePermiso = () => false;
   if (options.user) window._usuarioActual = options.user;
   if (options.bcUser) window.__bcUser = options.bcUser;
+  if (typeof options.m29Admin === "boolean") {
+    window.__BC_M29__ = { isAdmin: () => options.m29Admin };
+  }
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => options.apiAdmin === true,
     obtenerExpedienteTurno: async (id) => ({
@@ -64,6 +67,22 @@ test("el dueño con nombre_rol ve el control aunque la RPC no devuelva admin", a
   await window.__BC_M33.open("turno-antiguo");
   assert.ok(window.document.querySelector(".bc-force-close-turno"),
     "M33 reconoce nombre_rol como propietario; recuperación debe aplicar la misma regla");
+});
+
+test("reutiliza el ADMIN ya resuelto por M29 aunque la comprobación secundaria devuelva falso", async (t) => {
+  const window = setup(t, {
+    apiAdmin: false,
+    m29Admin: true,
+    user: { id: "owner-1" },
+    turn: { fecha_fin: "2026-09-07" }
+  });
+  await window.__BC_M33.open("turno-antiguo");
+  const button = window.document.querySelector(".bc-force-close-turno");
+  assert.ok(button, "la recuperación debe coincidir con el permiso que M33 ya resolvió");
+  const panel = button.closest(".bc-force-close-panel");
+  assert.ok(panel);
+  assert.equal(panel.style.flexBasis, "100%");
+  assert.equal(panel.querySelectorAll("button").length, 1);
 });
 
 test("calcula vencimiento desde fecha_inicio y dias_turno si falta fecha_fin", async (t) => {
