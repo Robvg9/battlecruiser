@@ -1,0 +1,196 @@
+\set ON_ERROR_STOP on
+-- These assertions run after the existing Step 7 contract has completed Day 1.
+-- All records are inside the disposable PostgreSQL 17 database.
+
+DO $finance$
+DECLARE
+  v_turno uuid := '90000000-0000-0000-0000-000000000007';
+  v_day1 uuid := '91000000-0000-0000-0000-000000000007';
+  v_prog1 uuid := '92000000-0000-0000-0000-000000000007';
+  v_owner uuid := '20000000-0000-0000-0000-000000000001';
+  v_worker uuid := '20000000-0000-0000-0000-000000000002';
+  v_almacen uuid := '10000000-0000-0000-0000-000000000001';
+  v_pan uuid := '31000000-0000-0000-0000-000000000001';
+  v_jugo uuid := '31000000-0000-0000-0000-000000000002';
+  v_day2 uuid := '91000000-0000-0000-0000-000000000008';
+  v_prog2 uuid := '92000000-0000-0000-0000-000000000008';
+  v_fecha_hoy date := (now() AT TIME ZONE 'America/Havana')::date;
+  v_final_id uuid;
+  v_initial_id uuid;
+  v_tramo uuid;
+  v_expense uuid;
+  v_expense_retry uuid;
+  v_reinvestment uuid;
+  v_reinvestment_retry uuid;
+  v_result jsonb;
+  v_before_pan numeric;
+  v_before_jugo numeric;
+  v_count integer;
+  v_error boolean;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  PERFORM set_config('test.perms','gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver,turnos:ver',false);
+
+  -- Day 1 has already been physically counted and closed by step7-jornada-contract.sql.
+  -- Move only the disposable fixture's historical date back one day, then create today's Day 2.
+  SELECT id INTO v_final_id
+  FROM public.turno_jornada_inventario_cortes
+  WHERE turno_sesion_id=v_day1 AND tipo='FINAL' AND estado='CONFIRMADO';
+  IF v_final_id IS NULL THEN RAISE EXCEPTION 'FAIL: Day 1 final snapshot is missing'; END IF;
+
+  UPDATE public.turnos SET dias_turno=2 WHERE id=v_turno;
+  UPDATE public.turno_jornada_programacion SET fecha=v_fecha_hoy-1 WHERE id=v_prog1;
+  UPDATE public.turno_sesiones SET fecha=v_fecha_hoy-1 WHERE id=v_day1;
+
+  INSERT INTO public.turno_jornada_programacion(
+    id,turno_id,almacen_id,numero_dia,fecha,trabaja,responsable_id,
+    hora_inicio_prevista,hora_fin_prevista,zona_horaria,patron_id,estado,creado_por,actualizado_por
+  ) VALUES(
+    v_prog2,v_turno,v_almacen,2,v_fecha_hoy,true,v_owner,
+    '07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner
+  );
+  INSERT INTO public.turno_sesiones(
+    id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id
+  ) VALUES(v_day2,v_turno,v_almacen,2,'JORNADA',v_fecha_hoy,'PROGRAMADA',v_prog2);
+  INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
+  VALUES(v_day2,v_turno,v_owner,v_owner);
+
+  -- The previous confirmed FINAL is displayed as an editable reference only.
+  v_result:=public.bc7_obtener_inventario_jornada(v_day2);
+  IF v_result->'apertura_previa'->>'corte_id' IS DISTINCT FROM v_final_id::text THEN
+    RAISE EXCEPTION 'FAIL: Day 2 did not read Day 1 confirmed FINAL as its opening reference';
+  END IF;
+  IF (SELECT (x->>'cantidad_contada')::numeric
+      FROM jsonb_array_elements(v_result->'apertura_previa'->'lineas') x
+      WHERE x->>'producto_id'=v_pan::text)<>8 THEN
+    RAISE EXCEPTION 'FAIL: previous physical count was not returned for the matching product';
+  END IF;
+
+  SELECT cantidad INTO v_before_pan FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen;
+  SELECT cantidad INTO v_before_jugo FROM public.stock WHERE producto_id=v_jugo AND almacen_id=v_almacen;
+
+  -- A fresh physical count is required; it creates a new immutable INITIAL with a source link.
+  v_result:=public.bc7_guardar_inventario_jornada(v_day2,'INICIAL',
+    jsonb_build_array(
+      jsonb_build_object('producto_id',v_pan,'cantidad',7.5),
+      jsonb_build_object('producto_id',v_jugo,'cantidad',4.25)
+    ),'Day 2 physical recount fixture');
+  v_initial_id:=(v_result->>'id')::uuid;
+  IF v_result->>'estado'<>'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: Day 2 initial count not confirmed'; END IF;
+  IF (SELECT origen_corte_id FROM public.turno_jornada_inventario_cortes WHERE id=v_initial_id) IS DISTINCT FROM v_final_id THEN
+    RAISE EXCEPTION 'FAIL: Day 2 INITIAL did not preserve the previous FINAL provenance link';
+  END IF;
+  IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas WHERE corte_id=v_initial_id AND producto_id=v_pan)<>7.5 THEN
+    RAISE EXCEPTION 'FAIL: Day 2 count did not preserve the fresh physical quantity';
+  END IF;
+  IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas l
+      JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
+      WHERE c.id=v_final_id AND l.producto_id=v_pan)<>8 THEN
+    RAISE EXCEPTION 'FAIL: carry-forward modified Day 1 immutable FINAL';
+  END IF;
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen)<>v_before_pan
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_jugo AND almacen_id=v_almacen)<>v_before_jugo THEN
+    RAISE EXCEPTION 'FAIL: confirming or carrying forward an inventory cut changed stock';
+  END IF;
+
+  PERFORM public.bc5_iniciar_jornada(v_day2,'PostgreSQL fixture start-time exception');
+  SELECT id INTO v_tramo FROM public.turno_tramos
+  WHERE turno_sesion_id=v_day2 AND estado='ACTIVO' AND usuario_id=v_owner;
+  IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: Day 2 did not open an active owner tranche'; END IF;
+
+  -- Expense is linked only to turno_sesiones/turno_tramos; legacy FK stays NULL.
+  v_expense:=public.bc7_registrar_gasto_jornada(
+    v_day2,'Agua para el local',20,'Compra operativa fixture',
+    '95000000-0000-0000-0000-000000000001'
+  );
+  v_expense_retry:=public.bc7_registrar_gasto_jornada(
+    v_day2,'Agua para el local',20,'Retry fixture',
+    '95000000-0000-0000-0000-000000000001'
+  );
+  IF v_expense IS DISTINCT FROM v_expense_retry THEN
+    RAISE EXCEPTION 'FAIL: gasto retry did not return the original ID';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.gastos
+  WHERE creado_por=v_owner AND idempotency_key='95000000-0000-0000-0000-000000000001';
+  IF v_count<>1 THEN RAISE EXCEPTION 'FAIL: duplicate expense was created for one idempotency key'; END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM public.gastos
+    WHERE id=v_expense AND estado='PENDIENTE'
+      AND turno_sesion_id=v_day2 AND turno_tramo_id=v_tramo
+      AND sesion_id IS NULL AND ciclo_id IS NULL AND almacen_id=v_almacen
+  ) THEN
+    RAISE EXCEPTION 'FAIL: expense is not pending or carries incorrect jornada/legacy provenance';
+  END IF;
+
+  -- Reinvestment reuses the established stock/FIFO/cash function and retains provider + master turn.
+  v_reinvestment:=public.bc7_registrar_reinversion_jornada(
+    v_day2,
+    jsonb_build_array(jsonb_build_object(
+      'producto_id',v_pan,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+      'cantidad_base',2,'costo_total',10
+    )),
+    '95000000-0000-0000-0000-000000000002',
+    'Proveedor de prueba'
+  );
+  v_reinvestment_retry:=public.bc7_registrar_reinversion_jornada(
+    v_day2,
+    jsonb_build_array(jsonb_build_object(
+      'producto_id',v_pan,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+      'cantidad_base',2,'costo_total',10
+    )),
+    '95000000-0000-0000-0000-000000000002',
+    'Proveedor de prueba'
+  );
+  IF v_reinvestment IS DISTINCT FROM v_reinvestment_retry THEN
+    RAISE EXCEPTION 'FAIL: reinvestment retry did not return the original ID';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.reinversiones
+  WHERE usuario_id=v_owner AND idempotency_key='95000000-0000-0000-0000-000000000002';
+  IF v_count<>1 THEN RAISE EXCEPTION 'FAIL: duplicate reinvestment was created for one idempotency key'; END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM public.reinversiones
+    WHERE id=v_reinvestment AND proveedor='Proveedor de prueba'
+      AND turno_id=v_turno AND turno_sesion_id=v_day2 AND turno_tramo_id=v_tramo
+      AND sesion_id IS NULL AND ciclo_id IS NULL AND almacen_id=v_almacen
+  ) THEN
+    RAISE EXCEPTION 'FAIL: reinvestment lost provider or correct session/tranche/master provenance';
+  END IF;
+  IF (SELECT count(*) FROM public.reinversiones_lineas WHERE reinversion_id=v_reinvestment)<>1 THEN
+    RAISE EXCEPTION 'FAIL: reinvestment detail line not persisted';
+  END IF;
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen)<>v_before_pan+2 THEN
+    RAISE EXCEPTION 'FAIL: reinvestment did not add stock exactly once';
+  END IF;
+  IF (SELECT count(*) FROM public.lotes_compra WHERE usuario_id=v_owner AND origen='reinversion')<>1 THEN
+    RAISE EXCEPTION 'FAIL: FIFO purchase lot was not created exactly once';
+  END IF;
+  IF (SELECT count(*) FROM public.movimientos_caja_fixture WHERE referencia_id=v_reinvestment)<>1 THEN
+    RAISE EXCEPTION 'FAIL: cash ledger integration did not create exactly one movement';
+  END IF;
+
+  -- A worker may create without financial read; the RPC must not leak either section.
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear',false);
+  v_result:=public.bc7_finanzas_jornada(v_day2);
+  IF jsonb_array_length(v_result->'gastos')<>0 OR jsonb_array_length(v_result->'reinversiones')<>0 THEN
+    RAISE EXCEPTION 'FAIL: finance read exposed a section without its own .ver permission';
+  END IF;
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver',false);
+  v_result:=public.bc7_finanzas_jornada(v_day2);
+  IF jsonb_array_length(v_result->'gastos')<>1 OR jsonb_array_length(v_result->'reinversiones')<>1 THEN
+    RAISE EXCEPTION 'FAIL: authorized finance history did not return both linked records';
+  END IF;
+
+  -- An unrelated authenticated user with read grants cannot inspect someone else's finance.
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_finanzas_jornada(v_day2);
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unrelated user read another worker finance'; END IF;
+
+  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward: idempotent expense/reinvestment, provider, stock/FIFO/cash, permission-scoped reads and immutable previous-day provenance';
+END
+$finance$;
