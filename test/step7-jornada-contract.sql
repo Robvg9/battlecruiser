@@ -72,8 +72,12 @@ BEGIN
 
   v_ajuste:=public.bc7_registrar_ajuste_jornada(v_sesion,'merma',v_pan,1,'Merma de prueba aislada',
     '93000000-0000-0000-0000-000000000007');
-  IF NOT EXISTS(SELECT 1 FROM public.mermas WHERE id=v_ajuste AND sesion_id=v_sesion AND estado='PENDIENTE') THEN
-    RAISE EXCEPTION 'FAIL: session adjustment not linked to the correct jornada';
+  IF NOT EXISTS(
+    SELECT 1 FROM public.mermas
+    WHERE id=v_ajuste AND turno_sesion_id=v_sesion AND turno_tramo_id=v_tramo
+      AND sesion_id IS NULL AND ciclo_id IS NULL AND estado='PENDIENTE'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: session adjustment must keep legacy links NULL and preserve Jornada session/tranche provenance';
   END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
