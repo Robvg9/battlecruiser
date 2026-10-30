@@ -4,7 +4,7 @@ const path = require("path");
 
 const MODULOS_APP = [
   "core.js", "auth.js", "offline.js", "centro-control.js", "navegacion.js", "productos.js", "presentaciones.js", "almacenes.js",
-  "transferencias.js", "vales.js", "ventas.js", "catalogos.js", "configuracion.js", "usuarios-permisos.js", "mando.js", "reportes.js",
+  "transferencias.js", "vales.js", "ventas.js", "catalogos.js", "configuracion.js", "usuarios-permisos.js", "permisos-navegacion.js", "mando.js", "reportes.js",
   "nucleo-operativo.js", "operacion-humana.js", "comunicacion.js",
 ];
 
