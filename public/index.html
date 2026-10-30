@@ -12,9 +12,10 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.38">
+<link rel="stylesheet" href="style.css?v=9.5.39">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
+#tabs[data-bc-permissions-ready="0"] .tab-btn[data-tab],#tabs[data-bc-permissions-ready="0"] #nav-config-toggle{display:none!important;visibility:hidden!important;pointer-events:none!important}
 .venta-almacen-operativo{margin-bottom:12px;padding:12px 14px;border-radius:8px;background:var(--stone);border:1px solid var(--gold-dim);display:flex;flex-direction:column;gap:4px}
 .venta-almacen-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mist);font-family:'IBM Plex Mono',monospace}
 .venta-almacen-nombre{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--gold)}
@@ -78,7 +79,7 @@
       <button type="button" class="login-utility" id="password-recovery-request-btn">Enviar correo de recuperación</button>
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote app-version-label">v9.5.38 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.39 — BattleCruiser</p>
     </form>
   </div>
 
@@ -91,7 +92,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <nav class="sidebar-nav" id="tabs">
+      <nav class="sidebar-nav" id="tabs" data-bc-permissions-ready="0">
         <button class="tab-btn active" data-tab="resumen">Centro de Control <span id="resumen-tab-badge" class="pendientes-tab-badge hidden"></span></button>
         <button class="tab-btn" data-tab="productos">Productos</button>
         <button class="tab-btn" data-tab="ventas">Ventas</button>
@@ -492,6 +493,7 @@
     <section id="tab-operacion" class="tab-panel">
       <div class="pendientes-header"><h3>Operación</h3><span id="operacion-conn-info" class="muted"></span></div>
       <p class="muted">Responsabilidades, incidencias y aprobaciones.</p>
+      <div id="operacion-responsabilidades-section">
       <div class="cc-bloque">
         <h3>Nueva responsabilidad</h3>
         <form id="form-responsabilidad" class="inline-form">
@@ -507,6 +509,8 @@
         <select id="resp-filtro-estado"><option value="">Todos los estados</option><option value="PENDIENTE">Pendiente</option><option value="EN_PROGRESO">En progreso</option><option value="COMPLETADA">Completada</option></select>
         <div id="lista-responsabilidades" class="lista"></div>
       </div>
+      </div>
+      <div id="operacion-incidencias-section">
       <div class="cc-bloque">
         <h3>Incidencias</h3>
         <form id="form-incidencia" class="inline-form">
@@ -516,6 +520,7 @@
         </form>
         <p class="msg" id="msg-inc-crear"></p>
         <div id="lista-incidencias" class="lista"></div>
+      </div>
       </div>
     </section>
 
@@ -596,7 +601,7 @@
     <section id="tab-config" class="tab-panel">
       <div class="pendientes-header"><h2>Administración</h2></div>
       <p class="muted">Gestión de roles, permisos y catálogos maestros del salón.</p>
-      <div class="cc-bloque">
+      <div class="cc-bloque" id="config-roles-section">
         <h3>Roles y permisos</h3>
         <form id="form-nuevo-rol" class="inline-form">
           <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
@@ -605,18 +610,22 @@
         <p class="msg" id="msg-roles"></p>
         <div id="lista-roles" class="lista"></div>
       </div>
+      <div class="cc-bloque" id="config-categorias-section">
       <h3>Categorías</h3>
       <form id="form-categoria" class="inline-form">
         <input id="cat-nombre" placeholder="Nombre de la categoría" required>
         <button type="submit">Agregar categoría</button>
       </form>
       <div id="lista-categorias" class="lista"></div>
+      </div>
+      <div class="cc-bloque" id="config-unidades-section">
       <h3>Unidades de medida</h3>
       <form id="form-unidad" class="inline-form">
         <input id="uni-nombre" placeholder="Nombre de la unidad" required>
         <button type="submit">Agregar unidad</button>
       </form>
       <div id="lista-unidades" class="lista"></div>
+      </div>
       <p class="msg" id="msg-config"></p>
     </section>
     </main>
@@ -654,6 +663,6 @@
 <script src="js/comunicacion.js"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.38"></script>
+<script src="app.js?v=9.5.39"></script>
 </body>
 </html>
