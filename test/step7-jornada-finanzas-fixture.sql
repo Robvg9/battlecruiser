@@ -94,15 +94,20 @@ CREATE SCHEMA IF NOT EXISTS private;
 CREATE OR REPLACE FUNCTION private.registrar_movimiento_caja(
   p_almacen_id uuid,p_ciclo_id uuid,p_sesion_id uuid,p_turno_id uuid,
   p_tipo text,p_direccion text,p_monto numeric,p_referencia_tipo text,
-  p_referencia_id uuid,p_descripcion text
-) RETURNS void
-LANGUAGE sql
+  p_referencia_id uuid,p_concepto text
+) RETURNS uuid
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public','pg_temp'
 AS $fn$
+DECLARE v_id uuid;
+BEGIN
   INSERT INTO public.movimientos_caja_fixture
     (almacen_id,turno_id,tipo,direccion,monto,referencia_tipo,referencia_id,descripcion)
-  VALUES (p_almacen_id,p_turno_id,p_tipo,p_direccion,p_monto,p_referencia_tipo,p_referencia_id,p_descripcion);
+  VALUES (p_almacen_id,p_turno_id,p_tipo,p_direccion,p_monto,p_referencia_tipo,p_referencia_id,p_concepto)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
 $fn$;
 
 -- A disposable implementation of the existing reinvestment contract. It exercises
