@@ -554,7 +554,7 @@ async function main() {
     "document.addEventListener('DOMContentLoaded',()=>console.warn('__BC_E2E_BOOT_DIAG__DOM_READY__',JSON.stringify({readyState:document.readyState,elapsedMs:Math.round(performance.now())})),{once:true});",
     "window.addEventListener('load',()=>console.warn('__BC_E2E_BOOT_DIAG__LOAD__',JSON.stringify({readyState:document.readyState,elapsedMs:Math.round(performance.now())})),{once:true});",
     "})();"
-  ].join('\\n');
+  ].join('\n');
 
   const diagnosticInstalled = await cdpCommand("Page.addScriptToEvaluateOnNewDocument", {
     source: bootDiagnosticSource,
