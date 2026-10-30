@@ -253,6 +253,9 @@ BEGIN
   END IF;
   v_t := public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  -- Serialize retries at the same actor/key before probing the existing row.
+  -- The table's unique key is the final cross-path guard; this lock keeps wrapper retries idempotent.
+  PERFORM pg_advisory_xact_lock(hashtextextended(auth.uid()::text||':'||p_idempotency_key::text,0));
   SELECT id,turno_sesion_id,turno_tramo_id
     INTO v_id,v_existing_session,v_existing_tramo
   FROM public.reinversiones
@@ -269,7 +272,8 @@ BEGIN
   -- The Jornada association is additional provenance, not a replacement for turno_id.
   -- Use the server transaction time; a caller cannot backdate an active-tranche operation.
   v_id := public.registrar_reinversion_multiple(
-    v_s.almacen_id,NULL,now(),p_lineas,NULL,NULL,v_s.turno_id,p_idempotency_key
+    v_s.almacen_id,NULLIF(btrim(coalesce(p_proveedor,'')),''),now(),
+    p_lineas,NULL,NULL,v_s.turno_id,p_idempotency_key
   );
   UPDATE public.reinversiones
   SET turno_sesion_id=v_s.id,turno_tramo_id=v_t.id
