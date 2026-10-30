@@ -43,7 +43,7 @@ jobs:
       - name: PostgreSQL 17 disposable fixture, migrations and ACL contract
         shell: cmd
         env:
-          BC_STEP7_POSTGRES_ROOT: ${{ runner.temp }}\BattleCruiser-CI\Postgres17
+          BC_STEP7_POSTGRES_ROOT: C:\Users\runneradmin\AppData\Local\Temp\BattleCruiser-CI\Postgres17
         run: node test/step7-jornada-postgres-windows-ci.js
       - name: Persist PostgreSQL 17 contract evidence
         if: always()
