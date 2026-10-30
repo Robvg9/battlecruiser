@@ -9,9 +9,10 @@ function irATab(tab) {
     if (ciclosBtn) tab = "ciclos";
   }
   var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-  if (!btn) return;
-  if (btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") || btn.style.display === "none") {
-    console.warn("[BattleCruiser] irATab: pestaña no disponible:", tab);
+  if (!btn || btn.getAttribute("data-bc-permiso") !== "1" ||
+      btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") ||
+      btn.style.display === "none") {
+    console.warn("[BattleCruiser] irATab: pestaña no autorizada:", tab);
     return;
   }
   btn.click();
@@ -24,8 +25,12 @@ safeInit("tabs", function () {
   tabsEl.addEventListener("click", function (e) {
     var btn = e.target.closest(".tab-btn");
     if (!btn) return;
-    if (btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") || btn.style.display === "none") {
+    if (btn.getAttribute("data-bc-permiso") !== "1" ||
+        btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") ||
+        btn.style.display === "none") {
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       return;
     }
     var t = btn.dataset.tab;
