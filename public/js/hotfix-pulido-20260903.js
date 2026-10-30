@@ -61,8 +61,6 @@
       +'#tab-productos #form-producto.bc-pulido-form .prod-imagen-campo{grid-column:1/-1}'
       +'#tab-transferencias{display:none!important}'
       +'#tabs [data-tab=transferencias]{display:none!important}'
-      +'#tabs [data-tab=config]{display:flex!important;visibility:visible!important;opacity:1!important}'
-      +'#tab-config{visibility:visible!important}'
       +'#tab-ventas .bc-pulido-product-card{cursor:pointer}'
       +'#tab-ventas .bc-pulido-product-card:focus{outline:2px solid var(--gold);outline-offset:2px}'
       +'#tab-comunicacion .bc-pulido-empty-chat{display:none!important}'
@@ -383,8 +381,12 @@
   function cleanCommunicationEmpty(){
     document.querySelectorAll('#tab-comunicacion *').forEach(function(el){var t=norm(el.textContent||'');if((t==='no tenes conversaciones todavia inicia una nueva conversacion'||t==='no tienes conversaciones todavía. iniciá una nueva conversación para comenzar a chatear.')&&el.children.length===0)el.classList.add('bc-pulido-empty-chat');});
   }
-  function configVisible(){
-    var tabs=document.getElementById('tabs');if(!tabs)return;var b=tabs.querySelector('[data-tab="config"]');if(!b){b=document.createElement('button');b.type='button';b.className='tab-btn';b.dataset.tab='config';b.textContent='Configuración';tabs.appendChild(b);if(typeof window.navegarTab==='function')b.onclick=function(){window.navegarTab('config');};else b.addEventListener('click',function(){document.querySelectorAll('.tab-btn').forEach(function(x){x.classList.remove('active');});b.classList.add('active');document.querySelectorAll('.tab-panel').forEach(function(x){x.classList.remove('visible');});var p=document.getElementById('tab-config');if(p)p.classList.add('visible');});}b.style.display='flex';b.hidden=false;b.removeAttribute('aria-hidden');
+  function normalizarEtiquetaConfig(){
+    var b=document.querySelector('#tabs [data-tab="config"]');if(!b)return;
+    var label=b.querySelector('.bc-nav-label');
+    if(label){label.textContent='Administración';return;}
+    if(b.querySelector('.bc-nav-icon')){var span=document.createElement('span');span.className='bc-nav-label';span.textContent='Administración';b.appendChild(span);}
+    else if(b.textContent.trim()!=='Administración')b.textContent='Administración';
   }
   function reportsSingleFilter(){
     var tab=document.getElementById('tab-reportes');if(!tab)return;
@@ -396,16 +398,16 @@
     var b=document.querySelector('#tabs [data-tab="transferencias"]');if(b)b.remove();var sec=document.getElementById('tab-transferencias');if(sec)sec.classList.remove('visible');
   }
   function productModalObserver(){
-    var obs=new MutationObserver(function(){productModalPolish();discoverEditButtons();cleanCommunicationEmpty();reportsSingleFilter();configVisible();repaintStockCards();});obs.observe(document.body,{subtree:true,childList:true});
+    var obs=new MutationObserver(function(){productModalPolish();discoverEditButtons();cleanCommunicationEmpty();reportsSingleFilter();normalizarEtiquetaConfig();repaintStockCards();});obs.observe(document.body,{subtree:true,childList:true});
   }
   function boot(){
     css();
     ensureWarehouses();preloadStock();patchStockGetter();bindCatalogClicks();
-    ensurePresFields();patchProductSubmit();patchEditBridge();ensurePresentationCreateForm();buildPresentationCatalog();configVisible();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
+    ensurePresFields();patchProductSubmit();patchEditBridge();ensurePresentationCreateForm();buildPresentationCatalog();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
     setTimeout(function(){preloadStock(true);ensureWarehouses();patchStockGetter();patchEditBridge();},800);
     setTimeout(function(){productModalPolish();ensurePresFields();renderPresentationCatalog();discoverEditButtons();repaintStockCards();},1400);
-    setTimeout(function(){configVisible();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
-    window.__BC_PULIDO_20260903_VERIFY=function(){return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialFields:!!document.getElementById('bc-product-commercial-fields')}};
+    setTimeout(function(){normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
+    window.__BC_PULIDO_20260903_VERIFY=function(){return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialFields:!!document.getElementById('bc-product-commercial-fields')}};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('online',function(){setTimeout(function(){preloadStock(true);ensureWarehouses();},300);});
