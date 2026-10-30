@@ -78,7 +78,10 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"), 'the recovery control must be available in the offline shell');
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.7"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
-  assert.ok(app.includes('["m33-turnos-final.js","33.11"]'), 'the turn detail modal cache key must load the audited recovery action');
+  assert.ok(app.includes('["m33-turnos-final.js","33.12"]'), 'the turn detail modal cache key must load the audited recovery action');
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.6"]'), 'Step 7 must load the M33 session bridge');
+  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.6"), 'the updated Step 7 bundle must be offline-ready');
+
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
@@ -149,8 +152,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   const assets = [
     "./js/turno-api.js?v=9.4.7",
     "./js/turnos-maestro.js?v=9.4.3",
-    "./js/m29-turnos-organizacion.js?v=29.15",
-    "./js/m33-turnos-final.js?v=33.11",
+    "./js/m29-turnos-organizacion.js?v=29.16",
+    "./js/m33-turnos-final.js?v=33.12",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
     "./js/m51-movimientos-centro.js?v=51.4",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
@@ -159,8 +162,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   for (const key of [
     '["turno-api.js","9.4.7"]',
     '["turnos-maestro.js","9.4.3"]',
-    '["m29-turnos-organizacion.js","29.15"]',
-    '["m33-turnos-final.js","33.11"]',
+    '["m29-turnos-organizacion.js","29.16"]',
+    '["m33-turnos-final.js","33.12"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
     '["m51-movimientos-centro.js","51.4"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
