@@ -308,14 +308,9 @@ BEGIN
   IF NOT public.bc_actor_is_admin()
      AND (
        NOT public.tiene_permiso('turnos','ver')
-       OR (
-         NOT EXISTS (
-           SELECT 1 FROM public.turno_asignaciones a
-           WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
-         ) AND NOT EXISTS (
-           SELECT 1 FROM public.turno_jornada_programacion p
-           WHERE p.id=v_s.jornada_programacion_id AND p.responsable_id=auth.uid()
-         )
+       OR NOT EXISTS (
+         SELECT 1 FROM public.turno_asignaciones a
+         WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
        )
      ) THEN
     RAISE EXCEPTION 'Solo el responsable asignado con turnos.ver o ADMIN puede consultar estas finanzas.' USING ERRCODE='42501';
