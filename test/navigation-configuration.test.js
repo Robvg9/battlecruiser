@@ -123,7 +123,7 @@ test("al abrirse el shell, toda la navegación permanece cerrada hasta validar e
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.38 and load refreshed navigation modules", () => {
+test("app shell, application and Service Worker share 9.5.39 and load refreshed navigation modules", () => {
   assert.match(app, /const VERSION="9.5.39"/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9.5.39"/);
   assert.match(index, /href="style\.css\?v=9.5.39"/);
