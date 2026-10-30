@@ -17,7 +17,9 @@ const RECOVERY_SOURCE = fs.readFileSync(
 
 test("la recuperación aparece en Resumen del M33 real usando el permiso ADMIN resuelto por M29", async (t) => {
   const dom = new JSDOM(
-    "<!doctype html><html lang='es'><head></head><body></body></html>",
+    "<!doctype html><html lang='es'><head></head><body>" +
+      "<div id='ciclos-m18-root'><article class='m29-card' data-turno-id='turno-la-cueva-vencido-fixture'>La Cueva</article></div>" +
+      "</body></html>",
     {
       url: "https://battlecruiser-step4-m33-integration.test/",
       runScripts: "outside-only",
@@ -67,9 +69,15 @@ test("la recuperación aparece en Resumen del M33 real usando el permiso ADMIN r
   assert.equal(window.__BC_M33.open.__bcForceCloseWrapped, true,
     "el hotfix debe envolver el open real de M33");
 
-  await window.__BC_M33.open(turnoId);
+  // Exercise the actual user path: tap the M29 card rather than calling M33.open.
+  const card = window.document.querySelector("#ciclos-m18-root .m29-card");
+  assert.ok(card, "la tarjeta M29 de La Cueva debe existir");
+  card.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  for (let attempt = 0; attempt < 40 && window.document.querySelectorAll(".m33-step").length !== 5; attempt++) {
+    await new Promise(resolve => window.setTimeout(resolve, 5));
+  }
   assert.equal(window.document.querySelectorAll(".m33-step").length, 5,
-    "M33 debe renderizar el expediente administrativo real");
+    "el toque real en la tarjeta M29 debe abrir el expediente M33");
 
   for (let step = 1; step < 5; step++) {
     const next = window.document.querySelector("#m33-next");
