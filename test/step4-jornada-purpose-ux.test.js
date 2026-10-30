@@ -96,3 +96,15 @@ test("el cierre solo informa éxito tras releer COMPLETADA y reconcilia respuest
   assert.match(close,/No repitas la escritura todavía/);
   assert.match(close,/no se pudo releer el resumen/i);
 });
+
+test("el inicio solo muestra éxito tras releer EN_CURSO y reconcilia respuestas perdidas",()=>{
+  const start=JOURNADA_UI.indexOf("async function startSession(btn)");
+  const end=JOURNADA_UI.indexOf("async function closeSession(form)",start);
+  assert.ok(start>=0&&end>start);
+  const open=JOURNADA_UI.slice(start,end);
+  assert.match(open,/const reread=await openWorkspace\(sessionId\)/);
+  assert.match(open,/currentState!=='EN_CURSO'/);
+  assert.match(open,/rereadState==='EN_CURSO'/);
+  assert.match(open,/No se repitió la escritura/);
+  assert.match(open,/No repitas la escritura todavía/);
+});
