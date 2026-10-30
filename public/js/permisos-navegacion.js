@@ -182,6 +182,9 @@
 
     toggleForm("form-producto", "productos", "crear");
     toggleForm("form-compra", "stock", "crear");
+    if (!tienePermiso("stock", "crear")) toggleForm("form-compra", "productos", "crear");
+    var formVale = document.getElementById("form-vale");
+    if (formVale) setElementoVisible(formVale, false);
     toggleForm("form-venta-linea", "ventas", "crear");
     toggleForm("form-almacen", "almacenes", "crear");
     toggleForm("form-transferencia", "transferencias", "crear");
