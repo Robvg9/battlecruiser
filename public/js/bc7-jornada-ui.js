@@ -317,8 +317,10 @@
     loadMovements(detail);
   }
   async function openWorkspace(sessionId){
+    if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
     $('bc7-workspace').hidden=false;$('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada y conteos confirmados…</div>';
-    try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);}catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">No se pudo abrir esta jornada: '+esc(e.message)+'</div>';}
+    try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);return true;}
+    catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">No se pudo abrir esta jornada: '+esc(e.message)+'</div>';return false;}
   }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
@@ -526,6 +528,14 @@
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
+  window.__BC7_JORNADA__ = {
+    openWorkspace: openWorkspace,
+    openForSession: async function(sessionId) {
+      if (!sessionId) return false;
+      navTo('jornada');
+      return openWorkspace(sessionId);
+    }
+  };
   document.addEventListener('click',function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,.tab-btn[data-tab="jornada"]'):null;if(!t)return;
     if(t.id==='bc7-warehouse-retry'){e.preventDefault();ensureWarehouseCatalog();return;}
