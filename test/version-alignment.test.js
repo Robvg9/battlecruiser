@@ -87,7 +87,8 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(m74.includes("button.setAttribute('aria-disabled', 'false')"), 'Sales remains accessible as a navigable section');
   assert.ok(!m74.includes("stopImmediatePropagation"), 'M74 must not cancel a tap when no session is open');
   assert.ok(!m74.includes("display:none!important"), 'M74 must not hide the Sales panel');
-  assert.ok(visibilityNormalizer.includes('ventas:true'), 'the global visibility normalizer must leave Ventas styles to its own policy');
+  assert.ok(visibilityNormalizer.includes('var LABELS = { config: "Administración", ciclos: "Turnos" }'), 'the normalizer is limited to labels');
+  assert.ok(!visibilityNormalizer.includes("ventas"), 'the global normalizer must not rewrite Sales visibility or styles');
   assert.ok(index.includes('<section id="tab-ventas" class="tab-panel">'), 'the sales panel must remain in the application');
   assert.ok(index.includes('<div id="lista-ventas" class="lista"></div>'), 'the sales history container must be preserved');
 });
@@ -108,7 +109,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
-  assert.ok(index.includes('<script src="js/navegacion.js?v=20261029.1"></script>'), "new navigation sections need a cache-busted script");
+  assert.ok(index.includes('<script src="js/navegacion.js?v=20261030.1"></script>'), "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
