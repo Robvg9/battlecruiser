@@ -36,7 +36,7 @@ test("purchase and movement modal cache keys match the active release", () => {
   assert.ok(app.includes('["compra-multiple.js","27.9"]'));
   assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.9"]'));
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/);
-  const workerVersion = serviceWorker.match(/BC_SW_VERSION =\\s*["']([^"']+)["']/);
+  const workerVersion = serviceWorker.match(/BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion && workerVersion);
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.9"));
