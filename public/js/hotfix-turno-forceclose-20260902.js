@@ -92,8 +92,12 @@
       el.setAttribute('aria-live', 'polite');
       host.appendChild(el);
     }
-    el.textContent = message || '';
-    el.className = 'bc-force-close-msg m33-msg' + (isError ? ' error' : ' ok');
+    const nextText = String(message || '');
+    const nextClass = 'bc-force-close-msg m33-msg' + (isError ? ' error' : ' ok');
+    // The observer watches M33's body/footer. Avoid self-triggering forever
+    // when the eligibility diagnostic is already visible.
+    if (el.textContent !== nextText) el.textContent = nextText;
+    if (el.className !== nextClass) el.className = nextClass;
   }
 
   function isSummaryStep(modal) {
@@ -143,7 +147,6 @@
     }
     if (!(await isAdmin())) {
       if (existingButton) existingButton.remove();
-      if (existingMessage) existingMessage.remove();
       setMessage(modal, 'Recuperación no disponible: esta sesión no está reconocida como ADMIN por el módulo de Turnos.', true);
       return;
     }
@@ -262,7 +265,8 @@
 
   function wrapOpen() {
     const hub = window.__BC_M33;
-    if (!hub || typeof hub.open !== 'function' || hub.open.__bcForceCloseWrapped) return false;
+    if (!hub || typeof hub.open !== 'function') return false;
+    if (hub.open.__bcForceCloseWrapped) return true;
     const original = hub.open;
     const wrapped = async function (turnoId) {
       const result = await original.apply(this, arguments);
@@ -276,8 +280,29 @@
     return true;
   }
 
+  let wrapRetryScheduled = false;
+  function retryOpenWrapper() {
+    if (wrapRetryScheduled) return;
+    wrapRetryScheduled = true;
+    let attempts = 0;
+    const retry = function () {
+      if (wrapOpen()) {
+        wrapRetryScheduled = false;
+        return;
+      }
+      attempts += 1;
+      if (attempts >= 40) {
+        wrapRetryScheduled = false;
+        console.warn('[BattleCruiser] M33 aún no está disponible; no se pudo enlazar la recuperación del turno.');
+        return;
+      }
+      window.setTimeout(retry, 250);
+    };
+    window.setTimeout(retry, 100);
+  }
+
   function boot() {
-    wrapOpen();
+    if (!wrapOpen()) retryOpenWrapper();
     const active = document.getElementById('m33-bg');
     const id = active && active.getAttribute('data-turno-id');
     if (id) {
