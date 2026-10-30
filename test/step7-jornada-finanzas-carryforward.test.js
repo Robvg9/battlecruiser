@@ -61,7 +61,7 @@ test("Reinvestment preserves provider and serializes actor/key retries", () => {
   assert.ok(start>=0&&end>start);
   const fn=MIGRATION.slice(start,end);
   assert.match(fn,/pg_advisory_xact_lock/);
-  assert.match(fn,/NULLIF\(btrim\(coalesce\(p_proveedor,''\)\),' '\)/);
+  assert.match(fn,/NULLIF\(btrim\(coalesce\(p_proveedor,''\)\),''\)/);
   assert.match(fn,/v_s\.turno_id,p_idempotency_key/);
 });
 
@@ -80,6 +80,8 @@ test("Jornada finance read respects per-section view permissions", () => {
   assert.ok(start >= 0 && end > start, "bc7_finanzas_jornada debe estar definida");
   const fn = MIGRATION.slice(start, end);
   assert.match(fn, /tiene_permiso\('turnos','ver'\)/);
+  assert.match(fn, /a\.turno_sesion_id=v_s\.id AND a\.usuario_id=auth\.uid\(\) AND a\.retirado_at IS NULL/);
+  assert.doesNotMatch(fn, /turno_jornada_programacion p[\\s\\S]*responsable_id=auth\\.uid\\(\\)/, "finance history must not be readable from a stale scheduling row without an active assignment");
   assert.match(fn, /tiene_permiso\('gastos','ver'\)/);
   assert.match(fn, /tiene_permiso\('reinversiones','ver'\)/);
   assert.match(fn, /'gastos',CASE WHEN/);
