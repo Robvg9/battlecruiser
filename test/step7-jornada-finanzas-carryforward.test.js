@@ -35,7 +35,9 @@ test("Jornada finance RPCs require permission, assigned worker, active tramo and
   assert.match(MIGRATION, /tramo_activo/);
   assert.match(MIGRATION, /CREATE OR REPLACE FUNCTION public\.bc7_registrar_gasto_jornada/);
   assert.match(MIGRATION, /tiene_permiso\('gastos','crear'\)/);
-  assert.match(MIGRATION, /public\.crear_gasto\(/);
+  assert.match(MIGRATION, /pg_advisory_xact_lock/);
+  assert.match(MIGRATION, /INSERT INTO public\.gastos[\s\S]*'PENDIENTE'/);
+  assert.doesNotMatch(MIGRATION, /public\.crear_gasto\(/);
   assert.match(MIGRATION, /p_idempotency_key/);
   assert.match(MIGRATION, /GASTO_SOLICITADO/);
   assert.match(MIGRATION, /CREATE OR REPLACE FUNCTION public\.bc7_registrar_reinversion_jornada/);
