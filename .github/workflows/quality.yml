@@ -100,9 +100,9 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
-      # Run preview deployment and browser E2E in this same self-hosted job.
-      # Splitting these into more jobs caused the single local runner to leave
-      # the dependent jobs queued after Quality had completed.
+      # Run preview deployment and browser E2E in this same hosted Windows job.
+      # Keeping them together preserves ordering without requiring the local runner
+      # or introducing dependent queued jobs.
       - name: Deploy isolated PR preview
         if: github.event_name == 'pull_request'
         env:
