@@ -43,9 +43,12 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   for (const id of expectedHidden) {
     assert.ok(routeIds.includes(id), "hidden/aliased logical route must remain explicit: " + id);
   }
-  assert.match(permissions, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
+  assert.match(permissions, /RUTAS_SIEMPRE_OCULTAS/);
+  assert.match(permissions, /return \\?\\.tienePermiso/);
   assert.match(permissions, /if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/);
-  assert.match(sectionVisibility, /var KEEP_HIDDEN = \{ transferencias:true, vales:true, turnos:true, ventas:true \}/);
+  assert.doesNotMatch(sectionVisibility, /KEEP_HIDDEN/);
+  assert.doesNotMatch(sectionVisibility, /setImportantStyle|normalizarPanelConfigActivo/);
+  assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
   assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
   assert.match(app, /m12-fe5-hide-vales\.js/);
@@ -98,7 +101,7 @@ test("el panel de Administración se oculta cuando no es la pestaña seleccionad
   assert.match(index, /<section id="tab-config" class="tab-panel">/);
 });
 
-test("al abrirse el shell, las pestañas están disponibles durante la carga del usuario sin habilitar formularios sensibles", async () => {
+test("al abrirse el shell, todas las rutas y paneles permanecen cerrados hasta cargar permisos", async () => {
   const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
   const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
   const { window } = dom;
@@ -107,31 +110,75 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   window._usuarioActual = null;
   window._permisosCargaExitosa = false;
   window._permisosEfectivos = {};
-  window.irATab = function (tab) {
-    const btn = document.querySelector('#tabs .tab-btn[data-tab="' + tab + '"]');
-    if (!btn || btn.classList.contains("hidden")) return;
-    document.querySelectorAll("#tabs .tab-btn.active").forEach(x => x.classList.remove("active"));
-    document.querySelectorAll(".tab-panel.visible").forEach(x => x.classList.remove("visible"));
-    btn.classList.add("active");
-    const panel = document.getElementById("tab-" + tab);
-    if (panel) panel.classList.add("visible");
-  };
   window.eval(permissions);
-  await new Promise(resolve => window.setTimeout(resolve, 25));
-  for (const name of ["resumen","productos","ventas","almacenes","pendientes","reportes","inventario","movimientos","ciclos","operacion","comunicacion","mando","usuarios","config","conectividad","preferencias"]) {
-    const button = document.querySelector('#tabs .tab-btn[data-tab="' + name + '"]');
-    assert.ok(button, "falta navegación: " + name);
-    assert.notEqual(button.getAttribute("data-bc-permiso"), "0", "pestaña bloqueada durante carga: " + name);
-    assert.equal(button.classList.contains("hidden"), false, "pestaña oculta durante carga: " + name);
+  await new Promise(resolve => window.setTimeout(resolve, 20));
+  assert.equal(document.getElementById("app-shell").getAttribute("data-bc-permisos-cargados"), "0");
+  for (const button of document.querySelectorAll("#tabs .tab-btn[data-tab]")) {
+    assert.equal(button.getAttribute("data-bc-permiso"), "0", "ruta abierta sin permisos: " + button.dataset.tab);
+    assert.equal(button.classList.contains("hidden"), true, "ruta no oculta durante carga: " + button.dataset.tab);
   }
-  for (const name of ["transferencias","vales","turnos"]) {
-    const button = document.querySelector('#tabs .tab-btn[data-tab="' + name + '"]');
-    if (button) assert.equal(button.getAttribute("data-bc-permiso"), "0", "se mantienen fuera del menú: " + name);
+  for (const panel of document.querySelectorAll(".main-content > .tab-panel")) {
+    assert.equal(panel.getAttribute("data-bc-permiso"), "0", "panel abierto sin permisos: " + panel.id);
+    assert.equal(panel.classList.contains("visible"), false, "panel visible durante carga: " + panel.id);
   }
-  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="resumen"]').classList.contains("active"), true);
-  assert.equal(document.getElementById("tab-resumen").classList.contains("visible"), true);
   assert.equal(document.getElementById("form-categoria").classList.contains("hidden"), true);
   assert.equal(document.getElementById("form-unidad").classList.contains("hidden"), true);
+  dom.window.close();
+});
+
+test("la Dependienta ve solo módulos concedidos y conserva las excepciones personales", async () => {
+  const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const { window } = dom;
+  const { document } = window;
+  window.console.warn = () => {};
+  window._usuarioActual = { id: "dependienta-test", rol: "Dependienta" };
+  window._permisosCargaExitosa = true;
+  window._permisosEfectivos = {
+    comunicacion: { ver: true, crear: true },
+    gastos: { ver: true, crear: true },
+    incidencias: { ver: true, crear: true },
+    mermas: { ver: true, crear: true },
+    turnos: { ver: true },
+    ventas: { ver: true, crear: true }
+  };
+  window.eval(permissions);
+  window.aplicarPermisosAInterfaz();
+
+  const allowed = ["jornada", "ciclos", "operacion", "comunicacion", "conectividad", "preferencias"];
+  const denied = ["resumen", "productos", "ventas", "almacenes", "pendientes", "reportes", "inventario", "movimientos", "mando", "usuarios", "config", "transferencias", "turnos"];
+  for (const name of allowed) {
+    const btn = document.querySelector('#tabs .tab-btn[data-tab="' + name + '"]');
+    assert.equal(btn.getAttribute("data-bc-permiso"), "1", "debe permitir " + name);
+  }
+  for (const name of denied) {
+    const btn = document.querySelector('#tabs .tab-btn[data-tab="' + name + '"]');
+    assert.equal(btn.getAttribute("data-bc-permiso"), "0", "no debe permitir " + name);
+    const panel = document.getElementById("tab-" + name);
+    assert.equal(panel.getAttribute("data-bc-permiso"), "0", "panel cerrado: " + name);
+  }
+  assert.equal(window.tienePermiso("ventas", "ver"), true, "la política POS no altera el permiso backend");
+  assert.equal(window.__BC_ROUTE_CAN_VIEW__("ventas"), false, "la Dependienta no entra al POS legado");
+  dom.window.close();
+});
+
+test("ver y crear son permisos independientes; crear no abre la navegación", async () => {
+  const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const { window } = dom;
+  const { document } = window;
+  window.console.warn = () => {};
+  window._usuarioActual = { id: "role-test", rol: "Operador" };
+  window._permisosCargaExitosa = true;
+  window._permisosEfectivos = { productos: { crear: true }, reportes: { ver: true } };
+  window.eval(permissions);
+  window.aplicarPermisosAInterfaz();
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="productos"]').getAttribute("data-bc-permiso"), "0");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="reportes"]').getAttribute("data-bc-permiso"), "1");
+  assert.equal(window.tienePermiso("productos", "crear"), true);
+  assert.equal(window.tienePermiso("productos", "ver"), false);
+  assert.equal(window.tienePermiso("reportes", "crear"), false);
+  assert.equal(window.tienePermiso("reportes", "ver"), true);
   dom.window.close();
 });
 
