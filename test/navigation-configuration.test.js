@@ -180,6 +180,23 @@ test("la Dependienta ve solo módulos concedidos y conserva las excepciones pers
   dom.window.close();
 });
 
+test("Administración solo aparece por permisos de usuarios o catálogos", async () => {
+  const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const { window } = dom;
+  const { document } = window;
+  window._usuarioActual = { id: "catalog-role", rol: "Catalogador" };
+  window._permisosCargaExitosa = true;
+  window._permisosEfectivos = { categorias: { ver: true }, unidades: { ver: false } };
+  window.eval(permissions);
+  window.aplicarPermisosAInterfaz();
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "1");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="usuarios"]').getAttribute("data-bc-permiso"), "0");
+  assert.equal(window.tienePermiso("usuarios", "ver"), false);
+  assert.equal(window.tienePermiso("categorias", "ver"), true);
+  dom.window.close();
+});
+
 test("ver y crear son permisos independientes; crear no abre la navegación", async () => {
   const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
   const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
