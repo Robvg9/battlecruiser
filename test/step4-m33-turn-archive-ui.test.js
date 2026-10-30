@@ -168,3 +168,12 @@ test("Paso 4: un expediente histórico de dependienta no permite abrir sesiones 
     "el modo histórico debe ocultar Abrir sesión incluso si el estado de una sesión está pendiente");
   assert.equal(writeCalls.length, 0);
 });
+
+test("M33 sends JORNADA sessions to the Step 7 workspace instead of legacy session opening", () => {
+  assert.match(M33_SOURCE, /data-m33-abrir-jornada/);
+  assert.match(M33_SOURCE, /window\.__BC7_JORNADA__/);
+  assert.match(M33_SOURCE, /openForSession\(sesionId\)/);
+  assert.match(M33_SOURCE, /data-m33-abrir-sesion/);
+  assert.match(JORNADA_UI, /window\.__BC7_JORNADA__/);
+  assert.match(JORNADA_UI, /openForSession:\s*async function\(sessionId\)/);
+});
