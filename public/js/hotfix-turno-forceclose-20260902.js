@@ -21,15 +21,6 @@
       if (m29 && typeof m29.isAdmin === 'function' && m29.isAdmin() === true) return true;
     } catch (e) {}
 
-    // M33 renders the five-step navigation only in its ADMIN branch. This is
-    // a UI-visibility signal, not a security boundary: the RPC still validates
-    // the authenticated role again when a user explicitly confirms recovery.
-    try {
-      const modal = document.getElementById('m33-bg');
-      const steps = modal && modal.querySelectorAll('.m33-step');
-      if (steps && steps.length === 5 && modal.querySelector('.m33-step.active')) return true;
-    } catch (e) {}
-
     try {
       if (window.BattleCruiserTurnoAPI && typeof window.BattleCruiserTurnoAPI.actorIsAdmin === 'function') {
         const r = await window.BattleCruiserTurnoAPI.actorIsAdmin();
