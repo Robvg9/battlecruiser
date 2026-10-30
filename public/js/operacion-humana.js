@@ -237,7 +237,7 @@ function renderTurnos(filas) {
 async function refrescarListaCuadres() {
   const el = document.getElementById("lista-cuadres");
   if (!el) return;
-  if (!tienePermiso("responsabilidades", "ver")) { el.innerHTML = ""; return; }
+  if (!tienePermiso("turnos", "ver")) { el.innerHTML = ""; return; }
   if (!navigator.onLine) {
     el.innerHTML = '<p class="lista-estado">⚪ Sin conexión.</p>';
     return;
