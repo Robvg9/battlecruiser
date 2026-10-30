@@ -19,6 +19,7 @@ const operationsHub = fs.readFileSync("public/js/ui-operaciones-hub.js", "utf8")
 const pulido = fs.readFileSync("public/js/hotfix-pulido-20260903.js", "utf8");
 const pulidoB = fs.readFileSync("public/js/hotfix-pulido-20260903b.js", "utf8");
 const sectionScope = fs.readFileSync("public/js/section-scope-fix.js", "utf8");
+const finalLoader = fs.readFileSync("public/js/hotfix-17-final-loader-20260903.js", "utf8");
 
 
 test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidden-route aliases preserved", () => {
