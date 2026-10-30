@@ -171,16 +171,69 @@ async function evaluate(expression, timeoutOverrideMs) {
   return result.result ? result.result.value : undefined;
 }
 async function waitUntil(description, predicate, timeoutMs) {
-  const deadline = Date.now() + (timeoutMs || TIMEOUT_MS);
+  const totalTimeoutMs = timeoutMs || TIMEOUT_MS;
+  const startedAt = Date.now();
+  const deadline = startedAt + totalTimeoutMs;
   let lastValue;
+  let lastError = null;
+  let attempts = 0;
+  const evaluationErrors = [];
+
   while (Date.now() < deadline) {
+    attempts++;
+    const remainingMs = Math.max(1, deadline - Date.now());
+    // A single CDP evaluation must not consume the entire readiness window.
+    // Short bounded polls let Chromium recover from a transient main-thread stall
+    // while preserving the original total timeout for this readiness condition.
+    const pollTimeoutMs = Math.min(2500, remainingMs);
     try {
-      lastValue = await evaluate("(async()=>(" + predicate + "))()", Math.min(CDP_COMMAND_TIMEOUT_MS, Math.max(1, deadline - Date.now())));
-      if (lastValue) return lastValue;
-    } catch (_) {}
-    await delay(250);
+      lastValue = await evaluate(
+        "(async()=>(" + predicate + "))()",
+        pollTimeoutMs
+      );
+      lastError = null;
+      if (lastValue) {
+        if (evaluationErrors.length) {
+          report.evidence.waitUntilRecoveries = report.evidence.waitUntilRecoveries || [];
+          report.evidence.waitUntilRecoveries.push({
+            description,
+            totalTimeoutMs,
+            elapsedMs: Date.now() - startedAt,
+            attempts,
+            evaluationErrors,
+            recovered: true,
+          });
+        }
+        return lastValue;
+      }
+    } catch (error) {
+      lastError = error && error.message ? error.message : String(error);
+      evaluationErrors.push({
+        elapsedMs: Date.now() - startedAt,
+        error: lastError,
+      });
+    }
+
+    const pauseMs = Math.min(250, Math.max(0, deadline - Date.now()));
+    if (pauseMs > 0) await delay(pauseMs);
   }
-  throw new Error("Timeout esperando " + description + ". Último valor: " + JSON.stringify(lastValue));
+
+  report.evidence.waitUntilTimeouts = report.evidence.waitUntilTimeouts || [];
+  report.evidence.waitUntilTimeouts.push({
+    description,
+    totalTimeoutMs,
+    elapsedMs: Date.now() - startedAt,
+    attempts,
+    lastValue: lastValue === undefined ? null : lastValue,
+    lastError,
+    evaluationErrors,
+  });
+  throw new Error(
+    "Timeout esperando " + description +
+      ". Último valor: " + JSON.stringify(lastValue) +
+      (lastError ? ". Último error CDP: " + lastError : "") +
+      ". Evaluaciones: " + attempts
+  );
 }
 async function navigateAndWait(url) {
   let domContentLoadedSeen = false;
