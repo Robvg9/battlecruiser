@@ -13,6 +13,14 @@ const UI = fs.readFileSync(
   path.join(__dirname, "..", "public/js/bc7-jornada-ui.js"),
   "utf8"
 );
+const PG_CI = fs.readFileSync(
+  path.join(__dirname, "..", "test/step7-jornada-postgres-windows-ci.js"),
+  "utf8"
+);
+const PG_WORKFLOW = fs.readFileSync(
+  path.join(__dirname, "..", ".github/workflows/step7-jornada-postgres.yml"),
+  "utf8"
+);
 
 test("Jornada finance adds separate session/tranche provenance without repointing legacy FKs", () => {
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS turno_sesion_id uuid/);
@@ -45,6 +53,25 @@ test("Jornada finance RPCs require permission, assigned worker, active tramo and
   assert.match(MIGRATION, /public\.registrar_reinversion_multiple\(/);
   assert.match(MIGRATION, /REINVERSION_REGISTRADA/);
   assert.match(MIGRATION, /v_s\.turno_id,p_idempotency_key/);
+});
+
+test("Reinvestment preserves provider and serializes actor/key retries", () => {
+  const start=MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_registrar_reinversion_jornada");
+  const end=MIGRATION.indexOf("$function$;",start);
+  assert.ok(start>=0&&end>start);
+  const fn=MIGRATION.slice(start,end);
+  assert.match(fn,/pg_advisory_xact_lock/);
+  assert.match(fn,/NULLIF\(btrim\(coalesce\(p_proveedor,''\)\),' '\)/);
+  assert.match(fn,/v_s\.turno_id,p_idempotency_key/);
+});
+
+test("PostgreSQL 17 workflow applies the new finance/carry-forward migration and exercises its contract", () => {
+  assert.match(PG_CI,/test\/step7-jornada-finanzas-fixture\.sql/);
+  assert.match(PG_CI,/supabase\/migrations\/20261030160000_step7_jornada_finanzas_carryforward\.sql/);
+  assert.match(PG_CI,/test\/step7-jornada-finanzas-contract\.sql/);
+  assert.match(PG_WORKFLOW,/supabase\/migrations\/20261030160000_step7_jornada_finanzas_carryforward\.sql/);
+  assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-fixture\.sql/);
+  assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-contract\.sql/);
 });
 
 test("Jornada finance read respects per-section view permissions", () => {
