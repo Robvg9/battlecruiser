@@ -423,7 +423,12 @@
     r.addEventListener('click', function (e) {
       const card = e.target.closest('[data-m33-id],.m29-card'); if (!card) return;
       const id = card.dataset.m33Id || card.dataset.turnoId || card.getAttribute('data-turno-id'); if (!id) return;
-      e.preventDefault(); e.stopPropagation(); open(id);
+      e.preventDefault(); e.stopPropagation();
+      // Route real M29 card taps through the public entrypoint so wrappers
+      // (including overdue ADMIN recovery) execute on the actual user path.
+      const hub = window.__BC_M33;
+      if (hub && typeof hub.open === 'function') hub.open(id);
+      else open(id);
     }, true);
   }
   function boot() { css(); intercept(); }
