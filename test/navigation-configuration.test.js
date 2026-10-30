@@ -44,10 +44,12 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
     assert.ok(routeIds.includes(id), "hidden/aliased logical route must remain explicit: " + id);
   }
   assert.match(permissions, /RUTAS_SIEMPRE_OCULTAS/);
-  assert.match(permissions, /return \\?\\.tienePermiso/);
-  assert.match(permissions, /if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/);
+  assert.match(permissions, /function puedeVerRuta\(tab\)/);
+  assert.match(permissions, /jornada: "turnos"/);
   assert.doesNotMatch(sectionVisibility, /KEEP_HIDDEN/);
   assert.doesNotMatch(sectionVisibility, /setImportantStyle|normalizarPanelConfigActivo/);
+  assert.match(index, /data-bc-permisos-cargados="1"/);
+  assert.match(index, /:not\(\[data-bc-permisos-cargados="1"\]\)/);
   assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
   assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
@@ -159,6 +161,16 @@ test("la Dependienta ve solo módulos concedidos y conserva las excepciones pers
   }
   assert.equal(window.tienePermiso("ventas", "ver"), true, "la política POS no altera el permiso backend");
   assert.equal(window.__BC_ROUTE_CAN_VIEW__("ventas"), false, "la Dependienta no entra al POS legado");
+
+  window.safeInit = function (name, init) { if (name === "tabs") init(); };
+  window.eval(navigation);
+  window.irATab("productos");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="productos"]').classList.contains("active"), false,
+    "irATab no debe abrir una ruta sin permiso aunque se invoque directamente");
+  window.irATab("jornada");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="jornada"]').classList.contains("active"), true,
+    "irATab permite una ruta autorizada");
+  assert.equal(document.getElementById("tab-jornada").classList.contains("visible"), true);
   dom.window.close();
 });
 
