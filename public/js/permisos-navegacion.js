@@ -5,8 +5,7 @@
   window.__BC_PERMISOS_CANONICO__ = true;
 
   function usuarioActual() {
-    return (typeof _usuarioActual !== "undefined" && _usuarioActual) ||
-      window.__bcUser || null;
+    return typeof _usuarioActual !== "undefined" ? _usuarioActual : null;
   }
 
   function permisosListos() {
@@ -208,6 +207,9 @@
       document.querySelectorAll("#tabs .tab-btn[data-tab]"),
       function (btn) { return btn.getAttribute("data-bc-permiso") === "1"; }
     );
+    var modulosOperativosVisibles = visibles.some(function (btn) {
+      return !RUTAS_PERSONALES[btn.dataset.tab];
+    });
 
     if (ready && shellVisible && visibles.length) {
       var activo = document.querySelector("#tabs .tab-btn.active[data-tab]");
@@ -233,7 +235,7 @@
         panel.classList.remove("visible");
       });
     }
-    mostrarEstadoSinPermisos(ready && visibles.length === 0);
+    mostrarEstadoSinPermisos(ready && !modulosOperativosVisibles);
   }
 
   window.tienePermiso = tienePermiso;
