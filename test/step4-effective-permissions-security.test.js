@@ -126,6 +126,7 @@ test("el hotfix de visibilidad antiguo no puede reabrir una pestaña denegada", 
 });
 
 test("las listas B7 y sus operaciones usan permisos específicos de responsabilidades e incidencias", () => {
+  assert.match(b7Source, /async function refrescarListaCuadres\(\)[\s\S]{0,180}tienePermiso\(["']turnos["'],\s*["']ver["']\)/, "cuadres conservan el permiso propio de turnos");
   assert.match(b7Source, /async function refrescarListaResponsabilidades\(\)[\s\S]{0,220}tienePermiso\(["']responsabilidades["'],\s*["']ver["']\)/);
   assert.match(b7Source, /async function refrescarListaIncidencias\(\)[\s\S]{0,220}tienePermiso\(["']incidencias["'],\s*["']ver["']\)/);
   assert.match(b7Source, /tienePermiso\(["']responsabilidades["'],\s*["']crear["']\)/);
