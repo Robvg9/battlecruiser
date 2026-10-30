@@ -18,6 +18,14 @@ const pulidoBSource = fs.readFileSync(
   path.join(__dirname, "../public/js/hotfix-pulido-20260903b.js"),
   "utf8"
 );
+const adminVisibleSource = fs.readFileSync(
+  path.join(__dirname, "../public/js/hotfix-17-13-configuracion-admin-visible-20260903.js"),
+  "utf8"
+);
+const finalLoaderSource = fs.readFileSync(
+  path.join(__dirname, "../public/js/hotfix-17-final-loader-20260903.js"),
+  "utf8"
+);
 
 function createDom({ ready = false, buttonPermission = "0", panelPermission = "0" } = {}) {
   const marker = ready ? 'data-bc-permisos-cargados="1"' : "";
