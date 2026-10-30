@@ -83,3 +83,16 @@ test("Jornada recupera el catálogo de almacenes cuando la caché está vacía",
   assert.match(JOURNADA_UI, /\.tab-btn\[data-tab="jornada"\]/,
     "al volver a abrir Jornada debe reintentarse la carga");
 });
+
+test("el cierre solo informa éxito tras releer COMPLETADA y reconcilia respuestas perdidas",()=>{
+  const start=JOURNADA_UI.indexOf("async function closeSession(form)");
+  const end=JOURNADA_UI.indexOf("async function submitAdjustment(form)",start);
+  assert.ok(start>=0&&end>start);
+  const close=JOURNADA_UI.slice(start,end);
+  assert.match(close,/const reread=await openWorkspace\(sessionId\)/);
+  assert.match(close,/finalState!=='COMPLETADA'/);
+  assert.match(close,/rereadState==='COMPLETADA'/);
+  assert.match(close,/No se repitió la escritura/);
+  assert.match(close,/No repitas la escritura todavía/);
+  assert.match(close,/No se pudo releer el resumen/);
+});
