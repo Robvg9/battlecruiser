@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.2 — puente de sesión M33 y contratos bc5_* + bc7_*; conserva históricos de ventas.
+// v7.7 — finanzas por tramo activo y carry-forward de inventario físico; conserva los históricos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
