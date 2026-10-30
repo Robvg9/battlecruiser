@@ -190,6 +190,41 @@
     }, 0);
   }
 
+  function isTabButtonNode(node) {
+    if (!node || node.nodeType !== 1) return false;
+    if (node.matches && node.matches('.tab-btn[data-tab]')) return true;
+    return !!(node.querySelector && node.querySelector('.tab-btn[data-tab]'));
+  }
+
+  function handleTabsMutations(records) {
+    var relevant = records.some(function (record) {
+      if (record.type === 'attributes') {
+        return !!(record.target && record.target.classList &&
+          record.target.classList.contains('tab-btn'));
+      }
+      var changed = Array.prototype.slice.call(record.addedNodes || [])
+        .concat(Array.prototype.slice.call(record.removedNodes || []));
+      return changed.some(isTabButtonNode);
+    });
+    if (relevant) schedule();
+  }
+
+  function handleMainMutations(records, main) {
+    var relevant = records.some(function (record) {
+      if (record.type === 'attributes') {
+        return record.target && record.target.parentElement === main &&
+          record.target.classList && record.target.classList.contains('tab-panel');
+      }
+      var changed = Array.prototype.slice.call(record.addedNodes || [])
+        .concat(Array.prototype.slice.call(record.removedNodes || []));
+      return changed.some(function (node) {
+        return !!(node && node.nodeType === 1 && node.classList &&
+          node.classList.contains('tab-panel'));
+      });
+    });
+    if (relevant) schedule();
+  }
+
   function boot() {
     if (initialized) return;
     initialized = true;
@@ -210,14 +245,18 @@
         window.setTimeout(enforce, 50);
         window.setTimeout(enforce, 180);
       }, true);
-      new MutationObserver(schedule).observe(tabs, {
+      new MutationObserver(handleTabsMutations).observe(tabs, {
         subtree: true, childList: true, attributes: true,
         attributeFilter: ['class', 'data-tab', 'style']
       });
     }
     if (main) {
-      new MutationObserver(schedule).observe(main, {
-        childList: true, subtree: true, attributes: true,
+      // Only direct tab-panel boundaries affect section isolation. Watching every
+      // descendant class made ordinary control updates re-run the full panel scan.
+      new MutationObserver(function (records) {
+        handleMainMutations(records, main);
+      }).observe(main, {
+        childList: true, attributes: true,
         attributeFilter: ['class']
       });
     }
