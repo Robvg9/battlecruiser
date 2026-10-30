@@ -486,6 +486,22 @@ async function main() {
           errorText: message.params.errorText || "",
           canceled: Boolean(message.params.canceled),
         });
+      } else if (message.method === "Runtime.consoleAPICalled") {
+        const args = (message.params && message.params.args) || [];
+        const joined = args.map((arg) => {
+          if (arg && typeof arg.value === "string") return arg.value;
+          if (arg && typeof arg.description === "string") return arg.description;
+          return "";
+        }).join(" ");
+        if (joined.includes("__BC_E2E_BOOT_DIAG__")) {
+          report.evidence.runtimeDiagnostics = report.evidence.runtimeDiagnostics || [];
+          report.evidence.runtimeDiagnostics.push({
+            at: new Date().toISOString(),
+            phase: report.evidence.phase || "initial",
+            type: message.params.type || null,
+            text: joined.slice(0, 4000),
+          });
+        }
       } else if (message.method === "Runtime.exceptionThrown") {
         pageExceptions.push({
           at: new Date().toISOString(),
@@ -513,6 +529,42 @@ async function main() {
 
   await cdpCommand("Page.enable");
   await cdpCommand("Runtime.enable");
+
+  const bootDiagnosticSource = [
+    "(()=>{",
+    "if(window.__BC_E2E_BOOT_DIAG_INSTALLED__)return;",
+    "window.__BC_E2E_BOOT_DIAG_INSTALLED__=true;",
+    "const nativeObserver=window.MutationObserver;let nextObserverId=0;",
+    "window.MutationObserver=function(callback){",
+    "const id=++nextObserverId;let calls=0;let totalRecords=0;let repeatLogged=false;const createdAt=performance.now();",
+    "const stack=(new Error('MutationObserver created')).stack||'';",
+    "const wrapped=function(records,observer){",
+    "calls++;totalRecords+=records?records.length:0;",
+    "const samples=Array.from(records||[]).slice(0,4).map(r=>({type:r.type,target:r.target&&r.target.nodeName,id:r.target&&r.target.id,className:r.target&&typeof r.target.className==='string'?r.target.className.slice(0,100):'',attributeName:r.attributeName,added:r.addedNodes?r.addedNodes.length:0,removed:r.removedNodes?r.removedNodes.length:0}));",
+    "if(calls===1)console.warn('__BC_E2E_BOOT_DIAG__MO_FIRST__',JSON.stringify({id,createdAgeMs:Math.round(performance.now()-createdAt),stack:stack.split('\\n').slice(0,5),samples}));",
+    "if(!repeatLogged&&calls>=8){repeatLogged=true;console.warn('__BC_E2E_BOOT_DIAG__MO_REPEAT__',JSON.stringify({id,calls,totalRecords,ageMs:Math.round(performance.now()-createdAt),stack:stack.split('\\n').slice(0,5),samples}));}",
+    "const started=performance.now();try{return callback.call(this,records,observer);}finally{const duration=performance.now()-started;if(duration>=40)console.warn('__BC_E2E_BOOT_DIAG__MO_SLOW__',JSON.stringify({id,calls,totalRecords,durationMs:Math.round(duration*10)/10,ageMs:Math.round(performance.now()-createdAt),stack:stack.split('\\n').slice(0,5),samples}));}",
+    "};",
+    "return new nativeObserver(wrapped);",
+    "};",
+    "window.MutationObserver.prototype=nativeObserver.prototype;",
+    "try{Object.setPrototypeOf(window.MutationObserver,nativeObserver);}catch(_){}",
+    "let longTaskCount=0;",
+    "try{const observer=new PerformanceObserver(list=>{for(const entry of list.getEntries()){longTaskCount++;if(longTaskCount<=20)console.warn('__BC_E2E_BOOT_DIAG__LONGTASK__',JSON.stringify({startTime:Math.round(entry.startTime),durationMs:Math.round(entry.duration*10)/10,name:entry.name,attribution:(entry.attribution||[]).slice(0,3).map(a=>({name:a.name,entryType:a.entryType,containerType:a.containerType,containerName:a.containerName,containerId:a.containerId}))}));}});observer.observe({type:'longtask',buffered:true});window.__BC_E2E_BOOT_DIAG_LONGTASK_OBSERVER__=observer;}catch(error){console.warn('__BC_E2E_BOOT_DIAG__LONGTASK_UNAVAILABLE__',String(error));}",
+    "document.addEventListener('DOMContentLoaded',()=>console.warn('__BC_E2E_BOOT_DIAG__DOM_READY__',JSON.stringify({readyState:document.readyState,elapsedMs:Math.round(performance.now())})),{once:true});",
+    "window.addEventListener('load',()=>console.warn('__BC_E2E_BOOT_DIAG__LOAD__',JSON.stringify({readyState:document.readyState,elapsedMs:Math.round(performance.now())})),{once:true});",
+    "})();"
+  ].join('\\n');
+
+  const diagnosticInstalled = await cdpCommand("Page.addScriptToEvaluateOnNewDocument", {
+    source: bootDiagnosticSource,
+  });
+  report.evidence.bootDiagnostic = {
+    installed: Boolean(diagnosticInstalled && diagnosticInstalled.identifier),
+    observerInstrumentation: true,
+    longTaskInstrumentation: true,
+  };
+
   await cdpCommand("Network.enable");
   await cdpCommand("Log.enable");
   await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
