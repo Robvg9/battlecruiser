@@ -10,6 +10,12 @@ ALTER TABLE public.gastos
 ALTER TABLE public.reinversiones
   ADD COLUMN IF NOT EXISTS turno_sesion_id uuid,
   ADD COLUMN IF NOT EXISTS turno_tramo_id uuid;
+ALTER TABLE public.mermas
+  ADD COLUMN IF NOT EXISTS turno_sesion_id uuid,
+  ADD COLUMN IF NOT EXISTS turno_tramo_id uuid;
+ALTER TABLE public.bajas
+  ADD COLUMN IF NOT EXISTS turno_sesion_id uuid,
+  ADD COLUMN IF NOT EXISTS turno_tramo_id uuid;
 
 DO $constraints$
 BEGIN
@@ -37,6 +43,30 @@ BEGIN
     ALTER TABLE public.reinversiones ADD CONSTRAINT reinversiones_jornada_link_pair_chk
       CHECK ((turno_sesion_id IS NULL) = (turno_tramo_id IS NULL));
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='mermas_turno_sesion_id_fkey') THEN
+    ALTER TABLE public.mermas ADD CONSTRAINT mermas_turno_sesion_id_fkey
+      FOREIGN KEY (turno_sesion_id) REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='mermas_turno_tramo_id_fkey') THEN
+    ALTER TABLE public.mermas ADD CONSTRAINT mermas_turno_tramo_id_fkey
+      FOREIGN KEY (turno_tramo_id) REFERENCES public.turno_tramos(id) ON DELETE RESTRICT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='mermas_jornada_link_pair_chk') THEN
+    ALTER TABLE public.mermas ADD CONSTRAINT mermas_jornada_link_pair_chk
+      CHECK ((turno_sesion_id IS NULL) = (turno_tramo_id IS NULL));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='bajas_turno_sesion_id_fkey') THEN
+    ALTER TABLE public.bajas ADD CONSTRAINT bajas_turno_sesion_id_fkey
+      FOREIGN KEY (turno_sesion_id) REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='bajas_turno_tramo_id_fkey') THEN
+    ALTER TABLE public.bajas ADD CONSTRAINT bajas_turno_tramo_id_fkey
+      FOREIGN KEY (turno_tramo_id) REFERENCES public.turno_tramos(id) ON DELETE RESTRICT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='bajas_jornada_link_pair_chk') THEN
+    ALTER TABLE public.bajas ADD CONSTRAINT bajas_jornada_link_pair_chk
+      CHECK ((turno_sesion_id IS NULL) = (turno_tramo_id IS NULL));
+  END IF;
 END;
 $constraints$;
 
@@ -44,6 +74,10 @@ CREATE INDEX IF NOT EXISTS gastos_turno_sesion_idx
   ON public.gastos(turno_sesion_id,turno_tramo_id);
 CREATE INDEX IF NOT EXISTS reinversiones_turno_sesion_idx
   ON public.reinversiones(turno_sesion_id,turno_tramo_id);
+CREATE INDEX IF NOT EXISTS mermas_turno_sesion_idx
+  ON public.mermas(turno_sesion_id,turno_tramo_id);
+CREATE INDEX IF NOT EXISTS bajas_turno_sesion_idx
+  ON public.bajas(turno_sesion_id,turno_tramo_id);
 
 -- A link may only identify a real jornada session, its matching tranche, warehouse and creator.
 -- Tranches may already be COMPLETADO when an expense is later approved, so this trigger
@@ -126,6 +160,52 @@ CREATE TRIGGER bc7_reinversiones_jornada_link_guard
   BEFORE INSERT OR UPDATE ON public.reinversiones
   FOR EACH ROW EXECUTE FUNCTION public.bc7_guard_reinversion_jornada_link();
 
+-- Mermas and bajas also retain their existing approval process and legacy FKs.
+-- JORNADA provenance is stored separately so the legacy sesion_id is always NULL.
+CREATE OR REPLACE FUNCTION public.bc7_guard_ajuste_jornada_link()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_almacen uuid;
+  v_bloque text;
+  v_tramo_sesion uuid;
+  v_tramo_usuario uuid;
+BEGIN
+  IF NEW.turno_sesion_id IS NULL AND NEW.turno_tramo_id IS NULL THEN RETURN NEW; END IF;
+  IF NEW.turno_sesion_id IS NULL OR NEW.turno_tramo_id IS NULL THEN
+    RAISE EXCEPTION 'El vínculo del ajuste requiere sesión y tramo.' USING ERRCODE='23514';
+  END IF;
+  IF NEW.sesion_id IS NOT NULL OR NEW.ciclo_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Un ajuste JORNADA no puede reutilizar vínculos legacy de sesión/ciclo.' USING ERRCODE='23514';
+  END IF;
+  SELECT s.almacen_id,s.bloque,tr.turno_sesion_id,tr.usuario_id
+    INTO v_almacen,v_bloque,v_tramo_sesion,v_tramo_usuario
+  FROM public.turno_sesiones s
+  JOIN public.turno_tramos tr ON tr.turno_sesion_id=s.id
+  WHERE s.id=NEW.turno_sesion_id AND tr.id=NEW.turno_tramo_id;
+  IF NOT FOUND OR v_bloque<>'JORNADA'
+     OR v_tramo_sesion IS DISTINCT FROM NEW.turno_sesion_id
+     OR v_almacen IS DISTINCT FROM NEW.almacen_id
+     OR v_tramo_usuario IS DISTINCT FROM NEW.creado_por THEN
+    RAISE EXCEPTION 'El ajuste no coincide con sesión, tramo, almacén o responsable.' USING ERRCODE='42501';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS bc7_mermas_jornada_link_guard ON public.mermas;
+CREATE TRIGGER bc7_mermas_jornada_link_guard
+  BEFORE INSERT OR UPDATE ON public.mermas
+  FOR EACH ROW EXECUTE FUNCTION public.bc7_guard_ajuste_jornada_link();
+
+DROP TRIGGER IF EXISTS bc7_bajas_jornada_link_guard ON public.bajas;
+CREATE TRIGGER bc7_bajas_jornada_link_guard
+  BEFORE INSERT OR UPDATE ON public.bajas
+  FOR EACH ROW EXECUTE FUNCTION public.bc7_guard_ajuste_jornada_link();
+
 CREATE OR REPLACE FUNCTION public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id uuid)
 RETURNS public.turno_tramos
 LANGUAGE plpgsql
@@ -160,6 +240,89 @@ BEGIN
   LIMIT 1 FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'No hay un tramo activo del responsable para esta jornada.' USING ERRCODE='23514'; END IF;
   RETURN v_t;
+END;
+$function$;
+
+-- Preserve the existing review workflow for merma/baja, but never pass a JORNADA
+-- session id into the legacy sesion_id FK (which still targets sesiones_ciclo).
+CREATE OR REPLACE FUNCTION public.bc7_registrar_ajuste_jornada(
+  p_turno_sesion_id uuid,
+  p_tipo text,
+  p_producto_id uuid,
+  p_cantidad numeric,
+  p_motivo text,
+  p_idempotency_key uuid
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_t public.turno_tramos;
+  v_uid uuid:=auth.uid();
+  v_id uuid;
+  v_existing_session uuid;
+  v_existing_tramo uuid;
+  v_tipo text:=lower(coalesce(p_tipo,''));
+BEGIN
+  IF v_tipo NOT IN ('merma','baja') THEN
+    RAISE EXCEPTION 'Tipo de ajuste inválido.' USING ERRCODE='22023';
+  END IF;
+  IF p_producto_id IS NULL OR p_cantidad IS NULL OR p_cantidad<=0
+     OR p_motivo IS NULL OR btrim(p_motivo)='' OR length(p_motivo)>1000 THEN
+    RAISE EXCEPTION 'Producto, cantidad positiva y motivo válido son obligatorios.' USING ERRCODE='22023';
+  END IF;
+  IF p_idempotency_key IS NULL THEN
+    RAISE EXCEPTION 'Se requiere clave de idempotencia.' USING ERRCODE='22023';
+  END IF;
+  v_t:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_uid::text||':'||p_idempotency_key::text,0));
+  IF v_tipo='merma' THEN
+    SELECT id,turno_sesion_id,turno_tramo_id
+      INTO v_id,v_existing_session,v_existing_tramo
+    FROM public.mermas
+    WHERE idempotency_key=p_idempotency_key AND creado_por=v_uid
+    LIMIT 1 FOR UPDATE;
+    IF v_id IS NOT NULL THEN
+      IF v_existing_session IS DISTINCT FROM v_s.id OR v_existing_tramo IS DISTINCT FROM v_t.id THEN
+        RAISE EXCEPTION 'La clave de idempotencia ya pertenece a otro ajuste/jornada.' USING ERRCODE='23505';
+      END IF;
+      RETURN v_id;
+    END IF;
+    -- Keep the existing approval/PENDIENTE workflow; legacy ciclo/session links remain NULL.
+    v_id:=public.crear_merma(v_s.almacen_id,p_producto_id,p_cantidad,btrim(p_motivo),NULL,NULL,p_idempotency_key);
+    UPDATE public.mermas SET turno_sesion_id=v_s.id,turno_tramo_id=v_t.id
+    WHERE id=v_id AND creado_por=v_uid;
+  ELSE
+    SELECT id,turno_sesion_id,turno_tramo_id
+      INTO v_id,v_existing_session,v_existing_tramo
+    FROM public.bajas
+    WHERE idempotency_key=p_idempotency_key AND creado_por=v_uid
+    LIMIT 1 FOR UPDATE;
+    IF v_id IS NOT NULL THEN
+      IF v_existing_session IS DISTINCT FROM v_s.id OR v_existing_tramo IS DISTINCT FROM v_t.id THEN
+        RAISE EXCEPTION 'La clave de idempotencia ya pertenece a otro ajuste/jornada.' USING ERRCODE='23505';
+      END IF;
+      RETURN v_id;
+    END IF;
+    v_id:=public.crear_baja(v_s.almacen_id,p_producto_id,p_cantidad,btrim(p_motivo),NULL,NULL,p_idempotency_key);
+    UPDATE public.bajas SET turno_sesion_id=v_s.id,turno_tramo_id=v_t.id
+    WHERE id=v_id AND creado_por=v_uid;
+  END IF;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No se pudo ligar el ajuste a su jornada.' USING ERRCODE='23514'; END IF;
+
+  INSERT INTO public.turno_jornada_eventos
+    (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES (v_s.almacen_id,v_s.jornada_programacion_id,v_uid,
+    CASE WHEN v_tipo='merma' THEN 'MERMA_SOLICITADA' ELSE 'BAJA_SOLICITADA' END,
+    btrim(p_motivo),jsonb_build_object('sesion_id',v_s.id,'tramo_id',v_t.id),
+    jsonb_build_object('ajuste_id',v_id,'tipo',v_tipo,'producto_id',p_producto_id,
+      'cantidad',p_cantidad,'estado','PENDIENTE'));
+  RETURN v_id;
 END;
 $function$;
 
@@ -602,6 +765,8 @@ REVOKE ALL ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,
 REVOKE ALL ON FUNCTION public.bc7_finanzas_jornada(uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_guard_gasto_jornada_link() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_guard_reinversion_jornada_link() FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.bc7_guard_ajuste_jornada_link() FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc7_finanzas_jornada(uuid) TO authenticated;
