@@ -64,6 +64,7 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
   const { window, createdLegacy, jornadaCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")), "M29 boot completes and renders the owner create action");
   root.querySelector("#m29-btn-crear").click();
 
   const modal = window.document.getElementById("m29-crear-overlay");
@@ -98,13 +99,14 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
   const { window, createdLegacy, jornadaCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")), "M29 boot completes and renders the owner create action");
   root.querySelector("#m29-btn-crear").click();
 
   const modal = window.document.getElementById("m29-crear-overlay");
   modal.querySelector("#m29-toggle-plan-b").click();
   const days = modal.querySelector("#m29-create-days");
   assert.equal(days.dataset.mode, "legacy");
-  assert.match(modal.querySelector("#m29-mode-label").textContent, /Mañana y Tarde/);
+  assert.match(modal.querySelector("#m29-mode-label").textContent, /sesiones independientes por bloque/);
 
   const count = modal.querySelector("#m29-dias");
   count.value = "2";
