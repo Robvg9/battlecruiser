@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.38 — Movimientos diarios e historial por sesión/turno
+// v9.5.39 — Permisos efectivos de navegación y Operación
 (function hotfixV9475(){
-  const VERSION="9.5.38";
+  const VERSION="9.5.39";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -15,7 +15,7 @@
 (function cargarModulosDinamicos(){
   const modules=[
     ["turno-api.js","9.4.7"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.3"],["bc7-jornada-ui.js","7.5"],
-    ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.4"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
+    ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.5"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js","20261023.2"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.31"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.2"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.2"],["ui-operaciones-hub.js","41.1"],
@@ -40,7 +40,7 @@
     ["hotfix-14-regresiones-20260902.js","14.1"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1"],["hotfix-17-2-productos-save-20260903.js","17.2"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.4"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.6"],["hotfix-17-final-loader-20260903.js","17.final"],
     ["hotfix-pulido-20260903.js","20260903.1"],["hotfix-pulido-20260903b.js","20260903.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20260903.4"],
-    ["hotfix-secciones-visibles-20260903.js","20261026.1"],["section-scope-fix.js","20261016.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"]
+    ["hotfix-secciones-visibles-20260903.js","20261030.2"],["section-scope-fix.js","20261016.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"]
   ];
   let resolveUIReady;window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});window.__BC_UI_READY_RESOLVED__=false;
   function cargarUno(name,version){return new Promise(resolve=>{if(document.querySelector('script[src*="'+name+'"]')){resolve();return;}const s=document.createElement("script");s.src="js/"+name+(version?"?v="+version:"");s.async=false;let terminado=false;const terminar=(estado)=>{if(terminado)return;terminado=true;if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);resolve();};s.onload=()=>terminar("ok");s.onerror=()=>terminar("error");setTimeout(()=>terminar("timeout"),4000);document.body.appendChild(s);});}
