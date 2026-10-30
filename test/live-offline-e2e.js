@@ -280,14 +280,17 @@ async function navigateAndWait(url) {
   await delay(500);
 }
 async function reloadAndWait(ignoreCache = true) {
-  // DOMContentLoaded is deterministic for shell readiness; full load can wait on optional scripts/fonts.
-  const loaded = waitForEvent("Page.domContentEventFired", TIMEOUT_MS);
-  loaded.catch(() => {});
   // Hard reloads bypass the Service Worker in Chromium; only use them for the
   // offline cache probe. The online reconnect must be a normal navigation.
   await cdpCommand("Page.reload", ignoreCache ? { ignoreCache: true } : {});
-  await loaded;
-  await delay(500);
+  // CDP may omit Page.domContentEventFired on a same-target reload even after
+  // the new document was served. Poll observable browser readiness instead.
+  await waitUntil(
+    "documento y módulos base listos después de recargar",
+    "(()=>document.readyState!=='loading'&&window.__BC_UI_READY_RESOLVED__===true)()",
+    TIMEOUT_MS
+  );
+  await delay(250);
 }
 function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
