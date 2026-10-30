@@ -135,14 +135,29 @@ test("al abrirse el shell, las pestañas están disponibles durante la carga del
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.38 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.38"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.38"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.38"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
-  assert.match(app, /\["permisos-navegacion\.js","67\.4"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.5"\]/);
-  assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
-  assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
+test("app shell, application and Service Worker share canonical release and module versions", () => {
+  const appVersion = app.match(/const VERSION=["']([^"']+)["']/);
+  const workerVersion = serviceWorker.match(/BC_SW_VERSION\\s*=\\s*["']([^"']+)["']/);
+  assert.ok(appVersion, "application release version must be detectable");
+  assert.ok(workerVersion, "Service Worker release version must be detectable");
+  assert.equal(workerVersion[1], appVersion[1]);
+  assert.ok(index.includes("style.css?v=" + appVersion[1]));
+  assert.ok(index.includes('<script src="app.js?v=' + appVersion[1] + '"></script>'));
+  const moduleVersion = (name) => {
+    const marker = '["' + name + '","';
+    const start = app.indexOf(marker);
+    assert.ok(start >= 0, "module must be registered in the application loader: " + name);
+    const valueStart = start + marker.length;
+    const end = app.indexOf('"', valueStart);
+    assert.ok(end > valueStart, "module loader version must be quoted: " + name);
+    return app.slice(valueStart, end);
+  };
+  for (const name of [
+    "permisos-navegacion.js", "bc7-jornada-ui.js", "ui-visual-salon.js",
+    "hotfix-regresiones-20260902.js", "hotfix-secciones-visibles-20260903.js"
+  ]) moduleVersion(name);
+  for (const name of ["bc7-jornada-ui.js", "m29-turnos-organizacion.js", "m33-turnos-final.js"]) {
+    assert.ok(serviceWorker.includes("./js/" + name + "?v=" + moduleVersion(name)),
+      "offline shell must precache the current module version: " + name);
+  }
 });
