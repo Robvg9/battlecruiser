@@ -237,7 +237,7 @@ function renderTurnos(filas) {
 async function refrescarListaCuadres() {
   const el = document.getElementById("lista-cuadres");
   if (!el) return;
-  if (!tienePermiso("turnos", "ver")) { el.innerHTML = ""; return; }
+  if (!tienePermiso("responsabilidades", "ver")) { el.innerHTML = ""; return; }
   if (!navigator.onLine) {
     el.innerHTML = '<p class="lista-estado">⚪ Sin conexión.</p>';
     return;
@@ -341,7 +341,7 @@ async function refrescarTurnos() {
 async function refrescarListaResponsabilidades() {
   const el = document.getElementById("lista-responsabilidades");
   if (!el) return;
-  if (!tienePermiso("turnos", "ver")) { el.innerHTML = ""; return; }
+  if (!tienePermiso("incidencias", "ver")) { el.innerHTML = ""; return; }
   if (!navigator.onLine) {
     el.innerHTML = '<p class="lista-estado">⚪ Sin conexión.</p>';
     return;
@@ -381,11 +381,11 @@ function renderResponsabilidades(filas) {
     div.className = "rep-fila rep-estado-" + (r.estado || "").toLowerCase();
     let acciones = "";
     if (r.estado !== "COMPLETADA" && r.estado !== "CANCELADA") {
-      if (tienePermiso("turnos", "crear")) {
+      if (tienePermiso("responsabilidades", "editar")) {
         acciones += '<button type="button" class="cc-accion resp-estado-btn" data-id="' + r.id + '" data-estado="COMPLETADA">Completar</button>';
         acciones += '<button type="button" class="cc-accion resp-estado-btn" data-id="' + r.id + '" data-estado="EN_PROGRESO">En progreso</button>';
       }
-      if (tienePermiso("turnos", "editar_any")) {
+      if (tienePermiso("responsabilidades", "editar_any")) {
         acciones += '<button type="button" class="cc-accion resp-estado-btn" data-id="' + r.id + '" data-estado="CANCELADA">Cancelar</button>';
       }
     }
@@ -398,6 +398,10 @@ function renderResponsabilidades(filas) {
 }
 
 async function crearResponsabilidad(titulo, descripcion, prioridad) {
+  if (!tienePermiso("responsabilidades", "crear")) {
+    setMsg("msg-resp-crear", "No tenés permiso para crear responsabilidades.", false);
+    return false;
+  }
   const r = await ejecutarOperacion("responsabilidad", {
     p_titulo: titulo, p_descripcion: descripcion || null, p_prioridad: prioridad || "normal",
   });
@@ -411,6 +415,11 @@ async function crearResponsabilidad(titulo, descripcion, prioridad) {
 }
 
 async function actualizarResponsabilidad(id, estado) {
+  const accion = estado === "CANCELADA" ? "editar_any" : "editar";
+  if (!tienePermiso("responsabilidades", accion)) {
+    setMsg("msg-resp-crear", "No tenés permiso para modificar esta responsabilidad.", false);
+    return false;
+  }
   const r = await ejecutarOperacion("responsabilidad_actualizar", {
     p_responsabilidad_id: id, p_estado: estado,
   });
@@ -461,7 +470,7 @@ function renderIncidencias(filas) {
     const div = document.createElement("div");
     div.className = "rep-fila rep-estado-" + (i.estado || "").toLowerCase();
     let acciones = "";
-    if (i.estado === "ABIERTA" && tienePermiso("turnos", "editar_any")) {
+    if (i.estado === "ABIERTA" && tienePermiso("incidencias", "editar_any")) {
       acciones = '<button type="button" class="cc-accion inc-resolver-btn" data-id="' + i.id + '">Resolver</button>';
     }
     const fecha = i.creado_en ? fechaHora(i.creado_en) : "—";
@@ -472,6 +481,10 @@ function renderIncidencias(filas) {
 }
 
 async function crearIncidencia(tipo, descripcion) {
+  if (!tienePermiso("incidencias", "crear")) {
+    setMsg("msg-inc-crear", "No tenés permiso para reportar incidencias.", false);
+    return false;
+  }
   const r = await ejecutarOperacion("incidencia", {
     p_tipo: tipo, p_descripcion: descripcion,
   });
@@ -485,6 +498,10 @@ async function crearIncidencia(tipo, descripcion) {
 }
 
 async function resolverIncidencia(id) {
+  if (!tienePermiso("incidencias", "editar_any")) {
+    setMsg("msg-inc-crear", "No tenés permiso para resolver incidencias.", false);
+    return;
+  }
   const resolucion = prompt("¿Cómo se resolvió la incidencia?", "");
   if (!resolucion) return;
   const r = await ejecutarOperacion("incidencia_resolver", {
@@ -513,22 +530,26 @@ async function refrescarOperacion() {
 let _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
 
 async function refrescarAlertasB7() {
-  if (!navigator.onLine || !tienePermiso("turnos", "ver")) return;
+  if (!navigator.onLine) return;
+  // Reiniciar antes de consultar: un permiso revocado no conserva contadores viejos.
+  _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
   try {
-    // Turnos abiertos.
-    const { data: turnos } = await client.rpc("listar_turnos", { p_estado: "ABIERTO", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.turnosAbiertos = (turnos || []).length;
-    // Cuadres pendientes / con diferencia.
-    const { data: cuadresP } = await client.rpc("listar_cuadres", { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.cuadresPendientes = (cuadresP || []).length;
-    const { data: cuadresD } = await client.rpc("listar_cuadres", { p_estado: "CON_DIFERENCIA", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.cuadresDiferencia = (cuadresD || []).length;
-    // Responsabilidades pendientes.
-    const { data: resp } = await client.rpc("listar_responsabilidades", { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.respPendientes = (resp || []).length;
-    // Incidencias abiertas.
-    const { data: inc } = await client.rpc("listar_incidencias", { p_estado: "ABIERTA", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.incAbiertas = (inc || []).length;
+    if (tienePermiso("turnos", "ver")) {
+      const { data: turnos } = await client.rpc("listar_turnos", { p_estado: "ABIERTO", p_limite: 100, p_offset: 0 });
+      _b7CacheAlertas.turnosAbiertos = (turnos || []).length;
+      const { data: cuadresP } = await client.rpc("listar_cuadres", { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 });
+      _b7CacheAlertas.cuadresPendientes = (cuadresP || []).length;
+      const { data: cuadresD } = await client.rpc("listar_cuadres", { p_estado: "CON_DIFERENCIA", p_limite: 100, p_offset: 0 });
+      _b7CacheAlertas.cuadresDiferencia = (cuadresD || []).length;
+    }
+    if (tienePermiso("responsabilidades", "ver")) {
+      const { data: resp } = await client.rpc("listar_responsabilidades", { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 });
+      _b7CacheAlertas.respPendientes = (resp || []).length;
+    }
+    if (tienePermiso("incidencias", "ver")) {
+      const { data: inc } = await client.rpc("listar_incidencias", { p_estado: "ABIERTA", p_limite: 100, p_offset: 0 });
+      _b7CacheAlertas.incAbiertas = (inc || []).length;
+    }
   } catch (e) {
     // Si los RPC no existen o fallan, no agregar alertas (no inventar).
   }
