@@ -160,7 +160,7 @@
     if (btn) btn.addEventListener("click", function () {
       var real = document.getElementById("logout-btn");
       if (real) real.click();
-      else if (window.client && window.client.auth) window.client.auth.signOut();
+      else if (typeof client !== "undefined" && client && client.auth) client.auth.signOut();
     });
     return el;
   }
