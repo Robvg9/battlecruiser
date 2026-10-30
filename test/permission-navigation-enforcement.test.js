@@ -92,3 +92,61 @@ test("legacy polish modules no longer create or force-show Administration", () =
   assert.doesNotMatch(pulidoSource, /tabs\.appendChild\(b\)/);
   assert.doesNotMatch(pulidoBSource, /t\.style\.display='flex'/);
 });
+
+test("section-scope observers ignore nested control churn and watch only navigation/panel boundaries", async () => {
+  const dom = createDom({ ready: true, buttonPermission: "1", panelPermission: "1" });
+  const { window } = dom;
+  const observers = [];
+  window.MutationObserver = class {
+    constructor(callback) {
+      this.callback = callback;
+    }
+    observe(target, options) {
+      observers.push({ target, options, callback: this.callback });
+    }
+    disconnect() {}
+  };
+
+  try {
+    window.eval(scopeSource);
+    await new Promise(resolve => window.setTimeout(resolve, 5));
+
+    const tabs = observers.find(observer => observer.target.id === "tabs");
+    const main = observers.find(observer => observer.target.classList &&
+      observer.target.classList.contains("main-content"));
+    assert.ok(tabs, "navigation observer must be installed");
+    assert.ok(main, "main panel observer must be installed");
+    assert.equal(tabs.options.subtree, true,
+      "nested authorized nav groups must continue to be observed");
+    assert.notEqual(main.options.subtree, true,
+      "main observer must not scan every nested control mutation");
+
+    const button = window.document.querySelector("#tabs .tab-btn[data-tab]");
+    const panel = window.document.querySelector(".main-content > .tab-panel");
+    const nestedControl = window.document.createElement("span");
+    panel.appendChild(nestedControl);
+
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    let scheduled = 0;
+    window.setTimeout = function (...args) {
+      scheduled++;
+      return nativeSetTimeout(...args);
+    };
+
+    tabs.callback([{ type: "attributes", target: nestedControl, attributeName: "class" }]);
+    main.callback([{ type: "attributes", target: nestedControl, attributeName: "class" }]);
+    assert.equal(scheduled, 0,
+      "class changes inside panel controls must not schedule a section-wide enforcement pass");
+
+    tabs.callback([{ type: "attributes", target: button, attributeName: "class" }]);
+    assert.equal(scheduled, 1,
+      "navigation button changes must still schedule enforcement");
+
+    main.callback([{ type: "attributes", target: panel, attributeName: "class" }]);
+    assert.equal(scheduled, 2,
+      "direct tab-panel changes must still schedule enforcement");
+  } finally {
+    dom.window.close();
+  }
+});
+
