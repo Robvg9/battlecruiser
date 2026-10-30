@@ -1,0 +1,131 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { JSDOM } = require("jsdom");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "m29-turnos-organizacion.js"),
+  "utf8"
+);
+
+async function waitFor(predicate, timeout = 1200) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return Boolean(predicate());
+}
+
+function setup(t) {
+  const dom = new JSDOM(
+    "<!doctype html><html><head></head><body>" +
+      "<nav id='tabs'><button class='tab-btn' data-tab='ciclos'>Turnos</button></nav>" +
+      "<section id='tab-ciclos' class='tab-panel visible'><div id='ciclos-m18-root'></div></section>" +
+    "</body></html>",
+    { url: "https://battlecruiser-m29-jornada.test/", runScripts: "outside-only", pretendToBeVisual: true }
+  );
+  const { window } = dom;
+  Object.defineProperty(window.document, "readyState", { value: "complete", configurable: true });
+  window.setInterval = () => 0;
+  window.confirm = () => true;
+  window.__bcUser = { rol: "Dueño" };
+  window.tienePermiso = () => true;
+  window._cache = {
+    almacenes: [{ id: "alm-1", nombre: "La Cueva", activo: true }],
+    usuarios: [
+      { id: "dep-1", nombre: "Dependienta 1", rol: "Dependienta", activo: true },
+      { id: "dep-2", nombre: "Dependienta 2", rol: "Dependienta", activo: true }
+    ]
+  };
+  const createdLegacy = [];
+  const jornadaCalls = [];
+  window.BattleCruiserTurnoAPI = {
+    actorIsAdmin: async () => true,
+    crearTurno: async (payload) => { createdLegacy.push(payload); return { id: "legacy-turn" }; },
+    listarTurnosMaestros: async () => [],
+    labelEstado: (value) => String(value || "—")
+  };
+  window.client = {
+    rpc: async (name, payload) => {
+      jornadaCalls.push({ name, payload });
+      return { data: { turno_id: "jornada-turn", estado: "PROGRAMADO" }, error: null };
+    }
+  };
+  window.eval(SOURCE);
+  t.after(() => window.close());
+  return { window, createdLegacy, jornadaCalls };
+}
+
+test("M29 creates complete-day JORNADA by default with one named responsible per working day", async (t) => {
+  const { window, createdLegacy, jornadaCalls } = setup(t);
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  root.querySelector("#m29-btn-crear").click();
+
+  const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(modal, "Crear Turno opens the modal");
+  const days = modal.querySelector("#m29-create-days");
+  assert.equal(days.dataset.mode, "jornada", "Jornada completa is the default model");
+  assert.match(modal.querySelector("#m29-mode-label").textContent, /Jornada completa/);
+  assert.equal(modal.querySelectorAll("[data-m29-day]").length, 7);
+
+  const count = modal.querySelector("#m29-dias");
+  count.value = "2";
+  count.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const rows = modal.querySelectorAll("[data-m29-day]");
+  assert.equal(rows.length, 2);
+  rows[0].querySelector("[data-m29-person]").value = "dep-1";
+  rows[1].querySelector("[data-m29-works]").click();
+  assert.equal(rows[1].querySelector("[data-m29-person]").disabled, true);
+
+  modal.querySelector("#m29-confirm-crear").click();
+  assert.ok(await waitFor(() => jornadaCalls.length === 1), "the canonical Jornada RPC is called");
+  assert.equal(jornadaCalls[0].name, "bc5_crear_jornada_unica");
+  assert.equal(jornadaCalls[0].payload.p_almacen_id, "alm-1");
+  assert.equal(jornadaCalls[0].payload.p_dias, 2);
+  assert.deepEqual(jornadaCalls[0].payload.p_programacion, [
+    { numero_dia: 1, trabaja: true, responsable_id: "dep-1" },
+    { numero_dia: 2, trabaja: false, responsable_id: null }
+  ]);
+  assert.equal(createdLegacy.length, 0, "the default model never creates MANANA/TARDE sessions");
+});
+
+test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through the legacy contract", async (t) => {
+  const { window, createdLegacy, jornadaCalls } = setup(t);
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  root.querySelector("#m29-btn-crear").click();
+
+  const modal = window.document.getElementById("m29-crear-overlay");
+  modal.querySelector("#m29-toggle-plan-b").click();
+  const days = modal.querySelector("#m29-create-days");
+  assert.equal(days.dataset.mode, "legacy");
+  assert.match(modal.querySelector("#m29-mode-label").textContent, /Mañana y Tarde/);
+
+  const count = modal.querySelector("#m29-dias");
+  count.value = "2";
+  count.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const rows = modal.querySelectorAll("[data-m29-day]");
+  rows[0].querySelector("[data-m29-manana]").value = "dep-1";
+  rows[0].querySelector("[data-m29-tarde]").value = "dep-2";
+  rows[1].querySelector("[data-m29-tarde]").value = "dep-1";
+
+  modal.querySelector("#m29-confirm-crear").click();
+  assert.ok(await waitFor(() => createdLegacy.length === 1), "the legacy creation API is called");
+  assert.deepEqual(createdLegacy[0], {
+    almacenId: "alm-1",
+    inicioPlan: createdLegacy[0].inicioPlan,
+    cantidadDias: 2,
+    asignaciones: [
+      { numero_dia: 1, bloque: "MANANA", usuario_id: "dep-1" },
+      { numero_dia: 1, bloque: "TARDE", usuario_id: "dep-2" },
+      { numero_dia: 2, bloque: "TARDE", usuario_id: "dep-1" }
+    ]
+  });
+  assert.match(createdLegacy[0].inicioPlan, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(jornadaCalls.length, 0, "Plan B never creates JORNADA rows in parallel");
+});
