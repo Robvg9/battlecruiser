@@ -351,7 +351,7 @@
         createdId=await rpc('bc7_registrar_reinversion_jornada',{
           p_turno_sesion_id:sessionId,
           p_lineas:[{producto_id:product,presentacion_id:null,cantidad_presentacion:null,cantidad_base:quantity,costo_total:cost}],
-          p_idempotency_key:key,p_proveedor:supplier||null,p_fecha:new Date().toISOString()
+          p_idempotency_key:key,p_proveedor:supplier||null
         });
       }else{
         throw new Error('Tipo de operación financiera desconocido.');
