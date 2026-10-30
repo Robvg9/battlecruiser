@@ -2,7 +2,8 @@
 // Bloqueo en fase capture: ningún otro listener recibe una ruta sin permiso efectivo.
 document.addEventListener("click", function (event) {
   var denied = event.target && event.target.closest
-    ? event.target.closest(".tab-btn[data-tab]");
+    ? event.target.closest(".tab-btn[data-tab]")
+    : null;
   if (!denied) return;
   var shell = document.getElementById("app-shell");
   var permisosCargados = shell && shell.getAttribute("data-bc-permisos-cargados") === "1";
