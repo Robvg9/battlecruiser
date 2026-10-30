@@ -4,10 +4,24 @@
   "use strict";
   window.__BC_PERMISOS_CANONICO__ = true;
 
+  function usuarioActual() {
+    return (typeof _usuarioActual !== "undefined" && _usuarioActual) ||
+      window.__bcUser || null;
+  }
+
+  function permisosListos() {
+    return typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa === true;
+  }
+
+  function mapaPermisos() {
+    return typeof _permisosEfectivos !== "undefined" && _permisosEfectivos &&
+      typeof _permisosEfectivos === "object" ? _permisosEfectivos : null;
+  }
+
   function tienePermiso(seccion, accion) {
-    if (!window._usuarioActual || window._permisosCargaExitosa !== true) return false;
-    var efectivos = window._permisosEfectivos;
-    if (!efectivos || typeof efectivos !== "object") return false;
+    if (!usuarioActual() || !permisosListos()) return false;
+    var efectivos = mapaPermisos();
+    if (!efectivos) return false;
     var sec = efectivos[seccion];
     return !!(sec && sec[accion] === true);
   }
@@ -46,7 +60,7 @@
   ];
 
   function esDependienta() {
-    var u = window._usuarioActual || window.__bcUser || {};
+    var u = usuarioActual() || {};
     var rol = String(u.rol || u.role_name || u.nombre_rol || u.role || "").toLowerCase();
     return rol.indexOf("dependienta") >= 0;
   }
@@ -58,7 +72,7 @@
   }
 
   function puedeVerRuta(tab) {
-    if (!window._usuarioActual || window._permisosCargaExitosa !== true) return false;
+    if (!usuarioActual() || !permisosListos()) return false;
     if (RUTAS_SIEMPRE_OCULTAS[tab]) return false;
     if (RUTAS_PERSONALES[tab]) return true;
     if (tab === "operacion") return puedeVerOperaciones();
@@ -157,9 +171,8 @@
   }
 
   function aplicarPermisosAInterfaz() {
-    var loggedIn = !!window._usuarioActual;
-    var cargaOk = window._permisosCargaExitosa === true &&
-      !!window._permisosEfectivos && typeof window._permisosEfectivos === "object";
+    var loggedIn = !!usuarioActual();
+    var cargaOk = permisosListos() && !!mapaPermisos();
     var ready = loggedIn && cargaOk;
     var shell = document.getElementById("app-shell");
     var shellVisible = !!(shell && shell.classList.contains("visible"));
@@ -259,6 +272,5 @@
     "padding:0!important;margin:0!important;border:none!important;}";
   document.head.appendChild(st);
 
-  if (window._permisosCargaExitosa === true) aplicarPermisosAInterfaz();
-  else aplicarPermisosAInterfaz();
+  aplicarPermisosAInterfaz();
 })();
