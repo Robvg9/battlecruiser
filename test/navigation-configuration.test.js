@@ -51,7 +51,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   assert.match(index, /data-bc-permisos-cargados="1"/);
   assert.match(index, /:not\(\[data-bc-permisos-cargados="1"\]\)/);
   assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
-  assert.match(sectionVisibility, /LABELS = \{ config:'Administración', ciclos:'Turnos' \}/);
+  assert.match(sectionVisibility, /LABELS = \{ config: "Administración", ciclos: "Turnos" \}/);
   assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
   assert.match(app, /m12-fe5-hide-vales\.js/);
   assert.match(hideVales, /removeChild\(panel\)/, "Vales panel is deliberately removed by the loaded module");
@@ -199,9 +199,9 @@ test("app shell, application and Service Worker share 9.5.38 and load refreshed 
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.38"/);
   assert.match(index, /href="style\.css\?v=9\.5\.38"/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
-  assert.match(app, /\["permisos-navegacion\.js","67\.4"\]/);
+  assert.match(app, /\["permisos-navegacion\.js","67\.5"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.5"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
+  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
 });
