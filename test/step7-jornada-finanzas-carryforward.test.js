@@ -90,6 +90,22 @@ test("Jornada finance read respects per-section view permissions", () => {
   assert.match(fn, /r\.turno_sesion_id=v_s\.id/);
 });
 
+test("Jornada inventory read and write RPCs require turnos.ver for non-admin assigned users", () => {
+  const readStart = MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_obtener_inventario_jornada");
+  const readEnd = MIGRATION.indexOf("$function$;", readStart);
+  assert.ok(readStart >= 0 && readEnd > readStart, "bc7_obtener_inventario_jornada must be replaced");
+  const readFn = MIGRATION.slice(readStart, readEnd);
+  assert.match(readFn, /NOT public\\.tiene_permiso\\('turnos','ver'\\)/);
+  assert.match(readFn, /a\\.turno_sesion_id=v_s\\.id AND a\\.usuario_id=auth\\.uid\\(\\) AND a\\.retirado_at IS NULL/);
+
+  const writeStart = MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_guardar_inventario_jornada");
+  const writeEnd = MIGRATION.indexOf("$function$;", writeStart);
+  assert.ok(writeStart >= 0 && writeEnd > writeStart, "bc7_guardar_inventario_jornada must be replaced");
+  const writeFn = MIGRATION.slice(writeStart, writeEnd);
+  assert.match(writeFn, /NOT public\\.tiene_permiso\\('turnos','ver'\\)/);
+  assert.match(writeFn, /a\\.turno_sesion_id=v_s\\.id AND a\\.usuario_id=v_uid AND a\\.retirado_at IS NULL/);
+});
+
 test("previous confirmed final cut is only a source for a new physical initial cut", () => {
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS origen_corte_id uuid/);
   assert.match(MIGRATION, /turno_jornada_corte_origen_fkey/);
