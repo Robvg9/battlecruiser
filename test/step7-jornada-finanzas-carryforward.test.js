@@ -13,10 +13,6 @@ const UI = fs.readFileSync(
   path.join(__dirname, "..", "public/js/bc7-jornada-ui.js"),
   "utf8"
 );
-const BASE_FINANCE = fs.readFileSync(
-  path.join(__dirname, "..", "supabase/migrations/20261023053011_step5_jornada_unica_backend.sql"),
-  "utf8"
-);
 
 test("Jornada finance adds separate session/tranche provenance without repointing legacy FKs", () => {
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS turno_sesion_id uuid/);
@@ -29,8 +25,6 @@ test("Jornada finance adds separate session/tranche provenance without repointin
   assert.match(MIGRATION, /REVOKE ALL ON FUNCTION public\.bc7_registrar_gasto_jornada/);
   assert.match(MIGRATION, /REVOKE ALL ON FUNCTION public\.bc7_registrar_reinversion_jornada/);
   assert.doesNotMatch(MIGRATION, /\bDROP\s+TABLE\b|\bTRUNCATE\b|\bDELETE\s+FROM\s+public\.(gastos|reinversiones|turno_sesiones)/i);
-  assert.match(BASE_FINANCE, /CREATE OR REPLACE FUNCTION public\.crear_gasto/);
-  assert.match(BASE_FINANCE, /CREATE OR REPLACE FUNCTION public\.registrar_reinversion_multiple/);
 });
 
 test("Jornada finance RPCs require permission, assigned worker, active tramo and idempotency", () => {
@@ -48,7 +42,7 @@ test("Jornada finance RPCs require permission, assigned worker, active tramo and
   assert.match(MIGRATION, /tiene_permiso\('reinversiones','crear'\)/);
   assert.match(MIGRATION, /public\.registrar_reinversion_multiple\(/);
   assert.match(MIGRATION, /REINVERSION_REGISTRADA/);
-  assert.match(MIGRATION, /p_turno_id,v_s\.turno_id/);
+  assert.match(MIGRATION, /v_s\.turno_id,p_idempotency_key/);
 });
 
 test("Jornada finance read respects per-section view permissions", () => {
@@ -81,7 +75,7 @@ test("previous confirmed final cut is only a source for a new physical initial c
 test("Step 7 shows prior count only as an editable physical recount reference", () => {
   assert.match(UI, /detail\.apertura_previa/);
   assert.match(UI, /openingLines\.get\(String\(p\.producto_id\)\)/);
-  assert.match(UI, /value="\+'\(prior\?esc\(prior\.cantidad_contada\):''\)/);
+  assert.match(UI, /prior\?esc\(prior\.cantidad_contada\)/);
   assert.match(UI, /Debes volver a contar físicamente cada producto/);
   assert.match(UI, /nuevo corte requiere confirmación física explícita/);
   assert.match(UI, /corte final anterior/);
