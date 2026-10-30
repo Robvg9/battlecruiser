@@ -506,6 +506,30 @@ BEGIN
       ) ORDER BY r.fecha,r.id)
       FROM public.reinversiones r
       WHERE r.turno_sesion_id=v_s.id
+    ),'[]'::jsonb) ELSE '[]'::jsonb END,
+    'mermas',CASE WHEN public.bc_actor_is_admin() OR public.tiene_permiso('mermas','ver') THEN coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'id',m.id,'producto',p.nombre,'producto_id',m.producto_id,
+        'cantidad',m.cantidad,'motivo',m.motivo,'estado',m.estado,
+        'creado_en',m.creado_en,'creado_nombre',m.creado_nombre,
+        'revisado_nombre',m.revisado_nombre,'comentario_revision',m.comentario_revision,
+        'fecha_revision',m.fecha_revision
+      ) ORDER BY m.creado_en,m.id)
+      FROM public.mermas m
+      JOIN public.productos p ON p.id=m.producto_id
+      WHERE m.turno_sesion_id=v_s.id
+    ),'[]'::jsonb) ELSE '[]'::jsonb END,
+    'bajas',CASE WHEN public.bc_actor_is_admin() OR public.tiene_permiso('bajas','ver') THEN coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'id',b.id,'producto',p.nombre,'producto_id',b.producto_id,
+        'cantidad',b.cantidad,'motivo',b.motivo,'estado',b.estado,
+        'creado_en',b.creado_en,'creado_nombre',b.creado_nombre,
+        'revisado_nombre',b.revisado_nombre,'comentario_revision',b.comentario_revision,
+        'fecha_revision',b.fecha_revision
+      ) ORDER BY b.creado_en,b.id)
+      FROM public.bajas b
+      JOIN public.productos p ON p.id=b.producto_id
+      WHERE b.turno_sesion_id=v_s.id
     ),'[]'::jsonb) ELSE '[]'::jsonb END
   ) INTO v_result;
   RETURN v_result;
@@ -760,6 +784,8 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.bc7_validar_tramo_responsable_jornada(uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.bc7_guard_ajuste_jornada_link() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text) FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.bc7_finanzas_jornada(uuid) FROM PUBLIC,anon,authenticated;
