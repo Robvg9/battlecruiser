@@ -49,7 +49,7 @@ test('pulido: transferencias ya no tienen entrada visible en sidebar', () => {
 test('pulido: configuración queda visible y comunicación elimina el estado vacío', () => {
   const src = read('public/js/hotfix-pulido-20260903.js');
   const srcB = read('public/js/hotfix-pulido-20260903b.js');
-  assert.match(src, /data-tab=config/);
+  assert.doesNotMatch(src, /data-tab=config/, "el hotfix pulido no debe decidir visibilidad de Administración");
   assert.match(srcB, /no tenes conversaciones|no tienes conversaciones/);
   assert.match(srcB, /iniciá una nueva conversación|inicia una nueva conversacion/);
 });
@@ -71,23 +71,22 @@ test('pulido: el submit del producto se captura antes del listener heredado', ()
 
 test('navegación: configuración y secciones operativas quedan visibles con sesión', () => {
   const src = read('public/js/permisos-navegacion.js');
-  assert.match(src, /if \(tab === "config" \|\| tab === "pendientes"\)/);
-  assert.match(src, /setTabVisible\(btn, true\);/);
-  assert.match(src, /tienePermiso\(seccion, accion\)|function tienePermiso/);
-  assert.match(src, /tab === "transferencias" \|\| tab === "vales" \|\| tab === "turnos"/);
+  assert.match(src, /TAB_A_SECCION/);
+  assert.match(src, /RUTAS_SIEMPRE_OCULTAS/);
+  assert.match(src, /function puedeVerRuta\(tab\)/);
+  assert.match(src, /return !!seccion && tienePermiso\(seccion, "ver"\)/);
+  assert.match(src, /if \(tab === "config"\)[\s\S]*?tienePermiso\("categorias", "ver"\)/);
+  assert.match(src, /RUTAS_PERSONALES = \{ conectividad: true, preferencias: true \}/);
 });
 
 test('navegación: guardia final garantiza botón Configuración aunque otra capa lo quite u oculte', () => {
   const app = read('public/app.js');
   const guard = read('public/js/hotfix-secciones-visibles-20260903.js');
   assert.match(app, /hotfix-secciones-visibles-20260903\.js/);
-  assert.match(guard, /data-tab/);
-  assert.match(guard, /setAttribute\('data-tab','config'\)/);
-  assert.match(guard, /textContent = LABELS\.config|textContent=LABELS\.config/);
-  assert.match(guard, /function setImportantStyle\(el, property, value\)/);
-  assert.match(guard, /setImportantStyle\(btn, 'display', 'flex'\)/);
-  assert.match(guard, /getPropertyValue\(property\) !== value/);
-  assert.match(guard, /MutationObserver/);
+  assert.match(guard, /function normalizarEtiquetas\(\)/);
+  assert.match(guard, /LABELS = \{ config: "Administración", ciclos: "Turnos" \}/);
+  assert.doesNotMatch(guard, /MutationObserver|setImportantStyle|style\.display|setAttribute\(['"]data-tab/);
+  assert.match(guard, /textContent = label/);
 });
 
 test('preferencias y conectividad están separadas; Configuración no vuelve a alojar Ajustes', () => {

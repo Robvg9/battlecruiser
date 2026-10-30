@@ -14,12 +14,12 @@ const wait = (window, ms = 35) => new Promise(resolve => window.setTimeout(resol
 function fixture() {
   const initialTab = TAB_NAMES[0];
   const buttons = TAB_NAMES.map(name =>
-    '<button class="tab-btn' + (name === initialTab ? ' active' : '') + '" data-tab="' + name + '">' + name + '</button>'
+    '<button class="tab-btn' + (name === initialTab ? ' active' : '') + '" data-tab="' + name + '" data-bc-permiso="1">' + name + '</button>'
   ).join('');
   const panels = TAB_NAMES.map(name => {
     const style = ' style="display:block!important;visibility:visible!important;opacity:1!important"';
     if (name === 'productos') {
-      return '<section id="tab-productos" class="tab-panel visible"' + style + '>' +
+      return '<section id="tab-productos" class="tab-panel visible" data-bc-permiso="1"' + style + '>' +
         '<div id="productos-tools-nomenclatura"><button id="productos-nomenclatura-btn">Nomenclatura</button></div>' +
         '<div id="bc-productos-barra"><input id="productos-buscar"></div>' +
         '<div id="lista-productos">Productos reales</div>' +
@@ -28,9 +28,9 @@ function fixture() {
         '<div class="productos-buscador-controles">Buscador duplicado</div>' +
         '<span id="bc176-pres-anchor">Presentaciones disponibles</span></section>';
     }
-    return '<section id="tab-' + name + '" class="tab-panel"' + style + '>Panel ' + name + '</section>';
+    return '<section id="tab-' + name + '" class="tab-panel" data-bc-permiso="1"' + style + '>Panel ' + name + '</section>';
   }).join('');
-  return new JSDOM('<!doctype html><html><head></head><body><aside><nav id="tabs">' + buttons +
+  return new JSDOM('<!doctype html><html><head></head><body><div id="app-shell" class="visible" data-bc-permisos-cargados="1"></div><aside><nav id="tabs">' + buttons +
     '</nav></aside><main class="main-content">' + panels + '</main></body></html>',
     { runScripts: 'outside-only', url: 'https://battlecruiser.test/' });
 }
@@ -79,12 +79,23 @@ test('section guard isolates every real first-level PWA panel despite stale inli
   dom.window.close();
 });
 
-test('release loader places the section guard after legacy UI modules and invalidates the PWA shell', () => {
-  assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
-  const visibilityHotfixIndex = app.indexOf('["hotfix-secciones-visibles-20260903.js","20261026.1"]');
-  assert.ok(visibilityHotfixIndex >= 0 && visibilityHotfixIndex <
-    app.indexOf('["section-scope-fix.js","20261016.1"]'),
-    'the section guard must execute after the current legacy visibility hotfix');
-  assert.match(app, /const VERSION=["']9\.5\.38["']/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
+test('release loader places the section guard after the current visibility hotfix and invalidates the PWA shell', () => {
+  const moduleVersion = (name) => {
+    const marker = '["' + name + '","';
+    const start = app.indexOf(marker);
+    assert.ok(start >= 0, "module must be registered in the application loader: " + name);
+    const valueStart = start + marker.length;
+    const end = app.indexOf('"', valueStart);
+    assert.ok(end > valueStart, "module loader version must be quoted: " + name);
+    return app.slice(valueStart, end);
+  };
+  const visibilityName = "hotfix-secciones-visibles-20260903.js";
+  const sectionName = "section-scope-fix.js";
+  const visibilityIndex = app.indexOf('["' + visibilityName + '","' + moduleVersion(visibilityName) + '"]');
+  const sectionIndex = app.indexOf('["' + sectionName + '","' + moduleVersion(sectionName) + '"]');
+  assert.ok(visibilityIndex >= 0 && sectionIndex > visibilityIndex,
+    "section-scope guard must execute after the current visibility hotfix");
+  const appVersion = app.match(/const VERSION=["']([^"']+)["']/);
+  assert.ok(appVersion, "application release version must be detectable");
+  assert.ok(index.includes("app.js?v=" + appVersion[1]));
 });

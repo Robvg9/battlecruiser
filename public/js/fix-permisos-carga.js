@@ -109,16 +109,6 @@
   wrapCargar();
   window.addEventListener("load", wrapCargar, { once: true });
 
-  try {
-    if (typeof window.tienePermiso === "function" && !window.__bcTienePermisoDegradacion) {
-      var permisoOriginal = window.tienePermiso;
-      var permisoDegradado = function (seccion, accion) {
-        if (window.__bcB3NoAplicado && window._usuarioActual && !window._permisosCargaExitosa) return true;
-        return permisoOriginal(seccion, accion);
-      };
-      window.tienePermiso = permisoDegradado;
-      try { tienePermiso = permisoDegradado; } catch (e1) {}
-      window.__bcTienePermisoDegradacion = true;
-    }
-  } catch (e2) {}
+  // No degradar permisos durante un fallo B3: una carga fallida nunca concede acceso.
+  // usuarios-permisos.js conserva únicamente el snapshot ya validado del mismo usuario.
 })();

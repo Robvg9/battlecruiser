@@ -32,9 +32,10 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/dataset\.bc7Busy/);
   assert.match(ui,/navigator\.onLine/);
   assert.match(ui,/data-tab="jornada"/);
-  assert.match(nav,/if \(tab === "jornada"\)[\s\S]*?setTabVisible\(btn, true\)/, "jornada navigation must remain visible; write permissions are server-gated");
-  assert.match(nav,/rol\.indexOf\("dependienta"\) >= 0[\s\S]*?setTabVisible\(btn, false\)/, "the ordinary sales tab is hidden only for dependienta role");
-  assert.match(nav,/jornada: "turnos"/);
+  assert.match(nav,/jornada: "turnos"/, "jornada visibility is mapped to the canonical turnos.ver permission");
+  assert.match(nav,/return !!seccion && tienePermiso\(seccion, "ver"\)/, "routes require the effective read permission");
+  assert.match(nav,/if \(tab === "ventas" && esDependienta\(\)\) return false/, "Dependienta keeps the ordinary POS route hidden");
+  assert.match(nav,/RUTAS_PERSONALES = \{ conectividad: true, preferencias: true \}/, "only the two explicit personal routes bypass business permissions");
   assert.match(ui,/data-tab=.?ventas/);
 });
 

@@ -22,10 +22,9 @@ permissions:
 jobs:
   quality:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-vale-detail-keyboard-20261029' && 'windows-latest' || github.event_name == 'pull_request' && contains(fromJSON('["fix/quality-context-ready-tests-20261029","fix/ux-compact-preferences-turns-main-20261029","fix/step4-live-modal-pill-step2-20261029","fix/step4-summary-route-main-20261029","fix/step4-expired-turn-recovery-ui-20261029","fix/step4-forceclose-m29-admin-and-mobile-20261029","fix/step4-m33-forceclose-real-entrypoint-20261030"]'), github.head_ref) && 'windows-latest' || fromJSON('["self-hosted","Windows","X64"]') }}
+    runs-on: windows-latest
     timeout-minutes: 35
-    # The self-hosted runner inherited a Node heap cap of about 32 MB; npm ci
-    # and JSDOM suites then crash with out-of-memory before exercising the code.
+    # Keep enough heap for the full JSDOM and integration suite.
     env:
       NODE_OPTIONS: --max-old-space-size=1536
 
@@ -37,8 +36,8 @@ jobs:
           fetch-depth: 1
           clean: true
 
-      # Use the repository's self-hosted Windows runner to avoid GitHub-hosted
-      # runner billing blocks. Keep the Node runtime pinned for reproducibility.
+      # Standard hosted Windows is free for this public repository and keeps
+      # product CI independent of local machine availability.
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -101,9 +100,9 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
-      # Run preview deployment and browser E2E in this same self-hosted job.
-      # Splitting these into more jobs caused the single local runner to leave
-      # the dependent jobs queued after Quality had completed.
+      # Run preview deployment and browser E2E in this same hosted Windows job.
+      # Keeping them together preserves ordering without requiring the local runner
+      # or introducing dependent queued jobs.
       - name: Deploy isolated PR preview
         if: github.event_name == 'pull_request'
         env:

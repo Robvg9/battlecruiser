@@ -82,9 +82,12 @@
 
   function tabPermitido(btn) {
     if (!btn) return false;
+    var shell = document.getElementById("app-shell");
+    if (!shell || shell.getAttribute("data-bc-permisos-cargados") !== "1") return false;
+    if (btn.getAttribute("data-bc-permiso") !== "1") return false;
     if (btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso")) return false;
+    if (btn.hasAttribute("hidden") || btn.getAttribute("aria-hidden") === "true") return false;
     if (btn.style.display === "none") return false;
-    if (btn.getAttribute("data-bc-permiso") === "0") return false;
     return true;
   }
 
@@ -139,8 +142,15 @@
       });
       var btnAct = document.querySelector('.tab-btn[data-tab="' + elegido + '"]');
       var panel = document.getElementById("tab-" + elegido);
-      if (btnAct) btnAct.classList.add("active");
-      if (panel) panel.classList.add("visible");
+      if (!btnAct || !panel ||
+          btnAct.getAttribute("data-bc-permiso") !== "1" ||
+          panel.getAttribute("data-bc-permiso") !== "1" ||
+          panel.hasAttribute("hidden")) {
+        logWarn("fail-safe: ruta perdió autorización antes de restaurar");
+        return false;
+      }
+      btnAct.classList.add("active");
+      panel.classList.add("visible");
       window.__bcUltimaTabActiva = elegido;
       logWarn("fail-safe: navegación restaurada →", elegido);
       return true;

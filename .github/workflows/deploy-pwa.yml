@@ -17,14 +17,18 @@ on:
       - 'test/**'
   workflow_dispatch:
 
+concurrency:
+  group: battlecruiser-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   deploy:
-    # Use the registered BattleCruiser Windows runner, now proven to accept and
-    # complete the exact-SHA validation job. The hosted fallback failed before steps ran.
-    runs-on: [self-hosted, Windows, X64]
+    # Standard hosted Windows is free for this public repository and avoids
+    # coupling LIVE deploys to the local ROBVG runner's availability.
+    runs-on: windows-latest
     timeout-minutes: 35
     steps:
       - name: Checkout
@@ -39,8 +43,8 @@ jobs:
       - name: Reuse Wrangler from persistent D drive cache
         shell: cmd
         env:
-          BC_WRANGLER_ROOT: D:\\Databank\\BattleCruiser-CI\\Wrangler
-          npm_config_cache: D:\\Databank\\npm-cache
+          BC_WRANGLER_ROOT: ${{ runner.temp }}\BattleCruiser-CI\Wrangler
+          npm_config_cache: ${{ runner.temp }}\npm-cache
         run: |
           node -e "try { const p = require(process.env.BC_WRANGLER_ROOT + '/node_modules/wrangler/package.json'); process.exit(p.version === '4.151.0' ? 0 : 1); } catch (_) { process.exit(1); }"
           if errorlevel 1 (
@@ -53,7 +57,7 @@ jobs:
         shell: cmd
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          BC_WRANGLER_ROOT: D:\\Databank\\BattleCruiser-CI\\Wrangler
+          BC_WRANGLER_ROOT: ${{ runner.temp }}\BattleCruiser-CI\Wrangler
         run: node test/deploy-production-pwa.js
       - name: Persist LIVE-verified release provenance and deploy log
         if: always()
