@@ -169,8 +169,28 @@ BEGIN
     RAISE EXCEPTION 'FAIL: cash ledger integration did not create exactly one movement';
   END IF;
 
-  -- A worker may create without financial read; the RPC must not leak either section.
+  -- The assigned worker still needs turnos.ver to read or save Jornada inventory.
+  -- Financial create grants alone must not expose inventory snapshots or bypass the gate.
   PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver',false);
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_obtener_inventario_jornada(v_day2);
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: assigned user read Jornada inventory without turnos.ver'; END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_guardar_inventario_jornada(v_day2,'INICIAL',
+      jsonb_build_array(
+        jsonb_build_object('producto_id',v_pan,'cantidad',7.5),
+        jsonb_build_object('producto_id',v_jugo,'cantidad',4.25)
+      ),'Permission rejection fixture');
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: assigned user saved Jornada inventory without turnos.ver'; END IF;
+
+  -- A worker may create without financial read; the RPC must not leak either section.
   PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear',false);
   v_result:=public.bc7_finanzas_jornada(v_day2);
   IF jsonb_array_length(v_result->'gastos')<>0 OR jsonb_array_length(v_result->'reinversiones')<>0 THEN
