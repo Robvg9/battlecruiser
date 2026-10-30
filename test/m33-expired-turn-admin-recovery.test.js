@@ -284,3 +284,68 @@ test("el hotfix reutiliza el gate ADMIN que habilita el expediente M33 real", as
   assert.match(button.textContent, /Cierre forzado/i);
   assert.equal(rpcCalls.length, 0, "showing the button must never close or modify the production turn");
 });
+
+
+test("el expediente M33 explica por qué no ofrece recuperación y el observador no entra en bucle", async (t) => {
+  const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", {
+    url: "https://battlecruiser-m33-current-turn.test/",
+    runScripts: "outside-only",
+    pretendToBeVisual: true
+  });
+  const { window } = dom;
+  window.setTimeout = (callback) => { callback(); return 1; };
+  window._cache = { usuarios: [] };
+  window._usuarioActual = { id: "owner-fixture", rol: "Operadora" };
+  window.tienePermiso = (resource, action) =>
+    resource === "ciclos" && action === "editar_any";
+  window.BattleCruiserTurnoAPI = {
+    actorIsAdmin: async () => false,
+    obtenerExpedienteTurno: async (id) => ({
+      id,
+      estado: "ABIERTO",
+      estado_maestro: "EN_CURSO",
+      fecha: "2099-12-01",
+      fecha_inicio: "2099-12-01",
+      fecha_fin: "2099-12-07",
+      dias_turno: 7,
+      almacen_nombre: "La Cueva",
+      sesiones: []
+    })
+  };
+  const rpcCalls = [];
+  window.client = { rpc: async (...args) => { rpcCalls.push(args); return { data: null, error: null }; } };
+  window.__BC_M29__ = {
+    isAdmin: () => window.tienePermiso("ciclos", "editar_any")
+  };
+
+  window.eval(M33_SOURCE);
+  window.eval(source);
+  t.after(() => window.close());
+
+  await window.__BC_M33.open("turno-vigente");
+  for (let i = 0; i < 4; i++) {
+    const next = window.document.querySelector("#m33-next");
+    assert.ok(next, "the real M33 admin expediente must render all five stages");
+    next.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  const modal = window.document.getElementById("m33-bg");
+  const changes = [];
+  const observer = new window.MutationObserver(records => changes.push(records.length));
+  observer.observe(modal, { childList: true, subtree: true });
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  assert.equal(window.document.querySelector(".bc-force-close-turno"), null,
+    "a current turn must never expose the irreversible recovery action");
+  const message = window.document.querySelector(".bc-force-close-msg");
+  assert.ok(message);
+  assert.match(message.textContent, /no confirma que el turno siga abierto y vencido/i);
+
+  const settledChanges = changes.length;
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(changes.length, settledChanges,
+    "updating its own eligibility message must not recursively trigger the observer");
+  observer.disconnect();
+  assert.equal(rpcCalls.length, 0, "eligibility checks must never call the close RPC");
+});
