@@ -108,6 +108,9 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
   assert.match(app, /\["hotfix-pulido-20260903\.js","20261030\.2"\]/);
   assert.match(app, /\["hotfix-pulido-20260903b\.js","20261030\.3"\]/);
+  assert.match(app, /\["hotfix-17-final-loader-20260903\.js","20261030\.2"\]/);
+  assert.match(app, /hotfix-17-13-configuracion-admin-visible-20260903\.js/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.38["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261030\.2/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261030\.3/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
