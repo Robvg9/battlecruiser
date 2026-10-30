@@ -191,6 +191,20 @@ BEGIN
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unrelated user read another worker finance'; END IF;
 
+  IF has_table_privilege('authenticated','public.gastos','SELECT')
+     OR has_table_privilege('authenticated','public.gastos','INSERT')
+     OR has_table_privilege('authenticated','public.reinversiones','SELECT')
+     OR has_table_privilege('authenticated','public.reinversiones','INSERT')
+     OR has_table_privilege('authenticated','public.reinversiones_lineas','SELECT') THEN
+    RAISE EXCEPTION 'FAIL: authenticated can bypass the finance RPCs through direct table access';
+  END IF;
+  IF has_function_privilege('anon','public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: finance RPC ACL grants do not match authenticated-only policy';
+  END IF;
+
   RAISE NOTICE 'PASS Step 7 Finance + Carry-forward: idempotent expense/reinvestment, provider, stock/FIFO/cash, permission-scoped reads and immutable previous-day provenance';
 END
 $finance$;
