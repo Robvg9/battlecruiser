@@ -109,6 +109,7 @@ BEGIN
       LIMIT 1
     ) dif ON true
     WHERE t.ciclo_id IS NULL AND t.sesion_id IS NULL
+      AND s.estado='COMPLETADA'
       AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION','CON_DIFERENCIA')
   ) q;
 
