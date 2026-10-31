@@ -21,9 +21,9 @@ test("opening one jornada exposes four task tabs",()=>{
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9\.5\.43"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.9"\]/);
- assert.match(sw,/BC_SW_VERSION = "9\.5\.43"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.9/);
- assert.match(ui,/v7\.9 — catálogo autoritativo de responsables/);
+ assert.match(app,/const VERSION="9\.5\.44"/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.10"\]/);
+ assert.match(sw,/BC_SW_VERSION = "9\.5\.44"/);
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.10/);
+ assert.match(ui,/v7\.10 — catálogo autoritativo de responsables/);
 });
