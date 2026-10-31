@@ -241,7 +241,7 @@ function applySql(file) {
       "--locale=C",
       "--auth-local=trust",
       "--auth-host=trust",
-      // The cluster is disposable CI data; skipping fsync avoids slow per-file flushes on D:.
+      // This is a disposable CI cluster; skip fsync to avoid slow per-file flushes on D:.
       "--no-sync",
     ], { env: { ...binEnv, PATH: pgBinDir + path.delimiter + process.env.PATH }, timeout: 10 * 60 * 1000 });
     pgCtl = pgExe("pg_ctl.exe");
@@ -257,26 +257,32 @@ function applySql(file) {
     ], { env: binEnv, timeout: 5 * 60 * 1000, stdio: "ignore" });
 
     run(pgExe("createdb.exe"), ["-h", "127.0.0.1", "-p", PG_PORT, "-U", "postgres", "battlecruiser_step7_test"], {
-      env: binEnv, timeout: 2 * 60 * 1000,
+      env: binEnv, timeout: 60 * 1000,
     });
 
     log("\r\n=== 1/5 Build disposable fixture (includes Step 5 base schema) ===");
     applySql("test/step7-jornada-fixture.sql");
     log("\r\n=== 2/5 Apply Step 5 baseline migration ===");
     applySql("supabase/migrations/20261023053011_step5_jornada_unica_backend.sql");
-    log("\r\n=== 3/5 Apply Step 7 inventory migration ===");
+    log("\r\n=== 3/9 Apply Step 7 inventory migration ===");
     applySql("supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql");
-    log("\r\n=== 4/5 Apply forward expired-turn guard and exercise ADMIN recovery ===");
+    log("\\r\\n=== 4/9 Build disposable finance schema contracts ===");
+    applySql("test/step7-jornada-finanzas-fixture.sql");
+    log("\\r\\n=== 5/9 Apply Step 7 finance/carry-forward migration ===");
+    applySql("supabase/migrations/20261030160000_step7_jornada_finanzas_carryforward.sql");
+    log("\r\n=== 6/9 Apply forward expired-turn guard and exercise ADMIN recovery ===");
     applySql("test/force-close-turno-admin-fixture.sql");
     applySql("supabase/migrations/20261026170000_bc_force_close_admin_expiry_guard.sql");
     applySql("test/force-close-turno-admin-contract.sql");
-    log("\r\n=== 5/6 Verify read-only daily movement archive, session boundaries and ACL ===");
+    log("\r\n=== 7/9 Verify read-only daily movement archive, session boundaries and ACL ===");
     applySql("test/bc7-turno-movimientos-sesion-fixture.sql");
     applySql("supabase/migrations/20261027184823_bc7_turno_movimientos_sesion_20261027.sql");
     applySql("test/bc7-turno-movimientos-sesion-contract.sql");
-    log("\r\n=== 6/6 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
+    log("\r\n=== 8/9 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
-    log("\r\nPASS Step 7 + Step 4 PostgreSQL 17 disposable fixtures and ACL contracts.");
+    log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
+    applySql("test/step7-jornada-finanzas-contract.sql");
+    log("\r\nPASS Step 7 inventory + finance + carry-forward + Step 4 PostgreSQL 17 disposable fixtures and ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));

@@ -88,10 +88,16 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
   assert.equal(jornadaCalls[0].name, "bc5_crear_jornada_unica");
   assert.equal(jornadaCalls[0].payload.p_almacen_id, "alm-1");
   assert.equal(jornadaCalls[0].payload.p_dias, 2);
-  assert.deepEqual(JSON.parse(JSON.stringify(jornadaCalls[0].payload.p_programacion)), [
+  const expectedProgramacion = [
     { numero_dia: 1, trabaja: true, responsable_id: "dep-1" },
     { numero_dia: 2, trabaja: false, responsable_id: null }
-  ]);
+  ];
+  const actualProgramacion = JSON.parse(JSON.stringify(jornadaCalls[0].payload.p_programacion));
+  assert.deepEqual(
+    actualProgramacion,
+    expectedProgramacion,
+    "Jornada programming must contain the expected day/responsible assignments"
+  );
   assert.equal(createdLegacy.length, 0, "the default model never creates MANANA/TARDE sessions");
 });
 
@@ -118,7 +124,7 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
 
   modal.querySelector("#m29-confirm-crear").click();
   assert.ok(await waitFor(() => createdLegacy.length === 1), "the legacy creation API is called");
-  assert.deepEqual(JSON.parse(JSON.stringify(createdLegacy[0])), {
+  const expectedLegacyPayload = {
     almacenId: "alm-1",
     inicioPlan: createdLegacy[0].inicioPlan,
     cantidadDias: 2,
@@ -127,7 +133,13 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
       { numero_dia: 1, bloque: "TARDE", usuario_id: "dep-2" },
       { numero_dia: 2, bloque: "TARDE", usuario_id: "dep-1" }
     ]
-  });
+  };
+  const actualLegacyPayload = JSON.parse(JSON.stringify(createdLegacy[0]));
+  assert.deepEqual(
+    actualLegacyPayload,
+    expectedLegacyPayload,
+    "Plan B must preserve the legacy payload contract"
+  );
   assert.match(createdLegacy[0].inicioPlan, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(jornadaCalls.length, 0, "Plan B never creates JORNADA rows in parallel");
 });
