@@ -123,6 +123,7 @@
         '.m33-summary{gap:4px!important}',
         '.m33-box{padding:6px 7px!important}',
         '.m33-session{padding:4px 0!important}',
+        '.m33-dep-cash{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:150px}.m33-dep-cash label{font-size:.7rem;display:grid;gap:3px}.m33-dep-cash input{width:100%;min-width:0;box-sizing:border-box;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:rgba(0,0,0,.18);color:inherit}.m33-dep-cash button{min-height:32px;padding:6px 9px;font-size:.76rem}.m33-dep-cash small{font-size:.7rem;line-height:1.3}.m33-dep-cash .m33-msg.error{color:#fca5a5}.m33-dep-cash .m33-msg.ok{color:#86efac}'
         '.m33-assignment-card select{min-height:31px!important;padding:5px 7px!important;font-size:11px!important}',
         '.m33-muted{font-size:.72rem!important;line-height:1.28!important}',
         '.m33-book{display:grid;gap:7px;min-width:0}',
@@ -1084,8 +1085,20 @@
       var actions = '';
       if (state.readOnly) actions = '<span class="m33-pill">Solo lectura</span>';
       else if (String(x.bloque || '').toUpperCase() === 'JORNADA') actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + esc(x.id) + '">Gestionar jornada</button>';
+       ov.querySelectorAll('[data-m33-declare-cash]').forEach(function (btn) { btn.addEventListener('click', function () { declararDineroSesionLegacy(btn.getAttribute('data-m33-declare-cash'),btn); }); });
+       ov.querySelectorAll('[data-m33-close-legacy-session]').forEach(function (btn) { btn.addEventListener('click', function () { cerrarSesionLegacyResponsable(btn.getAttribute('data-m33-close-legacy-session'),btn); }); });
       else if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
-      else if (st === 'EN_CURSO') actions = '<span class="m33-pill m33-ok">Sesión en curso</span>';
+      else if (st === 'EN_CURSO') {
+        var hasDeclaration = x.dinero_declarado === true || !!x.dinero_id;
+        var cashAmount = hasDeclaration && x.dinero_monto != null ? String(x.dinero_monto) : '';
+        var sid = esc(x.id);
+        actions = '<div class="m33-dep-cash">' +
+          (hasDeclaration
+            ? '<span class="m33-pill m33-ok">Dinero entregado: ' + esc(cashAmount) + ' CUP</span><small class="m33-muted">' + esc(x.dinero_estado_aprobacion || 'Declarado') + '</small>'
+            : '<label>Dinero entregado (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" data-m33-cash-amount="' + sid + '" placeholder="0.00"></label><button type="button" class="m33-btn-sesion" data-m33-declare-cash="' + sid + '">Guardar dinero entregado</button>') +
+          '<button type="button" class="m33-btn-sesion" data-m33-close-legacy-session="' + sid + '"' + (!hasDeclaration ? ' disabled' : '') + '>Cerrar sesión</button>' +
+          '<small class="m33-muted" data-m33-legacy-msg="' + sid + '"></small></div>';
+      }
       else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
       return '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia || x.dia_n) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + ' · ' + esc(labelSt) + '</div></div><div>' + actions + '</div></div></div>';
     }).join('') + '</div>';
@@ -1098,6 +1111,61 @@
     if (!el) return;
     el.textContent = text || '';
     el.className = 'm33-msg ' + (ok ? 'ok' : (text ? 'error' : ''));
+  }
+  function setLegacyCashMsg(sesionId, text, ok) {
+    document.querySelectorAll('[data-m33-legacy-msg]').forEach(function (el) {
+      if (String(el.getAttribute('data-m33-legacy-msg')) !== String(sesionId)) return;
+      el.textContent = text || '';
+      el.className = 'm33-muted m33-msg ' + (ok ? 'ok' : (text ? 'error' : ''));
+    });
+  }
+  async function declararDineroSesionLegacy(sesionId, button) {
+    if (state.readOnly || !sesionId || !API()) return;
+    var card = button && button.closest('.m33-session');
+    var input = card && card.querySelector('[data-m33-cash-amount]');
+    var raw = input ? input.value.trim() : '';
+    var monto = Number(raw);
+    if (raw === '' || !Number.isFinite(monto) || monto < 0) {
+      setLegacyCashMsg(sesionId,'Introduce el importe real que entregas, incluido 0 si corresponde.',false);
+      return;
+    }
+    if (!window.confirm('¿Confirmas que este es el efectivo real que entregas al dueño? Después de guardarlo, no podrás cambiar la declaración.')) return;
+    if (button) button.disabled = true;
+    try {
+      if (!navigator.onLine) throw new Error('Necesitas conexión para registrar la entrega.');
+      var tramos = await API().listarTramosSesion(sesionId);
+      var rows = Array.isArray(tramos) ? tramos : [];
+      var active = rows.find(function (item) { return String(item.estado || '').toUpperCase() === 'ACTIVO'; });
+      if (!active && rows.length) active = rows[rows.length - 1];
+      if (!active || !active.id) throw new Error('No se encontró un tramo de trabajo para esta sesión.');
+      await API().declararDinero(active.id,monto);
+      setLegacyCashMsg(sesionId,'Dinero entregado guardado. Consultando la confirmación del servidor…',true);
+      await load(state.turno.id);
+      renderModal();
+    } catch (error) {
+      setLegacyCashMsg(sesionId,'No se guardó la entrega: ' + String(error && error.message || error),false);
+      if (button) button.disabled = false;
+    }
+  }
+  async function cerrarSesionLegacyResponsable(sesionId, button) {
+    if (state.readOnly || !sesionId || !API()) return;
+    var session = (state.sesiones || []).find(function (item) { return String(item.id) === String(sesionId); });
+    if (!session || !(session.dinero_declarado === true || session.dinero_id)) {
+      setLegacyCashMsg(sesionId,'Primero debes guardar el dinero entregado.',false);
+      return;
+    }
+    if (!window.confirm('¿Cerrar esta sesión? La declaración de dinero y las operaciones quedarán registradas. El cierre no elimina ni altera el turno histórico.')) return;
+    if (button) button.disabled = true;
+    try {
+      if (!navigator.onLine) throw new Error('Necesitas conexión para cerrar la sesión.');
+      await API().cerrarSesion(sesionId);
+      setLegacyCashMsg(sesionId,'Sesión cerrada. Verificando el estado guardado en el servidor…',true);
+      await load(state.turno.id);
+      renderModal();
+    } catch (error) {
+      setLegacyCashMsg(sesionId,'No se pudo cerrar la sesión: ' + String(error && error.message || error),false);
+      if (button) button.disabled = false;
+    }
   }
 
   // Jornada única usa el workspace Step 7 y nunca la RPC legacy MANANA/TARDE.
