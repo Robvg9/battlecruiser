@@ -326,6 +326,7 @@ test("M33 hydrates the assignment selectors from the authorized responsible-user
   assert.ok(!Array.from(first.options).some((option) => option.value === "staff-stale"),
     "the assignment form must not resurrect a stale staff member missing from the canonical catalog");
   assert.equal(calls[0].name, "listar_usuarios_admin");
-  assert.deepEqual(calls[0].params, { p_incluir_archivados: false });
+  assert.equal(calls[0].params.p_incluir_archivados, false);
+  assert.deepEqual(Object.keys(calls[0].params), ["p_incluir_archivados"]);
   assert.equal(window.document.querySelector("#bc-m33-compact-sheet-css") !== null, true);
 });
