@@ -43,6 +43,7 @@ function setup(t) {
   };
   const createdLegacy = [];
   const jornadaCalls = [];
+  const staffCalls = [];
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => true,
     crearTurno: async (payload) => { createdLegacy.push(payload); return { id: "legacy-turn" }; },
@@ -51,13 +52,20 @@ function setup(t) {
   };
   window.client = {
     rpc: async (name, payload) => {
+      if (name === "listar_usuarios_admin") {
+        staffCalls.push({ name, payload });
+        return { data: [
+          { id: "dep-1", nombre: "Dependienta 1", rol: "Dependienta", activo: true, archivado: false },
+          { id: "dep-2", nombre: "Dependienta 2", rol: "Dependienta", activo: true, archivado: false }
+        ], error: null };
+      }
       jornadaCalls.push({ name, payload });
       return { data: { turno_id: "jornada-turn", estado: "PROGRAMADO" }, error: null };
     }
   };
   window.eval(SOURCE);
   t.after(() => window.close());
-  return { window, createdLegacy, jornadaCalls };
+  return { window, createdLegacy, jornadaCalls, staffCalls };
 }
 
 test("M29 creates complete-day JORNADA by default with one named responsible per working day", async (t) => {
@@ -69,6 +77,8 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
 
   const modal = window.document.getElementById("m29-crear-overlay");
   assert.ok(modal, "Crear Turno opens the modal");
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7),
+    "the default day grid appears after the canonical staff catalog is loaded");
   const days = modal.querySelector("#m29-create-days");
   assert.equal(days.dataset.mode, "jornada", "Jornada completa is the default model");
   assert.match(modal.querySelector("#m29-mode-label").textContent, /Jornada completa/);
@@ -109,6 +119,8 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
   root.querySelector("#m29-btn-crear").click();
 
   const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7),
+    "the default day grid appears after the canonical staff catalog is loaded");
   modal.querySelector("#m29-toggle-plan-b").click();
   const days = modal.querySelector("#m29-create-days");
   assert.equal(days.dataset.mode, "legacy");
