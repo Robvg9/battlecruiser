@@ -24,10 +24,8 @@
     }
     const cache = (window._cache && Array.isArray(window._cache.usuarios)) ? window._cache.usuarios : [];
     const source = Array.isArray(window.__BC_M29_STAFF_CACHE__) ? window.__BC_M29_STAFF_CACHE__ : [];
-    const byId = new Map();
-    cache.forEach(function (user) { if (user && user.id) byId.set(String(user.id), user); });
-    source.forEach(function (user) { if (user && user.id) byId.set(String(user.id), Object.assign({}, byId.get(String(user.id)) || {}, user)); });
-    return Array.from(byId.values()).filter(function (user) {
+    const rows = window.__BC_M29_STAFF_CACHE_LOADED__ === true ? source : cache;
+    return rows.filter(function (user) {
       if (!user || !user.id || user.activo === false || user.archivado) return false;
       var role = user.rol || user.nombre_rol || user.role_name || user.role || '';
       if (role && typeof role === 'object') role = role.nombre || role.name || role.rol || '';
