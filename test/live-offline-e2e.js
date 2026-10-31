@@ -280,16 +280,36 @@ async function navigateAndWait(url) {
   await delay(500);
 }
 async function reloadAndWait(ignoreCache = true) {
+  // Capture the current document identity before requesting a reload. Polling
+  // only UI readiness can accidentally accept the old document while Chromium
+  // is still replacing it.
+  const previousDocumentTimeOrigin = await evaluate("performance.timeOrigin");
+  assert(
+    Number.isFinite(previousDocumentTimeOrigin) && previousDocumentTimeOrigin > 0,
+    "No se pudo capturar la identidad del documento antes de recargar."
+  );
+
   // Hard reloads bypass the Service Worker in Chromium; only use them for the
   // offline cache probe. The online reconnect must be a normal navigation.
   await cdpCommand("Page.reload", ignoreCache ? { ignoreCache: true } : {});
-  // CDP may omit Page.domContentEventFired on a same-target reload even after
-  // the new document was served. Poll observable browser readiness instead.
-  await waitUntil(
-    "documento y módulos base listos después de recargar",
-    "(()=>document.readyState!=='loading'&&window.__BC_UI_READY_RESOLVED__===true)()",
+
+  // Do not accept a stale Runtime.evaluate result from the previous document.
+  // A new timeOrigin proves navigation completed; UI_READY then proves the app
+  // has completed its own base initialization in that new document.
+  const reloadReady = await waitUntil(
+    "nuevo documento y módulos base listos después de recargar",
+    "(()=>{const origin=performance.timeOrigin;return Number.isFinite(origin)&&origin!==" +
+      JSON.stringify(previousDocumentTimeOrigin) +
+      "&&document.readyState!=='loading'&&window.__BC_UI_READY_RESOLVED__===true" +
+      "?{documentTimeOrigin:origin,readyState:document.readyState,uiReady:true}:null})()",
     TIMEOUT_MS
   );
+  report.evidence.reloadReadiness = report.evidence.reloadReadiness || [];
+  report.evidence.reloadReadiness.push({
+    previousDocumentTimeOrigin,
+    ...reloadReady,
+    ignoreCache,
+  });
   await delay(250);
 }
 function pageSnapshotExpression() {
@@ -647,6 +667,15 @@ async function main() {
     "const originalStyleCssText=(()=>{const probe=document.createElement('div');if(originalStyle!==null)probe.setAttribute('style',originalStyle);return probe.style.cssText;})();const restoration={originalClass,restoredClass:tab.getAttribute('class'),originalStyle,restoredStyle:tab.getAttribute('style'),originalStyleCssText,restoredStyleCssText:tab.style.cssText};const restored=restoration.restoredClass===restoration.originalClass&&restoration.restoredStyleCssText===restoration.originalStyleCssText;",
     "return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted,probeStateRestored:restored,probeRestoration:restoration};})()"
   ].join("");
+  // The configuration module is loaded asynchronously after DOMContentLoaded.
+  // Wait for its real panel instead of reading the old document or a half-loaded
+  // replacement document immediately after Page.reload.
+  const preferencePanelReady = await waitUntil(
+    "seis interruptores de Preferencias montados después de la recarga",
+    "(()=>{const panel=document.querySelector('#cfg-preferencias-personales');const ids=['cfg-aj-auto-refresh','cfg-aj-sync-auto','cfg-aj-sync-open','cfg-aj-sync-wifi','cfg-aj-notify','cfg-aj-compact'];return panel&&ids.every(id=>document.getElementById(id))?{ready:true,ids}:null})()",
+    10000
+  );
+  report.evidence.preferencesPanelAfterReload = preferencePanelReady;
   const preferenceReload = await evaluate(preferenceReloadExpression);
   assert(preferenceReload.ready && preferenceReload.allPersisted && preferenceReload.probeStateRestored,
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
