@@ -31,7 +31,7 @@
       if (!user || !user.id || user.activo === false || user.archivado) return false;
       var role = user.rol || user.nombre_rol || user.role_name || user.role || '';
       if (role && typeof role === 'object') role = role.nombre || role.name || role.rol || '';
-      role = String(role || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+      role = String(role || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       return role.indexOf('dependienta') >= 0 || role.indexOf('dueno') === 0 || role === 'admin' || role === 'administrador';
     });
   };
@@ -1270,6 +1270,19 @@
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
       return;
     }
+    if (state.step === 2 && !state.readOnly && !users().length && !state.staffLoading) {
+      state.staffLoading = true;
+      state.staffError = 'Cargando responsables…';
+      ensureAssignmentUsers(true).then(function () {
+        state.staffLoading = false;
+        state.staffError = '';
+        renderModal();
+      }).catch(function (error) {
+        state.staffLoading = false;
+        state.staffError = String(error && error.message ? error.message : error);
+        renderModal();
+      });
+    }
     const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];
     const bodies = [step1(t), step2(), step3(), step4(), step5(t)];
     const prev = state.step > 1 ? '<button type="button" id="m33-prev">Atrás</button>' : '';
@@ -1307,10 +1320,6 @@
     state.readOnly = !!(options && options.readOnly === true);
     state.staffError = '';
     await resolveAdmin();
-    if (state.isAdmin && !state.readOnly) {
-      try { await ensureAssignmentUsers(false); }
-      catch (staffError) { state.staffError = String(staffError && staffError.message ? staffError.message : staffError); }
-    }
     const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
     try { await load(id); state.busy = false; renderModal(); }
     catch (e) { state.busy = false; ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>'; ov.querySelector('#m33-error-close').onclick = close; }
