@@ -187,3 +187,45 @@ test("M29 loads active eligible responsables when the shared cache is empty", as
   assert.match(SOURCE, /grid-template-columns:minmax\(100px,.7fr\) auto minmax\(190px,1.3fr\)/);
 });
 
+
+test("M29 recovers responsible roles when the shared user cache contains role-less rows", async (t) => {
+  const { window } = setup(t);
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+  window._cache.usuarios = [
+    { id: "dep-cache", nombre: "Dependienta en caché", activo: true },
+    { id: "owner-cache", nombre: "Dueño en caché", activo: true }
+  ];
+  const authoritative = [
+    { id: "dep-cache", nombre: "Dependienta recuperada", rol: "Dependienta", activo: true, archivado: false },
+    { id: "owner-cache", nombre: "Dueño recuperado", rol: "Dueño", activo: true, archivado: false },
+    { id: "inactive", nombre: "Inactiva", rol: "Dependienta", activo: false, archivado: false },
+    { id: "warehouse", nombre: "Almacenero", rol: "Almacenero", activo: true, archivado: false }
+  ];
+  const calls = [];
+  window.client.rpc = async (name, payload) => {
+    calls.push({ name, payload });
+    if (name === "listar_usuarios_admin") return { data: authoritative, error: null };
+    if (name === "bc5_crear_jornada_unica") return { data: { turno_id: "turno-test" }, error: null };
+    throw new Error("RPC inesperada: " + name);
+  };
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")));
+  root.querySelector("#m29-btn-crear").click();
+  const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(modal);
+  const ready = await waitFor(() => {
+    const select = modal.querySelector("[data-m29-person]");
+    return select && select.options.length === 3;
+  }, 4000);
+  assert.ok(ready, "the selector must be hydrated from the role-authoritative RPC even if the shared cache has no role fields");
+  const select = modal.querySelector("[data-m29-person]");
+  assert.deepEqual(Array.from(select.options).map((option) => option.value), ["", "dep-cache", "owner-cache"]);
+  assert.equal(select.options[1].textContent, "Dependienta recuperada");
+  assert.equal(calls[0].name, "listar_usuarios_admin");
+  assert.deepEqual(calls[0].payload, { p_incluir_archivados: false });
+  assert.match(modal.querySelector("#m29-create-summary").textContent, /responsables asignados|pendientes/);
+  const compactCss = window.document.getElementById("bc-m29-compact-modal-css");
+  assert.ok(compactCss, "the create modal must load the compact layout overrides");
+  assert.match(compactCss.textContent, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+});
