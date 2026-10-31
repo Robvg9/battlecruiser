@@ -96,7 +96,7 @@
   }
   function rowHtml(row) {
     const status = String(row.estado_aprobacion || '').toUpperCase();
-    const pending = status === 'ESPERANDO_APROBACION';
+    const pending = status === 'ESPERANDO_APROBACION' || status === 'PENDIENTE';
     const discrepancy = status === 'CON_DIFERENCIA';
     const completed = String(row.estado_sesion || '').toUpperCase() === 'COMPLETADA';
     const id = esc(row.declaracion_id);
