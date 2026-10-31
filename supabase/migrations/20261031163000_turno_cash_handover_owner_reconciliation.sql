@@ -108,7 +108,8 @@ BEGIN
       ORDER BY x.created_at DESC
       LIMIT 1
     ) dif ON true
-    WHERE d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION','CON_DIFERENCIA')
+    WHERE t.ciclo_id IS NULL AND t.sesion_id IS NULL
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION','CON_DIFERENCIA')
   ) q;
 
   RETURN coalesce(v_result,'[]'::jsonb);
