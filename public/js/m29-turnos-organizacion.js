@@ -154,7 +154,7 @@
         '#m29-crear-overlay .m29-create-summary{margin:0!important;padding:5px 7px!important;font-size:10px!important;line-height:1.2!important}',
         '#m29-crear-overlay .m29-actions{margin:2px 0 0!important;gap:6px!important}',
         '#m29-crear-overlay .m29-actions button{min-height:32px!important;padding:6px 12px!important;font-size:11px!important}',
-        '#m29-crear-overlay .m29-msg# m29-modal-msg{min-height:0!important;margin:0!important}',
+        '#m29-crear-overlay #m29-modal-msg{min-height:0!important;margin:0!important}',
         '@media(max-width:620px){#m29-crear-overlay .m29-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 76px;gap:5px}#m29-crear-overlay #m29-create-days{grid-template-columns:minmax(0,1fr)}#m29-crear-overlay .m29-create-day{grid-template-columns:minmax(78px,.85fr) auto minmax(130px,1.3fr)!important}}',
         '@media(max-width:380px){#m29-crear-overlay .m29-fields{grid-template-columns:1fr 1fr}#m29-crear-overlay .m29-field:nth-child(3){grid-column:1/-1}}'
       ].join('');
@@ -463,16 +463,10 @@
     try { if (typeof _cache !== 'undefined' && _cache) cached = staffRowsFrom(_cache.usuarios); } catch (_) {}
     if (!cached.length) cached = staffRowsFrom(window._cache && window._cache.usuarios);
     var authoritative = staffRowsFrom(window.__BC_M29_STAFF_CACHE__);
-    var byId = new Map();
-    cached.forEach(function (user) {
-      if (user && user.id) byId.set(String(user.id), user);
-    });
-    authoritative.forEach(function (user) {
-      if (!user || !user.id) return;
-      var key = String(user.id);
-      byId.set(key, Object.assign({}, byId.get(key) || {}, user));
-    });
-    return Array.from(byId.values()).filter(staffIsEligible).sort(function (a, b) {
+    // Once the server catalog has loaded, it is the sole source of truth.
+    // Do not resurrect archived/deleted people from a stale local cache.
+    var rows = window.__BC_M29_STAFF_CACHE_LOADED__ === true ? authoritative : cached;
+    return rows.filter(staffIsEligible).sort(function (a, b) {
       return String(a.nombre || a.nombre_usuario || a.email || '').localeCompare(String(b.nombre || b.nombre_usuario || b.email || ''), 'es');
     });
   }
@@ -489,11 +483,12 @@
     }
     var response = await client.rpc('listar_usuarios_admin', { p_incluir_archivados: false });
     if (response && response.error) {
-      if (people.length) return people;
+      if (people.length && !forceRefresh) return people;
       throw new Error(response.error.message || response.error.details || 'El servidor rechazó la consulta de usuarios.');
     }
     var rows = staffRowsFrom(response && response.data);
     window.__BC_M29_STAFF_CACHE__ = rows;
+    window.__BC_M29_STAFF_CACHE_LOADED__ = true;
     try {
       if (typeof _cache !== 'undefined' && _cache) _cache.usuarios = rows;
       else {
