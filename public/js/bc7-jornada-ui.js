@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.9 — catálogo autoritativo de responsables con reintento y bloqueo seguro.
+// v7.10 — programación clara, mensajes humanos y días ordenados.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -515,14 +515,14 @@
       const canReadThisType=state.admin||(type==='gasto'?can('gastos','ver'):can('reinversiones','ver'));
       if(!canReadThisType){
         form.reset();keyField.value='';
-        msg(message,'El servidor aceptó la operación ('+String(createdId||'ID confirmado').slice(0,12)+'). No aparece en el historial de esta cuenta porque no tiene permiso de lectura; la aprobación de gastos sigue su flujo habitual.','ok');
+        msg(message,'El servidor guardó la operación. No aparece en el historial de esta cuenta porque tu usuario no tiene permiso para consultarlo; los gastos siguen el proceso habitual de aprobación.','ok');
         await loadCalendar();
         setStatus('Operación aceptada por el servidor. El historial requiere el permiso de lectura de la sección.','ok');
         return;
       }
       const verified=await loadFinances(state.detail);
       if(!verified){
-        msg(message,'El servidor aceptó la operación, pero la lectura de confirmación falló. No vuelvas a enviarla con una clave nueva; el formulario conserva la misma clave para un reintento idempotente.','error');
+        msg(message,'El servidor aceptó la operación, pero no pudimos comprobarla al volver a consultar. No la envíes otra vez con una referencia nueva; el formulario conserva la referencia original para evitar duplicados.','error');
         return;
       }
       form.reset();
@@ -550,7 +550,7 @@
     const session=detail.sesion;
     const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(String(session.estado).toUpperCase()):String(session.estado).toUpperCase()==='EN_CURSO';
     if(cut)return '<div class="bc7-note">El conteo '+(type==='INICIAL'?'inicial':'final')+' está confirmado e inmutable. Para corregirlo se necesita un proceso administrativo auditado.</div>'+cutHtml(cut,arr(detail.productos));
-    if(!allowed)return '<div class="bc7-empty">El conteo '+(type==='INICIAL'?'inicial':'final')+' no puede modificarse en el estado actual ('+esc(session.estado)+').</div>';
+    if(!allowed)return '<div class="bc7-empty">El conteo '+(type==='INICIAL'?'inicial':'final')+' no se puede modificar en el estado actual ('+esc(humanStatus(session.estado))+').</div>';
     const products=arr(detail.productos);
     const opening=type==='INICIAL'?detail.apertura_previa:null;
     const openingLines=new Map(arr(opening&&opening.lineas).map(x=>[String(x.producto_id),x]));
