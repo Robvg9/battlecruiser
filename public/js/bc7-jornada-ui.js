@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.10 — programación clara, mensajes humanos y días ordenados.
+// v7.11 — controles móviles compactos y responsables identificados.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -107,7 +107,7 @@
     return staffLoadPromise;
   }
   function warehouseName(id){const w=warehouses().find(x=>String(x.id)===String(id));return w?(w.nombre||'Almacén'):'Almacén no disponible';}
-  function userName(id){const u=users().find(x=>String(x.id)===String(id));return u?(u.nombre||u.nombre_usuario||u.email||'Responsable'):(id?'Responsable no identificado':'Sin asignar');}
+  function userName(id){if(id==null||String(id)==='')return 'Sin asignar';const key=String(id);const sources=[staffRowsFrom(window.__BC_M29_STAFF_CACHE__),users(),eligibleStaff()];for(const source of sources){const u=source.find(person=>person&&String(person.id)===key);if(u){const name=u.nombre||u.nombre_completo||u.nombre_usuario||u.full_name||u.fullName||u.name||u.email||u.email_usuario;return String(name||'Responsable asignado').trim();}}return 'Responsable asignado';}
   function roleOf(u){return String(u&&(u.rol||u.role_name||u.nombre_rol||u.role)||'').toLowerCase();}
   function friendlyError(error,context){
     const raw=String(error&&error.message||error||'').trim();
@@ -221,7 +221,7 @@
   function ensureDayRowsStyles(){
     if($('bc7-day-layout-style'))return;
     const style=document.createElement('style');style.id='bc7-day-layout-style';
-    style.textContent='#tab-jornada .bc7-day-row{grid-template-columns:minmax(0,1.5fr) minmax(115px,.65fr) minmax(180px,1fr)!important;gap:10px!important;align-items:center!important;padding:11px!important}#tab-jornada .bc7-day-main{display:flex;flex-direction:column;gap:4px;min-width:0}#tab-jornada .bc7-day-main strong{font-size:13px;line-height:1.25;color:var(--text)}#tab-jornada .bc7-day-date{display:block;font-size:12px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;color:var(--mist)}#tab-jornada .bc7-day-person{min-width:0;margin:0!important}#tab-jornada .bc7-day-person select{box-sizing:border-box;width:100%;min-width:0;min-height:38px;padding:8px}#tab-jornada .bc7-day-row .bc7-check{box-sizing:border-box;display:flex;align-items:center;gap:8px;min-height:38px;padding:8px;border:1px solid var(--gold-dim);border-radius:6px;white-space:nowrap}#tab-jornada .bc7-day-row .bc7-check input{flex:0 0 auto}@media(max-width:650px){#tab-jornada .bc7-day-row{grid-template-columns:minmax(0,1fr)!important;gap:7px!important;padding:10px!important}#tab-jornada .bc7-day-main{padding-bottom:2px}#tab-jornada .bc7-day-date{font-size:12px}#tab-jornada .bc7-day-person{width:100%}#tab-jornada .bc7-day-row .bc7-check{width:100%;justify-content:flex-start}}';
+    style.textContent='#tab-jornada .bc7-day-row{grid-template-columns:minmax(0,1.5fr) minmax(115px,.65fr) minmax(180px,1fr)!important;gap:10px!important;align-items:center!important;padding:11px!important}#tab-jornada .bc7-day-main{display:flex;flex-direction:column;gap:4px;min-width:0}#tab-jornada .bc7-day-main strong{font-size:13px;line-height:1.25;color:var(--text)}#tab-jornada .bc7-day-date{display:block;font-size:12px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;color:var(--mist)}#tab-jornada .bc7-day-person{min-width:0;margin:0!important}#tab-jornada .bc7-day-person select{box-sizing:border-box;width:100%;min-width:0;min-height:38px;padding:8px}#tab-jornada .bc7-day-row .bc7-check{box-sizing:border-box;display:inline-flex;align-items:center;align-self:flex-start;gap:8px;width:max-content;max-width:100%;min-height:36px;padding:6px 10px;border:1px solid var(--gold-dim);border-radius:6px;background:rgba(201,162,77,.07);white-space:nowrap}#tab-jornada .bc7-day-row .bc7-check input[type=checkbox]{-webkit-appearance:checkbox!important;appearance:auto!important;box-sizing:border-box;width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;max-width:18px!important;max-height:18px!important;margin:0!important;padding:0!important;flex:0 0 18px;accent-color:var(--gold);vertical-align:middle}@media(max-width:650px){#tab-jornada .bc7-day-row{grid-template-columns:minmax(0,1fr)!important;gap:7px!important;padding:10px!important}#tab-jornada .bc7-day-main{padding-bottom:2px}#tab-jornada .bc7-day-date{font-size:12px}#tab-jornada .bc7-day-person{width:100%}#tab-jornada .bc7-day-row .bc7-check{width:max-content!important;max-width:100%;justify-content:flex-start}}';
     document.head.appendChild(style);
   }
   function ensureShell(){
@@ -367,7 +367,7 @@
   function buildDayRows(){
     const host=$('bc7-day-rows');if(!host)return;
     const n=Math.max(1,Math.min(31,Number($('bc7-days-count')?.value||7)));
-    const old=readDayRows();const anchor=$('bc7-anchor')?.value||$('bc7-start-date')?.value||dateHavana();
+    const old=readDayRows();const mode=$('bc7-plan-mode')?.value||'explicit';const anchor=mode==='pattern'?($('bc7-anchor')?.value||$('bc7-start-date')?.value||dateHavana()):($('bc7-start-date')?.value||$('bc7-anchor')?.value||dateHavana());
     host.innerHTML=Array.from({length:n},(_,i)=>{
       const d=old[i]||{trabaja:true,responsable_id:null};
       return '<div class="bc7-day-row" role="group" aria-label="Día '+(i+1)+'"><div class="bc7-day-main"><strong>Día '+(i+1)+'</strong><span class="bc7-day-date">'+esc(fmtDateHuman(addDays(anchor,i)))+'</span></div><label class="bc7-check"><input type="checkbox" data-bc7-works '+(d.trabaja?'checked':'')+'><span>Trabaja</span></label><label class="bc7-field bc7-day-person"><span>Responsable</span><select data-bc7-person '+(!d.trabaja||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(d.responsable_id)+'</select></label></div>';
