@@ -106,7 +106,7 @@
     let actions = '';
     if (pending && completed) {
       actions = '<form class="bc5-cash-form" data-bc5-cash-form="' + id + '">' +
-        '<label>Dinero contado por el dueño (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" required data-bc5-cash-amount placeholder="0.00"></label>' +
+        '<label>Dinero contado por el dueño (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" required data-bc5-cash-amount placeholder="0.00"><input type="text" maxlength="1000" data-bc5-cash-observation placeholder="Observación del conteo (opcional)"></label>' +
         '<button type="submit">Registrar conteo</button></form>' +
         '<div class="bc5-cash-status" data-bc5-cash-msg></div>';
     } else if (pending) {
@@ -202,6 +202,7 @@
     const msg = form.querySelector('[data-bc5-cash-msg]');
     const value = input ? input.value.trim() : '';
     const amountValue = Number(value);
+    const observation = form.querySelector('[data-bc5-cash-observation]');
     if (value === '' || !Number.isFinite(amountValue) || amountValue < 0) {
       if (msg) { msg.className = 'bc5-cash-status error'; msg.textContent = 'Introduce un importe válido, incluido 0 si corresponde.'; }
       return;
@@ -215,7 +216,7 @@
       const result = await rpc('bc5_contar_dinero_entregado', {
         p_declaracion_id: id,
         p_monto_contado: amountValue,
-        p_observacion: null
+        p_observacion: observation ? observation.value.trim() || null : null
       });
       if (result && result.estado === 'APROBADA') {
         toast('Conteo confirmado: declarado y recibido coinciden (' + amount(result.monto_contado) + ' CUP).');
