@@ -134,6 +134,7 @@
     else if(context==='pattern') message='No se pudo guardar la rotación. Comprueba el almacén, la fecha y que cada día de trabajo tenga una persona asignada.';
     else if(context==='calendar') message='No se pudo cargar el calendario. Comprueba la conexión y vuelve a actualizarlo.';
     else if(context==='hours') message='No se pudo guardar el horario. Comprueba que la hora de apertura sea anterior a la de cierre.';
+    else if(context==='warehouse') message='No se pudo cargar la lista de almacenes. Comprueba la conexión y pulsa «Reintentar carga de almacenes».';
     else message='No se pudo completar esta acción. Revisa los datos y la conexión; vuelve a intentarlo.';
     try{console.warn('[BC7] '+String(context||'operacion')+':',error);}catch(_){}
     return message;
@@ -339,7 +340,7 @@
         return list;
       }catch(e){
         fillWarehouses();
-        setWarehouseMessage('No se pudieron cargar los almacenes. '+String(e&&e.message||e)+' Puedes reintentarlo.','error');
+        setWarehouseMessage(friendlyError(e,'warehouse'),'error');
         if(retry)retry.hidden=false;
         return warehouses();
       }finally{
@@ -655,14 +656,14 @@
       }
       const currentState=String(state.detail?.sesion?.estado||'').toUpperCase();
       if(currentState!=='EN_CURSO'){
-        setStatus('La respuesta de inicio llegó, pero el estado releído es '+(currentState||'desconocido')+'. No se confirma el inicio.','error');
+        setStatus('La jornada todavía no aparece como iniciada. Estado: '+humanStatus(currentState)+'. Actualiza antes de volver a intentarlo.','error');
         return;
       }
       setStatus(archiveRefreshFailed
-        ? 'Jornada iniciada y estado EN_CURSO confirmado; no se pudo actualizar el archivo POS.'
-        : 'Jornada iniciada: estado EN_CURSO confirmado al releer el servidor.','ok');
+        ? 'Jornada iniciada y confirmada; no se pudo actualizar el archivo de caja.'
+        : 'Jornada iniciada y confirmada.','ok');
     }catch(e){
-      const errorText='La respuesta del inicio no fue concluyente: '+e.message+'. Se consultará el estado real antes de permitir otro intento.';
+      const errorText='No se pudo confirmar todavía el inicio. '+friendlyError(e,'create')+' Se comprobará el estado antes de permitir otro intento.';
       try{
         const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
         renderWorkspace(d);
@@ -671,12 +672,12 @@
           await loadCalendar();
           setStatus('Inicio confirmado al releer el servidor: la jornada ya está EN_CURSO. No se repitió la escritura.','ok');
         }else{
-          setStatus('El servidor aún no confirma el inicio. Estado releído: '+(rereadState||'desconocido')+'.','error');
+          setStatus('El servidor todavía no confirma el inicio. Estado actual: '+humanStatus(rereadState)+'.','error');
           msg($('bc7-start-msg'),errorText,'error');
         }
       }catch(x){
         setStatus('No se pudo confirmar el estado del inicio por falta de lectura del servidor. No repitas la escritura todavía.','error');
-        msg($('bc7-start-msg'),errorText+' También falló la relectura: '+x.message,'error');
+        msg($('bc7-start-msg'),errorText+' Tampoco se pudo consultar el estado actual. '+friendlyError(x,'calendar'),'error');
       }
     }
     finally{busy(btn,false);}
@@ -704,12 +705,12 @@
       }
       const finalState=String(state.detail?.sesion?.estado||'').toUpperCase();
       if(finalState!=='COMPLETADA'){
-        setStatus('La respuesta de cierre llegó, pero el estado releído es '+(finalState||'desconocido')+'. No se confirma el cierre final.','error');
+        setStatus('La jornada todavía no aparece como finalizada. Estado: '+humanStatus(finalState)+'. Actualiza antes de volver a intentarlo.','error');
         return;
       }
-      setStatus('Cierre confirmado: estado COMPLETADA y resumen releído del servidor.','ok');
+      setStatus('Jornada finalizada y confirmada.','ok');
     }catch(e){
-      const errorText='La respuesta del cierre no fue concluyente: '+e.message+'. Se consultará el estado real antes de permitir otro intento.';
+      const errorText='No se pudo confirmar todavía el cierre. '+friendlyError(e,'create')+' Se comprobará el estado antes de permitir otro intento.';
       try{
         const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
         renderWorkspace(d);
@@ -718,13 +719,13 @@
           await loadCalendar();
           setStatus('Cierre confirmado al releer el servidor: la jornada ya está COMPLETADA. No se repitió la escritura.','ok');
         }else{
-          setStatus('El servidor aún no confirma el cierre. Estado releído: '+(rereadState||'desconocido')+'.','error');
+          setStatus('El servidor todavía no confirma el cierre. Estado actual: '+humanStatus(rereadState)+'.','error');
           const currentMsg=document.querySelector('[data-bc7-close-msg]')||msgEl;
           msg(currentMsg,errorText,'error');
         }
       }catch(x){
         setStatus('No se pudo confirmar el estado del cierre por falta de lectura del servidor. No repitas la escritura todavía.','error');
-        msg(form.querySelector('[data-bc7-close-msg]')||msgEl,errorText+' También falló la relectura: '+x.message,'error');
+        msg(form.querySelector('[data-bc7-close-msg]')||msgEl,errorText+' Tampoco se pudo consultar el estado actual. '+friendlyError(x,'calendar'),'error');
       }
     }
     finally{busy(btn,false);}
