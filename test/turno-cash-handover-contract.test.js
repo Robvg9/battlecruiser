@@ -9,7 +9,7 @@ function read(relative) {
   return fs.readFileSync(path.join(__dirname, "..", relative), "utf8");
 }
 
-const MIGRATION = read("supabase/migrations/20261031163000_turno_cash_handover_owner_reconciliation.sql");
+const MIGRATION = read("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");
 const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
@@ -111,9 +111,9 @@ test("PWA release 9.5.46 loads and precaches the cash handover UI", () => {
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
   assert.match(INDEX, /app\.js\?v=9\.5\.46/);
   assert.match(INDEX, /style\.css\?v=9\.5\.46/);
-  assert.match(PG_CI, /20261031163000_turno_cash_handover_owner_reconciliation\.sql/);
+  assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
-  assert.match(PG_WORKFLOW, /20261031163000_turno_cash_handover_owner_reconciliation\.sql/);
+  assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_WORKFLOW, /turno-cash-handover-contract\.sql/);
   assert.match(QUALITY, /node --check public\/js\/turno-cash-handover-ui\.js/);
 });
