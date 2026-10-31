@@ -88,7 +88,7 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
   assert.equal(jornadaCalls[0].name, "bc5_crear_jornada_unica");
   assert.equal(jornadaCalls[0].payload.p_almacen_id, "alm-1");
   assert.equal(jornadaCalls[0].payload.p_dias, 2);
-  assert.deepEqual(jornadaCalls[0].payload.p_programacion, [
+  assert.deepEqual(JSON.parse(JSON.stringify(jornadaCalls[0].payload.p_programacion)), [
     { numero_dia: 1, trabaja: true, responsable_id: "dep-1" },
     { numero_dia: 2, trabaja: false, responsable_id: null }
   ]);
@@ -118,7 +118,7 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
 
   modal.querySelector("#m29-confirm-crear").click();
   assert.ok(await waitFor(() => createdLegacy.length === 1), "the legacy creation API is called");
-  assert.deepEqual(createdLegacy[0], {
+  assert.deepEqual(JSON.parse(JSON.stringify(createdLegacy[0])), {
     almacenId: "alm-1",
     inicioPlan: createdLegacy[0].inicioPlan,
     cantidadDias: 2,
