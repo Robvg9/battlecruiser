@@ -167,12 +167,19 @@ test("M29 loads active eligible responsables when the shared cache is empty", as
   root.querySelector("#m29-btn-crear").click();
   const modal = window.document.getElementById("m29-crear-overlay");
   assert.ok(modal);
-  const catalogLoaded = await waitFor(() => modal.querySelectorAll("[data-m29-person] option").length === 3, 5000);
+  const catalogLoaded = await waitFor(() => {
+    const selects = Array.from(modal.querySelectorAll("[data-m29-person]"));
+    return selects.length === 7 && selects.every((select) => select.options.length === 3);
+  }, 5000);
   assert.ok(catalogLoaded,
-    "responsables not loaded; status=" + (modal.querySelector("#m29-staff-status")?.textContent || "missing") +
+    "each of the seven day selectors must contain the three expected options; status=" +
+    (modal.querySelector("#m29-staff-status")?.textContent || "missing") +
     "; rpc=" + staffRpcCalls.join(",") + "; online=" + window.navigator.onLine);
-  const options = Array.from(modal.querySelector("[data-m29-person]").options).map((option) => option.value);
-  assert.deepEqual(options, ["", "dep-3", "owner-2"]);
+  const expectedOptions = ["", "dep-3", "owner-2"];
+  const allSelections = Array.from(modal.querySelectorAll("[data-m29-person]"));
+  for (const select of allSelections) {
+    assert.deepEqual(Array.from(select.options).map((option) => option.value), expectedOptions);
+  }
   assert.match(modal.querySelector("#m29-staff-status").textContent, /2 responsables activos disponibles/);
   const checkbox = modal.querySelector("[data-m29-works]");
   assert.equal(checkbox.type, "checkbox");
