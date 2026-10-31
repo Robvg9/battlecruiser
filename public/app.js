@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.40 — Turnos compactos, responsables remotos y libro de inventario por sesión
+// v9.5.40 — Movimientos diarios e historial por sesión/turno
 (function hotfixV9475(){
   const VERSION="9.5.40";
   window.__BC_VERSION__=VERSION;
