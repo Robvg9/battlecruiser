@@ -26,8 +26,10 @@
     return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('es-ES');
   }
   function rpc(name, args) {
-    const client = window.client;
-    if (!client || typeof client.rpc !== 'function') return Promise.reject(new Error('Cliente del servidor no disponible.'));
+    // core.js exposes Supabase as a top-level lexical const, not window.client.
+    if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
+      return Promise.reject(new Error('Cliente del servidor no disponible.'));
+    }
     return client.rpc(name, args || {}).then(function (response) {
       if (response && response.error) throw response.error;
       return response ? response.data : null;
