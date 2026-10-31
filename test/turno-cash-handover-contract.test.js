@@ -40,6 +40,7 @@ test("cash handover extends the modern declaration and difference records additi
 
 test("only the authenticated administrator can count cash after a completed session", () => {
   assert.match(MIGRATION, /CREATE OR REPLACE FUNCTION public\.bc5_listar_dinero_pendiente_contar/);
+  assert.match(MIGRATION, /t\.ciclo_id IS NULL AND t\.sesion_id IS NULL/);
   assert.match(MIGRATION, /CREATE OR REPLACE FUNCTION public\.bc5_contar_dinero_entregado/);
   assert.match(MIGRATION, /IF NOT public\.bc_actor_is_admin\(\) THEN/);
   assert.match(MIGRATION, /IF v_s\.estado<>'COMPLETADA' THEN/);
