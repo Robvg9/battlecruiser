@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.7 — finanzas por tramo activo y carry-forward de inventario físico; conserva los históricos.
+// v7.8 — jornada compacta con guía plegada y expediente por paneles.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario'};
   let warehouseLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -90,6 +90,7 @@
       '@media(max-width:650px){#tab-jornada .bc7-hero{display:block}#tab-jornada .bc7-status{text-align:left;margin-top:9px;max-width:none}#tab-jornada .bc7-grid{grid-template-columns:1fr}#tab-jornada .bc7-day-row{grid-template-columns:1fr;gap:5px}#tab-jornada .bc7-day-row label{margin-top:4px}#tab-jornada .bc7-actions .bc7-btn{flex:1 1 140px}#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:8px 6px}}'
     ].join('\n');
     document.head.appendChild(s);
+    if(!$('bc7-compact-style')){const c=document.createElement('style');c.id='bc7-compact-style';c.textContent="#tab-jornada{max-width:1320px!important;padding-bottom:12px!important}\n#tab-jornada .bc7-hero{align-items:center!important;margin:0 0 7px!important;padding:3px 0 7px!important}\n#tab-jornada .bc7-hero h2{font-family:Inter,sans-serif!important;font-size:20px!important;font-weight:700!important}\n#tab-jornada .bc7-hero p{display:none!important}\n#tab-jornada .bc7-status{font-size:10px!important;min-height:0!important;max-width:none!important}\n#tab-jornada .bc7-card{padding:8px!important;margin:6px 0!important;border-radius:8px!important}\n#tab-jornada .bc7-card h3{font-size:13px!important;margin:0 0 5px!important}\n#tab-jornada .bc7-card h4{font-size:12px!important;margin:7px 0 5px!important}\n#tab-jornada .bc7-muted{font-size:10px!important;line-height:1.3!important}\n#tab-jornada .bc7-field{font-size:10px!important;gap:3px!important;margin:4px 0!important}\n#tab-jornada .bc7-field input,#tab-jornada .bc7-field select,#tab-jornada .bc7-field textarea{height:34px!important;min-height:34px!important;padding:6px 8px!important;font-size:11px!important}\n#tab-jornada .bc7-btn{min-height:34px!important;padding:6px 10px!important;font-size:10px!important;border-radius:6px!important}\n#tab-jornada .bc7-actions{gap:5px!important;margin-top:6px!important}\n#tab-jornada .bc7-jornada{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;padding:7px!important}\n#tab-jornada .bc7-jornada-top{display:contents!important}\n#tab-jornada .bc7-jornada strong{font-size:11px!important;line-height:1.2}\n#tab-jornada .bc7-jornada p{font-size:10px!important;margin:2px 0 0!important}\n#tab-jornada .bc7-jornada .bc7-actions{margin:0!important;grid-column:3}\n#tab-jornada .bc7-jornada .bc7-btn{white-space:nowrap;min-height:30px!important;padding:5px 8px!important}\n#tab-jornada .bc7-help,#tab-jornada .bc7-admin-details{margin:4px 0!important;padding:6px 8px;border:1px solid var(--gold-dim);border-radius:7px;background:rgba(255,255,255,.02)}\n#tab-jornada .bc7-help summary,#tab-jornada .bc7-admin-details>summary{font-size:10px!important;font-weight:600;color:var(--gold);cursor:pointer;list-style:none}\n#tab-jornada .bc7-admin-details[hidden],#tab-jornada [hidden]{display:none!important}\n#tab-jornada .bc7-calendar-controls{display:grid;grid-template-columns:minmax(0,1fr) 68px auto;gap:6px;align-items:end}\n#tab-jornada .bc7-calendar-controls .bc7-field{margin:0!important}\n#tab-jornada .bc7-workspace-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}\n#tab-jornada .bc7-workspace-title-wrap{min-width:0;display:flex;align-items:center;gap:8px}\n#tab-jornada .bc7-workspace-head h3{font-size:14px!important;margin:0!important}\n#tab-jornada .bc7-back{min-height:30px!important;padding:5px 8px!important;white-space:nowrap}\n#tab-jornada .bc7-workspace-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:4px 0 8px}\n#tab-jornada .bc7-overview-item{min-width:0;padding:6px 7px;border:1px solid var(--gold-dim);border-radius:6px;background:rgba(255,255,255,.025)}\n#tab-jornada .bc7-overview-item small{display:block;font-size:9px;color:var(--mist);line-height:1.1}\n#tab-jornada .bc7-overview-item b{display:block;font-size:11px;margin-top:3px;overflow-wrap:anywhere}\n#tab-jornada .bc7-workspace-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:6px 0 8px;padding:3px;background:rgba(0,0,0,.18);border:1px solid var(--gold-dim);border-radius:7px}\n#tab-jornada .bc7-workspace-tab{min-width:0;min-height:32px;padding:5px 3px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--mist);font-size:10px;font-weight:600;cursor:pointer}\n#tab-jornada .bc7-workspace-tab[aria-selected=true]{color:var(--text);background:rgba(201,162,77,.16);border-color:var(--gold-dim)}\n#tab-jornada .bc7-workspace-panel[hidden]{display:none!important}\n#tab-jornada .bc7-panel-stack{display:grid;gap:6px}\n#tab-jornada .bc7-detail{border:1px solid var(--gold-dim);border-radius:7px;background:rgba(255,255,255,.018);padding:0 8px}\n#tab-jornada .bc7-detail>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;cursor:pointer;list-style:none;font-size:11px;font-weight:600}\n#tab-jornada .bc7-detail>summary small{font-size:9px;color:var(--mist);font-weight:500}\n#tab-jornada .bc7-detail-body{padding:0 0 7px;min-width:0}\n#tab-jornada .bc7-note{padding:7px!important;font-size:10px!important;line-height:1.3!important}\n#tab-jornada .bc7-table{font-size:10px!important}\n#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:5px!important}\n#tab-jornada .bc7-table input{width:76px!important;padding:5px!important;font-size:11px!important}\n@media(max-width:650px){#tab-jornada .bc7-calendar-controls{grid-template-columns:minmax(0,1fr) 60px auto}#tab-jornada .bc7-jornada{grid-template-columns:minmax(0,1fr) auto;gap:5px}#tab-jornada .bc7-jornada .bc7-actions{grid-column:2;grid-row:2}#tab-jornada .bc7-workspace-overview{grid-template-columns:repeat(3,minmax(0,1fr))}#tab-jornada .bc7-overview-item{padding:5px}#tab-jornada .bc7-overview-item b{font-size:10px}#tab-jornada .bc7-workspace-tab{font-size:9px;min-height:30px}#tab-jornada .bc7-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-jornada .bc7-day-row{grid-template-columns:minmax(70px,.8fr) minmax(80px,1fr) minmax(100px,1.4fr)}#tab-jornada .bc7-day-row label{margin:0!important}}\n@media(max-width:390px){#tab-jornada .bc7-workspace-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.appendChild(c);}
   }
   function ensureShell(){
     let button=document.querySelector('.tab-btn[data-tab="jornada"]');
@@ -102,19 +103,45 @@
     }
     if(!tab)return null;
     tab.innerHTML='<div class="bc7-wrap">'+
-      '<header class="bc7-hero"><div><h2>Jornada e inventario</h2><p>Controla qué persona trabaja cada día, el inventario físico inicial y final, y la declaración de dinero al cerrar.</p></div><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></header>'+
-      '<section class="bc7-card bc7-purpose" aria-labelledby="bc7-purpose-title"><h3 id="bc7-purpose-title">¿Para qué sirve esta sección?</h3><p class="bc7-muted">Una jornada es un día de trabajo de un almacén con responsable y horario definidos. Aquí se controla el inicio, el inventario contado físicamente, la actividad y el cierre; no es el historial general de todos los movimientos.</p><ol class="bc7-muted"><li>Consulta el calendario y abre la jornada que te corresponde.</li><li>Antes de empezar, confirma el inventario inicial contando la mercancía física.</li><li>Durante la jornada, registra las operaciones en sus secciones habituales.</li><li>Al terminar, confirma el inventario final y la declaración de dinero, y completa el cierre que autorice el servidor.</li></ol><p class="bc7-muted">Las operaciones se muestran dentro de un día del turno solo cuando existe un vínculo verificable con esa sesión. Las demás se conservan en Movimientos → Historial, organizadas por fecha y almacén.</p></section>'+
-      '<section id="bc7-admin-panel" class="bc7-card" hidden>'+
+      '<header class="bc7-hero"><div><h2>Jornada e inventario</h2></div><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></header>'+
+      '<details id="bc7-help-details" class="bc7-help"><summary>¿Para qué sirve esta sección? · Guía rápida</summary><div class="bc7-purpose"><p class="bc7-muted">La jornada controla el inventario físico inicial y final, responsable, actividad y cierre; no es el historial general de movimientos.</p><ol class="bc7-muted"><li>Abre la jornada asignada.</li><li>Confirma el inventario inicial con conteo físico.</li><li>Registra las operaciones en sus secciones habituales.</li><li>Al terminar, confirma inventario final y dinero declarado para solicitar el cierre.</li></ol><p class="bc7-muted">Solo se atribuyen a la jornada operaciones con vínculo verificable a la sesión. Las demás siguen en Movimientos → Historial.</p></div></details>'+
+      '<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Programación y configuración · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">'+
        '<h3>Programación y responsable</h3><p class="bc7-muted">Define el horario, guarda una rotación explícita o programa fechas concretas. No se infieren descansos ni responsables.</p>'+
        '<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">Modo de programación<select id="bc7-plan-mode"><option value="explicit">Fechas explícitas</option><option value="pattern">Usar patrón activo</option></select></label></div>'+
        '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Zona horaria IANA<input id="bc7-timezone" value="America/Havana" required></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
        '<form id="bc7-pattern-form"><h4>Rotación configurable</h4><div class="bc7-grid"><label class="bc7-field">Nombre del patrón<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días de trabajo / 2 descanso" required></label><label class="bc7-field">Fecha ancla<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Días del ciclo<input id="bc7-days-count" type="number" min="1" max="31" value="7" required></label><label class="bc7-field">Inicio de programación<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Preparar días</button><button class="bc7-btn" type="submit">Guardar patrón</button></div><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Previsualizar patrón</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear jornadas</button></div><label class="bc7-field">Observación de programación (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+
-      '</section>'+
-      '<section class="bc7-card"><h3>Calendario de jornadas</h3><div class="bc7-grid"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días a consultar<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
-      '<section id="bc7-workspace" class="bc7-card" hidden><h3 id="bc7-workspace-title">Detalle de jornada</h3><div id="bc7-workspace-body"></div></section>'+
+      '</section></details>'+
+      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><h3>Calendario</h3><span class="bc7-muted">Jornadas asignadas</span></div><div class="bc7-calendar-controls"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
+      '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
       '</div>';
     return tab;
+  }
+  function setPageMode(workspace){
+    const help=$('bc7-help-details'),admin=$('bc7-admin-details'),calendar=$('bc7-calendar-section'),panel=$('bc7-workspace');
+    if(help)help.hidden=!!workspace;
+    if(admin)admin.hidden=!!workspace||!state.admin;
+    if(calendar)calendar.hidden=!!workspace;
+    if(panel)panel.hidden=!workspace;
+  }
+  function returnToCalendar(){
+    setPageMode(false);
+    const calendar=$('bc7-calendar-section');
+    if(calendar)calendar.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function activateWorkspaceTab(name){
+    const allowed=['inventario','operacion','finanzas','movimientos'];
+    const tab=allowed.includes(name)?name:'inventario';
+    state.workspaceTab=tab;
+    const body=$('bc7-workspace-body');if(!body)return;
+    body.querySelectorAll('[data-bc7-workspace-tab]').forEach(button=>{
+      const active=button.getAttribute('data-bc7-workspace-tab')===tab;
+      button.setAttribute('aria-selected',active?'true':'false');
+      button.classList.toggle('active',active);
+    });
+    body.querySelectorAll('[data-bc7-workspace-panel]').forEach(panel=>{panel.hidden=panel.getAttribute('data-bc7-workspace-panel')!==tab;});
+    if(tab==='finanzas'&&state.detail)loadFinances(state.detail);
+    if(tab==='movimientos'&&state.detail)loadMovements(state.detail);
   }
   function fillWarehouses(){
     const sel=$('bc7-warehouse');if(!sel)return;
@@ -233,7 +260,7 @@
     if(state.admin){
       reschedule='<details class="bc7-reschedule"><summary>Reprogramar responsable / descanso</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-check"><input type="checkbox" data-bc7-rework '+(!rest?'checked':'')+'> Jornada laborable</label><label class="bc7-field">Responsable<select data-bc7-reperson '+(!rest?'':' disabled')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Ausencia, sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reprogramación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
     }
-    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDate(r.fecha))+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Sin responsable (descanso)')+' · '+esc(String(r.hora_inicio_prevista||'07:00').slice(0,5))+'–'+esc(String(r.hora_fin_prevista||'23:00').slice(0,5))+' · '+esc(r.zona_horaria||'America/Havana')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
+    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDate(r.fecha))+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
   }
   async function loadCalendar(){
     const host=$('bc7-schedule-list');if(!host)return;
@@ -425,45 +452,37 @@
   }
   function renderWorkspace(detail){
     state.detail=detail;
-    const s=detail.sesion;
-    const cuts=detail.cortes||{};
-    const initial=!!cuts.INICIAL,final=!!cuts.FINAL;
-    const status=String(s.estado||'').toUpperCase();
-    const isAssigned=String(currentUser()?.id||'')===String(s.responsable_id||'');
+    const s=detail.sesion,cuts=detail.cortes||{},initial=!!cuts.INICIAL,final=!!cuts.FINAL;
+    const status=String(s.estado||'').toUpperCase(),isAssigned=String(currentUser()?.id||'')===String(s.responsable_id||'');
     let actionArea='';
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
-      actionArea='<div class="bc7-card"><h4>Comenzar jornada</h4><p class="bc7-muted">El backend comprobará la fecha, el responsable asignado, la secuencia y las excepciones horarias.</p><label class="bc7-field">Motivo si abres antes/después de la hora prevista<input id="bc7-start-reason" maxlength="1000" placeholder="Deja vacío si abres exactamente a la hora programada"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></div>';
-    } else if(status==='EN_CURSO'){
-      const tramo=detail.tramo_activo;
-      const savedDeclaration=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
-      actionArea='<div class="bc7-card"><h4>Finalizar jornada</h4><p class="bc7-muted">'+(savedDeclaration?'La declaración de este tramo ya está guardada; no se repetirá al reintentar el cierre.':'Introduce el efectivo real entregado, incluidos los valores cero si no hubo efectivo.')+' El cierre mantiene la validación y aprobación existentes.</p><form data-bc7-close-form="'+esc(s.id)+'"><label class="bc7-field">Dinero declarado<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(savedDeclaration?esc(detail.declaracion_dinero.monto):'')+'" '+(savedDeclaration?'readonly':'')+'></label><label class="bc7-field">Motivo si cierras antes/después de hora o fecha<input id="bc7-close-reason" maxlength="1000" placeholder="Motivo de excepción (si aplica)"></label><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(savedDeclaration?'Finalizar jornada con declaración guardada':'Declarar dinero y finalizar jornada')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-note">El cierre está bloqueado hasta confirmar el inventario final.</p>')+'</form></div>';
-    } else if(status==='COMPLETADA'){
-      actionArea='<div class="bc7-note">Jornada completada. Los conteos confirmados y los movimientos permanecen como evidencia histórica.</div>';
-    } else {
-      actionArea='<div class="bc7-note">Estado actual: '+esc(status)+'. Las acciones de escritura solo aparecen cuando están permitidas por el backend.</div>';
-    }
+      actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
+    }else if(status==='EN_CURSO'){
+      const tramo=detail.tramo_activo,saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
+      actionArea='<div class="bc7-note"><b>Finalizar jornada.</b> Declara el efectivo real contado; el cierre exige inventario final y autorización.<form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero declarado<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de excepción<input id="bc7-close-reason" maxlength="1000" placeholder="Solo si aplica"></label></div><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar con declaración guardada':'Declarar y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Bloqueado: falta confirmar inventario final.</p>')+'</form></div>';
+    }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
+    else actionArea='<div class="bc7-note">Estado: '+esc(status)+'. Las acciones se habilitan según el servidor.</div>';
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos);
-      adjustment='<div class="bc7-card"><h4>Registrar movimiento de salida</h4><p class="bc7-muted">Mermas y bajas quedan pendientes de revisión. El stock no se altera hasta que la aprobación existente las acepte.</p><form data-bc7-adjust-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Tipo<select data-bc7-ajust-type required>'+((can('mermas','crear'))?'<option value="merma">Merma</option>':'')+((can('bajas','crear'))?'<option value="baja">Baja</option>':'')+'</select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Motivo<input data-bc7-ajust-reason maxlength="500" required placeholder="Describe la salida"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar ajuste a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div>';
+      adjustment='<details class="bc7-detail"><summary><span>Solicitar merma o baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Tipo<select data-bc7-ajust-type required>'+((can('mermas','crear'))?'<option value="merma">Merma</option>':'')+((can('bajas','crear'))?'<option value="baja">Baja</option>':'')+'</select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Motivo<input data-bc7-ajust-reason maxlength="500" required placeholder="Motivo obligatorio"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
-    $('bc7-workspace-title').textContent='Jornada · '+fmtDate(s.fecha)+' · '+warehouseName(s.almacen_id);
-    $('bc7-workspace-body').innerHTML='<div class="bc7-grid"><div class="bc7-note"><b>Estado:</b> '+esc(status)+'<br><b>Responsable:</b> '+esc(userName(s.responsable_id))+'<br><b>Horario:</b> '+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'<br><b>Zona:</b> '+esc(s.zona_horaria||'America/Havana')+'</div><div class="bc7-note"><b>Inventario inicial:</b> '+(initial?'confirmado':'pendiente')+'<br><b>Inventario final:</b> '+(final?'confirmado':'pendiente')+'<br><b>Jornada:</b> '+esc(s.id)+'</div></div>'+
-      '<h4>1. Inventario inicial</h4>'+countFormHtml('INICIAL',detail)+
-      '<h4>2. Inventario final y diferencias</h4>'+countFormHtml('FINAL',detail)+
-      financeFormHtml(detail,isAssigned,status)+
-      adjustment+actionArea+
-      '<div class="bc7-card"><h4>Movimientos registrados en la fecha</h4><p class="bc7-muted">Vista de solo lectura; los tipos y registros provienen de la función canónica de movimientos.</p><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar movimientos</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir libro de movimientos</button></div><div id="bc7-movements"><div class="bc7-empty">Pulse Actualizar movimientos para consultar el libro.</div></div></div>';
-    $('bc7-workspace').hidden=false;
-    $('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
-    loadMovements(detail);
-    loadFinances(detail);
+    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div><details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
+    const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
+    const fin=financeFormHtml(detail,isAssigned,status);
+    const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
+    $('bc7-workspace-title').textContent=fmtDate(s.fecha)+' · '+warehouseName(s.almacen_id);
+    $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(status)+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="finanzas" aria-selected="false">Finanzas</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="finanzas" hidden>'+fin+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
+    $('bc7-workspace').hidden=false;setPageMode(true);$('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
+    activateWorkspaceTab(state.workspaceTab);
   }
   async function openWorkspace(sessionId){
     if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
-    $('bc7-workspace').hidden=false;$('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada y conteos confirmados…</div>';
+    if(String(state.selected||'')!==String(sessionId||''))state.workspaceTab='inventario';
+    setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
+    $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);return true;}
-    catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">No se pudo abrir esta jornada: '+esc(e.message)+'</div>';return false;}
+    catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">No se pudo abrir: '+esc(e.message)+'. No se modificó ningún dato.</div>';return false;}
   }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
@@ -702,7 +721,8 @@
     ensureWarehouseCatalog();
     try{state.admin=!!(await rpc('bc_actor_is_admin',{}));}
     catch(e){state.admin=false;setStatus('No se verificó el rol: '+e.message,'error');}
-    if($('bc7-admin-panel'))$('bc7-admin-panel').hidden=!state.admin;
+    if($('bc7-admin-panel'))$('bc7-admin-panel').hidden=false;
+    if($('bc7-admin-details'))$('bc7-admin-details').hidden=!state.admin;
     const btn=document.querySelector('.tab-btn[data-tab="jornada"]');if(btn&&state.admin)btn.textContent='Jornada e inventario · Admin';
     if(state.admin)setStatus(navigator.onLine?'Acceso administrativo verificado.':'Sin conexión: solo lectura local, no se permiten escrituras.','ok');
     else setStatus(navigator.onLine?'Acceso limitado al calendario propio.':'Sin conexión. Reconnecta para actualizar el calendario.','');
@@ -727,6 +747,12 @@
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
+  document.addEventListener('click',function(e){
+    const tab=e.target&&e.target.closest?e.target.closest('[data-bc7-workspace-tab]'):null;
+    if(tab){e.preventDefault();activateWorkspaceTab(tab.getAttribute('data-bc7-workspace-tab'));return;}
+    const back=e.target&&e.target.closest?e.target.closest('[data-bc7-back-calendar]'):null;
+    if(back){e.preventDefault();returnToCalendar();}
+  });
   window.__BC7_JORNADA__ = {
     openWorkspace: openWorkspace,
     openForSession: async function(sessionId) {
