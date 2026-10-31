@@ -25,5 +25,5 @@ test("compact Step 7 updates app loader and offline cache",()=>{
  assert.match(app,/\["bc7-jornada-ui\.js","7\.10"\]/);
  assert.match(sw,/BC_SW_VERSION = "9\.5\.44"/);
  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.10/);
- assert.match(ui,/v7\.10 — catálogo autoritativo de responsables/);
+ assert.match(ui,/v7\.10 — programación clara, mensajes humanos y días ordenados/);
 });
