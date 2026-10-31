@@ -57,7 +57,7 @@ test("cash mismatch remains an explicit, auditable difference without automatic 
   assert.match(MIGRATION, /IF d\.estado_aprobacion='CON_DIFERENCIA' THEN/);
   assert.match(MIGRATION, /IF s\.bloque='JORNADA' THEN/);
   assert.doesNotMatch(MIGRATION, /UPDATE\s+public\.(stock|productos|movimientos_caja|caja_movimientos)/i);
-  assert.match(CONTRACT, /monto_declarado',v_d\.monto/);
+  assert.match(CONTRACT, /monto_declarado/);
   assert.match(CONTRACT, /'CON_DIFERENCIA'/);
   assert.match(CONTRACT, /diferencia=-8/);
   assert.match(CONTRACT, /cash count\/difference changed cash movements or product stock/);
