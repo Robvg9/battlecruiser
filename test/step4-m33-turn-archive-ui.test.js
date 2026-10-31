@@ -198,17 +198,25 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
       if (name === "bc7_obtener_inventario_jornada") {
         return { error: null, data: {
           productos: [{ producto_id: "product-1", nombre: "Café", unidad: "kg" }],
-          cortes: { INICIAL: {
-            id: "opening-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T07:00:00-04:00",
-            confirmado_por: "owner-fixture",
-            lineas: [{ producto_id: "product-1", cantidad_contada: 10 }]
-          } }
+          cortes: {
+            INICIAL: {
+              id: "opening-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T07:00:00-04:00",
+              confirmado_por: "owner-fixture",
+              lineas: [{ producto_id: "product-1", cantidad_contada: 10 }]
+            },
+            FINAL: {
+              id: "final-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T22:00:00-04:00",
+              confirmado_por: "owner-fixture",
+              lineas: [{ producto_id: "product-1", cantidad_contada: 13 }]
+            }
+          }
         } };
       }
       if (name === "bc7_movimientos_sesion") {
         return { error: null, data: [
           { fecha: "2026-10-20T09:00:00-04:00", tipo: "compra", producto: "Café", cantidad: 5, usuario: "Responsable fixture", operacion_id: "op-buy-1" },
-          { fecha: "2026-10-20T10:00:00-04:00", tipo: "venta", producto: "Café", cantidad: -2, usuario: "Responsable fixture", operacion_id: "op-sale-1" }
+          { fecha: "2026-10-20T10:00:00-04:00", tipo: "venta", producto: "Café", cantidad: -2, usuario: "Responsable fixture", operacion_id: "op-sale-1" },
+          { fecha: "2026-10-20T11:00:00-04:00", tipo: "baja", producto: "Café", cantidad: -1, costo_unitario: 3, usuario: "Dueño fixture", operacion_id: "op-loss-1" }
         ] };
       }
       if (name === "bc7_finanzas_jornada") {
@@ -222,7 +230,22 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
         } };
       }
       return { error: { code: "UNEXPECTED_RPC", message: name }, data: null };
-    }
+    },
+    from: (table) => ({
+      select: () => ({
+        in: async (column, values) => {
+          if (table === "ventas_lineas") return { error: null, data: [{
+            venta_id: "op-sale-1", producto_id: "product-1", cantidad: 2,
+            precio_unitario: 20, subtotal: 40, costo_unitario_fifo: 5
+          }] };
+          if (table === "productos") return { error: null, data: [{
+            id: "product-1", nombre: "Café", precio_normal: 20
+          }] };
+          if (table === "turno_declaraciones") return { error: null, data: [] };
+          return { error: null, data: [] };
+        }
+      })
+    })
   };
   await window.__BC_M33.open("turno-closed-fixture");
   const modal = window.document.getElementById("m33-bg");
@@ -245,6 +268,12 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.match(host.textContent, /Solicitudes de merma y baja/);
   assert.match(host.textContent, /no descuenta existencias/);
   assert.match(host.textContent, /Recogido por dueño/);
+  const productRow = host.querySelector(".m33-book-table tbody tr");
+  assert.ok(productRow, "the product matrix must contain its Café fixture row");
+  assert.deepEqual(Array.from(productRow.cells).map((cell) => cell.textContent.trim()), [
+    "300%", "15,00", "5,00", "20,00", "Café", "10", "5", "3", "1", "—",
+    "13", "4", "2", "30,00", "40,00", "3,00"
+  ], "the spreadsheet columns must reconcile real opening, entries, reinvestment, approved loss, closing count and FIFO sales");
   assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_movimientos_sesion"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_finanzas_jornada"));
