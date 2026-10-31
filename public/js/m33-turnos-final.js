@@ -774,10 +774,12 @@
       const snapshotNote = (!hasOpening || !hasFinal)
         ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
         : '';
-      const salesNote = salesApprox
-        ? 'El detalle histórico de líneas POS no estuvo disponible para todas las ventas. Las cantidades POS proceden de movimientos; los importes marcados ≈ usan precios actuales o costos medios documentados.'
-        : (tableRows.some(function (row) { return row.profitApprox; })
-          ? 'El ingreso procede de líneas POS históricas; la ganancia de los productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
+      const needsRevenueEstimate = tableRows.some(function (row) { return row.revenueApprox; });
+      const needsProfitEstimate = tableRows.some(function (row) { return row.profitApprox; });
+      const salesNote = needsRevenueEstimate
+        ? 'Algunos importes POS están aproximados con precio actual porque no se pudo leer su línea histórica. La ganancia usa costo FIFO cuando está disponible; cualquier alternativa se marca ≈.'
+        : (needsProfitEstimate
+          ? 'El ingreso procede de líneas POS históricas; la ganancia de productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
           : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.');
       const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
       const summary = [
