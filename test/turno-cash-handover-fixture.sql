@@ -1,3 +1,12 @@
+-- Supabase service role exists in production; model it in the disposable PG harness.
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+    CREATE ROLE service_role NOLOGIN;
+  END IF;
+END
+$roles$;
+
 -- Disposable-only shape for owner cash discrepancy tests.
 -- Production already has turno_diferencias; the Step 7 sandbox fixture does not.
 CREATE TABLE IF NOT EXISTS public.turno_diferencias (
