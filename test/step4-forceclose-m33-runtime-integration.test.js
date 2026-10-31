@@ -56,7 +56,10 @@ test("la recuperación aparece en Resumen del M33 real usando el permiso ADMIN r
   window.client = {
     rpc: async (name, params) => {
       rpcCalls.push({ name, params });
-      return { data: null, error: new Error("La prueba no debe ejecutar RPC de cierre") };
+      if (name === "listar_usuarios_admin") return { data: [
+        { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+      ], error: null };
+      return { data: null, error: new Error("La prueba no debe ejecutar RPC de escritura/cierre") };
     }
   };
 
@@ -101,6 +104,6 @@ test("la recuperación aparece en Resumen del M33 real usando el permiso ADMIN r
   assert.equal(panel.querySelector(".bc-force-close-msg").getAttribute("aria-live"), "polite");
   assert.equal(window.document.querySelector(".m33-foot").style.flexWrap, "wrap");
 
-  assert.equal(rpcCalls.length, 0,
-    "abrir el expediente y mostrar el botón nunca debe modificar el turno");
+  assert.ok(rpcCalls.every((call) => call.name === "listar_usuarios_admin"),
+    "abrir el expediente solo puede consultar el catálogo de responsables; no debe ejecutar RPC de escritura/cierre");
 });
