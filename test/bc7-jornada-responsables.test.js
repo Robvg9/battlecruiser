@@ -175,7 +175,9 @@ test("Step 7 day cards show a readable full date and mobile-safe stacked layout"
     if (name === "bc5_mis_jornadas") return { data: [], error: null };
     throw new Error("Unexpected RPC: " + name);
   });
-  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]"));
+  await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
   window.document.getElementById("bc7-anchor").value = "2026-05-31";
   window.document.getElementById("bc7-days-count").value = "1";
   window.document.querySelector("[data-bc7-build]").click();
@@ -214,7 +216,7 @@ test("Step 7 scheduling success is shown in plain language without IDs or JSON",
   person.value = "dep-2";
   assert.equal(person.value, "dep-2");
   window.document.querySelector("[data-bc7-create]").click();
-  const done = await waitFor(() => /Se programaron 1 días?: 1 de trabajo y 0 de descanso/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
+  const done = await waitFor(() => /Se programó 1 día: 1 de trabajo y 0 de descanso/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
   assert.ok(done, "show human confirmation after the server confirms creation");
   const message = window.document.getElementById("bc7-create-msg").textContent;
   assert.doesNotMatch(message, /turno_id|[0-9a-f]{8}-[0-9a-f-]{27,}|\{|\}/i);
