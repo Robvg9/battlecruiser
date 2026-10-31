@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.11 — Jornada única abre su workspace Step 7 desde M33
+// v33.15 — declaración de efectivo y cierre desde la vista del responsable
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
