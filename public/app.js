@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.44 — Jornada: lenguaje claro y selector de días adaptado
+// v9.5.44 — catálogo autoritativo de responsables para Jornada
 (function hotfixV9475(){
   const VERSION="9.5.44";
   window.__BC_VERSION__=VERSION;
