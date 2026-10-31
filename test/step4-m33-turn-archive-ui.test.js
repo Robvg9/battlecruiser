@@ -64,7 +64,9 @@ function setup(t, { admin = true } = {}) {
   const rpcCalls = [];
   window._usuarioActual = { id: "owner-fixture", nombre: "Dueño fixture", rol: admin ? "dueño" : "dependienta" };
   window.__bcUser = { rol: admin ? "dueño" : "dependienta" };
-  window._cache = { almacenes: [{ id: "alm-1", nombre: "La Cueva", activo: true }], usuarios: [] };
+  window._cache = { almacenes: [{ id: "alm-1", nombre: "La Cueva", activo: true }], usuarios: [
+    { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+  ] };
   window.tienePermiso = () => admin;
   window.escHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -227,19 +229,22 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   modal.querySelector("#m33-next").click();
   modal.querySelector("#m33-next").click();
   modal.querySelector("#m33-next").click();
-  const openBook = modal.querySelector("[data-m33-inventory-sessions]");
-  assert.ok(openBook, "Inventario must show a day entry with an explicit open-book action");
+  const openBook = modal.querySelector("[data-m33-inventory-book]");
+  assert.ok(openBook, "Inventario must render one consolidated workbook, not one card per day");
   const host = modal.querySelector("[data-m33-inventory-host]");
-  assert.ok(await waitFor(() => host.dataset.loaded === "1"), "the first day's ledger should load automatically from read-only RPCs");
-  assert.equal(host.hidden, false, "Inventory should show the first day ledger immediately without an extra click");
-  assert.match(host.textContent, /Inventario inicial confirmado/);
-  assert.match(host.textContent, /Compra \/ entrada/);
-  assert.match(host.textContent, /Venta \/ salida/);
-  assert.match(host.textContent, /Reinversión \/ entrada/);
+  assert.ok(await waitFor(() => host.querySelector(".m33-book-table")), "the consolidated product sheet should load automatically from read-only RPCs");
+  assert.equal(host.hidden, false, "the inventory sheet is visible immediately without an extra click");
+  assert.match(host.textContent, /Inventario consolidado por producto/);
+  assert.match(host.textContent, /Inv\. inicial/);
+  assert.match(host.textContent, /Entradas/);
+  assert.match(host.textContent, /Reinversión/);
+  assert.match(host.textContent, /Venta \(saldo\)/);
+  assert.match(host.textContent, /Venta POS/);
+  assert.match(host.textContent, /Reinversiones detalladas/);
   assert.match(host.textContent, /Electricidad/);
-  assert.match(host.textContent, /Gasto CUP/);
-  assert.match(host.textContent, /Solicitud de merma/);
-  assert.match(host.textContent, /no descuenta stock/);
+  assert.match(host.textContent, /Solicitudes de merma y baja/);
+  assert.match(host.textContent, /no descuenta existencias/);
+  assert.match(host.textContent, /Recogido por dueño/);
   assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_movimientos_sesion"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_finanzas_jornada"));
@@ -247,3 +252,33 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.doesNotMatch(SOURCE, /stock_actual/, "the ledger must not mislabel current stock as historical opening stock");
 });
 
+
+test("M33 hydrates the assignment selectors from the authorized responsible-user catalog", async (t) => {
+  const { window, sessions } = setup(t);
+  window._cache.usuarios = [
+    { id: "staff-cache", nombre: "Responsable en caché", activo: true }
+  ];
+  const staffRows = [
+    { id: "dep-live", nombre: "Dependienta LIVE", rol: "Dependienta", activo: true, archivado: false },
+    { id: "owner-live", nombre: "Dueño LIVE", rol: "Dueño", activo: true, archivado: false }
+  ];
+  const calls = [];
+  window.client.rpc = async (name, params = {}) => {
+    calls.push({ name, params });
+    if (name === "listar_usuarios_admin") return { data: staffRows, error: null };
+    throw new Error("RPC inesperada: " + name);
+  };
+  await window.__BC_M33.open("turno-closed-fixture");
+  const modal = window.document.getElementById("m33-bg");
+  modal.querySelector("#m33-next").click();
+  const hydrated = await waitFor(() => {
+    const selects = Array.from(modal.querySelectorAll("select[data-m33-sid]"));
+    return selects.length === sessions.length && selects.every((select) => select.options.length === 3);
+  }, 4000);
+  assert.ok(hydrated, "each assignment select must contain the authoritative active responsible users");
+  const first = modal.querySelector("select[data-m33-sid]");
+  assert.deepEqual(Array.from(first.options).map((option) => option.value), ["", "dep-live", "owner-live"]);
+  assert.equal(calls[0].name, "listar_usuarios_admin");
+  assert.deepEqual(calls[0].params, { p_incluir_archivados: false });
+  assert.equal(window.document.querySelector("#bc-m33-compact-sheet-css") !== null, true);
+});
