@@ -193,7 +193,8 @@ test("M29 recovers responsible roles when the shared user cache contains role-le
   Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
   window._cache.usuarios = [
     { id: "dep-cache", nombre: "Dependienta en caché", activo: true },
-    { id: "owner-cache", nombre: "Dueño en caché", activo: true }
+    { id: "owner-cache", nombre: "Dueño en caché", activo: true },
+    { id: "archived-cache", nombre: "Dependienta archivada en caché", rol: "Dependienta", activo: true }
   ];
   const authoritative = [
     { id: "dep-cache", nombre: "Dependienta recuperada", rol: "Dependienta", activo: true, archivado: false },
@@ -222,6 +223,9 @@ test("M29 recovers responsible roles when the shared user cache contains role-le
   const select = modal.querySelector("[data-m29-person]");
   assert.deepEqual(Array.from(select.options).map((option) => option.value), ["", "dep-cache", "owner-cache"]);
   assert.equal(select.options[1].textContent, "Dependienta recuperada");
+  assert.ok(!Array.from(select.options).some((option) => option.value === "archived-cache"),
+    "a stale locally cached user missing from the canonical unarchived server catalog must not be resurrected");
+  assert.equal(window.__BC_M29_STAFF_CACHE_LOADED__, true);
   assert.equal(calls[0].name, "listar_usuarios_admin");
   assert.deepEqual(calls[0].payload, { p_incluir_archivados: false });
   assert.match(modal.querySelector("#m29-create-summary").textContent, /responsables asignados|pendientes/);
