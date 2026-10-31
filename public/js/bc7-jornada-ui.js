@@ -106,8 +106,8 @@
     });
     return staffLoadPromise;
   }
-  function warehouseName(id){const w=warehouses().find(x=>String(x.id)===String(id));return w?w.nombre:('Almacén '+String(id||'').slice(0,8));}
-  function userName(id){const u=users().find(x=>String(x.id)===String(id));return u?(u.nombre||u.nombre_usuario||u.email||'Responsable'):String(id||'Sin asignar');}
+  function warehouseName(id){const w=warehouses().find(x=>String(x.id)===String(id));return w?(w.nombre||'Almacén'):'Almacén no disponible';}
+  function userName(id){const u=users().find(x=>String(x.id)===String(id));return u?(u.nombre||u.nombre_usuario||u.email||'Responsable'):(id?'Responsable no identificado':'Sin asignar');}
   function roleOf(u){return String(u&&(u.rol||u.role_name||u.nombre_rol||u.role)||'').toLowerCase();}
   function friendlyError(error,context){
     const raw=String(error&&error.message||error||'').trim();
@@ -389,7 +389,7 @@
     if(state.admin){
       reschedule='<details class="bc7-reschedule"><summary>Reprogramar responsable / descanso</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-check"><input type="checkbox" data-bc7-rework '+(!rest?'checked':'')+'> Jornada laborable</label><label class="bc7-field">Responsable<select data-bc7-reperson '+(rest||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Ausencia, sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reprogramación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
     }
-    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDate(r.fecha))+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
+    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
   }
   async function loadCalendar(){
     const host=$('bc7-schedule-list');if(!host)return;
@@ -412,11 +412,11 @@
     const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
     const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
     if(!showExpenses&&!showReinvestments&&!createExpenses&&!createReinvestments)return '';
-    let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas de esta jornada</h4><p class="bc7-muted">Cada operación queda vinculada a esta jornada, al responsable y al tramo activo. Los gastos siguen pendientes de aprobación; una reinversión usa el registro de inventario/FIFO y caja existente.</p>';
+    let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas de esta jornada</h4><p class="bc7-muted">Cada registro queda asociado a esta jornada y a la persona responsable. Los gastos esperan la aprobación del administrador. Las reinversiones se reflejan en el inventario y la caja por el proceso habitual.</p>';
     if(showExpenses)html+='<div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div>';
-    else if(createExpenses)html+='<p class="bc7-muted">Puedes registrar un gasto. Para consultar su estado posterior se necesita el permiso gastos.ver.</p>';
+    else if(createExpenses)html+='<p class="bc7-muted">Puedes registrar un gasto. Para consultar su estado posterior necesitas autorización para ver los gastos.</p>';
     if(showReinvestments)html+='<div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div>';
-    else if(createReinvestments)html+='<p class="bc7-muted">Puedes registrar una reinversión. Para consultar su historial se necesita el permiso reinversiones.ver.</p>';
+    else if(createReinvestments)html+='<p class="bc7-muted">Puedes registrar una reinversión. Para consultar su historial necesitas autorización para ver las reinversiones.</p>';
     if(createExpenses){
       html+='<form data-bc7-finance-form="gasto" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar gasto</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
@@ -430,7 +430,7 @@
       html+='<form data-bc7-finance-form="reinversion" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar reinversión</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
         '<label class="bc7-field">Producto<select data-bc7-reinvestment-product required>'+options+'</select></label>'+
-        '<div class="bc7-grid"><label class="bc7-field">Cantidad (unidad base)<input data-bc7-reinvestment-quantity type="number" min="0.001" step="0.001" required inputmode="decimal"></label>'+
+        '<div class="bc7-grid"><label class="bc7-field">Cantidad que entra al inventario<input data-bc7-reinvestment-quantity type="number" min="0.001" step="0.001" required inputmode="decimal"></label>'+
         '<label class="bc7-field">Costo total<input data-bc7-reinvestment-cost type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>'+
         '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label>'+
         '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>';
@@ -445,14 +445,14 @@
     }
     if(type==='gastos'){
       host.innerHTML='<h4>Gastos</h4><div class="bc7-list">'+rows.map(g=>
-        '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(g.concepto||'Gasto')+' · '+esc(money(g.monto))+'</strong><p>'+esc(fmtDate(g.creado_en))+' · '+esc(g.creado_nombre||'Responsable')+'</p></div><span class="bc7-pill '+(g.estado==='APROBADO'?'ok':g.estado==='RECHAZADO'?'warn':'')+'">'+esc(g.estado||'PENDIENTE')+'</span></div>'+
+        '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(g.concepto||'Gasto')+' · '+esc(money(g.monto))+'</strong><p>'+esc(fmtDateHuman(g.creado_en))+' · '+esc(g.creado_nombre||'Responsable')+'</p></div><span class="bc7-pill '+(g.estado==='APROBADO'?'ok':g.estado==='RECHAZADO'?'warn':'')+'">'+esc(humanStatus(g.estado||'PENDIENTE'))+'</span></div>'+
         (g.descripcion?'<p>'+esc(g.descripcion)+'</p>':'')+
         (g.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(g.comentario_revision)+'</p>':'')+'</article>'
       ).join('')+'</div>';
     }else{
       host.innerHTML='<h4>Reinversiones</h4><div class="bc7-list">'+rows.map(r=>
-        '<article class="bc7-jornada"><strong>'+esc(r.proveedor||'Reinversión')+' · '+esc(money(r.total))+'</strong><p>'+esc(fmtDate(r.fecha))+' · '+esc(r.usuario_nombre||'Responsable')+'</p>'+
-        '<div class="bc7-muted">'+arr(r.lineas).map(l=>esc(l.producto||l.producto_id)+' · '+esc(qty(l.cantidad_base))+' · '+esc(money(l.costo_total))).join('<br>')+'</div></article>'
+        '<article class="bc7-jornada"><strong>'+esc(r.proveedor||'Reinversión')+' · '+esc(money(r.total))+'</strong><p>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.usuario_nombre||'Responsable')+'</p>'+
+        '<div class="bc7-muted">'+arr(r.lineas).map(l=>esc(l.producto||'Producto no identificado')+' · '+esc(qty(l.cantidad_base))+' · '+esc(money(l.costo_total))).join('<br>')+'</div></article>'
       ).join('')+'</div>';
     }
   }
@@ -538,11 +538,11 @@
   function cutHtml(cut,products){
     if(!cut)return '<div class="bc7-empty">Aún no hay conteo confirmado.</div>';
     const lines=arr(cut.lineas);
-    return '<p class="bc7-muted">Confirmado '+esc(fmtDate(cut.confirmado_en||cut.creado_en))+' · autor '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
-      (cut.origen_corte_id?'<p class="bc7-muted">Saldo de apertura derivado del corte final anterior · origen '+esc(cut.origen_corte_id)+'. Este corte permanece independiente e inmutable.</p>':'')+
+    return '<p class="bc7-muted">Confirmado '+esc(fmtDateHuman(cut.confirmado_en||cut.creado_en))+' · responsable '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
+      (cut.origen_corte_id?'<p class="bc7-muted">El inventario inicial toma como referencia el corte final anterior confirmado. El nuevo conteo queda guardado por separado.</p>':'')+
       (cut.observacion?'<p class="bc7-muted">Nota: '+esc(cut.observacion)+'</p>':'')+
-      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Conteo físico</th><th>Stock sistema al confirmar</th><th>Diferencia</th></tr></thead><tbody>'+
-      lines.map(l=>{const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};const d=Number(l.diferencia??Number(l.cantidad_contada)-Number(l.stock_sistema));return '<tr><td>'+esc(p.nombre||l.producto_id)+'</td><td>'+esc(qty(l.cantidad_contada))+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>';}).join('')+
+      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Conteo físico</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
+      lines.map(l=>{const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};const d=Number(l.diferencia??Number(l.cantidad_contada)-Number(l.stock_sistema));return '<tr><td>'+esc(p.nombre||'Producto no identificado')+'</td><td>'+esc(qty(l.cantidad_contada))+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>';}).join('')+
       '</tbody></table></div>';
   }
   function countFormHtml(type,detail){
@@ -600,7 +600,7 @@
     const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
     const fin=financeFormHtml(detail,isAssigned,status);
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
-    $('bc7-workspace-title').textContent=fmtDate(s.fecha)+' · '+warehouseName(s.almacen_id);
+    $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+' · '+warehouseName(s.almacen_id);
     $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="finanzas" aria-selected="false">Finanzas</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="finanzas" hidden>'+fin+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
     $('bc7-workspace').hidden=false;setPageMode(true);$('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
     activateWorkspaceTab(state.workspaceTab);
@@ -622,9 +622,9 @@
     if(bad){msg(form.querySelector('[data-bc7-count-msg]'),'Cuenta todos los productos e introduce cantidades válidas con hasta 3 decimales.','error');return;}
     const note=form.querySelector('[data-bc7-count-note]')?.value||null;
     const label=type==='INICIAL'?'inventario inicial':'inventario final';
-    if(!confirm('Vas a confirmar el '+label+' físico. El corte quedará inmutable y se guardará quién/cuándo y el stock de sistema usado para comparar. ¿Confirmas que contaste todos los productos?'))return;
+    if(!confirm('Vas a confirmar el '+label+' físico. Después no podrás editar este conteo; quedará guardado quién lo hizo, cuándo y qué cantidades mostraba la aplicación para comparar. ¿Confirmas que contaste todos los productos?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{await rpc('bc7_guardar_inventario_jornada',{p_turno_sesion_id:sessionId,p_tipo:type,p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),p_observacion:note});await openWorkspace(sessionId);setStatus('Conteo confirmado y leído de nuevo desde el backend.','ok');}
+    try{await rpc('bc7_guardar_inventario_jornada',{p_turno_sesion_id:sessionId,p_tipo:type,p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),p_observacion:note});await openWorkspace(sessionId);setStatus('Conteo confirmado y actualizado desde el servidor.','ok');}
     catch(e){msg(form.querySelector('[data-bc7-count-msg]'),'No se confirmó el conteo. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
@@ -818,7 +818,7 @@
     try{
       const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:mode==='pattern'?null:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
       const total=Number(result&&result.dias_total),work=Number(result&&result.dias_laborables),rest=Number(result&&result.dias_descanso);
-      const summary=Number.isFinite(total)&&Number.isFinite(work)&&Number.isFinite(rest)?'Se programaron '+total+' días: '+work+' de trabajo y '+rest+' de descanso.':'La programación se creó correctamente.';
+      const summary=Number.isFinite(total)&&Number.isFinite(work)&&Number.isFinite(rest)?(total===1?'Se programó 1 día: ':'Se programaron '+total+' días: ')+work+' de trabajo y '+rest+' de descanso.':'La programación se creó correctamente.';
       msg($('bc7-create-msg'),summary,'ok');
       state.lastPreview=null;await loadCalendar();
     }catch(e){msg($('bc7-create-msg'),'No se pudo crear la programación. '+friendlyError(e,'create'),'error');}
