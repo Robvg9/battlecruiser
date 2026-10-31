@@ -21,9 +21,16 @@ test("opening one jornada exposes four task tabs",()=>{
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9\.5\.44"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.10"\]/);
- assert.match(sw,/BC_SW_VERSION = "9\.5\.44"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.10/);
- assert.match(ui,/v7\.10 — programación clara, mensajes humanos y días ordenados/);
+ assert.match(app,/const VERSION="9\.5\.45"/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.11"\]/);
+ assert.match(sw,/BC_SW_VERSION = "9\.5\.45"/);
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.11/);
+ assert.match(ui,/v7\.11 — programación clara, mensajes humanos y días ordenados/);
+});
+
+test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
+ assert.match(ui,/\.bc7-day-row \.bc7-check\{[^}]*width:max-content/);
+ assert.match(ui,/\.bc7-day-row \.bc7-check input\[type=checkbox\]\{[^}]*width:18px!important[^}]*min-height:18px!important/);
+ assert.match(ui,/\.bc7-day-row \.bc7-check\{width:max-content!important;max-width:100%;justify-content:flex-start\}/);
+ assert.doesNotMatch(ui,/\.bc7-day-row \.bc7-check\{width:100%/);
 });
