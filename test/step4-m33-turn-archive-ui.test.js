@@ -294,7 +294,8 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
 test("M33 hydrates the assignment selectors from the authorized responsible-user catalog", async (t) => {
   const { window, sessions } = setup(t);
   window._cache.usuarios = [
-    { id: "staff-cache", nombre: "Responsable en caché", activo: true }
+    { id: "staff-cache", nombre: "Responsable en caché", activo: true },
+    { id: "staff-stale", nombre: "Responsable obsoleto", rol: "Dependienta", activo: true, archivado: false }
   ];
   const staffRows = [
     { id: "dep-live", nombre: "Dependienta LIVE", rol: "Dependienta", activo: true, archivado: false },
@@ -316,6 +317,8 @@ test("M33 hydrates the assignment selectors from the authorized responsible-user
   assert.ok(hydrated, "each assignment select must contain the authoritative active responsible users");
   const first = modal.querySelector("select[data-m33-sid]");
   assert.deepEqual(Array.from(first.options).map((option) => option.value), ["", "dep-live", "owner-live"]);
+  assert.ok(!Array.from(first.options).some((option) => option.value === "staff-stale"),
+    "the assignment form must not resurrect a stale staff member missing from the canonical catalog");
   assert.equal(calls[0].name, "listar_usuarios_admin");
   assert.deepEqual(calls[0].params, { p_incluir_archivados: false });
   assert.equal(window.document.querySelector("#bc-m33-compact-sheet-css") !== null, true);
