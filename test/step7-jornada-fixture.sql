@@ -23,6 +23,20 @@ CREATE TABLE public.bajas(
   estado text NOT NULL DEFAULT 'PENDIENTE',creado_por uuid NOT NULL,creado_nombre text,
   idempotency_key uuid,creado_en timestamptz NOT NULL DEFAULT now()
 );
+
+-- Mirror the production approval metadata used by the Jornada finance read RPCs.
+ALTER TABLE public.mermas
+  ADD COLUMN revisado_por uuid,
+  ADD COLUMN revisado_nombre text,
+  ADD COLUMN comentario_revision text,
+  ADD COLUMN fecha_revision timestamptz,
+  ADD COLUMN actualizado_en timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.bajas
+  ADD COLUMN revisado_por uuid,
+  ADD COLUMN revisado_nombre text,
+  ADD COLUMN comentario_revision text,
+  ADD COLUMN fecha_revision timestamptz,
+  ADD COLUMN actualizado_en timestamptz NOT NULL DEFAULT now();
 CREATE OR REPLACE FUNCTION public.tiene_permiso(p_seccion text,p_accion text)
 RETURNS boolean LANGUAGE sql STABLE
 AS $fn$
