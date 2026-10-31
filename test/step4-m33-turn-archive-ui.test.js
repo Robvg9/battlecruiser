@@ -271,7 +271,7 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   const productRow = host.querySelector(".m33-book-table tbody tr");
   assert.ok(productRow, "the product matrix must contain its Café fixture row");
   assert.deepEqual(Array.from(productRow.cells).map((cell) => cell.textContent.trim()), [
-    "300%", "15,00", "5,00", "20,00", "Café", "10", "5", "3", "1", "—",
+    "300%", "15,00", "5,00", "20,00", "Café", "10", "5", "3", "1", "0",
     "13", "4", "2", "30,00", "40,00", "3,00"
   ], "the spreadsheet columns must reconcile real opening, entries, reinvestment, approved loss, closing count and FIFO sales");
   assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
