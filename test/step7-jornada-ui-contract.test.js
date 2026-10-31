@@ -36,6 +36,9 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/openForSession:\s*async function\(sessionId\)/);
   assert.match(ui,/openWorkspace\(sessionId\)/);
   assert.match(nav,/jornada: "turnos"/, "jornada is mapped to the canonical turnos.ver permission");
+  assert.match(nav,/return !!seccion && tienePermiso\(seccion, "ver"\)/, "routes require the effective read permission");
+  assert.match(nav,/if \(tab === "ventas" && esDependienta\(\)\) return false/, "Dependienta keeps the ordinary POS route hidden");
+  assert.match(nav,/RUTAS_PERSONALES = \{ conectividad: true, preferencias: true \}/, "only the two explicit personal routes bypass business permissions");
   assert.match(ui,/data-tab=.?ventas/);
 });
 
