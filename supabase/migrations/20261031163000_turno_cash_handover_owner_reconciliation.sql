@@ -13,7 +13,7 @@ ALTER TABLE public.turno_declaraciones
   DROP CONSTRAINT IF EXISTS turno_declaraciones_estado_aprobacion_check;
 ALTER TABLE public.turno_declaraciones
   ADD CONSTRAINT turno_declaraciones_estado_aprobacion_check
-  CHECK (estado_aprobacion IN ('ESPERANDO_APROBACION','APROBADA','RECHAZADA','CON_DIFERENCIA'));
+  CHECK (estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION','APROBADA','RECHAZADA','CON_DIFERENCIA'));
 
 ALTER TABLE public.turno_declaraciones
   DROP CONSTRAINT IF EXISTS turno_declaraciones_conteo_consistency_chk;
@@ -105,7 +105,7 @@ BEGIN
       ORDER BY x.created_at DESC
       LIMIT 1
     ) dif ON true
-    WHERE d.estado_aprobacion IN ('ESPERANDO_APROBACION','CON_DIFERENCIA')
+    WHERE d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION','CON_DIFERENCIA')
   ) q;
 
   RETURN coalesce(v_result,'[]'::jsonb);
@@ -185,7 +185,7 @@ BEGIN
     );
   END IF;
 
-  IF v_d.estado_aprobacion<>'ESPERANDO_APROBACION' THEN
+  IF v_d.estado_aprobacion NOT IN ('PENDIENTE','ESPERANDO_APROBACION') THEN
     RAISE EXCEPTION 'La declaración no está pendiente de conteo.' USING ERRCODE='23514';
   END IF;
 
