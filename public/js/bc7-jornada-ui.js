@@ -467,7 +467,7 @@
   }
   function freshIdempotencyKey(){
     if(window.crypto&&typeof window.crypto.randomUUID==='function')return window.crypto.randomUUID();
-    throw new Error('Este navegador no dispone de una clave segura de idempotencia. Actualiza el navegador e inténtalo de nuevo.');
+    throw new Error('No se pudo preparar la operación de forma segura. Actualiza la aplicación y vuelve a intentarlo.');
   }
   async function submitFinance(form){
     const type=form.dataset.bc7FinanceForm;
@@ -477,7 +477,7 @@
     if(!sessionId||!keyField){msg(message,'Falta el vínculo de esta operación con la jornada.','error');return;}
     let key=keyField.value.trim();
     try{if(!key){key=freshIdempotencyKey();keyField.value=key;}}
-    catch(e){msg(message,e.message,'error');return;}
+    catch(e){msg(message,'No se pudo preparar la operación de forma segura. Actualiza la aplicación y vuelve a intentarlo.','error');return;}
     const btn=form.querySelector('button[type="submit"]');
     if(!busy(btn,true))return;
     try{
@@ -670,7 +670,7 @@
         const rereadState=String(d?.sesion?.estado||'').toUpperCase();
         if(rereadState==='EN_CURSO'){
           await loadCalendar();
-          setStatus('Inicio confirmado al releer el servidor: la jornada ya está EN_CURSO. No se repitió la escritura.','ok');
+          setStatus('Inicio confirmado al volver a consultar la jornada. No se repitió la operación.','ok');
         }else{
           setStatus('El servidor todavía no confirma el inicio. Estado actual: '+humanStatus(rereadState)+'.','error');
           msg($('bc7-start-msg'),errorText,'error');
@@ -717,7 +717,7 @@
         const rereadState=String(d?.sesion?.estado||'').toUpperCase();
         if(rereadState==='COMPLETADA'){
           await loadCalendar();
-          setStatus('Cierre confirmado al releer el servidor: la jornada ya está COMPLETADA. No se repitió la escritura.','ok');
+          setStatus('Cierre confirmado al volver a consultar la jornada. No se repitió la operación.','ok');
         }else{
           setStatus('El servidor todavía no confirma el cierre. Estado actual: '+humanStatus(rereadState)+'.','error');
           const currentMsg=document.querySelector('[data-bc7-close-msg]')||msgEl;
