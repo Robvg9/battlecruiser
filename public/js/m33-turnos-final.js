@@ -8,7 +8,7 @@
 
   const ROOT_ID = 'ciclos-m18-root';
   const API = () => window.BattleCruiserTurnoAPI;
-  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false };
+  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false, staffError: '', staffLoading: false, staffLoaded: false, staffRequestAttempted: false, inventoryBook: null };
   const root = () => document.getElementById(ROOT_ID);
   const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
   const date = v => {
@@ -18,7 +18,21 @@
     if (m) return m[3] + '/' + m[2] + '/' + m[1];
     return typeof fechaCorta === 'function' ? fechaCorta(v) : s.split('T')[0].split('-').reverse().join('/');
   };
-  const users = () => ((_cache && _cache.usuarios) || []).filter(u => u.activo !== false && !u.archivado);
+  const users = () => {
+    if (window.__BC_M29__ && typeof window.__BC_M29__.eligibleStaff === 'function') {
+      try { return window.__BC_M29__.eligibleStaff(); } catch (error) {}
+    }
+    const cache = (window._cache && Array.isArray(window._cache.usuarios)) ? window._cache.usuarios : [];
+    const source = Array.isArray(window.__BC_M29_STAFF_CACHE__) ? window.__BC_M29_STAFF_CACHE__ : [];
+    const rows = window.__BC_M29_STAFF_CACHE_LOADED__ === true ? source : cache;
+    return rows.filter(function (user) {
+      if (!user || !user.id || user.activo === false || user.archivado) return false;
+      var role = user.rol || user.nombre_rol || user.role_name || user.role || '';
+      if (role && typeof role === 'object') role = role.nombre || role.name || role.rol || '';
+      role = String(role || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return role.indexOf('dependienta') >= 0 || role.indexOf('dueno') === 0 || role === 'admin' || role === 'administrador';
+    });
+  };
   const field = v => (v == null || v === '') ? '-' : v;
 
   function can(r, a) {
@@ -63,12 +77,85 @@
     state.isAdmin = can('turnos', 'editar_any') || can('ciclos', 'editar_any') || isDuenoRole();
   }
 
+  async function ensureAssignmentUsers(forceRefresh) {
+    const current = users();
+    if (current.length && !forceRefresh) return current;
+    if (!navigator.onLine) throw new Error('Conecta el dispositivo para consultar responsables.');
+    const hub = window.__BC_M29__;
+    if (hub && typeof hub.loadResponsibleStaff === 'function') {
+      const rows = await hub.loadResponsibleStaff(!!forceRefresh);
+      state.staffError = '';
+      return rows;
+    }
+    if (!window.client || typeof window.client.rpc !== 'function') throw new Error('Cliente del servidor no disponible para cargar responsables.');
+    const response = await window.client.rpc('listar_usuarios_admin', { p_incluir_archivados: false });
+    if (response && response.error) throw response.error;
+    const rows = Array.isArray(response && response.data) ? response.data : [];
+    window.__BC_M29_STAFF_CACHE__ = rows;
+    window.__BC_M29_STAFF_CACHE_LOADED__ = true;
+    window._cache = window._cache || {};
+    window._cache.usuarios = rows;
+    const result = users();
+    if (!result.length) throw new Error('La consulta no devolvió responsables activos elegibles.');
+    state.staffError = '';
+    return result;
+  }
+
   function css() {
     if (document.getElementById('bc-m33-css')) return;
     const s = document.createElement('style');
     s.id = 'bc-m33-css';
     s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.m33-modal{width:min(920px,100%);max-width:100%;box-sizing:border-box;max-height:94vh;max-height:94dvh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px;overflow:visible}.m33-step{min-width:0;padding:6px 4px;text-align:center;line-height:1.2;overflow-wrap:anywhere;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.m33-box{padding:8px 9px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;min-width:0}.m33-assignment-grid .m33-assignment-card{display:grid;grid-template-columns:minmax(84px,.56fr) minmax(0,1fr);align-items:center;gap:8px;padding:5px 0;min-width:0}.m33-assignment-card label{min-width:0;margin:0!important;font-size:.76rem;line-height:1.25;overflow-wrap:anywhere}.m33-assignment-card select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin:0!important;padding:7px 8px!important;min-height:38px;font-size:.86rem;line-height:1.2}.m33-assignment-card .m33-muted{min-width:0;font-size:.8rem;overflow-wrap:anywhere}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:6px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}.m33-archive{margin-top:10px}.m33-archive-day{margin:6px 0;padding:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px}.m33-archive-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.m33-archive-head b{display:block}.m33-archive-head small{display:block;opacity:.65;margin-top:3px}.m33-archive-head button{min-height:40px;padding:9px 12px;border-radius:8px;border:1px solid rgba(59,130,246,.55);background:rgba(59,130,246,.12);color:inherit;font-weight:600}.m33-archive-head button:disabled{opacity:.55}.m33-archive-host{margin-top:6px}.m33-archive-host[hidden]{display:none}.m33-archive-scroll{max-width:100%;overflow-x:auto}.m33-archive-table{width:100%;min-width:640px;border-collapse:collapse;font-size:.78rem}.m33-archive-table th,.m33-archive-table td{padding:6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}.m33-archive-table th{opacity:.65}.m33-archive-empty{padding:10px;border:1px dashed rgba(255,255,255,.16);border-radius:8px;opacity:.75;font-size:.84rem}.m33-inventory{display:grid;gap:8px;margin-top:8px}.m33-inventory-day{padding:9px;border:1px solid rgba(255,255,255,.12);border-radius:9px}.m33-inventory-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.m33-inventory-head b{display:block}.m33-inventory-head small{display:block;opacity:.62;margin-top:2px}.m33-inventory-head button{min-height:34px;padding:7px 10px;border-radius:7px;border:1px solid rgba(59,130,246,.5);background:rgba(59,130,246,.12);color:inherit;font-size:.78rem;font-weight:600}.m33-inventory-host{margin-top:8px}.m33-inventory-host[hidden]{display:none}.m33-inventory-scroll{max-width:100%;overflow:auto}.m33-inventory-table{width:100%;min-width:720px;border-collapse:collapse;font-size:.74rem}.m33-inventory-table th,.m33-inventory-table td{padding:6px 7px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}.m33-inventory-table th{opacity:.65;font-weight:600}.m33-inventory-table td.m33-num{text-align:right;font-variant-numeric:tabular-nums}.m33-inventory-table tr.m33-opening{background:rgba(34,197,94,.07);font-weight:600}.m33-inventory-note{padding:8px 10px;margin:7px 0;border-left:2px solid rgba(201,162,77,.7);background:rgba(201,162,77,.07);font-size:.78rem;line-height:1.4}.m33-inventory-note.error{border-color:#ef7777;color:#ffc0bb}.m33-inventory-host .m33-archive-empty{margin-top:7px}@media(max-width:720px){.m33-bg{padding:6px}.m33-modal{width:100%;max-width:100%;box-sizing:border-box;max-height:calc(100dvh - 12px);border-radius:12px}.m33-head{padding:10px 12px 7px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.m33-step{font-size:.68rem;padding:6px 4px}.m33-session-grid{grid-template-columns:minmax(0,1fr)}.m33-body{padding:10px 12px;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 12px}.m33-foot button{padding:8px 11px}}';
     document.head.appendChild(s);
+    if (!document.getElementById('bc-m33-compact-sheet-css')) {
+      const compact = document.createElement('style');
+      compact.id = 'bc-m33-compact-sheet-css';
+      compact.textContent = [
+        '.m33-bg{padding:6px!important}',
+        '.m33-modal{width:min(1240px,calc(100vw - 12px))!important;max-width:1240px!important;max-height:calc(100dvh - 12px)!important;border-radius:12px!important}',
+        '.m33-head{padding:8px 12px 6px!important}',
+        '.m33-title h3{font-size:1.04rem!important;line-height:1.2!important}',
+        '.m33-steps{gap:3px!important;margin-top:6px!important}',
+        '.m33-step{padding:4px 2px!important;font-size:.66rem!important;line-height:1.12!important;border-radius:6px!important}',
+        '.m33-body{padding:8px 12px!important}',
+        '.m33-foot{padding:7px 12px!important}',
+        '.m33-foot button{padding:7px 11px!important;font-size:11px!important}',
+        '.m33-summary{gap:4px!important}',
+        '.m33-box{padding:6px 7px!important}',
+        '.m33-session{padding:4px 0!important}',
+        '.m33-assignment-card select{min-height:31px!important;padding:5px 7px!important;font-size:11px!important}',
+        '.m33-muted{font-size:.72rem!important;line-height:1.28!important}',
+        '.m33-book{display:grid;gap:7px;min-width:0}',
+        '.m33-book-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}',
+        '.m33-book-top b{display:block;font-size:.94rem}',
+        '.m33-book-top small{display:block;font-size:.68rem;opacity:.65;margin-top:2px}',
+        '.m33-book-top button{min-height:29px;padding:5px 9px;border:1px solid rgba(59,130,246,.5);border-radius:6px;background:rgba(59,130,246,.12);color:inherit;font-size:10px;font-weight:600}',
+        '.m33-book-host{display:grid;gap:9px;min-width:0}',
+        '.m33-book-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}',
+        '.m33-book-metric{min-width:0;padding:6px 7px;border:1px solid rgba(255,255,255,.1);border-radius:6px;background:rgba(255,255,255,.025)}',
+        '.m33-book-metric small{display:block;font-size:9px;opacity:.62;line-height:1.1}',
+        '.m33-book-metric b{display:block;font-size:12px;line-height:1.25;margin-top:3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}',
+        '.m33-book-section{min-width:0}',
+        '.m33-book-section h4{font-size:11px;margin:2px 0 5px!important}',
+        '.m33-book-scroll{width:100%;max-width:100%;overflow:auto;border:1px solid rgba(255,255,255,.11);border-radius:6px;-webkit-overflow-scrolling:touch}',
+        '.m33-book-table{width:100%;min-width:1320px;border-collapse:separate;border-spacing:0;font-size:10px;font-variant-numeric:tabular-nums}',
+        '.m33-book-table th,.m33-book-table td{padding:5px 6px;border-right:1px solid rgba(255,255,255,.055);border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;text-align:right}',
+        '.m33-book-table th{position:sticky;top:0;z-index:1;background:#202a32;color:#d9d2c2;font-size:9px;font-weight:700;text-align:center}',
+        '.m33-book-table th:nth-child(5),.m33-book-table td:nth-child(5){position:sticky;left:0;z-index:2;text-align:left;background:#18241f;min-width:170px}',
+        '.m33-book-table th:nth-child(5){z-index:3;background:#202a32}',
+        '.m33-book-table td:first-child,.m33-book-table td:nth-child(5){text-align:left}',
+        '.m33-book-table tfoot th,.m33-book-table tfoot td{background:rgba(212,176,92,.09);font-weight:700}',
+        '.m33-book-table .m33-negative{color:#ffaaa0}',
+        '.m33-book-note{padding:6px 8px;border-left:2px solid rgba(201,162,77,.7);background:rgba(201,162,77,.06);font-size:10px;line-height:1.3}',
+        '.m33-book-subtables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}',
+        '.m33-book-subtable{width:100%;border-collapse:collapse;font-size:10px}',
+        '.m33-book-subtable th,.m33-book-subtable td{padding:5px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07)}',
+        '.m33-book-subtable th{font-size:9px;opacity:.65}',
+        '.m33-book-empty{padding:7px 8px;border:1px dashed rgba(255,255,255,.15);border-radius:6px;font-size:10px;opacity:.72}',
+        '@media(max-width:720px){.m33-bg{padding:3px!important}.m33-modal{width:calc(100vw - 6px)!important;max-height:calc(100dvh - 6px)!important;border-radius:9px!important}.m33-head{padding:6px 8px 5px!important}.m33-title h3{font-size:.96rem!important}.m33-steps{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:2px!important}.m33-step{font-size:.56rem!important;padding:4px 1px!important;overflow-wrap:anywhere}.m33-body{padding:6px 8px!important}.m33-foot{padding:6px 8px!important}.m33-book-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-book-subtables{grid-template-columns:minmax(0,1fr)}.m33-book-table{min-width:1220px}}'
+      ].join('');
+      document.head.appendChild(compact);
+    }
   }
 
   function normalizeExp(d) {
@@ -122,14 +209,26 @@
             '</label><div class="m33-muted" data-m33-readonly-assignment="' + esc(session.id) + '">' + esc(assigned) + '</div></div>';
         }).join('') + '</div>';
     }
+    if (state.staffLoading) {
+      return '<p class="m33-muted" role="status">Consultando responsables activos en el servidor…</p><p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
+    }
+    if (!state.staffLoaded) {
+      return '<p class="m33-muted" role="status">No se pudo confirmar la lista actual de responsables. ' + esc(state.staffError || 'La consulta aún no ha terminado.') + '</p>' +
+        '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Reintentar carga de responsables</button>' +
+        '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
+    }
     const us = users();
-    return '<p class="m33-muted">Asigna una trabajadora a cada sesión. Los cambios se guardan inmediatamente; el botón Guardar vuelve a verificar todo el bloque.</p>' +
+    if (!us.length) {
+      return '<p class="m33-muted" role="status">El servidor respondió, pero no hay responsables activos elegibles para asignar.</p>' +
+        '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Actualizar responsables</button>' +
+        '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
+    }
+    return '<p class="m33-muted">Responsable por sesión. Los cambios se guardan y verifican en el servidor.</p>' +
       '<p id="m33-asig-msg" class="bc-m33-save-msg"></p><div class="m33-session-grid m33-assignment-grid">' + state.sesiones.map(s => {
         const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' +
-          (String(u.id) === String(s.usuario_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.email || u.id) + '</option>').join('');
+          (String(u.id) === String(s.usuario_id || s.responsable_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.nombre_usuario || u.email || u.id) + '</option>').join('');
         return '<div class="m33-session m33-assignment-card"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) +
-          '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || '') +
-          '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
+          '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || s.responsable_id || '') + '">' + opts + '</select></div>';
       }).join('') + '</div>';
   }
   function archiveSessionsForViewer() {
@@ -166,16 +265,16 @@
     return archiveDayGroups(archiveSessionsForViewer());
   }
   function step4() {
-    const groups = inventoryDayGroups();
-    if (!groups.length) return '<div class="m33-archive-empty">No hay sesiones disponibles para consultar el inventario de este turno.</div>';
-    return '<div class="m33-inventory"><p class="m33-muted">Libro cronológico de solo lectura. El saldo de apertura procede únicamente de un conteo físico inicial confirmado. Las entradas, salidas, gastos, reinversiones y solicitudes de merma/baja se muestran con trazabilidad; las solicitudes pendientes no descuentan existencias.</p>' +
-      groups.map(function (group) {
-        const ids = group.sessions.map(function (session) { return String(session.id || ''); }).filter(Boolean).join('|');
-        const action = ids
-          ? '<button type="button" data-m33-inventory-sessions="' + esc(ids) + '" data-m33-inventory-day="' + esc(group.day) + '" data-m33-inventory-date="' + esc(group.date) + '" aria-expanded="false">Ver libro del día</button>'
-          : '<span class="m33-muted">Sin sesiones consultables</span>';
-        return '<section class="m33-inventory-day"><div class="m33-inventory-head"><div><b>Día ' + esc(group.day) + '</b><small>' + esc(date(group.date)) + ' · ' + group.sessions.length + ' sesión(es)</small></div>' + action + '</div><div class="m33-inventory-host" data-m33-inventory-host hidden></div></section>';
-      }).join('') + '</div>';
+    const sessions = archiveSessionsForViewer().slice().sort(function (a, b) {
+      return String(a.fecha || '').localeCompare(String(b.fecha || ''));
+    });
+    if (!sessions.length) return '<div class="m33-archive-empty">No hay sesiones disponibles para consultar el inventario de este turno.</div>';
+    const first = date(sessions[0].fecha);
+    const last = date(sessions[sessions.length - 1].fecha);
+    return '<section class="m33-book">' +
+      '<header class="m33-book-top"><div><b>Inventario del turno</b><small>' + esc(first) + (first !== last ? ' → ' + esc(last) : '') + ' · ' + sessions.length + ' registro(s) de jornada</small></div>' +
+      '<button type="button" data-m33-inventory-book>Actualizar libro</button></header>' +
+      '<div class="m33-book-host" data-m33-inventory-host><div class="m33-archive-empty">Preparando la hoja de inventario…</div></div></section>';
   }
   function inventoryQuantity(value) {
     const number = Number(value);
@@ -196,6 +295,558 @@
       baja: 'Baja aprobada'
     })[String(value || '').toLowerCase()] || String(value || 'Movimiento');
   }
+  function bookNameKey(value) {
+    return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function bookNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+  function bookQty(value) {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    return Number(value).toLocaleString('es-ES', { maximumFractionDigits: 3 });
+  }
+  function bookMoney(value, approximate) {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    return (approximate ? '≈ ' : '') + Number(value).toLocaleString('es-ES', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+  }
+  function bookRows(value) {
+    if (Array.isArray(value)) return value;
+    return value && typeof value === 'object' ? [value] : [];
+  }
+  function loadInventoryBook(button) {
+    const overlay = document.getElementById('m33-bg');
+    const host = overlay && overlay.querySelector('[data-m33-inventory-host]');
+    if (!host || button.dataset.m33BookLoading === '1') return;
+    button.disabled = true;
+    button.dataset.m33BookLoading = '1';
+    host.innerHTML = '<div class="m33-archive-empty">Calculando la hoja consolidada del turno…</div>';
+    loadInventoryBookData(host).finally(function () {
+      button.disabled = false;
+      delete button.dataset.m33BookLoading;
+    });
+  }
+  async function loadInventoryBookData(host) {
+    try {
+      const rpcClient = window.client;
+      if (!navigator.onLine) throw new Error('El libro consolidado requiere conexión al servidor.');
+      if (!rpcClient || typeof rpcClient.rpc !== 'function') throw new Error('Cliente del servidor no disponible.');
+      const sessions = archiveSessionsForViewer().slice().sort(function (a, b) {
+        return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
+          Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
+      });
+      if (!sessions.length) {
+        host.innerHTML = '<div class="m33-book-empty">No hay sesiones asociadas a este turno.</div>';
+        return;
+      }
+      const sessionData = [];
+      const salesIds = new Set();
+      let readable = 0;
+      let denied = 0;
+      let hasMovementRead = false;
+      for (const session of sessions) {
+        const isJornada = String(session.bloque || '').toUpperCase() === 'JORNADA';
+        const calls = await Promise.all([
+          rpcClient.rpc('bc7_movimientos_sesion', { p_turno_sesion_id: session.id }),
+          isJornada
+            ? rpcClient.rpc('bc7_obtener_inventario_jornada', { p_turno_sesion_id: session.id })
+            : Promise.resolve({ data: null, error: null }),
+          isJornada
+            ? rpcClient.rpc('bc7_finanzas_jornada', { p_turno_sesion_id: session.id })
+            : Promise.resolve({ data: null, error: null })
+        ]);
+        const movementResponse = calls[0];
+        const inventoryResponse = calls[1];
+        const financeResponse = calls[2];
+        [movementResponse, inventoryResponse, financeResponse].forEach(function (response) {
+          if (response && response.error) {
+            if (String(response.error.code || '') === '42501') denied += 1;
+            else throw response.error;
+          }
+        });
+        const movementsDenied = movementResponse && movementResponse.error;
+        const inventoryDenied = inventoryResponse && inventoryResponse.error;
+        const financeDenied = financeResponse && financeResponse.error;
+        if (!movementsDenied) {
+          hasMovementRead = true;
+          readable += 1;
+        }
+        const movementRows = movementsDenied ? [] : bookRows(movementResponse && movementResponse.data);
+        movementRows.forEach(function (movement) {
+          if (String(movement.tipo || '').toLowerCase() === 'venta' && movement.operacion_id) {
+            salesIds.add(String(movement.operacion_id));
+          }
+        });
+        sessionData.push({
+          session: session,
+          movements: movementRows,
+          inventory: inventoryDenied ? null : (inventoryResponse && inventoryResponse.data || null),
+          finance: financeDenied ? {} : (financeResponse && financeResponse.data || {}),
+          movementDenied: !!movementsDenied
+        });
+      }
+      if (!readable && denied) {
+        host.innerHTML = '<div class="m33-book-empty">Tu perfil no tiene permiso para consultar los movimientos y el inventario de este turno.</div>';
+        return;
+      }
+
+      const byId = new Map();
+      const byName = new Map();
+      function ensureProduct(id, name, unit) {
+        const productId = id == null || id === '' ? '' : String(id);
+        const nameText = String(name || (productId || 'Producto sin nombre'));
+        const nameKey = bookNameKey(nameText);
+        let row = productId ? byId.get(productId) : null;
+        if (!row && nameKey && byName.has(nameKey)) row = byName.get(nameKey);
+        if (!row) {
+          row = {
+            id: productId || null, name: nameText, unit: unit || '',
+            opening: null, final: null, incoming: 0, reinvestment: 0,
+            losses: 0, otherOut: 0, posMovementQty: 0,
+            costWeightedQty: 0, costWeightedTotal: 0,
+            saleCostQty: 0, saleCostTotal: 0,
+            salePriceQty: 0, salePriceTotal: 0,
+            saleLinesQty: 0, saleRevenue: 0, saleProfit: 0,
+            hasSaleLine: false, hasSaleCost: true, currentPrice: null, lossCostTotal: 0, lossValueApprox: false
+          };
+        } else {
+          if (productId && !row.id) row.id = productId;
+          if (nameText && (!row.name || row.name === row.id || row.name === 'Producto sin nombre')) row.name = nameText;
+          if (unit && !row.unit) row.unit = unit;
+        }
+        if (productId) byId.set(productId, row);
+        if (nameKey) byName.set(nameKey, row);
+        return row;
+      }
+      function addCost(row, quantity, unitCost) {
+        const q = Math.abs(bookNumber(quantity));
+        const cost = Number(unitCost);
+        if (q > 0 && Number.isFinite(cost) && cost >= 0) {
+          row.costWeightedQty += q;
+          row.costWeightedTotal += q * cost;
+        }
+      }
+
+      sessionData.forEach(function (entry) {
+        const inventory = entry.inventory;
+        if (inventory && Array.isArray(inventory.productos)) {
+          inventory.productos.forEach(function (product) {
+            ensureProduct(product.producto_id || product.id, product.nombre, product.unidad);
+          });
+        }
+      });
+
+      const jornadaSessions = sessionData.filter(function (entry) {
+        return String(entry.session.bloque || '').toUpperCase() === 'JORNADA' && entry.inventory;
+      });
+      const firstInventory = jornadaSessions.length ? jornadaSessions[0].inventory : null;
+      const lastInventory = jornadaSessions.length ? jornadaSessions[jornadaSessions.length - 1].inventory : null;
+      const initialCut = firstInventory && firstInventory.cortes && firstInventory.cortes.INICIAL;
+      const finalCut = lastInventory && lastInventory.cortes && lastInventory.cortes.FINAL;
+      const hasOpening = !!(initialCut && initialCut.estado === 'CONFIRMADO');
+      const hasFinal = !!(finalCut && finalCut.estado === 'CONFIRMADO');
+      if (hasOpening) {
+        bookRows(initialCut.lineas).forEach(function (line) {
+          const row = ensureProduct(line.producto_id, null, '');
+          row.opening = bookNumber(line.cantidad_contada);
+        });
+      }
+      if (hasFinal) {
+        bookRows(finalCut.lineas).forEach(function (line) {
+          const row = ensureProduct(line.producto_id, null, '');
+          row.final = bookNumber(line.cantidad_contada);
+        });
+      }
+
+      const reinvestmentRows = [];
+      const expenseRows = [];
+      const pendingAdjustmentRows = [];
+      const declarationFallback = [];
+      let reinvestmentTotal = 0;
+      let expenseTotal = 0;
+      let expensePendingTotal = 0;
+      let expenseRejectedTotal = 0;
+      let expenseOtherStatusTotal = 0;
+      sessionData.forEach(function (entry) {
+        const session = entry.session;
+        entry.movements.forEach(function (movement) {
+          const type = String(movement.tipo || '').toLowerCase();
+          const quantity = Math.abs(bookNumber(movement.cantidad));
+          const row = ensureProduct(null, movement.producto, '');
+          if (type === 'compra') {
+            row.incoming += quantity;
+            addCost(row, quantity, movement.costo_unitario);
+          } else if (type === 'transferencia_entrada') {
+            row.incoming += quantity;
+          } else if (type === 'venta') {
+            row.posMovementQty += quantity;
+          } else if (type === 'merma' || type === 'baja') {
+            row.losses += quantity;
+            if (Number.isFinite(Number(movement.costo_unitario))) {
+              row.lossCostTotal += quantity * Number(movement.costo_unitario);
+            }
+          } else if (type === 'vale' || type === 'transferencia_salida') {
+            row.otherOut += quantity;
+          }
+        });
+        const finance = entry.finance || {};
+        bookRows(finance.reinversiones).forEach(function (reinvestment) {
+          bookRows(reinvestment.lineas).forEach(function (line) {
+            const row = ensureProduct(line.producto_id, line.producto, '');
+            const quantity = Math.abs(bookNumber(line.cantidad_base));
+            const total = Math.abs(bookNumber(line.costo_total));
+            const unit = Number(line.costo_unitario);
+            row.reinvestment += quantity;
+            if (quantity > 0 && Number.isFinite(unit)) addCost(row, quantity, unit);
+            else if (quantity > 0 && total > 0) addCost(row, quantity, total / quantity);
+            reinvestmentTotal += total;
+            reinvestmentRows.push({
+              date: reinvestment.fecha || session.fecha,
+              product: line.producto || line.producto_id || '—',
+              quantity: quantity,
+              unitCost: Number.isFinite(unit) ? unit : (quantity ? total / quantity : null),
+              total: total,
+              actor: reinvestment.usuario_nombre || '—',
+              supplier: reinvestment.proveedor || ''
+            });
+          });
+        });
+        bookRows(finance.gastos).forEach(function (expense) {
+          const amount = bookNumber(expense.monto);
+          const expenseStatus = String(expense.estado || 'REGISTRADO').toUpperCase();
+          if (expenseStatus === 'APROBADO') expenseTotal += amount;
+          else if (expenseStatus === 'PENDIENTE') expensePendingTotal += amount;
+          else if (expenseStatus === 'RECHAZADO') expenseRejectedTotal += amount;
+          else expenseOtherStatusTotal += amount;
+          expenseRows.push({
+            date: expense.creado_en || session.fecha,
+            concept: expense.concepto || 'Gasto operativo',
+            description: expense.descripcion || expense.comentario_revision || '',
+            amount: amount,
+            status: expense.estado || 'Registrado',
+            actor: expense.creado_nombre || '—'
+          });
+        });
+        ['mermas', 'bajas'].forEach(function (bucket) {
+          bookRows(finance[bucket]).forEach(function (request) {
+            const status = String(request.estado || 'PENDIENTE').toUpperCase();
+            if (status === 'APROBADA') return;
+            pendingAdjustmentRows.push({
+              date: request.creado_en || session.fecha,
+              kind: bucket === 'mermas' ? 'Merma' : 'Baja',
+              product: request.producto || request.producto_id || '—',
+              quantity: bookNumber(request.cantidad),
+              reason: request.motivo || '',
+              status: status + ' · no descuenta existencias',
+              actor: request.creado_nombre || '—'
+            });
+          });
+        });
+        const declaration = entry.inventory && entry.inventory.declaracion_dinero;
+        if (declaration && declaration.monto != null) {
+          declarationFallback.push({
+            sessionId: String(session.id),
+            date: declaration.declarado_at || session.fecha,
+            amount: bookNumber(declaration.monto),
+            currency: declaration.moneda || 'Sin moneda registrada',
+            userId: declaration.usuario_id || (entry.inventory.sesion && entry.inventory.sesion.responsable_id) || session.usuario_id,
+            status: declaration.estado_aprobacion || 'Declarado'
+          });
+        }
+      });
+
+      let salesLines = null;
+      if (salesIds.size && typeof rpcClient.from === 'function') {
+        try {
+          const salesResponse = await rpcClient.from('ventas_lineas')
+            .select('venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo')
+            .in('venta_id', Array.from(salesIds));
+          if (salesResponse && salesResponse.error) throw salesResponse.error;
+          salesLines = Array.isArray(salesResponse && salesResponse.data) ? salesResponse.data : [];
+        } catch (salesError) {
+          salesLines = null;
+        }
+      } else if (!salesIds.size) {
+        salesLines = [];
+      }
+      if (salesLines) {
+        salesLines.forEach(function (line) {
+          const row = ensureProduct(line.producto_id, null, '');
+          const quantity = Math.abs(bookNumber(line.cantidad));
+          const unitPrice = Number(line.precio_unitario);
+          const subtotal = Number.isFinite(Number(line.subtotal))
+            ? Number(line.subtotal)
+            : (Number.isFinite(unitPrice) ? quantity * unitPrice : 0);
+          const unitCost = Number(line.costo_unitario_fifo);
+          row.saleLinesQty += quantity;
+          row.saleRevenue += subtotal;
+          row.hasSaleLine = true;
+          if (Number.isFinite(unitPrice)) {
+            row.salePriceQty += quantity;
+            row.salePriceTotal += unitPrice * quantity;
+          }
+          if (quantity > 0 && Number.isFinite(unitCost)) {
+            row.saleCostQty += quantity;
+            row.saleCostTotal += unitCost * quantity;
+            row.saleProfit += subtotal - unitCost * quantity;
+          } else if (quantity > 0) {
+            row.hasSaleCost = false;
+          }
+        });
+      }
+
+      const productIds = Array.from(byId.keys());
+      const cachedProducts = (window._cache && Array.isArray(window._cache.productos)) ? window._cache.productos : [];
+      cachedProducts.forEach(function (product) {
+        const row = product && byId.get(String(product.id || product.producto_id || ''));
+        if (row && Number.isFinite(Number(product.precio_normal))) row.currentPrice = Number(product.precio_normal);
+      });
+      if (productIds.length && typeof rpcClient.from === 'function') {
+        try {
+          const priceResponse = await rpcClient.from('productos').select('id,nombre,precio_normal').in('id', productIds);
+          if (!priceResponse.error) {
+            (priceResponse.data || []).forEach(function (product) {
+              const row = byId.get(String(product.id));
+              if (row && Number.isFinite(Number(product.precio_normal))) row.currentPrice = Number(product.precio_normal);
+              if (row && product.nombre) row.name = product.nombre;
+            });
+          }
+        } catch (priceError) {}
+      }
+
+      let declarations = null;
+      if (typeof rpcClient.from === 'function') {
+        try {
+          const declarationResponse = await rpcClient.from('turno_declaraciones')
+            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion')
+            .in('turno_sesion_id', sessions.map(function (session) { return String(session.id); }));
+          if (!declarationResponse.error) declarations = Array.isArray(declarationResponse.data) ? declarationResponse.data : [];
+        } catch (declarationError) {}
+      }
+      const cashRows = [];
+      if (declarations && declarations.length) {
+        const sessionMap = new Map(sessions.map(function (session) { return [String(session.id), session]; }));
+        declarations.forEach(function (declaration) {
+          const session = sessionMap.get(String(declaration.turno_sesion_id));
+          if (!session) return;
+          cashRows.push({
+            date: declaration.declarado_at || session.fecha,
+            responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
+            declared: bookNumber(declaration.monto),
+            currency: declaration.moneda || 'Sin moneda registrada',
+            status: declaration.estado_aprobacion || 'Declarado',
+            collected: null
+          });
+        });
+      } else {
+        declarationFallback.forEach(function (declaration) {
+          const session = sessions.find(function (item) { return String(item.id) === declaration.sessionId; });
+          cashRows.push({
+            date: declaration.date,
+            responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
+            declared: declaration.amount,
+            currency: declaration.currency || 'Sin moneda registrada',
+            status: declaration.status,
+            collected: null
+          });
+        });
+      }
+      cashRows.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
+
+      const productRows = Array.from(new Set(Array.from(byId.values()).concat(Array.from(byName.values()))))
+        .filter(function (row) { return row && row.name; })
+        .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'es'); });
+      const totals = {
+        opening: 0, incoming: 0, reinvestment: 0, losses: 0, otherOut: 0,
+        final: 0, balanceSales: 0, posSales: 0, profit: 0, revenue: 0, lossValue: 0,
+        declaration: 0
+      };
+      const allOpening = productRows.length > 0 && productRows.every(function (row) { return row.opening != null; });
+      const allFinal = productRows.length > 0 && productRows.every(function (row) { return row.final != null; });
+      const tableRows = productRows.map(function (row) {
+        const cost = row.hasSaleCost && row.saleCostQty > 0
+          ? row.saleCostTotal / row.saleCostQty
+          : (row.costWeightedQty > 0 ? row.costWeightedTotal / row.costWeightedQty : null);
+        const hasLineDetail = !!(salesLines && row.hasSaleLine);
+        const saleQty = hasLineDetail ? row.saleLinesQty : row.posMovementQty;
+        const salePrice = hasLineDetail && row.salePriceQty > 0
+          ? row.salePriceTotal / row.salePriceQty : row.currentPrice;
+        const costApprox = !(row.hasSaleCost && row.saleCostQty > 0) && cost != null;
+        const priceApprox = !hasLineDetail && salePrice != null;
+        const unitGain = salePrice != null && cost != null ? salePrice - cost : null;
+        const unitGainApprox = (costApprox || priceApprox) && unitGain != null;
+        const markup = cost > 0 && unitGain != null ? unitGain / cost * 100 : null;
+        const balanceSales = row.opening != null && row.final != null
+          ? row.opening + row.incoming + row.reinvestment - row.losses - row.otherOut - row.final
+          : null;
+        const revenue = hasLineDetail
+          ? row.saleRevenue
+          : (saleQty > 0 && salePrice != null ? saleQty * salePrice : (row.posMovementQty > 0 ? null : 0));
+        const profit = hasLineDetail && row.hasSaleCost
+          ? row.saleProfit
+          : (saleQty > 0 && unitGain != null ? saleQty * unitGain : (row.posMovementQty > 0 ? null : 0));
+        const revenueApprox = !hasLineDetail && saleQty > 0 && revenue != null;
+        const profitApprox = (!hasLineDetail || !row.hasSaleCost) && saleQty > 0 && profit != null;
+        const lossValue = row.lossCostTotal > 0
+          ? row.lossCostTotal
+          : (row.losses > 0 && cost != null ? row.losses * cost : null);
+        const lossValueApprox = row.losses > 0 && row.lossCostTotal <= 0 && lossValue != null;
+        if (row.opening != null) totals.opening += row.opening;
+        if (row.final != null) totals.final += row.final;
+        totals.incoming += row.incoming;
+        totals.reinvestment += row.reinvestment;
+        totals.losses += row.losses;
+        totals.otherOut += row.otherOut;
+        if (balanceSales != null) totals.balanceSales += balanceSales;
+        totals.posSales += saleQty;
+        if (profit != null) totals.profit += profit;
+        if (revenue != null) totals.revenue += revenue;
+        if (lossValue != null) totals.lossValue += lossValue;
+        return Object.assign({}, row, {
+          cost: cost,
+          salePrice: salePrice,
+          unitGain: unitGain,
+          unitGainApprox: unitGainApprox,
+          costApprox: costApprox,
+          priceApprox: priceApprox,
+          markup: markup,
+          markupApprox: unitGainApprox,
+          balanceSales: balanceSales,
+          saleQty: saleQty,
+          revenue: revenue,
+          profit: profit,
+          revenueApprox: revenueApprox,
+          profitApprox: profitApprox,
+          lossValue: lossValue,
+          lossValueApprox: lossValueApprox
+        });
+      });
+      const salesApprox = !salesLines || (salesIds.size > 0 && salesLines.length === 0);
+      const hasAnySalesDetail = !!salesLines && salesLines.length > 0;
+      const declaredByCurrency = new Map();
+      cashRows.forEach(function (row) {
+        const currency = String(row.currency || 'Sin moneda registrada');
+        declaredByCurrency.set(currency, (declaredByCurrency.get(currency) || 0) + bookNumber(row.declared));
+      });
+      const fmtCell = function (value, type, approximate) {
+        if (value == null) return '—';
+        return type === 'money' ? bookMoney(value, approximate) : bookQty(value);
+      };
+      const totalsApprox = tableRows.some(function (row) { return row.revenueApprox || row.profitApprox; });
+      const totalLossApprox = tableRows.some(function (row) { return row.lossValueApprox; });
+      const tableBody = tableRows.map(function (row) {
+        const cells = [
+          row.markup == null ? '—' : (row.markupApprox ? '≈ ' : '') + row.markup.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '%',
+          fmtCell(row.unitGain, 'money', row.unitGainApprox),
+          fmtCell(row.cost, 'money', row.costApprox),
+          fmtCell(row.salePrice, 'money', row.priceApprox),
+          esc(row.name),
+          fmtCell(row.opening, 'qty', false),
+          fmtCell(row.incoming, 'qty', false),
+          fmtCell(row.reinvestment, 'qty', false),
+          fmtCell(row.losses, 'qty', false),
+          fmtCell(row.otherOut, 'qty', false),
+          fmtCell(row.final, 'qty', false),
+          fmtCell(row.balanceSales, 'qty', false),
+          fmtCell(row.saleQty, 'qty', false),
+          fmtCell(row.profit, 'money', row.profitApprox),
+          fmtCell(row.revenue, 'money', row.revenueApprox),
+          fmtCell(row.lossValue, 'money', row.lossValueApprox)
+        ];
+        return '<tr>' + cells.map(function (cell, index) {
+          return '<td' + ((index === 13 || index === 14 || index === 15) ? ' class="m33-num"' : '') + '>' + cell + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+      const totalMarkup = '<tr><th colspan="5">TOTAL DEL TURNO</th>' +
+        '<td>' + (allOpening ? bookQty(totals.opening) : '—') + '</td>' +
+        '<td>' + bookQty(totals.incoming) + '</td>' +
+        '<td>' + bookQty(totals.reinvestment) + '</td>' +
+        '<td>' + bookQty(totals.losses) + '</td>' +
+        '<td>' + bookQty(totals.otherOut) + '</td>' +
+        '<td>' + (allFinal ? bookQty(totals.final) : '—') + '</td>' +
+        '<td>' + (allOpening && allFinal ? bookQty(totals.balanceSales) : '—') + '</td>' +
+        '<td>' + bookQty(totals.posSales) + '</td>' +
+        '<td>' + bookMoney(totals.profit, totalsApprox) + '</td>' +
+        '<td>' + bookMoney(totals.revenue, totalsApprox) + '</td>' +
+        '<td>' + bookMoney(totals.lossValue, totalLossApprox) + '</td></tr>';
+      const reinvestmentBody = reinvestmentRows.length ? reinvestmentRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.product) + '</td><td>' + bookQty(row.quantity) +
+          '</td><td>' + bookMoney(row.unitCost, false) + '</td><td>' + bookMoney(row.total, false) + '</td><td>' +
+          esc(row.actor) + (row.supplier ? '<small> · ' + esc(row.supplier) + '</small>' : '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="6">Sin reinversiones registradas.</td></tr>';
+      const expenseBody = expenseRows.length ? expenseRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.concept) +
+          (row.description ? '<small>' + esc(row.description) + '</small>' : '') + '</td><td>' +
+          bookMoney(row.amount, false) + '</td><td>' + esc(row.status) + '</td><td>' + esc(row.actor) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5">Sin gastos registrados.</td></tr>';
+      const cashBody = cashRows.length ? cashRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
+          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5">No hay declaraciones de dinero registradas.</td></tr>';
+      const pendingAdjustmentBody = pendingAdjustmentRows.length ? pendingAdjustmentRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.kind) + '</td><td>' + esc(row.product) +
+          '</td><td>' + bookQty(row.quantity) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.status) +
+          '</td><td>' + esc(row.actor) + '</td></tr>';
+      }).join('') : '<tr><td colspan="7">No hay solicitudes pendientes o rechazadas asociadas al turno.</td></tr>';
+      const snapshotNote = (!hasOpening || !hasFinal)
+        ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
+        : '';
+      const needsRevenueEstimate = tableRows.some(function (row) { return row.revenueApprox; });
+      const needsProfitEstimate = tableRows.some(function (row) { return row.profitApprox; });
+      const salesNote = needsRevenueEstimate
+        ? 'Algunos importes POS están aproximados con precio actual porque no se pudo leer su línea histórica. La ganancia usa costo FIFO cuando está disponible; cualquier alternativa se marca ≈.'
+        : (needsProfitEstimate
+          ? 'El ingreso procede de líneas POS históricas; la ganancia de productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
+          : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.');
+      const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
+      const summaryItems = [
+        ['Ingreso POS', bookMoney(totals.revenue, totalsApprox)],
+        ['Ganancia', bookMoney(totals.profit, totalsApprox)],
+        ['Reinversiones', bookMoney(reinvestmentTotal, false)],
+        ['Gastos aprobados', bookMoney(expenseTotal, false)],
+        ['Gastos pendientes', bookMoney(expensePendingTotal, false)]
+      ];
+      if (expenseRejectedTotal > 0) summaryItems.push(['Gastos rechazados', bookMoney(expenseRejectedTotal, false)]);
+      if (expenseOtherStatusTotal > 0) summaryItems.push(['Gastos · otros estados', bookMoney(expenseOtherStatusTotal, false)]);
+      declaredByCurrency.forEach(function (amount, currency) {
+        summaryItems.push(['Dinero declarado · ' + currency, bookMoney(amount, false) + (currency === 'Sin moneda registrada' ? '' : ' ' + currency)]);
+      });
+      const summary = summaryItems.map(function (item) {
+        return '<div class="m33-book-metric"><small>' + item[0] + '</small><b>' + item[1] + '</b></div>';
+      }).join('');
+      const notes = [snapshotNote, salesNote, cashNote].filter(Boolean).map(function (item) {
+        return '<div class="m33-book-note">' + esc(item) + '</div>';
+      }).join('');
+      host.innerHTML = '<div class="m33-book-summary">' + summary + '</div>' + notes +
+        '<section class="m33-book-section"><h4>Inventario consolidado por producto</h4><div class="m33-book-scroll">' +
+        '<table class="m33-book-table"><thead><tr><th>% G</th><th>G/u</th><th>P.C.</th><th>P.V.</th><th>Producto</th><th>Inv. inicial</th><th>Entradas</th><th>Reinversión</th><th>Bajas</th><th>Otros</th><th>Inv. final</th><th>Venta (saldo)</th><th>Venta POS</th><th>Ganancia</th><th>Ingreso</th><th>Bajas $</th></tr></thead><tbody>' +
+        (tableBody || '<tr><td colspan="16">No hay productos asociados a los cortes o movimientos del turno.</td></tr>') +
+        '</tbody><tfoot>' + totalMarkup + '</tfoot></table></div></section>' +
+        '<div class="m33-book-subtables">' +
+        '<section class="m33-book-section"><h4>Reinversiones detalladas · ' + bookMoney(reinvestmentTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Producto</th><th>Uds.</th><th>P.C.</th><th>Inversión</th><th>Responsable</th></tr></thead><tbody>' + reinvestmentBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Gastos aprobados · ' + bookMoney(expenseTotal, false) +
+        ' · pendientes ' + bookMoney(expensePendingTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
+        '</div>' +
+        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Solicitudes de merma y baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
+      state.inventoryBook = {
+        products: tableRows,
+        totals: totals,
+        reinvestmentRows: reinvestmentRows,
+        expenseRows: expenseRows,
+        cashRows: cashRows,
+        pendingAdjustmentRows: pendingAdjustmentRows,
+        salesApprox: salesApprox,
+        hasMovementRead: hasMovementRead
+      };
+    } catch (error) {
+      host.innerHTML = '<div class="m33-book-empty">No se pudo construir el inventario consolidado: ' +
+        esc(error && error.message ? error.message : error) + '. No se han modificado registros.</div>';
+    }
+  }
+
   function renderInventoryLedger(rows, hasOpening, pendingMessage) {
     if (!rows.length) {
       return (pendingMessage ? '<div class="m33-inventory-note">' + esc(pendingMessage) + '</div>' : '') +
@@ -408,8 +1059,8 @@
     return user ? (user.nombre || user.nombre_usuario || user.email || String(id)) : (id ? String(id) : '—');
   }
   function bindInventoryButtons(overlay) {
-    overlay.querySelectorAll('[data-m33-inventory-sessions]').forEach(function (button) {
-      button.addEventListener('click', function () { loadInventoryDay(button); });
+    overlay.querySelectorAll('[data-m33-inventory-book]').forEach(function (button) {
+      button.addEventListener('click', function () { loadInventoryBook(button); });
     });
   }
   function step5(t) {
@@ -666,6 +1317,22 @@
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
       return;
     }
+    if (state.step === 2 && !state.readOnly && !state.staffRequestAttempted) {
+      state.staffRequestAttempted = true;
+      state.staffLoading = true;
+      state.staffError = 'Cargando responsables…';
+      ensureAssignmentUsers(true).then(function () {
+        state.staffLoaded = true;
+        state.staffLoading = false;
+        state.staffError = '';
+        renderModal();
+      }).catch(function (error) {
+        state.staffLoaded = false;
+        state.staffLoading = false;
+        state.staffError = String(error && error.message ? error.message : error);
+        renderModal();
+      });
+    }
     const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];
     const bodies = [step1(t), step2(), step3(), step4(), step5(t)];
     const prev = state.step > 1 ? '<button type="button" id="m33-prev">Atrás</button>' : '';
@@ -677,17 +1344,43 @@
     var cf = ov.querySelector('#m33-close-final'); if (cf) cf.onclick = close;
     var d = ov.querySelector('#m33-delete'); if (d) d.onclick = deleteTurno;
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
-    if (state.step === 2 && !state.readOnly) bindAssignmentAutosave();
+    if (state.step === 2 && !state.readOnly) {
+      bindAssignmentAutosave();
+      const retryStaff = ov.querySelector('[data-m33-reload-staff]');
+      if (retryStaff) retryStaff.addEventListener('click', async function () {
+        state.staffRequestAttempted = true;
+        state.staffLoading = true;
+        state.staffLoaded = false;
+        state.staffError = '';
+        renderModal();
+        try {
+          await ensureAssignmentUsers(true);
+          state.staffLoaded = true;
+        } catch (error) {
+          state.staffError = String(error && error.message ? error.message : error);
+        }
+        state.staffLoading = false;
+        renderModal();
+      });
+    }
     if (state.step === 3) bindArchiveButtons(ov);
     if (state.step === 4) {
       bindInventoryButtons(ov);
-      const firstInventoryDay = ov.querySelector('[data-m33-inventory-sessions]');
-      if (firstInventoryDay) loadInventoryDay(firstInventoryDay);
+      const bookButton = ov.querySelector('[data-m33-inventory-book]');
+      if (bookButton) loadInventoryBook(bookButton);
     }
   }
 
   async function open(id, options) {
-    css(); state.step = 1; state.busy = true; state.readOnly = !!(options && options.readOnly === true); await resolveAdmin();
+    css();
+    state.step = 1;
+    state.busy = true;
+    state.readOnly = !!(options && options.readOnly === true);
+    state.staffError = '';
+    state.staffLoading = false;
+    state.staffLoaded = false;
+    state.staffRequestAttempted = false;
+    await resolveAdmin();
     const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
     try { await load(id); state.busy = false; renderModal(); }
     catch (e) { state.busy = false; ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>'; ov.querySelector('#m33-error-close').onclick = close; }
@@ -708,6 +1401,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.13', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.14', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

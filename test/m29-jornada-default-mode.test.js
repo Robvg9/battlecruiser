@@ -43,6 +43,7 @@ function setup(t) {
   };
   const createdLegacy = [];
   const jornadaCalls = [];
+  const staffCalls = [];
   window.BattleCruiserTurnoAPI = {
     actorIsAdmin: async () => true,
     crearTurno: async (payload) => { createdLegacy.push(payload); return { id: "legacy-turn" }; },
@@ -51,13 +52,20 @@ function setup(t) {
   };
   window.client = {
     rpc: async (name, payload) => {
+      if (name === "listar_usuarios_admin") {
+        staffCalls.push({ name, payload });
+        return { data: [
+          { id: "dep-1", nombre: "Dependienta 1", rol: "Dependienta", activo: true, archivado: false },
+          { id: "dep-2", nombre: "Dependienta 2", rol: "Dependienta", activo: true, archivado: false }
+        ], error: null };
+      }
       jornadaCalls.push({ name, payload });
       return { data: { turno_id: "jornada-turn", estado: "PROGRAMADO" }, error: null };
     }
   };
   window.eval(SOURCE);
   t.after(() => window.close());
-  return { window, createdLegacy, jornadaCalls };
+  return { window, createdLegacy, jornadaCalls, staffCalls };
 }
 
 test("M29 creates complete-day JORNADA by default with one named responsible per working day", async (t) => {
@@ -69,6 +77,8 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
 
   const modal = window.document.getElementById("m29-crear-overlay");
   assert.ok(modal, "Crear Turno opens the modal");
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7),
+    "the default day grid appears after the canonical staff catalog is loaded");
   const days = modal.querySelector("#m29-create-days");
   assert.equal(days.dataset.mode, "jornada", "Jornada completa is the default model");
   assert.match(modal.querySelector("#m29-mode-label").textContent, /Jornada completa/);
@@ -109,6 +119,8 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
   root.querySelector("#m29-btn-crear").click();
 
   const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7),
+    "the default day grid appears after the canonical staff catalog is loaded");
   modal.querySelector("#m29-toggle-plan-b").click();
   const days = modal.querySelector("#m29-create-days");
   assert.equal(days.dataset.mode, "legacy");
@@ -187,3 +199,52 @@ test("M29 loads active eligible responsables when the shared cache is empty", as
   assert.match(SOURCE, /grid-template-columns:minmax\(100px,.7fr\) auto minmax\(190px,1.3fr\)/);
 });
 
+
+test("M29 refreshes the canonical responsible catalog even when stale cached roles look eligible", async (t) => {
+  const { window } = setup(t);
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+  window._cache.usuarios = [
+    { id: "dep-cache", nombre: "Dependienta en caché", activo: true },
+    { id: "owner-cache", nombre: "Dueño en caché", activo: true },
+    { id: "archived-cache", nombre: "Dependienta archivada en caché", rol: "Dependienta", activo: true }
+  ];
+  const authoritative = [
+    { id: "dep-cache", nombre: "Dependienta recuperada", rol: "Dependienta", activo: true, archivado: false },
+    { id: "owner-cache", nombre: "Dueño recuperado", rol: "Dueño", activo: true, archivado: false },
+    { id: "inactive", nombre: "Inactiva", rol: "Dependienta", activo: false, archivado: false },
+    { id: "warehouse", nombre: "Almacenero", rol: "Almacenero", activo: true, archivado: false }
+  ];
+  const calls = [];
+  window.client.rpc = async (name, payload) => {
+    calls.push({ name, payload });
+    if (name === "listar_usuarios_admin") return { data: authoritative, error: null };
+    if (name === "bc5_crear_jornada_unica") return { data: { turno_id: "turno-test" }, error: null };
+    throw new Error("RPC inesperada: " + name);
+  };
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")));
+  root.querySelector("#m29-btn-crear").click();
+  const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(modal);
+  const ready = await waitFor(() => {
+    const select = modal.querySelector("[data-m29-person]");
+    return select && select.options.length === 3;
+  }, 4000);
+  assert.ok(ready, "the selector must be hydrated from the role-authoritative RPC even if the shared cache has no role fields");
+  const select = modal.querySelector("[data-m29-person]");
+  assert.deepEqual(Array.from(select.options).map((option) => option.value), ["", "dep-cache", "owner-cache"]);
+  assert.equal(select.options[1].textContent, "Dependienta recuperada");
+  assert.ok(!Array.from(select.options).some((option) => option.value === "archived-cache"),
+    "a stale locally cached user missing from the canonical unarchived server catalog must not be resurrected");
+  assert.equal(window.__BC_M29_STAFF_CACHE_LOADED__, true);
+  assert.equal(calls[0].name, "listar_usuarios_admin");
+  assert.equal(calls[0].payload.p_incluir_archivados, false);
+  assert.deepEqual(Object.keys(calls[0].payload), ["p_incluir_archivados"]);
+  assert.equal(calls.filter((call) => call.name === "listar_usuarios_admin").length, 1,
+    "opening the create modal must refresh the canonical catalog exactly once");
+  assert.match(modal.querySelector("#m29-create-summary").textContent, /responsables asignados|pendientes/);
+  const compactCss = window.document.getElementById("bc-m29-compact-modal-css");
+  assert.ok(compactCss, "the create modal must load the compact layout overrides");
+  assert.match(compactCss.textContent, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+});

@@ -64,7 +64,9 @@ function setup(t, { admin = true } = {}) {
   const rpcCalls = [];
   window._usuarioActual = { id: "owner-fixture", nombre: "Dueño fixture", rol: admin ? "dueño" : "dependienta" };
   window.__bcUser = { rol: admin ? "dueño" : "dependienta" };
-  window._cache = { almacenes: [{ id: "alm-1", nombre: "La Cueva", activo: true }], usuarios: [] };
+  window._cache = { almacenes: [{ id: "alm-1", nombre: "La Cueva", activo: true }], usuarios: [
+    { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+  ] };
   window.tienePermiso = () => admin;
   window.escHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -80,6 +82,9 @@ function setup(t, { admin = true } = {}) {
   window.client = {
     rpc: async (name, params = {}) => {
       rpcCalls.push({ name, params: { ...params } });
+      if (name === "listar_usuarios_admin") return { data: [
+        { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+      ], error: null };
       if (name !== "bc7_movimientos_sesion") return { data: null, error: { code: "UNEXPECTED_RPC", message: name } };
       return { data: (rowsBySession[params.p_turno_sesion_id] || []).map((row) => ({ ...row })), error: null };
     }
@@ -106,15 +111,15 @@ test("Paso 4: M33 consulta el archivo de un turno cerrado por fecha sin mutar re
   assert.ok(await waitFor(() => host1.textContent.includes("Compra vinculada día 1") && host1.textContent.includes("Venta vinculada día 1")),
     "el día 1 debe mostrar operaciones de sus sesiones");
   assert.doesNotMatch(host1.textContent, /Compra vinculada día 2|Venta vinculada día 2/);
-  assert.deepEqual(rpcCalls.map((call) => call.params.p_turno_sesion_id).sort(),
+  assert.deepEqual(rpcCalls.filter((call) => call.name === "bc7_movimientos_sesion").map((call) => call.params.p_turno_sesion_id).sort(),
     ["session-day1-am", "session-day1-pm"], "la consulta debe enviar las sesiones exactas del día");
   groups[1].querySelector("[data-m33-archive-sessions]").click();
   const host2 = groups[1].querySelector("[data-m33-archive-host]");
   assert.ok(await waitFor(() => host2.textContent.includes("Compra vinculada día 2") && host2.textContent.includes("Venta vinculada día 2")),
     "el día 2 debe mostrar sus propias operaciones");
   assert.doesNotMatch(host2.textContent, /Compra vinculada día 1|Venta vinculada día 1/);
-  assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
-    "la prueba solo permite RPCs de lectura del archivo");
+  assert.ok(rpcCalls.filter((call) => call.name !== "listar_usuarios_admin").every((call) => call.name === "bc7_movimientos_sesion"),
+    "el expediente solo puede consultar responsables y RPCs de lectura del archivo");
 });
 
 
@@ -129,7 +134,7 @@ test("Paso 4: personal asignado también accede solo al archivo de sus sesiones"
   const host = groups[0].querySelector("[data-m33-archive-host]");
   assert.ok(await waitFor(() => host.textContent.includes("Compra vinculada día 1")),
     "se consulta el archivo de solo lectura para las sesiones asignadas");
-  assert.deepEqual(rpcCalls.map((call) => call.params.p_turno_sesion_id).sort(),
+  assert.deepEqual(rpcCalls.filter((call) => call.name === "bc7_movimientos_sesion").map((call) => call.params.p_turno_sesion_id).sort(),
     ["session-day1-am", "session-day1-pm"]);
 });
 
@@ -157,8 +162,8 @@ test("Paso 4: el historial cerrado abre M33 en modo de solo lectura, sin control
     "el archivo debe poder consultarse sin salir del modo histórico");
   assert.ok(rpcCalls.length > 0, "la vista de movimientos debe haber usado su RPC de lectura");
   assert.equal(writeCalls.length, 0, "abrir y navegar por el expediente no debe llamar RPCs de escritura");
-  assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
-    "el archivo del historial solo puede consultar el RPC de lectura");
+  assert.ok(rpcCalls.filter((call) => call.name !== "listar_usuarios_admin").every((call) => call.name === "bc7_movimientos_sesion"),
+    "el historial solo puede consultar el catálogo de responsables y el RPC de lectura");
 });
 
 test("Paso 4: un expediente histórico de dependienta no permite abrir sesiones aunque estén pendientes", async (t) => {
@@ -193,20 +198,31 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   window.client = {
     rpc: async (name, params = {}) => {
       rpcCalls.push({ name, params: { ...params } });
+      if (name === "listar_usuarios_admin") return { data: [
+        { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+      ], error: null };
       if (name === "bc7_obtener_inventario_jornada") {
         return { error: null, data: {
           productos: [{ producto_id: "product-1", nombre: "Café", unidad: "kg" }],
-          cortes: { INICIAL: {
-            id: "opening-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T07:00:00-04:00",
-            confirmado_por: "owner-fixture",
-            lineas: [{ producto_id: "product-1", cantidad_contada: 10 }]
-          } }
+          cortes: {
+            INICIAL: {
+              id: "opening-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T07:00:00-04:00",
+              confirmado_por: "owner-fixture",
+              lineas: [{ producto_id: "product-1", cantidad_contada: 10 }]
+            },
+            FINAL: {
+              id: "final-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T22:00:00-04:00",
+              confirmado_por: "owner-fixture",
+              lineas: [{ producto_id: "product-1", cantidad_contada: 13 }]
+            }
+          }
         } };
       }
       if (name === "bc7_movimientos_sesion") {
         return { error: null, data: [
           { fecha: "2026-10-20T09:00:00-04:00", tipo: "compra", producto: "Café", cantidad: 5, usuario: "Responsable fixture", operacion_id: "op-buy-1" },
-          { fecha: "2026-10-20T10:00:00-04:00", tipo: "venta", producto: "Café", cantidad: -2, usuario: "Responsable fixture", operacion_id: "op-sale-1" }
+          { fecha: "2026-10-20T10:00:00-04:00", tipo: "venta", producto: "Café", cantidad: -2, usuario: "Responsable fixture", operacion_id: "op-sale-1" },
+          { fecha: "2026-10-20T11:00:00-04:00", tipo: "baja", producto: "Café", cantidad: -1, costo_unitario: 3, usuario: "Dueño fixture", operacion_id: "op-loss-1" }
         ] };
       }
       if (name === "bc7_finanzas_jornada") {
@@ -220,26 +236,59 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
         } };
       }
       return { error: { code: "UNEXPECTED_RPC", message: name }, data: null };
-    }
+    },
+    from: (table) => ({
+      select: () => ({
+        in: async (column, values) => {
+          if (table === "ventas_lineas") return { error: null, data: [{
+            venta_id: "op-sale-1", producto_id: "product-1", cantidad: 2,
+            precio_unitario: 20, subtotal: 40, costo_unitario_fifo: 5
+          }] };
+          if (table === "productos") return { error: null, data: [{
+            id: "product-1", nombre: "Café", precio_normal: 20
+          }] };
+          if (table === "turno_declaraciones") return { error: null, data: [
+      { turno_sesion_id: "jornada-day1", usuario_id: "owner-fixture", monto: 100, moneda: "CUP", declarado_at: "2026-10-20T20:00:00-04:00", estado_aprobacion: "APROBADO" },
+      { turno_sesion_id: "jornada-day1", usuario_id: "owner-fixture", monto: 10, moneda: "USD", declarado_at: "2026-10-20T20:05:00-04:00", estado_aprobacion: "ESPERANDO_APROBACION" }
+    ] };
+          return { error: null, data: [] };
+        }
+      })
+    })
   };
   await window.__BC_M33.open("turno-closed-fixture");
   const modal = window.document.getElementById("m33-bg");
   modal.querySelector("#m33-next").click();
   modal.querySelector("#m33-next").click();
   modal.querySelector("#m33-next").click();
-  const openBook = modal.querySelector("[data-m33-inventory-sessions]");
-  assert.ok(openBook, "Inventario must show a day entry with an explicit open-book action");
+  const openBook = modal.querySelector("[data-m33-inventory-book]");
+  assert.ok(openBook, "Inventario must render one consolidated workbook, not one card per day");
   const host = modal.querySelector("[data-m33-inventory-host]");
-  assert.ok(await waitFor(() => host.dataset.loaded === "1"), "the first day's ledger should load automatically from read-only RPCs");
-  assert.equal(host.hidden, false, "Inventory should show the first day ledger immediately without an extra click");
-  assert.match(host.textContent, /Inventario inicial confirmado/);
-  assert.match(host.textContent, /Compra \/ entrada/);
-  assert.match(host.textContent, /Venta \/ salida/);
-  assert.match(host.textContent, /Reinversión \/ entrada/);
+  assert.ok(await waitFor(() => host.querySelector(".m33-book-table")), "the consolidated product sheet should load automatically from read-only RPCs");
+  assert.equal(host.hidden, false, "the inventory sheet is visible immediately without an extra click");
+  assert.match(host.textContent, /Inventario consolidado por producto/);
+  assert.match(host.textContent, /Inv\. inicial/);
+  assert.match(host.textContent, /Entradas/);
+  assert.match(host.textContent, /Reinversión/);
+  assert.match(host.textContent, /Venta \(saldo\)/);
+  assert.match(host.textContent, /Venta POS/);
+  assert.match(host.textContent, /Reinversiones detalladas/);
   assert.match(host.textContent, /Electricidad/);
-  assert.match(host.textContent, /Gasto CUP/);
-  assert.match(host.textContent, /Solicitud de merma/);
-  assert.match(host.textContent, /no descuenta stock/);
+  assert.match(host.textContent, /Solicitudes de merma y baja/);
+  assert.match(host.textContent, /no descuenta existencias/);
+  assert.match(host.textContent, /Recogido por dueño/);
+  assert.match(host.textContent, /Gastos aprobados/);
+  assert.match(host.textContent, /Gastos pendientes/);
+  assert.match(host.textContent, /Dinero declarado · CUP/);
+  assert.match(host.textContent, /Dinero declarado · USD/);
+  assert.match(host.textContent, /100,00 CUP/);
+  assert.match(host.textContent, /10,00 USD/);
+  const productRow = host.querySelector(".m33-book-table tbody tr");
+  assert.ok(productRow, "the product matrix must contain its Café fixture row");
+  assert.deepEqual(Array.from(productRow.cells).map((cell) => cell.textContent.trim()), [
+    "300%", "15,00", "5,00", "20,00", "Café", "10", "5", "3", "1", "0",
+    "13", "4", "2", "30,00", "40,00", "3,00"
+  ], "the spreadsheet columns must reconcile real opening, entries, reinvestment, approved loss, closing count and FIFO sales");
   assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_movimientos_sesion"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_finanzas_jornada"));
@@ -247,3 +296,37 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.doesNotMatch(SOURCE, /stock_actual/, "the ledger must not mislabel current stock as historical opening stock");
 });
 
+
+test("M33 hydrates the assignment selectors from the authorized responsible-user catalog", async (t) => {
+  const { window, sessions } = setup(t);
+  window._cache.usuarios = [
+    { id: "staff-cache", nombre: "Responsable en caché", activo: true },
+    { id: "staff-stale", nombre: "Responsable obsoleto", rol: "Dependienta", activo: true, archivado: false }
+  ];
+  const staffRows = [
+    { id: "dep-live", nombre: "Dependienta LIVE", rol: "Dependienta", activo: true, archivado: false },
+    { id: "owner-live", nombre: "Dueño LIVE", rol: "Dueño", activo: true, archivado: false }
+  ];
+  const calls = [];
+  window.client.rpc = async (name, params = {}) => {
+    calls.push({ name, params });
+    if (name === "listar_usuarios_admin") return { data: staffRows, error: null };
+    throw new Error("RPC inesperada: " + name);
+  };
+  await window.__BC_M33.open("turno-closed-fixture");
+  const modal = window.document.getElementById("m33-bg");
+  modal.querySelector("#m33-next").click();
+  const hydrated = await waitFor(() => {
+    const selects = Array.from(modal.querySelectorAll("select[data-m33-sid]"));
+    return selects.length === sessions.length && selects.every((select) => select.options.length === 3);
+  }, 4000);
+  assert.ok(hydrated, "each assignment select must contain the authoritative active responsible users");
+  const first = modal.querySelector("select[data-m33-sid]");
+  assert.deepEqual(Array.from(first.options).map((option) => option.value), ["", "dep-live", "owner-live"]);
+  assert.ok(!Array.from(first.options).some((option) => option.value === "staff-stale"),
+    "the assignment form must not resurrect a stale staff member missing from the canonical catalog");
+  assert.equal(calls[0].name, "listar_usuarios_admin");
+  assert.equal(calls[0].params.p_incluir_archivados, false);
+  assert.deepEqual(Object.keys(calls[0].params), ["p_incluir_archivados"]);
+  assert.equal(window.document.querySelector("#bc-m33-compact-sheet-css") !== null, true);
+});

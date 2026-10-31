@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.17';
+  var VERSION = '29.18';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -129,6 +129,37 @@
       '[' + HOME_MARK + '="1"] #m24-asig-panel,[' + HOME_MARK + '="1"] #m22-sesiones-panel,.m33-home{display:none!important}'
     ].join('');
     document.head.appendChild(s);
+    if (!document.getElementById('bc-m29-compact-modal-css')) {
+      var compact = document.createElement('style');
+      compact.id = 'bc-m29-compact-modal-css';
+      compact.textContent = [
+        '#m29-crear-overlay{padding:7px!important;align-items:center!important}',
+        '#m29-crear-overlay .m29-modal{width:min(760px,calc(100vw - 14px))!important;max-width:760px!important;max-height:calc(100dvh - 14px)!important;overflow:auto!important;padding:10px 12px!important;border-radius:11px!important;display:flex!important;flex-direction:column!important;gap:5px!important}',
+        '#m29-crear-overlay .m29-modal>h3{font-size:1.08rem!important;margin:0 0 3px!important;line-height:1.2!important}',
+        '#m29-crear-overlay .m29-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 100px;gap:7px;align-items:end}',
+        '#m29-crear-overlay .m29-field{margin:0!important;min-width:0}',
+        '#m29-crear-overlay .m29-field label{font-size:10px!important;margin:0 0 3px!important;letter-spacing:.03em}',
+        '#m29-crear-overlay .m29-field input,#m29-crear-overlay .m29-field select{box-sizing:border-box;min-height:32px!important;padding:5px 7px!important;font-size:12px!important;width:100%;margin:0!important}',
+        '#m29-crear-overlay .m29-mode-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}',
+        '#m29-crear-overlay #m29-mode-label{margin:0!important;font-size:11px;line-height:1.25;opacity:.8}',
+        '#m29-crear-overlay #m29-toggle-plan-b{min-height:28px!important;padding:4px 8px!important;font-size:10px!important;white-space:nowrap}',
+        '#m29-crear-overlay #m29-staff-status{margin:0!important;min-height:14px!important;font-size:10px!important;line-height:1.2}',
+        '#m29-crear-overlay #m29-create-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}',
+        '#m29-crear-overlay .m29-create-day{display:grid!important;grid-template-columns:minmax(78px,.85fr) auto minmax(112px,1.2fr)!important;gap:4px!important;align-items:center!important;padding:4px 5px!important;margin:0!important;min-height:34px!important;border-radius:6px!important}',
+        '#m29-crear-overlay .m29-create-day>strong{font-size:10px!important;line-height:1.15!important;white-space:normal}',
+        '#m29-crear-overlay .m29-create-day label{font-size:9px!important;line-height:1.1!important;margin:0!important;gap:2px!important;min-width:0}',
+        '#m29-crear-overlay .m29-create-day label.m29-create-check{font-size:9px!important;gap:3px!important;white-space:nowrap}',
+        '#m29-crear-overlay .m29-create-day select{min-height:28px!important;padding:4px 5px!important;font-size:10px!important;line-height:1.1!important}',
+        '#m29-crear-overlay .m29-create-day input[type=checkbox]{width:13px!important;height:13px!important;min-width:13px!important;min-height:13px!important;max-width:13px!important;max-height:13px!important;flex:0 0 13px!important}',
+        '#m29-crear-overlay .m29-create-summary{margin:0!important;padding:5px 7px!important;font-size:10px!important;line-height:1.2!important}',
+        '#m29-crear-overlay .m29-actions{margin:2px 0 0!important;gap:6px!important}',
+        '#m29-crear-overlay .m29-actions button{min-height:32px!important;padding:6px 12px!important;font-size:11px!important}',
+        '#m29-crear-overlay #m29-modal-msg{min-height:0!important;margin:0!important}',
+        '@media(max-width:620px){#m29-crear-overlay .m29-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 76px;gap:5px}#m29-crear-overlay #m29-create-days{grid-template-columns:minmax(0,1fr)}#m29-crear-overlay .m29-create-day{grid-template-columns:minmax(78px,.85fr) auto minmax(130px,1.3fr)!important}}',
+        '@media(max-width:380px){#m29-crear-overlay .m29-fields{grid-template-columns:1fr 1fr}#m29-crear-overlay .m29-field:nth-child(3){grid-column:1/-1}}'
+      ].join('');
+      document.head.appendChild(compact);
+    }
   }
 
   function normalizeAdminFlag(r) {
@@ -406,30 +437,58 @@
     var ov = document.getElementById('m29-crear-overlay');
     if (ov) ov.remove();
   }
+  function staffRowsFrom(value) {
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object') return [];
+    var keys = ['usuarios','users','rows','items','data'];
+    for (var i = 0; i < keys.length; i++) {
+      if (Array.isArray(value[keys[i]])) return value[keys[i]];
+    }
+    return value.id ? [value] : [];
+  }
+  function staffRole(user) {
+    var value = user && (user.rol || user.nombre_rol || user.role_name || user.role);
+    if (value && typeof value === 'object') value = value.nombre || value.name || value.rol || value.role_name;
+    return String(value || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function staffIsEligible(user) {
+    if (!user || !user.id) return false;
+    if (user.activo === false || String(user.activo).toLowerCase() === 'false' || user.activo === 0) return false;
+    if (user.archivado === true || String(user.archivado).toLowerCase() === 'true' || user.archivado === 1) return false;
+    var role = staffRole(user);
+    return role.indexOf('dependienta') >= 0 || role.indexOf('dueno') === 0 || role === 'admin' || role === 'administrador';
+  }
   function eligibleStaff() {
-    var cacheRows = (typeof _cache !== 'undefined' && _cache && Array.isArray(_cache.usuarios))
-      ? _cache.usuarios
-      : (Array.isArray(window.__BC_M29_STAFF_CACHE__) ? window.__BC_M29_STAFF_CACHE__ : []);
-    return cacheRows.filter(function (u) {
-      if (!u || !u.id || u.activo === false || u.archivado) return false;
-      var role = String(u.rol || u.role_name || u.nombre_rol || u.role || '').toLowerCase().trim();
-      return role.indexOf('dependienta') >= 0 || role.indexOf('due') === 0;
+    var cached = [];
+    try { if (typeof _cache !== 'undefined' && _cache) cached = staffRowsFrom(_cache.usuarios); } catch (_) {}
+    if (!cached.length) cached = staffRowsFrom(window._cache && window._cache.usuarios);
+    var authoritative = staffRowsFrom(window.__BC_M29_STAFF_CACHE__);
+    // Once the server catalog has loaded, it is the sole source of truth.
+    // Do not resurrect archived/deleted people from a stale local cache.
+    var rows = window.__BC_M29_STAFF_CACHE_LOADED__ === true ? authoritative : cached;
+    return rows.filter(staffIsEligible).sort(function (a, b) {
+      return String(a.nombre || a.nombre_usuario || a.email || '').localeCompare(String(b.nombre || b.nombre_usuario || b.email || ''), 'es');
     });
   }
-  async function ensureEligibleStaff() {
+  async function ensureEligibleStaff(forceRefresh) {
     var people = eligibleStaff();
-    if (people.length) return people;
-    if (offlineNow()) throw new Error('Conecta el dispositivo para cargar la lista de responsables.');
-    if (!can('usuarios', 'ver')) throw new Error('Tu perfil no tiene permiso usuarios.ver para consultar responsables.');
+    if (people.length && !forceRefresh) return people;
+    if (offlineNow()) {
+      if (people.length) return people;
+      throw new Error('Conecta el dispositivo para cargar la lista de responsables.');
+    }
     if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
+      if (people.length) return people;
       throw new Error('El cliente del servidor no está disponible para cargar responsables.');
     }
-    var response = await client.rpc('listar_usuarios_admin', {});
+    var response = await client.rpc('listar_usuarios_admin', { p_incluir_archivados: false });
     if (response && response.error) {
+      if (people.length && !forceRefresh) return people;
       throw new Error(response.error.message || response.error.details || 'El servidor rechazó la consulta de usuarios.');
     }
-    var rows = Array.isArray(response && response.data) ? response.data : [];
+    var rows = staffRowsFrom(response && response.data);
     window.__BC_M29_STAFF_CACHE__ = rows;
+    window.__BC_M29_STAFF_CACHE_LOADED__ = true;
     try {
       if (typeof _cache !== 'undefined' && _cache) _cache.usuarios = rows;
       else {
@@ -438,7 +497,7 @@
       }
     } catch (_) {}
     people = eligibleStaff();
-    if (!people.length) throw new Error('No hay usuarios activos elegibles (Dependienta o Dueño) para asignar.');
+    if (!people.length) throw new Error('La consulta del servidor respondió, pero no contiene responsables activos con rol Dependienta o Dueño.');
     return people;
   }
   function staffOptions(selected) {
@@ -532,21 +591,24 @@
     var summary = document.getElementById('m29-create-summary');
     if (!host || !summary) return;
     var rows = readCreateRows();
+    var assigned = 0;
+    var rest = 0;
+    var pending = 0;
     if (host.dataset.mode === 'legacy') {
-      summary.innerHTML = rows.map(function (r) {
-        var morning = eligibleStaff().find(function (u) { return String(u.id) === String(r.manana); });
-        var afternoon = eligibleStaff().find(function (u) { return String(u.id) === String(r.tarde); });
-        return '<div>Día ' + r.numero_dia + ' · Mañana: ' + esc(morning ? (morning.nombre || morning.nombre_usuario || morning.id) : 'Sin asignar') +
-          ' · Tarde: ' + esc(afternoon ? (afternoon.nombre || afternoon.nombre_usuario || afternoon.id) : 'Sin asignar') + '</div>';
-      }).join('');
-    } else {
-      summary.innerHTML = rows.map(function (r) {
-        var person = eligibleStaff().find(function (u) { return String(u.id) === String(r.responsable_id); });
-        return '<div>Día ' + r.numero_dia + ' · ' + (r.trabaja
-          ? esc(person ? (person.nombre || person.nombre_usuario || person.id) : 'Responsable pendiente')
-          : 'Descanso') + '</div>';
-      }).join('');
+      rows.forEach(function (row) {
+        if (row.manana) assigned += 1; else pending += 1;
+        if (row.tarde) assigned += 1; else pending += 1;
+      });
+      summary.textContent = assigned + ' sesiones asignadas · ' + pending + ' sin asignar';
+      return;
     }
+    rows.forEach(function (row) {
+      if (!row.trabaja) rest += 1;
+      else if (row.responsable_id) assigned += 1;
+      else pending += 1;
+    });
+    summary.textContent = assigned + ' responsables asignados · ' + rest + ' descansos' +
+      (pending ? ' · ' + pending + ' pendientes' : '');
   }
   async function openCrearModal() {
     if (!state.isAdmin) return;
@@ -559,15 +621,17 @@
     var ov = document.createElement('div');
     ov.id = 'm29-crear-overlay';
     ov.className = 'm29-overlay';
-    ov.innerHTML = '<div class="m29-modal"><h3>Crear Turno</h3>' +
+    ov.innerHTML = '<div class="m29-modal"><h3>Crear turno</h3>' +
+      '<div class="m29-fields">' +
       '<div class="m29-field"><label>Almacén</label><select id="m29-almacen">' + opts + '</select></div>' +
       '<div class="m29-field"><label>Fecha inicial</label><input type="date" id="m29-inicio" value="' + hoy + '"></div>' +
-      '<div class="m29-field"><label>Días (1–31)</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div>' +
-      '<p id="m29-mode-label">Jornada completa · una persona responsable por día</p>' +
-      '<button type="button" class="m29-btn-refresh" id="m29-toggle-plan-b">Plan alternativo: dividir en Mañana y Tarde</button>' +
+      '<div class="m29-field"><label>Días</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div>' +
+      '</div>' +
+      '<div class="m29-mode-row"><span id="m29-mode-label">Jornada completa · un responsable por jornada</span>' +
+      '<button type="button" class="m29-btn-refresh" id="m29-toggle-plan-b">Alternar Mañana / Tarde</button></div>' +
       '<p id="m29-staff-status" class="m29-msg" role="status" aria-live="polite">Cargando responsables…</p>' +
       '<div id="m29-create-days" data-mode="jornada"></div>' +
-      '<div class="m29-create-summary"><strong>Resumen compacto</strong><div id="m29-create-summary"></div></div>' +
+      '<div class="m29-create-summary"><span id="m29-create-summary">Preparando programación…</span></div>' +
       '<div class="m29-msg" id="m29-modal-msg"></div>' +
       '<div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear" disabled>Crear turno</button></div></div>';
     document.body.appendChild(ov);
@@ -576,17 +640,10 @@
     document.getElementById('m29-inicio').addEventListener('change', buildCreateRows);
     document.getElementById('m29-dias').addEventListener('change', buildCreateRows);
     document.getElementById('m29-confirm-crear').onclick = confirmCrear;
-    var cachedPeople = eligibleStaff();
-    if (cachedPeople.length) {
-      var cachedStatus = document.getElementById('m29-staff-status');
-      if (cachedStatus) { cachedStatus.textContent = cachedPeople.length + ' responsables activos disponibles.'; cachedStatus.className = 'm29-msg ok'; }
-      buildCreateRows();
-      var cachedConfirm = document.getElementById('m29-confirm-crear');
-      if (cachedConfirm) cachedConfirm.disabled = false;
-      return;
-    }
     try {
-      var people = await ensureEligibleStaff();
+      // Online creation always validates the canonical active staff catalog.
+      // Offline creation may continue from the last locally verified catalog.
+      var people = await ensureEligibleStaff(!offlineNow());
       var status = document.getElementById('m29-staff-status');
       if (status) { status.textContent = people.length + ' responsables activos disponibles.'; status.className = 'm29-msg ok'; }
       buildCreateRows();
@@ -720,6 +777,8 @@
     renderHome: renderHome,
     openDetalle: openDetalle,
     claimHomeOwnership: claimHomeOwnership,
+    loadResponsibleStaff: ensureEligibleStaff,
+    eligibleStaff: eligibleStaff,
     isTurnoReal: isTurnoReal,
     isAdmin: function () { return !!state.isAdmin; }
   };
