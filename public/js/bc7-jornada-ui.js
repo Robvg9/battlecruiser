@@ -670,7 +670,7 @@
         const rereadState=String(d?.sesion?.estado||'').toUpperCase();
         if(rereadState==='EN_CURSO'){
           await loadCalendar();
-          setStatus('Inicio confirmado al volver a consultar la jornada. No se repitió la operación.','ok');
+          setStatus('Inicio confirmado al volver a consultar la jornada. No se repitió la escritura.','ok');
         }else{
           setStatus('El servidor todavía no confirma el inicio. Estado actual: '+humanStatus(rereadState)+'.','error');
           msg($('bc7-start-msg'),errorText,'error');
@@ -717,7 +717,7 @@
         const rereadState=String(d?.sesion?.estado||'').toUpperCase();
         if(rereadState==='COMPLETADA'){
           await loadCalendar();
-          setStatus('Cierre confirmado al volver a consultar la jornada. No se repitió la operación.','ok');
+          setStatus('Cierre confirmado al volver a consultar la jornada. No se repitió la escritura.','ok');
         }else{
           setStatus('El servidor todavía no confirma el cierre. Estado actual: '+humanStatus(rereadState)+'.','error');
           const currentMsg=document.querySelector('[data-bc7-close-msg]')||msgEl;
