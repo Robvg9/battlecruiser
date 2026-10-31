@@ -9,7 +9,7 @@ function read(relative) {
   return fs.readFileSync(path.join(__dirname, "..", relative), "utf8");
 }
 
-const MIGRATION = read("supabase/migrations/20261031163000_turno_cash_handover_owner_reconciliation.sql");
+const MIGRATION = read("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");
 const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
