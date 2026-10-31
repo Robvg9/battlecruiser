@@ -103,7 +103,7 @@ jobs:
       # Reuse the existing free-tier preview Worker for all PRs.
       # Pull-request quality runs share one concurrency group above, so deployments
       # to this Worker remain serialized and do not consume one Worker per PR.
-      - name: Deploy shared PR preview
+      - name: Deploy isolated PR preview
         if: github.event_name == 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -115,7 +115,7 @@ jobs:
           node_modules\.bin\wrangler.cmd deploy --config wrangler.toml --name "%BC_PREVIEW_NAME%"
           if errorlevel 1 exit /b 1
 
-      - name: Wait for shared preview assets
+      - name: Wait for isolated preview assets
         if: github.event_name == 'pull_request'
         env:
           BC_PREVIEW_NAME: bc-pr-224-battlecruiser
