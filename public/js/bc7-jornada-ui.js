@@ -32,9 +32,9 @@
       if(!user||!user.id||user.activo===false||String(user.activo).toLowerCase()==='false'||user.activo===0||user.archivado===true||String(user.archivado).toLowerCase()==='true'||user.archivado===1)return false;
       let role=user.rol||user.nombre_rol||user.role_name||user.role||'';
       if(role&&typeof role==='object')role=role.nombre||role.name||role.rol||role.role_name||'';
-      role=String(role||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').trim();
+      role=String(role||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
       return role.includes('dependienta')||role.startsWith('dueno')||role==='admin'||role==='administrador';
-    }).sort((a,b)=>String(a.nombre||a.nombre_usuario||a.email||'').localeCompare(String(b.nombre||b.nombre_usuario||b.email||''),'es');
+    }).sort((a,b)=>String(a.nombre||a.nombre_usuario||a.email||'').localeCompare(String(b.nombre||b.nombre_usuario||b.email||''),'es'));
   }
   function staffRowsFrom(value){
     if(Array.isArray(value))return value;
@@ -323,7 +323,7 @@
       const d=old[i]||{trabaja:true,responsable_id:null};
       return '<div class="bc7-day-row"><b>Día '+(i+1)+' · '+esc(fmtDate(addDays(anchor,i)))+'</b><label class="bc7-check"><input type="checkbox" data-bc7-works '+(d.trabaja?'checked':'')+'> Trabaja</label><label><span class="bc7-muted">Responsable</span><select data-bc7-person '+(!d.trabaja||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(d.responsable_id)+'</select></label></div>';
     }).join('');
-    host.querySelectorAll('[data-bc7-works]').forEach(ch=>ch.addEventListener('change',()=>{const row=ch.closest('.bc7-day-row');const person=row&&row.querySelector('[data-bc7-person]');if(person){person.disabled=!ch.checked;if(!ch.checked)person.value='';}}));
+    host.querySelectorAll('[data-bc7-works]').forEach(ch=>ch.addEventListener('change',()=>{const row=ch.closest('.bc7-day-row');const person=row&&row.querySelector('[data-bc7-person]');if(person){person.disabled=!ch.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!ch.checked)person.value='';}}));
     state.lastPreview=null;
     if($('bc7-preview'))$('bc7-preview').innerHTML='';
   }
@@ -871,7 +871,7 @@
   });
   document.addEventListener('change',function(e){
     const t=e.target;
-    if(t&&t.matches('[data-bc7-rework]')){const s=t.closest('form')?.querySelector('[data-bc7-reperson]');if(s){s.disabled=!t.checked;if(!t.checked)s.value='';}}
+    if(t&&t.matches('[data-bc7-rework]')){const s=t.closest('form')?.querySelector('[data-bc7-reperson]');if(s){s.disabled=!t.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!t.checked)s.value='';}}
   });
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>boot());else boot();
 })();
