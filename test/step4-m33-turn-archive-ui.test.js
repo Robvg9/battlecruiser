@@ -108,15 +108,15 @@ test("Paso 4: M33 consulta el archivo de un turno cerrado por fecha sin mutar re
   assert.ok(await waitFor(() => host1.textContent.includes("Compra vinculada día 1") && host1.textContent.includes("Venta vinculada día 1")),
     "el día 1 debe mostrar operaciones de sus sesiones");
   assert.doesNotMatch(host1.textContent, /Compra vinculada día 2|Venta vinculada día 2/);
-  assert.deepEqual(rpcCalls.map((call) => call.params.p_turno_sesion_id).sort(),
+  assert.deepEqual(rpcCalls.filter((call) => call.name === "bc7_movimientos_sesion").map((call) => call.params.p_turno_sesion_id).sort(),
     ["session-day1-am", "session-day1-pm"], "la consulta debe enviar las sesiones exactas del día");
   groups[1].querySelector("[data-m33-archive-sessions]").click();
   const host2 = groups[1].querySelector("[data-m33-archive-host]");
   assert.ok(await waitFor(() => host2.textContent.includes("Compra vinculada día 2") && host2.textContent.includes("Venta vinculada día 2")),
     "el día 2 debe mostrar sus propias operaciones");
   assert.doesNotMatch(host2.textContent, /Compra vinculada día 1|Venta vinculada día 1/);
-  assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
-    "la prueba solo permite RPCs de lectura del archivo");
+  assert.ok(rpcCalls.filter((call) => call.name !== "listar_usuarios_admin").every((call) => call.name === "bc7_movimientos_sesion"),
+    "el expediente solo puede consultar responsables y RPCs de lectura del archivo");
 });
 
 
@@ -131,7 +131,7 @@ test("Paso 4: personal asignado también accede solo al archivo de sus sesiones"
   const host = groups[0].querySelector("[data-m33-archive-host]");
   assert.ok(await waitFor(() => host.textContent.includes("Compra vinculada día 1")),
     "se consulta el archivo de solo lectura para las sesiones asignadas");
-  assert.deepEqual(rpcCalls.map((call) => call.params.p_turno_sesion_id).sort(),
+  assert.deepEqual(rpcCalls.filter((call) => call.name === "bc7_movimientos_sesion").map((call) => call.params.p_turno_sesion_id).sort(),
     ["session-day1-am", "session-day1-pm"]);
 });
 
@@ -159,8 +159,8 @@ test("Paso 4: el historial cerrado abre M33 en modo de solo lectura, sin control
     "el archivo debe poder consultarse sin salir del modo histórico");
   assert.ok(rpcCalls.length > 0, "la vista de movimientos debe haber usado su RPC de lectura");
   assert.equal(writeCalls.length, 0, "abrir y navegar por el expediente no debe llamar RPCs de escritura");
-  assert.ok(rpcCalls.every((call) => call.name === "bc7_movimientos_sesion"),
-    "el archivo del historial solo puede consultar el RPC de lectura");
+  assert.ok(rpcCalls.filter((call) => call.name !== "listar_usuarios_admin").every((call) => call.name === "bc7_movimientos_sesion"),
+    "el historial solo puede consultar el catálogo de responsables y el RPC de lectura");
 });
 
 test("Paso 4: un expediente histórico de dependienta no permite abrir sesiones aunque estén pendientes", async (t) => {
@@ -241,7 +241,10 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
           if (table === "productos") return { error: null, data: [{
             id: "product-1", nombre: "Café", precio_normal: 20
           }] };
-          if (table === "turno_declaraciones") return { error: null, data: [] };
+          if (table === "turno_declaraciones") return { error: null, data: [
+      { turno_sesion_id: "jornada-day1", usuario_id: "owner-fixture", monto: 100, moneda: "CUP", declarado_at: "2026-10-20T20:00:00-04:00", estado_aprobacion: "APROBADO" },
+      { turno_sesion_id: "jornada-day1", usuario_id: "owner-fixture", monto: 10, moneda: "USD", declarado_at: "2026-10-20T20:05:00-04:00", estado_aprobacion: "ESPERANDO_APROBACION" }
+    ] };
           return { error: null, data: [] };
         }
       })
@@ -268,6 +271,12 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.match(host.textContent, /Solicitudes de merma y baja/);
   assert.match(host.textContent, /no descuenta existencias/);
   assert.match(host.textContent, /Recogido por dueño/);
+  assert.match(host.textContent, /Gastos aprobados/);
+  assert.match(host.textContent, /Gastos pendientes/);
+  assert.match(host.textContent, /Dinero declarado · CUP/);
+  assert.match(host.textContent, /Dinero declarado · USD/);
+  assert.match(host.textContent, /100,00 CUP/);
+  assert.match(host.textContent, /10,00 USD/);
   const productRow = host.querySelector(".m33-book-table tbody tr");
   assert.ok(productRow, "the product matrix must contain its Café fixture row");
   assert.deepEqual(Array.from(productRow.cells).map((cell) => cell.textContent.trim()), [
