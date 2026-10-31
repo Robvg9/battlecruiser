@@ -79,6 +79,10 @@ BEGIN
   EXCEPTION WHEN check_violation THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: owner counted cash before session completion'; END IF;
+  v_result:=public.bc5_listar_dinero_pendiente_contar();
+  IF EXISTS(SELECT 1 FROM jsonb_array_elements(v_result) x WHERE x->>'declaracion_id'=v_decl2::text) THEN
+    RAISE EXCEPTION 'FAIL: owner inbox exposed a declaration before session completion';
+  END IF;
 
   -- Complete the real Step 7 flow inside the disposable database.
   PERFORM public.bc7_guardar_inventario_jornada(v_day2,'FINAL',
