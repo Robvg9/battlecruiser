@@ -11,6 +11,7 @@ function read(relative) {
 
 const MIGRATION = read("supabase/migrations/20261031163000_turno_cash_handover_owner_reconciliation.sql");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");
+const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
 const JOURNEY_UI = read("public/js/bc7-jornada-ui.js");
 const ADMIN_UI = read("public/js/turno-cash-handover-ui.js");
@@ -28,6 +29,8 @@ test("cash handover extends the modern declaration and difference records additi
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS contado_at timestamptz/);
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS diferencia numeric/);
   assert.match(MIGRATION, /declaracion_dinero_id uuid/);
+  assert.match(FIXTURE, /CREATE TABLE IF NOT EXISTS public\\.turno_diferencias/);
+  assert.match(PG_CI, /turno-cash-handover-fixture\\.sql/);
   assert.match(MIGRATION, /REFERENCES public\.turno_declaraciones\(id\) ON DELETE RESTRICT/);
   assert.match(MIGRATION, /CON_DIFERENCIA/);
   assert.doesNotMatch(MIGRATION, /\bDROP\s+TABLE\b|\bTRUNCATE\b|\bDELETE\s+FROM\s+public\.(turnos|turno_sesiones|turno_declaraciones|turno_diferencias)/i);
