@@ -46,6 +46,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS turno_diferencias_declaracion_dinero_uidx
   ON public.turno_diferencias(declaracion_dinero_id)
   WHERE declaracion_dinero_id IS NOT NULL;
 
+-- Do not permit direct client writes; authenticated callers must use the audited SECURITY DEFINER RPCs.
+REVOKE INSERT,UPDATE,DELETE ON TABLE public.turno_declaraciones,public.turno_diferencias FROM PUBLIC,anon,authenticated;
+
 -- Administrative inbox: pending counts and unresolved discrepancies, with no table exposure.
 CREATE OR REPLACE FUNCTION public.bc5_listar_dinero_pendiente_contar()
 RETURNS jsonb
