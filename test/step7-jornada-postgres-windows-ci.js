@@ -283,6 +283,7 @@ function applySql(file) {
     log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
     applySql("test/step7-jornada-finanzas-contract.sql");
     log("\\r\\n=== 10/10 Verify owner cash count, immutable evidence, discrepancy review and ACL ===");
+    applySql("test/turno-cash-handover-fixture.sql");
     applySql("supabase/migrations/20261031163000_turno_cash_handover_owner_reconciliation.sql");
     applySql("test/turno-cash-handover-contract.sql");
     log("\\r\\nPASS Step 7 inventory + finance + carry-forward + owner cash handover + discrepancy review + ACL contracts.");
