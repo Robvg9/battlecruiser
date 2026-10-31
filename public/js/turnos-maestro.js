@@ -328,7 +328,7 @@
             actions += '<button type="button" class="cc-accion" data-tm-iniciar="' + esc(s.id) + '">Iniciar sesión</button>';
           }
           if (se === 'EN_CURSO' && assigned && me && String(assigned) === String(me)) {
-            actions += '<button type="button" class="cc-accion" data-tm-declarar="' + esc(s.id) + '">Declarar dinero</button>';
+            actions += '<button type="button" class="cc-accion" data-tm-declarar="' + esc(s.id) + '">Dinero entregado</button>';
             actions += '<button type="button" class="cc-accion" data-tm-cerrar-ses="' + esc(s.id) + '">Cerrar sesión</button>';
             actions += '<button type="button" class="cc-accion" data-tm-interrumpir="' + esc(s.id) + '">Interrumpir / relevo</button>';
           }
