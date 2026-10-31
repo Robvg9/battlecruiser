@@ -188,7 +188,7 @@ test("M29 loads active eligible responsables when the shared cache is empty", as
 });
 
 
-test("M29 recovers responsible roles when the shared user cache contains role-less rows", async (t) => {
+test("M29 refreshes the canonical responsible catalog even when stale cached roles look eligible", async (t) => {
   const { window } = setup(t);
   Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
   window._cache.usuarios = [
@@ -227,7 +227,10 @@ test("M29 recovers responsible roles when the shared user cache contains role-le
     "a stale locally cached user missing from the canonical unarchived server catalog must not be resurrected");
   assert.equal(window.__BC_M29_STAFF_CACHE_LOADED__, true);
   assert.equal(calls[0].name, "listar_usuarios_admin");
-  assert.deepEqual(calls[0].payload, { p_incluir_archivados: false });
+  assert.equal(calls[0].payload.p_incluir_archivados, false);
+  assert.deepEqual(Object.keys(calls[0].payload), ["p_incluir_archivados"]);
+  assert.equal(calls.filter((call) => call.name === "listar_usuarios_admin").length, 1,
+    "opening the create modal must refresh the canonical catalog exactly once");
   assert.match(modal.querySelector("#m29-create-summary").textContent, /responsables asignados|pendientes/);
   const compactCss = window.document.getElementById("bc-m29-compact-modal-css");
   assert.ok(compactCss, "the create modal must load the compact layout overrides");
