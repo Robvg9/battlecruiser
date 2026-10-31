@@ -134,7 +134,7 @@
     else if(context==='pattern') message='No se pudo guardar la rotación. Comprueba el almacén, la fecha y que cada día de trabajo tenga una persona asignada.';
     else if(context==='calendar') message='No se pudo cargar el calendario. Comprueba la conexión y vuelve a actualizarlo.';
     else if(context==='hours') message='No se pudo guardar el horario. Comprueba que la hora de apertura sea anterior a la de cierre.';
-    else if(context==='warehouse') message='No se pudo cargar la lista de almacenes. Comprueba la conexión y pulsa «Reintentar carga de almacenes».';
+    else if(context==='warehouse') message='No se pudieron cargar los almacenes. Comprueba la conexión y pulsa «Reintentar carga de almacenes».';
     else message='No se pudo completar esta acción. Revisa los datos y la conexión; vuelve a intentarlo.';
     try{console.warn('[BC7] '+String(context||'operacion')+':',error);}catch(_){}
     return message;
