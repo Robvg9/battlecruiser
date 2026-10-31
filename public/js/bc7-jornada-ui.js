@@ -144,6 +144,13 @@
     const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',RECHAZADO:'Rechazado'};
     return labels[key]||'En revisión';
   }
+  function friendlyTimezone(value){
+    const zone=String(value||'America/Havana').trim();
+    const known={'America/Havana':'Hora de Cuba (La Habana)','America/Puerto_Rico':'Hora de Puerto Rico','America/New_York':'Hora del Este','America/Chicago':'Hora central','America/Denver':'Hora de la montaña','America/Los_Angeles':'Hora del Pacífico','Europe/Madrid':'Hora de España (Madrid)'};
+    if(known[zone])return known[zone];
+    try{const parts=new Intl.DateTimeFormat('es-ES',{timeZone:zone,timeZoneName:'long'}).formatToParts(new Date());const name=parts.find(x=>x.type==='timeZoneName')?.value;return name?'Hora local: '+name:'Hora local configurada';}catch(_){return 'Hora local configurada';}
+  }
+  function setTimezoneLabel(value){const label=$('bc7-timezone-label');if(label)label.textContent=friendlyTimezone(value);}
   function setStatus(msg,kind){const el=$('bc7-status');if(!el)return;el.textContent=msg||'';el.className='bc7-status '+(kind||'');}
   function msg(el,text,kind){if(!el)return;el.textContent=text||'';el.className='bc7-msg '+(kind||'');}
   function can(section,action){try{return typeof tienePermiso==='function'&&tienePermiso(section,action)}catch(e){return false}}
@@ -233,7 +240,7 @@
       '<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Organizar jornadas · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">'+
        '<h3>Crear y organizar jornadas</h3><p class="bc7-muted">Elige el almacén, la fecha y quién trabaja cada día. Puedes asignar las personas una por una o repetir una rotación que hayas guardado.</p>'+
        '<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">¿Cómo quieres organizar los días?<select id="bc7-plan-mode"><option value="explicit">Elegir responsables día por día</option><option value="pattern">Repetir una rotación guardada</option></select></label></div>'+
-       '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Zona horaria del almacén<input id="bc7-timezone" value="America/Havana" required></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
+       '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Hora local del almacén<input type="hidden" id="bc7-timezone" value="America/Havana"><span id="bc7-timezone-label" class="bc7-muted">Hora de Cuba (La Habana)</span></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
        '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="1" max="31" value="7" required></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+
       '</section></details>'+
@@ -371,7 +378,7 @@
   }
   async function loadHours(){
     const warehouseId=$('bc7-warehouse')?.value;if(!warehouseId)return;
-    try{const d=await rpc('bc5_obtener_configuracion_jornada',{p_almacen_id:warehouseId});if(d){$('bc7-hour-start').value=String(d.hora_inicio||'07:00').slice(0,5);$('bc7-hour-end').value=String(d.hora_fin||'23:00').slice(0,5);$('bc7-timezone').value=d.zona_horaria||'America/Havana';}}catch(e){msg($('bc7-hours-msg'),friendlyError(e,'hours'),'error');}
+    try{const d=await rpc('bc5_obtener_configuracion_jornada',{p_almacen_id:warehouseId});if(d){$('bc7-hour-start').value=String(d.hora_inicio||'07:00').slice(0,5);$('bc7-hour-end').value=String(d.hora_fin||'23:00').slice(0,5);$('bc7-timezone').value=d.zona_horaria||'America/Havana';setTimezoneLabel($('bc7-timezone').value);}}catch(e){msg($('bc7-hours-msg'),friendlyError(e,'hours'),'error');}
   }
   function rowHtml(r){
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
@@ -751,7 +758,7 @@
     const warehouse=$('bc7-warehouse')?.value;
     const start=$('bc7-hour-start').value,end=$('bc7-hour-end').value,zone=$('bc7-timezone').value.trim();
     if(!warehouse){msg($('bc7-hours-msg'),'Selecciona un almacén.','error');return;}
-    if(!start||!end||start>=end||!zone){msg($('bc7-hours-msg'),'Revisa horas (apertura anterior al cierre) y zona IANA.','error');return;}
+    if(!start||!end||start>=end||!zone){msg($('bc7-hours-msg'),'La hora de apertura debe ser anterior a la hora de cierre.','error');return;}
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{await rpc('bc5_configurar_horario_jornada',{p_almacen_id:warehouse,p_hora_inicio:start,p_hora_fin:end,p_zona_horaria:zone});msg($('bc7-hours-msg'),'Horario guardado.','ok');await loadCalendar();}
     catch(e){msg($('bc7-hours-msg'),'No se guardó el horario. '+friendlyError(e,'hours'),'error');}
@@ -761,11 +768,11 @@
     const warehouse=$('bc7-warehouse')?.value;
     const name=$('bc7-pattern-name').value.trim(),anchor=$('bc7-anchor').value,days=readDayRows();
     if(!warehouse){msg($('bc7-pattern-msg'),'Selecciona un almacén.','error');return;}
-    if(!name||!anchor||!days.length){msg($('bc7-pattern-msg'),'Nombre, fecha ancla y días son obligatorios.','error');return;}
-    if(days.some(x=>x.trabaja)&&!staffCatalogReady()){msg($('bc7-pattern-msg'),'Carga y verifica los responsables activos antes de guardar el patrón.','error');return;}
+    if(!name||!anchor||!days.length){msg($('bc7-pattern-msg'),'Escribe un nombre para la rotación, elige la fecha desde la que comienza y muestra los días.','error');return;}
+    if(days.some(x=>x.trabaja)&&!staffCatalogReady()){msg($('bc7-pattern-msg'),'Espera a que se cargue la lista de personas disponibles antes de guardar la rotación.','error');return;}
     const bad=days.find(x=>x.trabaja&&!x.responsable_id);
-    if(bad){msg($('bc7-pattern-msg'),'Cada día laborable necesita un responsable explícito (día '+bad.numero_dia+').','error');return;}
-    if(!confirm('Se activará este patrón de trabajo/descanso para el almacén. No se alteran jornadas ya programadas. ¿Confirmas?'))return;
+    if(bad){msg($('bc7-pattern-msg'),'El Día '+bad.numero_dia+' está marcado como día de trabajo, pero todavía no tiene una persona asignada.','error');return;}
+    if(!confirm('Se guardará esta rotación para el almacén. Las jornadas que ya existen no cambiarán. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{await rpc('bc5_guardar_patron_jornada',{p_almacen_id:warehouse,p_nombre:name,p_fecha_ancla:anchor,p_patron:days});msg($('bc7-pattern-msg'),'Rotación guardada. Ya puedes revisar las fechas y crear la programación.','ok');state.lastPreview=null;}
     catch(e){msg($('bc7-pattern-msg'),'No se pudo guardar la rotación. '+friendlyError(e,'pattern'),'error');}
@@ -779,7 +786,7 @@
     try{
       const rows=arr(await rpc('bc5_previsualizar_jornada',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n}));
       state.lastPreview={start,warehouse,days:n,rows,mode:'pattern'};
-      $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDate(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong><p>'+esc(String(r.hora_inicio_prevista).slice(0,5))+'–'+esc(String(r.hora_fin_prevista).slice(0,5))+'</p></div>'+(r.conflicto?'<span class="bc7-pill warn">Conflicto</span>':'<span class="bc7-pill ok">Disponible</span>')+'</div>'+(r.motivo_conflicto?'<p>'+esc(r.motivo_conflicto)+'</p>':'')+'</article>').join('');
+      $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong><p>'+esc(String(r.hora_inicio_prevista).slice(0,5))+'–'+esc(String(r.hora_fin_prevista).slice(0,5))+'</p></div>'+(r.conflicto?'<span class="bc7-pill warn">Revisar</span>':'<span class="bc7-pill ok">Disponible</span>')+'</div>'+(r.motivo_conflicto?'<p>'+esc(friendlyError(r.motivo_conflicto,'preview'))+'</p>':'')+'</article>').join('');
       msg($('bc7-create-msg'),rows.some(r=>r.conflicto)?'La vista previa contiene conflictos. Corrígelos antes de crear.':'Vista previa sin conflictos detectados. Aún falta confirmar la creación.','');
     }catch(e){state.lastPreview=null;msg($('bc7-create-msg'),friendlyError(e,'preview'),'error');}
     finally{busy(btn,false);}
@@ -790,23 +797,23 @@
     if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha que quieres programar.','error');return;}
     if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return;}
     let schedule=null;
-    if(mode==='explicit'&&!staffCatalogReady()){msg($('bc7-create-msg'),'Carga y verifica los responsables activos antes de programar las jornadas.','error');return;}
+    if(mode==='explicit'&&!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de personas disponibles antes de crear las jornadas.','error');return;}
     if(mode==='explicit'){
       schedule=readDayRows();
       if(schedule.length!==n){buildDayRows();schedule=readDayRows();}
       const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
-      if(missing){msg($('bc7-create-msg'),'Cada día laborable necesita responsable explícito (día '+missing.numero_dia+').','error');return;}
-      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'Los días de descanso no pueden tener responsable.','error');return;}
+      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como día de trabajo, pero todavía no tiene una persona asignada.','error');return;}
+      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días marcados como descanso, borra la persona que aparece asignada.','error');return;}
       const dates=schedule.map((r,i)=>addDays(start,i));
       state.lastPreview={start,warehouse,days:n,mode:'explicit',rows:schedule.map((r,i)=>({...r,fecha:dates[i],conflicto:false}))};
-      $('bc7-preview').innerHTML=state.lastPreview.rows.map(r=>'<article class="bc7-jornada"><strong>'+esc(fmtDate(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong></article>').join('');
+      $('bc7-preview').innerHTML=state.lastPreview.rows.map(r=>'<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong></article>').join('');
     }else{
       if(!state.lastPreview||state.lastPreview.mode!=='pattern'||state.lastPreview.start!==start||state.lastPreview.warehouse!==warehouse||state.lastPreview.days!==n){
-        msg($('bc7-create-msg'),'Previsualiza primero el patrón activo para este almacén/rango.','error');return;
+        msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return;
       }
-      if(state.lastPreview.rows.some(r=>r.conflicto)){msg($('bc7-create-msg'),'Hay conflictos en la vista previa. No se creó ningún dato.','error');return;}
+      if(state.lastPreview.rows.some(r=>r.conflicto)){msg($('bc7-create-msg'),'La revisión muestra fechas ocupadas o personas con otro turno. Corrige esos avisos antes de crear la programación. No se creó ningún cambio.','error');return;}
     }
-    if(!confirm('Se crearán '+n+' fechas de jornada en '+warehouseName(warehouse)+'. Las fechas ocupadas o los solapamientos serán rechazados por el backend. ¿Confirmas?'))return;
+    if(!confirm('Se crearán '+n+' días de jornada en '+warehouseName(warehouse)+'. Si alguna fecha o persona ya tiene otro turno, la aplicación te avisará. ¿Confirmas?'))return;
     if(!busy(btn,true))return;
     try{
       const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:mode==='pattern'?null:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
@@ -823,9 +830,9 @@
     const person=form.querySelector('[data-bc7-reperson]').value||null;
     const reason=form.querySelector('[data-bc7-reason]').value.trim();
     const msgEl=form.querySelector('[data-bc7-remsg]');
-    if(works&&!staffCatalogReady()){msg(msgEl,'Carga y verifica los responsables activos antes de reprogramar.','error');return;}
-    if(!reason|| (works&&!person)||(!works&&person)){msg(msgEl,'Motivo obligatorio; jornada laborable requiere responsable y descanso no admite responsable.','error');return;}
-    if(!confirm('Se registrará una reprogramación auditada. ¿Confirmas la ausencia, sustitución o descanso?'))return;
+    if(works&&!staffCatalogReady()){msg(msgEl,'Espera a que se cargue la lista de personas disponibles antes de hacer el cambio.','error');return;}
+    if(!reason|| (works&&!person)||(!works&&person)){msg(msgEl,'Escribe el motivo del cambio y, si ese día se trabaja, elige quién lo cubrirá. En un día de descanso no debe quedar nadie asignado.','error');return;}
+    if(!confirm('Se guardará este cambio en el historial de la jornada. ¿Confirmas la ausencia, la sustitución o el día de descanso?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{await rpc('bc5_reprogramar_jornada',{p_programacion_id:id,p_trabaja:works,p_responsable_id:works?person:null,p_motivo:reason});msg(msgEl,'Reprogramación guardada.','ok');await loadCalendar();}
     catch(e){msg(msgEl,'No se pudo guardar el cambio. '+friendlyError(e,'create'),'error');}
