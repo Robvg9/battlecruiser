@@ -155,7 +155,9 @@ test("M29 loads active eligible responsables when the shared cache is empty", as
     { id: "inactive", nombre: "Inactiva", rol: "Dependienta", activo: false },
     { id: "other", nombre: "Almacén", rol: "Almacenero", activo: true }
   ];
+  const staffRpcCalls = [];
   window.client.rpc = async (name) => {
+    staffRpcCalls.push(name);
     if (name === "listar_usuarios_admin") return { data: users, error: null };
     throw new Error("RPC inesperada: " + name);
   };
@@ -165,8 +167,10 @@ test("M29 loads active eligible responsables when the shared cache is empty", as
   root.querySelector("#m29-btn-crear").click();
   const modal = window.document.getElementById("m29-crear-overlay");
   assert.ok(modal);
-  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-person] option").length === 3),
-    "el formulario debe esperar el catálogo remoto antes de permitir asignaciones");
+  const catalogLoaded = await waitFor(() => modal.querySelectorAll("[data-m29-person] option").length === 3, 5000);
+  assert.ok(catalogLoaded,
+    "responsables not loaded; status=" + (modal.querySelector("#m29-staff-status")?.textContent || "missing") +
+    "; rpc=" + staffRpcCalls.join(",") + "; online=" + window.navigator.onLine);
   const options = Array.from(modal.querySelector("[data-m29-person]").options).map((option) => option.value);
   assert.deepEqual(options, ["", "dep-3", "owner-2"]);
   assert.match(modal.querySelector("#m29-staff-status").textContent, /2 responsables activos disponibles/);
