@@ -67,7 +67,7 @@
     if (document.getElementById('bc-m33-css')) return;
     const s = document.createElement('style');
     s.id = 'bc-m33-css';
-    s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.m33-modal{width:min(920px,100%);max-width:100%;box-sizing:border-box;max-height:94vh;max-height:94dvh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px;overflow:visible}.m33-step{min-width:0;padding:6px 4px;text-align:center;line-height:1.2;overflow-wrap:anywhere;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.m33-box{padding:8px 9px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;min-width:0}.m33-assignment-grid .m33-assignment-card{display:grid;grid-template-columns:minmax(84px,.56fr) minmax(0,1fr);align-items:center;gap:8px;padding:5px 0;min-width:0}.m33-assignment-card label{min-width:0;margin:0!important;font-size:.76rem;line-height:1.25;overflow-wrap:anywhere}.m33-assignment-card select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin:0!important;padding:7px 8px!important;min-height:38px;font-size:.86rem;line-height:1.2}.m33-assignment-card .m33-muted{min-width:0;font-size:.8rem;overflow-wrap:anywhere}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:6px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}.m33-archive{margin-top:10px}.m33-archive-day{margin:6px 0;padding:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px}.m33-archive-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.m33-archive-head b{display:block}.m33-archive-head small{display:block;opacity:.65;margin-top:3px}.m33-archive-head button{min-height:40px;padding:9px 12px;border-radius:8px;border:1px solid rgba(59,130,246,.55);background:rgba(59,130,246,.12);color:inherit;font-weight:600}.m33-archive-head button:disabled{opacity:.55}.m33-archive-host{margin-top:6px}.m33-archive-host[hidden]{display:none}.m33-archive-scroll{max-width:100%;overflow-x:auto}.m33-archive-table{width:100%;min-width:640px;border-collapse:collapse;font-size:.78rem}.m33-archive-table th,.m33-archive-table td{padding:6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}.m33-archive-table th{opacity:.65}.m33-archive-empty{padding:10px;border:1px dashed rgba(255,255,255,.16);border-radius:8px;opacity:.75;font-size:.84rem}@media(max-width:720px){.m33-bg{padding:6px}.m33-modal{width:100%;max-width:100%;box-sizing:border-box;max-height:calc(100dvh - 12px);border-radius:12px}.m33-head{padding:10px 12px 7px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.m33-step{font-size:.68rem;padding:6px 4px}.m33-session-grid{grid-template-columns:minmax(0,1fr)}.m33-body{padding:10px 12px;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 12px}.m33-foot button{padding:8px 11px}}';
+    s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.m33-modal{width:min(920px,100%);max-width:100%;box-sizing:border-box;max-height:94vh;max-height:94dvh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px;overflow:visible}.m33-step{min-width:0;padding:6px 4px;text-align:center;line-height:1.2;overflow-wrap:anywhere;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.m33-box{padding:8px 9px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;min-width:0}.m33-assignment-grid .m33-assignment-card{display:grid;grid-template-columns:minmax(84px,.56fr) minmax(0,1fr);align-items:center;gap:8px;padding:5px 0;min-width:0}.m33-assignment-card label{min-width:0;margin:0!important;font-size:.76rem;line-height:1.25;overflow-wrap:anywhere}.m33-assignment-card select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin:0!important;padding:7px 8px!important;min-height:38px;font-size:.86rem;line-height:1.2}.m33-assignment-card .m33-muted{min-width:0;font-size:.8rem;overflow-wrap:anywhere}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:6px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}.m33-archive{margin-top:10px}.m33-archive-day{margin:6px 0;padding:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px}.m33-archive-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.m33-archive-head b{display:block}.m33-archive-head small{display:block;opacity:.65;margin-top:3px}.m33-archive-head button{min-height:40px;padding:9px 12px;border-radius:8px;border:1px solid rgba(59,130,246,.55);background:rgba(59,130,246,.12);color:inherit;font-weight:600}.m33-archive-head button:disabled{opacity:.55}.m33-archive-host{margin-top:6px}.m33-archive-host[hidden]{display:none}.m33-archive-scroll{max-width:100%;overflow-x:auto}.m33-archive-table{width:100%;min-width:640px;border-collapse:collapse;font-size:.78rem}.m33-archive-table th,.m33-archive-table td{padding:6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}.m33-archive-table th{opacity:.65}.m33-archive-empty{padding:10px;border:1px dashed rgba(255,255,255,.16);border-radius:8px;opacity:.75;font-size:.84rem}.m33-inventory{display:grid;gap:8px;margin-top:8px}.m33-inventory-day{padding:9px;border:1px solid rgba(255,255,255,.12);border-radius:9px}.m33-inventory-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.m33-inventory-head b{display:block}.m33-inventory-head small{display:block;opacity:.62;margin-top:2px}.m33-inventory-head button{min-height:34px;padding:7px 10px;border-radius:7px;border:1px solid rgba(59,130,246,.5);background:rgba(59,130,246,.12);color:inherit;font-size:.78rem;font-weight:600}.m33-inventory-host{margin-top:8px}.m33-inventory-host[hidden]{display:none}.m33-inventory-scroll{max-width:100%;overflow:auto}.m33-inventory-table{width:100%;min-width:720px;border-collapse:collapse;font-size:.74rem}.m33-inventory-table th,.m33-inventory-table td{padding:6px 7px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}.m33-inventory-table th{opacity:.65;font-weight:600}.m33-inventory-table td.m33-num{text-align:right;font-variant-numeric:tabular-nums}.m33-inventory-table tr.m33-opening{background:rgba(34,197,94,.07);font-weight:600}.m33-inventory-note{padding:8px 10px;margin:7px 0;border-left:2px solid rgba(201,162,77,.7);background:rgba(201,162,77,.07);font-size:.78rem;line-height:1.4}.m33-inventory-note.error{border-color:#ef7777;color:#ffc0bb}.m33-inventory-host .m33-archive-empty{margin-top:7px}@media(max-width:720px){.m33-bg{padding:6px}.m33-modal{width:100%;max-width:100%;box-sizing:border-box;max-height:calc(100dvh - 12px);border-radius:12px}.m33-head{padding:10px 12px 7px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.m33-step{font-size:.68rem;padding:6px 4px}.m33-session-grid{grid-template-columns:minmax(0,1fr)}.m33-body{padding:10px 12px;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 12px}.m33-foot button{padding:8px 11px}}';
     document.head.appendChild(s);
   }
 
@@ -162,7 +162,253 @@
           '<div class="m33-archive-host" data-m33-archive-host hidden></div></section>';
       }).join('') + '</div>';
   }
-  function step4() { return '<div class="m33-muted">Inventario del expediente (si hay datos).</div>'; }
+  function inventoryDayGroups() {
+    return archiveDayGroups(archiveSessionsForViewer());
+  }
+  function step4() {
+    const groups = inventoryDayGroups();
+    if (!groups.length) return '<div class="m33-archive-empty">No hay sesiones disponibles para consultar el inventario de este turno.</div>';
+    return '<div class="m33-inventory"><p class="m33-muted">Libro cronológico de solo lectura. El saldo de apertura procede únicamente de un conteo físico inicial confirmado. Las entradas, salidas, gastos, reinversiones y solicitudes de merma/baja se muestran con trazabilidad; las solicitudes pendientes no descuentan existencias.</p>' +
+      groups.map(function (group) {
+        const ids = group.sessions.map(function (session) { return String(session.id || ''); }).filter(Boolean).join('|');
+        const action = ids
+          ? '<button type="button" data-m33-inventory-sessions="' + esc(ids) + '" data-m33-inventory-day="' + esc(group.day) + '" data-m33-inventory-date="' + esc(group.date) + '" aria-expanded="false">Ver libro del día</button>'
+          : '<span class="m33-muted">Sin sesiones consultables</span>';
+        return '<section class="m33-inventory-day"><div class="m33-inventory-head"><div><b>Día ' + esc(group.day) + '</b><small>' + esc(date(group.date)) + ' · ' + group.sessions.length + ' sesión(es)</small></div>' + action + '</div><div class="m33-inventory-host" data-m33-inventory-host hidden></div></section>';
+      }).join('') + '</div>';
+  }
+  function inventoryQuantity(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toLocaleString('es-ES', { maximumFractionDigits: 3 }) : '—';
+  }
+  function inventoryTimestamp(value) {
+    if (!value) return '—';
+    return String(value).replace('T', ' ').slice(0, 16);
+  }
+  function inventoryTypeLabel(value) {
+    return ({
+      compra: 'Compra / entrada',
+      venta: 'Venta / salida',
+      transferencia_salida: 'Transferencia de salida',
+      transferencia_entrada: 'Transferencia de entrada',
+      vale: 'Vale / salida',
+      merma: 'Merma aprobada',
+      baja: 'Baja aprobada'
+    })[String(value || '').toLowerCase()] || String(value || 'Movimiento');
+  }
+  function renderInventoryLedger(rows, hasOpening, pendingMessage) {
+    if (!rows.length) {
+      return (pendingMessage ? '<div class="m33-inventory-note">' + esc(pendingMessage) + '</div>' : '') +
+        '<div class="m33-archive-empty">Todavía no hay movimientos registrados para este día. ' +
+        (hasOpening ? 'El libro conserva el saldo inicial confirmado.' : 'Cuando exista el primer conteo físico confirmado, aparecerá como saldo de apertura.') +
+        '</div>';
+    }
+    const balances = new Map();
+    rows.sort(function (a, b) {
+      return String(a.timestamp || '').localeCompare(String(b.timestamp || '')) ||
+        Number(a.order || 0) - Number(b.order || 0);
+    });
+    const body = rows.map(function (row) {
+      const productKey = String(row.productKey || row.productId || '');
+      let balance = null;
+      if (row.kind === 'opening') {
+        balance = Number(row.quantity);
+        if (productKey) balances.set(productKey, balance);
+      } else if (row.stockEffect != null && productKey && balances.has(productKey)) {
+        balance = balances.get(productKey) + Number(row.stockEffect);
+        balances.set(productKey, balance);
+      } else if (productKey && balances.has(productKey)) {
+        balance = balances.get(productKey);
+      }
+      const incoming = row.kind === 'opening' || row.stockEffect == null ? '—' :
+        Number(row.stockEffect) > 0 ? inventoryQuantity(row.stockEffect) : '—';
+      const outgoing = row.stockEffect != null && Number(row.stockEffect) < 0
+        ? inventoryQuantity(Math.abs(Number(row.stockEffect))) : '—';
+      const opening = row.kind === 'opening' ? inventoryQuantity(row.quantity) : '—';
+      const cash = row.cashOut != null ? inventoryQuantity(row.cashOut) : '—';
+      const saldo = balance == null ? '—' : inventoryQuantity(balance);
+      const detail = row.detail ? '<div class="m33-muted">' + esc(row.detail) + '</div>' : '';
+      return '<tr class="' + (row.kind === 'opening' ? 'm33-opening' : '') + '">' +
+        '<td>' + esc(inventoryTimestamp(row.timestamp)) + '</td>' +
+        '<td>' + esc(row.label || 'Movimiento') + detail + '</td>' +
+        '<td>' + esc(row.product || '—') + '</td>' +
+        '<td class="m33-num">' + incoming + '</td>' +
+        '<td class="m33-num">' + outgoing + '</td>' +
+        '<td class="m33-num">' + opening + '</td>' +
+        '<td class="m33-num">' + saldo + '</td>' +
+        '<td class="m33-num">' + cash + '</td>' +
+        '<td>' + esc(row.status || 'Registrado') + '</td>' +
+        '<td>' + esc(row.actor || '—') + '</td></tr>';
+    }).join('');
+    return (pendingMessage ? '<div class="m33-inventory-note">' + esc(pendingMessage) + '</div>' : '') +
+      '<div class="m33-inventory-scroll"><table class="m33-inventory-table"><thead><tr>' +
+      '<th>Fecha/hora</th><th>Movimiento</th><th>Producto / concepto</th><th>Entradas</th><th>Salidas</th><th>Saldo inicial</th><th>Saldo</th><th>Gasto CUP</th><th>Estado</th><th>Responsable</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
+  async function loadInventoryDay(button) {
+    const group = button.closest('.m33-inventory-day');
+    const host = group && group.querySelector('[data-m33-inventory-host]');
+    if (!host) return;
+    if (host.dataset.loaded === '1') {
+      host.hidden = !host.hidden;
+      button.setAttribute('aria-expanded', host.hidden ? 'false' : 'true');
+      return;
+    }
+    host.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    button.disabled = true;
+    host.innerHTML = '<div class="m33-archive-empty">Consultando el libro de inventario…</div>';
+    const ids = String(button.dataset.m33InventorySessions || '').split('|').filter(Boolean);
+    const sessionsById = new Map((state.sesiones || []).map(function (session) { return [String(session.id), session]; }));
+    const ledgerRows = [];
+    let hasOpening = false;
+    let anyReadable = false;
+    let denied = 0;
+    let pendingMessages = [];
+    try {
+      const rpcClient = window.client;
+      if (!navigator.onLine) throw new Error('El libro requiere conexión al servidor.');
+      if (!rpcClient || typeof rpcClient.rpc !== 'function') throw new Error('Cliente del servidor no disponible.');
+      for (const sessionId of ids) {
+        const session = sessionsById.get(String(sessionId));
+        if (!session) continue;
+        let inventory = null;
+        if (String(session.bloque || '').toUpperCase() === 'JORNADA') {
+          const inventoryResponse = await rpcClient.rpc('bc7_obtener_inventario_jornada', { p_turno_sesion_id: sessionId });
+          if (inventoryResponse && inventoryResponse.error) {
+            if (String(inventoryResponse.error.code || '') === '42501') { denied += 1; continue; }
+            throw inventoryResponse.error;
+          }
+          inventory = inventoryResponse && inventoryResponse.data || {};
+        }
+        const movementResponse = await rpcClient.rpc('bc7_movimientos_sesion', { p_turno_sesion_id: sessionId });
+        if (movementResponse && movementResponse.error) {
+          if (String(movementResponse.error.code || '') === '42501') { denied += 1; continue; }
+          throw movementResponse.error;
+        }
+        anyReadable = true;
+        const movements = Array.isArray(movementResponse && movementResponse.data)
+          ? movementResponse.data
+          : (movementResponse && movementResponse.data ? [movementResponse.data] : []);
+        movements.forEach(function (movement) {
+          const quantity = Number(movement.cantidad);
+          const productName = movement.producto || '—';
+          ledgerRows.push({
+            timestamp: movement.fecha,
+            order: 20,
+            kind: 'movement',
+            label: inventoryTypeLabel(movement.tipo),
+            productKey: String(productName).trim().toLowerCase(),
+            product: productName,
+            stockEffect: Number.isFinite(quantity) ? quantity : null,
+            actor: movement.usuario || '—',
+            status: 'Aplicado',
+            detail: movement.operacion_id ? 'Ref. #' + String(movement.operacion_id).slice(-6) : ''
+          });
+        });
+        if (!inventory) continue;
+        const products = Array.isArray(inventory.productos) ? inventory.productos : [];
+        const initialCut = inventory.cortes && inventory.cortes.INICIAL;
+        if (initialCut && initialCut.estado === 'CONFIRMADO') {
+          hasOpening = true;
+          (Array.isArray(initialCut.lineas) ? initialCut.lineas : []).forEach(function (line) {
+            const product = products.find(function (item) { return String(item.producto_id) === String(line.producto_id); }) || {};
+            const productName = product.nombre || line.producto_id;
+            ledgerRows.push({
+              timestamp: initialCut.confirmado_en || initialCut.creado_en || session.fecha,
+              order: 0,
+              kind: 'opening',
+              productKey: String(productName).trim().toLowerCase(),
+              productId: String(line.producto_id),
+              label: 'Inventario inicial confirmado',
+              product: productName,
+              quantity: Number(line.cantidad_contada),
+              actor: inventoryUserLabel(initialCut.confirmado_por || initialCut.creado_por),
+              status: 'Confirmado',
+              detail: initialCut.observacion || ''
+            });
+          });
+        } else {
+          pendingMessages.push('Día ' + String(session.numero_dia || session.dia_n || '') + ': no existe corte inicial confirmado. No se presenta el stock actual como saldo histórico.');
+        }
+        const financeResponse = await rpcClient.rpc('bc7_finanzas_jornada', { p_turno_sesion_id: sessionId });
+        if (financeResponse && financeResponse.error) {
+          if (String(financeResponse.error.code || '') === '42501') { denied += 1; continue; }
+          throw financeResponse.error;
+        }
+        const finance = financeResponse && financeResponse.data || {};
+        (Array.isArray(finance.gastos) ? finance.gastos : []).forEach(function (expense) {
+          ledgerRows.push({
+            timestamp: expense.creado_en || session.fecha,
+            order: 30,
+            kind: 'cash',
+            label: 'Gasto',
+            product: expense.concepto || 'Gasto operativo',
+            cashOut: Number(expense.monto),
+            actor: expense.creado_nombre || '—',
+            status: expense.estado || 'Registrado',
+            detail: expense.descripcion || expense.comentario_revision || ''
+          });
+        });
+        (Array.isArray(finance.reinversiones) ? finance.reinversiones : []).forEach(function (reinvestment) {
+          (Array.isArray(reinvestment.lineas) ? reinvestment.lineas : []).forEach(function (line) {
+            const productName = line.producto || line.producto_id;
+            ledgerRows.push({
+              timestamp: reinvestment.fecha || session.fecha,
+              order: 10,
+              kind: 'reinvestment',
+              productKey: String(productName).trim().toLowerCase(),
+              label: 'Reinversión / entrada',
+              productId: String(line.producto_id),
+              product: productName,
+              stockEffect: Number(line.cantidad_base),
+              cashOut: Number(line.costo_total),
+              actor: reinvestment.usuario_nombre || '—',
+              status: 'Registrada',
+              detail: reinvestment.proveedor || ''
+            });
+          });
+        });
+        ['mermas', 'bajas'].forEach(function (bucket) {
+          (Array.isArray(finance[bucket]) ? finance[bucket] : []).forEach(function (request) {
+            if (String(request.estado || '').toUpperCase() === 'APROBADA') return;
+            ledgerRows.push({
+              timestamp: request.creado_en || session.fecha,
+              order: 40,
+              kind: 'request',
+              label: bucket === 'mermas' ? 'Solicitud de merma' : 'Solicitud de baja',
+              product: request.producto || request.producto_id || '—',
+              actor: request.creado_nombre || '—',
+              status: String(request.estado || 'PENDIENTE') + ' · no descuenta stock',
+              detail: inventoryQuantity(request.cantidad) + ' solicitada' + (request.motivo ? ' · ' + request.motivo : '')
+            });
+          });
+        });
+      }
+      if (!anyReadable && denied) {
+        host.innerHTML = '<div class="m33-archive-empty">Tu perfil no tiene permiso para consultar el inventario y movimientos de este día.</div>';
+      } else {
+        const pending = pendingMessages.join(' ');
+        host.innerHTML = (hasOpening ? '' : '<div class="m33-inventory-note">No hay apertura física confirmada disponible para este día. Las cantidades que aparecen son únicamente movimientos documentados; no se inventa un saldo inicial.</div>') +
+          renderInventoryLedger(ledgerRows, hasOpening, pending);
+        host.dataset.loaded = '1';
+      }
+    } catch (error) {
+      host.innerHTML = '<div class="m33-archive-empty">No se pudo consultar el libro de inventario: ' +
+        esc(error && error.message ? error.message : error) + '. No se han modificado datos.</div>';
+    } finally {
+      button.disabled = false;
+    }
+  }
+  function inventoryUserLabel(id) {
+    const user = users().find(function (item) { return String(item.id) === String(id); });
+    return user ? (user.nombre || user.nombre_usuario || user.email || String(id)) : (id ? String(id) : '—');
+  }
+  function bindInventoryButtons(overlay) {
+    overlay.querySelectorAll('[data-m33-inventory-sessions]').forEach(function (button) {
+      button.addEventListener('click', function () { loadInventoryDay(button); });
+    });
+  }
   function step5(t) {
     const st = String(t.estado_maestro || t.estado || '').toUpperCase();
     return '<div class="m33-session-row"><span>Estado</span><b>' + esc(st) + '</b></div>';
@@ -430,6 +676,7 @@
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
     if (state.step === 2 && !state.readOnly) bindAssignmentAutosave();
     if (state.step === 3) bindArchiveButtons(ov);
+    if (state.step === 4) bindInventoryButtons(ov);
   }
 
   async function open(id, options) {
@@ -454,6 +701,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.11-dep', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.13', renderHome: renderHome };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
