@@ -83,6 +83,8 @@ test("the owner inbox is RPC-only and exposes count, difference and explicit rev
   assert.match(ADMIN_UI, /bc5_listar_dinero_pendiente_contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
   assert.match(ADMIN_UI, /bc_aprobar_diferencia/);
+  assert.match(ADMIN_UI, /typeof client === 'undefined'/);
+  assert.doesNotMatch(ADMIN_UI, /window\.client/);
   assert.match(ADMIN_UI, /Diferencia pendiente de revisión/);
   assert.match(ADMIN_UI, /No se ha descontado ni ajustado dinero automáticamente/);
   assert.doesNotMatch(ADMIN_UI, /from\(['"]turno_declaraciones['"]\)/);
