@@ -33,7 +33,7 @@ test("cash handover extends the modern declaration and difference records additi
   assert.ok(FIXTURE.includes("CREATE TABLE IF NOT EXISTS public.turno_diferencias"));
   assert.match(FIXTURE, /ADD COLUMN IF NOT EXISTS ciclo_id uuid/);
   assert.match(FIXTURE, /ADD COLUMN IF NOT EXISTS sesion_id uuid/);
-  assert.match(PG_CI, /turno-cash-handover-fixture\\.sql/);
+  assert.ok(PG_CI.includes("turno-cash-handover-fixture.sql"));
   assert.match(MIGRATION, /REFERENCES public\.turno_declaraciones\(id\) ON DELETE RESTRICT/);
   assert.match(MIGRATION, /CON_DIFERENCIA/);
   assert.doesNotMatch(MIGRATION, /\bDROP\s+TABLE\b|\bTRUNCATE\b|\bDELETE\s+FROM\s+public\.(turnos|turno_sesiones|turno_declaraciones|turno_diferencias)/i);
