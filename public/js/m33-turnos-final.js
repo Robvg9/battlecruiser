@@ -8,7 +8,7 @@
 
   const ROOT_ID = 'ciclos-m18-root';
   const API = () => window.BattleCruiserTurnoAPI;
-  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false };
+  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false, staffError: '', inventoryBook: null };
   const root = () => document.getElementById(ROOT_ID);
   const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
   const date = v => {
@@ -18,7 +18,23 @@
     if (m) return m[3] + '/' + m[2] + '/' + m[1];
     return typeof fechaCorta === 'function' ? fechaCorta(v) : s.split('T')[0].split('-').reverse().join('/');
   };
-  const users = () => ((_cache && _cache.usuarios) || []).filter(u => u.activo !== false && !u.archivado);
+  const users = () => {
+    if (window.__BC_M29__ && typeof window.__BC_M29__.eligibleStaff === 'function') {
+      try { return window.__BC_M29__.eligibleStaff(); } catch (error) {}
+    }
+    const cache = (window._cache && Array.isArray(window._cache.usuarios)) ? window._cache.usuarios : [];
+    const source = Array.isArray(window.__BC_M29_STAFF_CACHE__) ? window.__BC_M29_STAFF_CACHE__ : [];
+    const byId = new Map();
+    cache.forEach(function (user) { if (user && user.id) byId.set(String(user.id), user); });
+    source.forEach(function (user) { if (user && user.id) byId.set(String(user.id), Object.assign({}, byId.get(String(user.id)) || {}, user)); });
+    return Array.from(byId.values()).filter(function (user) {
+      if (!user || !user.id || user.activo === false || user.archivado) return false;
+      var role = user.rol || user.nombre_rol || user.role_name || user.role || '';
+      if (role && typeof role === 'object') role = role.nombre || role.name || role.rol || '';
+      role = String(role || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+      return role.indexOf('dependienta') >= 0 || role.indexOf('dueno') === 0 || role === 'admin' || role === 'administrador';
+    });
+  };
   const field = v => (v == null || v === '') ? '-' : v;
 
   function can(r, a) {
@@ -63,12 +79,84 @@
     state.isAdmin = can('turnos', 'editar_any') || can('ciclos', 'editar_any') || isDuenoRole();
   }
 
+  async function ensureAssignmentUsers(forceRefresh) {
+    const current = users();
+    if (current.length && !forceRefresh) return current;
+    if (!navigator.onLine) throw new Error('Conecta el dispositivo para consultar responsables.');
+    const hub = window.__BC_M29__;
+    if (hub && typeof hub.loadResponsibleStaff === 'function') {
+      const rows = await hub.loadResponsibleStaff(!!forceRefresh);
+      state.staffError = '';
+      return rows;
+    }
+    if (!window.client || typeof window.client.rpc !== 'function') throw new Error('Cliente del servidor no disponible para cargar responsables.');
+    const response = await window.client.rpc('listar_usuarios_admin', { p_incluir_archivados: false });
+    if (response && response.error) throw response.error;
+    const rows = Array.isArray(response && response.data) ? response.data : [];
+    window.__BC_M29_STAFF_CACHE__ = rows;
+    window._cache = window._cache || {};
+    window._cache.usuarios = rows;
+    const result = users();
+    if (!result.length) throw new Error('La consulta no devolvió responsables activos elegibles.');
+    state.staffError = '';
+    return result;
+  }
+
   function css() {
     if (document.getElementById('bc-m33-css')) return;
     const s = document.createElement('style');
     s.id = 'bc-m33-css';
     s.textContent = '.m33-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}.m33-modal{width:min(920px,100%);max-width:100%;box-sizing:border-box;max-height:94vh;max-height:94dvh;overflow:hidden;background:var(--panel-bg,#171c24);color:var(--text,#fff);border:1px solid rgba(255,255,255,.1);border-radius:18px;box-shadow:0 26px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}.m33-head{padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.08)}.m33-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.m33-title h3{margin:0;font-size:1.22rem}.m33-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-top:10px;overflow:visible}.m33-step{min-width:0;padding:6px 4px;text-align:center;line-height:1.2;overflow-wrap:anywhere;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:.75rem;opacity:.55}.m33-step.active{opacity:1;border-color:rgba(59,130,246,.7);background:rgba(59,130,246,.12)}.m33-body{padding:12px 16px;overflow:auto;overscroll-behavior:contain;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:10px}.m33-foot button{padding:10px 16px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:transparent;color:inherit;font-weight:600;cursor:pointer}.m33-foot .primary{background:#2563eb;border-color:#2563eb;color:#fff}.m33-foot .danger{background:#b91c1c;border-color:#b91c1c;color:#fff}.m33-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.m33-box{padding:8px 9px;border:1px solid rgba(255,255,255,.08);border-radius:10px}.m33-box span{display:block;font-size:.72rem;opacity:.58;margin-bottom:3px}.m33-session{padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)}.m33-session-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;min-width:0}.m33-assignment-grid .m33-assignment-card{display:grid;grid-template-columns:minmax(84px,.56fr) minmax(0,1fr);align-items:center;gap:8px;padding:5px 0;min-width:0}.m33-assignment-card label{min-width:0;margin:0!important;font-size:.76rem;line-height:1.25;overflow-wrap:anywhere}.m33-assignment-card select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin:0!important;padding:7px 8px!important;min-height:38px;font-size:.86rem;line-height:1.2}.m33-assignment-card .m33-muted{min-width:0;font-size:.8rem;overflow-wrap:anywhere}.m33-session-row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.m33-pill{font-size:.72rem;padding:3px 8px;border-radius:999px;background:rgba(148,163,184,.14)}.m33-ok{background:rgba(34,197,94,.15);color:#86efac}.m33-warn{background:rgba(251,191,36,.15);color:#fde68a}.m33-muted{opacity:.62}.m33-msg{min-height:1.2em;margin:6px 0;font-size:.9rem}.m33-msg.error{color:#f87171}.m33-msg.ok{color:#86efac}.m33-btn-sesion{padding:9px 14px;border-radius:8px;border:none;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}.m33-btn-sesion:disabled{opacity:.5;cursor:not-allowed}.bc-m33-save-msg{font-size:.78rem;margin:6px 0;min-height:1em}.bc-m33-save-msg.ok{color:#86efac}.bc-m33-save-msg.error{color:#f87171}.m33-archive{margin-top:10px}.m33-archive-day{margin:6px 0;padding:8px;border:1px solid rgba(255,255,255,.12);border-radius:10px}.m33-archive-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.m33-archive-head b{display:block}.m33-archive-head small{display:block;opacity:.65;margin-top:3px}.m33-archive-head button{min-height:40px;padding:9px 12px;border-radius:8px;border:1px solid rgba(59,130,246,.55);background:rgba(59,130,246,.12);color:inherit;font-weight:600}.m33-archive-head button:disabled{opacity:.55}.m33-archive-host{margin-top:6px}.m33-archive-host[hidden]{display:none}.m33-archive-scroll{max-width:100%;overflow-x:auto}.m33-archive-table{width:100%;min-width:640px;border-collapse:collapse;font-size:.78rem}.m33-archive-table th,.m33-archive-table td{padding:6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top}.m33-archive-table th{opacity:.65}.m33-archive-empty{padding:10px;border:1px dashed rgba(255,255,255,.16);border-radius:8px;opacity:.75;font-size:.84rem}.m33-inventory{display:grid;gap:8px;margin-top:8px}.m33-inventory-day{padding:9px;border:1px solid rgba(255,255,255,.12);border-radius:9px}.m33-inventory-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.m33-inventory-head b{display:block}.m33-inventory-head small{display:block;opacity:.62;margin-top:2px}.m33-inventory-head button{min-height:34px;padding:7px 10px;border-radius:7px;border:1px solid rgba(59,130,246,.5);background:rgba(59,130,246,.12);color:inherit;font-size:.78rem;font-weight:600}.m33-inventory-host{margin-top:8px}.m33-inventory-host[hidden]{display:none}.m33-inventory-scroll{max-width:100%;overflow:auto}.m33-inventory-table{width:100%;min-width:720px;border-collapse:collapse;font-size:.74rem}.m33-inventory-table th,.m33-inventory-table td{padding:6px 7px;text-align:left;vertical-align:top;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}.m33-inventory-table th{opacity:.65;font-weight:600}.m33-inventory-table td.m33-num{text-align:right;font-variant-numeric:tabular-nums}.m33-inventory-table tr.m33-opening{background:rgba(34,197,94,.07);font-weight:600}.m33-inventory-note{padding:8px 10px;margin:7px 0;border-left:2px solid rgba(201,162,77,.7);background:rgba(201,162,77,.07);font-size:.78rem;line-height:1.4}.m33-inventory-note.error{border-color:#ef7777;color:#ffc0bb}.m33-inventory-host .m33-archive-empty{margin-top:7px}@media(max-width:720px){.m33-bg{padding:6px}.m33-modal{width:100%;max-width:100%;box-sizing:border-box;max-height:calc(100dvh - 12px);border-radius:12px}.m33-head{padding:10px 12px 7px}.m33-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.m33-step{font-size:.68rem;padding:6px 4px}.m33-session-grid{grid-template-columns:minmax(0,1fr)}.m33-body{padding:10px 12px;min-height:0;flex:1 1 auto}.m33-foot{padding:9px 12px}.m33-foot button{padding:8px 11px}}';
     document.head.appendChild(s);
+    if (!document.getElementById('bc-m33-compact-sheet-css')) {
+      const compact = document.createElement('style');
+      compact.id = 'bc-m33-compact-sheet-css';
+      compact.textContent = [
+        '.m33-bg{padding:6px!important}',
+        '.m33-modal{width:min(1240px,calc(100vw - 12px))!important;max-width:1240px!important;max-height:calc(100dvh - 12px)!important;border-radius:12px!important}',
+        '.m33-head{padding:8px 12px 6px!important}',
+        '.m33-title h3{font-size:1.04rem!important;line-height:1.2!important}',
+        '.m33-steps{gap:3px!important;margin-top:6px!important}',
+        '.m33-step{padding:4px 2px!important;font-size:.66rem!important;line-height:1.12!important;border-radius:6px!important}',
+        '.m33-body{padding:8px 12px!important}',
+        '.m33-foot{padding:7px 12px!important}',
+        '.m33-foot button{padding:7px 11px!important;font-size:11px!important}',
+        '.m33-summary{gap:4px!important}',
+        '.m33-box{padding:6px 7px!important}',
+        '.m33-session{padding:4px 0!important}',
+        '.m33-assignment-card select{min-height:31px!important;padding:5px 7px!important;font-size:11px!important}',
+        '.m33-muted{font-size:.72rem!important;line-height:1.28!important}',
+        '.m33-book{display:grid;gap:7px;min-width:0}',
+        '.m33-book-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}',
+        '.m33-book-top b{display:block;font-size:.94rem}',
+        '.m33-book-top small{display:block;font-size:.68rem;opacity:.65;margin-top:2px}',
+        '.m33-book-top button{min-height:29px;padding:5px 9px;border:1px solid rgba(59,130,246,.5);border-radius:6px;background:rgba(59,130,246,.12);color:inherit;font-size:10px;font-weight:600}',
+        '.m33-book-host{display:grid;gap:9px;min-width:0}',
+        '.m33-book-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}',
+        '.m33-book-metric{min-width:0;padding:6px 7px;border:1px solid rgba(255,255,255,.1);border-radius:6px;background:rgba(255,255,255,.025)}',
+        '.m33-book-metric small{display:block;font-size:9px;opacity:.62;line-height:1.1}',
+        '.m33-book-metric b{display:block;font-size:12px;line-height:1.25;margin-top:3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}',
+        '.m33-book-section{min-width:0}',
+        '.m33-book-section h4{font-size:11px;margin:2px 0 5px!important}',
+        '.m33-book-scroll{width:100%;max-width:100%;overflow:auto;border:1px solid rgba(255,255,255,.11);border-radius:6px;-webkit-overflow-scrolling:touch}',
+        '.m33-book-table{width:100%;min-width:1320px;border-collapse:separate;border-spacing:0;font-size:10px;font-variant-numeric:tabular-nums}',
+        '.m33-book-table th,.m33-book-table td{padding:5px 6px;border-right:1px solid rgba(255,255,255,.055);border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;text-align:right}',
+        '.m33-book-table th{position:sticky;top:0;z-index:1;background:#202a32;color:#d9d2c2;font-size:9px;font-weight:700;text-align:center}',
+        '.m33-book-table th:nth-child(5),.m33-book-table td:nth-child(5){position:sticky;left:0;z-index:2;text-align:left;background:#18241f;min-width:170px}',
+        '.m33-book-table th:nth-child(5){z-index:3;background:#202a32}',
+        '.m33-book-table td:first-child,.m33-book-table td:nth-child(5){text-align:left}',
+        '.m33-book-table tfoot th,.m33-book-table tfoot td{background:rgba(212,176,92,.09);font-weight:700}',
+        '.m33-book-table .m33-negative{color:#ffaaa0}',
+        '.m33-book-note{padding:6px 8px;border-left:2px solid rgba(201,162,77,.7);background:rgba(201,162,77,.06);font-size:10px;line-height:1.3}',
+        '.m33-book-subtables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}',
+        '.m33-book-subtable{width:100%;border-collapse:collapse;font-size:10px}',
+        '.m33-book-subtable th,.m33-book-subtable td{padding:5px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07)}',
+        '.m33-book-subtable th{font-size:9px;opacity:.65}',
+        '.m33-book-empty{padding:7px 8px;border:1px dashed rgba(255,255,255,.15);border-radius:6px;font-size:10px;opacity:.72}',
+        '@media(max-width:720px){.m33-bg{padding:3px!important}.m33-modal{width:calc(100vw - 6px)!important;max-height:calc(100dvh - 6px)!important;border-radius:9px!important}.m33-head{padding:6px 8px 5px!important}.m33-title h3{font-size:.96rem!important}.m33-steps{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:2px!important}.m33-step{font-size:.56rem!important;padding:4px 1px!important;overflow-wrap:anywhere}.m33-body{padding:6px 8px!important}.m33-foot{padding:6px 8px!important}.m33-book-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-book-subtables{grid-template-columns:minmax(0,1fr)}.m33-book-table{min-width:1220px}}'
+      ].join('');
+      document.head.appendChild(compact);
+    }
   }
 
   function normalizeExp(d) {
@@ -123,13 +211,17 @@
         }).join('') + '</div>';
     }
     const us = users();
-    return '<p class="m33-muted">Asigna una trabajadora a cada sesión. Los cambios se guardan inmediatamente; el botón Guardar vuelve a verificar todo el bloque.</p>' +
+    if (!us.length) {
+      return '<p class="m33-muted">No se pudo poblar la lista de responsables. ' + esc(state.staffError || 'La consulta no devolvió personal elegible.') + '</p>' +
+        '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Reintentar carga de responsables</button>' +
+        '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
+    }
+    return '<p class="m33-muted">Responsable por sesión. Los cambios se guardan y verifican en el servidor.</p>' +
       '<p id="m33-asig-msg" class="bc-m33-save-msg"></p><div class="m33-session-grid m33-assignment-grid">' + state.sesiones.map(s => {
         const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' +
-          (String(u.id) === String(s.usuario_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.email || u.id) + '</option>').join('');
+          (String(u.id) === String(s.usuario_id || s.responsable_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.nombre_usuario || u.email || u.id) + '</option>').join('');
         return '<div class="m33-session m33-assignment-card"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) +
-          '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || '') +
-          '" style="width:100%;margin-top:6px;padding:9px;border-radius:8px">' + opts + '</select></div>';
+          '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || s.responsable_id || '') + '">' + opts + '</select></div>';
       }).join('') + '</div>';
   }
   function archiveSessionsForViewer() {
@@ -166,16 +258,16 @@
     return archiveDayGroups(archiveSessionsForViewer());
   }
   function step4() {
-    const groups = inventoryDayGroups();
-    if (!groups.length) return '<div class="m33-archive-empty">No hay sesiones disponibles para consultar el inventario de este turno.</div>';
-    return '<div class="m33-inventory"><p class="m33-muted">Libro cronológico de solo lectura. El saldo de apertura procede únicamente de un conteo físico inicial confirmado. Las entradas, salidas, gastos, reinversiones y solicitudes de merma/baja se muestran con trazabilidad; las solicitudes pendientes no descuentan existencias.</p>' +
-      groups.map(function (group) {
-        const ids = group.sessions.map(function (session) { return String(session.id || ''); }).filter(Boolean).join('|');
-        const action = ids
-          ? '<button type="button" data-m33-inventory-sessions="' + esc(ids) + '" data-m33-inventory-day="' + esc(group.day) + '" data-m33-inventory-date="' + esc(group.date) + '" aria-expanded="false">Ver libro del día</button>'
-          : '<span class="m33-muted">Sin sesiones consultables</span>';
-        return '<section class="m33-inventory-day"><div class="m33-inventory-head"><div><b>Día ' + esc(group.day) + '</b><small>' + esc(date(group.date)) + ' · ' + group.sessions.length + ' sesión(es)</small></div>' + action + '</div><div class="m33-inventory-host" data-m33-inventory-host hidden></div></section>';
-      }).join('') + '</div>';
+    const sessions = archiveSessionsForViewer().slice().sort(function (a, b) {
+      return String(a.fecha || '').localeCompare(String(b.fecha || ''));
+    });
+    if (!sessions.length) return '<div class="m33-archive-empty">No hay sesiones disponibles para consultar el inventario de este turno.</div>';
+    const first = date(sessions[0].fecha);
+    const last = date(sessions[sessions.length - 1].fecha);
+    return '<section class="m33-book">' +
+      '<header class="m33-book-top"><div><b>Inventario del turno</b><small>' + esc(first) + (first !== last ? ' → ' + esc(last) : '') + ' · ' + sessions.length + ' registro(s) de jornada</small></div>' +
+      '<button type="button" data-m33-inventory-book>Actualizar libro</button></header>' +
+      '<div class="m33-book-host" data-m33-inventory-host><div class="m33-archive-empty">Preparando la hoja de inventario…</div></div></section>';
   }
   function inventoryQuantity(value) {
     const number = Number(value);
@@ -408,8 +500,8 @@
     return user ? (user.nombre || user.nombre_usuario || user.email || String(id)) : (id ? String(id) : '—');
   }
   function bindInventoryButtons(overlay) {
-    overlay.querySelectorAll('[data-m33-inventory-sessions]').forEach(function (button) {
-      button.addEventListener('click', function () { loadInventoryDay(button); });
+    overlay.querySelectorAll('[data-m33-inventory-book]').forEach(function (button) {
+      button.addEventListener('click', function () { loadInventoryBook(button); });
     });
   }
   function step5(t) {
@@ -677,17 +769,36 @@
     var cf = ov.querySelector('#m33-close-final'); if (cf) cf.onclick = close;
     var d = ov.querySelector('#m33-delete'); if (d) d.onclick = deleteTurno;
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
-    if (state.step === 2 && !state.readOnly) bindAssignmentAutosave();
+    if (state.step === 2 && !state.readOnly) {
+      bindAssignmentAutosave();
+      const retryStaff = ov.querySelector('[data-m33-reload-staff]');
+      if (retryStaff) retryStaff.addEventListener('click', async function () {
+        retryStaff.disabled = true;
+        state.staffError = '';
+        try { await ensureAssignmentUsers(true); }
+        catch (error) { state.staffError = String(error && error.message ? error.message : error); }
+        renderModal();
+      });
+    }
     if (state.step === 3) bindArchiveButtons(ov);
     if (state.step === 4) {
       bindInventoryButtons(ov);
-      const firstInventoryDay = ov.querySelector('[data-m33-inventory-sessions]');
-      if (firstInventoryDay) loadInventoryDay(firstInventoryDay);
+      const bookButton = ov.querySelector('[data-m33-inventory-book]');
+      if (bookButton) loadInventoryBook(bookButton);
     }
   }
 
   async function open(id, options) {
-    css(); state.step = 1; state.busy = true; state.readOnly = !!(options && options.readOnly === true); await resolveAdmin();
+    css();
+    state.step = 1;
+    state.busy = true;
+    state.readOnly = !!(options && options.readOnly === true);
+    state.staffError = '';
+    await resolveAdmin();
+    if (state.isAdmin && !state.readOnly) {
+      try { await ensureAssignmentUsers(false); }
+      catch (staffError) { state.staffError = String(staffError && staffError.message ? staffError.message : staffError); }
+    }
     const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
     try { await load(id); state.busy = false; renderModal(); }
     catch (e) { state.busy = false; ov.innerHTML = '<div class="m33-modal"><div class="m33-body"><h3>No se pudo cargar</h3><p>' + esc(e.message || e) + '</p><button type="button" id="m33-error-close">Cerrar</button></div></div>'; ov.querySelector('#m33-error-close').onclick = close; }
@@ -708,6 +819,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.13', renderHome: renderHome };
+  window.__BC_M33 = { open: open, version: '33.14', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
