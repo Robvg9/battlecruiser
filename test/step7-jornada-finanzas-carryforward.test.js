@@ -131,7 +131,7 @@ test("Step 7 shows prior count only as an editable physical recount reference", 
   assert.match(UI, /bc7_registrar_gasto_jornada/);
   assert.match(UI, /bc7_registrar_reinversion_jornada/);
   assert.match(UI, /bc7_finanzas_jornada/);
-  assert.match(UI, /clave de idempotencia se conserva/);
+  assert.match(UI, /No la envíes otra vez con una referencia nueva; el formulario conserva la referencia original para evitar duplicados/);
   assert.match(UI, /state\.admin\|\|can\('gastos','ver'\)/);
   assert.match(UI, /state\.admin\|\|can\('reinversiones','ver'\)/);
 });
