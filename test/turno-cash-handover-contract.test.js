@@ -51,8 +51,8 @@ test("only the authenticated administrator can count cash after a completed sess
 test("cash mismatch remains an explicit, auditable difference without automatic adjustment", () => {
   assert.match(MIGRATION, /IF v_diferencia<>0 THEN/);
   assert.match(MIGRATION, /'DINERO'/);
-  assert.match(MIGRATION, /aprobado=false/);
-  assert.match(MIGRATION, /estado_aprobacion='CON_DIFERENCIA'/);
+  assert.match(MIGRATION, /v_d\.usuario_id,false,v_obs,v_d\.id/);
+  assert.match(MIGRATION, /ELSE 'CON_DIFERENCIA' END/);
   assert.match(MIGRATION, /DINERO_DIFERENCIA_RESUELTA/);
   assert.match(MIGRATION, /IF d\.estado_aprobacion='CON_DIFERENCIA' THEN/);
   assert.match(MIGRATION, /IF s\.bloque='JORNADA' THEN/);
