@@ -147,6 +147,7 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
 
 test("M29 loads active eligible responsables when the shared cache is empty", async (t) => {
   const { window } = setup(t);
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
   window._cache.usuarios = [];
   const users = [
     { id: "dep-3", nombre: "Dependienta 3", rol: "Dependienta", activo: true },
