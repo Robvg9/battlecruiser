@@ -1117,8 +1117,6 @@
       var actions = '';
       if (state.readOnly) actions = '<span class="m33-pill">Solo lectura</span>';
       else if (String(x.bloque || '').toUpperCase() === 'JORNADA') actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + esc(x.id) + '">Gestionar jornada</button>';
-       ov.querySelectorAll('[data-m33-declare-cash]').forEach(function (btn) { btn.addEventListener('click', function () { declararDineroSesionLegacy(btn.getAttribute('data-m33-declare-cash'),btn); }); });
-       ov.querySelectorAll('[data-m33-close-legacy-session]').forEach(function (btn) { btn.addEventListener('click', function () { cerrarSesionLegacyResponsable(btn.getAttribute('data-m33-close-legacy-session'),btn); }); });
       else if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
       else if (st === 'EN_CURSO') {
         var hasDeclaration = x.dinero_declarado === true || !!x.dinero_id;
@@ -1415,6 +1413,8 @@
       bindArchiveButtons(ov);
       ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
+       ov.querySelectorAll('[data-m33-declare-cash]').forEach(function (btn) { btn.addEventListener('click', function () { declararDineroSesionLegacy(btn.getAttribute('data-m33-declare-cash'),btn); }); });
+       ov.querySelectorAll('[data-m33-close-legacy-session]').forEach(function (btn) { btn.addEventListener('click', function () { cerrarSesionLegacyResponsable(btn.getAttribute('data-m33-close-legacy-session'),btn); }); });
       return;
     }
     if (state.step === 2 && !state.readOnly && !state.staffRequestAttempted) {
