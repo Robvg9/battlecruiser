@@ -15,6 +15,7 @@ const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
 const JOURNEY_UI = read("public/js/bc7-jornada-ui.js");
 const ADMIN_UI = read("public/js/turno-cash-handover-ui.js");
+const CORE = read("public/js/core.js");
 const BOOK_UI = read("public/js/m33-turnos-final.js");
 const APP = read("public/app.js");
 const SW = read("public/service-worker.js");
@@ -83,6 +84,7 @@ test("the owner inbox is RPC-only and exposes count, difference and explicit rev
   assert.match(ADMIN_UI, /bc5_listar_dinero_pendiente_contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
   assert.match(ADMIN_UI, /bc_aprobar_diferencia/);
+  assert.match(CORE, /const client = window\.supabase\.createClient/);
   assert.match(ADMIN_UI, /typeof client === 'undefined'/);
   assert.doesNotMatch(ADMIN_UI, /window\.client/);
   assert.match(ADMIN_UI, /Diferencia pendiente de revisión/);
