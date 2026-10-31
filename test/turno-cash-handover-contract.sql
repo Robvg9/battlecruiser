@@ -12,6 +12,7 @@ DECLARE
   v_jugo uuid := '31000000-0000-0000-0000-000000000002';
   v_decl1 uuid;
   v_decl2 uuid;
+  v_declared1 numeric;
   v_tramo2 uuid;
   v_diff_id uuid;
   v_result jsonb;
@@ -32,6 +33,7 @@ BEGIN
   ORDER BY declarado_at DESC,created_at DESC
   LIMIT 1;
   IF v_decl1 IS NULL THEN RAISE EXCEPTION 'FAIL: Day 1 declaration fixture is missing'; END IF;
+  SELECT monto INTO v_declared1 FROM public.turno_declaraciones WHERE id=v_decl1;
   IF (SELECT estado FROM public.turno_sesiones WHERE id=v_day1)<>'COMPLETADA' THEN
     RAISE EXCEPTION 'FAIL: Day 1 fixture must already be completed';
   END IF;
@@ -45,8 +47,8 @@ BEGIN
     RAISE EXCEPTION 'FAIL: owner inbox did not return the pending Day 1 declaration';
   END IF;
 
-  -- Exact match: declared 0, physically counted 0, approved without a difference row.
-  v_result:=public.bc5_contar_dinero_entregado(v_decl1,0,'Conteo exacto fixture');
+  -- Exact match: count the exact declared amount, without creating a difference row.
+  v_result:=public.bc5_contar_dinero_entregado(v_decl1,v_declared1,'Conteo exacto fixture');
   IF v_result->>'estado'<>'APROBADA'
      OR (v_result->>'diferencia')::numeric<>0
      OR coalesce((v_result->>'idempotente')::boolean,false) THEN
