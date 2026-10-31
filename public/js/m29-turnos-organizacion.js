@@ -407,9 +407,9 @@
     if (ov) ov.remove();
   }
   function eligibleStaff() {
-    var cacheRows = Array.isArray(window.__BC_M29_STAFF_CACHE__)
-      ? window.__BC_M29_STAFF_CACHE__
-      : ((_cache && Array.isArray(_cache.usuarios)) ? _cache.usuarios : []);
+    var cacheRows = (typeof _cache !== 'undefined' && _cache && Array.isArray(_cache.usuarios))
+      ? _cache.usuarios
+      : (Array.isArray(window.__BC_M29_STAFF_CACHE__) ? window.__BC_M29_STAFF_CACHE__ : []);
     return cacheRows.filter(function (u) {
       if (!u || !u.id || u.activo === false || u.archivado) return false;
       var role = String(u.rol || u.role_name || u.nombre_rol || u.role || '').toLowerCase().trim();
