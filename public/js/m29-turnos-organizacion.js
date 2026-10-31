@@ -576,6 +576,15 @@
     document.getElementById('m29-inicio').addEventListener('change', buildCreateRows);
     document.getElementById('m29-dias').addEventListener('change', buildCreateRows);
     document.getElementById('m29-confirm-crear').onclick = confirmCrear;
+    var cachedPeople = eligibleStaff();
+    if (cachedPeople.length) {
+      var cachedStatus = document.getElementById('m29-staff-status');
+      if (cachedStatus) { cachedStatus.textContent = cachedPeople.length + ' responsables activos disponibles.'; cachedStatus.className = 'm29-msg ok'; }
+      buildCreateRows();
+      var cachedConfirm = document.getElementById('m29-confirm-crear');
+      if (cachedConfirm) cachedConfirm.disabled = false;
+      return;
+    }
     try {
       var people = await ensureEligibleStaff();
       var status = document.getElementById('m29-staff-status');
