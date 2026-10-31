@@ -288,6 +288,493 @@
       baja: 'Baja aprobada'
     })[String(value || '').toLowerCase()] || String(value || 'Movimiento');
   }
+  function bookNameKey(value) {
+    return String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function bookNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+  }
+  function bookQty(value) {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    return Number(value).toLocaleString('es-ES', { maximumFractionDigits: 3 });
+  }
+  function bookMoney(value, approximate) {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    return (approximate ? '≈ ' : '') + Number(value).toLocaleString('es-ES', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+  }
+  function bookRows(value) {
+    if (Array.isArray(value)) return value;
+    return value && typeof value === 'object' ? [value] : [];
+  }
+  function loadInventoryBook(button) {
+    const overlay = document.getElementById('m33-bg');
+    const host = overlay && overlay.querySelector('[data-m33-inventory-host]');
+    if (!host || button.dataset.m33BookLoading === '1') return;
+    button.disabled = true;
+    button.dataset.m33BookLoading = '1';
+    host.innerHTML = '<div class="m33-archive-empty">Calculando la hoja consolidada del turno…</div>';
+    loadInventoryBookData(host).finally(function () {
+      button.disabled = false;
+      delete button.dataset.m33BookLoading;
+    });
+  }
+  async function loadInventoryBookData(host) {
+    try {
+      const rpcClient = window.client;
+      if (!navigator.onLine) throw new Error('El libro consolidado requiere conexión al servidor.');
+      if (!rpcClient || typeof rpcClient.rpc !== 'function') throw new Error('Cliente del servidor no disponible.');
+      const sessions = archiveSessionsForViewer().slice().sort(function (a, b) {
+        return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
+          Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
+      });
+      if (!sessions.length) {
+        host.innerHTML = '<div class="m33-book-empty">No hay sesiones asociadas a este turno.</div>';
+        return;
+      }
+      const sessionData = [];
+      const salesIds = new Set();
+      let readable = 0;
+      let denied = 0;
+      let hasMovementRead = false;
+      for (const session of sessions) {
+        const isJornada = String(session.bloque || '').toUpperCase() === 'JORNADA';
+        const calls = await Promise.all([
+          rpcClient.rpc('bc7_movimientos_sesion', { p_turno_sesion_id: session.id }),
+          isJornada
+            ? rpcClient.rpc('bc7_obtener_inventario_jornada', { p_turno_sesion_id: session.id })
+            : Promise.resolve({ data: null, error: null }),
+          isJornada
+            ? rpcClient.rpc('bc7_finanzas_jornada', { p_turno_sesion_id: session.id })
+            : Promise.resolve({ data: null, error: null })
+        ]);
+        const movementResponse = calls[0];
+        const inventoryResponse = calls[1];
+        const financeResponse = calls[2];
+        [movementResponse, inventoryResponse, financeResponse].forEach(function (response) {
+          if (response && response.error) {
+            if (String(response.error.code || '') === '42501') denied += 1;
+            else throw response.error;
+          }
+        });
+        const movementsDenied = movementResponse && movementResponse.error;
+        const inventoryDenied = inventoryResponse && inventoryResponse.error;
+        const financeDenied = financeResponse && financeResponse.error;
+        if (!movementsDenied) {
+          hasMovementRead = true;
+          readable += 1;
+        }
+        const movementRows = movementsDenied ? [] : bookRows(movementResponse && movementResponse.data);
+        movementRows.forEach(function (movement) {
+          if (String(movement.tipo || '').toLowerCase() === 'venta' && movement.operacion_id) {
+            salesIds.add(String(movement.operacion_id));
+          }
+        });
+        sessionData.push({
+          session: session,
+          movements: movementRows,
+          inventory: inventoryDenied ? null : (inventoryResponse && inventoryResponse.data || null),
+          finance: financeDenied ? {} : (financeResponse && financeResponse.data || {}),
+          movementDenied: !!movementsDenied
+        });
+      }
+      if (!readable && denied) {
+        host.innerHTML = '<div class="m33-book-empty">Tu perfil no tiene permiso para consultar los movimientos y el inventario de este turno.</div>';
+        return;
+      }
+
+      const byId = new Map();
+      const byName = new Map();
+      function ensureProduct(id, name, unit) {
+        const productId = id == null || id === '' ? '' : String(id);
+        const nameText = String(name || (productId || 'Producto sin nombre'));
+        const nameKey = bookNameKey(nameText);
+        let row = productId ? byId.get(productId) : null;
+        if (!row && nameKey && byName.has(nameKey)) row = byName.get(nameKey);
+        if (!row) {
+          row = {
+            id: productId || null, name: nameText, unit: unit || '',
+            opening: null, final: null, incoming: 0, reinvestment: 0,
+            losses: 0, otherOut: 0, posMovementQty: 0,
+            costWeightedQty: 0, costWeightedTotal: 0,
+            saleCostQty: 0, saleCostTotal: 0,
+            salePriceQty: 0, salePriceTotal: 0,
+            saleLinesQty: 0, saleRevenue: 0, saleProfit: 0,
+            hasSaleLine: false, currentPrice: null, lossCostTotal: 0
+          };
+        } else {
+          if (productId && !row.id) row.id = productId;
+          if (nameText && (!row.name || row.name === row.id || row.name === 'Producto sin nombre')) row.name = nameText;
+          if (unit && !row.unit) row.unit = unit;
+        }
+        if (productId) byId.set(productId, row);
+        if (nameKey) byName.set(nameKey, row);
+        return row;
+      }
+      function addCost(row, quantity, unitCost) {
+        const q = Math.abs(bookNumber(quantity));
+        const cost = Number(unitCost);
+        if (q > 0 && Number.isFinite(cost) && cost >= 0) {
+          row.costWeightedQty += q;
+          row.costWeightedTotal += q * cost;
+        }
+      }
+
+      sessionData.forEach(function (entry) {
+        const inventory = entry.inventory;
+        if (inventory && Array.isArray(inventory.productos)) {
+          inventory.productos.forEach(function (product) {
+            ensureProduct(product.producto_id || product.id, product.nombre, product.unidad);
+          });
+        }
+      });
+
+      const jornadaSessions = sessionData.filter(function (entry) {
+        return String(entry.session.bloque || '').toUpperCase() === 'JORNADA' && entry.inventory;
+      });
+      const firstInventory = jornadaSessions.length ? jornadaSessions[0].inventory : null;
+      const lastInventory = jornadaSessions.length ? jornadaSessions[jornadaSessions.length - 1].inventory : null;
+      const initialCut = firstInventory && firstInventory.cortes && firstInventory.cortes.INICIAL;
+      const finalCut = lastInventory && lastInventory.cortes && lastInventory.cortes.FINAL;
+      const hasOpening = !!(initialCut && initialCut.estado === 'CONFIRMADO');
+      const hasFinal = !!(finalCut && finalCut.estado === 'CONFIRMADO');
+      if (hasOpening) {
+        bookRows(initialCut.lineas).forEach(function (line) {
+          const row = ensureProduct(line.producto_id, null, '');
+          row.opening = bookNumber(line.cantidad_contada);
+        });
+      }
+      if (hasFinal) {
+        bookRows(finalCut.lineas).forEach(function (line) {
+          const row = ensureProduct(line.producto_id, null, '');
+          row.final = bookNumber(line.cantidad_contada);
+        });
+      }
+
+      const reinvestmentRows = [];
+      const expenseRows = [];
+      const declarationFallback = [];
+      let reinvestmentTotal = 0;
+      let expenseTotal = 0;
+      sessionData.forEach(function (entry) {
+        const session = entry.session;
+        entry.movements.forEach(function (movement) {
+          const type = String(movement.tipo || '').toLowerCase();
+          const quantity = Math.abs(bookNumber(movement.cantidad));
+          const row = ensureProduct(null, movement.producto, '');
+          if (type === 'compra') {
+            row.incoming += quantity;
+            addCost(row, quantity, movement.costo_unitario);
+          } else if (type === 'transferencia_entrada') {
+            row.incoming += quantity;
+          } else if (type === 'venta') {
+            row.posMovementQty += quantity;
+          } else if (type === 'merma' || type === 'baja') {
+            row.losses += quantity;
+            if (Number.isFinite(Number(movement.costo_unitario))) {
+              row.lossCostTotal += quantity * Number(movement.costo_unitario);
+            }
+          } else if (type === 'vale' || type === 'transferencia_salida') {
+            row.otherOut += quantity;
+          }
+        });
+        const finance = entry.finance || {};
+        bookRows(finance.reinversiones).forEach(function (reinvestment) {
+          bookRows(reinvestment.lineas).forEach(function (line) {
+            const row = ensureProduct(line.producto_id, line.producto, '');
+            const quantity = Math.abs(bookNumber(line.cantidad_base));
+            const total = Math.abs(bookNumber(line.costo_total));
+            const unit = Number(line.costo_unitario);
+            row.reinvestment += quantity;
+            if (quantity > 0 && Number.isFinite(unit)) addCost(row, quantity, unit);
+            else if (quantity > 0 && total > 0) addCost(row, quantity, total / quantity);
+            reinvestmentTotal += total;
+            reinvestmentRows.push({
+              date: reinvestment.fecha || session.fecha,
+              product: line.producto || line.producto_id || '—',
+              quantity: quantity,
+              unitCost: Number.isFinite(unit) ? unit : (quantity ? total / quantity : null),
+              total: total,
+              actor: reinvestment.usuario_nombre || '—',
+              supplier: reinvestment.proveedor || ''
+            });
+          });
+        });
+        bookRows(finance.gastos).forEach(function (expense) {
+          const amount = bookNumber(expense.monto);
+          expenseTotal += amount;
+          expenseRows.push({
+            date: expense.creado_en || session.fecha,
+            concept: expense.concepto || 'Gasto operativo',
+            description: expense.descripcion || expense.comentario_revision || '',
+            amount: amount,
+            status: expense.estado || 'Registrado',
+            actor: expense.creado_nombre || '—'
+          });
+        });
+        const declaration = entry.inventory && entry.inventory.declaracion_dinero;
+        if (declaration && declaration.monto != null) {
+          declarationFallback.push({
+            sessionId: String(session.id),
+            date: declaration.declarado_at || session.fecha,
+            amount: bookNumber(declaration.monto),
+            currency: declaration.moneda || 'CUP',
+            userId: declaration.usuario_id || (entry.inventory.sesion && entry.inventory.sesion.responsable_id) || session.usuario_id,
+            status: declaration.estado_aprobacion || 'Declarado'
+          });
+        }
+      });
+
+      let salesLines = null;
+      if (salesIds.size && typeof rpcClient.from === 'function') {
+        try {
+          const salesResponse = await rpcClient.from('ventas_lineas')
+            .select('venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo')
+            .in('venta_id', Array.from(salesIds));
+          if (salesResponse && salesResponse.error) throw salesResponse.error;
+          salesLines = Array.isArray(salesResponse && salesResponse.data) ? salesResponse.data : [];
+        } catch (salesError) {
+          salesLines = null;
+        }
+      } else if (!salesIds.size) {
+        salesLines = [];
+      }
+      if (salesLines) {
+        salesLines.forEach(function (line) {
+          const row = ensureProduct(line.producto_id, null, '');
+          const quantity = Math.abs(bookNumber(line.cantidad));
+          const unitPrice = Number(line.precio_unitario);
+          const subtotal = Number.isFinite(Number(line.subtotal))
+            ? Number(line.subtotal)
+            : (Number.isFinite(unitPrice) ? quantity * unitPrice : 0);
+          const unitCost = Number(line.costo_unitario_fifo);
+          row.saleLinesQty += quantity;
+          row.saleRevenue += subtotal;
+          row.hasSaleLine = true;
+          if (Number.isFinite(unitPrice)) {
+            row.salePriceQty += quantity;
+            row.salePriceTotal += unitPrice * quantity;
+          }
+          if (quantity > 0 && Number.isFinite(unitCost)) {
+            row.saleCostQty += quantity;
+            row.saleCostTotal += unitCost * quantity;
+            row.saleProfit += subtotal - unitCost * quantity;
+          }
+        });
+      }
+
+      const productIds = Array.from(byId.keys());
+      const cachedProducts = (window._cache && Array.isArray(window._cache.productos)) ? window._cache.productos : [];
+      cachedProducts.forEach(function (product) {
+        const row = product && byId.get(String(product.id || product.producto_id || ''));
+        if (row && Number.isFinite(Number(product.precio_normal))) row.currentPrice = Number(product.precio_normal);
+      });
+      if (productIds.length && typeof rpcClient.from === 'function') {
+        try {
+          const priceResponse = await rpcClient.from('productos').select('id,nombre,precio_normal').in('id', productIds);
+          if (!priceResponse.error) {
+            (priceResponse.data || []).forEach(function (product) {
+              const row = byId.get(String(product.id));
+              if (row && Number.isFinite(Number(product.precio_normal))) row.currentPrice = Number(product.precio_normal);
+              if (row && product.nombre) row.name = product.nombre;
+            });
+          }
+        } catch (priceError) {}
+      }
+
+      let declarations = null;
+      if (typeof rpcClient.from === 'function') {
+        try {
+          const declarationResponse = await rpcClient.from('turno_declaraciones')
+            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion')
+            .in('turno_sesion_id', sessions.map(function (session) { return String(session.id); }));
+          if (!declarationResponse.error) declarations = Array.isArray(declarationResponse.data) ? declarationResponse.data : [];
+        } catch (declarationError) {}
+      }
+      const cashRows = [];
+      if (declarations) {
+        const sessionMap = new Map(sessions.map(function (session) { return [String(session.id), session]; }));
+        declarations.forEach(function (declaration) {
+          const session = sessionMap.get(String(declaration.turno_sesion_id));
+          if (!session) return;
+          cashRows.push({
+            date: declaration.declarado_at || session.fecha,
+            responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
+            declared: bookNumber(declaration.monto),
+            status: declaration.estado_aprobacion || 'Declarado',
+            collected: null
+          });
+        });
+      } else {
+        declarationFallback.forEach(function (declaration) {
+          const session = sessions.find(function (item) { return String(item.id) === declaration.sessionId; });
+          cashRows.push({
+            date: declaration.date,
+            responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
+            declared: declaration.amount,
+            status: declaration.status,
+            collected: null
+          });
+        });
+      }
+      cashRows.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
+
+      const productRows = Array.from(new Set(Array.from(byId.values()).concat(Array.from(byName.values()))))
+        .filter(function (row) { return row && row.name; })
+        .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'es'); });
+      const totals = {
+        opening: 0, incoming: 0, reinvestment: 0, losses: 0, otherOut: 0,
+        final: 0, balanceSales: 0, posSales: 0, profit: 0, revenue: 0, lossValue: 0,
+        declaration: 0
+      };
+      const allOpening = productRows.length > 0 && productRows.every(function (row) { return row.opening != null; });
+      const allFinal = productRows.length > 0 && productRows.every(function (row) { return row.final != null; });
+      const tableRows = productRows.map(function (row) {
+        const cost = row.saleCostQty > 0
+          ? row.saleCostTotal / row.saleCostQty
+          : (row.costWeightedQty > 0 ? row.costWeightedTotal / row.costWeightedQty : null);
+        const saleQty = salesLines ? row.saleLinesQty : row.posMovementQty;
+        const salePrice = row.salePriceQty > 0 ? row.salePriceTotal / row.salePriceQty : row.currentPrice;
+        const unitGain = salePrice != null && cost != null ? salePrice - cost : null;
+        const markup = cost > 0 && unitGain != null ? unitGain / cost * 100 : null;
+        const balanceSales = row.opening != null && row.final != null
+          ? row.opening + row.incoming + row.reinvestment - row.losses - row.otherOut - row.final
+          : null;
+        const revenue = salesLines
+          ? (row.hasSaleLine ? row.saleRevenue : 0)
+          : (saleQty > 0 && salePrice != null ? saleQty * salePrice : null);
+        const profit = salesLines
+          ? (row.hasSaleLine ? row.saleProfit : 0)
+          : (saleQty > 0 && unitGain != null ? saleQty * unitGain : null);
+        const lossValue = row.lossCostTotal > 0
+          ? row.lossCostTotal
+          : (row.losses > 0 && cost != null ? row.losses * cost : null);
+        if (row.opening != null) totals.opening += row.opening;
+        if (row.final != null) totals.final += row.final;
+        totals.incoming += row.incoming;
+        totals.reinvestment += row.reinvestment;
+        totals.losses += row.losses;
+        totals.otherOut += row.otherOut;
+        if (balanceSales != null) totals.balanceSales += balanceSales;
+        totals.posSales += saleQty;
+        if (profit != null) totals.profit += profit;
+        if (revenue != null) totals.revenue += revenue;
+        if (lossValue != null) totals.lossValue += lossValue;
+        return Object.assign({}, row, {
+          cost: cost,
+          salePrice: salePrice,
+          unitGain: unitGain,
+          markup: markup,
+          balanceSales: balanceSales,
+          saleQty: saleQty,
+          revenue: revenue,
+          profit: profit,
+          lossValue: lossValue
+        });
+      });
+      const salesApprox = !salesLines;
+      const hasAnySalesDetail = !!salesLines;
+      const totalDeclared = cashRows.reduce(function (sum, row) { return sum + bookNumber(row.declared); }, 0);
+      totals.declaration = totalDeclared;
+      const fmtCell = function (value, type, approximate) {
+        if (value == null) return '—';
+        return type === 'money' ? bookMoney(value, approximate) : bookQty(value);
+      };
+      const tableBody = tableRows.map(function (row) {
+        const cells = [
+          row.markup == null ? '—' : row.markup.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '%',
+          fmtCell(row.unitGain, 'money', false),
+          fmtCell(row.cost, 'money', false),
+          fmtCell(row.salePrice, 'money', false),
+          esc(row.name),
+          fmtCell(row.opening, 'qty', false),
+          fmtCell(row.incoming, 'qty', false),
+          fmtCell(row.reinvestment, 'qty', false),
+          fmtCell(row.losses, 'qty', false),
+          fmtCell(row.otherOut, 'qty', false),
+          fmtCell(row.final, 'qty', false),
+          fmtCell(row.balanceSales, 'qty', false),
+          fmtCell(row.saleQty, 'qty', false),
+          fmtCell(row.profit, 'money', salesApprox),
+          fmtCell(row.revenue, 'money', salesApprox),
+          fmtCell(row.lossValue, 'money', false)
+        ];
+        return '<tr>' + cells.map(function (cell, index) {
+          return '<td' + ((index === 13 || index === 14 || index === 15) ? ' class="m33-num"' : '') + '>' + cell + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+      const totalMarkup = '<tr><th colspan="5">TOTAL DEL TURNO</th>' +
+        '<td>' + (allOpening ? bookQty(totals.opening) : '—') + '</td>' +
+        '<td>' + bookQty(totals.incoming) + '</td>' +
+        '<td>' + bookQty(totals.reinvestment) + '</td>' +
+        '<td>' + bookQty(totals.losses) + '</td>' +
+        '<td>' + bookQty(totals.otherOut) + '</td>' +
+        '<td>' + (allFinal ? bookQty(totals.final) : '—') + '</td>' +
+        '<td>' + (allOpening && allFinal ? bookQty(totals.balanceSales) : '—') + '</td>' +
+        '<td>' + bookQty(totals.posSales) + '</td>' +
+        '<td>' + bookMoney(totals.profit, salesApprox) + '</td>' +
+        '<td>' + bookMoney(totals.revenue, salesApprox) + '</td>' +
+        '<td>' + bookMoney(totals.lossValue, false) + '</td></tr>';
+      const reinvestmentBody = reinvestmentRows.length ? reinvestmentRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.product) + '</td><td>' + bookQty(row.quantity) +
+          '</td><td>' + bookMoney(row.unitCost, false) + '</td><td>' + bookMoney(row.total, false) + '</td><td>' +
+          esc(row.actor) + (row.supplier ? '<small> · ' + esc(row.supplier) + '</small>' : '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="6">Sin reinversiones registradas.</td></tr>';
+      const expenseBody = expenseRows.length ? expenseRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.concept) +
+          (row.description ? '<small>' + esc(row.description) + '</small>' : '') + '</td><td>' +
+          bookMoney(row.amount, false) + '</td><td>' + esc(row.status) + '</td><td>' + esc(row.actor) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5">Sin gastos registrados.</td></tr>';
+      const cashBody = cashRows.length ? cashRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
+          bookMoney(row.declared, false) + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
+      }).join('') : '<tr><td colspan="5">No hay declaraciones de dinero registradas.</td></tr>';
+      const snapshotNote = (!hasOpening || !hasFinal)
+        ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
+        : '';
+      const salesNote = salesApprox
+        ? 'No se pudo leer el detalle histórico de líneas POS. La venta por POS e ingreso se muestran como aproximación cuando existe precio actual; la venta por saldo sigue siendo una conciliación física.'
+        : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.';
+      const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
+      const summary = [
+        ['Ingreso POS', bookMoney(totals.revenue, salesApprox)],
+        ['Ganancia', bookMoney(totals.profit, salesApprox)],
+        ['Reinversiones', bookMoney(reinvestmentTotal, false)],
+        ['Gastos', bookMoney(expenseTotal, false)],
+        ['Dinero declarado', bookMoney(totalDeclared, false)]
+      ].map(function (item) {
+        return '<div class="m33-book-metric"><small>' + item[0] + '</small><b>' + item[1] + '</b></div>';
+      }).join('');
+      const notes = [snapshotNote, salesNote, cashNote].filter(Boolean).map(function (item) {
+        return '<div class="m33-book-note">' + esc(item) + '</div>';
+      }).join('');
+      host.innerHTML = '<div class="m33-book-summary">' + summary + '</div>' + notes +
+        '<section class="m33-book-section"><h4>Inventario consolidado por producto</h4><div class="m33-book-scroll">' +
+        '<table class="m33-book-table"><thead><tr><th>% G</th><th>G/u</th><th>P.C.</th><th>P.V.</th><th>Producto</th><th>Inv. inicial</th><th>Entradas</th><th>Reinversión</th><th>Bajas</th><th>Otros</th><th>Inv. final</th><th>Venta (saldo)</th><th>Venta POS</th><th>Ganancia</th><th>Ingreso</th><th>Bajas $</th></tr></thead><tbody>' +
+        (tableBody || '<tr><td colspan="16">No hay productos asociados a los cortes o movimientos del turno.</td></tr>') +
+        '</tbody><tfoot>' + totalMarkup + '</tfoot></table></div></section>' +
+        '<div class="m33-book-subtables">' +
+        '<section class="m33-book-section"><h4>Reinversiones detalladas · ' + bookMoney(reinvestmentTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Producto</th><th>Uds.</th><th>P.C.</th><th>Inversión</th><th>Responsable</th></tr></thead><tbody>' + reinvestmentBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Gastos · ' + bookMoney(expenseTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
+        '</div>' +
+        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>';
+      state.inventoryBook = {
+        products: tableRows,
+        totals: totals,
+        reinvestmentRows: reinvestmentRows,
+        expenseRows: expenseRows,
+        cashRows: cashRows,
+        salesApprox: salesApprox,
+        hasMovementRead: hasMovementRead
+      };
+    } catch (error) {
+      host.innerHTML = '<div class="m33-book-empty">No se pudo construir el inventario consolidado: ' +
+        esc(error && error.message ? error.message : error) + '. No se han modificado registros.</div>';
+    }
+  }
+
   function renderInventoryLedger(rows, hasOpening, pendingMessage) {
     if (!rows.length) {
       return (pendingMessage ? '<div class="m33-inventory-note">' + esc(pendingMessage) + '</div>' : '') +
