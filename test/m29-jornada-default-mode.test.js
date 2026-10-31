@@ -143,3 +143,35 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
   assert.match(createdLegacy[0].inicioPlan, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(jornadaCalls.length, 0, "Plan B never creates JORNADA rows in parallel");
 });
+
+
+test("M29 loads active eligible responsables when the shared cache is empty", async (t) => {
+  const { window } = setup(t);
+  window._cache.usuarios = [];
+  const users = [
+    { id: "dep-3", nombre: "Dependienta 3", rol: "Dependienta", activo: true },
+    { id: "owner-2", nombre: "Dueño 2", rol: "Dueño", activo: true },
+    { id: "inactive", nombre: "Inactiva", rol: "Dependienta", activo: false },
+    { id: "other", nombre: "Almacén", rol: "Almacenero", activo: true }
+  ];
+  window.client.rpc = async (name) => {
+    if (name === "listar_usuarios_admin") return { data: users, error: null };
+    throw new Error("RPC inesperada: " + name);
+  };
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")));
+  root.querySelector("#m29-btn-crear").click();
+  const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(modal);
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-person] option").length === 3),
+    "el formulario debe esperar el catálogo remoto antes de permitir asignaciones");
+  const options = Array.from(modal.querySelector("[data-m29-person]").options).map((option) => option.value);
+  assert.deepEqual(options, ["", "dep-3", "owner-2"]);
+  assert.match(modal.querySelector("#m29-staff-status").textContent, /2 responsables activos disponibles/);
+  const checkbox = modal.querySelector("[data-m29-works]");
+  assert.equal(checkbox.type, "checkbox");
+  assert.match(SOURCE, /width:16px!important;height:16px!important/);
+  assert.match(SOURCE, /grid-template-columns:minmax\(100px,.7fr\) auto minmax\(190px,1.3fr\)/);
+});
+
