@@ -178,7 +178,9 @@ test("Step 7 day cards show a readable full date and mobile-safe stacked layout"
   await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
   await window.__BC7_JORNADA__.refreshResponsibleStaff();
   await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
-  window.document.getElementById("bc7-anchor").value = "2026-05-31";
+  window.document.getElementById("bc7-plan-mode").value = "explicit";
+  window.document.getElementById("bc7-anchor").value = "2026-05-20";
+  window.document.getElementById("bc7-start-date").value = "2026-05-31";
   window.document.getElementById("bc7-days-count").value = "1";
   window.document.querySelector("[data-bc7-build]").click();
   const row = window.document.querySelector("#bc7-day-rows .bc7-day-row");
@@ -253,3 +255,75 @@ test("Step 7 known scheduling conflicts are translated into human guidance", asy
   assert.doesNotMatch(message, /23505|SQLSTATE|Ya existe programación para el almacén en 2099/);
 });
 
+
+
+test("Step 7 labels explicit days from the first scheduled date and pattern days from the rotation anchor", async (t) => {
+  const { window } = setup(t, async (name) => {
+    if (name === "bc_actor_is_admin") return { data: true, error: null };
+    if (name === "listar_usuarios_admin") return { data: activeStaff, error: null };
+    if (name === "bc5_mis_jornadas") return { data: [], error: null };
+    throw new Error("Unexpected RPC: " + name);
+  });
+  await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  const mode = window.document.getElementById("bc7-plan-mode");
+  const anchor = window.document.getElementById("bc7-anchor");
+  const start = window.document.getElementById("bc7-start-date");
+  const days = window.document.getElementById("bc7-days-count");
+  days.value = "1";
+
+  mode.value = "explicit";
+  anchor.value = "2026-05-20";
+  start.value = "2026-05-31";
+  window.document.querySelector("[data-bc7-build]").click();
+  assert.match(window.document.querySelector("#bc7-day-rows .bc7-day-date").textContent, /31 de mayo de 2026/);
+
+  mode.value = "pattern";
+  anchor.value = "2026-05-20";
+  start.value = "2026-05-31";
+  window.document.querySelector("[data-bc7-build]").click();
+  assert.match(window.document.querySelector("#bc7-day-rows .bc7-day-date").textContent, /20 de mayo de 2026/);
+});
+
+test("Step 7 resolves responsible names from the authoritative M29 staff cache in conflict previews", async (t) => {
+  const { window } = setup(t, async (name) => {
+    if (name === "bc_actor_is_admin") return { data: true, error: null };
+    if (name === "listar_usuarios_admin") return { data: activeStaff, error: null };
+    if (name === "bc5_mis_jornadas") return { data: [], error: null };
+    if (name === "bc5_previsualizar_jornada") {
+      return { data: [{
+        fecha: "2099-01-01",
+        trabaja: true,
+        responsable_id: "dep-2",
+        hora_inicio_prevista: "07:00",
+        hora_fin_prevista: "23:00",
+        conflicto: true,
+        motivo_conflicto: "La persona elegida ya tiene otro turno pendiente en esa fecha."
+      }], error: null };
+    }
+    throw new Error("Unexpected RPC: " + name);
+  });
+
+  window.__BC_M29__ = {
+    eligibleStaff: () => window.__BC_M29_STAFF_CACHE__ || [],
+    loadResponsibleStaff: async () => {
+      window.__BC_M29_STAFF_CACHE__ = activeStaff.slice(0, 2);
+      window.__BC_M29_STAFF_CACHE_LOADED__ = true;
+    }
+  };
+  await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
+  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
+
+  const warehouse = window.document.getElementById("bc7-warehouse");
+  warehouse.value = "warehouse-1";
+  window.document.getElementById("bc7-plan-mode").value = "pattern";
+  window.document.getElementById("bc7-start-date").value = "2099-01-01";
+  window.document.getElementById("bc7-days-count").value = "1";
+  window.document.querySelector("[data-bc7-preview]").click();
+
+  const loaded = await waitFor(() => window.document.getElementById("bc7-preview")?.textContent.includes("Beatriz"));
+  assert.ok(loaded, "conflict preview should resolve the person through the M29 cache");
+  const preview = window.document.getElementById("bc7-preview").textContent;
+  assert.match(preview, /Beatriz/);
+  assert.doesNotMatch(preview, /Responsable no identificado/);
+});
