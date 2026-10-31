@@ -92,9 +92,10 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
     { numero_dia: 1, trabaja: true, responsable_id: "dep-1" },
     { numero_dia: 2, trabaja: false, responsable_id: null }
   ];
-  assert.equal(
-    JSON.stringify(jornadaCalls[0].payload.p_programacion),
-    JSON.stringify(expectedProgramacion),
+  const actualProgramacion = JSON.parse(JSON.stringify(jornadaCalls[0].payload.p_programacion));
+  assert.deepEqual(
+    actualProgramacion,
+    expectedProgramacion,
     "Jornada programming must contain the expected day/responsible assignments"
   );
   assert.equal(createdLegacy.length, 0, "the default model never creates MANANA/TARDE sessions");
@@ -133,9 +134,10 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
       { numero_dia: 2, bloque: "TARDE", usuario_id: "dep-1" }
     ]
   };
-  assert.equal(
-    JSON.stringify(createdLegacy[0]),
-    JSON.stringify(expectedLegacyPayload),
+  const actualLegacyPayload = JSON.parse(JSON.stringify(createdLegacy[0]));
+  assert.deepEqual(
+    actualLegacyPayload,
+    expectedLegacyPayload,
     "Plan B must preserve the legacy payload contract"
   );
   assert.match(createdLegacy[0].inicioPlan, /^\d{4}-\d{2}-\d{2}$/);
