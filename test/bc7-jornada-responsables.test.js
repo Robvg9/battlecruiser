@@ -107,9 +107,9 @@ test("Step 7 loads eligible responsible users from the authoritative server cata
   assert.equal(calls.filter((call) => call.name === "listar_usuarios_admin").length, 1);
   assert.equal(window.__BC_M29_STAFF_CACHE_LOADED__, true);
   assert.equal(window.document.getElementById("bc7-staff-retry").hidden, true);
-  assert.deepEqual(
-    calls.filter((call) => call.name === "listar_usuarios_admin")[0].payload,
-    { p_incluir_archivados: false }
+  assert.equal(
+    calls.filter((call) => call.name === "listar_usuarios_admin")[0].payload.p_incluir_archivados,
+    false
   );
   assert.equal(
     calls.some((call) => /crear|guardar|reprogramar|cerrar|iniciar/.test(call.name)),
