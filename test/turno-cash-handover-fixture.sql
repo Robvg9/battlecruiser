@@ -7,6 +7,11 @@ BEGIN
 END
 $roles$;
 
+-- Match the production Turno maestro identity columns in the disposable Step 5 schema.
+ALTER TABLE public.turnos
+  ADD COLUMN IF NOT EXISTS ciclo_id uuid,
+  ADD COLUMN IF NOT EXISTS sesion_id uuid;
+
 -- Disposable-only shape for owner cash discrepancy tests.
 -- Production already has turno_diferencias; the Step 7 sandbox fixture does not.
 CREATE TABLE IF NOT EXISTS public.turno_diferencias (
