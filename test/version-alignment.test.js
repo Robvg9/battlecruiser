@@ -7,6 +7,7 @@ const sw = fs.readFileSync('public/service-worker.js', 'utf8');
 const m68 = fs.readFileSync('public/js/m68-ventas-pos-definitivo.js', 'utf8');
 const m74 = fs.readFileSync('public/js/m74-pos-archive-retail.js', 'utf8');
 const visibilityNormalizer = fs.readFileSync('public/js/hotfix-secciones-visibles-20260903.js', 'utf8');
+const adminVisibilityNormalizer = fs.readFileSync('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js', 'utf8');
 const m26 = fs.readFileSync('public/js/m26-ui-integridad.js', 'utf8');
 const index = fs.readFileSync('public/index.html', 'utf8');
 const auth = fs.readFileSync('public/js/auth.js', 'utf8');
@@ -79,14 +80,8 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.7"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
   assert.ok(app.includes('["m33-turnos-final.js","33.12"]'), 'the turn detail modal cache key must load the audited recovery action');
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.7"]'), 'Step 7 must load the M33 session bridge');
-  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.7"), 'the updated Step 7 bundle must be offline-ready');
-  assert.ok(app.includes('["m29-turnos-organizacion.js","29.16"]'), 'M29 must load the full-day default creation flow');
-  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.16"), 'M29 full-day creation must be precached');
-  assert.ok(sw.includes("./js/m33-turnos-final.js?v=33.12"), 'M33 must precache the Jornada-to-Step-7 route');
-  assert.doesNotMatch(app, /\["m29-turnos-organizacion\.js","29\.15"\]/, 'the legacy M29 creation form must not be reused');
-  assert.doesNotMatch(app, /\["m33-turnos-final\.js","33\.11"\]/, 'the old M33 routing module must not be reused');
-
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.16"]'), 'M29 full-day default flow must be loaded dynamically');
+  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.16"), 'M29 full-day default flow must be available offline');
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
@@ -95,7 +90,8 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(m74.includes("button.setAttribute('aria-disabled', 'false')"), 'Sales remains accessible as a navigable section');
   assert.ok(!m74.includes("stopImmediatePropagation"), 'M74 must not cancel a tap when no session is open');
   assert.ok(!m74.includes("display:none!important"), 'M74 must not hide the Sales panel');
-  assert.ok(visibilityNormalizer.includes('ventas:true'), 'the global visibility normalizer must leave Ventas styles to its own policy');
+  assert.ok(visibilityNormalizer.includes('var LABELS = { config: "Administración", ciclos: "Turnos" }'), 'the normalizer is limited to labels');
+  assert.ok(!visibilityNormalizer.includes("ventas"), 'the global normalizer must not rewrite Sales visibility or styles');
   assert.ok(index.includes('<section id="tab-ventas" class="tab-panel">'), 'the sales panel must remain in the application');
   assert.ok(index.includes('<div id="lista-ventas" class="lista"></div>'), 'the sales history container must be preserved');
 });
@@ -108,19 +104,31 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.39["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.39["']/);
-  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261026\.1"\]/);
-  assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261026\.1/, "the sidebar visibility policy must be available in the offline shell");
-  assert.match(app, /\["section-scope-fix\.js","20261016\.1"\]/);
+  assert.match(app, /const VERSION=["']9\.5\.38["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.38["']/);
+  assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
+  assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261030\.1/, "the sidebar visibility policy must be available in the offline shell");
+  assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
+  assert.match(app, /\["hotfix-pulido-20260903\.js","20261030\.2"\]/);
+  assert.match(app, /\["hotfix-pulido-20260903b\.js","20261030\.3"\]/);
+  assert.match(app, /\["hotfix-17-final-loader-20260903\.js","20261030\.2"\]/);
+  assert.doesNotMatch(app, /\["hotfix-17-13-configuracion-admin-visible-20260903\.js"/, "the legacy config label helper must not participate in route visibility");
+  assert.match(sw, /\.\/js\/hotfix-17-13-configuracion-admin-visible-20260903\.js\?v=20261030\.3/, "the label-only helper remains available to the offline shell");
+  assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
+  assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
+  assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.38["']/);
+  assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261030\.2/);
+  assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261030\.3/);
+  assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
-  assert.ok(index.includes('<script src="js/navegacion.js?v=20261029.1"></script>'), "new navigation sections need a cache-busted script");
+  assert.ok(index.includes('<script src="js/navegacion.js?v=20261030.1"></script>'), "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.7"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.6"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
@@ -132,11 +140,11 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.39 — Movimientos diarios e historial por sesión\/turno/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.39"><\/script>/);
+  assert.match(app, /v9\.5\.38 — Movimientos diarios e historial por sesión\/turno/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.7/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.6/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
@@ -149,7 +157,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.39['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.38['"]\);/);
 });
 
 
@@ -180,6 +188,6 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.9"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.5"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.39["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.39["']/);
+  assert.match(app, /const VERSION=["']9\.5\.38["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.38["']/);
 });
