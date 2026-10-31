@@ -402,7 +402,7 @@
             saleCostQty: 0, saleCostTotal: 0,
             salePriceQty: 0, salePriceTotal: 0,
             saleLinesQty: 0, saleRevenue: 0, saleProfit: 0,
-            hasSaleLine: false, currentPrice: null, lossCostTotal: 0
+            hasSaleLine: false, hasSaleCost: true, currentPrice: null, lossCostTotal: 0
           };
         } else {
           if (productId && !row.id) row.id = productId;
@@ -455,6 +455,7 @@
 
       const reinvestmentRows = [];
       const expenseRows = [];
+      const pendingAdjustmentRows = [];
       const declarationFallback = [];
       let reinvestmentTotal = 0;
       let expenseTotal = 0;
@@ -514,6 +515,21 @@
             actor: expense.creado_nombre || '—'
           });
         });
+        ['mermas', 'bajas'].forEach(function (bucket) {
+          bookRows(finance[bucket]).forEach(function (request) {
+            const status = String(request.estado || 'PENDIENTE').toUpperCase();
+            if (status === 'APROBADA') return;
+            pendingAdjustmentRows.push({
+              date: request.creado_en || session.fecha,
+              kind: bucket === 'mermas' ? 'Merma' : 'Baja',
+              product: request.producto || request.producto_id || '—',
+              quantity: bookNumber(request.cantidad),
+              reason: request.motivo || '',
+              status: status + ' · no descuenta existencias',
+              actor: request.creado_nombre || '—'
+            });
+          });
+        });
         const declaration = entry.inventory && entry.inventory.declaracion_dinero;
         if (declaration && declaration.monto != null) {
           declarationFallback.push({
@@ -561,6 +577,8 @@
             row.saleCostQty += quantity;
             row.saleCostTotal += unitCost * quantity;
             row.saleProfit += subtotal - unitCost * quantity;
+          } else if (quantity > 0) {
+            row.hasSaleCost = false;
           }
         });
       }
@@ -594,7 +612,7 @@
         } catch (declarationError) {}
       }
       const cashRows = [];
-      if (declarations) {
+      if (declarations && declarations.length) {
         const sessionMap = new Map(sessions.map(function (session) { return [String(session.id), session]; }));
         declarations.forEach(function (declaration) {
           const session = sessionMap.get(String(declaration.turno_sesion_id));
@@ -646,7 +664,7 @@
           ? (row.hasSaleLine ? row.saleRevenue : 0)
           : (saleQty > 0 && salePrice != null ? saleQty * salePrice : null);
         const profit = salesLines
-          ? (row.hasSaleLine ? row.saleProfit : 0)
+          ? (row.hasSaleLine ? (row.hasSaleCost ? row.saleProfit : null) : 0)
           : (saleQty > 0 && unitGain != null ? saleQty * unitGain : null);
         const lossValue = row.lossCostTotal > 0
           ? row.lossCostTotal
@@ -731,6 +749,11 @@
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
           bookMoney(row.declared, false) + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">No hay declaraciones de dinero registradas.</td></tr>';
+      const pendingAdjustmentBody = pendingAdjustmentRows.length ? pendingAdjustmentRows.map(function (row) {
+        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.kind) + '</td><td>' + esc(row.product) +
+          '</td><td>' + bookQty(row.quantity) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.status) +
+          '</td><td>' + esc(row.actor) + '</td></tr>';
+      }).join('') : '<tr><td colspan="7">No hay solicitudes pendientes o rechazadas asociadas al turno.</td></tr>';
       const snapshotNote = (!hasOpening || !hasFinal)
         ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
         : '';
@@ -759,13 +782,15 @@
         '<section class="m33-book-section"><h4>Reinversiones detalladas · ' + bookMoney(reinvestmentTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Producto</th><th>Uds.</th><th>P.C.</th><th>Inversión</th><th>Responsable</th></tr></thead><tbody>' + reinvestmentBody + '</tbody></table></div></section>' +
         '<section class="m33-book-section"><h4>Gastos · ' + bookMoney(expenseTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
         '</div>' +
-        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>';
+        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Solicitudes de merma y baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
       state.inventoryBook = {
         products: tableRows,
         totals: totals,
         reinvestmentRows: reinvestmentRows,
         expenseRows: expenseRows,
         cashRows: cashRows,
+        pendingAdjustmentRows: pendingAdjustmentRows,
         salesApprox: salesApprox,
         hasMovementRead: hasMovementRead
       };
