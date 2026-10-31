@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.11 — Jornada única abre su workspace Step 7 desde M33
+// v33.15 — declaración de efectivo y cierre desde la vista del responsable
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -123,6 +123,7 @@
         '.m33-summary{gap:4px!important}',
         '.m33-box{padding:6px 7px!important}',
         '.m33-session{padding:4px 0!important}',
+        '.m33-dep-cash{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:150px}.m33-dep-cash label{font-size:.7rem;display:grid;gap:3px}.m33-dep-cash input{width:100%;min-width:0;box-sizing:border-box;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:7px;background:rgba(0,0,0,.18);color:inherit}.m33-dep-cash button{min-height:32px;padding:6px 9px;font-size:.76rem}.m33-dep-cash small{font-size:.7rem;line-height:1.3}.m33-dep-cash .m33-msg.error{color:#fca5a5}.m33-dep-cash .m33-msg.ok{color:#86efac}',
         '.m33-assignment-card select{min-height:31px!important;padding:5px 7px!important;font-size:11px!important}',
         '.m33-muted{font-size:.72rem!important;line-height:1.28!important}',
         '.m33-book{display:grid;gap:7px;min-width:0}',
@@ -552,7 +553,11 @@
             amount: bookNumber(declaration.monto),
             currency: declaration.moneda || 'Sin moneda registrada',
             userId: declaration.usuario_id || (entry.inventory.sesion && entry.inventory.sesion.responsable_id) || session.usuario_id,
-            status: declaration.estado_aprobacion || 'Declarado'
+            status: declaration.estado_aprobacion || 'Declarado',
+            collected: declaration.monto_contado == null ? null : bookNumber(declaration.monto_contado),
+            difference: declaration.diferencia == null ? null : bookNumber(declaration.diferencia),
+            counterId: declaration.contado_por || null,
+            countedAt: declaration.contado_at || null
           });
         }
       });
@@ -620,7 +625,7 @@
       if (typeof rpcClient.from === 'function') {
         try {
           const declarationResponse = await rpcClient.from('turno_declaraciones')
-            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion')
+            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion,monto_contado,diferencia,contado_por,contado_at,observacion_conteo')
             .in('turno_sesion_id', sessions.map(function (session) { return String(session.id); }));
           if (!declarationResponse.error) declarations = Array.isArray(declarationResponse.data) ? declarationResponse.data : [];
         } catch (declarationError) {}
@@ -632,27 +637,51 @@
           const session = sessionMap.get(String(declaration.turno_sesion_id));
           if (!session) return;
           cashRows.push({
+            sessionId: String(session.id),
             date: declaration.declarado_at || session.fecha,
             responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
             declared: bookNumber(declaration.monto),
             currency: declaration.moneda || 'Sin moneda registrada',
             status: declaration.estado_aprobacion || 'Declarado',
-            collected: null
+            collected: declaration.monto_contado == null ? null : bookNumber(declaration.monto_contado),
+            difference: declaration.diferencia == null ? null : bookNumber(declaration.diferencia),
+            counter: inventoryUserLabel(declaration.contado_por),
+            countedAt: declaration.contado_at || null
           });
         });
       } else {
         declarationFallback.forEach(function (declaration) {
           const session = sessions.find(function (item) { return String(item.id) === declaration.sessionId; });
           cashRows.push({
+            sessionId: declaration.sessionId,
             date: declaration.date,
             responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
             declared: declaration.amount,
             currency: declaration.currency || 'Sin moneda registrada',
             status: declaration.status,
-            collected: null
+            collected: declaration.collected == null ? null : declaration.collected,
+            difference: declaration.difference == null ? null : declaration.difference,
+            counter: inventoryUserLabel(declaration.counterId),
+            countedAt: declaration.countedAt || null
           });
         });
       }
+      const coveredCashSessions = new Set(cashRows.map(function (row) { return String(row.sessionId || ''); }));
+      sessions.forEach(function (session) {
+        if (!session || !session.dinero_id || coveredCashSessions.has(String(session.id))) return;
+        cashRows.push({
+          sessionId: String(session.id),
+          date: session.fecha,
+          responsible: inventoryUserLabel(session.usuario_id),
+          declared: bookNumber(session.dinero_monto),
+          currency: 'CUP',
+          status: session.dinero_estado_aprobacion || 'Declarado',
+          collected: session.dinero_monto_contado == null ? null : bookNumber(session.dinero_monto_contado),
+          difference: session.dinero_diferencia == null ? null : bookNumber(session.dinero_diferencia),
+          counter: inventoryUserLabel(session.dinero_contado_por),
+          countedAt: session.dinero_contado_at || null
+        });
+      });
       cashRows.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
 
       const productRows = Array.from(new Set(Array.from(byId.values()).concat(Array.from(byName.values()))))
@@ -782,9 +811,13 @@
           bookMoney(row.amount, false) + '</td><td>' + esc(row.status) + '</td><td>' + esc(row.actor) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">Sin gastos registrados.</td></tr>';
       const cashBody = cashRows.length ? cashRows.map(function (row) {
+        const counted = row.collected == null ? '—' : bookMoney(row.collected, false) +
+          (row.counter ? '<small> · ' + esc(row.counter) + '</small>' : '');
+        const difference = row.difference == null ? '—' : bookMoney(row.difference, false);
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
-          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
-      }).join('') : '<tr><td colspan="5">No hay declaraciones de dinero registradas.</td></tr>';
+          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>' + counted +
+          '</td><td>' + difference + '</td><td>' + esc(row.status) + '</td></tr>';
+      }).join('') : '<tr><td colspan="6">No hay declaraciones de dinero registradas.</td></tr>';
       const pendingAdjustmentBody = pendingAdjustmentRows.length ? pendingAdjustmentRows.map(function (row) {
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.kind) + '</td><td>' + esc(row.product) +
           '</td><td>' + bookQty(row.quantity) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.status) +
@@ -800,7 +833,7 @@
         : (needsProfitEstimate
           ? 'El ingreso procede de líneas POS históricas; la ganancia de productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
           : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.');
-      const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
+      const cashNote = 'La declaración de la responsable y el conteo físico del dueño se guardan por separado. Las diferencias quedan vinculadas al expediente y requieren revisión; no se descuenta dinero automáticamente.';
       const summaryItems = [
         ['Ingreso POS', bookMoney(totals.revenue, totalsApprox)],
         ['Ganancia', bookMoney(totals.profit, totalsApprox)],
@@ -829,7 +862,7 @@
         '<section class="m33-book-section"><h4>Gastos aprobados · ' + bookMoney(expenseTotal, false) +
         ' · pendientes ' + bookMoney(expensePendingTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
         '</div>' +
-        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Contado por dueño</th><th>Diferencia</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
         '<section class="m33-book-section"><h4>Solicitudes de merma y baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
       state.inventoryBook = {
         products: tableRows,
@@ -1085,7 +1118,17 @@
       if (state.readOnly) actions = '<span class="m33-pill">Solo lectura</span>';
       else if (String(x.bloque || '').toUpperCase() === 'JORNADA') actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + esc(x.id) + '">Gestionar jornada</button>';
       else if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
-      else if (st === 'EN_CURSO') actions = '<span class="m33-pill m33-ok">Sesión en curso</span>';
+      else if (st === 'EN_CURSO') {
+        var hasDeclaration = x.dinero_declarado === true || !!x.dinero_id;
+        var cashAmount = hasDeclaration && x.dinero_monto != null ? String(x.dinero_monto) : '';
+        var sid = esc(x.id);
+        actions = '<div class="m33-dep-cash">' +
+          (hasDeclaration
+            ? '<span class="m33-pill m33-ok">Dinero entregado: ' + esc(cashAmount) + ' CUP</span><small class="m33-muted">' + esc(x.dinero_estado_aprobacion || 'Declarado') + '</small>'
+            : '<label>Dinero entregado (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" data-m33-cash-amount="' + sid + '" placeholder="0.00"></label><button type="button" class="m33-btn-sesion" data-m33-declare-cash="' + sid + '">Guardar dinero entregado</button>') +
+          '<button type="button" class="m33-btn-sesion" data-m33-close-legacy-session="' + sid + '"' + (!hasDeclaration ? ' disabled' : '') + '>Cerrar sesión</button>' +
+          '<small class="m33-muted" data-m33-legacy-msg="' + sid + '"></small></div>';
+      }
       else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
       return '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia || x.dia_n) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + ' · ' + esc(labelSt) + '</div></div><div>' + actions + '</div></div></div>';
     }).join('') + '</div>';
@@ -1098,6 +1141,73 @@
     if (!el) return;
     el.textContent = text || '';
     el.className = 'm33-msg ' + (ok ? 'ok' : (text ? 'error' : ''));
+  }
+  function setLegacyCashMsg(sesionId, text, ok) {
+    document.querySelectorAll('[data-m33-legacy-msg]').forEach(function (el) {
+      if (String(el.getAttribute('data-m33-legacy-msg')) !== String(sesionId)) return;
+      el.textContent = text || '';
+      el.className = 'm33-muted m33-msg ' + (ok ? 'ok' : (text ? 'error' : ''));
+    });
+  }
+  async function declararDineroSesionLegacy(sesionId, button) {
+    if (state.readOnly || !sesionId || !API()) return;
+    var card = button && button.closest('.m33-session');
+    var input = card && card.querySelector('[data-m33-cash-amount]');
+    var raw = input ? input.value.trim() : '';
+    var monto = Number(raw);
+    if (raw === '' || !Number.isFinite(monto) || monto < 0) {
+      setLegacyCashMsg(sesionId,'Introduce el importe real que entregas, incluido 0 si corresponde.',false);
+      return;
+    }
+    if (!window.confirm('¿Confirmas que este es el efectivo real que entregas al dueño? Después de guardarlo, no podrás cambiar la declaración.')) return;
+    if (button) button.disabled = true;
+    try {
+      if (!navigator.onLine) throw new Error('Necesitas conexión para registrar la entrega.');
+      var tramos = await API().listarTramosSesion(sesionId);
+      var rows = Array.isArray(tramos) ? tramos : [];
+      var active = rows.find(function (item) { return String(item.estado || '').toUpperCase() === 'ACTIVO'; });
+      if (!active || !active.id) throw new Error('No se encontró un tramo de trabajo para esta sesión.');
+      await API().declararDinero(active.id,monto);
+    } catch (error) {
+      setLegacyCashMsg(sesionId,'No se guardó la entrega: ' + String(error && error.message || error),false);
+      if (button) button.disabled = false;
+      return;
+    }
+    setLegacyCashMsg(sesionId,'Dinero entregado confirmado por el servidor. Actualizando vista…',true);
+    try {
+      await load(state.turno.id);
+      renderModal();
+    } catch (refreshError) {
+      if (input) input.disabled = true;
+      if (button) { button.disabled = true; button.textContent = 'Entrega guardada'; }
+      setLegacyCashMsg(sesionId,'Entrega guardada en el servidor. No se pudo refrescar la pantalla; vuelve a abrir el turno para ver el estado actualizado.',true);
+    }
+  }
+  async function cerrarSesionLegacyResponsable(sesionId, button) {
+    if (state.readOnly || !sesionId || !API()) return;
+    var session = (state.sesiones || []).find(function (item) { return String(item.id) === String(sesionId); });
+    if (!session || !(session.dinero_declarado === true || session.dinero_id)) {
+      setLegacyCashMsg(sesionId,'Primero debes guardar el dinero entregado.',false);
+      return;
+    }
+    if (!window.confirm('¿Cerrar esta sesión? La declaración de dinero y las operaciones quedarán registradas. El cierre no elimina ni altera el turno histórico.')) return;
+    if (button) button.disabled = true;
+    try {
+      if (!navigator.onLine) throw new Error('Necesitas conexión para cerrar la sesión.');
+      await API().cerrarSesion(sesionId);
+    } catch (error) {
+      setLegacyCashMsg(sesionId,'No se pudo cerrar la sesión: ' + String(error && error.message || error),false);
+      if (button) button.disabled = false;
+      return;
+    }
+    setLegacyCashMsg(sesionId,'Cierre confirmado por el servidor. Actualizando vista…',true);
+    try {
+      await load(state.turno.id);
+      renderModal();
+    } catch (refreshError) {
+      if (button) { button.disabled = true; button.textContent = 'Sesión cerrada'; }
+      setLegacyCashMsg(sesionId,'Sesión cerrada en el servidor. No se pudo refrescar la pantalla; vuelve a abrir el turno para ver el estado actualizado.',true);
+    }
   }
 
   // Jornada única usa el workspace Step 7 y nunca la RPC legacy MANANA/TARDE.
@@ -1315,6 +1425,8 @@
       bindArchiveButtons(ov);
       ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
+       ov.querySelectorAll('[data-m33-declare-cash]').forEach(function (btn) { btn.addEventListener('click', function () { declararDineroSesionLegacy(btn.getAttribute('data-m33-declare-cash'),btn); }); });
+       ov.querySelectorAll('[data-m33-close-legacy-session]').forEach(function (btn) { btn.addEventListener('click', function () { cerrarSesionLegacyResponsable(btn.getAttribute('data-m33-close-legacy-session'),btn); }); });
       return;
     }
     if (state.step === 2 && !state.readOnly && !state.staffRequestAttempted) {
