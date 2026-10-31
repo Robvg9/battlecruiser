@@ -137,9 +137,10 @@ test("Step 7 exposes a retry after staff lookup failure and preserves a selected
     const button = window.document.getElementById("bc7-staff-retry");
     const status = window.document.getElementById("bc7-staff-status");
     return button && !button.hidden && status &&
-      status.textContent.includes("Temporary staff catalog outage");
+      status.textContent.includes("No se pudo cargar la lista de responsables");
   });
-  assert.ok(failed, "a failed catalogue fetch must expose the error and retry action");
+  assert.ok(failed, "a failed catalogue fetch must expose a clear explanation and retry action");
+  assert.doesNotMatch(window.document.getElementById("bc7-staff-status").textContent, /Temporary staff catalog outage/);
 
   const disabled = window.document.querySelector("#bc7-day-rows [data-bc7-person]");
   assert.ok(disabled && disabled.disabled, "the planner must not offer an empty or unverified selection");
