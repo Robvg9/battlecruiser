@@ -82,6 +82,9 @@ function setup(t, { admin = true } = {}) {
   window.client = {
     rpc: async (name, params = {}) => {
       rpcCalls.push({ name, params: { ...params } });
+      if (name === "listar_usuarios_admin") return { data: [
+        { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+      ], error: null };
       if (name !== "bc7_movimientos_sesion") return { data: null, error: { code: "UNEXPECTED_RPC", message: name } };
       return { data: (rowsBySession[params.p_turno_sesion_id] || []).map((row) => ({ ...row })), error: null };
     }
@@ -195,6 +198,9 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   window.client = {
     rpc: async (name, params = {}) => {
       rpcCalls.push({ name, params: { ...params } });
+      if (name === "listar_usuarios_admin") return { data: [
+        { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+      ], error: null };
       if (name === "bc7_obtener_inventario_jornada") {
         return { error: null, data: {
           productos: [{ producto_id: "product-1", nombre: "Café", unidad: "kg" }],
