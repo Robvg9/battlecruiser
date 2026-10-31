@@ -657,7 +657,10 @@
         const saleQty = hasLineDetail ? row.saleLinesQty : row.posMovementQty;
         const salePrice = hasLineDetail && row.salePriceQty > 0
           ? row.salePriceTotal / row.salePriceQty : row.currentPrice;
+        const costApprox = !(row.hasSaleCost && row.saleCostQty > 0) && cost != null;
+        const priceApprox = !hasLineDetail && salePrice != null;
         const unitGain = salePrice != null && cost != null ? salePrice - cost : null;
+        const unitGainApprox = (costApprox || priceApprox) && unitGain != null;
         const markup = cost > 0 && unitGain != null ? unitGain / cost * 100 : null;
         const balanceSales = row.opening != null && row.final != null
           ? row.opening + row.incoming + row.reinvestment - row.losses - row.otherOut - row.final
@@ -689,7 +692,11 @@
           cost: cost,
           salePrice: salePrice,
           unitGain: unitGain,
+          unitGainApprox: unitGainApprox,
+          costApprox: costApprox,
+          priceApprox: priceApprox,
           markup: markup,
+          markupApprox: unitGainApprox,
           balanceSales: balanceSales,
           saleQty: saleQty,
           revenue: revenue,
@@ -712,10 +719,10 @@
       const totalLossApprox = tableRows.some(function (row) { return row.lossValueApprox; });
       const tableBody = tableRows.map(function (row) {
         const cells = [
-          row.markup == null ? '—' : row.markup.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '%',
-          fmtCell(row.unitGain, 'money', false),
-          fmtCell(row.cost, 'money', false),
-          fmtCell(row.salePrice, 'money', false),
+          row.markup == null ? '—' : (row.markupApprox ? '≈ ' : '') + row.markup.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '%',
+          fmtCell(row.unitGain, 'money', row.unitGainApprox),
+          fmtCell(row.cost, 'money', row.costApprox),
+          fmtCell(row.salePrice, 'money', row.priceApprox),
           esc(row.name),
           fmtCell(row.opening, 'qty', false),
           fmtCell(row.incoming, 'qty', false),
