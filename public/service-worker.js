@@ -1,4 +1,4 @@
-/* BattleCruiser Service Worker — v9.5.43
+/* BattleCruiser Service Worker — v9.5.44
  * App shell: network-first with a versioned offline cache fallback.
  * Core shell assets must be cached at install; same-origin JS/CSS/HTML
  * assets are refreshed on successful network reads for later offline use.
