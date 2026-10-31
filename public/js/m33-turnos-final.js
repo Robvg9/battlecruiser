@@ -553,7 +553,11 @@
             amount: bookNumber(declaration.monto),
             currency: declaration.moneda || 'Sin moneda registrada',
             userId: declaration.usuario_id || (entry.inventory.sesion && entry.inventory.sesion.responsable_id) || session.usuario_id,
-            status: declaration.estado_aprobacion || 'Declarado'
+            status: declaration.estado_aprobacion || 'Declarado',
+            collected: declaration.monto_contado == null ? null : bookNumber(declaration.monto_contado),
+            difference: declaration.diferencia == null ? null : bookNumber(declaration.diferencia),
+            counterId: declaration.contado_por || null,
+            countedAt: declaration.contado_at || null
           });
         }
       });
@@ -621,7 +625,7 @@
       if (typeof rpcClient.from === 'function') {
         try {
           const declarationResponse = await rpcClient.from('turno_declaraciones')
-            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion')
+            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion,monto_contado,diferencia,contado_por,contado_at,observacion_conteo')
             .in('turno_sesion_id', sessions.map(function (session) { return String(session.id); }));
           if (!declarationResponse.error) declarations = Array.isArray(declarationResponse.data) ? declarationResponse.data : [];
         } catch (declarationError) {}
@@ -633,27 +637,51 @@
           const session = sessionMap.get(String(declaration.turno_sesion_id));
           if (!session) return;
           cashRows.push({
+            sessionId: String(session.id),
             date: declaration.declarado_at || session.fecha,
             responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
             declared: bookNumber(declaration.monto),
             currency: declaration.moneda || 'Sin moneda registrada',
             status: declaration.estado_aprobacion || 'Declarado',
-            collected: null
+            collected: declaration.monto_contado == null ? null : bookNumber(declaration.monto_contado),
+            difference: declaration.diferencia == null ? null : bookNumber(declaration.diferencia),
+            counter: inventoryUserLabel(declaration.contado_por),
+            countedAt: declaration.contado_at || null
           });
         });
       } else {
         declarationFallback.forEach(function (declaration) {
           const session = sessions.find(function (item) { return String(item.id) === declaration.sessionId; });
           cashRows.push({
+            sessionId: declaration.sessionId,
             date: declaration.date,
             responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
             declared: declaration.amount,
             currency: declaration.currency || 'Sin moneda registrada',
             status: declaration.status,
-            collected: null
+            collected: declaration.collected == null ? null : declaration.collected,
+            difference: declaration.difference == null ? null : declaration.difference,
+            counter: inventoryUserLabel(declaration.counterId),
+            countedAt: declaration.countedAt || null
           });
         });
       }
+      const coveredCashSessions = new Set(cashRows.map(function (row) { return String(row.sessionId || ''); }));
+      sessions.forEach(function (session) {
+        if (!session || !session.dinero_id || coveredCashSessions.has(String(session.id))) return;
+        cashRows.push({
+          sessionId: String(session.id),
+          date: session.fecha,
+          responsible: inventoryUserLabel(session.usuario_id),
+          declared: bookNumber(session.dinero_monto),
+          currency: 'CUP',
+          status: session.dinero_estado_aprobacion || 'Declarado',
+          collected: session.dinero_monto_contado == null ? null : bookNumber(session.dinero_monto_contado),
+          difference: session.dinero_diferencia == null ? null : bookNumber(session.dinero_diferencia),
+          counter: inventoryUserLabel(session.dinero_contado_por),
+          countedAt: session.dinero_contado_at || null
+        });
+      });
       cashRows.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
 
       const productRows = Array.from(new Set(Array.from(byId.values()).concat(Array.from(byName.values()))))
@@ -783,9 +811,13 @@
           bookMoney(row.amount, false) + '</td><td>' + esc(row.status) + '</td><td>' + esc(row.actor) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">Sin gastos registrados.</td></tr>';
       const cashBody = cashRows.length ? cashRows.map(function (row) {
+        const counted = row.collected == null ? '—' : bookMoney(row.collected, false) +
+          (row.counter ? '<small> · ' + esc(row.counter) + '</small>' : '');
+        const difference = row.difference == null ? '—' : bookMoney(row.difference, false);
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
-          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
-      }).join('') : '<tr><td colspan="5">No hay declaraciones de dinero registradas.</td></tr>';
+          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>' + counted +
+          '</td><td>' + difference + '</td><td>' + esc(row.status) + '</td></tr>';
+      }).join('') : '<tr><td colspan="6">No hay declaraciones de dinero registradas.</td></tr>';
       const pendingAdjustmentBody = pendingAdjustmentRows.length ? pendingAdjustmentRows.map(function (row) {
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.kind) + '</td><td>' + esc(row.product) +
           '</td><td>' + bookQty(row.quantity) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.status) +
@@ -801,7 +833,7 @@
         : (needsProfitEstimate
           ? 'El ingreso procede de líneas POS históricas; la ganancia de productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
           : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.');
-      const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
+      const cashNote = 'La declaración de la responsable y el conteo físico del dueño se guardan por separado. Las diferencias quedan vinculadas al expediente y requieren revisión; no se descuenta dinero automáticamente.';
       const summaryItems = [
         ['Ingreso POS', bookMoney(totals.revenue, totalsApprox)],
         ['Ganancia', bookMoney(totals.profit, totalsApprox)],
@@ -830,7 +862,7 @@
         '<section class="m33-book-section"><h4>Gastos aprobados · ' + bookMoney(expenseTotal, false) +
         ' · pendientes ' + bookMoney(expensePendingTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
         '</div>' +
-        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Contado por dueño</th><th>Diferencia</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
         '<section class="m33-book-section"><h4>Solicitudes de merma y baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
       state.inventoryBook = {
         products: tableRows,
