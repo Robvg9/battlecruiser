@@ -9,6 +9,14 @@ const MIGRATION = fs.readFileSync(
   path.join(__dirname, "..", "supabase", "migrations", "20261027184823_bc7_turno_movimientos_sesion_20261027.sql"),
   "utf8"
 ).toLowerCase();
+const FIXTURE = fs.readFileSync(
+  path.join(__dirname, "bc7-turno-movimientos-sesion-fixture.sql"),
+  "utf8"
+).toLowerCase();
+const CONTRACT = fs.readFileSync(
+  path.join(__dirname, "bc7-turno-movimientos-sesion-contract.sql"),
+  "utf8"
+).toLowerCase();
 
 test("archivo por turno es una función de solo lectura y exige sesión autenticada", () => {
   assert.match(MIGRATION, /create or replace function public\.bc7_movimientos_sesion\(p_turno_sesion_id uuid\)/);
@@ -20,7 +28,7 @@ test("archivo por turno es una función de solo lectura y exige sesión autentic
   assert.doesNotMatch(MIGRATION, /\b(insert into|update public\.|delete from|truncate)\b/);
 });
 
-test("la atribución al turno requiere la sesión exacta, el usuario y el tramo temporal", () => {
+test("la atribución al turno requiere la sesión exacta, el usuario, el almacén y el tramo temporal", () => {
   assert.match(MIGRATION, /tr\.turno_sesion_id = v_s\.id/);
   assert.match(MIGRATION, /p\.responsable_id = v_uid/);
   assert.match(MIGRATION, /p\.id = v_s\.jornada_programacion_id/);
@@ -30,6 +38,15 @@ test("la atribución al turno requiere la sesión exacta, el usuario y el tramo 
   assert.match(MIGRATION, /tr\.fin_at is null or/);
   assert.match(MIGRATION, /v_s\.almacen_id/);
   assert.match(MIGRATION, /at time zone 'america\/havana'\)::date = v_s\.fecha/);
+});
+
+test("el contrato PostgreSQL cubre un turno cerrado de dos fechas y evita cruces entre días", () => {
+  assert.match(FIXTURE, /estado_maestro,\s*dias_turno[\s\S]*?'cerrado',\s*2\s*\n\);/);
+  assert.match(FIXTURE, /,2,'manana','2026-10-28'/);
+  assert.match(CONTRACT, /day 2 is a separate business date/);
+  assert.match(CONTRACT, /day 1 operations leaked into the day 2 archive/);
+  assert.match(CONTRACT, /day 2 operations leaked into the day 1 archive/);
+  assert.match(CONTRACT, /v_turn_sessions <> 4 or v_turn_dates <> 2/);
 });
 
 test("función con privilegios limitados a usuarios autenticados", () => {
