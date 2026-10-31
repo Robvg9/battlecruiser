@@ -66,10 +66,10 @@ BEGIN
   LIMIT 1;
   IF v_tramo2 IS NULL THEN RAISE EXCEPTION 'FAIL: active Day 2 tranche is missing'; END IF;
 
-  v_decl2:=public.bc_declarar_dinero(v_tramo2,100);
+  SELECT id INTO v_decl2 FROM public.bc_declarar_dinero(v_tramo2,100::numeric);
   v_error:=false;
   BEGIN
-    PERFORM public.bc5_contar_dinero_entregado(v_decl2,92,'Conteo antes del cierre');
+    PERFORM public.bc5_contar_dinero_entregado(v_decl2,92::numeric,'Conteo antes del cierre');
   EXCEPTION WHEN check_violation THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: owner counted cash before session completion'; END IF;
@@ -92,7 +92,7 @@ BEGIN
     WHERE producto_id=v_jugo AND almacen_id='10000000-0000-0000-0000-000000000001';
 
   -- A mismatch is persisted, linked to the declaration, and remains unresolved.
-  v_result:=public.bc5_contar_dinero_entregado(v_decl2,92,'Faltan 8 CUP al contar físicamente');
+  v_result:=public.bc5_contar_dinero_entregado(v_decl2,92::numeric,'Faltan 8 CUP al contar físicamente');
   IF v_result->>'estado'<>'CON_DIFERENCIA'
      OR (v_result->>'monto_declarado')::numeric<>100
      OR (v_result->>'monto_contado')::numeric<>92
@@ -111,14 +111,14 @@ BEGIN
   END IF;
 
   -- A same-value retry is idempotent; a different value cannot overwrite the physical evidence.
-  v_retry:=public.bc5_contar_dinero_entregado(v_decl2,92,'Reintento del mismo conteo');
+  v_retry:=public.bc5_contar_dinero_entregado(v_decl2,92::numeric,'Reintento del mismo conteo');
   IF coalesce((v_retry->>'idempotente')::boolean,false) IS NOT TRUE
      OR (v_retry->>'diferencia_id')::uuid IS DISTINCT FROM v_diff_id THEN
     RAISE EXCEPTION 'FAIL: identical cash count retry was not idempotent';
   END IF;
   v_error:=false;
   BEGIN
-    PERFORM public.bc5_contar_dinero_entregado(v_decl2,91,'Intento de sobrescribir evidencia');
+    PERFORM public.bc5_contar_dinero_entregado(v_decl2,91::numeric,'Intento de sobrescribir evidencia');
   EXCEPTION WHEN check_violation THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: a different amount overwrote a confirmed physical count'; END IF;
@@ -178,7 +178,7 @@ BEGIN
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: non-admin listed the administrator cash inbox'; END IF;
   v_error:=false;
   BEGIN
-    PERFORM public.bc5_contar_dinero_entregado(v_decl2,92,'Conteo no autorizado');
+    PERFORM public.bc5_contar_dinero_entregado(v_decl2,92::numeric,'Conteo no autorizado');
   EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: non-admin recorded the owner cash count'; END IF;
