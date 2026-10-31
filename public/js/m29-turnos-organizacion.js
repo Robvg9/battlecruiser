@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.16';
+  var VERSION = '29.17';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -104,7 +104,7 @@
       '.m29-filter select{width:100%;min-height:42px;padding:9px 10px;border:1px solid rgba(255,255,255,.16);border-radius:8px;background:var(--card-bg,rgba(255,255,255,.04));color:inherit}',
       '.m29-filter select option{background:#1e293b;color:#fff}',
       '.m29-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}',
-      '.m29-modal{background:#1e293b;border-radius:16px;width:100%;max-width:420px;padding:20px 22px;border:1px solid rgba(255,255,255,.08)}',
+      '.m29-modal{background:#1e293b;border-radius:14px;width:100%;max-width:640px;max-height:calc(100dvh - 24px);overflow:auto;box-sizing:border-box;padding:14px 16px;border:1px solid rgba(255,255,255,.08)}',
       '.m29-field{margin-bottom:12px}',
       '.m29-field label{display:block;font-size:.8rem;opacity:.7;margin-bottom:4px}',
       '.m29-field input,.m29-field select{width:100%;padding:9px 11px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.25);color:inherit}',
@@ -114,12 +114,18 @@
       '.m29-actions .ok{background:#2563eb;color:#fff}',
       '.m29-msg{font-size:.85rem;margin-top:8px;min-height:1.2em}',
       '.m29-msg.error{color:#f87171}',
-      '.m29-create-day{display:grid;grid-template-columns:minmax(130px,1fr) minmax(110px,.7fr) minmax(150px,1.3fr);gap:8px;align-items:center;padding:9px;margin:7px 0;border:1px solid rgba(255,255,255,.10);border-radius:8px}',
-      '.m29-create-day label{display:flex;flex-direction:column;gap:4px;font-size:12px;opacity:.85}',
-      '.m29-create-day select{min-width:0;width:100%;padding:8px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#17212b;color:inherit}',
+      '.m29-create-day{display:grid;grid-template-columns:minmax(100px,.7fr) auto minmax(190px,1.3fr);gap:7px;align-items:center;padding:6px 8px;margin:4px 0;min-height:44px;border:1px solid rgba(255,255,255,.10);border-radius:8px}',
+      '.m29-create-day>strong{font-size:12px;line-height:1.2}',
+      '#m29-crear-overlay .m29-create-day input[type=checkbox]{appearance:auto!important;-webkit-appearance:checkbox!important;display:inline-block!important;width:16px!important;height:16px!important;min-width:16px!important;min-height:16px!important;max-width:16px!important;max-height:16px!important;margin:0 2px 0 0!important;padding:0!important;flex:0 0 16px!important;vertical-align:middle;accent-color:#c6a35b}',
+      '#m29-crear-overlay .m29-create-day .m29-create-check{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:11px;line-height:1.2}',
+
+      '.m29-create-day label{display:flex;flex-direction:column;gap:3px;font-size:11px;opacity:.85;min-width:0}',
+
+      '.m29-create-day select{box-sizing:border-box;min-width:0;width:100%;min-height:34px;padding:5px 8px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#17212b;color:inherit;font-size:12px;line-height:1.2}',
+
       '.m29-create-day .m29-create-check{flex-direction:row;align-items:center}',
       '.m29-create-summary{padding:10px;margin-top:8px;border:1px solid rgba(201,162,77,.2);border-radius:8px;font-size:12px;line-height:1.6}',
-      '@media(max-width:560px){.m29-create-day{grid-template-columns:1fr}.m29-create-day .m29-create-check{margin:2px 0}}',
+      '@media(max-width:560px){.m29-modal{max-height:calc(100dvh - 12px);padding:12px}.m29-overlay{align-items:flex-start;padding:6px}.m29-create-day{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:7px}.m29-create-day label:not(.m29-create-check){grid-column:1/-1}.m29-create-day .m29-create-check{margin:0}.m29-create-day select{min-height:32px}}',
       '[' + HOME_MARK + '="1"] #m24-asig-panel,[' + HOME_MARK + '="1"] #m22-sesiones-panel,.m33-home{display:none!important}'
     ].join('');
     document.head.appendChild(s);
@@ -401,16 +407,46 @@
     if (ov) ov.remove();
   }
   function eligibleStaff() {
-    var rows = ((_cache && _cache.usuarios) || []);
-    return rows.filter(function (u) {
-      if (!u || u.activo === false || u.archivado) return false;
-      var role = String(u.rol || u.role_name || u.nombre_rol || u.role || '').toLowerCase();
+    var cacheRows = Array.isArray(window.__BC_M29_STAFF_CACHE__)
+      ? window.__BC_M29_STAFF_CACHE__
+      : ((_cache && Array.isArray(_cache.usuarios)) ? _cache.usuarios : []);
+    return cacheRows.filter(function (u) {
+      if (!u || !u.id || u.activo === false || u.archivado) return false;
+      var role = String(u.rol || u.role_name || u.nombre_rol || u.role || '').toLowerCase().trim();
       return role.indexOf('dependienta') >= 0 || role.indexOf('due') === 0;
     });
   }
+  async function ensureEligibleStaff() {
+    var people = eligibleStaff();
+    if (people.length) return people;
+    if (offlineNow()) throw new Error('Conecta el dispositivo para cargar la lista de responsables.');
+    if (!can('usuarios', 'ver')) throw new Error('Tu perfil no tiene permiso usuarios.ver para consultar responsables.');
+    if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
+      throw new Error('El cliente del servidor no está disponible para cargar responsables.');
+    }
+    var response = await client.rpc('listar_usuarios_admin', {});
+    if (response && response.error) {
+      throw new Error(response.error.message || response.error.details || 'El servidor rechazó la consulta de usuarios.');
+    }
+    var rows = Array.isArray(response && response.data) ? response.data : [];
+    window.__BC_M29_STAFF_CACHE__ = rows;
+    try {
+      if (typeof _cache !== 'undefined' && _cache) _cache.usuarios = rows;
+      else {
+        window._cache = window._cache || {};
+        window._cache.usuarios = rows;
+      }
+    } catch (_) {}
+    people = eligibleStaff();
+    if (!people.length) throw new Error('No hay usuarios activos elegibles (Dependienta o Dueño) para asignar.');
+    return people;
+  }
   function staffOptions(selected) {
     var people = eligibleStaff();
-    return '<option value="">Selecciona responsable</option>' + people.map(function (u) {
+    var placeholder = people.length
+      ? '<option value="">Selecciona responsable</option>'
+      : '<option value="">Responsables no disponibles</option>';
+    return placeholder + people.map(function (u) {
       var name = u.nombre || u.nombre_usuario || u.email || u.id;
       return '<option value="' + esc(u.id) + '"' +
         (String(u.id) === String(selected || '') ? ' selected' : '') + '>' + esc(name) + '</option>';
@@ -512,7 +548,7 @@
       }).join('');
     }
   }
-  function openCrearModal() {
+  async function openCrearModal() {
     if (!state.isAdmin) return;
     closeCrearModal();
     var opts = warehouses().map(function (a) {
@@ -529,17 +565,31 @@
       '<div class="m29-field"><label>Días (1–31)</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div>' +
       '<p id="m29-mode-label">Jornada completa · una persona responsable por día</p>' +
       '<button type="button" class="m29-btn-refresh" id="m29-toggle-plan-b">Plan alternativo: dividir en Mañana y Tarde</button>' +
+      '<p id="m29-staff-status" class="m29-msg" role="status" aria-live="polite">Cargando responsables…</p>' +
       '<div id="m29-create-days" data-mode="jornada"></div>' +
-      '<div class="m29-create-summary"><strong>Resumen antes de crear</strong><div id="m29-create-summary"></div></div>' +
+      '<div class="m29-create-summary"><strong>Resumen compacto</strong><div id="m29-create-summary"></div></div>' +
       '<div class="m29-msg" id="m29-modal-msg"></div>' +
-      '<div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear">Crear turno</button></div></div>';
+      '<div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear" disabled>Crear turno</button></div></div>';
     document.body.appendChild(ov);
     document.getElementById('m29-cancel-crear').onclick = closeCrearModal;
     document.getElementById('m29-toggle-plan-b').onclick = toggleCreateMode;
     document.getElementById('m29-inicio').addEventListener('change', buildCreateRows);
     document.getElementById('m29-dias').addEventListener('change', buildCreateRows);
     document.getElementById('m29-confirm-crear').onclick = confirmCrear;
-    buildCreateRows();
+    try {
+      var people = await ensureEligibleStaff();
+      var status = document.getElementById('m29-staff-status');
+      if (status) { status.textContent = people.length + ' responsables activos disponibles.'; status.className = 'm29-msg ok'; }
+      buildCreateRows();
+      var confirm = document.getElementById('m29-confirm-crear');
+      if (confirm) confirm.disabled = false;
+    } catch (error) {
+      var statusError = document.getElementById('m29-staff-status');
+      if (statusError) { statusError.textContent = 'No se pudo cargar el personal: ' + String(error && error.message || error); statusError.className = 'm29-msg error'; }
+      var confirmError = document.getElementById('m29-confirm-crear');
+      if (confirmError) confirmError.disabled = true;
+      buildCreateRows();
+    }
   }
   async function confirmCrear() {
     if (!state.isAdmin) return;
