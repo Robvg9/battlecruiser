@@ -402,7 +402,7 @@
             saleCostQty: 0, saleCostTotal: 0,
             salePriceQty: 0, salePriceTotal: 0,
             saleLinesQty: 0, saleRevenue: 0, saleProfit: 0,
-            hasSaleLine: false, hasSaleCost: true, currentPrice: null, lossCostTotal: 0
+            hasSaleLine: false, hasSaleCost: true, currentPrice: null, lossCostTotal: 0, lossValueApprox: false
           };
         } else {
           if (productId && !row.id) row.id = productId;
@@ -650,25 +650,30 @@
       const allOpening = productRows.length > 0 && productRows.every(function (row) { return row.opening != null; });
       const allFinal = productRows.length > 0 && productRows.every(function (row) { return row.final != null; });
       const tableRows = productRows.map(function (row) {
-        const cost = row.saleCostQty > 0
+        const cost = row.hasSaleCost && row.saleCostQty > 0
           ? row.saleCostTotal / row.saleCostQty
           : (row.costWeightedQty > 0 ? row.costWeightedTotal / row.costWeightedQty : null);
-        const saleQty = salesLines ? row.saleLinesQty : row.posMovementQty;
-        const salePrice = row.salePriceQty > 0 ? row.salePriceTotal / row.salePriceQty : row.currentPrice;
+        const hasLineDetail = !!(salesLines && row.hasSaleLine);
+        const saleQty = hasLineDetail ? row.saleLinesQty : row.posMovementQty;
+        const salePrice = hasLineDetail && row.salePriceQty > 0
+          ? row.salePriceTotal / row.salePriceQty : row.currentPrice;
         const unitGain = salePrice != null && cost != null ? salePrice - cost : null;
         const markup = cost > 0 && unitGain != null ? unitGain / cost * 100 : null;
         const balanceSales = row.opening != null && row.final != null
           ? row.opening + row.incoming + row.reinvestment - row.losses - row.otherOut - row.final
           : null;
-        const revenue = salesLines
-          ? (row.hasSaleLine ? row.saleRevenue : 0)
-          : (saleQty > 0 && salePrice != null ? saleQty * salePrice : null);
-        const profit = salesLines
-          ? (row.hasSaleLine ? (row.hasSaleCost ? row.saleProfit : null) : 0)
-          : (saleQty > 0 && unitGain != null ? saleQty * unitGain : null);
+        const revenue = hasLineDetail
+          ? row.saleRevenue
+          : (saleQty > 0 && salePrice != null ? saleQty * salePrice : (row.posMovementQty > 0 ? null : 0));
+        const profit = hasLineDetail && row.hasSaleCost
+          ? row.saleProfit
+          : (saleQty > 0 && unitGain != null ? saleQty * unitGain : (row.posMovementQty > 0 ? null : 0));
+        const revenueApprox = !hasLineDetail && saleQty > 0 && revenue != null;
+        const profitApprox = (!hasLineDetail || !row.hasSaleCost) && saleQty > 0 && profit != null;
         const lossValue = row.lossCostTotal > 0
           ? row.lossCostTotal
           : (row.losses > 0 && cost != null ? row.losses * cost : null);
+        const lossValueApprox = row.losses > 0 && row.lossCostTotal <= 0 && lossValue != null;
         if (row.opening != null) totals.opening += row.opening;
         if (row.final != null) totals.final += row.final;
         totals.incoming += row.incoming;
@@ -689,17 +694,22 @@
           saleQty: saleQty,
           revenue: revenue,
           profit: profit,
-          lossValue: lossValue
+          revenueApprox: revenueApprox,
+          profitApprox: profitApprox,
+          lossValue: lossValue,
+          lossValueApprox: lossValueApprox
         });
       });
-      const salesApprox = !salesLines;
-      const hasAnySalesDetail = !!salesLines;
+      const salesApprox = !salesLines || (salesIds.size > 0 && salesLines.length === 0);
+      const hasAnySalesDetail = !!salesLines && salesLines.length > 0;
       const totalDeclared = cashRows.reduce(function (sum, row) { return sum + bookNumber(row.declared); }, 0);
       totals.declaration = totalDeclared;
       const fmtCell = function (value, type, approximate) {
         if (value == null) return '—';
         return type === 'money' ? bookMoney(value, approximate) : bookQty(value);
       };
+      const totalsApprox = tableRows.some(function (row) { return row.revenueApprox || row.profitApprox; });
+      const totalLossApprox = tableRows.some(function (row) { return row.lossValueApprox; });
       const tableBody = tableRows.map(function (row) {
         const cells = [
           row.markup == null ? '—' : row.markup.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '%',
@@ -715,9 +725,9 @@
           fmtCell(row.final, 'qty', false),
           fmtCell(row.balanceSales, 'qty', false),
           fmtCell(row.saleQty, 'qty', false),
-          fmtCell(row.profit, 'money', salesApprox),
-          fmtCell(row.revenue, 'money', salesApprox),
-          fmtCell(row.lossValue, 'money', false)
+          fmtCell(row.profit, 'money', row.profitApprox),
+          fmtCell(row.revenue, 'money', row.revenueApprox),
+          fmtCell(row.lossValue, 'money', row.lossValueApprox)
         ];
         return '<tr>' + cells.map(function (cell, index) {
           return '<td' + ((index === 13 || index === 14 || index === 15) ? ' class="m33-num"' : '') + '>' + cell + '</td>';
@@ -732,9 +742,9 @@
         '<td>' + (allFinal ? bookQty(totals.final) : '—') + '</td>' +
         '<td>' + (allOpening && allFinal ? bookQty(totals.balanceSales) : '—') + '</td>' +
         '<td>' + bookQty(totals.posSales) + '</td>' +
-        '<td>' + bookMoney(totals.profit, salesApprox) + '</td>' +
-        '<td>' + bookMoney(totals.revenue, salesApprox) + '</td>' +
-        '<td>' + bookMoney(totals.lossValue, false) + '</td></tr>';
+        '<td>' + bookMoney(totals.profit, totalsApprox) + '</td>' +
+        '<td>' + bookMoney(totals.revenue, totalsApprox) + '</td>' +
+        '<td>' + bookMoney(totals.lossValue, totalLossApprox) + '</td></tr>';
       const reinvestmentBody = reinvestmentRows.length ? reinvestmentRows.map(function (row) {
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.product) + '</td><td>' + bookQty(row.quantity) +
           '</td><td>' + bookMoney(row.unitCost, false) + '</td><td>' + bookMoney(row.total, false) + '</td><td>' +
@@ -758,12 +768,14 @@
         ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
         : '';
       const salesNote = salesApprox
-        ? 'No se pudo leer el detalle histórico de líneas POS. La venta por POS e ingreso se muestran como aproximación cuando existe precio actual; la venta por saldo sigue siendo una conciliación física.'
-        : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.';
+        ? 'El detalle histórico de líneas POS no estuvo disponible para todas las ventas. Las cantidades POS proceden de movimientos; los importes marcados ≈ usan precios actuales o costos medios documentados.'
+        : (tableRows.some(function (row) { return row.profitApprox; })
+          ? 'El ingreso procede de líneas POS históricas; la ganancia de los productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
+          : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.');
       const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
       const summary = [
-        ['Ingreso POS', bookMoney(totals.revenue, salesApprox)],
-        ['Ganancia', bookMoney(totals.profit, salesApprox)],
+        ['Ingreso POS', bookMoney(totals.revenue, totalsApprox)],
+        ['Ganancia', bookMoney(totals.profit, totalsApprox)],
         ['Reinversiones', bookMoney(reinvestmentTotal, false)],
         ['Gastos', bookMoney(expenseTotal, false)],
         ['Dinero declarado', bookMoney(totalDeclared, false)]
