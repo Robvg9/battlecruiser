@@ -66,8 +66,14 @@ BEGIN
   LIMIT 1;
   IF v_tramo2 IS NULL THEN RAISE EXCEPTION 'FAIL: active Day 2 tranche is missing'; END IF;
 
-  SELECT id INTO v_decl2 FROM public.bc_declarar_dinero(v_tramo2,100::numeric);
-  v_error:=false;
+  -- Seed the persisted staff declaration in the disposable fixture. Production
+  -- writes this row through bc_declarar_dinero; the Step 7 harness does not load
+  -- that legacy RPC, so test the owner-count contract against its real row shape.
+  INSERT INTO public.turno_declaraciones(
+    turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,estado_aprobacion
+  )
+  VALUES(v_turno,v_day2,v_tramo2,v_owner,100::numeric,'CUP','PENDIENTE')
+  RETURNING id INTO v_decl2;
   BEGIN
     PERFORM public.bc5_contar_dinero_entregado(v_decl2,92::numeric,'Conteo antes del cierre');
   EXCEPTION WHEN check_violation THEN v_error:=true;
