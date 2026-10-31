@@ -1,4 +1,17 @@
 // ==== Battlecruiser · js/navegacion.js ====
+// Bloqueo en fase capture: ningún otro listener recibe una ruta sin permiso efectivo.
+document.addEventListener("click", function (event) {
+  var denied = event.target && event.target.closest
+    ? event.target.closest(".tab-btn[data-tab]")
+    : null;
+  if (!denied) return;
+  var shell = document.getElementById("app-shell");
+  var permisosCargados = shell && shell.getAttribute("data-bc-permisos-cargados") === "1";
+  if (permisosCargados && denied.getAttribute("data-bc-permiso") === "1") return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+}, true);
 // Navegación por tabs y menú lateral. Visibilidad = autoridad de aplicarPermisosAInterfaz.
 // v9.2.80 — M26.5-FE: almacenes carga stock; ventas sincroniza turno del usuario.
 
@@ -9,9 +22,12 @@ function irATab(tab) {
     if (ciclosBtn) tab = "ciclos";
   }
   var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-  if (!btn) return;
-  if (btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") || btn.style.display === "none") {
-    console.warn("[BattleCruiser] irATab: pestaña no disponible:", tab);
+  var shell = document.getElementById("app-shell");
+  var permisosCargados = shell && shell.getAttribute("data-bc-permisos-cargados") === "1";
+  if (!btn || !permisosCargados || btn.getAttribute("data-bc-permiso") !== "1" ||
+      btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") ||
+      btn.style.display === "none") {
+    console.warn("[BattleCruiser] irATab: pestaña no autorizada:", tab);
     return;
   }
   btn.click();
@@ -24,8 +40,12 @@ safeInit("tabs", function () {
   tabsEl.addEventListener("click", function (e) {
     var btn = e.target.closest(".tab-btn");
     if (!btn) return;
-    if (btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") || btn.style.display === "none") {
+    if (btn.getAttribute("data-bc-permiso") !== "1" ||
+        btn.classList.contains("hidden") || btn.classList.contains("tab-sin-permiso") ||
+        btn.style.display === "none") {
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
       return;
     }
     var t = btn.dataset.tab;

@@ -171,16 +171,69 @@ async function evaluate(expression, timeoutOverrideMs) {
   return result.result ? result.result.value : undefined;
 }
 async function waitUntil(description, predicate, timeoutMs) {
-  const deadline = Date.now() + (timeoutMs || TIMEOUT_MS);
+  const totalTimeoutMs = timeoutMs || TIMEOUT_MS;
+  const startedAt = Date.now();
+  const deadline = startedAt + totalTimeoutMs;
   let lastValue;
+  let lastError = null;
+  let attempts = 0;
+  const evaluationErrors = [];
+
   while (Date.now() < deadline) {
+    attempts++;
+    const remainingMs = Math.max(1, deadline - Date.now());
+    // A single CDP evaluation must not consume the entire readiness window.
+    // Short bounded polls let Chromium recover from a transient main-thread stall
+    // while preserving the original total timeout for this readiness condition.
+    const pollTimeoutMs = Math.min(2500, remainingMs);
     try {
-      lastValue = await evaluate("(async()=>(" + predicate + "))()", Math.min(CDP_COMMAND_TIMEOUT_MS, Math.max(1, deadline - Date.now())));
-      if (lastValue) return lastValue;
-    } catch (_) {}
-    await delay(250);
+      lastValue = await evaluate(
+        "(async()=>(" + predicate + "))()",
+        pollTimeoutMs
+      );
+      lastError = null;
+      if (lastValue) {
+        if (evaluationErrors.length) {
+          report.evidence.waitUntilRecoveries = report.evidence.waitUntilRecoveries || [];
+          report.evidence.waitUntilRecoveries.push({
+            description,
+            totalTimeoutMs,
+            elapsedMs: Date.now() - startedAt,
+            attempts,
+            evaluationErrors,
+            recovered: true,
+          });
+        }
+        return lastValue;
+      }
+    } catch (error) {
+      lastError = error && error.message ? error.message : String(error);
+      evaluationErrors.push({
+        elapsedMs: Date.now() - startedAt,
+        error: lastError,
+      });
+    }
+
+    const pauseMs = Math.min(250, Math.max(0, deadline - Date.now()));
+    if (pauseMs > 0) await delay(pauseMs);
   }
-  throw new Error("Timeout esperando " + description + ". Último valor: " + JSON.stringify(lastValue));
+
+  report.evidence.waitUntilTimeouts = report.evidence.waitUntilTimeouts || [];
+  report.evidence.waitUntilTimeouts.push({
+    description,
+    totalTimeoutMs,
+    elapsedMs: Date.now() - startedAt,
+    attempts,
+    lastValue: lastValue === undefined ? null : lastValue,
+    lastError,
+    evaluationErrors,
+  });
+  throw new Error(
+    "Timeout esperando " + description +
+      ". Último valor: " + JSON.stringify(lastValue) +
+      (lastError ? ". Último error CDP: " + lastError : "") +
+      ". Evaluaciones: " + attempts
+  );
 }
 async function navigateAndWait(url) {
   let domContentLoadedSeen = false;
@@ -227,14 +280,37 @@ async function navigateAndWait(url) {
   await delay(500);
 }
 async function reloadAndWait(ignoreCache = true) {
-  // DOMContentLoaded is deterministic for shell readiness; full load can wait on optional scripts/fonts.
-  const loaded = waitForEvent("Page.domContentEventFired", TIMEOUT_MS);
-  loaded.catch(() => {});
+  // Capture the current document identity before requesting a reload. Polling
+  // only UI readiness can accidentally accept the old document while Chromium
+  // is still replacing it.
+  const previousDocumentTimeOrigin = await evaluate("performance.timeOrigin");
+  assert(
+    Number.isFinite(previousDocumentTimeOrigin) && previousDocumentTimeOrigin > 0,
+    "No se pudo capturar la identidad del documento antes de recargar."
+  );
+
   // Hard reloads bypass the Service Worker in Chromium; only use them for the
   // offline cache probe. The online reconnect must be a normal navigation.
   await cdpCommand("Page.reload", ignoreCache ? { ignoreCache: true } : {});
-  await loaded;
-  await delay(500);
+
+  // Do not accept a stale Runtime.evaluate result from the previous document.
+  // A new timeOrigin proves navigation completed; UI_READY then proves the app
+  // has completed its own base initialization in that new document.
+  const reloadReady = await waitUntil(
+    "nuevo documento y módulos base listos después de recargar",
+    "(()=>{const origin=performance.timeOrigin;return Number.isFinite(origin)&&origin!==" +
+      JSON.stringify(previousDocumentTimeOrigin) +
+      "&&document.readyState!=='loading'&&window.__BC_UI_READY_RESOLVED__===true" +
+      "?{documentTimeOrigin:origin,readyState:document.readyState,uiReady:true}:null})()",
+    TIMEOUT_MS
+  );
+  report.evidence.reloadReadiness = report.evidence.reloadReadiness || [];
+  report.evidence.reloadReadiness.push({
+    previousDocumentTimeOrigin,
+    ...reloadReady,
+    ignoreCache,
+  });
+  await delay(250);
 }
 function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
@@ -430,6 +506,22 @@ async function main() {
           errorText: message.params.errorText || "",
           canceled: Boolean(message.params.canceled),
         });
+      } else if (message.method === "Runtime.consoleAPICalled") {
+        const args = (message.params && message.params.args) || [];
+        const joined = args.map((arg) => {
+          if (arg && typeof arg.value === "string") return arg.value;
+          if (arg && typeof arg.description === "string") return arg.description;
+          return "";
+        }).join(" ");
+        if (joined.includes("__BC_E2E_BOOT_DIAG__")) {
+          report.evidence.runtimeDiagnostics = report.evidence.runtimeDiagnostics || [];
+          report.evidence.runtimeDiagnostics.push({
+            at: new Date().toISOString(),
+            phase: report.evidence.phase || "initial",
+            type: message.params.type || null,
+            text: joined.slice(0, 4000),
+          });
+        }
       } else if (message.method === "Runtime.exceptionThrown") {
         pageExceptions.push({
           at: new Date().toISOString(),
@@ -457,6 +549,42 @@ async function main() {
 
   await cdpCommand("Page.enable");
   await cdpCommand("Runtime.enable");
+
+  const bootDiagnosticSource = [
+    "(()=>{",
+    "if(window.__BC_E2E_BOOT_DIAG_INSTALLED__)return;",
+    "window.__BC_E2E_BOOT_DIAG_INSTALLED__=true;",
+    "const nativeObserver=window.MutationObserver;let nextObserverId=0;",
+    "window.MutationObserver=function(callback){",
+    "const id=++nextObserverId;let calls=0;let totalRecords=0;let repeatLogged=false;const createdAt=performance.now();",
+    "const stack=(new Error('MutationObserver created')).stack||'';",
+    "const wrapped=function(records,observer){",
+    "calls++;totalRecords+=records?records.length:0;",
+    "const samples=Array.from(records||[]).slice(0,4).map(r=>({type:r.type,target:r.target&&r.target.nodeName,id:r.target&&r.target.id,className:r.target&&typeof r.target.className==='string'?r.target.className.slice(0,100):'',attributeName:r.attributeName,added:r.addedNodes?r.addedNodes.length:0,removed:r.removedNodes?r.removedNodes.length:0}));",
+    "if(calls===1)console.warn('__BC_E2E_BOOT_DIAG__MO_FIRST__',JSON.stringify({id,createdAgeMs:Math.round(performance.now()-createdAt),stack:stack.split('\\n').slice(0,5),samples}));",
+    "if(!repeatLogged&&calls>=8){repeatLogged=true;console.warn('__BC_E2E_BOOT_DIAG__MO_REPEAT__',JSON.stringify({id,calls,totalRecords,ageMs:Math.round(performance.now()-createdAt),stack:stack.split('\\n').slice(0,5),samples}));}",
+    "const started=performance.now();try{return callback.call(this,records,observer);}finally{const duration=performance.now()-started;if(duration>=40)console.warn('__BC_E2E_BOOT_DIAG__MO_SLOW__',JSON.stringify({id,calls,totalRecords,durationMs:Math.round(duration*10)/10,ageMs:Math.round(performance.now()-createdAt),stack:stack.split('\\n').slice(0,5),samples}));}",
+    "};",
+    "return new nativeObserver(wrapped);",
+    "};",
+    "window.MutationObserver.prototype=nativeObserver.prototype;",
+    "try{Object.setPrototypeOf(window.MutationObserver,nativeObserver);}catch(_){}",
+    "let longTaskCount=0;",
+    "try{const observer=new PerformanceObserver(list=>{for(const entry of list.getEntries()){longTaskCount++;if(longTaskCount<=20)console.warn('__BC_E2E_BOOT_DIAG__LONGTASK__',JSON.stringify({startTime:Math.round(entry.startTime),durationMs:Math.round(entry.duration*10)/10,name:entry.name,attribution:(entry.attribution||[]).slice(0,3).map(a=>({name:a.name,entryType:a.entryType,containerType:a.containerType,containerName:a.containerName,containerId:a.containerId}))}));}});observer.observe({type:'longtask',buffered:true});window.__BC_E2E_BOOT_DIAG_LONGTASK_OBSERVER__=observer;}catch(error){console.warn('__BC_E2E_BOOT_DIAG__LONGTASK_UNAVAILABLE__',String(error));}",
+    "document.addEventListener('DOMContentLoaded',()=>console.warn('__BC_E2E_BOOT_DIAG__DOM_READY__',JSON.stringify({readyState:document.readyState,elapsedMs:Math.round(performance.now())})),{once:true});",
+    "window.addEventListener('load',()=>console.warn('__BC_E2E_BOOT_DIAG__LOAD__',JSON.stringify({readyState:document.readyState,elapsedMs:Math.round(performance.now())})),{once:true});",
+    "})();"
+  ].join('\n');
+
+  const diagnosticInstalled = await cdpCommand("Page.addScriptToEvaluateOnNewDocument", {
+    source: bootDiagnosticSource,
+  });
+  report.evidence.bootDiagnostic = {
+    installed: Boolean(diagnosticInstalled && diagnosticInstalled.identifier),
+    observerInstrumentation: true,
+    longTaskInstrumentation: true,
+  };
+
   await cdpCommand("Network.enable");
   await cdpCommand("Log.enable");
   await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
@@ -507,9 +635,20 @@ async function main() {
     httpStatus: preferenceLive.status,
     sha256: sha256(preferenceLive.body),
     sourceSha256: sha256(preferenceSource),
+    execution: "SHA-verified checkout source injected into Chromium; no second browser fetch",
   };
 
-  const preferenceProbeBefore = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab-preferencias ausente'};const login=document.querySelector('#login-form');if(login)login.classList.add('hidden');const shell=document.querySelector('#app-shell');if(shell)shell.classList.add('visible');tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_module='+Date.now());if(!r.ok)return {ready:false,reason:'módulo HTTP '+r.status};const src=await r.text();(0,eval)(src);}const controls=[{id:'cfg-aj-auto-refresh',key:'autoRefresh',label:'Actualización automática',defaultValue:true},{id:'cfg-aj-sync-auto',key:'syncAuto',label:'Sincronización automática',defaultValue:true},{id:'cfg-aj-sync-open',key:'syncOnOpen',label:'Sincronizar al abrir app',defaultValue:true},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly',label:'Sincronizar solo en Wi-Fi',defaultValue:false},{id:'cfg-aj-notify',key:'notifications',label:'Notificaciones',defaultValue:true},{id:'cfg-aj-compact',key:'compacto',label:'Modo compacto',defaultValue:false}];const panel=document.querySelector('#cfg-preferencias-personales');if(!panel)return {ready:false,reason:'panel no montado'};const initial=controls.map(c=>{const e=document.getElementById(c.id);return {id:c.id,key:c.key,exists:!!e,type:e&&e.type,checked:e?e.checked:null,role:e&&e.getAttribute('role'),ariaChecked:e&&e.getAttribute('aria-checked'),label:e&&e.getAttribute('aria-label'),describedByTargetsPresent:!!(e&&document.getElementById(c.id+'-help')&&document.getElementById(c.id+'-state')),nameStateMatches:!!e&&(e.getAttribute('aria-label')||'').includes(e.checked?'estado activado':'estado desactivado')};});return {ready:true,version:window.__BC_VERSION__||null,controls,initial,profile:location.origin,hasLoginSession:!!(window.client&&window.client.auth)};})()");
+  const preferenceModuleSourceLiteral = JSON.stringify(preferenceSource);
+  const preferenceProbeBeforeExpression = [
+    "(()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab-preferencias ausente'};",
+    "const login=document.querySelector('#login-form');if(login)login.classList.add('hidden');const shell=document.querySelector('#app-shell');if(shell)shell.classList.add('visible');tab.classList.add('active');tab.style.display='block';",
+    "if(!document.querySelector('#cfg-preferencias-personales')){(0,eval)(" + preferenceModuleSourceLiteral + ");}",
+    "const controls=[{id:'cfg-aj-auto-refresh',key:'autoRefresh',label:'Actualización automática',defaultValue:true},{id:'cfg-aj-sync-auto',key:'syncAuto',label:'Sincronización automática',defaultValue:true},{id:'cfg-aj-sync-open',key:'syncOnOpen',label:'Sincronizar al abrir app',defaultValue:true},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly',label:'Sincronizar solo en Wi-Fi',defaultValue:false},{id:'cfg-aj-notify',key:'notifications',label:'Notificaciones',defaultValue:true},{id:'cfg-aj-compact',key:'compacto',label:'Modo compacto',defaultValue:false}];",
+    "const panel=document.querySelector('#cfg-preferencias-personales');if(!panel)return {ready:false,reason:'panel no montado'};",
+    "const initial=controls.map(c=>{const e=document.getElementById(c.id);return {id:c.id,key:c.key,exists:!!e,type:e&&e.type,checked:e?e.checked:null,role:e&&e.getAttribute('role'),ariaChecked:e&&e.getAttribute('aria-checked'),label:e&&e.getAttribute('aria-label'),describedByTargetsPresent:!!(e&&document.getElementById(c.id+'-help')&&document.getElementById(c.id+'-state')),nameStateMatches:!!e&&(e.getAttribute('aria-label')||'').includes(e.checked?'estado activado':'estado desactivado')};});",
+    "return {ready:true,version:window.__BC_VERSION__||null,controls,initial,profile:location.origin,hasLoginSession:!!(window.client&&window.client.auth)};})()"
+  ].join("");
+  const preferenceProbeBefore = await evaluate(preferenceProbeBeforeExpression);
   assert(preferenceProbeBefore.ready && preferenceProbeBefore.initial.length === 6 &&
     preferenceProbeBefore.initial.every(c => c.exists && c.type === "checkbox" && c.role === "switch" && c.label && c.ariaChecked === String(c.checked) && c.describedByTargetsPresent && c.nameStateMatches),
     "Los seis interruptores no están presentes/accesibles en Chromium: " + JSON.stringify(preferenceProbeBefore));
@@ -519,7 +658,25 @@ async function main() {
   report.evidence.step4PreferencesAfterChange = { before: preferenceChange.before, stored: preferenceChange.stored, states: preferenceChange.after };
 
   await reloadAndWait(false);
-  const preferenceReload = await evaluate("(async()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};const originalClass=tab.getAttribute('class');const originalStyle=tab.getAttribute('style');tab.classList.add('active');tab.style.display='block';if(!document.querySelector('#cfg-preferencias-personales')){const r=await fetch('/js/configuracion-ajustes-migrados-20260903.js?bc_step4_reload='+Date.now());if(!r.ok)return {ready:false,reason:'module HTTP '+r.status};(0,eval)(await r.text());}const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');const states=items.map(item=>{const e=document.getElementById(item.id);return {id:item.id,key:item.key,exists:!!e,checked:e?e.checked:null,stored:stored[item.key],matches:!!e&&stored[item.key]===e.checked,ariaChecked:e&&e.getAttribute('aria-checked'),ariaMatches:!!e&&e.getAttribute('aria-checked')===String(e.checked),nameStateMatches:!!e&&(e.getAttribute('aria-label')||'').includes(e.checked?'estado activado':'estado desactivado')};});const allPersisted=states.every(x=>x.exists&&x.matches&&x.ariaMatches&&x.nameStateMatches);if(originalClass===null)tab.removeAttribute('class');else tab.setAttribute('class',originalClass);if(originalStyle===null)tab.removeAttribute('style');else tab.setAttribute('style',originalStyle);const originalStyleCssText=(()=>{const probe=document.createElement('div');if(originalStyle!==null)probe.setAttribute('style',originalStyle);return probe.style.cssText;})();const restoration={originalClass,restoredClass:tab.getAttribute('class'),originalStyle,restoredStyle:tab.getAttribute('style'),originalStyleCssText,restoredStyleCssText:tab.style.cssText};const restored=restoration.restoredClass===restoration.originalClass&&restoration.restoredStyleCssText===restoration.originalStyleCssText;return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted,probeStateRestored:restored,probeRestoration:restoration};})()");
+  const preferenceReloadExpression = [
+    "(()=>{const tab=document.querySelector('#tab-preferencias');if(!tab)return {ready:false,reason:'tab missing after reload'};const originalClass=tab.getAttribute('class');const originalStyle=tab.getAttribute('style');tab.classList.add('active');tab.style.display='block';",
+    "if(!document.querySelector('#cfg-preferencias-personales')){(0,eval)(" + preferenceModuleSourceLiteral + ");}",
+    "const items=[{id:'cfg-aj-auto-refresh',key:'autoRefresh'},{id:'cfg-aj-sync-auto',key:'syncAuto'},{id:'cfg-aj-sync-open',key:'syncOnOpen'},{id:'cfg-aj-sync-wifi',key:'syncWifiOnly'},{id:'cfg-aj-notify',key:'notifications'},{id:'cfg-aj-compact',key:'compacto'}];const stored=JSON.parse(localStorage.getItem('bc-ui-preferences-v2')||'{}');",
+    "const states=items.map(item=>{const e=document.getElementById(item.id);return {id:item.id,key:item.key,exists:!!e,checked:e?e.checked:null,stored:stored[item.key],matches:!!e&&stored[item.key]===e.checked,ariaChecked:e&&e.getAttribute('aria-checked'),ariaMatches:!!e&&e.getAttribute('aria-checked')===String(e.checked),nameStateMatches:!!e&&(e.getAttribute('aria-label')||'').includes(e.checked?'estado activado':'estado desactivado')};});",
+    "const allPersisted=states.every(x=>x.exists&&x.matches&&x.ariaMatches&&x.nameStateMatches);if(originalClass===null)tab.removeAttribute('class');else tab.setAttribute('class',originalClass);if(originalStyle===null)tab.removeAttribute('style');else tab.setAttribute('style',originalStyle);",
+    "const originalStyleCssText=(()=>{const probe=document.createElement('div');if(originalStyle!==null)probe.setAttribute('style',originalStyle);return probe.style.cssText;})();const restoration={originalClass,restoredClass:tab.getAttribute('class'),originalStyle,restoredStyle:tab.getAttribute('style'),originalStyleCssText,restoredStyleCssText:tab.style.cssText};const restored=restoration.restoredClass===restoration.originalClass&&restoration.restoredStyleCssText===restoration.originalStyleCssText;",
+    "return {ready:true,version:window.__BC_VERSION__||null,states,allPersisted,probeStateRestored:restored,probeRestoration:restoration};})()"
+  ].join("");
+  // The configuration module is loaded asynchronously after DOMContentLoaded.
+  // Wait for its real panel instead of reading the old document or a half-loaded
+  // replacement document immediately after Page.reload.
+  const preferencePanelReady = await waitUntil(
+    "seis interruptores de Preferencias montados después de la recarga",
+    "(()=>{const panel=document.querySelector('#cfg-preferencias-personales');const ids=['cfg-aj-auto-refresh','cfg-aj-sync-auto','cfg-aj-sync-open','cfg-aj-sync-wifi','cfg-aj-notify','cfg-aj-compact'];return panel&&ids.every(id=>document.getElementById(id))?{ready:true,ids}:null})()",
+    10000
+  );
+  report.evidence.preferencesPanelAfterReload = preferencePanelReady;
+  const preferenceReload = await evaluate(preferenceReloadExpression);
   assert(preferenceReload.ready && preferenceReload.allPersisted && preferenceReload.probeStateRestored,
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
   report.evidence.step4PreferencesAfterReload = preferenceReload;
@@ -619,12 +776,24 @@ async function main() {
     "El menú lateral no es visible/usable, no tiene márgenes o no abre/cierra en móvil: " + JSON.stringify(mobileMenuProbe));
 
 
-  // The login form is intentionally hidden for the header probe above. Re-open a real
-  // long-form panel before measuring document scrolling; otherwise an unauthenticated
-  // shell with no active tab measures only the header/footer and produces a false failure.
-  const mobileScrollPanelOpened = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b)return false;b.click();return true})()");
-  assert(mobileScrollPanelOpened, "No se encontró Configuración para medir el scroll del contenido móvil.");
-  await waitUntil("Configuración visible antes de medir el scroll móvil", "(()=>{const t=document.querySelector('#tab-config');return !!(t&&t.classList.contains('visible'))})()", 5000);
+  // The browser profile is deliberately unauthenticated. For this UI-only layout probe,
+  // install a synthetic in-memory permission context and let the real permission engine
+  // expose Administration. This does not create an auth session or write business data.
+  const mobileScrollPermissionFixture = await evaluate("(()=>{const shell=document.querySelector('#app-shell');const button=document.querySelector('#tabs .tab-btn[data-tab=config]');const panel=document.querySelector('#tab-config');if(!shell||!button||!panel||window.__BC_PERMISOS_CANONICO__!==true||typeof window.aplicarPermisosAInterfaz!=='function')return {ready:false,reason:'canonical permission engine unavailable'};_usuarioActual={id:'bc-e2e-layout-fixture',nombre:'E2E layout fixture',rol:'E2E'};_permisosEfectivos={categorias:{ver:true,crear:true},unidades:{ver:true,crear:true}};_permisosCargaExitosa=true;window.__BC_E2E_SYNTHETIC_PERMISSION_FIXTURE__=true;window.aplicarPermisosAInterfaz();return {ready:true,userId:_usuarioActual.id,permissionSections:Object.keys(_permisosEfectivos),shellReady:shell.getAttribute('data-bc-permisos-cargados'),buttonPermission:button.getAttribute('data-bc-permiso'),panelPermission:panel.getAttribute('data-bc-permiso'),buttonHidden:button.classList.contains('hidden'),panelHidden:panel.classList.contains('hidden'),panelVisible:panel.classList.contains('visible')};})()");
+  report.evidence.mobileScrollPermissionFixture = mobileScrollPermissionFixture;
+  assert(mobileScrollPermissionFixture.ready && mobileScrollPermissionFixture.shellReady === "1" &&
+         mobileScrollPermissionFixture.buttonPermission === "1" && mobileScrollPermissionFixture.panelPermission === "1" &&
+         !mobileScrollPermissionFixture.buttonHidden && !mobileScrollPermissionFixture.panelHidden,
+    "El motor real de permisos no habilitó Administración para el fixture UI sintético: " +
+      JSON.stringify(mobileScrollPermissionFixture));
+
+  const mobileScrollPanelOpened = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b||b.getAttribute('data-bc-permiso')!=='1')return false;b.click();return true})()");
+  assert(mobileScrollPanelOpened, "No se pudo abrir Configuración con el permiso sintético de UI.");
+  await waitUntil(
+    "Configuración autorizada visible antes de medir el scroll móvil",
+    "(()=>{const s=document.querySelector('#app-shell');const b=document.querySelector('#tabs .tab-btn[data-tab=config]');const t=document.querySelector('#tab-config');return !!(s&&s.getAttribute('data-bc-permisos-cargados')==='1'&&b&&b.getAttribute('data-bc-permiso')==='1'&&t&&t.getAttribute('data-bc-permiso')==='1'&&t.classList.contains('visible')&&getComputedStyle(t).display!=='none')})()",
+    5000
+  );
 
   // Verify mobile content uses page scrolling and critical settings remain reachable.
   const mobileContentLayout = await evaluate("(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {top:r.top,bottom:r.bottom,height:r.height,position:s.position,overflowX:s.overflowX,overflowY:s.overflowY,cssHeight:s.height,maxHeight:s.maxHeight,flex:s.flex,inlineStyle:e.getAttribute('style'),clientHeight:e.clientHeight,scrollHeight:e.scrollHeight};};const main=document.querySelector('.main-content');const footer=document.querySelector('.app-footer');const shell=document.querySelector('#app-shell');return {viewportWidth:innerWidth,viewportHeight:innerHeight,documentHeight:document.documentElement.scrollHeight,bodyHeight:document.body.scrollHeight,bodyComputedHeight:getComputedStyle(document.body).height,bodyDisplay:getComputedStyle(document.body).display,bodyOverflowY:getComputedStyle(document.body).overflowY,bodyClientHeight:document.body.clientHeight,htmlClientHeight:document.documentElement.clientHeight,shellDisplay:shell?getComputedStyle(shell).display:null,shell:box(shell),main:box(main),footer:box(footer),gap:main&&footer?footer.getBoundingClientRect().top-main.getBoundingClientRect().bottom:null};})()");

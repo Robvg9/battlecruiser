@@ -56,10 +56,11 @@ test("Paso 4 acceso: mostrar/ocultar contraseña actualiza tipo, nombre accesibl
 test("Paso 4 navegación: abrir menú actualiza sidebar, backdrop y aria-expanded", (t) => {
   const dom = new JSDOM(
     "<!doctype html><html><head></head><body>" +
+    "<div id='app-shell' class='visible' data-bc-permisos-cargados='1'></div>" +
     "<button id='sidebar-toggle-btn' aria-expanded='false'>Menú</button>" +
     "<button id='sidebar-close-btn'>Cerrar</button>" +
     "<div id='sidebar-backdrop'></div>" +
-    "<aside id='sidebar'><button class='tab-btn' data-tab='productos'>Productos</button></aside>" +
+    "<aside id='sidebar'><button class='tab-btn' data-tab='productos' data-bc-permiso='1'>Productos</button></aside>" +
     "</body></html>",
     { url: "https://battlecruiser-sidebar.test/", runScripts: "outside-only" }
   );

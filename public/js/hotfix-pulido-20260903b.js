@@ -84,7 +84,7 @@
   }
   function boot(){
     document.addEventListener('submit',formCapture,true);
-    var obs=new MutationObserver(function(){patchProductModal();addFactorControls();hideEmptyCommunication();enhancePresentationCatalog();var t=document.querySelector('#tabs [data-tab="config"]');if(t){t.style.display='flex';t.hidden=false;}var tr=document.querySelector('#tabs [data-tab="transferencias"]');if(tr)tr.remove();var sec=document.getElementById('tab-transferencias');if(sec)sec.classList.remove('visible');});obs.observe(document.body,{childList:true,subtree:true});
+    var obs=new MutationObserver(function(){patchProductModal();addFactorControls();hideEmptyCommunication();enhancePresentationCatalog();var tr=document.querySelector('#tabs [data-tab="transferencias"]');if(tr)tr.remove();var sec=document.getElementById('tab-transferencias');if(sec)sec.classList.remove('visible');});obs.observe(document.body,{childList:true,subtree:true});
     patchProductModal();addFactorControls();hideEmptyCommunication();enhancePresentationCatalog();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();

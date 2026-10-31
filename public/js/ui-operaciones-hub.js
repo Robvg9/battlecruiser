@@ -10,8 +10,8 @@
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
-    if (can(seccion, 'crear')) return true;
-    return false;
+    // Las acciones requieren permiso de lectura del módulo y permiso específico de escritura.
+    return can(seccion, 'ver') && can(seccion, 'crear');
   }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v) : String(v == null ? '' : v); }
   function key() { return crypto.randomUUID(); }
@@ -374,23 +374,23 @@
   /** Construye la lista de cards según permisos reales actuales. */
   function buildCardsList() {
     var cards = [];
-    if (can('gastos', 'crear')) {
+    if (can('gastos', 'ver') && can('gastos', 'crear')) {
       cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
     }
-    if (can('mermas', 'crear')) {
+    if (can('mermas', 'ver') && can('mermas', 'crear')) {
       cards.push({ tone: 'red', icon: '📦', title: 'Registrar merma', desc: 'Productos que salen de inventario por merma.', go: 'Registrar merma', fn: openMerma });
     }
-    if (can('reinversiones', 'crear')) {
+    if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
     }
     // Backend: responsabilidades.crear / incidencias.crear (no turnos.crear)
-    if (can('responsabilidades', 'crear')) {
+    if (can('responsabilidades', 'ver') && can('responsabilidades', 'crear')) {
       cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
     }
-    if (can('incidencias', 'crear')) {
+    if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
       cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
     }
-    if (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any')) {
+    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
       cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, merma y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
     }
     return cards;

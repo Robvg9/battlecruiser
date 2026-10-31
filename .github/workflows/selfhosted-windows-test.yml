@@ -1,5 +1,5 @@
-name: BattleCruiser Self-Hosted Windows Test
-# ARIA runner connectivity validation: infrastructure-only trigger, no application logic change.
+name: BattleCruiser Windows Regression Test
+# Full Windows regression on a standard hosted runner; local runner health is separate.
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   selfhosted-windows:
-    runs-on: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-vale-detail-keyboard-20261029' && 'windows-latest' || github.event_name == 'pull_request' && contains(fromJSON('["fix/quality-context-ready-tests-20261029","fix/ux-compact-preferences-turns-main-20261029","fix/step4-live-modal-pill-step2-20261029","fix/step4-summary-route-main-20261029","fix/step4-expired-turn-recovery-ui-20261029","fix/step4-forceclose-m29-admin-and-mobile-20261029"]'), github.head_ref) && 'windows-latest' || fromJSON('["self-hosted","Windows","X64"]') }}
+    runs-on: windows-latest
     timeout-minutes: 35
 
     steps:
@@ -54,13 +54,14 @@ jobs:
           node --version
           npm --version
 
-      - name: ARIA runner connectivity proof
+      - name: Verify Windows runner identity
         shell: cmd
         run: |
-          echo ARIA_BATTLECRUISER_RUNNER=ONLINE
+          if not defined RUNNER_NAME exit /b 1
+          if not "%RUNNER_OS%"=="Windows" exit /b 1
+          if not "%RUNNER_ARCH%"=="X64" exit /b 1
+          echo BATTLECRUISER_WINDOWS_RUNNER=ONLINE
           echo RUNNER_NAME=%RUNNER_NAME%
-          echo RUNNER_OS=%RUNNER_OS%
-          echo RUNNER_ARCH=%RUNNER_ARCH%
 
       - name: Install dependencies
         shell: cmd

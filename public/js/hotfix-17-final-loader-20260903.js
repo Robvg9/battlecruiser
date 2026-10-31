@@ -7,7 +7,7 @@ var mods=[
  ['hotfix-17-10-ventas-stock-visible-20260903.js','17.10'],
  ['hotfix-17-11-carrito-cantidad-box-20260903.js','17.11'],
  ['hotfix-17-12-comunicacion-limpiar-pruebas-20260903.js','17.12'],
- ['hotfix-17-13-configuracion-admin-visible-20260903.js','17.13'],
+ ['hotfix-17-13-configuracion-admin-visible-20260903.js','20261030.3'],
  ['hotfix-17-15-reportes-dedupe-id-20260903.js','17.15'],
  ['hotfix-17-17-reportes-unificacion-20260903.js','17.17'],
  ['hotfix-17-18-presentacion-rpc-map-20260903.js','17.18'],

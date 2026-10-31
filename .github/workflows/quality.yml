@@ -12,8 +12,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: battlecruiser-quality-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && 'battlecruiser-pr-preview-shared' || format('battlecruiser-quality-{0}', github.ref) }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -22,10 +22,9 @@ permissions:
 jobs:
   quality:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/step4-vale-detail-keyboard-20261029' && 'windows-latest' || github.event_name == 'pull_request' && contains(fromJSON('["fix/quality-context-ready-tests-20261029","fix/ux-compact-preferences-turns-main-20261029","fix/step4-live-modal-pill-step2-20261029","fix/step4-summary-route-main-20261029","fix/step4-expired-turn-recovery-ui-20261029","fix/step4-forceclose-m29-admin-and-mobile-20261029","fix/step4-m33-forceclose-real-entrypoint-20261030"]'), github.head_ref) && 'windows-latest' || fromJSON('["self-hosted","Windows","X64"]') }}
+    runs-on: windows-latest
     timeout-minutes: 35
-    # The self-hosted runner inherited a Node heap cap of about 32 MB; npm ci
-    # and JSDOM suites then crash with out-of-memory before exercising the code.
+    # Keep enough heap for the full JSDOM and integration suite.
     env:
       NODE_OPTIONS: --max-old-space-size=1536
 
@@ -37,8 +36,8 @@ jobs:
           fetch-depth: 1
           clean: true
 
-      # Use the repository's self-hosted Windows runner to avoid GitHub-hosted
-      # runner billing blocks. Keep the Node runtime pinned for reproducibility.
+      # Standard hosted Windows is free for this public repository and keeps
+      # product CI independent of local machine availability.
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
@@ -101,14 +100,14 @@ jobs:
         shell: cmd
         run: node test/verify-production-version.js
 
-      # Run preview deployment and browser E2E in this same self-hosted job.
-      # Splitting these into more jobs caused the single local runner to leave
-      # the dependent jobs queued after Quality had completed.
+      # Reuse the existing free-tier preview Worker for all PRs.
+      # Pull-request quality runs share one concurrency group above, so deployments
+      # to this Worker remain serialized and do not consume one Worker per PR.
       - name: Deploy isolated PR preview
         if: github.event_name == 'pull_request'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+          BC_PREVIEW_NAME: bc-pr-224-battlecruiser
         shell: cmd
         run: |
           if not defined CLOUDFLARE_API_TOKEN exit /b 1
@@ -119,14 +118,14 @@ jobs:
       - name: Wait for isolated preview assets
         if: github.event_name == 'pull_request'
         env:
-          BC_PREVIEW_NAME: bc-pr-${{ github.event.number }}-battlecruiser
+          BC_PREVIEW_NAME: bc-pr-224-battlecruiser
         shell: cmd
         run: node test/verify-pr-preview-assets.js
 
       - name: Run real-browser offline recovery E2E
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
         env:
-          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && format('https://bc-pr-{0}-battlecruiser.robvg9.workers.dev', github.event.number) || 'https://battlecruiser.robvg9.workers.dev' }}
+          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://bc-pr-224-battlecruiser.robvg9.workers.dev' || 'https://battlecruiser.robvg9.workers.dev' }}
           BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
           BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
         shell: cmd

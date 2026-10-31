@@ -1,17 +1,35 @@
-// BattleCruiser — 17.13: Configuración visible para administradores
+// BattleCruiser — 17.13: etiqueta de Administración sin autoridad de visibilidad.
+// La visibilidad la decide exclusivamente permisos-navegacion.js.
 (function(){
   'use strict';
   if(window.__BC1713)return;window.__BC1713=true;
-  function isAdmin(){
-    try{var u=window._usuarioActual||{};var r=String(u.rol||u.role||u.nombre_rol||'').toLowerCase();if(['admin','administrador','dueno','dueño','owner'].includes(r))return true;var p=window.tienePermiso;return typeof p==='function'&&(p('configuracion','ver')||p('configuracion','editar')||p('roles','editar_any'));}catch(_){return false;}
+  function normalizeLabel(){
+    var b=document.querySelector('#tabs [data-tab="config"]');
+    if(!b)return false;
+    var label=b.querySelector('.bc-nav-label');
+    if(label){label.textContent='Administración';return true;}
+    if(b.querySelector('.bc-nav-icon')){
+      var span=document.createElement('span');
+      span.className='bc-nav-label';
+      span.textContent='Administración';
+      b.appendChild(span);
+    }else if(b.textContent.trim()!=='Administración'){
+      b.textContent='Administración';
+    }
+    return true;
   }
-  function show(){
-    if(!isAdmin())return false;
-    var b=document.querySelector('.tab-btn[data-tab="config"]');var p=document.getElementById('tab-config');
-    [b,p].forEach(function(e){if(!e)return;e.classList.remove('hidden');e.removeAttribute('hidden');e.style.removeProperty('display');e.style.removeProperty('visibility');e.style.removeProperty('opacity');});
-    return !!b;
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',normalizeLabel,{once:true});
+  }else{
+    normalizeLabel();
   }
-  function boot(){show();if(!window.__BC1713_OBS){window.__BC1713_OBS=true;new MutationObserver(show).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden']});}}
-  [0,200,500,1000,2000,4000,8000].forEach(function(ms){setTimeout(boot,ms)});
-  window.__BC1713_verify=function(){var b=document.querySelector('.tab-btn[data-tab="config"]');return{admin:isAdmin(),visible:!!(b&&!b.classList.contains('hidden')&&!b.hasAttribute('hidden')&&getComputedStyle(b).display!=='none')}};
+  window.__BC1713_verify=function(){
+    var b=document.querySelector('#tabs [data-tab="config"]');
+    return {
+      button:!!b,
+      permitted:!!b&&b.getAttribute('data-bc-permiso')==='1',
+      visible:!!b&&b.getAttribute('data-bc-permiso')==='1'&&
+        !b.hidden&&getComputedStyle(b).display!=='none'
+    };
+  };
 })();
