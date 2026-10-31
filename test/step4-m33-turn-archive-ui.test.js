@@ -229,9 +229,9 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   modal.querySelector("#m33-next").click();
   const openBook = modal.querySelector("[data-m33-inventory-sessions]");
   assert.ok(openBook, "Inventario must show a day entry with an explicit open-book action");
-  openBook.click();
   const host = modal.querySelector("[data-m33-inventory-host]");
-  assert.ok(await waitFor(() => host.dataset.loaded === "1"), "the day ledger should load from read-only RPCs");
+  assert.ok(await waitFor(() => host.dataset.loaded === "1"), "the first day's ledger should load automatically from read-only RPCs");
+  assert.equal(host.hidden, false, "Inventory should show the first day ledger immediately without an extra click");
   assert.match(host.textContent, /Inventario inicial confirmado/);
   assert.match(host.textContent, /Compra \/ entrada/);
   assert.match(host.textContent, /Venta \/ salida/);
