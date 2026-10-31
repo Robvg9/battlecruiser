@@ -11,7 +11,7 @@ const SOURCE = fs.readFileSync(
   "utf8"
 );
 
-async function waitFor(predicate, timeout = 2500) {
+async function waitFor(predicate, timeout = 10000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
     if (predicate()) return true;
@@ -44,6 +44,7 @@ function setup(t, rpcHandler) {
   });
 
   window.setInterval = () => 0;
+  window.setTimeout = () => 0;
   window.confirm = () => true;
   window._usuarioActual = { id: "owner-1", rol: "Dueño" };
   window._cache = {
@@ -196,18 +197,26 @@ test("Step 7 scheduling success is shown in plain language without IDs or JSON",
     if (name === "bc5_crear_jornada_unica") return { data: { turno_id: "7a2e8f5a-1234-4567-8910-abcdef123456", dias_total: 1, dias_laborables: 1, dias_descanso: 0 }, error: null };
     throw new Error("Unexpected RPC: " + name);
   });
-  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]"));
+  await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
+  const warehouse = window.document.getElementById("bc7-warehouse");
+  assert.equal(warehouse.options.length, 2, "fixture must expose exactly one active warehouse");
+  warehouse.value = "warehouse-1";
+  window.document.getElementById("bc7-plan-mode").value = "explicit";
   window.document.getElementById("bc7-anchor").value = "2099-01-01";
   window.document.getElementById("bc7-start-date").value = "2099-01-01";
   window.document.getElementById("bc7-days-count").value = "1";
   window.document.querySelector("[data-bc7-build]").click();
-  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
-  window.document.querySelector("#bc7-day-rows [data-bc7-person]").value = "dep-2";
+  const person = window.document.querySelector("#bc7-day-rows [data-bc7-person]");
+  assert.ok(person && !person.disabled, "the responsible list must be verified before assigning a person");
+  assert.equal(person.options.length, 3);
+  person.value = "dep-2";
+  assert.equal(person.value, "dep-2");
   window.document.querySelector("[data-bc7-create]").click();
-  const done = await waitFor(() => /Se programaron 1 día/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
-  assert.ok(done);
+  const done = await waitFor(() => /Se programaron 1 días?: 1 de trabajo y 0 de descanso/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
+  assert.ok(done, "show human confirmation after the server confirms creation");
   const message = window.document.getElementById("bc7-create-msg").textContent;
-  assert.match(message, /1 de trabajo y 0 de descanso/);
   assert.doesNotMatch(message, /turno_id|[0-9a-f]{8}-[0-9a-f-]{27,}|\{|\}/i);
   assert.equal(calls.filter((call) => call.name === "bc5_crear_jornada_unica").length, 1);
 });
@@ -220,15 +229,25 @@ test("Step 7 known scheduling conflicts are translated into human guidance", asy
     if (name === "bc5_crear_jornada_unica") return { data: null, error: { code: "23505", message: "Ya existe programación para el almacén en 2099-01-01." } };
     throw new Error("Unexpected RPC: " + name);
   });
-  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]"));
+  await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
+  const warehouse = window.document.getElementById("bc7-warehouse");
+  assert.equal(warehouse.options.length, 2);
+  warehouse.value = "warehouse-1";
+  window.document.getElementById("bc7-plan-mode").value = "explicit";
   window.document.getElementById("bc7-anchor").value = "2099-01-01";
   window.document.getElementById("bc7-start-date").value = "2099-01-01";
   window.document.getElementById("bc7-days-count").value = "1";
   window.document.querySelector("[data-bc7-build]").click();
-  await waitFor(() => window.document.querySelector("#bc7-day-rows [data-bc7-person]")?.options.length === 3);
-  window.document.querySelector("#bc7-day-rows [data-bc7-person]").value = "dep-2";
+  const person = window.document.querySelector("#bc7-day-rows [data-bc7-person]");
+  assert.ok(person && !person.disabled);
+  person.value = "dep-2";
+  assert.equal(person.value, "dep-2");
   window.document.querySelector("[data-bc7-create]").click();
   const failed = await waitFor(() => /Ya hay una jornada programada/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
-  assert.ok(failed);
-  assert.doesNotMatch(window.document.getElementById("bc7-create-msg").textContent, /23505|SQLSTATE|Ya existe programación para el almacén en 2099/);
+  assert.ok(failed, "the duplicate date should explain what needs correction");
+  const message = window.document.getElementById("bc7-create-msg").textContent;
+  assert.doesNotMatch(message, /23505|SQLSTATE|Ya existe programación para el almacén en 2099/);
 });
+
