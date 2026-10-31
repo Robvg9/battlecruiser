@@ -181,3 +181,69 @@ test("M33 sends JORNADA sessions to the Step 7 workspace instead of legacy sessi
   assert.match(JORNADA_UI, /window\.__BC7_JORNADA__/);
   assert.match(JORNADA_UI, /openForSession:\s*async function\(sessionId\)/);
 });
+
+
+test("M33 Inventario renders opening counts, real movements, finance and pending adjustments as a read-only ledger", async (t) => {
+  const { window, rpcCalls, writeCalls, sessions } = setup(t);
+  sessions.splice(0, sessions.length, {
+    ...session("jornada-day1", 1, "2026-10-20", "JORNADA"),
+    estado: "COMPLETADA",
+    responsable_id: "owner-fixture"
+  });
+  window.client = {
+    rpc: async (name, params = {}) => {
+      rpcCalls.push({ name, params: { ...params } });
+      if (name === "bc7_obtener_inventario_jornada") {
+        return { error: null, data: {
+          productos: [{ producto_id: "product-1", nombre: "Café", unidad: "kg" }],
+          cortes: { INICIAL: {
+            id: "opening-1", estado: "CONFIRMADO", confirmado_en: "2026-10-20T07:00:00-04:00",
+            confirmado_por: "owner-fixture",
+            lineas: [{ producto_id: "product-1", cantidad_contada: 10 }]
+          } }
+        } };
+      }
+      if (name === "bc7_movimientos_sesion") {
+        return { error: null, data: [
+          { fecha: "2026-10-20T09:00:00-04:00", tipo: "compra", producto: "Café", cantidad: 5, usuario: "Responsable fixture", operacion_id: "op-buy-1" },
+          { fecha: "2026-10-20T10:00:00-04:00", tipo: "venta", producto: "Café", cantidad: -2, usuario: "Responsable fixture", operacion_id: "op-sale-1" }
+        ] };
+      }
+      if (name === "bc7_finanzas_jornada") {
+        return { error: null, data: {
+          gastos: [{ id: "expense-1", concepto: "Electricidad", monto: 20, estado: "PENDIENTE", creado_en: "2026-10-20T09:30:00-04:00", creado_nombre: "Responsable fixture" }],
+          reinversiones: [{ id: "reinvest-1", proveedor: "Proveedor", fecha: "2026-10-20T08:00:00-04:00", usuario_nombre: "Responsable fixture", lineas: [
+            { producto_id: "product-1", producto: "Café", cantidad_base: 3, costo_total: 10 }
+          ] }],
+          mermas: [{ id: "waste-1", producto: "Café", cantidad: 1, motivo: "Derrame", estado: "PENDIENTE", creado_en: "2026-10-20T10:30:00-04:00", creado_nombre: "Responsable fixture" }],
+          bajas: []
+        } };
+      }
+      return { error: { code: "UNEXPECTED_RPC", message: name }, data: null };
+    }
+  };
+  await window.__BC_M33.open("turno-closed-fixture");
+  const modal = window.document.getElementById("m33-bg");
+  modal.querySelector("#m33-next").click();
+  modal.querySelector("#m33-next").click();
+  modal.querySelector("#m33-next").click();
+  const openBook = modal.querySelector("[data-m33-inventory-sessions]");
+  assert.ok(openBook, "Inventario must show a day entry with an explicit open-book action");
+  const host = modal.querySelector("[data-m33-inventory-host]");
+  assert.ok(await waitFor(() => host.dataset.loaded === "1"), "the first day's ledger should load automatically from read-only RPCs");
+  assert.equal(host.hidden, false, "Inventory should show the first day ledger immediately without an extra click");
+  assert.match(host.textContent, /Inventario inicial confirmado/);
+  assert.match(host.textContent, /Compra \/ entrada/);
+  assert.match(host.textContent, /Venta \/ salida/);
+  assert.match(host.textContent, /Reinversión \/ entrada/);
+  assert.match(host.textContent, /Electricidad/);
+  assert.match(host.textContent, /Gasto CUP/);
+  assert.match(host.textContent, /Solicitud de merma/);
+  assert.match(host.textContent, /no descuenta stock/);
+  assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
+  assert.ok(rpcCalls.some((call) => call.name === "bc7_movimientos_sesion"));
+  assert.ok(rpcCalls.some((call) => call.name === "bc7_finanzas_jornada"));
+  assert.equal(writeCalls.length, 0, "opening and reading the day ledger must never mutate the turn");
+  assert.doesNotMatch(SOURCE, /stock_actual/, "the ledger must not mislabel current stock as historical opening stock");
+});
+

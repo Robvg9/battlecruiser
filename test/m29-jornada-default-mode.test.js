@@ -143,3 +143,47 @@ test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through
   assert.match(createdLegacy[0].inicioPlan, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(jornadaCalls.length, 0, "Plan B never creates JORNADA rows in parallel");
 });
+
+
+test("M29 loads active eligible responsables when the shared cache is empty", async (t) => {
+  const { window } = setup(t);
+  Object.defineProperty(window.navigator, "onLine", { configurable: true, value: true });
+  window._cache.usuarios = [];
+  const users = [
+    { id: "dep-3", nombre: "Dependienta 3", rol: "Dependienta", activo: true },
+    { id: "owner-2", nombre: "Dueño 2", rol: "Dueño", activo: true },
+    { id: "inactive", nombre: "Inactiva", rol: "Dependienta", activo: false },
+    { id: "other", nombre: "Almacén", rol: "Almacenero", activo: true }
+  ];
+  const staffRpcCalls = [];
+  window.client.rpc = async (name) => {
+    staffRpcCalls.push(name);
+    if (name === "listar_usuarios_admin") return { data: users, error: null };
+    throw new Error("RPC inesperada: " + name);
+  };
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")));
+  root.querySelector("#m29-btn-crear").click();
+  const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(modal);
+  const catalogLoaded = await waitFor(() => {
+    const selects = Array.from(modal.querySelectorAll("[data-m29-person]"));
+    return selects.length === 7 && selects.every((select) => select.options.length === 3);
+  }, 5000);
+  assert.ok(catalogLoaded,
+    "each of the seven day selectors must contain the three expected options; status=" +
+    (modal.querySelector("#m29-staff-status")?.textContent || "missing") +
+    "; rpc=" + staffRpcCalls.join(",") + "; online=" + window.navigator.onLine);
+  const expectedOptions = ["", "dep-3", "owner-2"];
+  const allSelections = Array.from(modal.querySelectorAll("[data-m29-person]"));
+  for (const select of allSelections) {
+    assert.deepEqual(Array.from(select.options).map((option) => option.value), expectedOptions);
+  }
+  assert.match(modal.querySelector("#m29-staff-status").textContent, /2 responsables activos disponibles/);
+  const checkbox = modal.querySelector("[data-m29-works]");
+  assert.equal(checkbox.type, "checkbox");
+  assert.match(SOURCE, /width:16px!important;height:16px!important/);
+  assert.match(SOURCE, /grid-template-columns:minmax\(100px,.7fr\) auto minmax\(190px,1.3fr\)/);
+});
+
