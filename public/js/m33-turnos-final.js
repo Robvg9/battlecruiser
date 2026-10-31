@@ -1168,12 +1168,19 @@
       var active = rows.find(function (item) { return String(item.estado || '').toUpperCase() === 'ACTIVO'; });
       if (!active || !active.id) throw new Error('No se encontró un tramo de trabajo para esta sesión.');
       await API().declararDinero(active.id,monto);
-      setLegacyCashMsg(sesionId,'Dinero entregado guardado. Consultando la confirmación del servidor…',true);
-      await load(state.turno.id);
-      renderModal();
     } catch (error) {
       setLegacyCashMsg(sesionId,'No se guardó la entrega: ' + String(error && error.message || error),false);
       if (button) button.disabled = false;
+      return;
+    }
+    setLegacyCashMsg(sesionId,'Dinero entregado confirmado por el servidor. Actualizando vista…',true);
+    try {
+      await load(state.turno.id);
+      renderModal();
+    } catch (refreshError) {
+      if (input) input.disabled = true;
+      if (button) { button.disabled = true; button.textContent = 'Entrega guardada'; }
+      setLegacyCashMsg(sesionId,'Entrega guardada en el servidor. No se pudo refrescar la pantalla; vuelve a abrir el turno para ver el estado actualizado.',true);
     }
   }
   async function cerrarSesionLegacyResponsable(sesionId, button) {
@@ -1188,12 +1195,18 @@
     try {
       if (!navigator.onLine) throw new Error('Necesitas conexión para cerrar la sesión.');
       await API().cerrarSesion(sesionId);
-      setLegacyCashMsg(sesionId,'Sesión cerrada. Verificando el estado guardado en el servidor…',true);
-      await load(state.turno.id);
-      renderModal();
     } catch (error) {
       setLegacyCashMsg(sesionId,'No se pudo cerrar la sesión: ' + String(error && error.message || error),false);
       if (button) button.disabled = false;
+      return;
+    }
+    setLegacyCashMsg(sesionId,'Cierre confirmado por el servidor. Actualizando vista…',true);
+    try {
+      await load(state.turno.id);
+      renderModal();
+    } catch (refreshError) {
+      if (button) { button.disabled = true; button.textContent = 'Sesión cerrada'; }
+      setLegacyCashMsg(sesionId,'Sesión cerrada en el servidor. No se pudo refrescar la pantalla; vuelve a abrir el turno para ver el estado actualizado.',true);
     }
   }
 
