@@ -8,7 +8,7 @@
 
   const ROOT_ID = 'ciclos-m18-root';
   const API = () => window.BattleCruiserTurnoAPI;
-  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false, staffError: '', inventoryBook: null };
+  const state = { turno: null, sesiones: [], step: 1, busy: false, isAdmin: false, readOnly: false, staffError: '', staffLoading: false, staffLoaded: false, staffRequestAttempted: false, inventoryBook: null };
   const root = () => document.getElementById(ROOT_ID);
   const esc = v => String(v == null ? '' : v).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]));
   const date = v => {
@@ -94,6 +94,7 @@
     if (response && response.error) throw response.error;
     const rows = Array.isArray(response && response.data) ? response.data : [];
     window.__BC_M29_STAFF_CACHE__ = rows;
+    window.__BC_M29_STAFF_CACHE_LOADED__ = true;
     window._cache = window._cache || {};
     window._cache.usuarios = rows;
     const result = users();
@@ -210,10 +211,18 @@
             '</label><div class="m33-muted" data-m33-readonly-assignment="' + esc(session.id) + '">' + esc(assigned) + '</div></div>';
         }).join('') + '</div>';
     }
+    if (state.staffLoading) {
+      return '<p class="m33-muted" role="status">Consultando responsables activos en el servidor…</p><p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
+    }
+    if (!state.staffLoaded) {
+      return '<p class="m33-muted" role="status">No se pudo confirmar la lista actual de responsables. ' + esc(state.staffError || 'La consulta aún no ha terminado.') + '</p>' +
+        '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Reintentar carga de responsables</button>' +
+        '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
+    }
     const us = users();
     if (!us.length) {
-      return '<p class="m33-muted">No se pudo poblar la lista de responsables. ' + esc(state.staffError || 'La consulta no devolvió personal elegible.') + '</p>' +
-        '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Reintentar carga de responsables</button>' +
+      return '<p class="m33-muted" role="status">El servidor respondió, pero no hay responsables activos elegibles para asignar.</p>' +
+        '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Actualizar responsables</button>' +
         '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
     }
     return '<p class="m33-muted">Responsable por sesión. Los cambios se guardan y verifican en el servidor.</p>' +
@@ -459,6 +468,9 @@
       const declarationFallback = [];
       let reinvestmentTotal = 0;
       let expenseTotal = 0;
+      let expensePendingTotal = 0;
+      let expenseRejectedTotal = 0;
+      let expenseOtherStatusTotal = 0;
       sessionData.forEach(function (entry) {
         const session = entry.session;
         entry.movements.forEach(function (movement) {
@@ -505,7 +517,11 @@
         });
         bookRows(finance.gastos).forEach(function (expense) {
           const amount = bookNumber(expense.monto);
-          expenseTotal += amount;
+          const expenseStatus = String(expense.estado || 'REGISTRADO').toUpperCase();
+          if (expenseStatus === 'APROBADO') expenseTotal += amount;
+          else if (expenseStatus === 'PENDIENTE') expensePendingTotal += amount;
+          else if (expenseStatus === 'RECHAZADO') expenseRejectedTotal += amount;
+          else expenseOtherStatusTotal += amount;
           expenseRows.push({
             date: expense.creado_en || session.fecha,
             concept: expense.concepto || 'Gasto operativo',
@@ -536,7 +552,7 @@
             sessionId: String(session.id),
             date: declaration.declarado_at || session.fecha,
             amount: bookNumber(declaration.monto),
-            currency: declaration.moneda || 'CUP',
+            currency: declaration.moneda || 'Sin moneda registrada',
             userId: declaration.usuario_id || (entry.inventory.sesion && entry.inventory.sesion.responsable_id) || session.usuario_id,
             status: declaration.estado_aprobacion || 'Declarado'
           });
@@ -621,6 +637,7 @@
             date: declaration.declarado_at || session.fecha,
             responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
             declared: bookNumber(declaration.monto),
+            currency: declaration.moneda || 'Sin moneda registrada',
             status: declaration.estado_aprobacion || 'Declarado',
             collected: null
           });
@@ -632,6 +649,7 @@
             date: declaration.date,
             responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
             declared: declaration.amount,
+            currency: declaration.currency || 'Sin moneda registrada',
             status: declaration.status,
             collected: null
           });
@@ -709,8 +727,11 @@
       });
       const salesApprox = !salesLines || (salesIds.size > 0 && salesLines.length === 0);
       const hasAnySalesDetail = !!salesLines && salesLines.length > 0;
-      const totalDeclared = cashRows.reduce(function (sum, row) { return sum + bookNumber(row.declared); }, 0);
-      totals.declaration = totalDeclared;
+      const declaredByCurrency = new Map();
+      cashRows.forEach(function (row) {
+        const currency = String(row.currency || 'Sin moneda registrada');
+        declaredByCurrency.set(currency, (declaredByCurrency.get(currency) || 0) + bookNumber(row.declared));
+      });
       const fmtCell = function (value, type, approximate) {
         if (value == null) return '—';
         return type === 'money' ? bookMoney(value, approximate) : bookQty(value);
@@ -764,7 +785,7 @@
       }).join('') : '<tr><td colspan="5">Sin gastos registrados.</td></tr>';
       const cashBody = cashRows.length ? cashRows.map(function (row) {
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
-          bookMoney(row.declared, false) + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
+          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>—</td><td>' + esc(row.status) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">No hay declaraciones de dinero registradas.</td></tr>';
       const pendingAdjustmentBody = pendingAdjustmentRows.length ? pendingAdjustmentRows.map(function (row) {
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.kind) + '</td><td>' + esc(row.product) +
@@ -782,13 +803,19 @@
           ? 'El ingreso procede de líneas POS históricas; la ganancia de productos sin costo FIFO completo usa un costo alternativo documentado y se marca como aproximada.'
           : 'El ingreso y la ganancia POS proceden de las líneas de venta y su costo FIFO histórico.');
       const cashNote = 'El sistema registra el dinero declarado por la responsable. La recogida física del dueño no tiene todavía un registro separado en este libro; por eso no se presenta como si ya estuviera contado.';
-      const summary = [
+      const summaryItems = [
         ['Ingreso POS', bookMoney(totals.revenue, totalsApprox)],
         ['Ganancia', bookMoney(totals.profit, totalsApprox)],
         ['Reinversiones', bookMoney(reinvestmentTotal, false)],
-        ['Gastos', bookMoney(expenseTotal, false)],
-        ['Dinero declarado', bookMoney(totalDeclared, false)]
-      ].map(function (item) {
+        ['Gastos aprobados', bookMoney(expenseTotal, false)],
+        ['Gastos pendientes', bookMoney(expensePendingTotal, false)]
+      ];
+      if (expenseRejectedTotal > 0) summaryItems.push(['Gastos rechazados', bookMoney(expenseRejectedTotal, false)]);
+      if (expenseOtherStatusTotal > 0) summaryItems.push(['Gastos · otros estados', bookMoney(expenseOtherStatusTotal, false)]);
+      declaredByCurrency.forEach(function (amount, currency) {
+        summaryItems.push(['Dinero declarado · ' + currency, bookMoney(amount, false) + (currency === 'Sin moneda registrada' ? '' : ' ' + currency)]);
+      });
+      const summary = summaryItems.map(function (item) {
         return '<div class="m33-book-metric"><small>' + item[0] + '</small><b>' + item[1] + '</b></div>';
       }).join('');
       const notes = [snapshotNote, salesNote, cashNote].filter(Boolean).map(function (item) {
@@ -801,7 +828,8 @@
         '</tbody><tfoot>' + totalMarkup + '</tfoot></table></div></section>' +
         '<div class="m33-book-subtables">' +
         '<section class="m33-book-section"><h4>Reinversiones detalladas · ' + bookMoney(reinvestmentTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Producto</th><th>Uds.</th><th>P.C.</th><th>Inversión</th><th>Responsable</th></tr></thead><tbody>' + reinvestmentBody + '</tbody></table></div></section>' +
-        '<section class="m33-book-section"><h4>Gastos · ' + bookMoney(expenseTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
+        '<section class="m33-book-section"><h4>Gastos aprobados · ' + bookMoney(expenseTotal, false) +
+        ' · pendientes ' + bookMoney(expensePendingTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
         '</div>' +
         '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Recogido por dueño</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
         '<section class="m33-book-section"><h4>Solicitudes de merma y baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
@@ -1291,14 +1319,17 @@
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
       return;
     }
-    if (state.step === 2 && !state.readOnly && !users().length && !state.staffLoading) {
+    if (state.step === 2 && !state.readOnly && !state.staffRequestAttempted) {
+      state.staffRequestAttempted = true;
       state.staffLoading = true;
       state.staffError = 'Cargando responsables…';
       ensureAssignmentUsers(true).then(function () {
+        state.staffLoaded = true;
         state.staffLoading = false;
         state.staffError = '';
         renderModal();
       }).catch(function (error) {
+        state.staffLoaded = false;
         state.staffLoading = false;
         state.staffError = String(error && error.message ? error.message : error);
         renderModal();
@@ -1319,10 +1350,18 @@
       bindAssignmentAutosave();
       const retryStaff = ov.querySelector('[data-m33-reload-staff]');
       if (retryStaff) retryStaff.addEventListener('click', async function () {
-        retryStaff.disabled = true;
+        state.staffRequestAttempted = true;
+        state.staffLoading = true;
+        state.staffLoaded = false;
         state.staffError = '';
-        try { await ensureAssignmentUsers(true); }
-        catch (error) { state.staffError = String(error && error.message ? error.message : error); }
+        renderModal();
+        try {
+          await ensureAssignmentUsers(true);
+          state.staffLoaded = true;
+        } catch (error) {
+          state.staffError = String(error && error.message ? error.message : error);
+        }
+        state.staffLoading = false;
         renderModal();
       });
     }
@@ -1340,6 +1379,9 @@
     state.busy = true;
     state.readOnly = !!(options && options.readOnly === true);
     state.staffError = '';
+    state.staffLoading = false;
+    state.staffLoaded = false;
+    state.staffRequestAttempted = false;
     await resolveAdmin();
     const ov = document.createElement('div'); ov.id = 'm33-bg'; ov.className = 'm33-bg'; ov.innerHTML = '<div class="m33-modal"><div class="m33-body">Cargando…</div></div>'; document.body.appendChild(ov);
     try { await load(id); state.busy = false; renderModal(); }
