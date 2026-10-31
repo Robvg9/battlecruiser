@@ -1166,7 +1166,6 @@
       var tramos = await API().listarTramosSesion(sesionId);
       var rows = Array.isArray(tramos) ? tramos : [];
       var active = rows.find(function (item) { return String(item.estado || '').toUpperCase() === 'ACTIVO'; });
-      if (!active && rows.length) active = rows[rows.length - 1];
       if (!active || !active.id) throw new Error('No se encontró un tramo de trabajo para esta sesión.');
       await API().declararDinero(active.id,monto);
       setLegacyCashMsg(sesionId,'Dinero entregado guardado. Consultando la confirmación del servidor…',true);
