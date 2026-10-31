@@ -14,13 +14,21 @@ const sw = read("public/service-worker.js");
 const account = read("public/js/mi-cuenta.js");
 
 test("Step 8 release version is aligned across the PWA and Service Worker shell", () => {
-  assert.match(index, /href="style\.css\?v=9\.5\.38"/);
-  assert.match(index, /v9\.5\.38 — BattleCruiser/);
-  assert.match(index, /app\.js\?v=9\.5\.38/);
-  assert.match(app, /const VERSION=["']9\.5\.38["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.38["']/);
-  assert.match(sw, /\.\/style\.css/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.5/);
+  const appVersion = app.match(/const VERSION="([^"]+)"/);
+  const workerVersion = sw.match(/BC_SW_VERSION = "([^"]+)"/);
+  assert.ok(appVersion && workerVersion);
+  assert.equal(workerVersion[1], appVersion[1]);
+  assert.ok(index.includes('href="style.css?v=' + appVersion[1] + '"'));
+  assert.ok(index.includes('v' + appVersion[1] + ' — BattleCruiser'));
+  assert.ok(index.includes('app.js?v=' + appVersion[1]));
+  assert.ok(sw.includes("./style.css"));
+  const marker = '["bc7-jornada-ui.js","';
+  const start = app.indexOf(marker);
+  assert.ok(start >= 0, "Step 7 UI module must be registered");
+  const valueStart = start + marker.length;
+  const end = app.indexOf('"', valueStart);
+  const moduleVersion = app.slice(valueStart, end);
+  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
 });
 
 test("Mobile footer stays in document flow and respects safe-area/real viewport height", () => {

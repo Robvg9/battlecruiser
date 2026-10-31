@@ -14,6 +14,10 @@ const M29_SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "m29-turnos-organizacion.js"),
   "utf8"
 );
+const JORNADA_UI = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "bc7-jornada-ui.js"),
+  "utf8"
+);
 
 async function waitFor(predicate, timeout = 2000) {
   const deadline = Date.now() + timeout;
@@ -167,4 +171,13 @@ test("Paso 4: un expediente histórico de dependienta no permite abrir sesiones 
   assert.equal(modal.querySelector("[data-m33-abrir-sesion]"), null,
     "el modo histórico debe ocultar Abrir sesión incluso si el estado de una sesión está pendiente");
   assert.equal(writeCalls.length, 0);
+});
+
+test("M33 sends JORNADA sessions to the Step 7 workspace instead of legacy session opening", () => {
+  assert.match(SOURCE, /data-m33-abrir-jornada/);
+  assert.match(SOURCE, /window\.__BC7_JORNADA__/);
+  assert.match(SOURCE, /openForSession\(sesionId\)/);
+  assert.match(SOURCE, /data-m33-abrir-sesion/);
+  assert.match(JORNADA_UI, /window\.__BC7_JORNADA__/);
+  assert.match(JORNADA_UI, /openForSession:\s*async function\(sessionId\)/);
 });

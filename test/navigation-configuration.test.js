@@ -232,7 +232,7 @@ test("app shell, application and Service Worker share 9.5.38 and load refreshed 
   assert.match(index, /href="style\.css\?v=9\.5\.38"/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.5"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.5"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.6"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);

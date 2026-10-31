@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.1 — usa contratos bc5_* + bc7_*; no borra ni reescribe históricos de ventas.
+// v7.2 — puente de sesión M33 y contratos bc5_* + bc7_*; conserva históricos de ventas.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -288,14 +288,14 @@
     const cuts=detail.cortes||{};
     const initial=!!cuts.INICIAL,final=!!cuts.FINAL;
     const status=String(s.estado||'').toUpperCase();
-    const isAssigned=!state.admin||String(currentUser()?.id||'')===String(s.responsable_id||'');
+    const isAssigned=String(currentUser()?.id||'')===String(s.responsable_id||'');
     let actionArea='';
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
-      actionArea='<div class="bc7-card"><h4>Iniciar jornada</h4><p class="bc7-muted">El backend comprobará la fecha, el responsable asignado, la secuencia y las excepciones horarias.</p><label class="bc7-field">Motivo si abres antes/después de la hora prevista<input id="bc7-start-reason" maxlength="1000" placeholder="Deja vacío si abres exactamente a la hora programada"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Confirmar apertura</button></div><p class="bc7-msg" id="bc7-start-msg"></p></div>';
+      actionArea='<div class="bc7-card"><h4>Comenzar jornada</h4><p class="bc7-muted">El backend comprobará la fecha, el responsable asignado, la secuencia y las excepciones horarias.</p><label class="bc7-field">Motivo si abres antes/después de la hora prevista<input id="bc7-start-reason" maxlength="1000" placeholder="Deja vacío si abres exactamente a la hora programada"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></div>';
     } else if(status==='EN_CURSO'){
       const tramo=detail.tramo_activo;
       const savedDeclaration=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
-      actionArea='<div class="bc7-card"><h4>Declaración de dinero y cierre</h4><p class="bc7-muted">'+(savedDeclaration?'La declaración de este tramo ya está guardada; no se repetirá al reintentar el cierre.':'Introduce el efectivo real entregado, incluidos los valores cero si no hubo efectivo.')+' El cierre mantiene la validación y aprobación existentes.</p><form data-bc7-close-form="'+esc(s.id)+'"><label class="bc7-field">Dinero declarado<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(savedDeclaration?esc(detail.declaracion_dinero.monto):'')+'" '+(savedDeclaration?'readonly':'')+'></label><label class="bc7-field">Motivo si cierras antes/después de hora o fecha<input id="bc7-close-reason" maxlength="1000" placeholder="Motivo de excepción (si aplica)"></label><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(savedDeclaration?'Cerrar jornada con declaración guardada':'Declarar dinero y cerrar jornada')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-note">El cierre está bloqueado hasta confirmar el inventario final.</p>')+'</form></div>';
+      actionArea='<div class="bc7-card"><h4>Finalizar jornada</h4><p class="bc7-muted">'+(savedDeclaration?'La declaración de este tramo ya está guardada; no se repetirá al reintentar el cierre.':'Introduce el efectivo real entregado, incluidos los valores cero si no hubo efectivo.')+' El cierre mantiene la validación y aprobación existentes.</p><form data-bc7-close-form="'+esc(s.id)+'"><label class="bc7-field">Dinero declarado<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(savedDeclaration?esc(detail.declaracion_dinero.monto):'')+'" '+(savedDeclaration?'readonly':'')+'></label><label class="bc7-field">Motivo si cierras antes/después de hora o fecha<input id="bc7-close-reason" maxlength="1000" placeholder="Motivo de excepción (si aplica)"></label><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(savedDeclaration?'Finalizar jornada con declaración guardada':'Declarar dinero y finalizar jornada')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-note">El cierre está bloqueado hasta confirmar el inventario final.</p>')+'</form></div>';
     } else if(status==='COMPLETADA'){
       actionArea='<div class="bc7-note">Jornada completada. Los conteos confirmados y los movimientos permanecen como evidencia histórica.</div>';
     } else {
@@ -317,8 +317,10 @@
     loadMovements(detail);
   }
   async function openWorkspace(sessionId){
+    if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
     $('bc7-workspace').hidden=false;$('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada y conteos confirmados…</div>';
-    try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);}catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">No se pudo abrir esta jornada: '+esc(e.message)+'</div>';}
+    try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);return true;}
+    catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">No se pudo abrir esta jornada: '+esc(e.message)+'</div>';return false;}
   }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
@@ -360,9 +362,40 @@
       const reason=$('bc7-start-reason')?.value||null;
       if(!confirm('¿Confirmas abrir esta jornada ahora? La fecha, la asignación y la secuencia volverán a validarse en el servidor.'))return;
       await rpc('bc5_iniciar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:reason});
-      await refreshPosArchiveAfterSessionStart();
-      await loadCalendar();await openWorkspace(sessionId);setStatus('Jornada abierta; estado releído del backend.','ok');
-    }catch(e){msg($('bc7-start-msg'),'No se abrió la jornada: '+e.message,'error');}
+      let archiveRefreshFailed=false;
+      try{await refreshPosArchiveAfterSessionStart();}catch(e){archiveRefreshFailed=true;}
+      await loadCalendar();
+      const reread=await openWorkspace(sessionId);
+      if(!reread){
+        setStatus('La solicitud de inicio fue aceptada, pero no se pudo releer el estado. Actualiza antes de repetir la operación.','error');
+        return;
+      }
+      const currentState=String(state.detail?.sesion?.estado||'').toUpperCase();
+      if(currentState!=='EN_CURSO'){
+        setStatus('La respuesta de inicio llegó, pero el estado releído es '+(currentState||'desconocido')+'. No se confirma el inicio.','error');
+        return;
+      }
+      setStatus(archiveRefreshFailed
+        ? 'Jornada iniciada y estado EN_CURSO confirmado; no se pudo actualizar el archivo POS.'
+        : 'Jornada iniciada: estado EN_CURSO confirmado al releer el servidor.','ok');
+    }catch(e){
+      const errorText='La respuesta del inicio no fue concluyente: '+e.message+'. Se consultará el estado real antes de permitir otro intento.';
+      try{
+        const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
+        renderWorkspace(d);
+        const rereadState=String(d?.sesion?.estado||'').toUpperCase();
+        if(rereadState==='EN_CURSO'){
+          await loadCalendar();
+          setStatus('Inicio confirmado al releer el servidor: la jornada ya está EN_CURSO. No se repitió la escritura.','ok');
+        }else{
+          setStatus('El servidor aún no confirma el inicio. Estado releído: '+(rereadState||'desconocido')+'.','error');
+          msg($('bc7-start-msg'),errorText,'error');
+        }
+      }catch(x){
+        setStatus('No se pudo confirmar el estado del inicio por falta de lectura del servidor. No repitas la escritura todavía.','error');
+        msg($('bc7-start-msg'),errorText+' También falló la relectura: '+x.message,'error');
+      }
+    }
     finally{busy(btn,false);}
   }
   async function closeSession(form){
@@ -380,11 +413,36 @@
     try{
       if(!saved) await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:Number(amount)});
       await rpc('bc5_cerrar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:$('bc7-close-reason')?.value||null});
-      await loadCalendar();await openWorkspace(sessionId);setStatus('Cierre ejecutado y estado releído del backend.','ok');
+      await loadCalendar();
+      const reread=await openWorkspace(sessionId);
+      if(!reread){
+        setStatus('La solicitud de cierre fue aceptada, pero no se pudo releer el resumen. Actualiza antes de repetir cualquier operación.','error');
+        return;
+      }
+      const finalState=String(state.detail?.sesion?.estado||'').toUpperCase();
+      if(finalState!=='COMPLETADA'){
+        setStatus('La respuesta de cierre llegó, pero el estado releído es '+(finalState||'desconocido')+'. No se confirma el cierre final.','error');
+        return;
+      }
+      setStatus('Cierre confirmado: estado COMPLETADA y resumen releído del servidor.','ok');
     }catch(e){
-      const errorText='No se completó el cierre: '+e.message+'. La pantalla releerá el estado antes de permitir otro intento.';
-      try{const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});renderWorkspace(d);msg(document.querySelector('[data-bc7-close-msg]'),errorText,'error');}
-      catch(x){msg(form.querySelector('[data-bc7-close-msg]'),errorText,'error');}
+      const errorText='La respuesta del cierre no fue concluyente: '+e.message+'. Se consultará el estado real antes de permitir otro intento.';
+      try{
+        const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
+        renderWorkspace(d);
+        const rereadState=String(d?.sesion?.estado||'').toUpperCase();
+        if(rereadState==='COMPLETADA'){
+          await loadCalendar();
+          setStatus('Cierre confirmado al releer el servidor: la jornada ya está COMPLETADA. No se repitió la escritura.','ok');
+        }else{
+          setStatus('El servidor aún no confirma el cierre. Estado releído: '+(rereadState||'desconocido')+'.','error');
+          const currentMsg=document.querySelector('[data-bc7-close-msg]')||msgEl;
+          msg(currentMsg,errorText,'error');
+        }
+      }catch(x){
+        setStatus('No se pudo confirmar el estado del cierre por falta de lectura del servidor. No repitas la escritura todavía.','error');
+        msg(form.querySelector('[data-bc7-close-msg]')||msgEl,errorText+' También falló la relectura: '+x.message,'error');
+      }
     }
     finally{busy(btn,false);}
   }
@@ -526,6 +584,14 @@
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
+  window.__BC7_JORNADA__ = {
+    openWorkspace: openWorkspace,
+    openForSession: async function(sessionId) {
+      if (!sessionId) return false;
+      navTo('jornada');
+      return openWorkspace(sessionId);
+    }
+  };
   document.addEventListener('click',function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,.tab-btn[data-tab="jornada"]'):null;if(!t)return;
     if(t.id==='bc7-warehouse-retry'){e.preventDefault();ensureWarehouseCatalog();return;}

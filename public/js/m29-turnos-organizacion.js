@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.15';
+  var VERSION = '29.16';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -114,6 +114,12 @@
       '.m29-actions .ok{background:#2563eb;color:#fff}',
       '.m29-msg{font-size:.85rem;margin-top:8px;min-height:1.2em}',
       '.m29-msg.error{color:#f87171}',
+      '.m29-create-day{display:grid;grid-template-columns:minmax(130px,1fr) minmax(110px,.7fr) minmax(150px,1.3fr);gap:8px;align-items:center;padding:9px;margin:7px 0;border:1px solid rgba(255,255,255,.10);border-radius:8px}',
+      '.m29-create-day label{display:flex;flex-direction:column;gap:4px;font-size:12px;opacity:.85}',
+      '.m29-create-day select{min-width:0;width:100%;padding:8px;border:1px solid rgba(255,255,255,.14);border-radius:6px;background:#17212b;color:inherit}',
+      '.m29-create-day .m29-create-check{flex-direction:row;align-items:center}',
+      '.m29-create-summary{padding:10px;margin-top:8px;border:1px solid rgba(201,162,77,.2);border-radius:8px;font-size:12px;line-height:1.6}',
+      '@media(max-width:560px){.m29-create-day{grid-template-columns:1fr}.m29-create-day .m29-create-check{margin:2px 0}}',
       '[' + HOME_MARK + '="1"] #m24-asig-panel,[' + HOME_MARK + '="1"] #m22-sesiones-panel,.m33-home{display:none!important}'
     ].join('');
     document.head.appendChild(s);
@@ -394,6 +400,118 @@
     var ov = document.getElementById('m29-crear-overlay');
     if (ov) ov.remove();
   }
+  function eligibleStaff() {
+    var rows = ((_cache && _cache.usuarios) || []);
+    return rows.filter(function (u) {
+      if (!u || u.activo === false || u.archivado) return false;
+      var role = String(u.rol || u.role_name || u.nombre_rol || u.role || '').toLowerCase();
+      return role.indexOf('dependienta') >= 0 || role.indexOf('due') === 0;
+    });
+  }
+  function staffOptions(selected) {
+    var people = eligibleStaff();
+    return '<option value="">Selecciona responsable</option>' + people.map(function (u) {
+      var name = u.nombre || u.nombre_usuario || u.email || u.id;
+      return '<option value="' + esc(u.id) + '"' +
+        (String(u.id) === String(selected || '') ? ' selected' : '') + '>' + esc(name) + '</option>';
+    }).join('');
+  }
+  function readCreateRows() {
+    var host = document.getElementById('m29-create-days');
+    if (!host) return [];
+    var legacy = host.dataset.mode === 'legacy';
+    return Array.prototype.map.call(host.querySelectorAll('[data-m29-day]'), function (row) {
+      if (legacy) {
+        return {
+          numero_dia: Number(row.dataset.m29Day),
+          manana: (row.querySelector('[data-m29-manana]') || {}).value || '',
+          tarde: (row.querySelector('[data-m29-tarde]') || {}).value || ''
+        };
+      }
+      var works = !!(row.querySelector('[data-m29-works]') || {}).checked;
+      return {
+        numero_dia: Number(row.dataset.m29Day),
+        trabaja: works,
+        responsable_id: works ? ((row.querySelector('[data-m29-person]') || {}).value || '') : ''
+      };
+    });
+  }
+  function buildCreateRows() {
+    var host = document.getElementById('m29-create-days');
+    if (!host) return;
+    var n = Math.max(1, Math.min(31, parseInt((document.getElementById('m29-dias') || {}).value, 10) || 7));
+    var inicio = (document.getElementById('m29-inicio') || {}).value || '';
+    var legacy = host.dataset.mode === 'legacy';
+    var old = readCreateRows();
+    host.innerHTML = Array.from({ length: n }, function (_, i) {
+      var dateValue = inicio ? new Date(inicio + 'T12:00:00').toLocaleDateString('es-ES') : 'Fecha pendiente';
+      if (inicio) {
+        var d = new Date(inicio + 'T12:00:00');
+        d.setDate(d.getDate() + i);
+        dateValue = d.toLocaleDateString('es-ES');
+      }
+      var prev = old[i] || {};
+      if (legacy) {
+        return '<div class="m29-create-day" data-m29-day="' + (i + 1) + '">' +
+          '<strong>Día ' + (i + 1) + ' · ' + esc(dateValue) + '</strong>' +
+          '<label>Mañana<select data-m29-manana>' + staffOptions(prev.manana) + '</select></label>' +
+          '<label>Tarde<select data-m29-tarde>' + staffOptions(prev.tarde) + '</select></label></div>';
+      }
+      var works = prev.trabaja !== false;
+      return '<div class="m29-create-day" data-m29-day="' + (i + 1) + '">' +
+        '<strong>Día ' + (i + 1) + ' · ' + esc(dateValue) + '</strong>' +
+        '<label class="m29-create-check"><input type="checkbox" data-m29-works ' + (works ? 'checked' : '') + '> Trabaja</label>' +
+        '<label>Responsable<select data-m29-person ' + (!works ? 'disabled' : '') + '>' + staffOptions(prev.responsable_id) + '</select></label></div>';
+    }).join('');
+    host.querySelectorAll('[data-m29-works]').forEach(function (checkbox) {
+      checkbox.addEventListener('change', function () {
+        var select = checkbox.closest('[data-m29-day]').querySelector('[data-m29-person]');
+        if (select) {
+          select.disabled = !checkbox.checked;
+          if (!checkbox.checked) select.value = '';
+        }
+        renderCreateSummary();
+      });
+    });
+    host.querySelectorAll('select').forEach(function (select) {
+      select.addEventListener('change', renderCreateSummary);
+    });
+    renderCreateSummary();
+  }
+  function toggleCreateMode() {
+    var host = document.getElementById('m29-create-days');
+    var button = document.getElementById('m29-toggle-plan-b');
+    var legacy = !!(host && host.dataset.mode !== 'legacy');
+    if (!host || !button) return;
+    host.dataset.mode = legacy ? 'legacy' : 'jornada';
+    button.textContent = legacy ? 'Volver a Jornada completa' : 'Plan alternativo: dividir en Mañana y Tarde';
+    var label = document.getElementById('m29-mode-label');
+    if (label) label.textContent = legacy
+      ? 'Plan alternativo · sesiones independientes por bloque'
+      : 'Jornada completa · una persona responsable por día';
+    buildCreateRows();
+  }
+  function renderCreateSummary() {
+    var host = document.getElementById('m29-create-days');
+    var summary = document.getElementById('m29-create-summary');
+    if (!host || !summary) return;
+    var rows = readCreateRows();
+    if (host.dataset.mode === 'legacy') {
+      summary.innerHTML = rows.map(function (r) {
+        var morning = eligibleStaff().find(function (u) { return String(u.id) === String(r.manana); });
+        var afternoon = eligibleStaff().find(function (u) { return String(u.id) === String(r.tarde); });
+        return '<div>Día ' + r.numero_dia + ' · Mañana: ' + esc(morning ? (morning.nombre || morning.nombre_usuario || morning.id) : 'Sin asignar') +
+          ' · Tarde: ' + esc(afternoon ? (afternoon.nombre || afternoon.nombre_usuario || afternoon.id) : 'Sin asignar') + '</div>';
+      }).join('');
+    } else {
+      summary.innerHTML = rows.map(function (r) {
+        var person = eligibleStaff().find(function (u) { return String(u.id) === String(r.responsable_id); });
+        return '<div>Día ' + r.numero_dia + ' · ' + (r.trabaja
+          ? esc(person ? (person.nombre || person.nombre_usuario || person.id) : 'Responsable pendiente')
+          : 'Descanso') + '</div>';
+      }).join('');
+    }
+  }
   function openCrearModal() {
     if (!state.isAdmin) return;
     closeCrearModal();
@@ -405,24 +523,79 @@
     var ov = document.createElement('div');
     ov.id = 'm29-crear-overlay';
     ov.className = 'm29-overlay';
-    ov.innerHTML = '<div class="m29-modal"><h3>Crear Turno</h3><div class="m29-field"><label>Almacén</label><select id="m29-almacen">' + opts + '</select></div><div class="m29-field"><label>Fecha inicio</label><input type="date" id="m29-inicio" value="' + hoy + '"></div><div class="m29-field"><label>Días (1-31)</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div><div class="m29-msg" id="m29-modal-msg"></div><div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear">Crear</button></div></div>';
+    ov.innerHTML = '<div class="m29-modal"><h3>Crear Turno</h3>' +
+      '<div class="m29-field"><label>Almacén</label><select id="m29-almacen">' + opts + '</select></div>' +
+      '<div class="m29-field"><label>Fecha inicial</label><input type="date" id="m29-inicio" value="' + hoy + '"></div>' +
+      '<div class="m29-field"><label>Días (1–31)</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div>' +
+      '<p id="m29-mode-label">Jornada completa · una persona responsable por día</p>' +
+      '<button type="button" class="m29-btn-refresh" id="m29-toggle-plan-b">Plan alternativo: dividir en Mañana y Tarde</button>' +
+      '<div id="m29-create-days" data-mode="jornada"></div>' +
+      '<div class="m29-create-summary"><strong>Resumen antes de crear</strong><div id="m29-create-summary"></div></div>' +
+      '<div class="m29-msg" id="m29-modal-msg"></div>' +
+      '<div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear">Crear turno</button></div></div>';
     document.body.appendChild(ov);
     document.getElementById('m29-cancel-crear').onclick = closeCrearModal;
+    document.getElementById('m29-toggle-plan-b').onclick = toggleCreateMode;
+    document.getElementById('m29-inicio').addEventListener('change', buildCreateRows);
+    document.getElementById('m29-dias').addEventListener('change', buildCreateRows);
     document.getElementById('m29-confirm-crear').onclick = confirmCrear;
+    buildCreateRows();
   }
   async function confirmCrear() {
     if (!state.isAdmin) return;
-    var api = API();
-    if (!api || !api.crearTurno) { setModalMsg('API no disponible', false); return; }
     if (offlineNow()) { setModalMsg('Requiere conexión', false); return; }
     var alm = (document.getElementById('m29-almacen') || {}).value;
     var inicio = (document.getElementById('m29-inicio') || {}).value;
     var dias = parseInt((document.getElementById('m29-dias') || {}).value, 10);
-    if (!alm || !inicio || !Number.isFinite(dias) || dias < 1) { setModalMsg('Completa los datos', false); return; }
+    var host = document.getElementById('m29-create-days');
+    if (!alm || !inicio || !Number.isFinite(dias) || dias < 1 || dias > 31 || !host) {
+      setModalMsg('Completa los datos del turno.', false); return;
+    }
+    var rows = readCreateRows();
+    var legacy = host.dataset.mode === 'legacy';
+    var assignments = [];
+    var schedule = [];
+    if (legacy) {
+      rows.forEach(function (r) {
+        if (r.manana) assignments.push({ numero_dia: r.numero_dia, bloque: 'MANANA', usuario_id: r.manana });
+        if (r.tarde) assignments.push({ numero_dia: r.numero_dia, bloque: 'TARDE', usuario_id: r.tarde });
+      });
+      if (!assignments.length) { setModalMsg('Asigna al menos una sesión de Mañana o Tarde.', false); return; }
+    } else {
+      schedule = rows.map(function (r) {
+        return { numero_dia: r.numero_dia, trabaja: r.trabaja, responsable_id: r.trabaja ? (r.responsable_id || null) : null };
+      });
+      var missing = schedule.find(function (r) { return r.trabaja && !r.responsable_id; });
+      if (missing) { setModalMsg('Falta responsable en el Día ' + missing.numero_dia + '.', false); return; }
+      if (schedule.some(function (r) { return !r.trabaja && r.responsable_id; })) {
+        setModalMsg('Los días de descanso no pueden tener responsable.', false); return;
+      }
+    }
+    var summaryText = legacy
+      ? 'Se crearán ' + dias + ' fechas con sesiones MANANA/TARDE según las asignaciones. No se crearán jornadas completas.'
+      : 'Se crearán ' + schedule.filter(function (r) { return r.trabaja; }).length + ' jornadas completas y ' +
+        schedule.filter(function (r) { return !r.trabaja; }).length + ' descansos. Cada día laborable tendrá una sola persona responsable.';
+    if (!window.confirm(summaryText + ' ¿Confirmas?')) return;
     var btn = document.getElementById('m29-confirm-crear');
     if (btn) btn.disabled = true;
     try {
-      await api.crearTurno({ almacenId: alm, inicioPlan: inicio, cantidadDias: dias, asignaciones: [] });
+      if (legacy) {
+        var api = API();
+        if (!api || !api.crearTurno) throw new Error('API de Turnos no disponible.');
+        await api.crearTurno({ almacenId: alm, inicioPlan: inicio, cantidadDias: dias, asignaciones: assignments });
+      } else {
+        if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
+          throw new Error('Cliente Supabase no disponible.');
+        }
+        var response = await client.rpc('bc5_crear_jornada_unica', {
+          p_almacen_id: alm,
+          p_fecha_inicio: inicio,
+          p_dias: dias,
+          p_programacion: schedule,
+          p_observacion: 'Creado desde Turnos · Jornada completa'
+        });
+        if (response && response.error) throw new Error(response.error.message || 'El backend rechazó la jornada.');
+      }
       closeCrearModal();
       await renderHome();
     } catch (e) {

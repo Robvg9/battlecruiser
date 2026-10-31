@@ -79,7 +79,9 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"), 'the recovery control must be available in the offline shell');
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.7"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
-  assert.ok(app.includes('["m33-turnos-final.js","33.11"]'), 'the turn detail modal cache key must load the audited recovery action');
+  assert.ok(app.includes('["m33-turnos-final.js","33.12"]'), 'the turn detail modal cache key must load the audited recovery action');
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.16"]'), 'M29 full-day default flow must be loaded dynamically');
+  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.16"), 'M29 full-day default flow must be available offline');
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
@@ -126,7 +128,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.5"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.6"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.31"\]/);
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
   assert.match(index, /<script src="js\/productos\.js\?v=20261015\.1"><\/script>/);
@@ -142,7 +144,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="app\.js\?v=9\.5\.38"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.5/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.6/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
@@ -163,8 +165,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   const assets = [
     "./js/turno-api.js?v=9.4.7",
     "./js/turnos-maestro.js?v=9.4.3",
-    "./js/m29-turnos-organizacion.js?v=29.15",
-    "./js/m33-turnos-final.js?v=33.11",
+    "./js/m29-turnos-organizacion.js?v=29.16",
+    "./js/m33-turnos-final.js?v=33.12",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
     "./js/m51-movimientos-centro.js?v=51.4",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
@@ -173,8 +175,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   for (const key of [
     '["turno-api.js","9.4.7"]',
     '["turnos-maestro.js","9.4.3"]',
-    '["m29-turnos-organizacion.js","29.15"]',
-    '["m33-turnos-final.js","33.11"]',
+    '["m29-turnos-organizacion.js","29.16"]',
+    '["m33-turnos-final.js","33.12"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
     '["m51-movimientos-centro.js","51.4"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
