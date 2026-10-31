@@ -449,7 +449,7 @@
   function staffRole(user) {
     var value = user && (user.rol || user.nombre_rol || user.role_name || user.role);
     if (value && typeof value === 'object') value = value.nombre || value.name || value.rol || value.role_name;
-    return String(value || '').toLowerCase().trim().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+    return String(value || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
   function staffIsEligible(user) {
     if (!user || !user.id) return false;
