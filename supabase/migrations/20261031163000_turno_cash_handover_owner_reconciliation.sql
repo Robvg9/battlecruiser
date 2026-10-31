@@ -188,7 +188,7 @@ BEGIN
     );
   END IF;
 
-  IF v_d.estado_aprobacion NOT IN ('PENDIENTE','ESPERANDO_APROBACION') THEN
+  IF coalesce(v_d.estado_aprobacion,'') NOT IN ('PENDIENTE','ESPERANDO_APROBACION') THEN
     RAISE EXCEPTION 'La declaración no está pendiente de conteo.' USING ERRCODE='23514';
   END IF;
 
@@ -289,6 +289,9 @@ BEGIN
   END IF;
   IF s.estado<>'COMPLETADA' THEN
     RAISE EXCEPTION 'La declaración solo puede aprobarse cuando la sesión esté terminada.' USING ERRCODE='P0001';
+  END IF;
+  IF coalesce(d.estado_aprobacion,'') NOT IN ('PENDIENTE','ESPERANDO_APROBACION') THEN
+    RAISE EXCEPTION 'La declaración no está disponible para aprobación.' USING ERRCODE='23514';
   END IF;
 
   IF public.bc_actor_is_admin() THEN
