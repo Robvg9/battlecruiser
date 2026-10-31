@@ -4,7 +4,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql'
-      - 'supabase/migrations/20261030160000_step7_jornada_finanzas_carryforward.sql'
+      - 'supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql'
       - 'test/step7-jornada-finanzas-fixture.sql'
       - 'test/step7-jornada-finanzas-contract.sql'
       - 'test/step7-jornada-finanzas-carryforward.test.js'
