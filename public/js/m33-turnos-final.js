@@ -249,6 +249,7 @@
     const group = button.closest('.m33-inventory-day');
     const host = group && group.querySelector('[data-m33-inventory-host]');
     if (!host) return;
+    if (button.dataset.m33InventoryLoading === '1') return;
     if (host.dataset.loaded === '1') {
       host.hidden = !host.hidden;
       button.setAttribute('aria-expanded', host.hidden ? 'false' : 'true');
@@ -257,6 +258,7 @@
     host.hidden = false;
     button.setAttribute('aria-expanded', 'true');
     button.disabled = true;
+    button.dataset.m33InventoryLoading = '1';
     host.innerHTML = '<div class="m33-archive-empty">Consultando el libro de inventario…</div>';
     const ids = String(button.dataset.m33InventorySessions || '').split('|').filter(Boolean);
     const sessionsById = new Map((state.sesiones || []).map(function (session) { return [String(session.id), session]; }));
@@ -398,6 +400,7 @@
         esc(error && error.message ? error.message : error) + '. No se han modificado datos.</div>';
     } finally {
       button.disabled = false;
+      delete button.dataset.m33InventoryLoading;
     }
   }
   function inventoryUserLabel(id) {
@@ -676,7 +679,11 @@
     var save = ov.querySelector('#m33-save'); if (save) save.onclick = saveAssignments;
     if (state.step === 2 && !state.readOnly) bindAssignmentAutosave();
     if (state.step === 3) bindArchiveButtons(ov);
-    if (state.step === 4) bindInventoryButtons(ov);
+    if (state.step === 4) {
+      bindInventoryButtons(ov);
+      const firstInventoryDay = ov.querySelector('[data-m33-inventory-sessions]');
+      if (firstInventoryDay) loadInventoryDay(firstInventoryDay);
+    }
   }
 
   async function open(id, options) {
