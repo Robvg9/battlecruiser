@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.17 — progreso real del turno y libro Excel compartido por rol
+// v33.18 — jornadas diarias agrupadas y revisión administrativa
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -221,10 +221,77 @@
 
   function labelBloque(b) {
     var s = String(b || '').toUpperCase();
-    if (s === 'MANANA' || s === 'MAÑANA') return 'Mañana';
-    if (s === 'TARDE') return 'Tarde';
-    if (s === 'JORNADA') return 'Jornada completa';
+    if (s === 'MANANA' || s === 'MAÑANA' || s === 'TARDE' || s === 'JORNADA') return 'Jornada diaria';
     return b || '-';
+  }
+  function activeSession(session) {
+    var status = normEstadoSesion(session && session.estado);
+    return status !== 'CANCELADA' && status !== 'CANCELADO';
+  }
+  function dailySessionGroups(sessions) {
+    var map = Object.create(null);
+    (sessions || []).filter(activeSession).forEach(function (session) {
+      var day = session.numero_dia || session.dia_n || '—';
+      var dayDate = String(session.fecha || '').slice(0, 10);
+      var key = String(day) + '|' + dayDate;
+      if (!map[key]) map[key] = { day: day, date: dayDate, sessions: [] };
+      map[key].sessions.push(session);
+    });
+    return Object.keys(map).map(function (key) { return map[key]; }).sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date)) || Number(a.day) - Number(b.day);
+    });
+  }
+  function dailyAssignedId(group) {
+    var ids = Array.from(new Set((group.sessions || []).map(function (s) {
+      return String(s.usuario_id || s.responsable_id || '');
+    }).filter(Boolean)));
+    return ids.length === 1 ? ids[0] : '';
+  }
+  function dailyResponsibleLabel(group) {
+    var names = Array.from(new Set((group.sessions || []).map(function (s) {
+      return String(s.usuario_nombre || s.responsable_nombre || '').trim();
+    }).filter(Boolean)));
+    if (names.length === 1) return names[0];
+    if (names.length > 1) return 'Asignación por unificar';
+    return dailyAssignedId(group) ? 'Asignada' : 'Sin asignar';
+  }
+  function dailyProgress(group) {
+    var rows = (group.sessions || []);
+    if (rows.some(function (session) { return /RECHAZ|CON_DIFERENCIA/.test(String(session.dinero_estado_aprobacion || '').toUpperCase()); })) return 'Revisión requerida';
+    var labels = rows.map(dependentDayProgress);
+    if (labels.indexOf('Revisión requerida') >= 0) return 'Revisión requerida';
+    if (labels.indexOf('Pendiente de revisión del dueño') >= 0) return 'Pendiente de revisión del dueño';
+    if (labels.indexOf('Declaración pendiente') >= 0) return 'Declaración pendiente';
+    if (labels.indexOf('En curso') >= 0) return 'En curso';
+    if (labels.every(function (label) { return label === 'No iniciada'; })) return 'No iniciada';
+    if (labels.every(function (label) { return label === 'Completada'; })) return 'Completada';
+    return labels[0] || 'Sin estado';
+  }
+  function dailyTurnProgress(turn, groups) {
+    var labels = (groups || []).map(dailyProgress);
+    if (!labels.length) return 'Sin jornadas activas';
+    if (labels.indexOf('Revisión requerida') >= 0) return 'Revisión requerida';
+    if (labels.indexOf('Pendiente de revisión del dueño') >= 0) return 'Turno pendiente de revisión';
+    if (labels.indexOf('Declaración pendiente') >= 0) return 'Declaración pendiente';
+    if (labels.indexOf('En curso') >= 0) return 'Turno en curso';
+    if (labels.every(function (label) { return label === 'No iniciada'; })) return 'No iniciado';
+    if (labels.indexOf('No iniciada') >= 0) return 'Turno en curso';
+    if (labels.every(function (label) { return label === 'Completada'; })) {
+      var master = String(turn && (turn.estado_maestro || turn.estado) || '').toUpperCase();
+      return master === 'CERRADO' || master === 'CERRADA' ? 'Turno completado' : 'Turno pendiente de revisión';
+    }
+    return 'Turno en revisión';
+  }
+  function dailyProgressSummary(groups) {
+    var counts = Object.create(null);
+    (groups || []).forEach(function (group) {
+      var label = dailyProgress(group);
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return Object.keys(counts).map(function (label) {
+      return '<span class="m33-dependent-progress-item ' + dependentProgressTone(label) + '"><b>' +
+        counts[label] + '</b> ' + esc(label) + '</span>';
+    }).join('');
   }
   function normEstadoSesion(e) {
     return String(e || '').toUpperCase().trim();
@@ -237,18 +304,21 @@
   }
 
   function step1(t) {
-    const s = state.sesiones;
-    const assigned = s.filter(x => x.usuario_id).length;
-    const declared = s.filter(x => x.dinero_declarado).length;
-    return '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duración</span><b>' + esc(field(t.dias_turno)) + ' día(s)</b></div><div class="m33-box"><span>Sesiones</span><b>' + s.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + s.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + s.length + '</b></div></div><h4 style="margin:12px 0 6px">Sesiones</h4><div class="m33-session-grid">' + (s.map(x => '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + '</div></div><div><span class="m33-pill ' + (x.usuario_id ? 'm33-ok' : 'm33-warn') + '">' + esc(x.usuario_nombre || (x.usuario_id ? 'Asignada' : 'Sin asignar')) + '</span></div></div></div>').join('') || '<div class="m33-muted">Sin sesiones.</div>') + '</div>';
+    const groups = dailySessionGroups(state.sesiones);
+    const assigned = groups.filter(function (g) { return !!dailyAssignedId(g); }).length;
+    const declared = groups.filter(function (g) {
+      return g.sessions.some(function (s) { return s.dinero_declarado === true || !!s.dinero_id || s.dinero_monto != null; });
+    }).length;
+    return '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duración</span><b>' + esc(field(t.dias_turno || groups.length)) + ' día(s)</b></div><div class="m33-box"><span>Sesiones</span><b>' + groups.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + groups.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + groups.length + '</b></div></div><h4 style="margin:12px 0 6px">Jornadas</h4><div class="m33-session-grid">' + (groups.map(function (group) {
+      return '<div class="m33-session"><div class="m33-session-row"><div><b>Jornada · Día ' + esc(group.day) + '</b><div class="m33-muted">' + esc(date(group.date)) + '</div></div><div><span class="m33-pill ' + (dailyAssignedId(group) ? 'm33-ok' : 'm33-warn') + '">' + esc(dailyResponsibleLabel(group)) + '</span></div></div></div>';
+    }).join('') || '<div class="m33-muted">Sin jornadas.</div>') + '</div>';
   }
   function step2() {
+    var groups = dailySessionGroups(state.sesiones);
     if (state.readOnly) {
-      return '<p class="m33-muted" role="status">Expediente histórico en solo lectura. Las asignaciones se muestran tal como quedaron registradas.</p><div class="m33-session-grid m33-assignment-grid">' +
-        state.sesiones.map(function (session) {
-          const assigned = session.usuario_nombre || (session.usuario_id ? 'Asignada' : 'Sin asignar');
-          return '<div class="m33-session m33-assignment-card"><label>Día ' + esc(session.numero_dia) + ' · ' + esc(labelBloque(session.bloque)) +
-            '</label><div class="m33-muted" data-m33-readonly-assignment="' + esc(session.id) + '">' + esc(assigned) + '</div></div>';
+      return '<p class="m33-muted" role="status">Expediente histórico en solo lectura. Se muestra una asignación por jornada, sin alterar los registros originales.</p><div class="m33-session-grid m33-assignment-grid">' +
+        groups.map(function (group) {
+          return '<div class="m33-session m33-assignment-card"><label>Jornada · Día ' + esc(group.day) + '</label><div class="m33-muted" data-m33-readonly-assignment="' + esc(group.sessions.map(function (s) { return s.id; }).join(',')) + '">' + esc(dailyResponsibleLabel(group)) + '</div></div>';
         }).join('') + '</div>';
     }
     if (state.staffLoading) {
@@ -265,12 +335,16 @@
         '<button type="button" class="m33-btn-sesion" data-m33-reload-staff>Actualizar responsables</button>' +
         '<p id="m33-asig-msg" class="bc-m33-save-msg"></p>';
     }
-    return '<p class="m33-muted">Responsable por sesión. Los cambios se guardan y verifican en el servidor.</p>' +
-      '<p id="m33-asig-msg" class="bc-m33-save-msg"></p><div class="m33-session-grid m33-assignment-grid">' + state.sesiones.map(s => {
-        const opts = '<option value="">Sin asignar</option>' + us.map(u => '<option value="' + esc(u.id) + '" ' +
-          (String(u.id) === String(s.usuario_id || s.responsable_id || '') ? 'selected' : '') + '>' + esc(u.nombre || u.nombre_usuario || u.email || u.id) + '</option>').join('');
-        return '<div class="m33-session m33-assignment-card"><label>Día ' + esc(s.numero_dia) + ' · ' + esc(labelBloque(s.bloque)) +
-          '</label><select data-m33-sid="' + esc(s.id) + '" data-bc-prev="' + esc(s.usuario_id || s.responsable_id || '') + '">' + opts + '</select></div>';
+    return '<p class="m33-muted">Un responsable por jornada completa (07:00–23:00). Si el turno conserva filas antiguas, la asignación se sincroniza en todos los registros activos de ese día.</p>' +
+      '<p id="m33-asig-msg" class="bc-m33-save-msg"></p><div class="m33-session-grid m33-assignment-grid">' + groups.map(function (group) {
+        var current = dailyAssignedId(group);
+        var ids = group.sessions.map(function (s) { return String(s.id); });
+        const opts = '<option value="">Sin asignar</option>' + us.map(function (u) {
+          return '<option value="' + esc(u.id) + '" ' + (String(u.id) === current ? 'selected' : '') + '>' +
+            esc(u.nombre || u.nombre_usuario || u.email || u.id) + '</option>';
+        }).join('');
+        return '<div class="m33-session m33-assignment-card"><label>Jornada · Día ' + esc(group.day) +
+          '</label><select data-m33-sids="' + esc(ids.join(',')) + '" data-bc-prev="' + esc(current) + '">' + opts + '</select></div>';
       }).join('') + '</div>';
   }
   function archiveSessionsForViewer() {
@@ -671,13 +745,13 @@
         cashRows.push({
           sessionId: String(session.id),
           date: session.dinero_declarado_at || session.fecha,
-          responsible: inventoryUserLabel(session.usuario_id),
+          responsible: session.usuario_nombre || session.responsable_nombre || inventoryUserLabel(session.usuario_id),
           declared: bookNumber(session.dinero_monto),
           currency: session.dinero_moneda || 'CUP',
           status: session.dinero_estado_aprobacion || 'Declarado',
           collected: session.dinero_monto_contado == null ? null : bookNumber(session.dinero_monto_contado),
           difference: session.dinero_diferencia == null ? null : bookNumber(session.dinero_diferencia),
-          counter: inventoryUserLabel(session.dinero_contado_por),
+          counter: session.dinero_contado_nombre || '',
           countedAt: session.dinero_contado_at || null
         });
       });
@@ -698,7 +772,7 @@
           difference: session && session.dinero_diferencia != null
             ? bookNumber(session.dinero_diferencia)
             : (declaration.difference == null ? null : declaration.difference),
-          counter: inventoryUserLabel((session && session.dinero_contado_por) || declaration.counterId),
+          counter: (session && session.dinero_contado_nombre) || declaration.counterName || '',
           countedAt: (session && session.dinero_contado_at) || declaration.countedAt || null
         });
       });
@@ -840,8 +914,7 @@
           bookMoney(row.amount, false) + '</td><td>' + esc(row.status) + '</td><td>' + esc(row.actor) + '</td></tr>';
       }).join('') : '<tr><td colspan="5">Sin gastos registrados.</td></tr>';
       const cashBody = cashRows.length ? cashRows.map(function (row) {
-        const counted = row.collected == null ? '—' : bookMoney(row.collected, false) +
-          (row.counter ? '<small> · ' + esc(row.counter) + '</small>' : '');
+        const counted = row.collected == null ? '—' : bookMoney(row.collected, false);
         const difference = row.difference == null ? '—' : bookMoney(row.difference, false);
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
           bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>' + counted +
@@ -1127,8 +1200,51 @@
     });
   }
   function step5(t) {
-    const st = String(t.estado_maestro || t.estado || '').toUpperCase();
-    return '<div class="m33-session-row"><span>Estado</span><b>' + esc(st) + '</b></div>';
+    var st = String(t.estado_maestro || t.estado || '').toUpperCase();
+    var book = state.inventoryBook;
+    var totals = book && book.totals ? book.totals : null;
+    var expenses = book && Array.isArray(book.expenseRows) ? book.expenseRows : [];
+    var cashRows = book && Array.isArray(book.cashRows) ? book.cashRows : [];
+    var approvedExpenses = expenses.filter(function (row) { return /APROBAD/i.test(String(row.status || '')); })
+      .reduce(function (sum, row) { return sum + bookNumber(row.amount); }, 0);
+    var pendingExpenses = expenses.filter(function (row) { return /PENDIENT/i.test(String(row.status || '')); })
+      .reduce(function (sum, row) { return sum + bookNumber(row.amount); }, 0);
+    var declared = cashRows.reduce(function (sum, row) { return sum + bookNumber(row.declared); }, 0);
+    var counted = cashRows.reduce(function (sum, row) { return sum + (row.collected == null ? 0 : bookNumber(row.collected)); }, 0);
+    var countedRows = cashRows.filter(function (row) { return row.collected != null; }).length;
+    var difference = cashRows.reduce(function (sum, row) { return sum + (row.difference == null ? 0 : bookNumber(row.difference)); }, 0);
+    var missingCount = cashRows.length - countedRows;
+    var approximate = book && (book.salesApprox || (totals && book.products && book.products.some(function (row) { return row.revenueApprox || row.profitApprox; })));
+    var metrics = totals ? [
+      ['Ventas POS', bookMoney(totals.revenue, !!approximate)],
+      ['Ganancia estimada/real', bookMoney(totals.profit, !!approximate)],
+      ['Gastos aprobados', bookMoney(approvedExpenses, false)],
+      ['Bajas', bookQty(totals.losses)],
+      ['Pérdida por bajas', bookMoney(totals.lossValue, false)],
+      ['Reinversión', bookMoney(totals.reinvestment, false)],
+      ['Dinero declarado', bookMoney(declared, false)],
+      ['Dinero contado', bookMoney(counted, false)]
+    ] : [];
+    var metricsHtml = metrics.length ? '<div class="m33-summary" style="margin-top:10px">' + metrics.map(function (item) {
+      return '<div class="m33-box"><span>' + esc(item[0]) + '</span><b>' + esc(item[1]) + '</b></div>';
+    }).join('') + '</div>' : '<p class="m33-muted">El resumen financiero se completa al cargar el inventario y las declaraciones de caja en la pestaña Inventario. No se estiman operaciones que no estén registradas.</p>';
+    var cashState = missingCount ? 'Faltan ' + missingCount + ' conteo(s) del dueño.' :
+      (cashRows.length ? (Math.abs(difference) < 0.005 ? 'El efectivo está correctamente conciliado.' :
+        (difference < 0 ? 'Faltante: ' : 'Sobrante: ') + bookMoney(Math.abs(difference), false)) : 'Sin declaraciones de efectivo.');
+    var workflow = '';
+    if (!state.readOnly && state.isAdmin) {
+      if (st === 'PENDIENTE_APROBACION' || st === 'EN_VALIDACION') {
+        workflow = '<div class="m33-session"><b>Revisión del dueño</b><p class="m33-muted">Comprueba la conciliación, el inventario y la entrega. La aprobación final cerrará el turno.</p><button type="button" class="m33-btn-sesion" data-m33-approve-turn>Confirmar revisión y cerrar turno</button><p class="m33-msg" data-m33-review-msg role="status" aria-live="polite"></p></div>';
+      } else if (st !== 'CERRADO' && st !== 'CERRADA' && st !== 'CANCELADO' && st !== 'CANCELADA') {
+        workflow = '<div class="m33-session"><b>Control del turno</b><p class="m33-muted">Cuando las jornadas estén completadas, el efectivo declarado y el inventario entregado, envía el turno a revisión. El cierre forzado queda reservado para recuperación excepcional.</p><button type="button" class="m33-btn-sesion" data-m33-send-review>Enviar a revisión del dueño</button><p class="m33-msg" data-m33-review-msg role="status" aria-live="polite"></p></div>';
+      } else {
+        workflow = '<p class="m33-muted">Turno cerrado. Este expediente permanece disponible para consulta.</p>';
+      }
+    }
+    return '<div class="m33-session-row"><span>Estado del turno</span><b>' + esc(dependentStatusLabel(st)) + '</b></div>' +
+      metricsHtml + '<div class="m33-session" style="margin-top:10px"><b>Conciliación de efectivo</b><p>' + esc(cashState) + '</p>' +
+      '<p class="m33-muted">Declarado: ' + esc(bookMoney(declared, false)) + ' · Contado: ' + esc(bookMoney(counted, false)) +
+      ' · Gastos pendientes: ' + esc(bookMoney(pendingExpenses, false)) + '</p></div>' + workflow;
   }
 
   function dependentStatusLabel(value) {
@@ -1206,19 +1322,22 @@
     return amount + (currency ? ' ' + currency : '');
   }
 
+  // Los bloques heredados se muestran consolidados y no ofrecen "Continuar registro anterior";
+  // el flujo operativo nuevo se abre desde una sesión JORNADA completa del día.
   function bodyDependienta(t) {
     var me = currentUserId();
-    var mias = state.sesiones.filter(sesionAsignadaAMi).slice().sort(function (a, b) {
+    var mias = state.sesiones.filter(sesionAsignadaAMi).filter(activeSession).slice().sort(function (a, b) {
       return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
         Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
     });
-    var turnProgress = dependentTurnProgress(t, mias);
+    var jornadasMias = dailySessionGroups(mias);
+    var turnProgress = dailyTurnProgress(t, jornadasMias);
     var html = '<div class="m33-dependent">';
     if (state.readOnly) html += '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>';
     html += '<section class="m33-dependent-top"><div><h4>Tu jornada · ' +
       esc(field(t.almacen_nombre || t.almacen)) + '</h4><p class="m33-dependent-schedule">Horario operativo previsto · 07:00–23:00</p></div>' +
       '<span class="m33-pill m33-dependent-status-pill ' + dependentProgressTone(turnProgress) + '" data-m33-turn-status>' + esc(turnProgress) + '</span></section>' +
-      (mias.length ? '<div class="m33-dependent-progress" aria-label="Progreso de tus jornadas">' + dependentProgressSummary(mias) + '</div>' : '');
+      (jornadasMias.length ? '<div class="m33-dependent-progress" aria-label="Progreso de tus jornadas">' + dailyProgressSummary(jornadasMias) + '</div>' : '');
     html += '<div class="m33-dependent-meta">' +
       '<div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio || (mias[0] && mias[0].fecha))) + '</b></div>' +
       '<div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin || (mias[mias.length - 1] && mias[mias.length - 1].fecha))) + '</b></div>' +
@@ -1227,43 +1346,35 @@
       html += '<p class="m33-dependent-note">No se pudo identificar tu usuario.</p></div>';
       return html;
     }
-    if (!mias.length) {
+    if (!jornadasMias.length) {
       html += '<section class="m33-dependent-section"><h4>Tus días</h4><p class="m33-dependent-note">No tienes jornadas asignadas en este turno.</p></section></div>';
       return html;
     }
     html += '<section class="m33-dependent-section"><h4>Tus días</h4>' +
       '<p class="m33-dependent-note">Una jornada completa por día. Los registros antiguos se conservan como historial y no se convierten automáticamente.</p>';
-    html += mias.map(function (session) {
+    html += jornadasMias.map(function (group) {
+      var rows = group.sessions;
+      var session = rows.find(function (s) { return String(s.bloque || '').toUpperCase() === 'JORNADA'; }) || rows[0];
       var status = normEstadoSesion(session.estado);
-      var labelStatus = dependentDayProgress(session);
-      var isJornada = String(session.bloque || '').toUpperCase() === 'JORNADA';
-      var actions = '';
+      var labelStatus = dailyProgress(group);
+      var isJornada = rows.some(function (s) { return String(s.bloque || '').toUpperCase() === 'JORNADA'; });
       var sid = esc(session.id);
+      var actions = '';
       if (state.readOnly) {
         actions = '<span class="m33-pill">Solo lectura</span>';
       } else if (isJornada) {
         actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + sid + '">' +
-          (status === 'COMPLETADA' ? 'Ver jornada' : 'Gestionar jornada') + '</button>';
-      } else if (status === 'PENDIENTE' || status === 'PROGRAMADA' || !status) {
-        actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + sid + '">Continuar registro anterior</button>';
-      } else if (status === 'EN_CURSO') {
-        var hasDeclaration = session.dinero_declarado === true || !!session.dinero_id;
-        var cashAmount = hasDeclaration && session.dinero_monto != null ? String(session.dinero_monto) : '';
-        actions = '<div class="m33-dep-cash">' +
-          (hasDeclaration
-            ? '<span class="m33-pill m33-ok">Dinero entregado: ' + esc(cashAmount) + ' CUP</span><small class="m33-muted">' + esc(dependentStatusLabel(session.dinero_estado_aprobacion || 'Declarado')) + '</small>'
-            : '<label>Dinero entregado (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" data-m33-cash-amount="' + sid + '" placeholder="0.00"></label><button type="button" class="m33-btn-sesion" data-m33-declare-cash="' + sid + '">Guardar entrega</button>') +
-          '<button type="button" class="m33-btn-sesion" data-m33-close-legacy-session="' + sid + '"' + (!hasDeclaration ? ' disabled' : '') + '>Cerrar registro anterior</button>' +
-          '<small class="m33-muted" data-m33-legacy-msg="' + sid + '"></small></div>';
+          (labelStatus === 'Completada' ? 'Ver jornada' : 'Gestionar jornada') + '</button>';
+      } else if (rows.some(function (s) { return normEstadoSesion(s.estado) === 'EN_CURSO' && (s.dinero_declarado === true || !!s.dinero_id); })) {
+        actions = '<span class="m33-pill">Registro anterior · consulta consolidada</span>';
       } else {
         actions = '<span class="m33-pill">' + esc(labelStatus) + '</span>';
       }
-      var legacyNote = isJornada ? '' :
-        '<div class="m33-dependent-legacy">Registro histórico del formato anterior</div>';
-      return '<article class="m33-dependent-day" data-m33-dependent-day="' + sid + '">' +
-        '<div class="m33-dependent-day-head"><div><b>Día ' + esc(session.numero_dia || session.dia_n || '—') +
-        ' · ' + esc(date(session.fecha)) + '</b><div class="m33-muted">' + esc(labelStatus) + '</div>' + legacyNote +
-        '</div><span class="m33-pill">' + esc(isJornada ? 'Jornada completa' : 'Histórico') + '</span></div>' +
+      var legacyNote = isJornada ? '' : '<div class="m33-dependent-legacy">Registro histórico del formato anterior · consolidado en una sola jornada diaria</div>';
+      return '<article class="m33-dependent-day" data-m33-dependent-day="' + esc(rows.map(function (s) { return s.id; }).join(',')) + '">' +
+        '<div class="m33-dependent-day-head"><div><b>Jornada · Día ' + esc(group.day) +
+        ' · ' + esc(date(group.date)) + '</b><div class="m33-muted">' + esc(labelStatus) + '</div>' + legacyNote +
+        '</div><span class="m33-pill">Jornada diaria</span></div>' +
         (actions ? '<div class="m33-dependent-day-actions">' + actions + '</div>' : '') +
         '</article>';
     }).join('');
@@ -1445,6 +1556,30 @@
     catch (e) { alert('No se pudo eliminar: ' + (e.message || e)); }
   }
 
+  async function runTurnReview(action) {
+    if (!state.isAdmin || state.readOnly || !state.turno || !navigator.onLine) return;
+    var ov = document.getElementById('m33-bg');
+    var msg = ov && ov.querySelector('[data-m33-review-msg]');
+    var buttons = ov ? [].slice.call(ov.querySelectorAll('[data-m33-send-review],[data-m33-approve-turn]')) : [];
+    buttons.forEach(function (button) { button.disabled = true; });
+    if (msg) msg.textContent = action === 'approve' ? 'Confirmando revisión con el servidor…' : 'Enviando el turno a revisión…';
+    try {
+      var api = API();
+      if (action === 'approve') {
+        if (typeof api.aprobarTurno !== 'function') throw new Error('La acción de aprobación no está disponible.');
+        await api.aprobarTurno(state.turno.id, 'Revisión del dueño confirmada desde el expediente del turno.');
+      } else {
+        if (typeof api.enviarAprobacion !== 'function') throw new Error('La acción de envío a revisión no está disponible.');
+        await api.enviarAprobacion(state.turno.id);
+      }
+      await load(state.turno.id);
+      if (state.step === 5) renderModal();
+    } catch (error) {
+      if (msg) msg.textContent = 'No se completó la acción: ' + String(error && error.message || error);
+      buttons.forEach(function (button) { button.disabled = false; });
+    }
+  }
+
   function setAsignacionMsg(text, ok) {
     var el = document.getElementById('m33-asig-msg');
     if (!el) return;
@@ -1453,22 +1588,21 @@
   }
 
   async function persistAssignmentSelect(sel) {
-    if (!state.isAdmin || state.readOnly || !sel || !sel.dataset.m33Sid) return;
+    if (!state.isAdmin || state.readOnly || !sel || !sel.dataset.m33Sids) return;
     var next = sel.value || '';
     var prev = sel.dataset.bcPrev || '';
     if (next === prev) return;
     sel.disabled = true;
     try {
       if (!next) {
-        // No existe un RPC de desasignación en el contrato actual; no fingimos que
-        // quitar el valor lo guardó. Se recupera el último valor válido.
         sel.value = prev;
-        throw new Error('Para quitar una asignación usá la reasignación del usuario; no se puede guardar "Sin asignar" desde este control.');
+        throw new Error('No se puede guardar una asignación vacía desde este control.');
       }
-      await API().asignarSesion(sel.dataset.m33Sid, next);
+      var ids = sel.dataset.m33Sids.split(',').filter(Boolean);
+      for (var i = 0; i < ids.length; i++) await API().asignarSesion(ids[i], next);
       sel.dataset.bcPrev = next;
       await load(state.turno.id);
-      setAsignacionMsg('✓ Asignación guardada y confirmada.', true);
+      setAsignacionMsg('✓ Responsable guardado para toda la jornada.', true);
     } catch (e) {
       sel.value = prev;
       setAsignacionMsg('No se guardó la asignación: ' + String(e && e.message || e), false);
@@ -1483,7 +1617,7 @@
     if (!ov || ov.dataset.bcM33AssignBound === '1') return;
     ov.dataset.bcM33AssignBound = '1';
     ov.addEventListener('change', async function (e) {
-      var sel = e.target && e.target.closest ? e.target.closest('select[data-m33-sid]') : null;
+      var sel = e.target && e.target.closest ? e.target.closest('select[data-m33-sids]') : null;
       if (!sel) return;
       try { await persistAssignmentSelect(sel); } catch (_) {}
     });
@@ -1492,14 +1626,14 @@
   async function saveAssignments() {
     if (!state.isAdmin || state.readOnly) return;
     const ov = document.getElementById('m33-bg');
-    const sels = [].slice.call(ov.querySelectorAll('select[data-m33-sid]'));
+    const sels = [].slice.call(ov.querySelectorAll('select[data-m33-sids]'));
     try {
       for (var i = 0; i < sels.length; i++) {
         if (sels[i].value) await persistAssignmentSelect(sels[i]);
       }
       await load(state.turno.id);
       var expected = {};
-      sels.forEach(function(sel){ expected[String(sel.dataset.m33Sid)] = sel.value; });
+      sels.forEach(function(sel){ (sel.dataset.m33Sids || '').split(',').filter(Boolean).forEach(function(id){ expected[String(id)] = sel.value; }); });
       var mismatches = (state.sesiones || []).filter(function(s){ return expected[String(s.id)] && String(s.usuario_id || '') !== String(expected[String(s.id)]); });
       if (mismatches.length) throw new Error('La verificación detectó asignaciones no persistidas.');
       setAsignacionMsg('✓ Asignaciones verificadas en Supabase.', true);
@@ -1672,6 +1806,12 @@
       const bookButton = ov.querySelector('[data-m33-inventory-book]');
       if (bookButton) loadInventoryBook(bookButton);
     }
+    if (state.step === 5) {
+      var sendReview = ov.querySelector('[data-m33-send-review]');
+      var approveTurn = ov.querySelector('[data-m33-approve-turn]');
+      if (sendReview) sendReview.addEventListener('click', function () { runTurnReview('send'); });
+      if (approveTurn) approveTurn.addEventListener('click', function () { runTurnReview('approve'); });
+    }
   }
 
   async function open(id, options) {
@@ -1704,6 +1844,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.16', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
+  window.__BC_M33 = { open: open, version: '33.18', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
