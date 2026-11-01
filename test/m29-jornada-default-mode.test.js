@@ -115,6 +115,28 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
   assert.equal(createdLegacy.length, 0, "the default model never creates MANANA/TARDE sessions");
 });
 
+test("M29 requires at least two calendar days for a Turno", async (t) => {
+  const { window, jornadaCalls, createdLegacy } = setup(t);
+  await window.__BC_M29__.renderHome();
+  const root = window.document.getElementById("ciclos-m18-root");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")));
+  root.querySelector("#m29-btn-crear").click();
+
+  const modal = window.document.getElementById("m29-crear-overlay");
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7));
+  const count = modal.querySelector("#m29-dias");
+  assert.equal(count.min, "2");
+  count.value = "1";
+  count.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal(modal.querySelectorAll("[data-m29-day]").length, 2,
+    "the grid cannot collapse below two calendar dates");
+
+  modal.querySelector("#m29-confirm-crear").click();
+  assert.match(modal.querySelector("#m29-modal-msg").textContent, /2–31/);
+  assert.equal(jornadaCalls.length, 0, "one-day turns must be rejected before the backend call");
+  assert.equal(createdLegacy.length, 0, "one-day turns must never fall back to legacy creation");
+});
+
 test("M29 only offers the full-day 07:00–23:00 model; Mañana/Tarde creation is unavailable", async (t) => {
   const { window, createdLegacy, jornadaCalls } = setup(t);
   await window.__BC_M29__.renderHome();
