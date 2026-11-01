@@ -73,6 +73,8 @@
     var buttons=Array.prototype.slice.call(modal.querySelectorAll('[data-m33-abrir-sesion]')); if(!buttons.length)return;
     css(); var ok=eligibleId(rows);
     buttons.forEach(function(btn){
+      // M33 owns the in-flight RPC state; never re-enable a button while it is opening.
+      if(btn.dataset && btn.dataset.bcBusy==='1')return;
       var canOpen=!!ok&&String(btn.getAttribute('data-m33-abrir-sesion'))===ok;
       if(canOpen){
         if(btn.disabled||btn.classList.contains('m57-locked')||btn.classList.contains('m56-lock')||btn.textContent.indexOf('Abrir sesión')===-1||btn.textContent.indexOf('🔒')>=0){
