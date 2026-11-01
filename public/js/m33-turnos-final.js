@@ -1135,7 +1135,7 @@
     var status = String(value || '').toUpperCase();
     return ({
       APROBADA: 'Aprobada', APROBADO: 'Aprobado',
-      PENDIENTE: 'Pendiente de revisión', RECHAZADA: 'Rechazada', RECHAZADO: 'Rechazado',
+      PENDIENTE: 'Pendiente de revisión', CON_DIFERENCIA: 'Revisión requerida', RECHAZADA: 'Rechazada', RECHAZADO: 'Rechazado',
       DECLARADO: 'Declarado', COMPLETADA: 'Completada', EN_CURSO: 'En curso', ABIERTO: 'En curso',
       PROGRAMADA: 'No iniciada', PROGRAMADO: 'No iniciado', CANCELADA: 'Cancelada', CERRADO: 'Cerrado', CERRADA: 'Cerrado', PENDIENTE_APROBACION: 'Pendiente de aprobación'
     })[status] || (value || 'Sin estado');
@@ -1149,7 +1149,7 @@
     var hasOwnerCount = !!(session && session.dinero_monto_contado != null);
     if (status === 'CANCELADA' || status === 'CANCELADO') return 'Cancelada';
     if (status === 'PENDIENTE' || status === 'PROGRAMADA' || !status) return 'No iniciada';
-    if (/RECHAZ/.test(approval)) return 'Revisión requerida';
+    if (/RECHAZ|CON_DIFERENCIA/.test(approval)) return 'Revisión requerida';
     if (status === 'EN_CURSO') return hasDeclaration ? 'Pendiente de revisión del dueño' : 'En curso';
     if (status === 'COMPLETADA' || status === 'CERRADO' || status === 'CERRADA') {
       if (!hasDeclaration) return 'Declaración pendiente';
