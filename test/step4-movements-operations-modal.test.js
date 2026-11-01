@@ -186,11 +186,11 @@ test("Paso 4: una transferencia sin catálogo visible informa del problema en ve
   assert.match(modal.querySelector(".bc165-feedback").textContent, /No se pudieron cargar almacenes y productos/);
 });
 
-test("Paso 4: la segunda sección de Turnos usa filas compactas en vez de tarjetas grandes", () => {
+test("Paso 4: M49 preserves the daily jornada layout and removes legacy split wrappers", () => {
   const layout = fs.readFileSync(path.join(__dirname, "..", "public", "js", "m49-turnos-layout-definitivo.js"), "utf8");
   const app = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
-  assert.match(layout, /grid-template-columns:minmax\(0,\.72fr\) minmax\(0,1\.28fr\)!important/);
-  assert.match(layout, /padding:10px 12px!important/);
-  assert.match(layout, /min-height:0!important/);
-  assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.5"\]/);
+  assert.match(layout, /restoreBody/);
+  assert.match(layout, /m33-session-grid/);
+  assert.doesNotMatch(layout, /Mañana|Tarde|grid-template-columns/);
+  assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
 });
