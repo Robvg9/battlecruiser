@@ -525,7 +525,7 @@
   function buildCreateRows() {
     var host = document.getElementById('m29-create-days');
     if (!host) return;
-    var n = Math.max(1, Math.min(31, parseInt((document.getElementById('m29-dias') || {}).value, 10) || 7));
+    var n = Math.max(2, Math.min(31, parseInt((document.getElementById('m29-dias') || {}).value, 10) || 7));
     var inicio = (document.getElementById('m29-inicio') || {}).value || '';
     var old = readCreateRows();
     host.innerHTML = Array.from({ length: n }, function (_, i) {
@@ -588,7 +588,7 @@
       '<div class="m29-fields">' +
       '<div class="m29-field"><label>Almacén</label><select id="m29-almacen">' + opts + '</select></div>' +
       '<div class="m29-field"><label>Fecha inicial</label><input type="date" id="m29-inicio" value="' + hoy + '"></div>' +
-      '<div class="m29-field"><label>Días</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div>' +
+      '<div class="m29-field"><label>Días</label><input type="number" id="m29-dias" min="2" max="31" value="7"></div>' +
       '</div>' +
       '<div class="m29-mode-row"><span id="m29-mode-label">Jornada completa · 07:00–23:00 · una dependienta por día trabajado</span></div>' +
       '<p id="m29-staff-status" class="m29-msg" role="status" aria-live="polite">Cargando responsables…</p>' +
@@ -625,8 +625,11 @@
     var inicio = (document.getElementById('m29-inicio') || {}).value;
     var dias = parseInt((document.getElementById('m29-dias') || {}).value, 10);
     var host = document.getElementById('m29-create-days');
-    if (!alm || !inicio || !Number.isFinite(dias) || dias < 1 || dias > 31 || !host) {
+    if (!alm || !inicio || !host) {
       setModalMsg('Completa los datos del turno.', false); return;
+    }
+    if (!Number.isFinite(dias) || dias < 2 || dias > 31) {
+      setModalMsg('Cantidad de días inválida (2–31).', false); return;
     }
     var schedule = readCreateRows().map(function (row) {
       return {
