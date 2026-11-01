@@ -264,6 +264,8 @@ function applySql(file) {
     applySql("test/step7-jornada-fixture.sql");
     log("\r\n=== 2/5 Apply Step 5 baseline migration ===");
     applySql("supabase/migrations/20261023053011_step5_jornada_unica_backend.sql");
+    log("\r\n=== 2/6 Apply Step 5 minimum two-day Turno guard ===");
+    applySql("supabase/migrations/20261101030000_step5_minimum_two_day_turn.sql");
     log("\r\n=== 3/9 Apply Step 7 inventory migration ===");
     applySql("supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql");
     log("\\r\\n=== 4/9 Build disposable finance schema contracts ===");
