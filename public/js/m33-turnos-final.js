@@ -1103,7 +1103,7 @@
               timestamp: request.creado_en || session.fecha,
               order: 40,
               kind: 'request',
-              label: bucket === 'mermas' ? 'Solicitud de merma' : 'Solicitud de baja',
+              label: 'Solicitud de baja',
               product: request.producto || request.producto_id || '—',
               actor: request.creado_nombre || '—',
               status: String(request.estado || 'PENDIENTE') + ' · no descuenta stock',
