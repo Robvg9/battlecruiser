@@ -164,7 +164,7 @@ test("the owner can start a scheduled legacy day while non-worked placeholders d
   assert.ok(TURNOS_MASTER_UI.includes("no requieren declaración de efectivo"));
 });
 
-test("PWA release 9.5.52 loads and precaches the cash handover UI", () => {
+test("PWA release 9.5.53 loads and precaches the cash handover UI", () => {
   assert.match(APP, /const VERSION="9\.5\.53"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
   assert.match(SW, /BC_SW_VERSION = "9\.5\.53"/);
