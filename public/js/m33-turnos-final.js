@@ -1140,7 +1140,7 @@
       APROBADA: 'Aprobada', APROBADO: 'Aprobado',
       PENDIENTE: 'Pendiente de revisión', RECHAZADA: 'Rechazada', RECHAZADO: 'Rechazado',
       DECLARADO: 'Declarado', COMPLETADA: 'Completada', EN_CURSO: 'En curso',
-      PROGRAMADA: 'Sin comenzar', CANCELADA: 'Cancelada'
+      PROGRAMADA: 'Sin comenzar', CANCELADA: 'Cancelada', CERRADO: 'Cerrado', PENDIENTE_APROBACION: 'Pendiente de aprobación'
     })[status] || (value || 'Sin estado');
   }
 
@@ -1223,70 +1223,35 @@
   async function loadDependentCashHistory(overlay) {
     var host = overlay && overlay.querySelector('#m33-dep-cash-history');
     if (!host) return;
+    // The authenticated expediente RPC already returns the declaration, owner
+    // count and difference. Do not query the private declarations table directly.
     var sessions = archiveSessionsForViewer().slice().sort(function (a, b) {
       return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
         Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
     });
-    var ids = sessions.map(function (session) { return String(session.id || ''); }).filter(Boolean);
-    if (!ids.length) {
-      host.innerHTML = '<div class="m33-archive-empty">No hay días asignados para consultar.</div>';
+    var rows = sessions.filter(function (session) {
+      return session.dinero_declarado === true || !!session.dinero_id;
+    });
+    if (!rows.length) {
+      host.innerHTML = '<div class="m33-archive-empty">Todavía no hay declaraciones de efectivo registradas para tus días.</div>';
       return;
     }
-    try {
-      if (!navigator.onLine) throw new Error('Conecta para consultar las liquidaciones guardadas en el servidor.');
-      var rpcClient = window.client;
-      if (!rpcClient || typeof rpcClient.from !== 'function') throw new Error('La lectura de liquidaciones no está disponible.');
-      var response = await rpcClient.from('turno_declaraciones')
-        .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion,monto_contado,diferencia,contado_por,contado_at')
-        .in('turno_sesion_id', ids);
-      if (response && response.error) throw response.error;
-      var sessionMap = new Map(sessions.map(function (session) { return [String(session.id), session]; }));
-      var rows = Array.isArray(response && response.data) ? response.data.filter(function (row) {
-        return row && sessionMap.has(String(row.turno_sesion_id));
-      }) : [];
-      // Legacy fields are used only when the expediente itself contains a stored declaration marker.
-      var covered = new Set(rows.map(function (row) { return String(row.turno_sesion_id); }));
-      sessions.forEach(function (session) {
-        var key = String(session.id || '');
-        if (!key || covered.has(key) || !(session.dinero_declarado === true || session.dinero_id)) return;
-        rows.push({
-          turno_sesion_id: key, usuario_id: session.usuario_id, monto: session.dinero_monto,
-          moneda: 'CUP', estado_aprobacion: session.dinero_estado_aprobacion || 'DECLARADO',
-          monto_contado: session.dinero_monto_contado, diferencia: session.dinero_diferencia,
-          declarado_at: session.fecha
-        });
-      });
-      rows.sort(function (a, b) {
-        var sa = sessionMap.get(String(a.turno_sesion_id));
-        var sb = sessionMap.get(String(b.turno_sesion_id));
-        return String((sa && sa.fecha) || a.declarado_at || '').localeCompare(String((sb && sb.fecha) || b.declarado_at || '')) ||
-          Number((sa && (sa.numero_dia || sa.dia_n)) || 0) - Number((sb && (sb.numero_dia || sb.dia_n)) || 0) ||
-          String(a.declarado_at || '').localeCompare(String(b.declarado_at || ''));
-      });
-      if (!rows.length) {
-        host.innerHTML = '<div class="m33-archive-empty">Todavía no hay declaraciones de efectivo registradas para tus días.</div>';
-        return;
-      }
-      host.innerHTML = rows.map(function (row) {
-        var session = sessionMap.get(String(row.turno_sesion_id));
-        var currency = row.moneda || 'CUP';
-        var status = String(row.estado_aprobacion || 'DECLARADO').toUpperCase();
-        var statusClass = /APROBAD/.test(status) ? 'm33-ok' : '';
-        return '<article class="m33-dependent-cash-row" data-m33-cash-session="' + esc(row.turno_sesion_id) + '">' +
-          '<div class="m33-dependent-cash-head"><b>Día ' + esc(session ? (session.numero_dia || session.dia_n || '—') : '—') +
-          ' · ' + esc(date(session ? session.fecha : row.declarado_at)) + '</b><span class="m33-pill ' + statusClass + '">' +
-          esc(dependentStatusLabel(status)) + '</span></div><div class="m33-dependent-cash-grid">' +
-          '<div class="m33-dependent-cash-metric"><small>Declarado</small><b>' + esc(dependentMoney(row.monto, currency)) + '</b></div>' +
-          '<div class="m33-dependent-cash-metric"><small>Contado por el dueño</small><b>' +
-          esc(row.monto_contado == null ? 'Pendiente' : dependentMoney(row.monto_contado, currency)) + '</b></div>' +
-          '<div class="m33-dependent-cash-metric"><small>Diferencia</small><b>' +
-          esc(row.diferencia == null ? 'Pendiente' : dependentMoney(row.diferencia, currency)) + '</b></div>' +
-          '</div></article>';
-      }).join('');
-    } catch (error) {
-      host.innerHTML = '<div class="m33-archive-empty" role="alert">No se pudo consultar el resumen de caja: ' +
-        esc(error && error.message ? error.message : error) + '. No se muestran importes estimados.</div>';
-    }
+    host.innerHTML = rows.map(function (session) {
+      var currency = session.dinero_moneda || 'CUP';
+      var status = String(session.dinero_estado_aprobacion || 'DECLARADO').toUpperCase();
+      var statusClass = /APROBAD/.test(status) ? 'm33-ok' : '';
+      return '<article class="m33-dependent-cash-row" data-m33-cash-session="' + esc(session.id) + '">' +
+        '<div class="m33-dependent-cash-head"><b>Día ' + esc(session.numero_dia || session.dia_n || '—') +
+        ' · ' + esc(date(session.fecha || session.dinero_declarado_at)) + '</b><span class="m33-pill ' + statusClass + '">' +
+        esc(dependentStatusLabel(status)) + '</span></div><div class="m33-dependent-cash-grid">' +
+        '<div class="m33-dependent-cash-metric"><small>Declarado</small><b>' +
+        esc(dependentMoney(session.dinero_monto, currency)) + '</b></div>' +
+        '<div class="m33-dependent-cash-metric"><small>Contado por el dueño</small><b>' +
+        esc(session.dinero_monto_contado == null ? 'Pendiente' : dependentMoney(session.dinero_monto_contado, currency)) + '</b></div>' +
+        '<div class="m33-dependent-cash-metric"><small>Diferencia</small><b>' +
+        esc(session.dinero_diferencia == null ? 'Pendiente' : dependentMoney(session.dinero_diferencia, currency)) + '</b></div>' +
+        '</div></article>';
+    }).join('');
   }
 
   function setDepMsg(text, ok) {
