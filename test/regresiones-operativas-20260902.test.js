@@ -34,10 +34,12 @@ test('ventas: no fabrica stock 0 durante carga', () => {
   assert.ok(hotfix.includes('estado:st')); assert.ok(hotfix.includes('valor:null')); assert.ok(hotfix.includes('cargarStockAlmacenes(false)'));
 });
 
-test('turnos: existe agrupación explícita de mañana y tarde', () => {
-  assert.ok(hotfix.includes("const grouped = { MAÑANA: [], TARDE: [] }"));
-  assert.ok(hotfix.includes("groupHtml('Tarde',grouped.TARDE)"));
-  assert.ok(hotfix.includes('Asignada a otra dependienta'));
+test('turnos: el hotfix legacy ya no inyecta paneles Mañana/Tarde', () => {
+  assert.ok(hotfix.includes("function cleanLegacyTurnoPanels()"));
+  assert.ok(hotfix.includes(".bc-session-recovery"));
+  assert.ok(!hotfix.includes("const grouped = { MAÑANA: [], TARDE: [] }"));
+  assert.ok(!hotfix.includes("groupHtml('Tarde',grouped.TARDE)"));
+  assert.ok(!hotfix.includes('Asignada a otra dependienta'));
 });
 
 test('force-close: solo vía RPC administrativa', () => {
