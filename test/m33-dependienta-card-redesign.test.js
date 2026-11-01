@@ -14,7 +14,7 @@ async function waitFor(predicate,timeout=2000){
  return Boolean(predicate());
 }
 
-function fixture(t,{failRead=false}={}){
+function fixture(t,{noDeclarations=false}={}){
  const dom=new JSDOM("<!doctype html><html><head></head><body></body></html>",{
   url:"https://battlecruiser-dependent-card.test/",runScripts:"outside-only",pretendToBeVisual:true
  });
@@ -22,14 +22,10 @@ function fixture(t,{failRead=false}={}){
  Object.defineProperty(window.document,"readyState",{configurable:true,value:"complete"});
  Object.defineProperty(window.navigator,"onLine",{configurable:true,value:true});
  const sessions=[
-  {id:"mine-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"},
-  {id:"mine-day-2",turno_id:"turno-fixture",numero_dia:2,dia_n:2,fecha:"2026-10-31",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"},
+  Object.assign({id:"mine-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-1",dinero_monto:200,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:200,dinero_diferencia:0}),
+  Object.assign({id:"mine-day-2",turno_id:"turno-fixture",numero_dia:2,dia_n:2,fecha:"2026-10-31",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-2",dinero_monto:8540,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:5220,dinero_diferencia:-3320}),
   {id:"other-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"TARDE",estado:"COMPLETADA",usuario_id:"dependent-b",usuario_nombre:"Otra dependienta"},
   {id:"cancelled-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"TARDE",estado:"CANCELADA",usuario_id:null}
- ];
- const declarations=[
-  {turno_sesion_id:"mine-day-1",turno_tramo_id:"tramo-1",usuario_id:"dependent-a",monto:200,moneda:"CUP",declarado_at:"2026-10-30T22:00:00-04:00",estado_aprobacion:"APROBADA",monto_contado:200,diferencia:0,contado_por:"owner"},
-  {turno_sesion_id:"mine-day-2",turno_tramo_id:"tramo-2",usuario_id:"dependent-a",monto:8540,moneda:"CUP",declarado_at:"2026-10-31T22:00:00-04:00",estado_aprobacion:"APROBADA",monto_contado:5220,diferencia:-3320,contado_por:"owner"}
  ];
  const queries=[],writes=[],rpcCalls=[];
  window._usuarioActual={id:"dependent-a",nombre:"Dependienta A",rol:"dependienta"};
@@ -47,16 +43,7 @@ function fixture(t,{failRead=false}={}){
   cerrarSesion:async()=>{writes.push("cerrar");}
  };
  window.client={
-  rpc:async(name,params)=>{rpcCalls.push({name,params});return {data:null,error:{code:"UNEXPECTED_RPC",message:name}};},
-  from:table=>({
-   select:columns=>({
-    in:async(column,ids)=>{
-     queries.push({table,columns,column,ids:[...ids]});
-     if(failRead)return {data:null,error:{message:"lectura no autorizada",code:"42501"}};
-     return {data:declarations.filter(row=>ids.includes(row.turno_sesion_id)),error:null};
-    }
-   })
-  })
+  rpc:async(name,params)=>{rpcCalls.push({name,params});return {data:null,error:{code:"UNEXPECTED_RPC",message:name}};}
  };
  window.eval(SOURCE);
  t.after(()=>window.close());
@@ -79,18 +66,18 @@ test("tarjeta compacta presenta liquidaciones propias y oculta sesiones ajenas",
  assert.doesNotMatch(modal.textContent,/Otra dependienta|other-day-1|cancelled-day-1/);
  assert.doesNotMatch(modal.textContent,/Mañana|Tarde|MANANA|TARDE/);
  assert.equal(modal.querySelectorAll(".m33-dependent-day").length,2);
- assert.deepEqual(queries.map(q=>q.ids).flat().sort(),["mine-day-1","mine-day-2"]);
- assert.ok(queries.every(q=>q.table==="turno_declaraciones"&&q.column==="turno_sesion_id"));
+ assert.equal(queries.length,0,"la tarjeta usa el expediente autorizado, no consulta la tabla privada de declaraciones");
  assert.equal(writes.length,0);
  assert.equal(rpcCalls.length,0);
 });
 
-test("fallo al leer liquidaciones se informa sin inventar importes",async t=>{
- const {window,writes}=fixture(t,{failRead:true});
+test("la ausencia de declaraciones se muestra como pendiente y no como cero",async t=>{
+ const {window,writes}=fixture(t,{noDeclarations:true});
  await window.__BC_M33.open("turno-fixture");
  const modal=window.document.getElementById("m33-bg");
- assert.ok(await waitFor(()=>modal.querySelector("#m33-dep-cash-history")?.textContent.includes("No se pudo consultar")));
- assert.doesNotMatch(modal.querySelector("#m33-dep-cash-history").textContent,/0,00 CUP/);
+ const host=modal.querySelector("#m33-dep-cash-history");
+ assert.match(host.textContent,/Todavía no hay declaraciones de efectivo/);
+ assert.doesNotMatch(host.textContent,/0,00 CUP/);
  assert.equal(writes.length,0);
 });
 
