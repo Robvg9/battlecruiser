@@ -21,9 +21,9 @@ test("opening one jornada exposes four task tabs",()=>{
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9\.5\.52"/);
+ assert.match(app,/const VERSION="9\.5\.53"/);
  assert.match(app,/\["bc7-jornada-ui\.js","7\.12"\]/);
- assert.match(sw,/BC_SW_VERSION = "9\.5\.52"/);
+ assert.match(sw,/BC_SW_VERSION = "9\.5\.53"/);
  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.12/);
  assert.match(ui,/v7\.12 — baja unificada con causa y compatibilidad de permisos/);
 });
@@ -36,6 +36,6 @@ test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
 });
 
 test("M33 dependent card release is version aligned",()=>{
- assert.match(app,/\["m33-turnos-final\.js","33\.18"\]/);
- assert.match(sw,/m33-turnos-final\.js\?v=33\.18/);
+ assert.match(app,/\["m33-turnos-final\.js","33\.19"\]/);
+ assert.match(sw,/m33-turnos-final\.js\?v=33\.19/);
 });
