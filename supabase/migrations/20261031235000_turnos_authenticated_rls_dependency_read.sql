@@ -7,6 +7,7 @@ DO $guard$
 DECLARE
   v_turnos_rls boolean;
   v_tramos_rls boolean;
+  v_sesiones_rls boolean;
 BEGIN
   SELECT relrowsecurity INTO v_turnos_rls
   FROM pg_class
@@ -16,9 +17,14 @@ BEGIN
   FROM pg_class
   WHERE oid = 'public.turno_tramos'::regclass;
 
-  IF v_turnos_rls IS DISTINCT FROM true OR v_tramos_rls IS DISTINCT FROM true THEN
+  SELECT relrowsecurity INTO v_sesiones_rls
+  FROM pg_class
+  WHERE oid = 'public.turno_sesiones'::regclass;
+
+  IF v_turnos_rls IS DISTINCT FROM true OR v_tramos_rls IS DISTINCT FROM true
+     OR v_sesiones_rls IS DISTINCT FROM true THEN
     RAISE EXCEPTION
-      'Refusing authenticated SELECT grant: RLS must remain enabled on public.turnos and public.turno_tramos';
+      'Refusing authenticated SELECT grant: RLS must remain enabled on public.turnos, public.turno_tramos and public.turno_sesiones';
   END IF;
 
   IF NOT EXISTS (
@@ -45,6 +51,19 @@ BEGIN
   ) THEN
     RAISE EXCEPTION
       'Refusing authenticated SELECT grant: expected turno_tramos_select_involucrados policy is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'turno_sesiones'
+      AND policyname = 'turno_sesiones_select_involucrados'
+      AND cmd = 'SELECT'
+      AND 'authenticated' = ANY (roles)
+  ) THEN
+    RAISE EXCEPTION
+      'Refusing authenticated SELECT grant: expected turno_sesiones_select_involucrados policy is missing';
   END IF;
 END
 $guard$;
