@@ -37,5 +37,5 @@ test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
 
 test("M33 dependent card release is version aligned",()=>{
  assert.match(app,/\["m33-turnos-final\.js","33\.17"\]/);
- assert.match(sw,/m33-turnos-final\.js\?v=33.17/);
+ assert.match(sw,/m33-turnos-final\.js\?v=33\.17/);
 });
