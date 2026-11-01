@@ -15,6 +15,8 @@ const legacyInjector = read("public/js/bc14-5-turnos-manana-tarde.js");
 const m22 = read("public/js/m22-sesiones-en-m21.js");
 const m29 = read("public/js/m29-turnos-organizacion.js");
 const turnosMaestro = read("public/js/turnos-maestro.js");
+const hotfixRegresiones = read("public/js/hotfix-regresiones-20260902.js");
+const hotfix174 = read("public/js/hotfix-17-4-turnos-tarde-visible-20260903.js");
 
 test("M33 keeps its five named steps while using a compact responsive grid", () => {
   assert.ok(source.includes("const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];"));
@@ -94,4 +96,12 @@ test("legacy layout modules cannot reintroduce split-shift headings or panels", 
   assert.match(turnosMaestro, /const assigned = s\.usuario_id \|\| s\.asignado_id \|\| null/);
   assert.match(turnosMaestro, /String\(assigned\) === String\(me\)/);
   assert.match(turnosMaestro, /status === 'CANCELADA' \|\| status === 'CANCELADO'/);
+});
+
+
+test("legacy recovery hotfixes cannot append split M33 sections", () => {
+  assert.match(hotfixRegresiones, /cleanLegacyTurnoPanels/);
+  assert.doesNotMatch(hotfixRegresiones, /groupHtml\('Mañana'|grouped = \\{ MAÑANA|Asignada a otra dependienta/);
+  assert.match(hotfix174, /remove\(\)/);
+  assert.doesNotMatch(hotfix174, /<h4>Tarde|innerHTML|hub\.open/);
 });
