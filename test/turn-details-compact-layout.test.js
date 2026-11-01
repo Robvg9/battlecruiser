@@ -91,4 +91,7 @@ test("legacy layout modules cannot reintroduce split-shift headings or panels", 
   assert.doesNotMatch(m29, /No se crearán bloques de Mañana\/Tarde/);
   assert.match(turnosMaestro, /return 'Jornada diaria'/);
   assert.doesNotMatch(turnosMaestro, /return 'Mañana'|return 'Tarde'/);
+  assert.match(turnosMaestro, /const assigned = s\.usuario_id \|\| s\.asignado_id \|\| null/);
+  assert.match(turnosMaestro, /String\(assigned\) === String\(me\)/);
+  assert.match(turnosMaestro, /status === 'CANCELADA' \|\| status === 'CANCELADO'/);
 });
