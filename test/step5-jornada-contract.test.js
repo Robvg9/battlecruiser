@@ -6,6 +6,10 @@ const path = require("node:path");
 
 const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261023053011_step5_jornada_unica_backend.sql");
 const sql = fs.readFileSync(migrationPath, "utf8");
+const minTwoDayMigrationPath = path.join(
+  __dirname, "..", "supabase", "migrations", "20261101030000_step5_minimum_two_day_turn.sql"
+);
+const minTwoDayMigration = fs.readFileSync(minTwoDayMigrationPath, "utf8");
 
 test("Step 5 adds a single 07:00–23:00 jornada with an explicit Cuban timezone default", () => {
   assert.match(sql, /hora_inicio time NOT NULL DEFAULT TIME '07:00'/);
@@ -29,6 +33,15 @@ test("new journey is one session per working day, with explicit rest records", (
   assert.match(sql, /'JORNADA_UNICA_CREADA'/);
   assert.match(sql, /'DESCANSO'/);
   assert.match(sql, /bc5_crear_jornada_unica/);
+});
+
+test("new Turnos require at least two calendar days at the database boundary", () => {
+  assert.match(minTwoDayMigration, /CREATE OR REPLACE FUNCTION public\\.bc5_crear_jornada_unica/);
+  assert.match(minTwoDayMigration, /p_dias NOT BETWEEN 2 AND 31/);
+  assert.match(minTwoDayMigration, /La programación debe abarcar entre 2 y 31 días/);
+  assert.doesNotMatch(minTwoDayMigration, /p_dias NOT BETWEEN 1 AND 31/);
+  assert.match(minTwoDayMigration, /SECURITY DEFINER/);
+  assert.match(minTwoDayMigration, /SET search_path TO 'public', 'pg_temp'/);
 });
 
 test("legacy MANANA/TARDE history is preserved and mixed-model rows are rejected", () => {
