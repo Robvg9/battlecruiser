@@ -111,6 +111,7 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.match(TURNOS_ACL_MIGRATION, /relrowsecurity/);
   assert.match(TURNOS_ACL_MIGRATION, /turnos_select_involucrados/);
   assert.match(TURNOS_ACL_MIGRATION, /turno_tramos_select_involucrados/);
+  assert.match(TURNOS_ACL_MIGRATION, /turno_sesiones_select_involucrados/);
   assert.match(TURNOS_ACL_MIGRATION, /REVOKE SELECT ON TABLE public\\.turnos FROM PUBLIC, anon/);
   assert.match(TURNOS_ACL_MIGRATION, /GRANT SELECT ON TABLE public\\.turnos TO authenticated/);
   assert.doesNotMatch(TURNOS_ACL_MIGRATION, /GRANT\\s+(?:ALL|INSERT|UPDATE|DELETE).*TO\\s+(?:anon|authenticated)/i);
