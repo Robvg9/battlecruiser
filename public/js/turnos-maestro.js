@@ -126,8 +126,7 @@
 
   function labelBloque(b) {
     const s = String(b || '').toUpperCase();
-    if (s === 'MANANA' || s === 'MAÑANA') return 'Mañana';
-    if (s === 'TARDE') return 'Tarde';
+    if (s === 'MANANA' || s === 'MAÑANA' || s === 'TARDE' || s === 'JORNADA') return 'Jornada diaria';
     return b || '—';
   }
 
