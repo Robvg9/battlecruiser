@@ -226,11 +226,11 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.46 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.46"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.46"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.46"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.46"><\/script>/);
+test("app shell, application and Service Worker share 9.5.47 and load refreshed navigation modules", () => {
+  assert.match(app, /const VERSION="9\.5\.47"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.47"/);
+  assert.match(index, /href="style\.css\?v=9\.5\.47"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.47"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.5"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.11"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
