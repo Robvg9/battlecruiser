@@ -662,65 +662,44 @@
         } catch (priceError) {}
       }
 
-      let declarations = null;
-      if (typeof rpcClient.from === 'function') {
-        try {
-          const declarationResponse = await rpcClient.from('turno_declaraciones')
-            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion,monto_contado,diferencia,contado_por,contado_at,observacion_conteo')
-            .in('turno_sesion_id', sessions.map(function (session) { return String(session.id); }));
-          if (!declarationResponse.error) declarations = Array.isArray(declarationResponse.data) ? declarationResponse.data : [];
-        } catch (declarationError) {}
-      }
+      // Cash details are part of the authorized turn expediente. Do not query
+      // turno_declaraciones from the browser: it is a private table and its RLS
+      // intentionally keeps direct reads closed to authenticated staff.
       const cashRows = [];
-      if (declarations && declarations.length) {
-        const sessionMap = new Map(sessions.map(function (session) { return [String(session.id), session]; }));
-        declarations.forEach(function (declaration) {
-          const session = sessionMap.get(String(declaration.turno_sesion_id));
-          if (!session) return;
-          cashRows.push({
-            sessionId: String(session.id),
-            date: declaration.declarado_at || session.fecha,
-            responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
-            declared: bookNumber(declaration.monto),
-            currency: declaration.moneda || 'Sin moneda registrada',
-            status: declaration.estado_aprobacion || 'Declarado',
-            collected: declaration.monto_contado == null ? null : bookNumber(declaration.monto_contado),
-            difference: declaration.diferencia == null ? null : bookNumber(declaration.diferencia),
-            counter: inventoryUserLabel(declaration.contado_por),
-            countedAt: declaration.contado_at || null
-          });
-        });
-      } else {
-        declarationFallback.forEach(function (declaration) {
-          const session = sessions.find(function (item) { return String(item.id) === declaration.sessionId; });
-          cashRows.push({
-            sessionId: declaration.sessionId,
-            date: declaration.date,
-            responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
-            declared: declaration.amount,
-            currency: declaration.currency || 'Sin moneda registrada',
-            status: declaration.status,
-            collected: declaration.collected == null ? null : declaration.collected,
-            difference: declaration.difference == null ? null : declaration.difference,
-            counter: inventoryUserLabel(declaration.counterId),
-            countedAt: declaration.countedAt || null
-          });
-        });
-      }
-      const coveredCashSessions = new Set(cashRows.map(function (row) { return String(row.sessionId || ''); }));
       sessions.forEach(function (session) {
-        if (!session || !session.dinero_id || coveredCashSessions.has(String(session.id))) return;
+        if (!session || !(session.dinero_declarado === true || session.dinero_id || session.dinero_monto != null)) return;
         cashRows.push({
           sessionId: String(session.id),
-          date: session.fecha,
+          date: session.dinero_declarado_at || session.fecha,
           responsible: inventoryUserLabel(session.usuario_id),
           declared: bookNumber(session.dinero_monto),
-          currency: 'CUP',
+          currency: session.dinero_moneda || 'CUP',
           status: session.dinero_estado_aprobacion || 'Declarado',
           collected: session.dinero_monto_contado == null ? null : bookNumber(session.dinero_monto_contado),
           difference: session.dinero_diferencia == null ? null : bookNumber(session.dinero_diferencia),
           counter: inventoryUserLabel(session.dinero_contado_por),
           countedAt: session.dinero_contado_at || null
+        });
+      });
+      const coveredCashSessions = new Set(cashRows.map(function (row) { return String(row.sessionId || ''); }));
+      declarationFallback.forEach(function (declaration) {
+        if (!declaration || coveredCashSessions.has(String(declaration.sessionId || ''))) return;
+        const session = sessions.find(function (item) { return String(item.id) === String(declaration.sessionId); });
+        cashRows.push({
+          sessionId: String(declaration.sessionId),
+          date: declaration.date || (session && session.fecha),
+          responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
+          declared: declaration.amount,
+          currency: declaration.currency || (session && session.dinero_moneda) || 'CUP',
+          status: declaration.status || (session && session.dinero_estado_aprobacion) || 'Declarado',
+          collected: session && session.dinero_monto_contado != null
+            ? bookNumber(session.dinero_monto_contado)
+            : (declaration.collected == null ? null : declaration.collected),
+          difference: session && session.dinero_diferencia != null
+            ? bookNumber(session.dinero_diferencia)
+            : (declaration.difference == null ? null : declaration.difference),
+          counter: inventoryUserLabel((session && session.dinero_contado_por) || declaration.counterId),
+          countedAt: (session && session.dinero_contado_at) || declaration.countedAt || null
         });
       });
       cashRows.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
