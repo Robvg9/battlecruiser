@@ -234,6 +234,6 @@ test("app shell, application and Service Worker share 9.5.53 and load refreshed 
   assert.match(app, /\["permisos-navegacion\.js","67\.5"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.12"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
-  assert.match(app, /\["hotfix-regresiones-20260902\.js","20261020\.5"\]/);
+  assert.match(app, /\["hotfix-regresiones-20260902\.js","20261101\.1"\]/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
 });
