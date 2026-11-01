@@ -23,7 +23,7 @@ function fixture(t,{noDeclarations=false,jornada=false}={}){
  Object.defineProperty(window.navigator,"onLine",{configurable:true,value:true});
  const sessions=[
   Object.assign({id:"mine-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:jornada?"JORNADA":"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-1",dinero_monto:200,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:200,dinero_diferencia:0}),
-  Object.assign({id:"mine-day-2",turno_id:"turno-fixture",numero_dia:2,dia_n:2,fecha:"2026-10-31",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-2",dinero_monto:8540,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:5220,dinero_diferencia:-3320}),
+  Object.assign({id:"mine-day-2",turno_id:"turno-fixture",numero_dia:2,dia_n:2,fecha:"2026-10-31",bloque:jornada?"JORNADA":"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-2",dinero_monto:8540,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:5220,dinero_diferencia:-3320}),
   {id:"other-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"TARDE",estado:"COMPLETADA",usuario_id:"dependent-b",usuario_nombre:"Otra dependienta"},
   {id:"cancelled-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"TARDE",estado:"CANCELADA",usuario_id:null}
  ];
@@ -137,4 +137,63 @@ test("los registros antiguos no se presentan como bloques mañana/tarde",()=>{
  assert.match(SOURCE,/Una jornada completa por día/);
  assert.match(SOURCE,/Continuar registro anterior/);
  assert.match(SOURCE,/data-m33-abrir-jornada/);
+});
+
+
+test("el libro distingue la venta POS del faltante físico y no infiere ventas desde el stock",async t=>{
+ const {window}=fixture(t,{jornada:true});
+ window.client={
+  rpc:async(name,params={})=>{
+   if(name==="bc7_movimientos_sesion"){
+    return {data:params.p_turno_sesion_id==="mine-day-1"?[
+     {tipo:"venta",producto:"Café",producto_id:"product-coffee",cantidad:-3,operacion_id:"sale-1",costo_unitario:5,fecha:"2026-10-30T10:00:00Z"}
+    ]:[],error:null};
+   }
+   if(name==="bc7_obtener_inventario_jornada"){
+    const first=params.p_turno_sesion_id==="mine-day-1";
+    return {data:{
+     sesion:{id:params.p_turno_sesion_id},
+     productos:[{producto_id:"product-coffee",nombre:"Café",unidad:"uds"}],
+     cortes:first?{
+      INICIAL:{estado:"CONFIRMADO",lineas:[{producto_id:"product-coffee",cantidad_contada:10}]}
+     }:{
+      FINAL:{estado:"CONFIRMADO",lineas:[{producto_id:"product-coffee",cantidad_contada:4}]}
+     }
+    },error:null};
+   }
+   if(name==="bc7_finanzas_jornada")return {data:{gastos:[],reinversiones:[],mermas:[],bajas:[]},error:null};
+   return {data:null,error:{code:"UNEXPECTED_RPC",message:name}};
+  },
+  from:(table)=>({
+   select:()=>({
+    in:async()=>{
+     if(table==="ventas_lineas")return {data:[
+      {venta_id:"sale-1",producto_id:"product-coffee",cantidad:3,precio_unitario:10,subtotal:30,costo_unitario_fifo:5}
+     ],error:null};
+     if(table==="productos")return {data:[{id:"product-coffee",nombre:"Café",precio_normal:10}],error:null};
+     if(table==="turno_declaraciones")return {data:[],error:null};
+     return {data:[],error:null};
+    }
+   })
+  })
+ };
+ await window.__BC_M33.open("turno-fixture");
+ const modal=window.document.getElementById("m33-bg");
+ const details=modal.querySelector("[data-m33-dependent-book]");
+ assert.ok(details,"la dependienta debe consultar la hoja compartida");
+ details.open=true;
+ details.dispatchEvent(new window.Event("toggle"));
+ const host=details.querySelector("[data-m33-inventory-host]");
+ assert.ok(await waitFor(()=>host.querySelector(".m33-book-table tbody tr")));
+ const table=host.querySelector(".m33-book-table");
+ const row=Array.from(table.querySelectorAll("tbody tr")).find(item=>item.cells[4]?.textContent==="Café");
+ assert.ok(row,"el producto debe aparecer en el libro");
+ assert.deepEqual(
+  Array.from(row.cells).slice(10,14).map(cell=>cell.textContent.trim()),
+  ["7","4","-3","3"],
+  "10 inicial - 3 ventas POS = 7 teórico; 4 físicos implica faltante de 3, no venta de 6"
+ );
+ assert.match(table.textContent,/Diferencia física/);
+ assert.match(table.textContent,/Venta POS/);
+ assert.doesNotMatch(table.textContent,/Venta \(saldo\)/);
 });
