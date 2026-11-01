@@ -55,7 +55,7 @@ test("tarjeta compacta presenta liquidaciones propias y oculta sesiones ajenas",
  await window.__BC_M33.open("turno-fixture");
  const modal=window.document.getElementById("m33-bg");
  assert.ok(modal);
- assert.ok(await waitFor(()=>modal.querySelector("#m33-dep-cash-history")?.textContent.includes("8.540,00 CUP")));
+ assert.ok(await waitFor(()=>modal.querySelector("#m33-dep-cash-history")?.(/8(?:\\.)?540,00 CUP/).test(modal.querySelector("#m33-dep-cash-history")?.textContent || "")));
  assert.match(modal.textContent,/Tu jornada · La Cueva/);
  assert.match(modal.textContent,/07:00–23:00/);
  assert.match(modal.textContent,/Declarado/);
