@@ -169,6 +169,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     "./js/m33-turnos-final.js?v=33.19",
     "./js/m22-sesiones-en-m21.js?v=25.5",
     "./js/m49-turnos-layout-definitivo.js?v=49.6",
+    "./js/hotfix-regresiones-20260902.js?v=20261101.1",
+    "./js/hotfix-17-4-turnos-tarde-visible-20260903.js?v=17.5",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
     "./js/m51-movimientos-centro.js?v=51.4",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
@@ -181,6 +183,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     '["m33-turnos-final.js","33.19"]',
     '["m22-sesiones-en-m21.js","25.5"]',
     '["m49-turnos-layout-definitivo.js","49.6"]',
+    '["hotfix-regresiones-20260902.js","20261101.1"]',
+    '["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
     '["m51-movimientos-centro.js","51.4"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
