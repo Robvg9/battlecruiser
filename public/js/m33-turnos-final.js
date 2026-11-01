@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.15 — declaración de efectivo y cierre desde la vista del responsable
+// v33.16 — tarjeta compacta de dependienta con liquidación histórica por sesión
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -156,6 +156,39 @@
         '@media(max-width:720px){.m33-bg{padding:3px!important}.m33-modal{width:calc(100vw - 6px)!important;max-height:calc(100dvh - 6px)!important;border-radius:9px!important}.m33-head{padding:6px 8px 5px!important}.m33-title h3{font-size:.96rem!important}.m33-steps{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:2px!important}.m33-step{font-size:.56rem!important;padding:4px 1px!important;overflow-wrap:anywhere}.m33-body{padding:6px 8px!important}.m33-foot{padding:6px 8px!important}.m33-book-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-book-subtables{grid-template-columns:minmax(0,1fr)}.m33-book-table{min-width:1220px}}'
       ].join('');
       document.head.appendChild(compact);
+    }
+    if (!document.getElementById('bc-m33-dependent-card-css')) {
+      var dependentStyle = document.createElement('style');
+      dependentStyle.id = 'bc-m33-dependent-card-css';
+      dependentStyle.textContent = [
+        '.m33-dependent{display:grid;gap:12px}',
+        '.m33-dependent-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.025)}',
+        '.m33-dependent-top h4{margin:0 0 3px!important;font-size:1.02rem}',
+        '.m33-dependent-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}',
+        '.m33-dependent-meta .m33-box{min-width:0}',
+        '.m33-dependent-schedule{font-size:.76rem;opacity:.7;margin:0}',
+        '.m33-dependent-section{padding:10px;border:1px solid rgba(255,255,255,.1);border-radius:11px;min-width:0}',
+        '.m33-dependent-section h4{margin:0 0 7px!important;font-size:.96rem}',
+        '.m33-dependent-day{padding:9px 0;border-top:1px solid rgba(255,255,255,.07)}',
+        '.m33-dependent-day:first-child{border-top:0;padding-top:2px}',
+        '.m33-dependent-day-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}',
+        '.m33-dependent-day-head b{font-size:.9rem}',
+        '.m33-dependent-day-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px}',
+        '.m33-dependent-legacy{font-size:.72rem;opacity:.64;margin-top:3px}',
+        '.m33-dependent-cash-list{display:grid;gap:7px}',
+        '.m33-dependent-cash-row{padding:9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}',
+        '.m33-dependent-cash-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:7px}',
+        '.m33-dependent-cash-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}',
+        '.m33-dependent-cash-metric{min-width:0}',
+        '.m33-dependent-cash-metric small{display:block;font-size:.68rem;opacity:.62;line-height:1.2}',
+        '.m33-dependent-cash-metric b{display:block;font-size:.88rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin-top:2px}',
+        '.m33-dependent-note{font-size:.76rem;line-height:1.35;opacity:.68;margin:0}',
+        '.m33-dependent-details>summary{cursor:pointer;font-weight:650;padding:2px 0}',
+        '.m33-dependent-details .m33-archive{margin-top:8px}',
+        '.m33-dependent .m33-btn-sesion{min-height:36px;padding:7px 11px;font-size:.78rem}',
+        '@media(max-width:720px){.m33-dependent{gap:9px}.m33-dependent-top{padding:9px}.m33-dependent-meta{gap:5px}.m33-dependent-section{padding:8px}.m33-dependent-cash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-dependent-cash-grid .m33-dependent-cash-metric:last-child{grid-column:1/-1}}'
+      ].join('');
+      document.head.appendChild(dependentStyle);
     }
   }
 
@@ -1101,39 +1134,124 @@
     return '<div class="m33-session-row"><span>Estado</span><b>' + esc(st) + '</b></div>';
   }
 
+  function dependentStatusLabel(value) {
+    var status = String(value || '').toUpperCase();
+    return ({
+      APROBADA: 'Aprobada', APROBADO: 'Aprobado',
+      PENDIENTE: 'Pendiente de revisión', RECHAZADA: 'Rechazada', RECHAZADO: 'Rechazado',
+      DECLARADO: 'Declarado', COMPLETADA: 'Completada', EN_CURSO: 'En curso',
+      PROGRAMADA: 'Sin comenzar', CANCELADA: 'Cancelada', CERRADO: 'Cerrado', PENDIENTE_APROBACION: 'Pendiente de aprobación'
+    })[status] || (value || 'Sin estado');
+  }
+
+  function dependentMoney(value, currency) {
+    if (value == null || value === '' || !Number.isFinite(Number(value))) return '—';
+    var amount = Number(value).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return amount + (currency ? ' ' + currency : '');
+  }
+
   function bodyDependienta(t) {
     var me = currentUserId();
-    var mias = state.sesiones.filter(sesionAsignadaAMi);
-    var html = state.readOnly ? '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>' : '';
-    html += '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado turno</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div>';
-    html += '<h4 style="margin:18px 0 8px">Tus sesiones</h4>';
-    html += '<p class="m33-muted">Solo ves las sesiones asignadas a vos. La secuencia la controla el sistema.</p>';
-    html += '<p id="m33-dep-msg" class="m33-msg"></p>';
-    if (!me) { html += '<p class="m33-muted">No se pudo identificar tu usuario.</p>'; return html; }
-    if (!mias.length) { html += '<p class="m33-muted">No tenés sesiones asignadas en este turno.</p>'; return html; }
-    html += '<div class="m33-session-grid">' + mias.map(function (x) {
-      var st = normEstadoSesion(x.estado);
-      var labelSt = st === 'PENDIENTE' || st === 'PROGRAMADA' ? 'Sin comenzar' : st === 'EN_CURSO' ? 'En curso' : st === 'COMPLETADA' ? 'Completada' : (st || '—');
+    var mias = state.sesiones.filter(sesionAsignadaAMi).slice().sort(function (a, b) {
+      return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
+        Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
+    });
+    var html = '<div class="m33-dependent">';
+    if (state.readOnly) html += '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>';
+    html += '<section class="m33-dependent-top"><div><h4>Tu jornada · ' +
+      esc(field(t.almacen_nombre || t.almacen)) + '</h4><p class="m33-dependent-schedule">Horario operativo previsto · 07:00–23:00</p></div>' +
+      '<span class="m33-pill">' + esc(dependentStatusLabel(t.estado_maestro || t.estado)) + '</span></section>';
+    html += '<div class="m33-dependent-meta">' +
+      '<div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio || (mias[0] && mias[0].fecha))) + '</b></div>' +
+      '<div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin || (mias[mias.length - 1] && mias[mias.length - 1].fecha))) + '</b></div>' +
+      '</div><p id="m33-dep-msg" class="m33-msg"></p>';
+    if (!me) {
+      html += '<p class="m33-dependent-note">No se pudo identificar tu usuario.</p></div>';
+      return html;
+    }
+    if (!mias.length) {
+      html += '<section class="m33-dependent-section"><h4>Tus días</h4><p class="m33-dependent-note">No tienes jornadas asignadas en este turno.</p></section></div>';
+      return html;
+    }
+    html += '<section class="m33-dependent-section"><h4>Tus días</h4>' +
+      '<p class="m33-dependent-note">Una jornada completa por día. Los registros antiguos se conservan como historial y no se convierten automáticamente.</p>';
+    html += mias.map(function (session) {
+      var status = normEstadoSesion(session.estado);
+      var labelStatus = dependentStatusLabel(status);
+      var isJornada = String(session.bloque || '').toUpperCase() === 'JORNADA';
       var actions = '';
-      if (state.readOnly) actions = '<span class="m33-pill">Solo lectura</span>';
-      else if (String(x.bloque || '').toUpperCase() === 'JORNADA') actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + esc(x.id) + '">Gestionar jornada</button>';
-      else if (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st) actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + esc(x.id) + '">Abrir sesión</button>';
-      else if (st === 'EN_CURSO') {
-        var hasDeclaration = x.dinero_declarado === true || !!x.dinero_id;
-        var cashAmount = hasDeclaration && x.dinero_monto != null ? String(x.dinero_monto) : '';
-        var sid = esc(x.id);
+      var sid = esc(session.id);
+      if (state.readOnly) {
+        actions = '<span class="m33-pill">Solo lectura</span>';
+      } else if (isJornada) {
+        actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-jornada="' + sid + '">' +
+          (status === 'COMPLETADA' ? 'Ver jornada' : 'Gestionar jornada') + '</button>';
+      } else if (status === 'PENDIENTE' || status === 'PROGRAMADA' || !status) {
+        actions = '<button type="button" class="m33-btn-sesion" data-m33-abrir-sesion="' + sid + '">Continuar registro anterior</button>';
+      } else if (status === 'EN_CURSO') {
+        var hasDeclaration = session.dinero_declarado === true || !!session.dinero_id;
+        var cashAmount = hasDeclaration && session.dinero_monto != null ? String(session.dinero_monto) : '';
         actions = '<div class="m33-dep-cash">' +
           (hasDeclaration
-            ? '<span class="m33-pill m33-ok">Dinero entregado: ' + esc(cashAmount) + ' CUP</span><small class="m33-muted">' + esc(x.dinero_estado_aprobacion || 'Declarado') + '</small>'
-            : '<label>Dinero entregado (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" data-m33-cash-amount="' + sid + '" placeholder="0.00"></label><button type="button" class="m33-btn-sesion" data-m33-declare-cash="' + sid + '">Guardar dinero entregado</button>') +
-          '<button type="button" class="m33-btn-sesion" data-m33-close-legacy-session="' + sid + '"' + (!hasDeclaration ? ' disabled' : '') + '>Cerrar sesión</button>' +
+            ? '<span class="m33-pill m33-ok">Dinero entregado: ' + esc(cashAmount) + ' CUP</span><small class="m33-muted">' + esc(dependentStatusLabel(session.dinero_estado_aprobacion || 'Declarado')) + '</small>'
+            : '<label>Dinero entregado (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" data-m33-cash-amount="' + sid + '" placeholder="0.00"></label><button type="button" class="m33-btn-sesion" data-m33-declare-cash="' + sid + '">Guardar entrega</button>') +
+          '<button type="button" class="m33-btn-sesion" data-m33-close-legacy-session="' + sid + '"' + (!hasDeclaration ? ' disabled' : '') + '>Cerrar registro anterior</button>' +
           '<small class="m33-muted" data-m33-legacy-msg="' + sid + '"></small></div>';
+      } else {
+        actions = '<span class="m33-pill">' + esc(labelStatus) + '</span>';
       }
-      else actions = '<span class="m33-pill">' + esc(labelSt) + '</span>';
-      return '<div class="m33-session"><div class="m33-session-row"><div><b>Día ' + esc(x.numero_dia || x.dia_n) + ' · ' + esc(labelBloque(x.bloque)) + '</b><div class="m33-muted">' + esc(date(x.fecha)) + ' · ' + esc(labelSt) + '</div></div><div>' + actions + '</div></div></div>';
-    }).join('') + '</div>';
-    html += '<h4 style="margin:12px 0 6px">Archivo de movimientos por día</h4>' + step3();
+      var legacyNote = isJornada ? '' :
+        '<div class="m33-dependent-legacy">Registro histórico del formato anterior</div>';
+      return '<article class="m33-dependent-day" data-m33-dependent-day="' + sid + '">' +
+        '<div class="m33-dependent-day-head"><div><b>Día ' + esc(session.numero_dia || session.dia_n || '—') +
+        ' · ' + esc(date(session.fecha)) + '</b><div class="m33-muted">' + esc(labelStatus) + '</div>' + legacyNote +
+        '</div><span class="m33-pill">' + esc(isJornada ? 'Jornada completa' : 'Histórico') + '</span></div>' +
+        (actions ? '<div class="m33-dependent-day-actions">' + actions + '</div>' : '') +
+        '</article>';
+    }).join('');
+    html += '</section>';
+    html += '<section class="m33-dependent-section"><h4>Resumen de caja</h4>' +
+      '<div id="m33-dep-cash-history" class="m33-dependent-cash-list" aria-live="polite">' +
+      '<div class="m33-archive-empty">Consultando declaraciones de tus días…</div></div>' +
+      '<p class="m33-dependent-note" style="margin-top:7px">El importe declarado, el conteo del dueño y la diferencia se muestran por separado, tal como quedaron registrados.</p></section>';
+    html += '<details class="m33-dependent-section m33-dependent-details"><summary>Movimientos de tus días</summary>' +
+      '<p class="m33-dependent-note">Solo movimientos atribuibles a tus sesiones. Lo que no tenga vínculo verificable permanece en el historial general.</p>' +
+      step3() + '</details></div>';
     return html;
+  }
+
+  async function loadDependentCashHistory(overlay) {
+    var host = overlay && overlay.querySelector('#m33-dep-cash-history');
+    if (!host) return;
+    // The authenticated expediente RPC already returns the declaration, owner
+    // count and difference. Do not query the private declarations table directly.
+    var sessions = archiveSessionsForViewer().slice().sort(function (a, b) {
+      return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
+        Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
+    });
+    var rows = sessions.filter(function (session) {
+      return session.dinero_declarado === true || !!session.dinero_id;
+    });
+    if (!rows.length) {
+      host.innerHTML = '<div class="m33-archive-empty">Todavía no hay declaraciones de efectivo registradas para tus días.</div>';
+      return;
+    }
+    host.innerHTML = rows.map(function (session) {
+      var currency = session.dinero_moneda || 'CUP';
+      var status = String(session.dinero_estado_aprobacion || 'DECLARADO').toUpperCase();
+      var statusClass = /APROBAD/.test(status) ? 'm33-ok' : '';
+      return '<article class="m33-dependent-cash-row" data-m33-cash-session="' + esc(session.id) + '">' +
+        '<div class="m33-dependent-cash-head"><b>Día ' + esc(session.numero_dia || session.dia_n || '—') +
+        ' · ' + esc(date(session.fecha || session.dinero_declarado_at)) + '</b><span class="m33-pill ' + statusClass + '">' +
+        esc(dependentStatusLabel(status)) + '</span></div><div class="m33-dependent-cash-grid">' +
+        '<div class="m33-dependent-cash-metric"><small>Declarado</small><b>' +
+        esc(dependentMoney(session.dinero_monto, currency)) + '</b></div>' +
+        '<div class="m33-dependent-cash-metric"><small>Contado por el dueño</small><b>' +
+        esc(session.dinero_monto_contado == null ? 'Pendiente' : dependentMoney(session.dinero_monto_contado, currency)) + '</b></div>' +
+        '<div class="m33-dependent-cash-metric"><small>Diferencia</small><b>' +
+        esc(session.dinero_diferencia == null ? 'Pendiente' : dependentMoney(session.dinero_diferencia, currency)) + '</b></div>' +
+        '</div></article>';
+    }).join('');
   }
 
   function setDepMsg(text, ok) {
@@ -1423,6 +1541,7 @@
       ov.querySelector('#m33-x').onclick = close;
       var c = ov.querySelector('#m33-close-final'); if (c) c.onclick = close;
       bindArchiveButtons(ov);
+      loadDependentCashHistory(ov);
       ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });
        ov.querySelectorAll('[data-m33-declare-cash]').forEach(function (btn) { btn.addEventListener('click', function () { declararDineroSesionLegacy(btn.getAttribute('data-m33-declare-cash'),btn); }); });
@@ -1513,6 +1632,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.14', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
+  window.__BC_M33 = { open: open, version: '33.16', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
