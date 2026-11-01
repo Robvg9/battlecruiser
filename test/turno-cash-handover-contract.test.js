@@ -11,6 +11,9 @@ function read(relative) {
 
 const MIGRATION = read("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
 const TURNOS_ACL_MIGRATION = read("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
+const LEGACY_RECONCILIATION_MIGRATION = read("supabase/migrations/20261101130000_legacy_turno_jornada_reconciliation.sql");
+const TURNOS_MASTER_UI = read("public/js/turnos-maestro.js");
+const TURN_API = read("public/js/turno-api.js");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");
 const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
@@ -122,7 +125,34 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.ok(PG_CI.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
   assert.ok(PG_WORKFLOW.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
 });
-test("PWA release 9.5.47 loads and precaches the cash handover UI", () => {
+test("unworked legacy Mañana/Tarde blocks can be cancelled without deleting the audit trail", () => {
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /CREATE OR REPLACE FUNCTION public\\.bc5_cancelar_sesion_programada/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /Solo ADMIN autenticado/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /v_sesion\\.bloque NOT IN \\('MANANA','TARDE'\\)/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /v_sesion\\.estado NOT IN \\('PENDIENTE','PROGRAMADA'\\)/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_tramos/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_declaraciones/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_jornada_inventario_cortes/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /SET estado='CANCELADA'/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /UPDATE public\\.turno_asignaciones/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /SESION_PROGRAMADA_CANCELADA_ADMIN/);
+  assert.doesNotMatch(LEGACY_RECONCILIATION_MIGRATION, /\\bDELETE\\s+FROM\\s+public\\.(turno_sesiones|turno_asignaciones|turno_eventos)/i);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /estado NOT IN \\('COMPLETADA','CANCELADA'\\)/);
+  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_entregas_inventario/);
+  assert.match(TURNOS_MASTER_UI, /se === 'PENDIENTE' \\|\\| se === 'PROGRAMADA'/);
+  assert.match(TURNOS_MASTER_UI, /data-tm-cancelar-programada/);
+  assert.match(TURNOS_MASTER_UI, /cancelarSesionProgramada/);
+  assert.match(TURN_API, /bc5_cancelar_sesion_programada/);
+  assert.match(TURN_API, /cancelarSesionProgramada:/);
+});
+
+test("the owner can start a scheduled legacy day while non-worked placeholders do not ask for cash", () => {
+  assert.match(TURNOS_MASTER_UI, /data-tm-iniciar/);
+  assert.match(TURNOS_MASTER_UI, /Jornada completa/);
+  assert.match(TURNOS_MASTER_UI, /no requieren declaración de efectivo/);
+});
+
+test("PWA release 9.5.48 loads and precaches the cash handover UI", () => {
   assert.match(APP, /const VERSION="9\.5\.47"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
   assert.match(SW, /BC_SW_VERSION = "9\.5\.47"/);
