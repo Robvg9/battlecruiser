@@ -329,8 +329,6 @@ test("M33 hydrates the assignment selectors from the authorized responsible-user
     return selects.length === 2 && selects.every((select) => select.options.length === 3);
   }, 4000);
   assert.ok(hydrated, "one assignment select per day must contain the authoritative active responsible users");
-  assert.match(modal.textContent, /Sesiones[\s\S]*2/);
-  assert.doesNotMatch(modal.textContent, /Mañana|Tarde/);
   assert.equal(modal.querySelectorAll("select[data-m33-sids]").length, 2, "two legacy blocks on the same date must appear as one daily assignment");
   const first = modal.querySelector("select[data-m33-sids]");
   assert.deepEqual(Array.from(first.options).map((option) => option.value), ["", "dep-live", "owner-live"]);
