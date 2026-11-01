@@ -7,7 +7,7 @@
 
   const API = function () { return window.BattleCruiserTurnoAPI; };
   const ROOT_ID = 'ciclos-m18-root';
-  const VERSION = '9.4.4-turno';
+  const VERSION = '9.4.5-turno';
 
   let state = {
     view: 'detalle',
@@ -210,7 +210,7 @@
       '<div class="tm-meta">Almacén<br><b>' + esc(a ? a.nombre : almacenId) + '</b></div>' +
       '<div class="tm-meta">Inicio<br><label class="muted"><input type="date" id="tm-inicio" value="' + esc(hoy) + '"></label></div>' +
       '</div>' +
-      '<p class="muted" style="margin-top:12px">Cantidad de días (cada día = mañana + tarde → 2 sesiones).</p>' +
+      '<p class="muted" style="margin-top:12px">Cada fecha trabajada es una jornada completa de 07:00 a 23:00, con una sola dependienta responsable. Este formulario antiguo no crea turnos; utiliza el programador oficial.</p>' +
       diasBtns +
       '<div class="tm-actions">' +
       '<button type="button" class="cc-accion" data-tm-confirm-create="' + esc(almacenId) + '">Crear turno</button>' +
@@ -219,34 +219,8 @@
     );
   }
 
-  async function confirmCreate(almacenId) {
-    const api = API();
-    if (!api) { msg('API Turno no cargada.', false); return; }
-    if (!state.isAdmin && !can('ciclos', 'crear') && !can('turnos', 'crear')) {
-      msg('Solo el administrador puede crear turnos.', false);
-      return;
-    }
-    const inicioEl = document.getElementById('tm-inicio');
-    const diasEl = document.getElementById('tm-dias');
-    const inicio = inicioEl ? inicioEl.value : new Date().toISOString().slice(0, 10);
-    const dias = diasEl ? parseInt(diasEl.value, 10) : 1;
-    if (!Number.isFinite(dias) || dias < 1 || dias > 31) {
-      msg('Cantidad de días inválida (1–31).', false);
-      return;
-    }
-    try {
-      const data = await api.crearTurno({
-        almacenId: almacenId,
-        inicioPlan: inicio,
-        cantidadDias: dias
-      });
-      const id = data && (data.id || data.turno_id || (data.turno && data.turno.id));
-      msg('✓ Turno creado.', true);
-      if (id) await openTurno(id, false);
-      else home();
-    } catch (e) {
-      msg('No se pudo crear el turno: ' + String(e && e.message || e), false);
-    }
+  async function confirmCreate() {
+    msg('La creación desde el formulario antiguo está deshabilitada. Utiliza el programador oficial de Jornada completa (07:00–23:00) para asignar una responsable por fecha.', false);
   }
 
   // ---------------------------------------------------------------------------

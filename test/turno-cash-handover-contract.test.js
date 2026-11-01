@@ -122,13 +122,13 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.ok(PG_CI.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
   assert.ok(PG_WORKFLOW.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
 });
-test("PWA release 9.5.46 loads and precaches the cash handover UI", () => {
-  assert.match(APP, /const VERSION="9\.5\.46"/);
+test("PWA release 9.5.47 loads and precaches the cash handover UI", () => {
+  assert.match(APP, /const VERSION="9\.5\.47"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.46"/);
+  assert.match(SW, /BC_SW_VERSION = "9\.5\.47"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.46/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.46/);
+  assert.match(INDEX, /app\.js\?v=9\.5\.47/);
+  assert.match(INDEX, /style\.css\?v=9\.5\.47/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
