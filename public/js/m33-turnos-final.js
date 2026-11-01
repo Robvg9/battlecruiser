@@ -730,8 +730,8 @@
         .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'es'); });
       const totals = {
         opening: 0, incoming: 0, reinvestment: 0, losses: 0, otherOut: 0,
-        final: 0, balanceSales: 0, posSales: 0, profit: 0, revenue: 0, lossValue: 0,
-        declaration: 0
+        final: 0, theoreticalFinal: 0, physicalDifference: 0, posSales: 0,
+        profit: 0, revenue: 0, lossValue: 0, declaration: 0
       };
       const allOpening = productRows.length > 0 && productRows.every(function (row) { return row.opening != null; });
       const allFinal = productRows.length > 0 && productRows.every(function (row) { return row.final != null; });
@@ -748,8 +748,13 @@
         const unitGain = salePrice != null && cost != null ? salePrice - cost : null;
         const unitGainApprox = (costApprox || priceApprox) && unitGain != null;
         const markup = cost > 0 && unitGain != null ? unitGain / cost * 100 : null;
-        const balanceSales = row.opening != null && row.final != null
-          ? row.opening + row.incoming + row.reinvestment - row.losses - row.otherOut - row.final
+        // Theoretical stock uses actual POS quantities. Any residual belongs to
+        // physical reconciliation; never infer or relabel an unexplained shortage as sales.
+        const theoreticalFinal = row.opening != null
+          ? row.opening + row.incoming + row.reinvestment - saleQty - row.losses - row.otherOut
+          : null;
+        const physicalDifference = theoreticalFinal != null && row.final != null
+          ? row.final - theoreticalFinal
           : null;
         const revenue = hasLineDetail
           ? row.saleRevenue
@@ -769,7 +774,8 @@
         totals.reinvestment += row.reinvestment;
         totals.losses += row.losses;
         totals.otherOut += row.otherOut;
-        if (balanceSales != null) totals.balanceSales += balanceSales;
+        if (theoreticalFinal != null) totals.theoreticalFinal += theoreticalFinal;
+        if (physicalDifference != null) totals.physicalDifference += physicalDifference;
         totals.posSales += saleQty;
         if (profit != null) totals.profit += profit;
         if (revenue != null) totals.revenue += revenue;
@@ -783,7 +789,8 @@
           priceApprox: priceApprox,
           markup: markup,
           markupApprox: unitGainApprox,
-          balanceSales: balanceSales,
+          theoreticalFinal: theoreticalFinal,
+          physicalDifference: physicalDifference,
           saleQty: saleQty,
           revenue: revenue,
           profit: profit,
@@ -818,8 +825,9 @@
           fmtCell(row.reinvestment, 'qty', false),
           fmtCell(row.losses, 'qty', false),
           fmtCell(row.otherOut, 'qty', false),
+          fmtCell(row.theoreticalFinal, 'qty', false),
           fmtCell(row.final, 'qty', false),
-          fmtCell(row.balanceSales, 'qty', false),
+          fmtCell(row.physicalDifference, 'qty', false),
           fmtCell(row.saleQty, 'qty', false),
           fmtCell(row.profit, 'money', row.profitApprox),
           fmtCell(row.revenue, 'money', row.revenueApprox),
@@ -835,8 +843,9 @@
         '<td>' + bookQty(totals.reinvestment) + '</td>' +
         '<td>' + bookQty(totals.losses) + '</td>' +
         '<td>' + bookQty(totals.otherOut) + '</td>' +
+        '<td>' + (allOpening ? bookQty(totals.theoreticalFinal) : '—') + '</td>' +
         '<td>' + (allFinal ? bookQty(totals.final) : '—') + '</td>' +
-        '<td>' + (allOpening && allFinal ? bookQty(totals.balanceSales) : '—') + '</td>' +
+        '<td>' + (allOpening && allFinal ? bookQty(totals.physicalDifference) : '—') + '</td>' +
         '<td>' + bookQty(totals.posSales) + '</td>' +
         '<td>' + bookMoney(totals.profit, totalsApprox) + '</td>' +
         '<td>' + bookMoney(totals.revenue, totalsApprox) + '</td>' +
@@ -865,8 +874,9 @@
           '</td><td>' + esc(row.actor) + '</td></tr>';
       }).join('') : '<tr><td colspan="7">No hay solicitudes pendientes o rechazadas asociadas al turno.</td></tr>';
       const snapshotNote = (!hasOpening || !hasFinal)
-        ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
+        ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La diferencia física queda sin cálculo hasta disponer de ambos cortes.'
         : '';
+      const inventoryNote = 'La diferencia física = inventario físico final − inventario teórico final (negativa = faltante; positiva = sobrante). Las ventas POS se descuentan del teórico y se muestran por separado; un faltante no se convierte automáticamente en venta.';
       const needsRevenueEstimate = tableRows.some(function (row) { return row.revenueApprox; });
       const needsProfitEstimate = tableRows.some(function (row) { return row.profitApprox; });
       const salesNote = needsRevenueEstimate
@@ -890,13 +900,13 @@
       const summary = summaryItems.map(function (item) {
         return '<div class="m33-book-metric"><small>' + item[0] + '</small><b>' + item[1] + '</b></div>';
       }).join('');
-      const notes = [snapshotNote, salesNote, cashNote].filter(Boolean).map(function (item) {
+      const notes = [snapshotNote, inventoryNote, salesNote, cashNote].filter(Boolean).map(function (item) {
         return '<div class="m33-book-note">' + esc(item) + '</div>';
       }).join('');
       host.innerHTML = '<div class="m33-book-summary">' + summary + '</div>' + notes +
         '<section class="m33-book-section"><h4>Inventario consolidado por producto</h4><div class="m33-book-scroll">' +
-        '<table class="m33-book-table"><thead><tr><th>% G</th><th>G/u</th><th>P.C.</th><th>P.V.</th><th>Producto</th><th>Inv. inicial</th><th>Entradas</th><th>Reinversión</th><th>Bajas</th><th>Otros</th><th>Inv. final</th><th>Venta (saldo)</th><th>Venta POS</th><th>Ganancia</th><th>Ingreso</th><th>Bajas $</th></tr></thead><tbody>' +
-        (tableBody || '<tr><td colspan="16">No hay productos asociados a los cortes o movimientos del turno.</td></tr>') +
+        '<table class="m33-book-table"><thead><tr><th>% G</th><th>G/u</th><th>P.C.</th><th>P.V.</th><th>Producto</th><th>Inv. inicial</th><th>Entradas</th><th>Reinversión</th><th>Bajas</th><th>Otros</th><th>Inv. teórico</th><th>Inv. físico</th><th>Diferencia física</th><th>Venta POS</th><th>Ganancia</th><th>Ingreso</th><th>Bajas $</th></tr></thead><tbody>' +
+        (tableBody || '<tr><td colspan="17">No hay productos asociados a los cortes o movimientos del turno.</td></tr>') +
         '</tbody><tfoot>' + totalMarkup + '</tfoot></table></div></section>' +
         '<div class="m33-book-subtables">' +
         '<section class="m33-book-section"><h4>Reinversiones detalladas · ' + bookMoney(reinvestmentTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Producto</th><th>Uds.</th><th>P.C.</th><th>Inversión</th><th>Responsable</th></tr></thead><tbody>' + reinvestmentBody + '</tbody></table></div></section>' +
