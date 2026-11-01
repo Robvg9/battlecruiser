@@ -79,7 +79,7 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"), 'the recovery control must be available in the offline shell');
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.8"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
-  assert.ok(app.includes('["m33-turnos-final.js","33.15"]'), 'the turn detail modal cache key must load the audited recovery action');
+  assert.ok(app.includes('["m33-turnos-final.js","33.16"]'), 'the turn detail modal cache key must load the audited recovery action');
   assert.ok(app.includes('["m29-turnos-organizacion.js","29.19"]'), 'M29 full-day default flow must be loaded dynamically');
   assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.19"), 'M29 full-day default flow must be available offline');
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
@@ -104,8 +104,8 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 
 
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.49["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.49["']/);
+  assert.match(app, /const VERSION=["']9\.5\.50["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.50["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261030\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
@@ -117,7 +117,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.49["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.50["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261030\.2/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261030\.3/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -140,8 +140,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.49 — apertura de la siguiente sesión atrasada y secuencia estable/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.49"><\/script>/);
+  assert.match(app, /v9\.5\.50 — tarjeta compacta de dependienta y resumen de caja/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.50"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.11/, "the Step 7 workflow is available in the offline static cache");
@@ -157,7 +157,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.49['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.50['"]\);/);
 });
 
 
@@ -166,7 +166,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     "./js/turno-api.js?v=9.4.8",
     "./js/turnos-maestro.js?v=9.4.6",
     "./js/m29-turnos-organizacion.js?v=29.19",
-    "./js/m33-turnos-final.js?v=33.15",
+    "./js/m33-turnos-final.js?v=33.16",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
     "./js/m51-movimientos-centro.js?v=51.4",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
@@ -176,7 +176,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     '["turno-api.js","9.4.8"]',
     '["turnos-maestro.js","9.4.6"]',
     '["m29-turnos-organizacion.js","29.19"]',
-    '["m33-turnos-final.js","33.15"]',
+    '["m33-turnos-final.js","33.16"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
     '["m51-movimientos-centro.js","51.4"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
@@ -188,6 +188,6 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.9"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.5"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.49["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.49["']/);
+  assert.match(app, /const VERSION=["']9\.5\.50["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.50["']/);
 });
