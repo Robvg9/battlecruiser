@@ -4,12 +4,20 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { JSDOM } = require("jsdom");
 
 const ROOT = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const source = read("public/js/m33-turnos-final.js");
 const app = read("public/app.js");
 const sw = read("public/service-worker.js");
+const legacyLayout = read("public/js/m49-turnos-layout-definitivo.js");
+const legacyInjector = read("public/js/bc14-5-turnos-manana-tarde.js");
+const m22 = read("public/js/m22-sesiones-en-m21.js");
+const m29 = read("public/js/m29-turnos-organizacion.js");
+const turnosMaestro = read("public/js/turnos-maestro.js");
+const hotfixRegresiones = read("public/js/hotfix-regresiones-20260902.js");
+const hotfix174 = read("public/js/hotfix-17-4-turnos-tarde-visible-20260903.js");
 
 test("M33 keeps its five named steps while using a compact responsive grid", () => {
   assert.ok(source.includes("const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];"));
@@ -63,4 +71,68 @@ test("M33 step 2 keeps every assignment label and selector in a compact horizont
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
   assert.ok(sw.includes("./js/m33-turnos-final.js?v=" + moduleVersion));
+});
+
+
+test("M33 operational views show one daily jornada and exclude cancelled legacy rows", () => {
+  assert.match(source, /const sessions = \(state\.sesiones \|\| \[\]\)\.filter\(activeSession\);/);
+  assert.ok(source.includes("<span>Jornadas</span><b>' + groups.length + '</b>"));
+  assert.ok(source.includes("'Jornada'"));
+});
+
+test("legacy layout modules cannot reintroduce split-shift headings or panels", () => {
+  assert.match(legacyLayout, /restoreBody/);
+  assert.doesNotMatch(legacyLayout, /Mañana|Tarde|Asignar la misma dependienta en cada bloque/);
+  assert.match(legacyInjector, /removeObsoletePanel/);
+  assert.doesNotMatch(legacyInjector, /<h4>Tarde|MANANA|TARDE|PM/);
+  assert.match(m22, /return 'Jornada diaria'/);
+  assert.doesNotMatch(m22, /return 'Mañana'|return 'Tarde'|Mañana \/ tarde/);
+  assert.match(m22, /var visibles =/);
+  assert.match(m22, /estado === 'CANCELADA' \|\| estado === 'CANCELADO'/);
+  assert.match(m22, /String\(assigned\) === String\(me\)/);
+  assert.match(m29, /Cada fecha trabajada contará como una sola jornada completa/);
+  assert.doesNotMatch(m29, /No se crearán bloques de Mañana\/Tarde/);
+  assert.match(turnosMaestro, /return 'Jornada diaria'/);
+  assert.doesNotMatch(turnosMaestro, /return 'Mañana'|return 'Tarde'/);
+  assert.match(turnosMaestro, /const assigned = s\.usuario_id \|\| s\.asignado_id \|\| null/);
+  assert.match(turnosMaestro, /String\(assigned\) === String\(me\)/);
+  assert.match(turnosMaestro, /status === 'CANCELADA' \|\| status === 'CANCELADO'/);
+});
+
+
+test("legacy recovery hotfixes cannot append split M33 sections", () => {
+  assert.match(hotfixRegresiones, /cleanLegacyTurnoPanels/);
+  assert.doesNotMatch(hotfixRegresiones, /groupHtml\('Mañana'|grouped = \\{ MAÑANA|Asignada a otra dependienta/);
+  assert.match(hotfix174, /remove\(\)/);
+  assert.doesNotMatch(hotfix174, /<h4>Tarde|innerHTML|hub\.open/);
+});
+
+
+test("M49 restores M33 daily cards and removes stale Mañana/Tarde DOM at runtime", () => {
+  const dom = new JSDOM(
+    "<!doctype html><html><head></head><body><div id='m33-bg'><div class='m33-modal'><div class='m33-body'>" +
+    "<div class='m33-session-grid' id='daily-grid'></div>" +
+    "<div class='m49-session-grid'>" +
+    "<div class='m49-session-col'><div class='m49-session-heading'>☀️ Mañana</div>" +
+    "<article id='day-1' class='m33-session m49-session-card'>Jornada · Día 1</article></div>" +
+    "<div class='m49-session-col'><div class='m49-session-heading'>🌙 Tarde</div>" +
+    "<article id='day-2' class='m33-session m49-session-card'>Jornada · Día 2</article></div></div>" +
+    "<section class='bc-session-recovery'><h4>Mañana</h4><h4>Tarde</h4></section>" +
+    "</div></div></div></body></html>",
+    { runScripts: "outside-only", pretendToBeVisual: true }
+  );
+  const { window } = dom;
+  Object.defineProperty(window.document, "readyState", { configurable: true, value: "complete" });
+  window.eval(legacyLayout);
+  const body = window.document.querySelector("#m33-bg .m33-body");
+  const grid = body.querySelector("#daily-grid");
+  assert.equal(body.querySelector(".m49-session-grid"), null);
+  assert.equal(body.querySelector(".bc-session-recovery"), null);
+  assert.equal(body.querySelectorAll(".m49-session-heading").length, 0);
+  assert.deepEqual(
+    Array.from(grid.querySelectorAll(".m33-session")).map((card) => card.id),
+    ["day-1", "day-2"]
+  );
+  assert.doesNotMatch(body.textContent, /Mañana|Tarde/);
+  dom.window.close();
 });

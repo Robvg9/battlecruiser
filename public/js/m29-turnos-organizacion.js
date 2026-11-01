@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.19';
+  var VERSION = '29.20';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -646,7 +646,7 @@
     var jornadas = schedule.filter(function (row) { return row.trabaja; }).length;
     var descansos = schedule.filter(function (row) { return !row.trabaja; }).length;
     var summaryText = 'Se crearán ' + jornadas + ' jornadas completas de 07:00 a 23:00, con una dependienta responsable por día, y ' +
-      descansos + ' días de descanso. No se crearán bloques de Mañana/Tarde.';
+      descansos + ' días de descanso. Cada fecha trabajada contará como una sola jornada completa.';
     if (!window.confirm(summaryText + ' ¿Confirmas?')) return;
     var btn = document.getElementById('m29-confirm-crear');
     if (btn) btn.disabled = true;

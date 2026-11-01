@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.18 — jornadas diarias agrupadas y revisión administrativa
+// v33.19 — una jornada visible por fecha, sin paneles legacy
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -309,7 +309,7 @@
     const declared = groups.filter(function (g) {
       return g.sessions.some(function (s) { return s.dinero_declarado === true || !!s.dinero_id || s.dinero_monto != null; });
     }).length;
-    return '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duración</span><b>' + esc(field(t.dias_turno || groups.length)) + ' día(s)</b></div><div class="m33-box"><span>Sesiones</span><b>' + groups.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + groups.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + groups.length + '</b></div></div><h4 style="margin:12px 0 6px">Jornadas</h4><div class="m33-session-grid">' + (groups.map(function (group) {
+    return '<div class="m33-summary"><div class="m33-box"><span>Almacén</span><b>' + esc(field(t.almacen_nombre || t.almacen)) + '</b></div><div class="m33-box"><span>Estado</span><b>' + esc(field(t.estado_maestro || t.estado)) + '</b></div><div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio)) + '</b></div><div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin)) + '</b></div></div><div class="m33-summary" style="margin-top:9px"><div class="m33-box"><span>Duración</span><b>' + esc(field(t.dias_turno || groups.length)) + ' día(s)</b></div><div class="m33-box"><span>Jornadas</span><b>' + groups.length + '</b></div><div class="m33-box"><span>Dependientas</span><b>' + assigned + '/' + groups.length + '</b></div><div class="m33-box"><span>Dinero</span><b>' + declared + '/' + groups.length + '</b></div></div><h4 style="margin:12px 0 6px">Jornadas</h4><div class="m33-session-grid">' + (groups.map(function (group) {
       return '<div class="m33-session"><div class="m33-session-row"><div><b>Jornada · Día ' + esc(group.day) + '</b><div class="m33-muted">' + esc(date(group.date)) + '</div></div><div><span class="m33-pill ' + (dailyAssignedId(group) ? 'm33-ok' : 'm33-warn') + '">' + esc(dailyResponsibleLabel(group)) + '</span></div></div></div>';
     }).join('') || '<div class="m33-muted">Sin jornadas.</div>') + '</div>';
   }
@@ -348,7 +348,7 @@
       }).join('') + '</div>';
   }
   function archiveSessionsForViewer() {
-    const sessions = state.sesiones || [];
+    const sessions = (state.sesiones || []).filter(activeSession);
     return state.isAdmin ? sessions : sessions.filter(sesionAsignadaAMi);
   }
   function archiveDayGroups(sessions) {
@@ -1718,7 +1718,7 @@
             '</td><td>' + esc(row.almacen || '—') + '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
             '</td><td>' + esc(row.usuario || '—') + '</td><td>' + esc(shortRef) + '</td></tr>';
         }).join('');
-        host.innerHTML = title + '<div class="m33-archive-scroll"><table class="m33-archive-table"><thead><tr><th>Fecha/hora</th><th>' + (state.isAdmin ? 'Sesión' : 'Jornada') + '</th><th>Tipo</th><th>Producto</th><th>Almacén</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+        host.innerHTML = title + '<div class="m33-archive-scroll"><table class="m33-archive-table"><thead><tr><th>Fecha/hora</th><th>' + 'Jornada' + '</th><th>Tipo</th><th>Producto</th><th>Almacén</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
           (denied ? '<div class="m33-archive-empty" role="status">Algunas sesiones no se muestran porque tu perfil no tiene permiso para consultarlas.</div>' : '');
       }
       host.dataset.loaded = '1';
@@ -1844,6 +1844,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.18', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
+  window.__BC_M33 = { open: open, version: '33.19', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

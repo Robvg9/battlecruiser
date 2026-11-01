@@ -123,6 +123,23 @@ test("Paso 4: M33 consulta el archivo de un turno cerrado por fecha sin mutar re
 });
 
 
+test("M33 excludes cancelled legacy sessions from the daily movements archive", async (t) => {
+  const { window, rpcCalls, sessions } = setup(t);
+  sessions.push({ ...session("session-day1-cancelled", 1, "2026-10-20", "TARDE"), estado: "CANCELADA" });
+  await window.__BC_M33.open("turno-closed-fixture");
+  const modal = window.document.getElementById("m33-bg");
+  modal.querySelector("#m33-next").click();
+  modal.querySelector("#m33-next").click();
+  assert.ok(await waitFor(() => modal.querySelectorAll(".m33-archive-day").length === 2));
+  const dayOne = modal.querySelector(".m33-archive-day");
+  dayOne.querySelector("[data-m33-archive-sessions]").click();
+  assert.ok(await waitFor(() => dayOne.querySelector("[data-m33-archive-host]").textContent.includes("Compra vinculada día 1")));
+  const queried = rpcCalls.filter((call) => call.name === "bc7_movimientos_sesion")
+    .map((call) => call.params.p_turno_sesion_id);
+  assert.ok(!queried.includes("session-day1-cancelled"), "cancelled history remains stored but is not exposed as an active operational session");
+  assert.deepEqual(queried.sort(), ["session-day1-am", "session-day1-pm"]);
+});
+
 test("Paso 4: personal asignado también accede solo al archivo de sus sesiones", async (t) => {
   const { window, rpcCalls } = setup(t, { admin: false });
   await window.__BC_M33.open("turno-closed-fixture");
