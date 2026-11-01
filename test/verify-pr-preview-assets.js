@@ -48,7 +48,8 @@ async function fetchText(assetPath, attempt) {
           "[preview] PASS — index.html, app.js and Service Worker HTTP 200; app=" +
           expectedAppVersion + " sw=" + expectedSwVersion
         );
-        process.exit(0);
+        // Return normally so Undici/Node can close completed fetch sockets cleanly.
+        return;
       }
       console.log(
         "[preview] attempt " + attempt + "/30: index=" + index.status +
