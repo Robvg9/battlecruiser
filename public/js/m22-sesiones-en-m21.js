@@ -1,5 +1,5 @@
-// BattleCruiser M22 + M24 + M25 + M25.1 + M25.3 + M25.4 — Sesiones en Turnos.
-// M25.4: romper bucle M22↔M24. refresh solo si falta panel o cambió ciclo; ignora paneles internos.
+// BattleCruiser M22 + M24 + M25 + M25.1 + M25.3 + M25.5 — Sesiones en Turnos.
+// M25.5: vista personal de jornadas activas; romper bucle M22↔M24. refresh solo si falta panel o cambió ciclo; ignora paneles internos.
 (function () {
   'use strict';
   var RPC_LIST = 'listar_sesiones_operativas';
@@ -148,7 +148,7 @@
     var panel = document.createElement('div');
     panel.id = PANEL_ID;
     panel.className = 'm21-card';
-    panel.innerHTML = '<h4>Sesiones de trabajo</h4><p class="muted">Jornada diaria · responsable asignado · estado de trabajo.</p><div id="m22-sesiones-lista" class="m22-ses-lista"><p class="muted">Cargando sesiones…</p></div><p id="m22-sesiones-msg" class="m21-msg"></p>';
+    panel.innerHTML = '<h4>Jornadas del turno</h4><p class="muted">Jornada diaria · responsable asignado · estado de trabajo.</p><div id="m22-sesiones-lista" class="m22-ses-lista"><p class="muted">Cargando sesiones…</p></div><p id="m22-sesiones-msg" class="m21-msg"></p>';
     var wrap = root.querySelector('.m21-wrap') || root;
     var firstCard = wrap.querySelector('.m21-card');
     if (firstCard && firstCard.parentNode) {
