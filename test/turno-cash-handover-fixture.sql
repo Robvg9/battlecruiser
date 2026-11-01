@@ -14,6 +14,21 @@ ALTER TABLE public.turnos
 
 -- Disposable-only shape for owner cash discrepancy tests.
 -- Production already has turno_diferencias; the Step 7 sandbox fixture does not.
+-- Minimal disposable shapes for session-bound finance/inventory records
+-- checked by the legacy cancellation guard. Production has the full schemas.
+CREATE TABLE IF NOT EXISTS public.turno_entregas_inventario (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  turno_id uuid NOT NULL,
+  turno_sesion_id uuid NOT NULL,
+  estado text NOT NULL DEFAULT 'PENDIENTE'
+);
+CREATE TABLE IF NOT EXISTS public.turno_descuentos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  turno_id uuid NOT NULL,
+  turno_sesion_id uuid NOT NULL,
+  monto numeric NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS public.turno_diferencias (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   turno_id uuid NOT NULL,
