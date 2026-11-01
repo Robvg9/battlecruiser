@@ -150,7 +150,7 @@ test("Paso 4: el historial cerrado abre M33 en modo de solo lectura, sin control
   assert.match(modal.textContent, /Expediente histórico.*Solo lectura/i);
   modal.querySelector("#m33-next").click();
   assert.match(modal.textContent, /asignaciones se muestran tal como quedaron registradas/i);
-  assert.equal(modal.querySelectorAll("select[data-m33-sid]").length, 0,
+  assert.equal(modal.querySelectorAll("select[data-m33-sids]").length, 0,
     "las asignaciones históricas deben ser texto, nunca controles editables");
   assert.equal(modal.querySelector("#m33-save"), null, "el expediente histórico no debe ofrecer Guardar");
   assert.equal(modal.querySelector("#m33-delete"), null, "el expediente histórico no debe ofrecer Eliminar");
@@ -325,11 +325,14 @@ test("M33 hydrates the assignment selectors from the authorized responsible-user
   const modal = window.document.getElementById("m33-bg");
   modal.querySelector("#m33-next").click();
   const hydrated = await waitFor(() => {
-    const selects = Array.from(modal.querySelectorAll("select[data-m33-sid]"));
-    return selects.length === sessions.length && selects.every((select) => select.options.length === 3);
+    const selects = Array.from(modal.querySelectorAll("select[data-m33-sids]"));
+    return selects.length === 2 && selects.every((select) => select.options.length === 3);
   }, 4000);
-  assert.ok(hydrated, "each assignment select must contain the authoritative active responsible users");
-  const first = modal.querySelector("select[data-m33-sid]");
+  assert.ok(hydrated, "one assignment select per day must contain the authoritative active responsible users");
+  assert.match(modal.textContent, /Sesiones[\s\S]*2/);
+  assert.doesNotMatch(modal.textContent, /Mañana|Tarde/);
+  assert.equal(modal.querySelectorAll("select[data-m33-sids]").length, 2, "two legacy blocks on the same date must appear as one daily assignment");
+  const first = modal.querySelector("select[data-m33-sids]");
   assert.deepEqual(Array.from(first.options).map((option) => option.value), ["", "dep-live", "owner-live"]);
   assert.ok(!Array.from(first.options).some((option) => option.value === "staff-stale"),
     "the assignment form must not resurrect a stale staff member missing from the canonical catalog");
