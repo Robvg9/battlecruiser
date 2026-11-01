@@ -292,6 +292,7 @@ function applySql(file) {
     applySql("supabase/migrations/20261101130000_legacy_turno_jornada_reconciliation.sql");
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation ===");
     applySql("test/turno-cash-handover-contract.sql");
+    log("\\r\\n=== 12/13 Verify owner cash and legacy reconciliation contracts ===");
     log("\\r\\nPASS Step 7 inventory + finance + carry-forward + cash handover + authenticated RLS + audited legacy-session reconciliation + ACL contracts.");
   } catch (error) {
     failure = error;
