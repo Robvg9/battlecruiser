@@ -285,7 +285,7 @@ function applySql(file) {
     log("\\r\\n=== 10/11 Verify cash handover fixture and authenticated RLS dependency ===");
     applySql("test/turno-cash-handover-fixture.sql");
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
-    applySql("supabase/migrations/20261031235000_turnos_authenticated_rls_dependency_read.sql");
+    applySql("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
     log("\\r\\n=== 11/11 Verify staff/owner RLS reads after the authenticated SELECT fix ===");
     applySql("test/turno-cash-handover-contract.sql");
     log("\\r\\nPASS Step 7 inventory + finance + carry-forward + owner cash handover + authenticated RLS visibility + discrepancy review + ACL contracts.");
