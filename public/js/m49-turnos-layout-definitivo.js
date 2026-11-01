@@ -7,7 +7,7 @@
 
   function removeObsoletePanels(root) {
     if (!root || !root.querySelectorAll) return;
-    root.querySelectorAll('.bc14-turnos, [data-bc14-turnos]').forEach(function (node) {
+    root.querySelectorAll('.bc14-turnos, [data-bc14-turnos], .bc-session-recovery, [data-bc174-tarde]').forEach(function (node) {
       node.remove();
     });
   }
