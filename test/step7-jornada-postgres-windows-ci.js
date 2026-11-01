@@ -289,9 +289,11 @@ function applySql(file) {
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
     applySql("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
     applySql("supabase/migrations/20261101005329_fix_turno_admin_permission_boundary.sql");
-    log("\\r\\n=== 11/12 Verify staff/owner RLS and admin permission boundary ===");
+    applySql("supabase/migrations/20261101130000_legacy_turno_jornada_reconciliation.sql");
+    log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation ===");
     applySql("test/turno-cash-handover-contract.sql");
-    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + owner cash handover + authenticated RLS visibility + discrepancy review + ACL contracts.");
+    log("\\r\\n=== 12/13 Verify owner cash and legacy reconciliation contracts ===");
+    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + cash handover + authenticated RLS + audited legacy-session reconciliation + ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));

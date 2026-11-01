@@ -270,11 +270,17 @@
     const alm = t.almacen_nombre || t.almacen_id || '—';
 
     let sesHtml = '';
-    if (!state.sesiones.length) {
-      sesHtml = '<p class="muted">Sin sesiones cargadas (posible restricción RLS o Turno vacío).</p>';
+    const cancelledSessions = state.sesiones.filter(function (s) {
+      return String(s.estado || '').toUpperCase() === 'CANCELADA';
+    });
+    const visibleSessions = state.sesiones.filter(function (s) {
+      return String(s.estado || '').toUpperCase() !== 'CANCELADA';
+    });
+    if (!visibleSessions.length) {
+      sesHtml = '<p class="muted">No hay jornadas activas en este turno.</p>';
     } else {
       const dayGroups = Object.create(null);
-      state.sesiones.forEach(function (s) {
+      visibleSessions.forEach(function (s) {
         const day = s.dia_n || s.numero_dia || '—';
         const date = String(s.fecha || '').slice(0, 10);
         const dayKey = String(day) + '|' + date;
@@ -289,6 +295,9 @@
           const assigned = s.usuario_id || s.asignado_id || null;
           const nombre = s.usuario_nombre || s.asignado_nombre || (assigned ? '—' : 'Sin asignar');
           const se = String(s.estado || '').toUpperCase();
+          const bloque = String(s.bloque || '').toUpperCase();
+          const blockLabel = group.sessions.length === 1 && (bloque === 'MANANA' || bloque === 'TARDE')
+            ? 'Jornada completa' : labelBloque(s.bloque);
           let actions = '';
           if (!assigned && state.isAdmin && (se === 'PENDIENTE' || se === 'PROGRAMADA' || !se)) {
             actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Asignar</button>';
@@ -297,13 +306,18 @@
             actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Cambiar</button>';
           }
           const me = currentUserId();
-          const puedoIniciar = se === 'PENDIENTE' && assigned && me && String(assigned) === String(me);
+          const puedoIniciar = (se === 'PENDIENTE' || se === 'PROGRAMADA') &&
+            bloque !== 'JORNADA' && assigned && me && String(assigned) === String(me);
           if (puedoIniciar) {
-            actions += '<button type="button" class="cc-accion" data-tm-iniciar="' + esc(s.id) + '">Iniciar sesión</button>';
+            actions += '<button type="button" class="cc-accion" data-tm-iniciar="' + esc(s.id) + '">Iniciar jornada</button>';
+          }
+          if (state.isAdmin && (bloque === 'MANANA' || bloque === 'TARDE') &&
+              (se === 'PENDIENTE' || se === 'PROGRAMADA')) {
+            actions += '<button type="button" class="cc-accion" data-tm-cancelar-programada="' + esc(s.id) + '">Cancelar bloque no trabajado</button>';
           }
           if (se === 'EN_CURSO' && assigned && me && String(assigned) === String(me)) {
             actions += '<button type="button" class="cc-accion" data-tm-declarar="' + esc(s.id) + '">Dinero entregado</button>';
-            actions += '<button type="button" class="cc-accion" data-tm-cerrar-ses="' + esc(s.id) + '">Cerrar sesión</button>';
+            actions += '<button type="button" class="cc-accion" data-tm-cerrar-ses="' + esc(s.id) + '">Cerrar jornada</button>';
             actions += '<button type="button" class="cc-accion" data-tm-interrumpir="' + esc(s.id) + '">Interrumpir / relevo</button>';
           }
           if (!assigned && se === 'PENDIENTE') {
@@ -314,7 +328,7 @@
           }
           return (
             '<div class="tm-row" data-sesion-id="' + esc(s.id) + '">' +
-            '<div><b>Sesión · ' + esc(labelBloque(s.bloque)) + '</b>' +
+            '<div><b>' + esc(blockLabel) + '</b>' +
             '<small>' + esc(fmtDate(s.fecha)) + ' · ' + esc(nombre) + '</small>' +
             '<span class="tm-status">' + esc(labelEstado(se)) + '</span></div>' +
             '<div class="tm-actions">' + actions + '</div></div>'
@@ -331,6 +345,10 @@
           '</section>'
         );
       }).join('');
+    }
+    if (state.isAdmin && cancelledSessions.length) {
+      sesHtml += '<p class="muted">Bloques antiguos no trabajados cancelados: ' + cancelledSessions.length +
+        '. Sus asignaciones y eventos se conservan en el expediente; no requieren declaración de efectivo.</p>';
     }
 
     let adminActions = '';
@@ -521,6 +539,18 @@
     );
   }
 
+  async function doCancelarSesionProgramada(sesionId) {
+    const motivo = 'Reconciliación de jornada única 07:00–23:00: bloque legacy no trabajado; se conserva su historial.';
+    if (!window.confirm('¿Cancelar este bloque programado que no se trabajó?\n\nNo se declarará efectivo ni se borrará el historial. El backend rechazará la operación si existe actividad, dinero o inventario asociado.')) return;
+    try {
+      await API().cancelarSesionProgramada(sesionId, motivo);
+      msg('✓ Bloque no trabajado cancelado; historial preservado.', true);
+      if (state.turno) await openTurno(state.turno.id, false);
+    } catch (e) {
+      msg('No se pudo cancelar el bloque: ' + String(e && e.message || e), false);
+    }
+  }
+
   async function doEnviarAprobacion(turnoId) {
     try {
       await API().enviarAprobacion(turnoId);
@@ -694,7 +724,7 @@
           const items = Array.isArray(result && result.data) ? result.data : [];
           items.forEach(function (row) {
             rows.push(Object.assign({}, row, {
-              __sessionLabel: session ? labelBloque(session.bloque) : 'Sesión',
+              __sessionLabel: session && ['MANANA','TARDE'].includes(String(session.bloque || '').toUpperCase()) ? 'Jornada completa' : (session ? labelBloque(session.bloque) : 'Sesión'),
               __sessionDay: session ? (session.dia_n || session.numero_dia || button.dataset.tmMovDia || '—') : (button.dataset.tmMovDia || '—')
             }));
           });
@@ -763,6 +793,7 @@
       if (b.dataset.tmOpen) return openTurno(b.dataset.tmOpen, b.dataset.legacy === '1');
       if (b.dataset.tmAsignar) return promptAsignar(b.dataset.tmAsignar);
       if (b.dataset.tmIniciar) return doIniciar(b.dataset.tmIniciar);
+      if (b.dataset.tmCancelarProgramada) return doCancelarSesionProgramada(b.dataset.tmCancelarProgramada);
       if (b.dataset.tmDeclarar) return doDeclarar(b.dataset.tmDeclarar);
       if (b.dataset.tmCerrarSes) return doCerrarSesion(b.dataset.tmCerrarSes);
       if (b.dataset.tmInterrumpir) return doInterrumpir(b.dataset.tmInterrumpir);

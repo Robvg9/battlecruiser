@@ -11,6 +11,9 @@ function read(relative) {
 
 const MIGRATION = read("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
 const TURNOS_ACL_MIGRATION = read("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
+const LEGACY_RECONCILIATION_MIGRATION = read("supabase/migrations/20261101130000_legacy_turno_jornada_reconciliation.sql");
+const TURNOS_MASTER_UI = read("public/js/turnos-maestro.js");
+const TURN_API = read("public/js/turno-api.js");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");
 const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
@@ -122,13 +125,50 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.ok(PG_CI.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
   assert.ok(PG_WORKFLOW.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
 });
-test("PWA release 9.5.47 loads and precaches the cash handover UI", () => {
-  assert.match(APP, /const VERSION="9\.5\.47"/);
+test("unworked legacy Mañana/Tarde blocks can be cancelled without deleting the audit trail", () => {
+  assert.ok(FIXTURE.includes("CREATE TABLE IF NOT EXISTS public.turno_entregas_inventario"));
+  assert.ok(FIXTURE.includes("CREATE TABLE IF NOT EXISTS public.turno_descuentos"));
+  for (const fragment of [
+    "CREATE OR REPLACE FUNCTION public.bc5_cancelar_sesion_programada",
+    "v_sesion.bloque NOT IN ('MANANA','TARDE')",
+    "v_sesion.estado NOT IN ('PENDIENTE','PROGRAMADA')",
+    "public.turno_tramos",
+    "public.turno_declaraciones",
+    "public.turno_jornada_inventario_cortes",
+    "public.turno_entregas_inventario",
+    "public.turno_descuentos",
+    "public.turno_diferencias",
+    "public.gastos",
+    "public.reinversiones",
+    "public.mermas",
+    "public.bajas",
+    "UPDATE public.turno_asignaciones",
+    "SET estado='CANCELADA'",
+    "SESION_PROGRAMADA_CANCELADA_ADMIN",
+    "estado NOT IN ('COMPLETADA','CANCELADA')",
+    "public.turno_entregas_inventario"
+  ]) assert.ok(LEGACY_RECONCILIATION_MIGRATION.includes(fragment), "missing cancellation invariant: " + fragment);
+  assert.equal(LEGACY_RECONCILIATION_MIGRATION.includes("DELETE FROM public.turno_sesiones"), false);
+  assert.equal(LEGACY_RECONCILIATION_MIGRATION.includes("DELETE FROM public.turno_asignaciones"), false);
+  assert.ok(TURNOS_MASTER_UI.includes("data-tm-cancelar-programada"));
+  assert.ok(TURNOS_MASTER_UI.includes("Cancelar bloque no trabajado"));
+  assert.ok(TURNOS_MASTER_UI.includes("se === 'PENDIENTE' || se === 'PROGRAMADA'"));
+  assert.ok(TURN_API.includes("bc5_cancelar_sesion_programada"));
+  assert.ok(TURN_API.includes("cancelarSesionProgramada:"));
+});
+
+test("the owner can start a scheduled legacy day while non-worked placeholders do not ask for cash", () => {
+  assert.ok(TURNOS_MASTER_UI.includes("Jornada completa"));
+  assert.ok(TURNOS_MASTER_UI.includes("no requieren declaración de efectivo"));
+});
+
+test("PWA release 9.5.48 loads and precaches the cash handover UI", () => {
+  assert.match(APP, /const VERSION="9\.5\.48"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.47"/);
+  assert.match(SW, /BC_SW_VERSION = "9\.5\.48"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.47/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.47/);
+  assert.match(INDEX, /app\.js\?v=9\.5\.48/);
+  assert.match(INDEX, /style\.css\?v=9\.5\.48/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
