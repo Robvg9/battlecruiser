@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261101013000_fix_turno_admin_permission_boundary.sql");
+const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261101005329_fix_turno_admin_permission_boundary.sql");
 const sql = fs.readFileSync(migrationPath, "utf8");
 
 test("turn creation permission never confers owner/admin authority", () => {
