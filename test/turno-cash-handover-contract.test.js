@@ -10,7 +10,7 @@ function read(relative) {
 }
 
 const MIGRATION = read("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
-const TURNOS_ACL_MIGRATION = read("supabase/migrations/20261031235000_turnos_authenticated_rls_dependency_read.sql");
+const TURNOS_ACL_MIGRATION = read("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");
 const FIXTURE = read("test/turno-cash-handover-fixture.sql");
 const STAFF_UI = read("public/js/m33-turnos-final.js");
@@ -119,8 +119,8 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   }
   assert.match(CONTRACT, /SET LOCAL ROLE authenticated/);
   assert.match(CONTRACT, /unrelated user can read the turn/);
-  assert.ok(PG_CI.includes("20261031235000_turnos_authenticated_rls_dependency_read.sql"));
-  assert.ok(PG_WORKFLOW.includes("20261031235000_turnos_authenticated_rls_dependency_read.sql"));
+  assert.ok(PG_CI.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
+  assert.ok(PG_WORKFLOW.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
 });
 test("PWA release 9.5.46 loads and precaches the cash handover UI", () => {
   assert.match(APP, /const VERSION="9\.5\.46"/);
