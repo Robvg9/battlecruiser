@@ -270,8 +270,8 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.match(host.textContent, /Inv\. inicial/);
   assert.match(host.textContent, /Entradas/);
   assert.match(host.textContent, /Reinversión/);
-  assert.match(host.textContent, /Inv\\. teórico/);
-  assert.match(host.textContent, /Inv\\. físico/);
+  assert.match(host.textContent, /Inv\. teórico/);
+  assert.match(host.textContent, /Inv\. físico/);
   assert.match(host.textContent, /Diferencia física/);
   assert.match(host.textContent, /Venta POS/);
   assert.match(host.textContent, /Reinversiones detalladas/);
