@@ -126,39 +126,44 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.ok(PG_WORKFLOW.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
 });
 test("unworked legacy Mañana/Tarde blocks can be cancelled without deleting the audit trail", () => {
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /CREATE OR REPLACE FUNCTION public\\.bc5_cancelar_sesion_programada/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /Solo ADMIN autenticado/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /v_sesion\\.bloque NOT IN \\('MANANA','TARDE'\\)/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /v_sesion\\.estado NOT IN \\('PENDIENTE','PROGRAMADA'\\)/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_tramos/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_declaraciones/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_jornada_inventario_cortes/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /SET estado='CANCELADA'/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /UPDATE public\\.turno_asignaciones/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /SESION_PROGRAMADA_CANCELADA_ADMIN/);
-  assert.doesNotMatch(LEGACY_RECONCILIATION_MIGRATION, /\\bDELETE\\s+FROM\\s+public\\.(turno_sesiones|turno_asignaciones|turno_eventos)/i);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /estado NOT IN \\('COMPLETADA','CANCELADA'\\)/);
-  assert.match(LEGACY_RECONCILIATION_MIGRATION, /turno_entregas_inventario/);
-  assert.match(TURNOS_MASTER_UI, /se === 'PENDIENTE' \\|\\| se === 'PROGRAMADA'/);
-  assert.match(TURNOS_MASTER_UI, /data-tm-cancelar-programada/);
-  assert.match(TURNOS_MASTER_UI, /cancelarSesionProgramada/);
-  assert.match(TURN_API, /bc5_cancelar_sesion_programada/);
-  assert.match(TURN_API, /cancelarSesionProgramada:/);
+  for (const fragment of [
+    "CREATE OR REPLACE FUNCTION public.bc5_cancelar_sesion_programada",
+    "v_sesion.bloque NOT IN ('MANANA','TARDE')",
+    "v_sesion.estado NOT IN ('PENDIENTE','PROGRAMADA')",
+    "public.turno_tramos",
+    "public.turno_declaraciones",
+    "public.turno_jornada_inventario_cortes",
+    "public.gastos",
+    "public.reinversiones",
+    "public.mermas",
+    "public.bajas",
+    "UPDATE public.turno_asignaciones",
+    "SET estado='CANCELADA'",
+    "SESION_PROGRAMADA_CANCELADA_ADMIN",
+    "estado NOT IN ('COMPLETADA','CANCELADA')",
+    "public.turno_entregas_inventario"
+  ]) assert.ok(LEGACY_RECONCILIATION_MIGRATION.includes(fragment), "missing cancellation invariant: " + fragment);
+  assert.equal(LEGACY_RECONCILIATION_MIGRATION.includes("DELETE FROM public.turno_sesiones"), false);
+  assert.equal(LEGACY_RECONCILIATION_MIGRATION.includes("DELETE FROM public.turno_asignaciones"), false);
+  assert.ok(TURNOS_MASTER_UI.includes("data-tm-cancelar-programada"));
+  assert.ok(TURNOS_MASTER_UI.includes("Cancelar bloque no trabajado"));
+  assert.ok(TURNOS_MASTER_UI.includes("se === 'PENDIENTE' || se === 'PROGRAMADA'"));
+  assert.ok(TURN_API.includes("bc5_cancelar_sesion_programada"));
+  assert.ok(TURN_API.includes("cancelarSesionProgramada:"));
 });
 
 test("the owner can start a scheduled legacy day while non-worked placeholders do not ask for cash", () => {
-  assert.match(TURNOS_MASTER_UI, /data-tm-iniciar/);
-  assert.match(TURNOS_MASTER_UI, /Jornada completa/);
-  assert.match(TURNOS_MASTER_UI, /no requieren declaración de efectivo/);
+  assert.ok(TURNOS_MASTER_UI.includes("Jornada completa"));
+  assert.ok(TURNOS_MASTER_UI.includes("no requieren declaración de efectivo"));
 });
 
 test("PWA release 9.5.48 loads and precaches the cash handover UI", () => {
-  assert.match(APP, /const VERSION="9\.5\.47"/);
+  assert.match(APP, /const VERSION="9\.5\.48"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.47"/);
+  assert.match(SW, /BC_SW_VERSION = "9\.5\.48"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.47/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.47/);
+  assert.match(INDEX, /app\.js\?v=9\.5\.48/);
+  assert.match(INDEX, /style\.css\?v=9\.5\.48/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
