@@ -286,7 +286,7 @@ function applySql(file) {
     applySql("test/turno-cash-handover-fixture.sql");
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
     applySql("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
-    applySql("supabase/migrations/20261101013000_fix_turno_admin_permission_boundary.sql");
+    applySql("supabase/migrations/20261101005329_fix_turno_admin_permission_boundary.sql");
     log("\\r\\n=== 11/12 Verify staff/owner RLS and admin permission boundary ===");
     applySql("test/turno-cash-handover-contract.sql");
     log("\\r\\nPASS Step 7 inventory + finance + carry-forward + owner cash handover + authenticated RLS visibility + discrepancy review + ACL contracts.");
