@@ -10,6 +10,11 @@ const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const source = read("public/js/m33-turnos-final.js");
 const app = read("public/app.js");
 const sw = read("public/service-worker.js");
+const legacyLayout = read("public/js/m49-turnos-layout-definitivo.js");
+const legacyInjector = read("public/js/bc14-5-turnos-manana-tarde.js");
+const m22 = read("public/js/m22-sesiones-en-m21.js");
+const m29 = read("public/js/m29-turnos-organizacion.js");
+const turnosMaestro = read("public/js/turnos-maestro.js");
 
 test("M33 keeps its five named steps while using a compact responsive grid", () => {
   assert.ok(source.includes("const titles = ['Información', 'Asignaciones', 'Movimientos', 'Inventario', 'Resumen'];"));
@@ -63,4 +68,27 @@ test("M33 step 2 keeps every assignment label and selector in a compact horizont
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
   assert.ok(sw.includes("./js/m33-turnos-final.js?v=" + moduleVersion));
+});
+
+
+test("M33 operational views show one daily jornada and exclude cancelled legacy rows", () => {
+  assert.match(source, /const sessions = \(state\.sesiones \|\| \[\]\)\.filter\(activeSession\);/);
+  assert.ok(source.includes("<span>Jornadas</span><b>' + groups.length + '</b>"));
+  assert.ok(source.includes("'Jornada'"));
+});
+
+test("legacy layout modules cannot reintroduce split-shift headings or panels", () => {
+  assert.match(legacyLayout, /restoreBody/);
+  assert.doesNotMatch(legacyLayout, /Mañana|Tarde|Asignar la misma dependienta en cada bloque/);
+  assert.match(legacyInjector, /removeObsoletePanel/);
+  assert.doesNotMatch(legacyInjector, /<h4>Tarde|MANANA|TARDE|PM/);
+  assert.match(m22, /return 'Jornada diaria'/);
+  assert.doesNotMatch(m22, /return 'Mañana'|return 'Tarde'|Mañana \/ tarde/);
+  assert.match(m22, /var visibles =/);
+  assert.match(m22, /estado === 'CANCELADA' \|\| estado === 'CANCELADO'/);
+  assert.match(m22, /String\(assigned\) === String\(me\)/);
+  assert.match(m29, /Cada fecha trabajada contará como una sola jornada completa/);
+  assert.doesNotMatch(m29, /No se crearán bloques de Mañana\/Tarde/);
+  assert.match(turnosMaestro, /return 'Jornada diaria'/);
+  assert.doesNotMatch(turnosMaestro, /return 'Mañana'|return 'Tarde'/);
 });
