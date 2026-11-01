@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.11 — controles móviles compactos y responsables identificados.
+// v7.12 — baja unificada con causa y compatibilidad de permisos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -594,7 +594,8 @@
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos);
-      adjustment='<details class="bc7-detail"><summary><span>Solicitar merma o baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Tipo<select data-bc7-ajust-type required>'+((can('mermas','crear'))?'<option value="merma">Merma</option>':'')+((can('bajas','crear'))?'<option value="baja">Baja</option>':'')+'</select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Motivo<input data-bc7-ajust-reason maxlength="500" required placeholder="Motivo obligatorio"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
+      const adjustmentStorageType=can('bajas','crear')?'baja':'merma';
+      adjustment='<details class="bc7-detail"><summary><span>Registrar baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'"><div class="bc7-grid"><label class="bc7-field">Causa de la baja<select data-bc7-ajust-cause required><option value="">Selecciona una causa</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar baja a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div><details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
@@ -739,19 +740,23 @@
   }
   async function submitAdjustment(form){
     const sessionId=form.dataset.bc7AdjustForm;
-    const type=form.querySelector('[data-bc7-ajust-type]').value;
+    const storageType=form.querySelector('[data-bc7-ajust-type]').value;
+    const cause=form.querySelector('[data-bc7-ajust-cause]').value.trim();
+    const detail=form.querySelector('[data-bc7-ajust-reason]').value.trim();
     const product=form.querySelector('[data-bc7-ajust-product]').value;
     const quantity=form.querySelector('[data-bc7-ajust-qty]').value;
-    const reason=form.querySelector('[data-bc7-ajust-reason]').value.trim();
     const msgEl=form.querySelector('[data-bc7-ajust-msg]');
-    if(!product||!Number.isFinite(Number(quantity))||Number(quantity)<=0||!reason){msg(msgEl,'Selecciona producto, cantidad positiva y motivo.','error');return;}
-    if(!confirm('Se enviará una solicitud de '+type+' a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
+    if(!cause||!product||!Number.isFinite(Number(quantity))||Number(quantity)<=0||(cause==='Otra causa'&&!detail)){
+      msg(msgEl,'Selecciona la causa y el producto, introduce una cantidad positiva y describe la otra causa cuando corresponda.','error');return;
+    }
+    const reason=cause+(detail?' — '+detail:'');
+    if(!confirm('Se enviará una solicitud de BAJA por "'+cause+'" a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
-      await rpc('bc7_registrar_ajuste_jornada',{p_turno_sesion_id:sessionId,p_tipo:type,p_producto_id:product,p_cantidad:Number(quantity),p_motivo:reason,p_idempotency_key:crypto.randomUUID()});
-      msg(msgEl,'Solicitud guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
+      await rpc('bc7_registrar_ajuste_jornada',{p_turno_sesion_id:sessionId,p_tipo:storageType,p_producto_id:product,p_cantidad:Number(quantity),p_motivo:reason,p_idempotency_key:crypto.randomUUID()});
+      msg(msgEl,'Solicitud de baja guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
       form.reset();await openWorkspace(sessionId);
-    }catch(e){msg(msgEl,'No se registró la solicitud. '+friendlyError(e,'create'),'error');}
+    }catch(e){msg(msgEl,'No se registró la baja. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
   async function saveHours(form){
