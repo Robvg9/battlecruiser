@@ -14,7 +14,7 @@ async function waitFor(predicate,timeout=2000){
  return Boolean(predicate());
 }
 
-function fixture(t,{noDeclarations=false}={}){
+function fixture(t,{noDeclarations=false,jornada=false}={}){
  const dom=new JSDOM("<!doctype html><html><head></head><body></body></html>",{
   url:"https://battlecruiser-dependent-card.test/",runScripts:"outside-only",pretendToBeVisual:true
  });
@@ -22,7 +22,7 @@ function fixture(t,{noDeclarations=false}={}){
  Object.defineProperty(window.document,"readyState",{configurable:true,value:"complete"});
  Object.defineProperty(window.navigator,"onLine",{configurable:true,value:true});
  const sessions=[
-  Object.assign({id:"mine-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-1",dinero_monto:200,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:200,dinero_diferencia:0}),
+  Object.assign({id:"mine-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:jornada?"JORNADA":"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-1",dinero_monto:200,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:200,dinero_diferencia:0}),
   Object.assign({id:"mine-day-2",turno_id:"turno-fixture",numero_dia:2,dia_n:2,fecha:"2026-10-31",bloque:"MANANA",estado:"COMPLETADA",usuario_id:"dependent-a",usuario_nombre:"Dependienta A"}, noDeclarations ? {} : {dinero_declarado:true,dinero_id:"decl-2",dinero_monto:8540,dinero_moneda:"CUP",dinero_estado_aprobacion:"APROBADA",dinero_monto_contado:5220,dinero_diferencia:-3320}),
   {id:"other-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"TARDE",estado:"COMPLETADA",usuario_id:"dependent-b",usuario_nombre:"Otra dependienta"},
   {id:"cancelled-day-1",turno_id:"turno-fixture",numero_dia:1,dia_n:1,fecha:"2026-10-30",bloque:"TARDE",estado:"CANCELADA",usuario_id:null}
@@ -73,11 +73,19 @@ test("tarjeta compacta presenta liquidaciones propias y oculta sesiones ajenas",
 
 
 test("dependienta gets the shared Excel workbook scoped to her assigned days and no legacy AM/PM labels",async t=>{
- const {window,rpcCalls}=fixture(t);
+ const {window,rpcCalls}=fixture(t,{jornada:true});
  window.client={
   rpc:async(name,params={})=>{
    rpcCalls.push({name,params});
-   return {data:[],error:null};
+   if(name==="bc7_movimientos_sesion")return {data:[],error:null};
+   if(name==="bc7_obtener_inventario_jornada")return {data:{sesion:{id:params.p_turno_sesion_id},productos:[],cortes:{},declaracion_dinero:null},error:null};
+   if(name==="bc7_finanzas_jornada")return {data:{
+    gastos:[{id:"expense-"+params.p_turno_sesion_id,concepto:"Electricidad de jornada",descripcion:"Factura fixture",monto:45,estado:"APROBADO",creado_en:"2026-10-30T18:00:00Z",creado_nombre:"Dependienta A"}],
+    reinversiones:[{id:"reinvestment-"+params.p_turno_sesion_id,proveedor:"Proveedor jornada",fecha:"2026-10-30T19:00:00Z",total:20,usuario_nombre:"Dependienta A",lineas:[{producto_id:"product-coffee",producto:"Café",cantidad_base:2,costo_total:20,costo_unitario:10}]}],
+    mermas:[{id:"loss-"+params.p_turno_sesion_id,producto:"Galletas",producto_id:"product-cookie",cantidad:1,motivo:"Producto vencido",estado:"PENDIENTE",creado_en:"2026-10-30T20:00:00Z",creado_nombre:"Dependienta A"}],
+    bajas:[]
+   },error:null};
+   return {data:null,error:{code:"UNEXPECTED_RPC",message:name}};
   },
   from:()=>({select:()=>({in:async()=>({data:[],error:null})})})
  };
@@ -89,6 +97,15 @@ test("dependienta gets the shared Excel workbook scoped to her assigned days and
  bookDetails.open=true;
  bookDetails.dispatchEvent(new window.Event("toggle"));
  assert.ok(await waitFor(()=>rpcCalls.filter(call=>call.name==="bc7_movimientos_sesion").length===2));
+ const workbookHost=bookDetails.querySelector("[data-m33-inventory-host]");
+ assert.ok(workbookHost);
+ assert.ok(await waitFor(()=>workbookHost.textContent.includes("Electricidad de jornada")&&workbookHost.textContent.includes("Proveedor jornada")));
+ assert.equal(rpcCalls.filter(call=>call.name==="bc7_finanzas_jornada").length,2);
+ assert.deepEqual(rpcCalls.filter(call=>call.name==="bc7_finanzas_jornada").map(call=>call.params.p_turno_sesion_id).sort(),
+  ["mine-day-1","mine-day-2"],"finance read must remain scoped to the dependent's assigned Jornada sessions");
+ assert.match(workbookHost.textContent,/Producto vencido/);
+ assert.match(workbookHost.textContent,/Solicitudes de baja/);
+ assert.doesNotMatch(workbookHost.textContent,/Solicitud de merma|Merma/);
  assert.deepEqual(rpcCalls.filter(call=>call.name==="bc7_movimientos_sesion").map(call=>call.params.p_turno_sesion_id).sort(),
   ["mine-day-1","mine-day-2"],"the workbook may query only the assigned user's session IDs");
  const movementsDetails=Array.from(modal.querySelectorAll("details")).find(details=>
