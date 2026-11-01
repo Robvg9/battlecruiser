@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { JSDOM } = require("jsdom");
 
 const ROOT = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -104,4 +105,34 @@ test("legacy recovery hotfixes cannot append split M33 sections", () => {
   assert.doesNotMatch(hotfixRegresiones, /groupHtml\('Mañana'|grouped = \\{ MAÑANA|Asignada a otra dependienta/);
   assert.match(hotfix174, /remove\(\)/);
   assert.doesNotMatch(hotfix174, /<h4>Tarde|innerHTML|hub\.open/);
+});
+
+
+test("M49 restores M33 daily cards and removes stale Mañana/Tarde DOM at runtime", () => {
+  const dom = new JSDOM(
+    "<!doctype html><html><head></head><body><div id='m33-bg'><div class='m33-modal'><div class='m33-body'>" +
+    "<div class='m33-session-grid' id='daily-grid'></div>" +
+    "<div class='m49-session-grid'>" +
+    "<div class='m49-session-col'><div class='m49-session-heading'>☀️ Mañana</div>" +
+    "<article id='day-1' class='m33-session m49-session-card'>Jornada · Día 1</article></div>" +
+    "<div class='m49-session-col'><div class='m49-session-heading'>🌙 Tarde</div>" +
+    "<article id='day-2' class='m33-session m49-session-card'>Jornada · Día 2</article></div></div>" +
+    "<section class='bc-session-recovery'><h4>Mañana</h4><h4>Tarde</h4></section>" +
+    "</div></div></div></body></html>",
+    { runScripts: "outside-only", pretendToBeVisual: true }
+  );
+  const { window } = dom;
+  Object.defineProperty(window.document, "readyState", { configurable: true, value: "complete" });
+  window.eval(legacyLayout);
+  const body = window.document.querySelector("#m33-bg .m33-body");
+  const grid = body.querySelector("#daily-grid");
+  assert.equal(body.querySelector(".m49-session-grid"), null);
+  assert.equal(body.querySelector(".bc-session-recovery"), null);
+  assert.equal(body.querySelectorAll(".m49-session-heading").length, 0);
+  assert.deepEqual(
+    Array.from(grid.querySelectorAll(".m33-session")).map((card) => card.id),
+    ["day-1", "day-2"]
+  );
+  assert.doesNotMatch(body.textContent, /Mañana|Tarde/);
+  dom.window.close();
 });
