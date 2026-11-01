@@ -269,14 +269,16 @@
     const alm = t.almacen_nombre || t.almacen_id || '—';
 
     let sesHtml = '';
-    const cancelledSessions = state.sesiones.filter(function (s) {
-      return String(s.estado || '').toUpperCase() === 'CANCELADA';
-    });
+    const me = currentUserId();
     const visibleSessions = state.sesiones.filter(function (s) {
-      return String(s.estado || '').toUpperCase() !== 'CANCELADA';
+      const status = String(s.estado || '').toUpperCase();
+      if (status === 'CANCELADA' || status === 'CANCELADO') return false;
+      if (state.isAdmin) return true;
+      const assigned = s.usuario_id || s.asignado_id || null;
+      return !!me && !!assigned && String(assigned) === String(me);
     });
     if (!visibleSessions.length) {
-      sesHtml = '<p class="muted">No hay jornadas activas en este turno.</p>';
+      sesHtml = '<p class="muted">No tienes jornadas activas para consultar.</p>';
     } else {
       const dayGroups = Object.create(null);
       visibleSessions.forEach(function (s) {
