@@ -9,7 +9,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.18';
+  var VERSION = '29.19';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -142,7 +142,6 @@
         '#m29-crear-overlay .m29-field input,#m29-crear-overlay .m29-field select{box-sizing:border-box;min-height:32px!important;padding:5px 7px!important;font-size:12px!important;width:100%;margin:0!important}',
         '#m29-crear-overlay .m29-mode-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}',
         '#m29-crear-overlay #m29-mode-label{margin:0!important;font-size:11px;line-height:1.25;opacity:.8}',
-        '#m29-crear-overlay #m29-toggle-plan-b{min-height:28px!important;padding:4px 8px!important;font-size:10px!important;white-space:nowrap}',
         '#m29-crear-overlay #m29-staff-status{margin:0!important;min-height:14px!important;font-size:10px!important;line-height:1.2}',
         '#m29-crear-overlay #m29-create-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}',
         '#m29-crear-overlay .m29-create-day{display:grid!important;grid-template-columns:minmax(78px,.85fr) auto minmax(112px,1.2fr)!important;gap:4px!important;align-items:center!important;padding:4px 5px!important;margin:0!important;min-height:34px!important;border-radius:6px!important}',
@@ -514,15 +513,7 @@
   function readCreateRows() {
     var host = document.getElementById('m29-create-days');
     if (!host) return [];
-    var legacy = host.dataset.mode === 'legacy';
     return Array.prototype.map.call(host.querySelectorAll('[data-m29-day]'), function (row) {
-      if (legacy) {
-        return {
-          numero_dia: Number(row.dataset.m29Day),
-          manana: (row.querySelector('[data-m29-manana]') || {}).value || '',
-          tarde: (row.querySelector('[data-m29-tarde]') || {}).value || ''
-        };
-      }
       var works = !!(row.querySelector('[data-m29-works]') || {}).checked;
       return {
         numero_dia: Number(row.dataset.m29Day),
@@ -536,7 +527,6 @@
     if (!host) return;
     var n = Math.max(1, Math.min(31, parseInt((document.getElementById('m29-dias') || {}).value, 10) || 7));
     var inicio = (document.getElementById('m29-inicio') || {}).value || '';
-    var legacy = host.dataset.mode === 'legacy';
     var old = readCreateRows();
     host.innerHTML = Array.from({ length: n }, function (_, i) {
       var dateValue = inicio ? new Date(inicio + 'T12:00:00').toLocaleDateString('es-ES') : 'Fecha pendiente';
@@ -546,12 +536,6 @@
         dateValue = d.toLocaleDateString('es-ES');
       }
       var prev = old[i] || {};
-      if (legacy) {
-        return '<div class="m29-create-day" data-m29-day="' + (i + 1) + '">' +
-          '<strong>Día ' + (i + 1) + ' · ' + esc(dateValue) + '</strong>' +
-          '<label>Mañana<select data-m29-manana>' + staffOptions(prev.manana) + '</select></label>' +
-          '<label>Tarde<select data-m29-tarde>' + staffOptions(prev.tarde) + '</select></label></div>';
-      }
       var works = prev.trabaja !== false;
       return '<div class="m29-create-day" data-m29-day="' + (i + 1) + '">' +
         '<strong>Día ' + (i + 1) + ' · ' + esc(dateValue) + '</strong>' +
@@ -573,19 +557,6 @@
     });
     renderCreateSummary();
   }
-  function toggleCreateMode() {
-    var host = document.getElementById('m29-create-days');
-    var button = document.getElementById('m29-toggle-plan-b');
-    var legacy = !!(host && host.dataset.mode !== 'legacy');
-    if (!host || !button) return;
-    host.dataset.mode = legacy ? 'legacy' : 'jornada';
-    button.textContent = legacy ? 'Volver a Jornada completa' : 'Plan alternativo: dividir en Mañana y Tarde';
-    var label = document.getElementById('m29-mode-label');
-    if (label) label.textContent = legacy
-      ? 'Plan alternativo · sesiones independientes por bloque'
-      : 'Jornada completa · una persona responsable por día';
-    buildCreateRows();
-  }
   function renderCreateSummary() {
     var host = document.getElementById('m29-create-days');
     var summary = document.getElementById('m29-create-summary');
@@ -594,20 +565,12 @@
     var assigned = 0;
     var rest = 0;
     var pending = 0;
-    if (host.dataset.mode === 'legacy') {
-      rows.forEach(function (row) {
-        if (row.manana) assigned += 1; else pending += 1;
-        if (row.tarde) assigned += 1; else pending += 1;
-      });
-      summary.textContent = assigned + ' sesiones asignadas · ' + pending + ' sin asignar';
-      return;
-    }
     rows.forEach(function (row) {
       if (!row.trabaja) rest += 1;
       else if (row.responsable_id) assigned += 1;
       else pending += 1;
     });
-    summary.textContent = assigned + ' responsables asignados · ' + rest + ' descansos' +
+    summary.textContent = assigned + ' jornadas asignadas · ' + rest + ' descansos' +
       (pending ? ' · ' + pending + ' pendientes' : '');
   }
   async function openCrearModal() {
@@ -627,8 +590,7 @@
       '<div class="m29-field"><label>Fecha inicial</label><input type="date" id="m29-inicio" value="' + hoy + '"></div>' +
       '<div class="m29-field"><label>Días</label><input type="number" id="m29-dias" min="1" max="31" value="7"></div>' +
       '</div>' +
-      '<div class="m29-mode-row"><span id="m29-mode-label">Jornada completa · un responsable por jornada</span>' +
-      '<button type="button" class="m29-btn-refresh" id="m29-toggle-plan-b">Alternar Mañana / Tarde</button></div>' +
+      '<div class="m29-mode-row"><span id="m29-mode-label">Jornada completa · 07:00–23:00 · una dependienta por día trabajado</span></div>' +
       '<p id="m29-staff-status" class="m29-msg" role="status" aria-live="polite">Cargando responsables…</p>' +
       '<div id="m29-create-days" data-mode="jornada"></div>' +
       '<div class="m29-create-summary"><span id="m29-create-summary">Preparando programación…</span></div>' +
@@ -636,7 +598,6 @@
       '<div class="m29-actions"><button type="button" class="cancel" id="m29-cancel-crear">Cancelar</button><button type="button" class="ok" id="m29-confirm-crear" disabled>Crear turno</button></div></div>';
     document.body.appendChild(ov);
     document.getElementById('m29-cancel-crear').onclick = closeCrearModal;
-    document.getElementById('m29-toggle-plan-b').onclick = toggleCreateMode;
     document.getElementById('m29-inicio').addEventListener('change', buildCreateRows);
     document.getElementById('m29-dias').addEventListener('change', buildCreateRows);
     document.getElementById('m29-confirm-crear').onclick = confirmCrear;
@@ -667,51 +628,37 @@
     if (!alm || !inicio || !Number.isFinite(dias) || dias < 1 || dias > 31 || !host) {
       setModalMsg('Completa los datos del turno.', false); return;
     }
-    var rows = readCreateRows();
-    var legacy = host.dataset.mode === 'legacy';
-    var assignments = [];
-    var schedule = [];
-    if (legacy) {
-      rows.forEach(function (r) {
-        if (r.manana) assignments.push({ numero_dia: r.numero_dia, bloque: 'MANANA', usuario_id: r.manana });
-        if (r.tarde) assignments.push({ numero_dia: r.numero_dia, bloque: 'TARDE', usuario_id: r.tarde });
-      });
-      if (!assignments.length) { setModalMsg('Asigna al menos una sesión de Mañana o Tarde.', false); return; }
-    } else {
-      schedule = rows.map(function (r) {
-        return { numero_dia: r.numero_dia, trabaja: r.trabaja, responsable_id: r.trabaja ? (r.responsable_id || null) : null };
-      });
-      var missing = schedule.find(function (r) { return r.trabaja && !r.responsable_id; });
-      if (missing) { setModalMsg('Falta responsable en el Día ' + missing.numero_dia + '.', false); return; }
-      if (schedule.some(function (r) { return !r.trabaja && r.responsable_id; })) {
-        setModalMsg('Los días de descanso no pueden tener responsable.', false); return;
-      }
+    var schedule = readCreateRows().map(function (row) {
+      return {
+        numero_dia: row.numero_dia,
+        trabaja: row.trabaja,
+        responsable_id: row.trabaja ? (row.responsable_id || null) : null
+      };
+    });
+    var missing = schedule.find(function (row) { return row.trabaja && !row.responsable_id; });
+    if (missing) { setModalMsg('Falta responsable en el Día ' + missing.numero_dia + '.', false); return; }
+    if (schedule.some(function (row) { return !row.trabaja && row.responsable_id; })) {
+      setModalMsg('Los días de descanso no pueden tener responsable.', false); return;
     }
-    var summaryText = legacy
-      ? 'Se crearán ' + dias + ' fechas con sesiones MANANA/TARDE según las asignaciones. No se crearán jornadas completas.'
-      : 'Se crearán ' + schedule.filter(function (r) { return r.trabaja; }).length + ' jornadas completas y ' +
-        schedule.filter(function (r) { return !r.trabaja; }).length + ' descansos. Cada día laborable tendrá una sola persona responsable.';
+    var jornadas = schedule.filter(function (row) { return row.trabaja; }).length;
+    var descansos = schedule.filter(function (row) { return !row.trabaja; }).length;
+    var summaryText = 'Se crearán ' + jornadas + ' jornadas completas de 07:00 a 23:00, con una dependienta responsable por día, y ' +
+      descansos + ' días de descanso. No se crearán bloques de Mañana/Tarde.';
     if (!window.confirm(summaryText + ' ¿Confirmas?')) return;
     var btn = document.getElementById('m29-confirm-crear');
     if (btn) btn.disabled = true;
     try {
-      if (legacy) {
-        var api = API();
-        if (!api || !api.crearTurno) throw new Error('API de Turnos no disponible.');
-        await api.crearTurno({ almacenId: alm, inicioPlan: inicio, cantidadDias: dias, asignaciones: assignments });
-      } else {
-        if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
-          throw new Error('Cliente Supabase no disponible.');
-        }
-        var response = await client.rpc('bc5_crear_jornada_unica', {
-          p_almacen_id: alm,
-          p_fecha_inicio: inicio,
-          p_dias: dias,
-          p_programacion: schedule,
-          p_observacion: 'Creado desde Turnos · Jornada completa'
-        });
-        if (response && response.error) throw new Error(response.error.message || 'El backend rechazó la jornada.');
+      if (typeof client === 'undefined' || !client || typeof client.rpc !== 'function') {
+        throw new Error('Cliente Supabase no disponible.');
       }
+      var response = await client.rpc('bc5_crear_jornada_unica', {
+        p_almacen_id: alm,
+        p_fecha_inicio: inicio,
+        p_dias: dias,
+        p_programacion: schedule,
+        p_observacion: 'Creado desde Turnos · Jornada completa 07:00–23:00'
+      });
+      if (response && response.error) throw new Error(response.error.message || 'El backend rechazó la jornada.');
       closeCrearModal();
       await renderHome();
     } catch (e) {
