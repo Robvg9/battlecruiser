@@ -6,7 +6,7 @@ on:
       - 'supabase/migrations/20261023122714_step7_jornada_inventory_ui.sql'
       - 'supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql'
       - 'supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql'
-      - 'supabase/migrations/20261031235000_turnos_authenticated_rls_dependency_read.sql'
+      - 'supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql'
       - 'test/turno-cash-handover-contract.sql'
       - 'test/turno-cash-handover-fixture.sql'
       - 'test/turno-cash-handover-contract.test.js'
