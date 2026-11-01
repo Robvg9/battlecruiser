@@ -311,13 +311,13 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.turno_jornada_eventos
     WHERE programacion_id=(SELECT id FROM public.turno_jornada_programacion
-      WHERE turno_id=(SELECT turno_id FROM _bc5_today_session))
+      WHERE turno_id=(SELECT turno_id FROM _bc5_today_session) AND numero_dia=1)
       AND tipo='JORNADA_INICIADA_CON_EXCEPCION') THEN
     RAISE EXCEPTION 'Auditable exceptional opening event missing';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.turno_jornada_eventos
     WHERE programacion_id=(SELECT id FROM public.turno_jornada_programacion
-      WHERE turno_id=(SELECT turno_id FROM _bc5_today_session))
+      WHERE turno_id=(SELECT turno_id FROM _bc5_today_session) AND numero_dia=1)
       AND tipo='JORNADA_CERRADA_CON_EXCEPCION') THEN
     RAISE EXCEPTION 'Auditable exceptional closure event missing';
   END IF;
