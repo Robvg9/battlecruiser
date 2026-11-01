@@ -36,7 +36,7 @@ test("new journey is one session per working day, with explicit rest records", (
 });
 
 test("new Turnos require at least two calendar days at the database boundary", () => {
-  assert.match(minTwoDayMigration, /CREATE OR REPLACE FUNCTION public\\.bc5_crear_jornada_unica/);
+  assert.match(minTwoDayMigration, /CREATE OR REPLACE FUNCTION public\.bc5_crear_jornada_unica/);
   assert.match(minTwoDayMigration, /p_dias NOT BETWEEN 2 AND 31/);
   assert.match(minTwoDayMigration, /La programación debe abarcar entre 2 y 31 días/);
   assert.doesNotMatch(minTwoDayMigration, /p_dias NOT BETWEEN 1 AND 31/);
