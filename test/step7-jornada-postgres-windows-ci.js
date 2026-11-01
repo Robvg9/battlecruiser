@@ -290,10 +290,12 @@ function applySql(file) {
     applySql("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
     applySql("supabase/migrations/20261101005329_fix_turno_admin_permission_boundary.sql");
     applySql("supabase/migrations/20261101041610_legacy_turno_jornada_reconciliation_20261101.sql");
-    log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation ===");
+    applySql("supabase/migrations/20261101044403_allow_overdue_next_legacy_session_20261101.sql");
+    log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation and overdue-start guard ===");
     applySql("test/turno-cash-handover-contract.sql");
-    log("\\r\\n=== 12/13 Verify owner cash and legacy reconciliation contracts ===");
-    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + cash handover + authenticated RLS + audited legacy-session reconciliation + ACL contracts.");
+    applySql("test/legacy-session-overdue-contract.sql");
+    log("\\r\\n=== 12/13 Verify owner cash, legacy reconciliation and overdue-start guard contracts ===");
+    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
