@@ -1322,6 +1322,8 @@
     return amount + (currency ? ' ' + currency : '');
   }
 
+  // Los bloques heredados se muestran consolidados y no ofrecen "Continuar registro anterior";
+  // el flujo operativo nuevo se abre desde una sesión JORNADA completa del día.
   function bodyDependienta(t) {
     var me = currentUserId();
     var mias = state.sesiones.filter(sesionAsignadaAMi).filter(activeSession).slice().sort(function (a, b) {
