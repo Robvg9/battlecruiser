@@ -10,7 +10,7 @@ const MIGRATION = fs.readFileSync(
   "utf8"
 );
 const FINANCE_READ_MIGRATION = fs.readFileSync(
-  path.join(__dirname, "..", "supabase/migrations/20261101110000_step4_assigned_jornada_finance_read.sql"),
+  path.join(__dirname, "..", "supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql"),
   "utf8"
 );
 const UI = fs.readFileSync(
