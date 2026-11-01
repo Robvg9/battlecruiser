@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.17 — progreso real del turno y libro Excel compartido por rol
+// v33.18 — jornadas diarias agrupadas y revisión administrativa
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -257,6 +257,7 @@
   }
   function dailyProgress(group) {
     var rows = (group.sessions || []);
+    if (rows.some(function (session) { return /RECHAZ|CON_DIFERENCIA/.test(String(session.dinero_estado_aprobacion || '').toUpperCase()); })) return 'Revisión requerida';
     var labels = rows.map(dependentDayProgress);
     if (labels.indexOf('Revisión requerida') >= 0) return 'Revisión requerida';
     if (labels.indexOf('Pendiente de revisión del dueño') >= 0) return 'Pendiente de revisión del dueño';
@@ -1341,7 +1342,7 @@
       } else {
         actions = '<span class="m33-pill">' + esc(labelStatus) + '</span>';
       }
-      var legacyNote = isJornada ? '' : '<div class="m33-dependent-legacy">Datos heredados consolidados en una sola jornada diaria</div>';
+      var legacyNote = isJornada ? '' : '<div class="m33-dependent-legacy">Registro histórico del formato anterior · consolidado en una sola jornada diaria</div>';
       return '<article class="m33-dependent-day" data-m33-dependent-day="' + esc(rows.map(function (s) { return s.id; }).join(',')) + '">' +
         '<div class="m33-dependent-day-head"><div><b>Jornada · Día ' + esc(group.day) +
         ' · ' + esc(date(group.date)) + '</b><div class="m33-muted">' + esc(labelStatus) + '</div>' + legacyNote +

@@ -55,7 +55,7 @@ test("M33 step 2 keeps every assignment label and selector in a compact horizont
   assert.ok(source.includes(".m33-assignment-grid .m33-assignment-card{display:grid;grid-template-columns:minmax(84px,.56fr) minmax(0,1fr);"));
   assert.ok(source.includes(".m33-assignment-card select{width:100%;min-width:0;max-width:100%;box-sizing:border-box;margin:0!important;padding:7px 8px!important;min-height:38px;font-size:.86rem;"));
   assert.ok(source.includes('class="m33-session-grid m33-assignment-grid"'));
-  assert.ok(source.includes("m33-assignment-card\"><label>Día "));
+  assert.ok(source.includes("m33-assignment-card\"><label>Jornada · Día "));
   const marker = '["m33-turnos-final.js","';
   const start = app.indexOf(marker);
   assert.ok(start >= 0, "M33 module must be registered");
