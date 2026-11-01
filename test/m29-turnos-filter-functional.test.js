@@ -141,8 +141,8 @@ test("Paso 4: el historial M29 consulta turnos maestros cerrados y los abre en s
 });
 
 test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
-  assert.match(SOURCE, /var VERSION = '29\.18';/);
-  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.18"\]/);
+  assert.match(SOURCE, /var VERSION = '29\.19';/);
+  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.19"\]/);
   const { window, getListCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
