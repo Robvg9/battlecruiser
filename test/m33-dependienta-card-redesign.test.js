@@ -71,6 +71,40 @@ test("tarjeta compacta presenta liquidaciones propias y oculta sesiones ajenas",
  assert.equal(rpcCalls.length,0);
 });
 
+
+test("dependienta gets the shared Excel workbook scoped to her assigned days and no legacy AM/PM labels",async t=>{
+ const {window,rpcCalls}=fixture(t);
+ window.client={
+  rpc:async(name,params={})=>{
+   rpcCalls.push({name,params});
+   return {data:[],error:null};
+  },
+  from:()=>({select:()=>({in:async()=>({data:[],error:null})})})
+ };
+ await window.__BC_M33.open("turno-fixture");
+ const modal=window.document.getElementById("m33-bg");
+ assert.match(modal.querySelector("[data-m33-turn-status]")?.textContent||"",/Turno pendiente de revisión/);
+ const bookDetails=modal.querySelector("[data-m33-dependent-book]");
+ assert.ok(bookDetails,"the dependent card must contain the same workbook used by the owner");
+ bookDetails.open=true;
+ bookDetails.dispatchEvent(new window.Event("toggle"));
+ assert.ok(await waitFor(()=>rpcCalls.filter(call=>call.name==="bc7_movimientos_sesion").length===2));
+ assert.deepEqual(rpcCalls.filter(call=>call.name==="bc7_movimientos_sesion").map(call=>call.params.p_turno_sesion_id).sort(),
+  ["mine-day-1","mine-day-2"],"the workbook may query only the assigned user's session IDs");
+ const movementsDetails=Array.from(modal.querySelectorAll("details")).find(details=>
+  details.querySelector("summary")?.textContent.includes("Movimientos de tus días"));
+ assert.ok(movementsDetails);
+ movementsDetails.open=true;
+ const archiveButton=movementsDetails.querySelector("[data-m33-archive-sessions]");
+ assert.ok(archiveButton);
+ archiveButton.click();
+ const archiveHost=movementsDetails.querySelector("[data-m33-archive-host]");
+ assert.ok(await waitFor(()=>archiveHost.dataset.loaded==="1"));
+ assert.doesNotMatch(movementsDetails.textContent,/Mañana|Tarde|MANANA|TARDE/);
+ assert.ok(rpcCalls.filter(call=>call.name==="bc7_movimientos_sesion").every(call=>
+  ["mine-day-1","mine-day-2"].includes(call.params.p_turno_sesion_id)));
+});
+
 test("la ausencia de declaraciones se muestra como pendiente y no como cero",async t=>{
  const {window,writes}=fixture(t,{noDeclarations:true});
  await window.__BC_M33.open("turno-fixture");
