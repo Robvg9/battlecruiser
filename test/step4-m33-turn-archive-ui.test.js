@@ -149,7 +149,7 @@ test("Paso 4: el historial cerrado abre M33 en modo de solo lectura, sin control
   assert.ok(modal);
   assert.match(modal.textContent, /Expediente histórico.*Solo lectura/i);
   modal.querySelector("#m33-next").click();
-  assert.match(modal.textContent, /asignaciones se muestran tal como quedaron registradas/i);
+  assert.match(modal.textContent, /se muestra una asignación por jornada/i);
   assert.equal(modal.querySelectorAll("select[data-m33-sids]").length, 0,
     "las asignaciones históricas deben ser texto, nunca controles editables");
   assert.equal(modal.querySelector("#m33-save"), null, "el expediente histórico no debe ofrecer Guardar");
