@@ -73,6 +73,10 @@ test("M56 yields button ownership to the canonical M57 guard", () => {
   assert.doesNotThrow(() => window.__BC_M56.renderSequence());
 });
 
+test("M57 does not re-enable the button while M33 is opening a session", () => {
+  assert.match(m57Source, /btn\.dataset && btn\.dataset\.bcBusy==='1'\)return;/);
+});
+
 test("M57 remains the single sequence owner and the new module versions are referenced", () => {
   const app = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
   assert.match(app, /m56-turnos-secuencia-ui\.js","56\.8"/);
