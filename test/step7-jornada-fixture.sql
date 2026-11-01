@@ -44,6 +44,15 @@ AS $fn$
    OR strpos(','||coalesce(current_setting('test.perms',true),'')||',',
              ','||p_seccion||':'||p_accion||',')>0
 $fn$;
+
+-- Mirror the production authorization boundary: creation is operational, not administrative.
+CREATE OR REPLACE FUNCTION public.bc_actor_is_admin()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
+AS $fn$
+ SELECT public.tiene_permiso('turnos','editar_any')
+     OR public.tiene_permiso('ciclos','editar_any')
+$fn$;
+
 CREATE OR REPLACE FUNCTION public.crear_merma(
  p_almacen_id uuid,p_producto_id uuid,p_cantidad numeric,p_motivo text,
  p_ciclo_id uuid DEFAULT NULL,p_sesion_id uuid DEFAULT NULL,p_idempotency_key uuid DEFAULT NULL
