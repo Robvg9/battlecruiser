@@ -47,7 +47,7 @@ function fixture(t,{noDeclarations=false,jornada=false}={}){
  };
  window.eval(SOURCE);
  t.after(()=>window.close());
- return {window,queries,writes,rpcCalls};
+ return {window,queries,writes,rpcCalls,sessions};
 }
 
 test("tarjeta compacta presenta liquidaciones propias y oculta sesiones ajenas",async t=>{
@@ -199,4 +199,18 @@ test("el libro distingue la venta POS del faltante físico y no infiere ventas d
  assert.match(table.textContent,/Venta POS/);
  assert.ok(!tableReads.includes("turno_declaraciones"),"the browser must never read the private cash-declarations table directly");
  assert.doesNotMatch(table.textContent,/Venta \(saldo\)/);
+});
+
+
+test("CON_DIFERENCIA is shown as review required in the day and turn progress",async t=>{
+ const {window,sessions}=fixture(t);
+ sessions[0].dinero_estado_aprobacion="CON_DIFERENCIA";
+ sessions[0].dinero_monto_contado=170;
+ sessions[0].dinero_diferencia=-30;
+ await window.__BC_M33.open("turno-fixture");
+ const modal=window.document.getElementById("m33-bg");
+ assert.equal(modal.querySelector("[data-m33-turn-status]")?.textContent.trim(),"Revisión requerida");
+ const day=modal.querySelector('[data-m33-dependent-day="mine-day-1"]');
+ assert.ok(day);
+ assert.match(day.textContent,/Revisión requerida/);
 });
