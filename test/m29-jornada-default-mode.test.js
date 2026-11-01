@@ -10,6 +10,10 @@ const SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "m29-turnos-organizacion.js"),
   "utf8"
 );
+const TURNOS_MASTER_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "turnos-maestro.js"),
+  "utf8"
+);
 
 async function waitFor(predicate, timeout = 1200) {
   const end = Date.now() + timeout;
@@ -111,51 +115,56 @@ test("M29 creates complete-day JORNADA by default with one named responsible per
   assert.equal(createdLegacy.length, 0, "the default model never creates MANANA/TARDE sessions");
 });
 
-test("M29 Plan B explicitly creates independent MANANA/TARDE assignments through the legacy contract", async (t) => {
+test("M29 only offers the full-day 07:00–23:00 model; Mañana/Tarde creation is unavailable", async (t) => {
   const { window, createdLegacy, jornadaCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
-  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")), "M29 boot completes and renders the owner create action");
+  assert.ok(await waitFor(() => root && root.querySelector("#m29-btn-crear")));
   root.querySelector("#m29-btn-crear").click();
 
   const modal = window.document.getElementById("m29-crear-overlay");
-  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7),
-    "the default day grid appears after the canonical staff catalog is loaded");
-  modal.querySelector("#m29-toggle-plan-b").click();
-  const days = modal.querySelector("#m29-create-days");
-  assert.equal(days.dataset.mode, "legacy");
-  assert.match(modal.querySelector("#m29-mode-label").textContent, /sesiones independientes por bloque/);
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-m29-day]").length === 7));
+  assert.equal(modal.querySelector("#m29-toggle-plan-b"), null,
+    "the old split-shift switch must not be exposed");
+  assert.match(modal.querySelector("#m29-mode-label").textContent, /07:00–23:00/);
+  assert.match(modal.querySelector("#m29-mode-label").textContent, /una dependienta por día trabajado/i);
+  assert.doesNotMatch(modal.textContent, /Mañana|Tarde|MANANA|TARDE/,
+    "the new-turn modal must not present legacy shift blocks");
+  assert.equal(modal.querySelectorAll("[data-m29-manana],[data-m29-tarde]").length, 0);
 
   const count = modal.querySelector("#m29-dias");
   count.value = "2";
   count.dispatchEvent(new window.Event("change", { bubbles: true }));
   const rows = modal.querySelectorAll("[data-m29-day]");
-  rows[0].querySelector("[data-m29-manana]").value = "dep-1";
-  rows[0].querySelector("[data-m29-tarde]").value = "dep-2";
-  rows[1].querySelector("[data-m29-tarde]").value = "dep-1";
+  assert.equal(rows.length, 2);
+  rows[0].querySelector("[data-m29-person]").value = "dep-1";
+  rows[1].querySelector("[data-m29-person]").value = "dep-2";
 
   modal.querySelector("#m29-confirm-crear").click();
-  assert.ok(await waitFor(() => createdLegacy.length === 1), "the legacy creation API is called");
-  const expectedLegacyPayload = {
-    almacenId: "alm-1",
-    inicioPlan: createdLegacy[0].inicioPlan,
-    cantidadDias: 2,
-    asignaciones: [
-      { numero_dia: 1, bloque: "MANANA", usuario_id: "dep-1" },
-      { numero_dia: 1, bloque: "TARDE", usuario_id: "dep-2" },
-      { numero_dia: 2, bloque: "TARDE", usuario_id: "dep-1" }
-    ]
-  };
-  const actualLegacyPayload = JSON.parse(JSON.stringify(createdLegacy[0]));
+  assert.ok(await waitFor(() => jornadaCalls.length === 1));
+  assert.equal(jornadaCalls[0].name, "bc5_crear_jornada_unica");
+  assert.equal(jornadaCalls[0].payload.p_dias, 2);
   assert.deepEqual(
-    actualLegacyPayload,
-    expectedLegacyPayload,
-    "Plan B must preserve the legacy payload contract"
+    JSON.parse(JSON.stringify(jornadaCalls[0].payload.p_programacion)),
+    [
+      { numero_dia: 1, trabaja: true, responsable_id: "dep-1" },
+      { numero_dia: 2, trabaja: true, responsable_id: "dep-2" }
+    ]
   );
-  assert.match(createdLegacy[0].inicioPlan, /^\d{4}-\d{2}-\d{2}$/);
-  assert.equal(jornadaCalls.length, 0, "Plan B never creates JORNADA rows in parallel");
+  assert.equal(createdLegacy.length, 0,
+    "the creation interface must never call the legacy M/T API");
 });
 
+test("the old Turno fallback cannot create split MANANA/TARDE sessions", () => {
+  const start = TURNOS_MASTER_SOURCE.indexOf("async function confirmCreate(");
+  const end = TURNOS_MASTER_SOURCE.indexOf("// DETALLE TURNO", start);
+  assert.ok(start >= 0 && end > start, "the fallback creation handler exists");
+  const handler = TURNOS_MASTER_SOURCE.slice(start, end);
+  assert.match(handler, /creación desde el formulario antiguo está deshabilitada/i);
+  assert.doesNotMatch(handler, /crearTurno\s*\(/,
+    "the fallback must not invoke the legacy API that creates two sessions per day");
+  assert.match(TURNOS_MASTER_SOURCE, /una jornada completa de 07:00 a 23:00/i);
+});
 
 test("M29 loads active eligible responsables when the shared cache is empty", async (t) => {
   const { window } = setup(t);
