@@ -112,15 +112,16 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.match(TURNOS_ACL_MIGRATION, /turnos_select_involucrados/);
   assert.match(TURNOS_ACL_MIGRATION, /turno_tramos_select_involucrados/);
   assert.match(TURNOS_ACL_MIGRATION, /turno_sesiones_select_involucrados/);
-  assert.match(TURNOS_ACL_MIGRATION, /REVOKE SELECT ON TABLE public\\.turnos FROM PUBLIC, anon/);
-  assert.match(TURNOS_ACL_MIGRATION, /GRANT SELECT ON TABLE public\\.turnos TO authenticated/);
-  assert.doesNotMatch(TURNOS_ACL_MIGRATION, /GRANT\\s+(?:ALL|INSERT|UPDATE|DELETE).*TO\\s+(?:anon|authenticated)/i);
+  assert.ok(TURNOS_ACL_MIGRATION.includes("REVOKE SELECT ON TABLE public.turnos FROM PUBLIC, anon;"));
+  assert.ok(TURNOS_ACL_MIGRATION.includes("GRANT SELECT ON TABLE public.turnos TO authenticated;"));
+  for (const statement of ["GRANT ALL", "GRANT INSERT", "GRANT UPDATE", "GRANT DELETE"]) {
+    assert.equal(TURNOS_ACL_MIGRATION.includes(statement), false, statement + " must not be introduced");
+  }
   assert.match(CONTRACT, /SET LOCAL ROLE authenticated/);
   assert.match(CONTRACT, /unrelated user can read the turn/);
-  assert.match(PG_CI, /20261031235000_turnos_authenticated_rls_dependency_read\\.sql/);
-  assert.match(PG_WORKFLOW, /20261031235000_turnos_authenticated_rls_dependency_read\\.sql/);
+  assert.ok(PG_CI.includes("20261031235000_turnos_authenticated_rls_dependency_read.sql"));
+  assert.ok(PG_WORKFLOW.includes("20261031235000_turnos_authenticated_rls_dependency_read.sql"));
 });
-
 test("PWA release 9.5.46 loads and precaches the cash handover UI", () => {
   assert.match(APP, /const VERSION="9\.5\.46"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
