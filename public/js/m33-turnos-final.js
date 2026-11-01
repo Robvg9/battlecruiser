@@ -1157,7 +1157,7 @@
         Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
     });
     var html = '<div class="m33-dependent">';
-    if (state.readOnly) html += '<p class="m33-muted" role="status">Expediente histórico · solo lectura.</p>';
+    if (state.readOnly) html += '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>';
     html += '<section class="m33-dependent-top"><div><h4>Tu jornada · ' +
       esc(field(t.almacen_nombre || t.almacen)) + '</h4><p class="m33-dependent-schedule">Horario operativo previsto · 07:00–23:00</p></div>' +
       '<span class="m33-pill">' + esc(dependentStatusLabel(t.estado_maestro || t.estado)) + '</span></section>';
