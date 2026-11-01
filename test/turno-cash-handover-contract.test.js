@@ -126,6 +126,8 @@ test("authenticated turn reads satisfy the RLS dependency without granting anony
   assert.ok(PG_WORKFLOW.includes("20261101001119_turnos_authenticated_rls_dependency_read.sql"));
 });
 test("unworked legacy Mañana/Tarde blocks can be cancelled without deleting the audit trail", () => {
+  assert.ok(FIXTURE.includes("CREATE TABLE IF NOT EXISTS public.turno_entregas_inventario"));
+  assert.ok(FIXTURE.includes("CREATE TABLE IF NOT EXISTS public.turno_descuentos"));
   for (const fragment of [
     "CREATE OR REPLACE FUNCTION public.bc5_cancelar_sesion_programada",
     "v_sesion.bloque NOT IN ('MANANA','TARDE')",
