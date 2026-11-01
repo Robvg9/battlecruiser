@@ -179,7 +179,11 @@ BEGIN
   -- An assigned non-admin cannot list all cash or register a count.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
-  PERFORM set_config('test.perms','turnos:ver',false);
+  -- A worker can create/start their own turn, but that is not owner/admin authority.
+  PERFORM set_config('test.perms','turnos:ver,turnos:crear',false);
+  IF public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'FAIL: turnos:crear incorrectly grants administrator authority';
+  END IF;
   v_error:=false;
   BEGIN
     PERFORM public.bc5_listar_dinero_pendiente_contar();
