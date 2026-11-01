@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.16 — tarjeta compacta de dependienta con liquidación histórica por sesión
+// v33.17 — progreso real del turno y libro Excel compartido por rol
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -183,6 +183,14 @@
         '.m33-dependent-cash-metric small{display:block;font-size:.68rem;opacity:.62;line-height:1.2}',
         '.m33-dependent-cash-metric b{display:block;font-size:.88rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin-top:2px}',
         '.m33-dependent-note{font-size:.76rem;line-height:1.35;opacity:.68;margin:0}',
+        '.m33-dependent-progress{display:flex;flex-wrap:wrap;gap:6px;margin-top:-5px}',
+        '.m33-dependent-progress-item{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid rgba(255,255,255,.09);border-radius:999px;font-size:.7rem;line-height:1.2;opacity:.82}',
+        '.m33-dependent-progress-item b{font-variant-numeric:tabular-nums}',
+        '.m33-dependent-status-pill{white-space:normal;text-align:center;max-width:175px}',
+        '.m33-dependent-status-pill.is-done{border-color:rgba(87,178,128,.4)}',
+        '.m33-dependent-status-pill.is-progress{border-color:rgba(91,157,207,.4)}',
+        '.m33-dependent-status-pill.is-review{border-color:rgba(215,166,79,.5)}',
+        '.m33-dependent-status-pill.is-warning{border-color:rgba(208,114,90,.5)}',
         '.m33-dependent-details>summary{cursor:pointer;font-weight:650;padding:2px 0}',
         '.m33-dependent-details .m33-archive{margin-top:8px}',
         '.m33-dependent .m33-btn-sesion{min-height:36px;padding:7px 11px;font-size:.78rem}',
@@ -325,7 +333,7 @@
       transferencia_salida: 'Transferencia de salida',
       transferencia_entrada: 'Transferencia de entrada',
       vale: 'Vale / salida',
-      merma: 'Merma aprobada',
+      merma: 'Baja aprobada',
       baja: 'Baja aprobada'
     })[String(value || '').toLowerCase()] || String(value || 'Movimiento');
   }
@@ -569,7 +577,7 @@
             if (status === 'APROBADA') return;
             pendingAdjustmentRows.push({
               date: request.creado_en || session.fecha,
-              kind: bucket === 'mermas' ? 'Merma' : 'Baja',
+              kind: 'Baja',
               product: request.producto || request.producto_id || '—',
               quantity: bookNumber(request.cantidad),
               reason: request.motivo || '',
@@ -654,65 +662,44 @@
         } catch (priceError) {}
       }
 
-      let declarations = null;
-      if (typeof rpcClient.from === 'function') {
-        try {
-          const declarationResponse = await rpcClient.from('turno_declaraciones')
-            .select('turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,declarado_at,estado_aprobacion,monto_contado,diferencia,contado_por,contado_at,observacion_conteo')
-            .in('turno_sesion_id', sessions.map(function (session) { return String(session.id); }));
-          if (!declarationResponse.error) declarations = Array.isArray(declarationResponse.data) ? declarationResponse.data : [];
-        } catch (declarationError) {}
-      }
+      // Cash details are part of the authorized turn expediente. Do not query
+      // turno_declaraciones from the browser: it is a private table and its RLS
+      // intentionally keeps direct reads closed to authenticated staff.
       const cashRows = [];
-      if (declarations && declarations.length) {
-        const sessionMap = new Map(sessions.map(function (session) { return [String(session.id), session]; }));
-        declarations.forEach(function (declaration) {
-          const session = sessionMap.get(String(declaration.turno_sesion_id));
-          if (!session) return;
-          cashRows.push({
-            sessionId: String(session.id),
-            date: declaration.declarado_at || session.fecha,
-            responsible: inventoryUserLabel(declaration.usuario_id || session.usuario_id),
-            declared: bookNumber(declaration.monto),
-            currency: declaration.moneda || 'Sin moneda registrada',
-            status: declaration.estado_aprobacion || 'Declarado',
-            collected: declaration.monto_contado == null ? null : bookNumber(declaration.monto_contado),
-            difference: declaration.diferencia == null ? null : bookNumber(declaration.diferencia),
-            counter: inventoryUserLabel(declaration.contado_por),
-            countedAt: declaration.contado_at || null
-          });
-        });
-      } else {
-        declarationFallback.forEach(function (declaration) {
-          const session = sessions.find(function (item) { return String(item.id) === declaration.sessionId; });
-          cashRows.push({
-            sessionId: declaration.sessionId,
-            date: declaration.date,
-            responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
-            declared: declaration.amount,
-            currency: declaration.currency || 'Sin moneda registrada',
-            status: declaration.status,
-            collected: declaration.collected == null ? null : declaration.collected,
-            difference: declaration.difference == null ? null : declaration.difference,
-            counter: inventoryUserLabel(declaration.counterId),
-            countedAt: declaration.countedAt || null
-          });
-        });
-      }
-      const coveredCashSessions = new Set(cashRows.map(function (row) { return String(row.sessionId || ''); }));
       sessions.forEach(function (session) {
-        if (!session || !session.dinero_id || coveredCashSessions.has(String(session.id))) return;
+        if (!session || !(session.dinero_declarado === true || session.dinero_id || session.dinero_monto != null)) return;
         cashRows.push({
           sessionId: String(session.id),
-          date: session.fecha,
+          date: session.dinero_declarado_at || session.fecha,
           responsible: inventoryUserLabel(session.usuario_id),
           declared: bookNumber(session.dinero_monto),
-          currency: 'CUP',
+          currency: session.dinero_moneda || 'CUP',
           status: session.dinero_estado_aprobacion || 'Declarado',
           collected: session.dinero_monto_contado == null ? null : bookNumber(session.dinero_monto_contado),
           difference: session.dinero_diferencia == null ? null : bookNumber(session.dinero_diferencia),
           counter: inventoryUserLabel(session.dinero_contado_por),
           countedAt: session.dinero_contado_at || null
+        });
+      });
+      const coveredCashSessions = new Set(cashRows.map(function (row) { return String(row.sessionId || ''); }));
+      declarationFallback.forEach(function (declaration) {
+        if (!declaration || coveredCashSessions.has(String(declaration.sessionId || ''))) return;
+        const session = sessions.find(function (item) { return String(item.id) === String(declaration.sessionId); });
+        cashRows.push({
+          sessionId: String(declaration.sessionId),
+          date: declaration.date || (session && session.fecha),
+          responsible: inventoryUserLabel(declaration.userId || (session && session.usuario_id)),
+          declared: declaration.amount,
+          currency: declaration.currency || (session && session.dinero_moneda) || 'CUP',
+          status: declaration.status || (session && session.dinero_estado_aprobacion) || 'Declarado',
+          collected: session && session.dinero_monto_contado != null
+            ? bookNumber(session.dinero_monto_contado)
+            : (declaration.collected == null ? null : declaration.collected),
+          difference: session && session.dinero_diferencia != null
+            ? bookNumber(session.dinero_diferencia)
+            : (declaration.difference == null ? null : declaration.difference),
+          counter: inventoryUserLabel((session && session.dinero_contado_por) || declaration.counterId),
+          countedAt: (session && session.dinero_contado_at) || declaration.countedAt || null
         });
       });
       cashRows.sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
@@ -722,8 +709,8 @@
         .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'es'); });
       const totals = {
         opening: 0, incoming: 0, reinvestment: 0, losses: 0, otherOut: 0,
-        final: 0, balanceSales: 0, posSales: 0, profit: 0, revenue: 0, lossValue: 0,
-        declaration: 0
+        final: 0, theoreticalFinal: 0, physicalDifference: 0, posSales: 0,
+        profit: 0, revenue: 0, lossValue: 0, declaration: 0
       };
       const allOpening = productRows.length > 0 && productRows.every(function (row) { return row.opening != null; });
       const allFinal = productRows.length > 0 && productRows.every(function (row) { return row.final != null; });
@@ -740,8 +727,13 @@
         const unitGain = salePrice != null && cost != null ? salePrice - cost : null;
         const unitGainApprox = (costApprox || priceApprox) && unitGain != null;
         const markup = cost > 0 && unitGain != null ? unitGain / cost * 100 : null;
-        const balanceSales = row.opening != null && row.final != null
-          ? row.opening + row.incoming + row.reinvestment - row.losses - row.otherOut - row.final
+        // Theoretical stock uses actual POS quantities. Any residual belongs to
+        // physical reconciliation; never infer or relabel an unexplained shortage as sales.
+        const theoreticalFinal = row.opening != null
+          ? row.opening + row.incoming + row.reinvestment - saleQty - row.losses - row.otherOut
+          : null;
+        const physicalDifference = theoreticalFinal != null && row.final != null
+          ? row.final - theoreticalFinal
           : null;
         const revenue = hasLineDetail
           ? row.saleRevenue
@@ -761,7 +753,8 @@
         totals.reinvestment += row.reinvestment;
         totals.losses += row.losses;
         totals.otherOut += row.otherOut;
-        if (balanceSales != null) totals.balanceSales += balanceSales;
+        if (theoreticalFinal != null) totals.theoreticalFinal += theoreticalFinal;
+        if (physicalDifference != null) totals.physicalDifference += physicalDifference;
         totals.posSales += saleQty;
         if (profit != null) totals.profit += profit;
         if (revenue != null) totals.revenue += revenue;
@@ -775,7 +768,8 @@
           priceApprox: priceApprox,
           markup: markup,
           markupApprox: unitGainApprox,
-          balanceSales: balanceSales,
+          theoreticalFinal: theoreticalFinal,
+          physicalDifference: physicalDifference,
           saleQty: saleQty,
           revenue: revenue,
           profit: profit,
@@ -810,8 +804,9 @@
           fmtCell(row.reinvestment, 'qty', false),
           fmtCell(row.losses, 'qty', false),
           fmtCell(row.otherOut, 'qty', false),
+          fmtCell(row.theoreticalFinal, 'qty', false),
           fmtCell(row.final, 'qty', false),
-          fmtCell(row.balanceSales, 'qty', false),
+          fmtCell(row.physicalDifference, 'qty', false),
           fmtCell(row.saleQty, 'qty', false),
           fmtCell(row.profit, 'money', row.profitApprox),
           fmtCell(row.revenue, 'money', row.revenueApprox),
@@ -827,8 +822,9 @@
         '<td>' + bookQty(totals.reinvestment) + '</td>' +
         '<td>' + bookQty(totals.losses) + '</td>' +
         '<td>' + bookQty(totals.otherOut) + '</td>' +
+        '<td>' + (allOpening ? bookQty(totals.theoreticalFinal) : '—') + '</td>' +
         '<td>' + (allFinal ? bookQty(totals.final) : '—') + '</td>' +
-        '<td>' + (allOpening && allFinal ? bookQty(totals.balanceSales) : '—') + '</td>' +
+        '<td>' + (allOpening && allFinal ? bookQty(totals.physicalDifference) : '—') + '</td>' +
         '<td>' + bookQty(totals.posSales) + '</td>' +
         '<td>' + bookMoney(totals.profit, totalsApprox) + '</td>' +
         '<td>' + bookMoney(totals.revenue, totalsApprox) + '</td>' +
@@ -857,8 +853,9 @@
           '</td><td>' + esc(row.actor) + '</td></tr>';
       }).join('') : '<tr><td colspan="7">No hay solicitudes pendientes o rechazadas asociadas al turno.</td></tr>';
       const snapshotNote = (!hasOpening || !hasFinal)
-        ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La columna “Venta (saldo)” queda sin cálculo cuando falta uno de esos cortes.'
+        ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La diferencia física queda sin cálculo hasta disponer de ambos cortes.'
         : '';
+      const inventoryNote = 'La diferencia física = inventario físico final − inventario teórico final (negativa = faltante; positiva = sobrante). Las ventas POS se descuentan del teórico y se muestran por separado; un faltante no se convierte automáticamente en venta.';
       const needsRevenueEstimate = tableRows.some(function (row) { return row.revenueApprox; });
       const needsProfitEstimate = tableRows.some(function (row) { return row.profitApprox; });
       const salesNote = needsRevenueEstimate
@@ -882,13 +879,13 @@
       const summary = summaryItems.map(function (item) {
         return '<div class="m33-book-metric"><small>' + item[0] + '</small><b>' + item[1] + '</b></div>';
       }).join('');
-      const notes = [snapshotNote, salesNote, cashNote].filter(Boolean).map(function (item) {
+      const notes = [snapshotNote, inventoryNote, salesNote, cashNote].filter(Boolean).map(function (item) {
         return '<div class="m33-book-note">' + esc(item) + '</div>';
       }).join('');
       host.innerHTML = '<div class="m33-book-summary">' + summary + '</div>' + notes +
         '<section class="m33-book-section"><h4>Inventario consolidado por producto</h4><div class="m33-book-scroll">' +
-        '<table class="m33-book-table"><thead><tr><th>% G</th><th>G/u</th><th>P.C.</th><th>P.V.</th><th>Producto</th><th>Inv. inicial</th><th>Entradas</th><th>Reinversión</th><th>Bajas</th><th>Otros</th><th>Inv. final</th><th>Venta (saldo)</th><th>Venta POS</th><th>Ganancia</th><th>Ingreso</th><th>Bajas $</th></tr></thead><tbody>' +
-        (tableBody || '<tr><td colspan="16">No hay productos asociados a los cortes o movimientos del turno.</td></tr>') +
+        '<table class="m33-book-table"><thead><tr><th>% G</th><th>G/u</th><th>P.C.</th><th>P.V.</th><th>Producto</th><th>Inv. inicial</th><th>Entradas</th><th>Reinversión</th><th>Bajas</th><th>Otros</th><th>Inv. teórico</th><th>Inv. físico</th><th>Diferencia física</th><th>Venta POS</th><th>Ganancia</th><th>Ingreso</th><th>Bajas $</th></tr></thead><tbody>' +
+        (tableBody || '<tr><td colspan="17">No hay productos asociados a los cortes o movimientos del turno.</td></tr>') +
         '</tbody><tfoot>' + totalMarkup + '</tfoot></table></div></section>' +
         '<div class="m33-book-subtables">' +
         '<section class="m33-book-section"><h4>Reinversiones detalladas · ' + bookMoney(reinvestmentTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Producto</th><th>Uds.</th><th>P.C.</th><th>Inversión</th><th>Responsable</th></tr></thead><tbody>' + reinvestmentBody + '</tbody></table></div></section>' +
@@ -896,7 +893,7 @@
         ' · pendientes ' + bookMoney(expensePendingTotal, false) + '</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Concepto</th><th>Importe</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + expenseBody + '</tbody></table></div></section>' +
         '</div>' +
         '<section class="m33-book-section"><h4>Conciliación de dinero</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Responsable</th><th>Declarado</th><th>Contado por dueño</th><th>Diferencia</th><th>Estado</th></tr></thead><tbody>' + cashBody + '</tbody></table></div></section>' +
-        '<section class="m33-book-section"><h4>Solicitudes de merma y baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
+        '<section class="m33-book-section"><h4>Solicitudes de baja · fuera del saldo hasta aprobarse</h4><div class="m33-book-scroll"><table class="m33-book-subtable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>' + pendingAdjustmentBody + '</tbody></table></div></section>';
       state.inventoryBook = {
         products: tableRows,
         totals: totals,
@@ -1095,7 +1092,7 @@
               timestamp: request.creado_en || session.fecha,
               order: 40,
               kind: 'request',
-              label: bucket === 'mermas' ? 'Solicitud de merma' : 'Solicitud de baja',
+              label: 'Solicitud de baja',
               product: request.producto || request.producto_id || '—',
               actor: request.creado_nombre || '—',
               status: String(request.estado || 'PENDIENTE') + ' · no descuenta stock',
@@ -1138,10 +1135,69 @@
     var status = String(value || '').toUpperCase();
     return ({
       APROBADA: 'Aprobada', APROBADO: 'Aprobado',
-      PENDIENTE: 'Pendiente de revisión', RECHAZADA: 'Rechazada', RECHAZADO: 'Rechazado',
-      DECLARADO: 'Declarado', COMPLETADA: 'Completada', EN_CURSO: 'En curso',
-      PROGRAMADA: 'Sin comenzar', CANCELADA: 'Cancelada', CERRADO: 'Cerrado', PENDIENTE_APROBACION: 'Pendiente de aprobación'
+      PENDIENTE: 'Pendiente de revisión', CON_DIFERENCIA: 'Revisión requerida', RECHAZADA: 'Rechazada', RECHAZADO: 'Rechazado',
+      DECLARADO: 'Declarado', COMPLETADA: 'Completada', EN_CURSO: 'En curso', ABIERTO: 'En curso',
+      PROGRAMADA: 'No iniciada', PROGRAMADO: 'No iniciado', CANCELADA: 'Cancelada', CERRADO: 'Cerrado', CERRADA: 'Cerrado', PENDIENTE_APROBACION: 'Pendiente de aprobación'
     })[status] || (value || 'Sin estado');
+  }
+
+
+  function dependentDayProgress(session) {
+    var status = normEstadoSesion(session && session.estado);
+    var approval = String(session && session.dinero_estado_aprobacion || '').toUpperCase();
+    var hasDeclaration = !!(session && (session.dinero_declarado === true || session.dinero_id || session.dinero_monto != null));
+    var hasOwnerCount = !!(session && session.dinero_monto_contado != null);
+    if (status === 'CANCELADA' || status === 'CANCELADO') return 'Cancelada';
+    if (status === 'PENDIENTE' || status === 'PROGRAMADA' || !status) return 'No iniciada';
+    if (/RECHAZ|CON_DIFERENCIA/.test(approval)) return 'Revisión requerida';
+    if (status === 'EN_CURSO') return hasDeclaration ? 'Pendiente de revisión del dueño' : 'En curso';
+    if (status === 'COMPLETADA' || status === 'CERRADO' || status === 'CERRADA') {
+      if (!hasDeclaration) return 'Declaración pendiente';
+      if (!hasOwnerCount || !/APROBAD/.test(approval)) return 'Pendiente de revisión del dueño';
+      return 'Completada';
+    }
+    return dependentStatusLabel(status);
+  }
+
+  function dependentProgressTone(label) {
+    var value = String(label || '').toLowerCase();
+    if (value.indexOf('revisión requerida') >= 0 || value.indexOf('rechaz') >= 0) return 'is-warning';
+    if (value.indexOf('pendiente de revisión') >= 0 || value.indexOf('declaración pendiente') >= 0) return 'is-review';
+    if (value.indexOf('completad') >= 0) return 'is-done';
+    if (value.indexOf('curso') >= 0) return 'is-progress';
+    return 'is-neutral';
+  }
+
+  function dependentTurnProgress(turn, sessions) {
+    var active = (sessions || []).filter(function (session) {
+      var status = normEstadoSesion(session && session.estado);
+      return status !== 'CANCELADA' && status !== 'CANCELADO';
+    });
+    if (!active.length) return 'Sin jornadas activas';
+    var labels = active.map(dependentDayProgress);
+    if (labels.indexOf('Revisión requerida') >= 0) return 'Revisión requerida';
+    if (labels.indexOf('Pendiente de revisión del dueño') >= 0) return 'Turno pendiente de revisión';
+    if (labels.indexOf('Declaración pendiente') >= 0) return 'Declaración pendiente';
+    if (labels.indexOf('En curso') >= 0) return 'Turno en curso';
+    if (labels.every(function (label) { return label === 'No iniciada'; })) return 'No iniciado';
+    if (labels.indexOf('No iniciada') >= 0) return 'Turno en curso';
+    if (labels.every(function (label) { return label === 'Completada'; })) {
+      var master = String(turn && (turn.estado_maestro || turn.estado) || '').toUpperCase();
+      return master === 'CERRADO' || master === 'CERRADA' ? 'Turno completado' : 'Turno pendiente de revisión';
+    }
+    return 'Turno en revisión';
+  }
+
+  function dependentProgressSummary(sessions) {
+    var counts = Object.create(null);
+    (sessions || []).forEach(function (session) {
+      var label = dependentDayProgress(session);
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return Object.keys(counts).map(function (label) {
+      return '<span class="m33-dependent-progress-item ' + dependentProgressTone(label) + '"><b>' +
+        counts[label] + '</b> ' + esc(label) + '</span>';
+    }).join('');
   }
 
   function dependentMoney(value, currency) {
@@ -1156,11 +1212,13 @@
       return String(a.fecha || '').localeCompare(String(b.fecha || '')) ||
         Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
     });
+    var turnProgress = dependentTurnProgress(t, mias);
     var html = '<div class="m33-dependent">';
     if (state.readOnly) html += '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>';
     html += '<section class="m33-dependent-top"><div><h4>Tu jornada · ' +
       esc(field(t.almacen_nombre || t.almacen)) + '</h4><p class="m33-dependent-schedule">Horario operativo previsto · 07:00–23:00</p></div>' +
-      '<span class="m33-pill">' + esc(dependentStatusLabel(t.estado_maestro || t.estado)) + '</span></section>';
+      '<span class="m33-pill m33-dependent-status-pill ' + dependentProgressTone(turnProgress) + '" data-m33-turn-status>' + esc(turnProgress) + '</span></section>' +
+      (mias.length ? '<div class="m33-dependent-progress" aria-label="Progreso de tus jornadas">' + dependentProgressSummary(mias) + '</div>' : '');
     html += '<div class="m33-dependent-meta">' +
       '<div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio || (mias[0] && mias[0].fecha))) + '</b></div>' +
       '<div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin || (mias[mias.length - 1] && mias[mias.length - 1].fecha))) + '</b></div>' +
@@ -1177,7 +1235,7 @@
       '<p class="m33-dependent-note">Una jornada completa por día. Los registros antiguos se conservan como historial y no se convierten automáticamente.</p>';
     html += mias.map(function (session) {
       var status = normEstadoSesion(session.estado);
-      var labelStatus = dependentStatusLabel(status);
+      var labelStatus = dependentDayProgress(session);
       var isJornada = String(session.bloque || '').toUpperCase() === 'JORNADA';
       var actions = '';
       var sid = esc(session.id);
@@ -1214,6 +1272,9 @@
       '<div id="m33-dep-cash-history" class="m33-dependent-cash-list" aria-live="polite">' +
       '<div class="m33-archive-empty">Consultando declaraciones de tus días…</div></div>' +
       '<p class="m33-dependent-note" style="margin-top:7px">El importe declarado, el conteo del dueño y la diferencia se muestran por separado, tal como quedaron registrados.</p></section>';
+    html += '<details class="m33-dependent-section m33-dependent-details" data-m33-dependent-book><summary>Hoja tipo Excel · inventario y liquidación</summary>' +
+      '<p class="m33-dependent-note">La misma hoja que consulta el administrador, con los datos de tus jornadas asignadas y sus permisos de lectura.</p>' +
+      step4() + '</details>';
     html += '<details class="m33-dependent-section m33-dependent-details"><summary>Movimientos de tus días</summary>' +
       '<p class="m33-dependent-note">Solo movimientos atribuibles a tus sesiones. Lo que no tenga vínculo verificable permanece en el historial general.</p>' +
       step3() + '</details></div>';
@@ -1453,7 +1514,7 @@
       transferencia_salida: 'Transferencia de salida',
       transferencia_entrada: 'Transferencia de entrada',
       vale: 'Vale de salida',
-      merma: 'Merma',
+      merma: 'Baja',
       baja: 'Baja'
     })[String(type || '').toLowerCase()] || String(type || '—');
   }
@@ -1502,7 +1563,10 @@
         const data = Array.isArray(response && response.data) ? response.data : (response && response.data ? [response.data] : []);
         data.forEach(function (row) {
           const session = sessionsById.get(String(sessionId));
-          rows.push(Object.assign({}, row, { __sessionLabel: session ? labelBloque(session.bloque) : 'Sesión' }));
+          const sessionLabel = !session ? 'Registro histórico' : (state.isAdmin
+            ? labelBloque(session.bloque)
+            : (String(session.bloque || '').toUpperCase() === 'JORNADA' ? 'Jornada completa' : 'Registro histórico'));
+          rows.push(Object.assign({}, row, { __sessionLabel: sessionLabel }));
         });
       }
       if (!readable && denied) {
@@ -1520,7 +1584,7 @@
             '</td><td>' + esc(row.almacen || '—') + '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
             '</td><td>' + esc(row.usuario || '—') + '</td><td>' + esc(shortRef) + '</td></tr>';
         }).join('');
-        host.innerHTML = title + '<div class="m33-archive-scroll"><table class="m33-archive-table"><thead><tr><th>Fecha/hora</th><th>Sesión</th><th>Tipo</th><th>Producto</th><th>Almacén</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+        host.innerHTML = title + '<div class="m33-archive-scroll"><table class="m33-archive-table"><thead><tr><th>Fecha/hora</th><th>' + (state.isAdmin ? 'Sesión' : 'Jornada') + '</th><th>Tipo</th><th>Producto</th><th>Almacén</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
           (denied ? '<div class="m33-archive-empty" role="status">Algunas sesiones no se muestran porque tu perfil no tiene permiso para consultarlas.</div>' : '');
       }
       host.dataset.loaded = '1';
@@ -1541,6 +1605,14 @@
       ov.querySelector('#m33-x').onclick = close;
       var c = ov.querySelector('#m33-close-final'); if (c) c.onclick = close;
       bindArchiveButtons(ov);
+      bindInventoryButtons(ov);
+      var dependentBook = ov.querySelector('[data-m33-dependent-book]');
+      if (dependentBook) dependentBook.addEventListener('toggle', function () {
+        if (!dependentBook.open || dependentBook.dataset.autoLoaded === '1') return;
+        dependentBook.dataset.autoLoaded = '1';
+        var bookButton = dependentBook.querySelector('[data-m33-inventory-book]');
+        if (bookButton) loadInventoryBook(bookButton);
+      });
       loadDependentCashHistory(ov);
       ov.querySelectorAll('[data-m33-abrir-sesion]').forEach(function (btn) { btn.addEventListener('click', function () { abrirSesionDependienta(btn.getAttribute('data-m33-abrir-sesion'), btn); }); });
       ov.querySelectorAll('[data-m33-abrir-jornada]').forEach(function (btn) { btn.addEventListener('click', function () { abrirJornadaUnica(btn.getAttribute('data-m33-abrir-jornada'), btn); }); });

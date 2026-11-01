@@ -272,6 +272,7 @@ function applySql(file) {
     applySql("test/step7-jornada-finanzas-fixture.sql");
     log("\\r\\n=== 5/9 Apply Step 7 finance/carry-forward migration ===");
     applySql("supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql");
+    applySql("supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql");
     log("\r\n=== 6/9 Apply forward expired-turn guard and exercise ADMIN recovery ===");
     applySql("test/force-close-turno-admin-fixture.sql");
     applySql("supabase/migrations/20261026170000_bc_force_close_admin_expiry_guard.sql");

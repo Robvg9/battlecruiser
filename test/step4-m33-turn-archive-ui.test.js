@@ -193,7 +193,17 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   sessions.splice(0, sessions.length, {
     ...session("jornada-day1", 1, "2026-10-20", "JORNADA"),
     estado: "COMPLETADA",
-    responsable_id: "owner-fixture"
+    responsable_id: "owner-fixture",
+    dinero_declarado: true,
+    dinero_id: "cash-declaration-1",
+    dinero_monto: 100,
+    dinero_moneda: "CUP",
+    dinero_estado_aprobacion: "APROBADA",
+    dinero_monto_contado: 100,
+    dinero_diferencia: 0,
+    dinero_contado_por: "owner-fixture",
+    dinero_contado_nombre: "Dueño fixture",
+    dinero_contado_at: "2026-10-20T22:15:00-04:00"
   });
   window.client = {
     rpc: async (name, params = {}) => {
@@ -247,10 +257,6 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
           if (table === "productos") return { error: null, data: [{
             id: "product-1", nombre: "Café", precio_normal: 20
           }] };
-          if (table === "turno_declaraciones") return { error: null, data: [
-      { turno_sesion_id: "jornada-day1", usuario_id: "owner-fixture", monto: 100, moneda: "CUP", declarado_at: "2026-10-20T20:00:00-04:00", estado_aprobacion: "APROBADO" },
-      { turno_sesion_id: "jornada-day1", usuario_id: "owner-fixture", monto: 10, moneda: "USD", declarado_at: "2026-10-20T20:05:00-04:00", estado_aprobacion: "ESPERANDO_APROBACION" }
-    ] };
           return { error: null, data: [] };
         }
       })
@@ -270,25 +276,27 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.match(host.textContent, /Inv\. inicial/);
   assert.match(host.textContent, /Entradas/);
   assert.match(host.textContent, /Reinversión/);
-  assert.match(host.textContent, /Venta \(saldo\)/);
+  assert.match(host.textContent, /Inv\. teórico/);
+  assert.match(host.textContent, /Inv\. físico/);
+  assert.match(host.textContent, /Diferencia física/);
   assert.match(host.textContent, /Venta POS/);
   assert.match(host.textContent, /Reinversiones detalladas/);
   assert.match(host.textContent, /Electricidad/);
-  assert.match(host.textContent, /Solicitudes de merma y baja/);
+  assert.match(host.textContent, /Solicitudes de baja/);
+  assert.doesNotMatch(host.textContent, /Merma/);
   assert.match(host.textContent, /no descuenta existencias/);
   assert.match(host.textContent, /Contado por dueño/);
   assert.match(host.textContent, /Gastos aprobados/);
   assert.match(host.textContent, /Gastos pendientes/);
   assert.match(host.textContent, /Dinero declarado · CUP/);
-  assert.match(host.textContent, /Dinero declarado · USD/);
   assert.match(host.textContent, /100,00 CUP/);
-  assert.match(host.textContent, /10,00 USD/);
+  assert.match(host.textContent, /0,00 CUP/);
   const productRow = host.querySelector(".m33-book-table tbody tr");
   assert.ok(productRow, "the product matrix must contain its Café fixture row");
   assert.deepEqual(Array.from(productRow.cells).map((cell) => cell.textContent.trim()), [
     "300%", "15,00", "5,00", "20,00", "Café", "10", "5", "3", "1", "0",
-    "13", "4", "2", "30,00", "40,00", "3,00"
-  ], "the spreadsheet columns must reconcile real opening, entries, reinvestment, approved loss, closing count and FIFO sales");
+    "15", "13", "-2", "2", "30,00", "40,00", "3,00"
+  ], "the spreadsheet must show theoretical stock after POS sales, physical closing count and their unexplained difference separately");
   assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_movimientos_sesion"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_finanzas_jornada"));

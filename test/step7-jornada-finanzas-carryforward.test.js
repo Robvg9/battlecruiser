@@ -9,6 +9,10 @@ const MIGRATION = fs.readFileSync(
   path.join(__dirname, "..", "supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql"),
   "utf8"
 );
+const FINANCE_READ_MIGRATION = fs.readFileSync(
+  path.join(__dirname, "..", "supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql"),
+  "utf8"
+);
 const UI = fs.readFileSync(
   path.join(__dirname, "..", "public/js/bc7-jornada-ui.js"),
   "utf8"
@@ -68,26 +72,35 @@ test("Reinvestment preserves provider and serializes actor/key retries", () => {
 test("PostgreSQL 17 workflow applies the new finance/carry-forward migration and exercises its contract", () => {
   assert.match(PG_CI,/test\/step7-jornada-finanzas-fixture\.sql/);
   assert.match(PG_CI,/supabase\/migrations\/20261031010121_step7_jornada_finanzas_carryforward\.sql/);
+  assert.match(PG_CI,/supabase\/migrations\/20261101154629_step4_assigned_jornada_finance_read\.sql/);
   assert.match(PG_CI,/test\/step7-jornada-finanzas-contract\.sql/);
   assert.match(PG_WORKFLOW,/supabase\/migrations\/20261031010121_step7_jornada_finanzas_carryforward\.sql/);
+  assert.match(PG_WORKFLOW,/supabase\/migrations\/20261101154629_step4_assigned_jornada_finance_read\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-fixture\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-contract\.sql/);
 });
 
-test("Jornada finance read respects per-section view permissions", () => {
-  const start = MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_finanzas_jornada");
-  const end = MIGRATION.indexOf("$function$;", start);
-  assert.ok(start >= 0 && end > start, "bc7_finanzas_jornada debe estar definida");
-  const fn = MIGRATION.slice(start, end);
+test("assigned responsible can read the full finance ledger for their own jornada only", () => {
+  const start = FINANCE_READ_MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_finanzas_jornada");
+  const end = FINANCE_READ_MIGRATION.indexOf("$function$;", start);
+  assert.ok(start >= 0 && end > start, "bc7_finanzas_jornada debe estar redefinida");
+  const fn = FINANCE_READ_MIGRATION.slice(start, end);
   assert.match(fn, /tiene_permiso\('turnos','ver'\)/);
   assert.match(fn, /a\.turno_sesion_id=v_s\.id AND a\.usuario_id=auth\.uid\(\) AND a\.retirado_at IS NULL/);
-  assert.doesNotMatch(fn, /responsable_id=auth\.uid\(\)/, "finance history must not be readable from a stale scheduling row without an active assignment");
-  assert.match(fn, /tiene_permiso\('gastos','ver'\)/);
-  assert.match(fn, /tiene_permiso\('reinversiones','ver'\)/);
-  assert.match(fn, /'gastos',CASE WHEN/);
-  assert.match(fn, /'reinversiones',CASE WHEN/);
-  assert.match(fn, /g\.turno_sesion_id=v_s\.id/);
-  assert.match(fn, /r\.turno_sesion_id=v_s\.id/);
+  assert.doesNotMatch(fn, /responsable_id=auth\.uid\(\)/, "finance history must require a current assignment, not a stale scheduling row");
+  assert.doesNotMatch(fn, /tiene_permiso\('(gastos|reinversiones|mermas|bajas)','ver'\)/, "assigned read must not require broad module visibility grants");
+  for (const section of ["gastos", "reinversiones", "mermas", "bajas"]) {
+    assert.match(fn, new RegExp("'" + section + "',coalesce\\(\\("), section + " must be returned for the assigned session");
+  }
+  for (const scope of [
+    /g\.turno_sesion_id=v_s\.id/,
+    /r\.turno_sesion_id=v_s\.id/,
+    /m\.turno_sesion_id=v_s\.id/,
+    /b\.turno_sesion_id=v_s\.id/
+  ]) assert.match(fn, scope, "each ledger section must remain scoped to the one authorized session");
+  assert.doesNotMatch(fn, /\bINSERT\s+INTO\b|\bUPDATE\s+public\.|\bDELETE\s+FROM\b/i, "the finance ledger RPC must remain read-only");
+  assert.match(FINANCE_READ_MIGRATION, /REVOKE ALL ON FUNCTION public\.bc7_finanzas_jornada\(uuid\) FROM PUBLIC, anon, authenticated/);
+  assert.match(FINANCE_READ_MIGRATION, /GRANT EXECUTE ON FUNCTION public\.bc7_finanzas_jornada\(uuid\) TO authenticated/);
 });
 
 test("Jornada inventory read and write RPCs require turnos.ver for non-admin assigned users", () => {

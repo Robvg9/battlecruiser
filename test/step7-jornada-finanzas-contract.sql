@@ -190,28 +190,16 @@ BEGIN
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: assigned user saved Jornada inventory without turnos.ver'; END IF;
 
-  -- A worker may create without financial read; the RPC must not leak either section.
-  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear',false);
-  v_result:=public.bc7_finanzas_jornada(v_day2);
-  IF jsonb_array_length(v_result->'gastos')<>0 OR jsonb_array_length(v_result->'reinversiones')<>0 THEN
-    RAISE EXCEPTION 'FAIL: finance read exposed a section without its own .ver permission';
-  END IF;
-  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver',false);
+  -- The assigned responsible can inspect the full financial and adjustment ledger
+  -- for this one jornada with turnos.ver. No global finance .ver grants are required.
+  PERFORM set_config('test.perms','turnos:ver',false);
   v_result:=public.bc7_finanzas_jornada(v_day2);
   IF jsonb_array_length(v_result->'gastos')<>1 OR jsonb_array_length(v_result->'reinversiones')<>1 THEN
-    RAISE EXCEPTION 'FAIL: authorized finance history did not return both linked records';
+    RAISE EXCEPTION 'FAIL: assigned responsible cannot read the complete own-session finance ledger';
   END IF;
-
-  -- View permission is section-scoped: neither section may leak the other section's rows.
-  PERFORM set_config('test.perms','turnos:ver,gastos:ver',false);
-  v_result:=public.bc7_finanzas_jornada(v_day2);
-  IF jsonb_array_length(v_result->'gastos')<>1 OR jsonb_array_length(v_result->'reinversiones')<>0 THEN
-    RAISE EXCEPTION 'FAIL: reinvestments leaked without reinversiones.ver';
-  END IF;
-  PERFORM set_config('test.perms','turnos:ver,reinversiones:ver',false);
-  v_result:=public.bc7_finanzas_jornada(v_day2);
-  IF jsonb_array_length(v_result->'gastos')<>0 OR jsonb_array_length(v_result->'reinversiones')<>1 THEN
-    RAISE EXCEPTION 'FAIL: expenses leaked without gastos.ver';
+  IF jsonb_typeof(v_result->'mermas') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(v_result->'bajas') IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'FAIL: own-session adjustment sections are missing from the finance ledger';
   END IF;
 
   -- An unrelated authenticated user cannot read or write this jornada by calling RPCs directly.
@@ -268,6 +256,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: finance RPC ACL grants do not match authenticated-only policy';
   END IF;
 
-  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward: idempotent expense/reinvestment, provider, stock/FIFO/cash, permission-scoped reads and immutable previous-day provenance';
+  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward: idempotent expense/reinvestment, provider, stock/FIFO/cash, assigned-session scoped finance reads and immutable previous-day provenance';
 END
 $finance$;
