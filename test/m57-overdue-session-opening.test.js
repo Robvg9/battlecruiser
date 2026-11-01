@@ -62,8 +62,8 @@ test("M57 permits the next overdue session but never skips an unresolved predece
       session("unresolved-older", 1, "MANANA", yesterday, "PROGRAMADA"),
       session("today-later", 2, "MANANA", today, "PROGRAMADA")
     ]),
-    null,
-    "a later session must remain locked while its predecessor is unresolved"
+    "unresolved-older",
+    "the first unresolved overdue session is eligible; a later one cannot skip it"
   );
 });
 
