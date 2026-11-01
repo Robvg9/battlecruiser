@@ -270,7 +270,9 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.match(host.textContent, /Inv\. inicial/);
   assert.match(host.textContent, /Entradas/);
   assert.match(host.textContent, /Reinversión/);
-  assert.match(host.textContent, /Venta \(saldo\)/);
+  assert.match(host.textContent, /Inv\\. teórico/);
+  assert.match(host.textContent, /Inv\\. físico/);
+  assert.match(host.textContent, /Diferencia física/);
   assert.match(host.textContent, /Venta POS/);
   assert.match(host.textContent, /Reinversiones detalladas/);
   assert.match(host.textContent, /Electricidad/);
@@ -288,8 +290,8 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.ok(productRow, "the product matrix must contain its Café fixture row");
   assert.deepEqual(Array.from(productRow.cells).map((cell) => cell.textContent.trim()), [
     "300%", "15,00", "5,00", "20,00", "Café", "10", "5", "3", "1", "0",
-    "13", "4", "2", "30,00", "40,00", "3,00"
-  ], "the spreadsheet columns must reconcile real opening, entries, reinvestment, approved loss, closing count and FIFO sales");
+    "15", "13", "-2", "2", "30,00", "40,00", "3,00"
+  ], "the spreadsheet must show theoretical stock after POS sales, physical closing count and their unexplained difference separately");
   assert.ok(rpcCalls.some((call) => call.name === "bc7_obtener_inventario_jornada"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_movimientos_sesion"));
   assert.ok(rpcCalls.some((call) => call.name === "bc7_finanzas_jornada"));
