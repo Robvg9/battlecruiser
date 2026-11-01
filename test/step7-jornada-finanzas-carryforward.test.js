@@ -72,10 +72,10 @@ test("Reinvestment preserves provider and serializes actor/key retries", () => {
 test("PostgreSQL 17 workflow applies the new finance/carry-forward migration and exercises its contract", () => {
   assert.match(PG_CI,/test\/step7-jornada-finanzas-fixture\.sql/);
   assert.match(PG_CI,/supabase\/migrations\/20261031010121_step7_jornada_finanzas_carryforward\.sql/);
-  assert.match(PG_CI,/supabase\/migrations\/20261101110000_step4_assigned_jornada_finance_read\.sql/);
+  assert.match(PG_CI,/supabase\/migrations\/20261101154629_step4_assigned_jornada_finance_read\.sql/);
   assert.match(PG_CI,/test\/step7-jornada-finanzas-contract\.sql/);
   assert.match(PG_WORKFLOW,/supabase\/migrations\/20261031010121_step7_jornada_finanzas_carryforward\.sql/);
-  assert.match(PG_WORKFLOW,/supabase\/migrations\/20261101110000_step4_assigned_jornada_finance_read\.sql/);
+  assert.match(PG_WORKFLOW,/supabase\/migrations\/20261101154629_step4_assigned_jornada_finance_read\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-fixture\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-contract\.sql/);
 });
