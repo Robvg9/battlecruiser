@@ -102,7 +102,9 @@ test("the owner inbox is RPC-only and exposes count, difference and explicit rev
 });
 
 test("inventory book reports declared, counted and difference values from the backend", () => {
-  assert.match(BOOK_UI, /monto_contado,diferencia,contado_por,contado_at/);
+  assert.match(BOOK_UI, /Cash details are part of the authorized turn expediente/);
+  assert.match(BOOK_UI, /entry\.inventory && entry\.inventory\.declaracion_dinero/);
+  assert.doesNotMatch(BOOK_UI, /from\(['"]turno_declaraciones['"]\)/, "the browser must not query the private cash table directly");
   assert.match(BOOK_UI, /dinero_monto_contado/);
   assert.match(BOOK_UI, /Contado por dueño/);
   assert.match(BOOK_UI, /cashNote = 'La declaración de la responsable y el conteo físico del dueño se guardan por separado/);
@@ -163,12 +165,12 @@ test("the owner can start a scheduled legacy day while non-worked placeholders d
 });
 
 test("PWA release 9.5.51 loads and precaches the cash handover UI", () => {
-  assert.match(APP, /const VERSION="9\.5\.50"/);
+  assert.match(APP, /const VERSION="9\.5\.51"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.50"/);
+  assert.match(SW, /BC_SW_VERSION = "9\.5\.51"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.50/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.50/);
+  assert.match(INDEX, /app\.js\?v=9\.5\.51/);
+  assert.match(INDEX, /style\.css\?v=9\.5\.51/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
