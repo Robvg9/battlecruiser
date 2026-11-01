@@ -142,6 +142,7 @@ test("los registros antiguos no se presentan como bloques mañana/tarde",()=>{
 
 test("el libro distingue la venta POS del faltante físico y no infiere ventas desde el stock",async t=>{
  const {window}=fixture(t,{jornada:true});
+ const tableReads=[];
  window.client={
   rpc:async(name,params={})=>{
    if(name==="bc7_movimientos_sesion"){
@@ -164,8 +165,9 @@ test("el libro distingue la venta POS del faltante físico y no infiere ventas d
    if(name==="bc7_finanzas_jornada")return {data:{gastos:[],reinversiones:[],mermas:[],bajas:[]},error:null};
    return {data:null,error:{code:"UNEXPECTED_RPC",message:name}};
   },
-  from:(table)=>({
-   select:()=>({
+  from:(table)=>{
+   tableReads.push(table);
+   return {select:()=>({
     in:async()=>{
      if(table==="ventas_lineas")return {data:[
       {venta_id:"sale-1",producto_id:"product-coffee",cantidad:3,precio_unitario:10,subtotal:30,costo_unitario_fifo:5}
@@ -174,8 +176,8 @@ test("el libro distingue la venta POS del faltante físico y no infiere ventas d
      if(table==="turno_declaraciones")return {data:[],error:null};
      return {data:[],error:null};
     }
-   })
-  })
+   })};
+  }
  };
  await window.__BC_M33.open("turno-fixture");
  const modal=window.document.getElementById("m33-bg");
@@ -195,5 +197,6 @@ test("el libro distingue la venta POS del faltante físico y no infiere ventas d
  );
  assert.match(table.textContent,/Diferencia física/);
  assert.match(table.textContent,/Venta POS/);
+ assert.ok(!tableReads.includes("turno_declaraciones"),"the browser must never read the private cash-declarations table directly");
  assert.doesNotMatch(table.textContent,/Venta \(saldo\)/);
 });
