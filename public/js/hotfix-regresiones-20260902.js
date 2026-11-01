@@ -115,45 +115,16 @@
   }
 
   function patchTurnoDetail() {
-    const api = window.BattleCruiserTurnoAPI;
-    const hub = window.__BC_M33;
-    if (!api || typeof api.obtenerExpedienteTurno !== 'function' || !hub || typeof hub.open !== 'function' || hub.open.__bcRegSessions) return;
-    const original = hub.open;
-    const wrapped = async function(turnoId) {
-      const result = await original.apply(this,arguments);
-      if (isAdmin()) return result;
-      try {
-        const modal = document.getElementById('m33-bg');
-        if (!modal) return result;
-        const exp = await api.obtenerExpedienteTurno(turnoId);
-        const data = Array.isArray(exp) ? (exp[0] || {}) : (exp || {});
-        const sesiones = Array.isArray(data.sesiones) ? data.sesiones.slice() : [];
-        const me = window._usuarioActualId || window._usuarioActual?.id || null;
-        const norm = s => String(s || '').toUpperCase();
-        const grouped = { MAÑANA: [], TARDE: [] };
-        sesiones.forEach(s => {
-          const t = norm(s.bloque || s.turno || s.periodo || s.nombre);
-          grouped[t.includes('TAR') || t.includes('PM') ? 'TARDE' : 'MAÑANA'].push(s);
-        });
-        const groupHtml = (title,rows) => `<section class="bc-session-group"><h4>${title}</h4>${rows.length ? rows.map(s => {
-          const own = me && same(s.usuario_id,me);
-          const st = norm(s.estado);
-          const action = own && (st === 'PENDIENTE' || st === 'PROGRAMADA' || !st)
-            ? `<button type="button" class="m33-btn-sesion" data-bc-reg-open-session="${esc(s.id)}">Abrir sesión</button>`
-            : own ? `<span class="m33-pill">${esc(st || 'Sin comenzar')}</span>` : '<span class="m33-pill">Asignada a otra dependienta</span>';
-          return `<div class="bc-session-row"><strong>${esc(s.nombre || s.titulo || s.hora || 'Sesión')}</strong>${action}</div>`;
-        }).join('') : '<div class="muted">Sin sesiones</div>'}</section>`;
-        const host = modal.querySelector('.m33-body,[data-m33-body],.m33-content') || modal;
-        host.querySelector('.bc-session-recovery')?.remove();
-        const section = document.createElement('div');
-        section.className = 'bc-session-recovery';
-        section.innerHTML = groupHtml('Mañana',grouped.MAÑANA) + groupHtml('Tarde',grouped.TARDE);
-        host.appendChild(section);
-      } catch (e) { console.warn('[BattleCruiser] sesiones:',e); }
-      return result;
-    };
-    wrapped.__bcRegSessions = true;
-    hub.open = wrapped;
+    function cleanLegacyTurnoPanels() {
+      const modal = document.getElementById('m33-bg');
+      if (!modal) return;
+      modal.querySelectorAll('.bc-session-recovery, .bc14-turnos, [data-bc174-tarde], [data-bc14-turnos]').forEach(node => node.remove());
+    }
+    cleanLegacyTurnoPanels();
+    if (window.__BC_REG_TURNO_CLEANUP_OBSERVER || !document.body) return;
+    const observer = new MutationObserver(cleanLegacyTurnoPanels);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.__BC_REG_TURNO_CLEANUP_OBSERVER = observer;
   }
 
   function consolidateInventoryRows(rows,params) {
