@@ -289,3 +289,65 @@ BEGIN
 END
 $authenticated_rls$;
 ROLLBACK;
+
+-- Admin cancellation is allowed only for an unworked scheduled legacy block.
+BEGIN;
+SELECT set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',true);
+SELECT set_config('test.bc_admin','true',true);
+INSERT INTO public.turno_sesiones(
+  id,turno_id,almacen_id,numero_dia,bloque,fecha,estado
+) VALUES(
+  '96000000-0000-0000-0000-000000000002',
+  '95000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000001',
+  2,'TARDE',CURRENT_DATE+1,'PROGRAMADA'
+);
+INSERT INTO public.turno_asignaciones(
+  turno_sesion_id,turno_id,usuario_id,asignado_por
+) VALUES(
+  '96000000-0000-0000-0000-000000000002',
+  '95000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000001'
+);
+DO $legacy_cancel$
+DECLARE
+  v_result jsonb;
+BEGIN
+  v_result:=public.bc5_cancelar_sesion_programada(
+    '96000000-0000-0000-0000-000000000002',
+    'CI: bloque duplicado no trabajado durante reconciliación de jornada única'
+  );
+  IF v_result->>'estado'<>'CANCELADA'
+     OR coalesce((v_result->>'idempotente')::boolean,true) THEN
+    RAISE EXCEPTION 'FAIL: scheduled legacy block was not cancelled as expected';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.turno_asignaciones
+    WHERE turno_sesion_id='96000000-0000-0000-0000-000000000002'
+      AND retirado_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'FAIL: active assignment remained after session cancellation';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.turno_eventos
+    WHERE turno_sesion_id='96000000-0000-0000-0000-000000000002'
+      AND tipo='SESION_PROGRAMADA_CANCELADA_ADMIN'
+      AND payload->>'historial_preservado'='true'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: cancellation audit event missing';
+  END IF;
+  v_result:=public.bc5_cancelar_sesion_programada(
+    '96000000-0000-0000-0000-000000000002','retry'
+  );
+  IF coalesce((v_result->>'idempotente')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'FAIL: repeated cancellation was not idempotent';
+  END IF;
+  IF (SELECT estado FROM public.turno_sesiones
+      WHERE id='96000000-0000-0000-0000-000000000001')<>'EN_CURSO' THEN
+    RAISE EXCEPTION 'FAIL: active worked session was altered';
+  END IF;
+  RAISE NOTICE 'PASS legacy session reconciliation: only unworked scheduled block cancelled, assignments retired, audit preserved, active work untouched';
+END
+$legacy_cancel$;
+ROLLBACK;
