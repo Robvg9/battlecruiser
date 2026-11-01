@@ -1,4 +1,4 @@
-// BattleCruiser — M57.5 · UX de secuencia + entrada directa a Ventas
+// BattleCruiser — M57.6 · guard canónico de secuencia y sesiones atrasadas
 // Solo la sesión elegible queda clickeable. El guard bloquea intentos directos.
 // Fecha operativa = America/Puerto_Rico (misma fuente que backend y M62).
 // Tras apertura confirmada por M33: refresca turno_actual_usuario y entra a Ventas.
@@ -54,7 +54,8 @@
     var all=rows.slice().filter(Boolean).sort(function(a,b){var x=order(a),y=order(b);return x[0]-y[0]||x[1]-y[1];}),h=today();
     for(var i=0;i<all.length;i++) {
       var cur=all[i],st=strip(cur.estado);
-      if(terminal(st)||st==='EN_CURSO'||String(cur.fecha||'').slice(0,10)!==h) continue;
+      var sessionDate=String(cur.fecha||'').slice(0,10);
+      if(terminal(st)||st==='EN_CURSO'||!sessionDate||sessionDate>h) continue;
       var blocked=false;
       for(var j=0;j<all.length;j++) if(before(all[j],cur)&&!terminal(all[j].estado)){blocked=true;break;}
       if(!blocked) return String(cur.id);
@@ -72,6 +73,8 @@
     var buttons=Array.prototype.slice.call(modal.querySelectorAll('[data-m33-abrir-sesion]')); if(!buttons.length)return;
     css(); var ok=eligibleId(rows);
     buttons.forEach(function(btn){
+      // M33 owns the in-flight RPC state; never re-enable a button while it is opening.
+      if(btn.dataset && btn.dataset.bcBusy==='1')return;
       var canOpen=!!ok&&String(btn.getAttribute('data-m33-abrir-sesion'))===ok;
       if(canOpen){
         if(btn.disabled||btn.classList.contains('m57-locked')||btn.classList.contains('m56-lock')||btn.textContent.indexOf('Abrir sesión')===-1||btn.textContent.indexOf('🔒')>=0){
@@ -146,7 +149,10 @@
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
     runRender();
   }
-  function boot(){if(!document.body)return;bind();setTimeout(runRender,250);setTimeout(runRender,700);}
-  window.__BC_M57={render:runRender,refreshVentas:refreshAndGoVentas,today:today,version:'57.5'};
+  function boot(){if(!document.body)return;
+    try{if(window.__BC_M56&&typeof window.__BC_M56.disable==='function')window.__BC_M56.disable();}catch(e){}
+    bind();setTimeout(runRender,250);setTimeout(runRender,700);
+  }
+  window.__BC_M57={render:runRender,refreshVentas:refreshAndGoVentas,today:today,eligibleId:eligibleId,version:'57.6'};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

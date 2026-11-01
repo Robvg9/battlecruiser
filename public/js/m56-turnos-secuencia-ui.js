@@ -1,4 +1,4 @@
-// BattleCruiser — M56.7 · secuencia UI robusta con metadata real
+// BattleCruiser — M56.8 · secuencia UI delegada al guard canónico M57
 // No interpreta fechas desde texto visual. Usa turno_sesiones reales del turno.
 // La elegibilidad visual y la apertura real usan la misma regla: fecha operativa PR + secuencia.
 // M56.7: fecha = America/Puerto_Rico (misma fuente que backend RPC y M62). Evita competir con M57 durante redirección a Ventas.
@@ -106,19 +106,20 @@
     var all=Object.keys(sessionMeta).map(function(id){return sessionMeta[id];});
     all.sort(function(a,b){var ka=metaClave(a),kb=metaClave(b);return ka[0]-kb[0]||ka[1]-kb[1];});
     for(var i=0;i<all.length;i++){
-      var cur=all[i]; if(terminal(cur.estado)||cur.estado==='EN_CURSO')continue; if(cur.fecha!==hoy())continue;
+      var cur=all[i]; if(terminal(cur.estado)||cur.estado==='EN_CURSO'||!cur.fecha||cur.fecha>hoy())continue;
       var blocked=false; for(var j=0;j<all.length;j++){if(!anterior(all[j],cur))continue;if(!terminal(all[j].estado)){blocked=true;break;}}
       if(!blocked)return String(cur.id);
     }
     return null;
   }
   function renderSequence() {
-    if(rendering)return;
+    if(window.__bcM57TurnosSessionUx||rendering)return;
     var modal=document.querySelector('#m33-bg .m33-modal'); if(!modal||!modal.querySelector('#m33-dep-msg, [data-m33-abrir-sesion]'))return;
     css(); var items=visibleMetaRows(modal); if(!items.length)return; var eligibleId=findEligibleId(); rendering=true;
     try { items.forEach(function(it){if(eligibleId&&String(it.meta.id)===eligibleId)desbloquear(it.button);else bloquear(it.button);if(it.meta.fecha&&it.meta.fecha!==hoy()&&it.meta.estado==='PENDIENTE'){var sub=it.row.querySelector('.m33-muted');if(sub&&!it.row.querySelector('.m56-when')){var when=document.createElement('span');when.className='m56-when';when.textContent=it.meta.fecha>hoy()?'Disponible en su fecha programada':'Fecha ya pasada';sub.appendChild(when);}}}); }
     finally{rendering=false;}
   }
+  function disable(){if(observer){observer.disconnect();observer=null;}}
   function onCardClick(e){var card=e.target&&e.target.closest?e.target.closest('.m29-card[data-turno-id]'):null;if(!card)return;lastTurnoId=card.getAttribute('data-turno-id')||null;metaTurnoId=null;metaPromise=null;sessionMeta=Object.create(null);TODAY_CACHE=null;}
 
   function volverAVentas(){
@@ -140,5 +141,5 @@
   }
   function boot(){if(!document.body)return;bind();setTimeout(function(){loadMetadata().then(renderSequence);},80);setTimeout(function(){loadMetadata().then(renderSequence);},300);setTimeout(function(){loadMetadata().then(renderSequence);},900);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.__BC_M56={renderSequence:renderSequence,volverAVentas:volverAVentas,reload:function(){metaTurnoId=null;metaPromise=null;TODAY_CACHE=null;return loadMetadata().then(renderSequence);},hoy:hoy,version:'56.7'};
+  window.__BC_M56={renderSequence:renderSequence,volverAVentas:volverAVentas,disable:disable,reload:function(){metaTurnoId=null;metaPromise=null;TODAY_CACHE=null;return loadMetadata().then(renderSequence);},hoy:hoy,version:'56.8'};
 })();
