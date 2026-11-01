@@ -266,6 +266,32 @@
     if (labels.every(function (label) { return label === 'Completada'; })) return 'Completada';
     return labels[0] || 'Sin estado';
   }
+  function dailyTurnProgress(turn, groups) {
+    var labels = (groups || []).map(dailyProgress);
+    if (!labels.length) return 'Sin jornadas activas';
+    if (labels.indexOf('Revisión requerida') >= 0) return 'Revisión requerida';
+    if (labels.indexOf('Pendiente de revisión del dueño') >= 0) return 'Turno pendiente de revisión';
+    if (labels.indexOf('Declaración pendiente') >= 0) return 'Declaración pendiente';
+    if (labels.indexOf('En curso') >= 0) return 'Turno en curso';
+    if (labels.every(function (label) { return label === 'No iniciada'; })) return 'No iniciado';
+    if (labels.indexOf('No iniciada') >= 0) return 'Turno en curso';
+    if (labels.every(function (label) { return label === 'Completada'; })) {
+      var master = String(turn && (turn.estado_maestro || turn.estado) || '').toUpperCase();
+      return master === 'CERRADO' || master === 'CERRADA' ? 'Turno completado' : 'Turno pendiente de revisión';
+    }
+    return 'Turno en revisión';
+  }
+  function dailyProgressSummary(groups) {
+    var counts = Object.create(null);
+    (groups || []).forEach(function (group) {
+      var label = dailyProgress(group);
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return Object.keys(counts).map(function (label) {
+      return '<span class="m33-dependent-progress-item ' + dependentProgressTone(label) + '"><b>' +
+        counts[label] + '</b> ' + esc(label) + '</span>';
+    }).join('');
+  }
   function normEstadoSesion(e) {
     return String(e || '').toUpperCase().trim();
   }
@@ -1302,13 +1328,13 @@
         Number(a.numero_dia || a.dia_n || 0) - Number(b.numero_dia || b.dia_n || 0);
     });
     var jornadasMias = dailySessionGroups(mias);
-    var turnProgress = dependentTurnProgress(t, jornadasMias.map(function (g) { return { estado: dailyProgress(g) === 'Completada' ? 'COMPLETADA' : (dailyProgress(g) === 'En curso' ? 'EN_CURSO' : 'PENDIENTE'), dinero_declarado: g.sessions.some(function (s) { return s.dinero_declarado === true || !!s.dinero_id; }), dinero_monto_contado: g.sessions.some(function (s) { return s.dinero_monto_contado != null; }), dinero_estado_aprobacion: g.sessions.some(function (s) { return /APROBAD/i.test(String(s.dinero_estado_aprobacion || '')); }) ? 'APROBADA' : '' }; }));
+    var turnProgress = dailyTurnProgress(t, jornadasMias);
     var html = '<div class="m33-dependent">';
     if (state.readOnly) html += '<p class="m33-muted" role="status">Expediente histórico en modo de solo lectura.</p>';
     html += '<section class="m33-dependent-top"><div><h4>Tu jornada · ' +
       esc(field(t.almacen_nombre || t.almacen)) + '</h4><p class="m33-dependent-schedule">Horario operativo previsto · 07:00–23:00</p></div>' +
       '<span class="m33-pill m33-dependent-status-pill ' + dependentProgressTone(turnProgress) + '" data-m33-turn-status>' + esc(turnProgress) + '</span></section>' +
-      (jornadasMias.length ? '<div class="m33-dependent-progress" aria-label="Progreso de tus jornadas">' + dependentProgressSummary(jornadasMias.map(function (g) { return { estado: dailyProgress(g) === 'Completada' ? 'COMPLETADA' : (dailyProgress(g) === 'En curso' ? 'EN_CURSO' : 'PENDIENTE'), dinero_declarado: g.sessions.some(function (s) { return s.dinero_declarado || s.dinero_id; }), dinero_monto_contado: g.sessions.some(function (s) { return s.dinero_monto_contado != null; }), dinero_estado_aprobacion: g.sessions.some(function (s) { return /APROBAD/i.test(String(s.dinero_estado_aprobacion || '')); }) ? 'APROBADA' : '' }; })) + '</div>' : '');
+      (jornadasMias.length ? '<div class="m33-dependent-progress" aria-label="Progreso de tus jornadas">' + dailyProgressSummary(jornadasMias) + '</div>' : '');
     html += '<div class="m33-dependent-meta">' +
       '<div class="m33-box"><span>Desde</span><b>' + esc(date(t.fecha_inicio || (mias[0] && mias[0].fecha))) + '</b></div>' +
       '<div class="m33-box"><span>Hasta</span><b>' + esc(date(t.fecha_fin || (mias[mias.length - 1] && mias[mias.length - 1].fecha))) + '</b></div>' +
