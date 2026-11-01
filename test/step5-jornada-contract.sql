@@ -5,6 +5,22 @@ SELECT set_config('test.bc_admin','true',false);
 SELECT public.bc5_configurar_horario_jornada(
   '10000000-0000-0000-0000-000000000001','07:00','23:00','America/Havana'
 );
+DO $test$
+BEGIN
+  BEGIN
+    PERFORM public.bc5_crear_jornada_unica(
+      '10000000-0000-0000-0000-000000000001',
+      DATE '2030-02-01',
+      1,
+      '[{"numero_dia":1,"trabaja":true,"responsable_id":"20000000-0000-0000-0000-000000000001"}]'::jsonb,
+      'CI: one-day turn must be rejected'
+    );
+    RAISE EXCEPTION 'A one-day Turno was accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+END
+$test$;
+
 CREATE TEMP TABLE _bc5_pattern_result AS
 SELECT public.bc5_guardar_patron_jornada(
   '10000000-0000-0000-0000-000000000001',
@@ -154,8 +170,9 @@ DO $test$
 BEGIN
   BEGIN
     PERFORM public.bc5_crear_jornada_unica(
-      '10000000-0000-0000-0000-000000000002',DATE '2030-01-02',1,
-      '[{"numero_dia":1,"trabaja":true,"responsable_id":"20000000-0000-0000-0000-000000000002"}]'::jsonb,
+      '10000000-0000-0000-0000-000000000002',DATE '2030-01-02',2,
+      '[{"numero_dia":1,"trabaja":true,"responsable_id":"20000000-0000-0000-0000-000000000002"},
+        {"numero_dia":2,"trabaja":false,"responsable_id":null}]'::jsonb,
       'CI: intentionally conflicting schedule'
     );
     RAISE EXCEPTION 'Cross-warehouse same-day conflict was accepted';
@@ -234,9 +251,10 @@ CREATE TEMP TABLE _bc5_today AS
 SELECT public.bc5_crear_jornada_unica(
   '10000000-0000-0000-0000-000000000003',
   (now() AT TIME ZONE 'America/Havana')::date,
-  1,
-  '[{"numero_dia":1,"trabaja":true,"responsable_id":"20000000-0000-0000-0000-000000000002"}]'::jsonb,
-  'CI: today-only isolated journey'
+  2,
+  '[{"numero_dia":1,"trabaja":true,"responsable_id":"20000000-0000-0000-0000-000000000002"},
+    {"numero_dia":2,"trabaja":false,"responsable_id":null}]'::jsonb,
+  'CI: today plus one rest date isolated journey'
 ) AS result;
 CREATE TEMP TABLE _bc5_today_session AS
 SELECT (result->>'turno_id')::uuid AS turno_id,
