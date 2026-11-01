@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.18 — jornadas diarias agrupadas y revisión administrativa
+// v33.19 — una jornada visible por fecha, sin paneles legacy
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -1844,6 +1844,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.18', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
+  window.__BC_M33 = { open: open, version: '33.19', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
