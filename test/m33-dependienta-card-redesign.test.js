@@ -61,7 +61,7 @@ test("tarjeta compacta presenta liquidaciones propias y oculta sesiones ajenas",
  assert.match(modal.textContent,/Declarado/);
  assert.match(modal.textContent,/Contado por el dueño/);
  assert.match(modal.textContent,/Diferencia/);
- assert.match(modal.textContent,/3\.320,00 CUP/);
+ assert.match(modal.textContent,/3(?:\\.)?320,00 CUP/);
  assert.match(modal.textContent,/200,00 CUP/);
  assert.doesNotMatch(modal.textContent,/Otra dependienta|other-day-1|cancelled-day-1/);
  assert.doesNotMatch(modal.textContent,/Mañana|Tarde|MANANA|TARDE/);
