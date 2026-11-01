@@ -209,3 +209,79 @@ BEGIN
   RAISE NOTICE 'PASS Cash handover: exact match, admin-only count, immutable evidence, discrepancy review, no automatic stock/cash mutation, idempotency and ACLs';
 END
 $cash$;
+
+-- Re-run the same policy path as a real authenticated role after the ACL migration.
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('test.bc_admin','false',true);
+DO $authenticated_rls$
+DECLARE
+  v_count integer;
+BEGIN
+  -- Assigned worker sees their own turn, session and active tranche.
+  PERFORM set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',true);
+
+  SELECT count(*) INTO v_count
+  FROM public.turno_tramos
+  WHERE id='97000000-0000-0000-0000-000000000001';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL: assigned worker cannot read their own tranche through RLS';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.turno_sesiones
+  WHERE id='96000000-0000-0000-0000-000000000001';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL: assigned worker cannot read their own session through RLS';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.turnos
+  WHERE id='95000000-0000-0000-0000-000000000001';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL: assigned worker cannot read the assigned turn through RLS';
+  END IF;
+
+  -- The creator/owner still sees the same related records.
+  PERFORM set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',true);
+
+  SELECT count(*) INTO v_count
+  FROM public.turno_tramos
+  WHERE id='97000000-0000-0000-0000-000000000001';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL: turn creator cannot read the tranche through RLS';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.turno_sesiones
+  WHERE id='96000000-0000-0000-0000-000000000001';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL: turn creator cannot read the session through RLS';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.turnos
+  WHERE id='95000000-0000-0000-0000-000000000001';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL: turn creator cannot read the turn through RLS';
+  END IF;
+
+  -- An unrelated authenticated user receives no rows.
+  PERFORM set_config('request.jwt.claim.sub','29999999-0000-0000-0000-000000000099',true);
+
+  SELECT count(*) INTO v_count
+  FROM public.turno_tramos
+  WHERE id='97000000-0000-0000-0000-000000000001';
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'FAIL: unrelated user can read the tranche';
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.turnos
+  WHERE id='95000000-0000-0000-0000-000000000001';
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'FAIL: unrelated user can read the turn';
+  END IF;
+END
+$authenticated_rls$;
+ROLLBACK;

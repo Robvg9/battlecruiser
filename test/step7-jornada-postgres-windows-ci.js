@@ -282,11 +282,13 @@ function applySql(file) {
     applySql("test/step7-jornada-contract.sql");
     log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
     applySql("test/step7-jornada-finanzas-contract.sql");
-    log("\\r\\n=== 10/10 Verify owner cash count, immutable evidence, discrepancy review and ACL ===");
+    log("\\r\\n=== 10/11 Verify cash handover fixture and authenticated RLS dependency ===");
     applySql("test/turno-cash-handover-fixture.sql");
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
+    applySql("supabase/migrations/20261031235000_turnos_authenticated_rls_dependency_read.sql");
+    log("\\r\\n=== 11/11 Verify staff/owner RLS reads after the authenticated SELECT fix ===");
     applySql("test/turno-cash-handover-contract.sql");
-    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + owner cash handover + discrepancy review + ACL contracts.");
+    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + owner cash handover + authenticated RLS visibility + discrepancy review + ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
