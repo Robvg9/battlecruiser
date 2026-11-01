@@ -1844,6 +1844,6 @@
     }, true);
   }
   function boot() { css(); intercept(); }
-  window.__BC_M33 = { open: open, version: '33.16', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
+  window.__BC_M33 = { open: open, version: '33.18', renderHome: renderHome, loadInventoryBook: loadInventoryBook };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
