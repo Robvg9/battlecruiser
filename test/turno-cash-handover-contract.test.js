@@ -11,7 +11,7 @@ function read(relative) {
 
 const MIGRATION = read("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
 const TURNOS_ACL_MIGRATION = read("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
-const LEGACY_RECONCILIATION_MIGRATION = read("supabase/migrations/20261101130000_legacy_turno_jornada_reconciliation.sql");
+const LEGACY_RECONCILIATION_MIGRATION = read("supabase/migrations/20261101041610_legacy_turno_jornada_reconciliation_20261101.sql");
 const TURNOS_MASTER_UI = read("public/js/turnos-maestro.js");
 const TURN_API = read("public/js/turno-api.js");
 const CONTRACT = read("test/turno-cash-handover-contract.sql");

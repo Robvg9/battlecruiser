@@ -289,7 +289,7 @@ function applySql(file) {
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
     applySql("supabase/migrations/20261101001119_turnos_authenticated_rls_dependency_read.sql");
     applySql("supabase/migrations/20261101005329_fix_turno_admin_permission_boundary.sql");
-    applySql("supabase/migrations/20261101130000_legacy_turno_jornada_reconciliation.sql");
+    applySql("supabase/migrations/20261101041610_legacy_turno_jornada_reconciliation_20261101.sql");
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation ===");
     applySql("test/turno-cash-handover-contract.sql");
     log("\\r\\n=== 12/13 Verify owner cash and legacy reconciliation contracts ===");
