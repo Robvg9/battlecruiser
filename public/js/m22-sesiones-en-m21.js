@@ -37,8 +37,7 @@
   }
   function labelBloque(b) {
     var s = String(b || '').toUpperCase();
-    if (s === 'MANANA' || s === 'MAÑANA') return 'Mañana';
-    if (s === 'TARDE') return 'Tarde';
+    if (s === 'MANANA' || s === 'MAÑANA' || s === 'TARDE' || s === 'JORNADA') return 'Jornada diaria';
     return b || '—';
   }
   function labelEstado(e) {
@@ -149,7 +148,7 @@
     var panel = document.createElement('div');
     panel.id = PANEL_ID;
     panel.className = 'm21-card';
-    panel.innerHTML = '<h4>Sesiones de trabajo</h4><p class="muted">Mañana / tarde · trabajador asignado · abrir y cerrar.</p><div id="m22-sesiones-lista" class="m22-ses-lista"><p class="muted">Cargando sesiones…</p></div><p id="m22-sesiones-msg" class="m21-msg"></p>';
+    panel.innerHTML = '<h4>Sesiones de trabajo</h4><p class="muted">Jornada diaria · responsable asignado · estado de trabajo.</p><div id="m22-sesiones-lista" class="m22-ses-lista"><p class="muted">Cargando sesiones…</p></div><p id="m22-sesiones-msg" class="m21-msg"></p>';
     var wrap = root.querySelector('.m21-wrap') || root;
     var firstCard = wrap.querySelector('.m21-card');
     if (firstCard && firstCard.parentNode) {
@@ -234,15 +233,23 @@
   function renderLista(sesiones, cicloEstado) {
     var el = document.getElementById('m22-sesiones-lista');
     if (!el) return;
-    lastSesiones = sesiones || [];
+    var me = uid();
+    var visibles = (sesiones || []).filter(function (s) {
+      var estado = normEstado(s && s.estado);
+      if (estado === 'CANCELADA' || estado === 'CANCELADO') return false;
+      if (isAdmin()) return true;
+      var assigned = sesionUsuarioId(s);
+      return !!me && !!assigned && String(assigned) === String(me);
+    });
+    lastSesiones = visibles;
     suppressObs = true;
-    if (!sesiones || !sesiones.length) {
+    if (!visibles.length) {
       el.innerHTML = '<p class="muted">Sin sesiones en este turno.</p>';
       setTimeout(function () { suppressObs = false; }, 0);
       return;
     }
     var cicloOperable = cicloEstado === 'ACTIVO' || cicloEstado === 'EN_VALIDACION';
-    el.innerHTML = sesiones.map(function (s) {
+    el.innerHTML = visibles.map(function (s) {
       var estado = normEstado(s.estado);
       var trabajador = sesionUsuarioNombre(s) || (sesionUsuarioId(s) ? '—' : 'Sin asignar');
       var alm = s.almacen_nombre || s.nombre_almacen || '';
