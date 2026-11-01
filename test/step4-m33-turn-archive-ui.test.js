@@ -274,7 +274,8 @@ test("M33 Inventario renders opening counts, real movements, finance and pending
   assert.match(host.textContent, /Venta POS/);
   assert.match(host.textContent, /Reinversiones detalladas/);
   assert.match(host.textContent, /Electricidad/);
-  assert.match(host.textContent, /Solicitudes de merma y baja/);
+  assert.match(host.textContent, /Solicitudes de baja/);
+  assert.doesNotMatch(host.textContent, /Merma/);
   assert.match(host.textContent, /no descuenta existencias/);
   assert.match(host.textContent, /Contado por dueño/);
   assert.match(host.textContent, /Gastos aprobados/);
