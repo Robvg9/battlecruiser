@@ -18,6 +18,9 @@ DECLARE
   v_final_id uuid;
   v_initial_id uuid;
   v_tramo uuid;
+  v_sale uuid;
+  v_sale_retry uuid;
+  v_sales_data jsonb;
   v_expense uuid;
   v_expense_retry uuid;
   v_reinvestment uuid;
@@ -30,7 +33,7 @@ DECLARE
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver,turnos:ver',false);
+  PERFORM set_config('test.perms','gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver,ventas:crear,ventas:ver,turnos:ver',false);
 
   -- Day 1 has already been physically counted and closed by step7-jornada-contract.sql.
   -- Move only the disposable fixture's historical date back one day, then create today's Day 2.
@@ -98,6 +101,62 @@ BEGIN
   SELECT id INTO v_tramo FROM public.turno_tramos
   WHERE turno_sesion_id=v_day2 AND estado='ACTIVO' AND usuario_id=v_owner;
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: Day 2 did not open an active owner tranche'; END IF;
+
+  -- New Jornada POS sales persist the exact active session/tranche and payment method.
+  -- The same external idempotency key must never duplicate a sale or change its attribution.
+  v_sale:=public.bc7_registrar_venta_jornada(
+    v_almacen,
+    jsonb_build_array(jsonb_build_object(
+      'producto_id',v_pan,'cantidad',2,'presentacion_id',NULL,
+      'cantidad_presentacion',NULL,'tipo_precio','normal'
+    )),
+    v_day2,v_tramo,'EFECTIVO',
+    '95000000-0000-0000-0000-000000000003'
+  );
+  v_sale_retry:=public.bc7_registrar_venta_jornada(
+    v_almacen,
+    jsonb_build_array(jsonb_build_object(
+      'producto_id',v_pan,'cantidad',2,'presentacion_id',NULL,
+      'cantidad_presentacion',NULL,'tipo_precio','normal'
+    )),
+    v_day2,v_tramo,'EFECTIVO',
+    '95000000-0000-0000-0000-000000000003'
+  );
+  IF v_sale IS DISTINCT FROM v_sale_retry THEN
+    RAISE EXCEPTION 'FAIL: repeated Jornada sale returned a different ID';
+  END IF;
+  IF (SELECT count(*) FROM public.ventas
+      WHERE creado_por=v_owner AND idempotency_key='95000000-0000-0000-0000-000000000003')<>1 THEN
+    RAISE EXCEPTION 'FAIL: retry duplicated a Jornada sale';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.ventas
+    WHERE id=v_sale AND turno_sesion_id=v_day2 AND turno_tramo_id=v_tramo
+      AND metodo_pago='EFECTIVO' AND idempotency_payload_hash IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'FAIL: sale lost exact Jornada/tranche/payment provenance';
+  END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_venta_jornada(
+      v_almacen,
+      jsonb_build_array(jsonb_build_object(
+        'producto_id',v_pan,'cantidad',2,'presentacion_id',NULL,
+        'cantidad_presentacion',NULL,'tipo_precio','normal'
+      )),
+      v_day2,v_tramo,'TRANSFERENCIA',
+      '95000000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN unique_violation THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: sale idempotency key allowed a payment-method change'; END IF;
+  v_sales_data:=public.bc7_ventas_jornada(v_day2);
+  IF jsonb_array_length(v_sales_data->'ventas')<>1
+     OR (v_sales_data->'resumen'->>'cantidad')::integer<>1
+     OR (v_sales_data->'resumen'->>'efectivo')::numeric<>20
+     OR (v_sales_data->'resumen'->>'transferencia')::numeric<>0 THEN
+    RAISE EXCEPTION 'FAIL: Jornada sales ledger did not return session-scoped totals by payment method';
+  END IF;
 
   -- Expense is linked only to turno_sesiones/turno_tramos; legacy FK stays NULL.
   v_expense:=public.bc7_registrar_gasto_jornada(
@@ -192,7 +251,7 @@ BEGIN
 
   -- The assigned responsible can inspect the full financial and adjustment ledger
   -- for this one jornada with turnos.ver. No global finance .ver grants are required.
-  PERFORM set_config('test.perms','turnos:ver',false);
+  PERFORM set_config('test.perms','turnos:ver,ventas:ver',false);
   v_result:=public.bc7_finanzas_jornada(v_day2);
   IF jsonb_array_length(v_result->'gastos')<>1 OR jsonb_array_length(v_result->'reinversiones')<>1 THEN
     RAISE EXCEPTION 'FAIL: assigned responsible cannot read the complete own-session finance ledger';
@@ -204,7 +263,7 @@ BEGIN
 
   -- An unrelated authenticated user cannot read or write this jornada by calling RPCs directly.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
-  PERFORM set_config('test.perms','turnos:ver,gastos:crear,gastos:ver,reinversiones:crear,reinversiones:ver',false);
+  PERFORM set_config('test.perms','turnos:ver,ventas:crear,ventas:ver,gastos:crear,gastos:ver,reinversiones:crear,reinversiones:ver',false);
   v_error:=false;
   BEGIN
     PERFORM public.bc7_finanzas_jornada(v_day2);
@@ -230,15 +289,39 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unassigned authenticated user wrote a reinvestment through the RPC'; END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_venta_jornada(
+      v_almacen,
+      jsonb_build_array(jsonb_build_object(
+        'producto_id',v_pan,'cantidad',1,'presentacion_id',NULL,
+        'cantidad_presentacion',NULL,'tipo_precio','normal'
+      )),
+      v_day2,v_tramo,'EFECTIVO',
+      '97000000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unrelated authenticated user registered a sale for another responsible'; END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_ventas_jornada(v_day2);
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unrelated authenticated user read another responsible sales ledger'; END IF;
 
   IF has_function_privilege('anon','public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)','EXECUTE')
      OR has_function_privilege('anon','public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)','EXECUTE')
-     OR has_function_privilege('anon','public.bc7_finanzas_jornada(uuid)','EXECUTE') THEN
+     OR has_function_privilege('anon','public.bc7_finanzas_jornada(uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_registrar_venta_jornada(uuid,jsonb,uuid,uuid,text,uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_ventas_jornada(uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'FAIL: anon has execute privilege on a protected Jornada finance RPC';
   END IF;
   IF NOT has_function_privilege('authenticated','public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)','EXECUTE')
-     OR NOT has_function_privilege('authenticated','public.bc7_finanzas_jornada(uuid)','EXECUTE') THEN
+     OR NOT has_function_privilege('authenticated','public.bc7_finanzas_jornada(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_registrar_venta_jornada(uuid,jsonb,uuid,uuid,text,uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_ventas_jornada(uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'FAIL: authenticated is missing an intended Jornada finance RPC grant';
   END IF;
 
@@ -256,6 +339,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: finance RPC ACL grants do not match authenticated-only policy';
   END IF;
 
-  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward: idempotent expense/reinvestment, provider, stock/FIFO/cash, assigned-session scoped finance reads and immutable previous-day provenance';
+  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward + Jornada sales: idempotent expense/reinvestment/sale, provider, stock/FIFO/cash, payment-method provenance, assigned-session scoped reads and immutable previous-day provenance';
 END
 $finance$;
