@@ -227,6 +227,9 @@ BEGIN
   v_before := v_before || jsonb_build_object('auth.users',v_count);
   EXECUTE 'SELECT count(*) FROM storage.objects' INTO v_count;
   v_before := v_before || jsonb_build_object('storage.objects',v_count);
+  IF v_count <> 0 THEN
+    RETURN jsonb_build_object('ok',false,'code','storage_cleanup_required','storage_object_count',v_count);
+  END IF;
 
   INSERT INTO private.bc_reset_operations(request_id,status,result)
   VALUES (p_request_id,'started',NULL)
@@ -235,7 +238,7 @@ BEGIN
   EXECUTE
     'TRUNCATE TABLE ' ||
     (SELECT string_agg(format('%I.%I','public',x),', ' ORDER BY x) FROM unnest(v_wipe) AS x) ||
-    ', auth.users, storage.objects RESTART IDENTITY CASCADE';
+    ', auth.users RESTART IDENTITY CASCADE';
 
   INSERT INTO public.auditoria_operaciones
     (usuario_id,usuario_nombre,tipo,descripcion,estado,entidad_id,idempotency_key,payload_resumen)
