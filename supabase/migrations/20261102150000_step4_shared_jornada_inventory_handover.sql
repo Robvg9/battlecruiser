@@ -155,7 +155,7 @@ $function$;
 
 DROP TRIGGER IF EXISTS bc7_preparar_entrega_inventario_jornada ON public.turno_jornada_inventario_cortes;
 CREATE CONSTRAINT TRIGGER bc7_preparar_entrega_inventario_jornada
-AFTER INSERT ON public.turno_jornada_inventario_cortes
+AFTER INSERT OR UPDATE ON public.turno_jornada_inventario_cortes
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION public.bc7_preparar_entrega_inventario_jornada();
 
