@@ -47,7 +47,7 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 (function programarLoadingGuard(){function cargar(){try{if(document.querySelector('script[data-battlecruiser-loading-guard="1"]'))return;const s=document.createElement('script');s.src='js/loading-guard.js';s.async=false;s.dataset.battlecruiserLoadingGuard='1';document.head.appendChild(s);}catch(e){console.warn('[BattleCruiser] No se pudo cargar loading-guard.js:',e);}}if(document.readyState==='complete')cargar();else window.addEventListener('load',cargar,{once:true});})();
 function safeInit(nombre,fn){try{fn();}catch(e){console.error("[Battlecruiser] No se pudo iniciar '"+nombre+"':",e);}}
 function esperar(ms){return new Promise(r=>setTimeout(r,ms));}
-function money(n){const v=Number(n);return Number.isFinite(v)?v.toFixed(2):"0.00";}
+function money(n){const v=Number(n);if(!Number.isFinite(v)||Object.is(v,-0)||Math.abs(v)<0.005)return "0.00";return v.toFixed(2);}
 function fechaCorta(fecha){return new Date(fecha).toLocaleDateString("es",{day:"2-digit",month:"2-digit",year:"numeric"});}
 function fechaHora(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
 function fechaHoraCompleta(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
