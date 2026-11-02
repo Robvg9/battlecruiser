@@ -301,4 +301,39 @@ BEGIN
 END
 $test$;
 
+-- Operational categories: reinvestment entry, a unified internal transfer filter,
+-- and both approved write-off tables must be available through the read-only movement RPC.
+SELECT set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',false);
+SELECT set_config('test.perms','reportes:ver',false);
+DO $test$
+DECLARE
+  v_reinvestment integer;
+  v_internal integer;
+  v_writeoffs integer;
+  v_out integer;
+  v_in integer;
+BEGIN
+  SELECT count(*) INTO v_reinvestment
+  FROM public.movimientos_producto(NULL,NULL,'2030-01-01','2030-01-31','reinversion',100,0)
+  WHERE tipo='reinversion' AND producto='Producto fixture' AND cantidad=3 AND costo_unitario=5;
+  IF v_reinvestment<>1 THEN
+    RAISE EXCEPTION 'Reinversion history filter did not return the incoming stock line: %',v_reinvestment;
+  END IF;
+  SELECT count(*) INTO v_internal
+  FROM public.movimientos_producto(NULL,NULL,'2030-01-01','2030-01-31','movimiento_interno',100,0);
+  IF v_internal<>2 THEN RAISE EXCEPTION 'Internal movement filter must return both legs: %',v_internal; END IF;
+  SELECT count(*) INTO v_out
+  FROM public.movimientos_producto(NULL,NULL,'2030-01-01','2030-01-31','movimiento_interno',100,0)
+  WHERE tipo='transferencia_salida' AND cantidad<0;
+  SELECT count(*) INTO v_in
+  FROM public.movimientos_producto(NULL,NULL,'2030-01-01','2030-01-31','movimiento_interno',100,0)
+  WHERE tipo='transferencia_entrada' AND cantidad>0;
+  IF v_out<>1 OR v_in<>1 THEN RAISE EXCEPTION 'Transfer direction is not preserved (out %, in %)',v_out,v_in; END IF;
+  SELECT count(*) INTO v_writeoffs
+  FROM public.movimientos_producto(NULL,NULL,'2030-01-01','2030-01-31','baja',100,0)
+  WHERE tipo IN ('merma','baja') AND cantidad<0;
+  IF v_writeoffs<>2 THEN RAISE EXCEPTION 'Baja must group only approved merma and baja rows: %',v_writeoffs; END IF;
+END
+$test$;
+
 SELECT 'STEP6 CONTRACT PASS' AS result;
