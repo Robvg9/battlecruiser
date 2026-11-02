@@ -435,8 +435,7 @@ test("M33 jornada workbook fits mobile width without horizontal scrolling", asyn
   if (adjustmentLabels.length) assert.deepEqual(adjustmentLabels, ["Fecha", "Tipo", "Producto", "Cantidad", "Motivo", "Estado", "Responsable"]);
   const style = window.document.getElementById("bc-m33-compact-sheet-css")?.textContent || "";
   assert.match(style, /m33-book-scroll\{overflow:visible!important\}/);
-  assert.match(style, /m33-book-table tbody tr\{display:grid!important/);
-  assert.match(style, /m33-book-subtable tbody tr\{display:grid!important/);
+  assert.match(style, /\.m33-book-table tbody tr,\.m33-book-subtable tbody tr\{display:grid!important/);
   assert.doesNotMatch(style, /min-width:1220px|min-width:1320px/);
   assert.equal(calls.filter((call) => !["listar_usuarios_admin","bc7_obtener_inventario_jornada","bc7_movimientos_sesion","bc7_finanzas_jornada"].includes(call.name)).length, 0);
 });
