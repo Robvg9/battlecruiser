@@ -28,8 +28,8 @@
     reinversion: { label: 'Reinversión', badge: 'entrada', short: 'Reinversión' },
     transferencia_salida: { label: 'Movimiento interno', badge: 'transf', short: 'Movimiento interno' },
     transferencia_entrada: { label: 'Movimiento interno', badge: 'transf', short: 'Movimiento interno' },
-    merma: { label: 'Baja', badge: 'baja', short: 'Baja' },
-    baja: { label: 'Baja', badge: 'baja', short: 'Baja' },
+    merma: { label: 'Baja', badge: 'salida', short: 'Baja' },
+    baja: { label: 'Baja', badge: 'salida', short: 'Baja' },
     venta: { label: 'Venta', badge: 'salida', short: 'Venta' },
     vale: { label: 'Vale de salida', badge: 'vale', short: 'Vale' },
     ajuste: { label: 'Ajuste', badge: 'ajuste', short: 'Ajuste' }
