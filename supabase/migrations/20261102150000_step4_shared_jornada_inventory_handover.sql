@@ -182,7 +182,10 @@ BEGIN
   WHERE id=p_destino_sesion_id FOR UPDATE;
   IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL
      OR v_s.almacen_id<>v_e.almacen_id OR v_s.fecha<>v_e.fecha_destino
-     OR v_s.estado NOT IN ('PENDIENTE','PROGRAMADA') THEN
+     OR v_s.estado NOT IN ('PENDIENTE','PROGRAMADA')
+     OR NOT EXISTS (SELECT 1 FROM public.turno_sesiones o
+       WHERE o.id=v_e.origen_sesion_id AND v_s.turno_id=o.turno_id
+         AND v_s.numero_dia=o.numero_dia+1) THEN
     RAISE EXCEPTION 'El destino debe ser una jornada única ya programada para el mismo almacén y la fecha siguiente.' USING ERRCODE='23514';
   END IF;
   IF EXISTS (
