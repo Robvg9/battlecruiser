@@ -238,7 +238,7 @@ BEGIN
   EXECUTE
     'TRUNCATE TABLE ' ||
     (SELECT string_agg(format('%I.%I','public',x),', ' ORDER BY x) FROM unnest(v_wipe) AS x) ||
-    ', auth.users RESTART IDENTITY CASCADE';
+    ', auth.users CONTINUE IDENTITY CASCADE';
 
   INSERT INTO public.auditoria_operaciones
     (usuario_id,usuario_nombre,tipo,descripcion,estado,entidad_id,idempotency_key,payload_resumen)
