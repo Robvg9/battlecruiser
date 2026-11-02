@@ -84,8 +84,9 @@ BEGIN
       WHERE entrega_id=v_entrega AND producto_id=v_pan)<>20 THEN
     RAISE EXCEPTION 'FAIL: source FINAL declaration was not copied into the handover ledger'; END IF;
 
-  -- Close only this disposable fixture day using its already-recorded cash declaration.
-  PERFORM public.bc5_cerrar_jornada(v_day2,'Shared inventory fixture moves to Day 3');
+  -- The disposable fixture has an intentionally unreconciled cash difference.
+  -- Exercise the inventory close barrier without manufacturing a cash approval.
+  UPDATE public.turno_sesiones SET estado='COMPLETADA' WHERE id=v_day2;
 
   -- Receiver reports 18 while source declared 20. This is pending, idempotent and blocks independent INITIAL.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
@@ -123,6 +124,21 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.turno_jornada_inventario_cortes
     WHERE turno_sesion_id=v_day3 AND tipo='INICIAL') THEN
     RAISE EXCEPTION 'FAIL: pending discrepancy generated an INITIAL cut prematurely'; END IF;
+
+  v_error:=false;
+  BEGIN
+    UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day3;
+  EXCEPTION WHEN check_violation THEN v_error:=true;
+  END;
+  IF NOT v_error OR (SELECT estado FROM public.turno_sesiones WHERE id=v_day3)<>'PROGRAMADA' THEN
+    RAISE EXCEPTION 'FAIL: destination jornada opened while its shared receipt was unresolved'; END IF;
+
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_resolver_entrega_jornada(v_entrega,'APROBAR','Unauthorized worker approval');
+  EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
+  END;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: assigned receiver could approve their own discrepancy'; END IF;
 
   -- Owner approves the received quantities as the sole effective amount for both days.
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
@@ -262,6 +278,24 @@ BEGIN
     WHERE tipo='INVENTARIO_INICIAL_LEGACY_REGULARIZADO'
       AND estado_despues->>'corte_inicial_id'=v_result->>'id') THEN
     RAISE EXCEPTION 'FAIL: legacy recovery reason/audit event was not persisted'; END IF;
+
+  -- The final day has no next session. It prepares an unlinked handover for owner scheduling;
+  -- it must not silently create a new Turno or Jornada session.
+  v_result:=public.bc7_guardar_inventario_jornada(v_day6,'FINAL',
+    jsonb_build_array(
+      jsonb_build_object('producto_id',v_pan,'cantidad',11),
+      jsonb_build_object('producto_id',v_jugo,'cantidad',9)
+    ),'Day 6 final without a pre-scheduled Day 7');
+  SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada IMMEDIATE;
+  SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada DEFERRED;
+  SELECT id INTO v_entrega FROM public.turno_jornada_inventario_entregas
+  WHERE origen_sesion_id=v_day6;
+  IF v_entrega IS NULL
+     OR (SELECT destino_sesion_id FROM public.turno_jornada_inventario_entregas WHERE id=v_entrega) IS NOT NULL
+     OR (SELECT estado FROM public.turno_jornada_inventario_entregas WHERE id=v_entrega)<>'PENDIENTE_PROGRAMACION' THEN
+    RAISE EXCEPTION 'FAIL: missing next day was not left as an owner-schedulable handover'; END IF;
+  IF (SELECT count(*) FROM public.turno_sesiones WHERE turno_id=v_turno)<>6 THEN
+    RAISE EXCEPTION 'FAIL: handover created a duplicate or unrequested next-day session'; END IF;
 
   -- Protected RPC and table boundaries remain authenticated-only.
   IF has_function_privilege('anon','public.bc7_recibir_entrega_jornada(uuid,jsonb,text,uuid)','EXECUTE')
