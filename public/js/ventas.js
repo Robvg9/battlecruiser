@@ -707,8 +707,28 @@ safeInit("confirmar-venta", () => {
     if (!almacen_id) { setMsg("msg-venta", "Elegí un almacén.", false); return; }
     if (ventaLineas.length === 0) { setMsg("msg-venta", "Agregá al menos un producto a la venta.", false); return; }
 
+    const turnoActual = window._turnoActual || (typeof _turnoActual !== "undefined" ? _turnoActual : null);
+    const esJornada = !!(turnoActual && String(turnoActual.bloque || "").toUpperCase() === "JORNADA");
+    const paymentSelect = document.getElementById("venta-metodo-pago");
+    const metodoPago = esJornada && paymentSelect ? String(paymentSelect.value || "").trim().toUpperCase() : "";
+    if (esJornada && (!turnoActual.turno_sesion_id || !turnoActual.tramo_id)) {
+      setMsg("msg-venta", "No se puede verificar la jornada y el tramo activo. Actualiza el contexto de Turnos antes de registrar la venta.", false);
+      if (typeof window.__BC_M25_refrescarTurno === "function") {
+        try { await window.__BC_M25_refrescarTurno(); } catch (e) {}
+      }
+      return;
+    }
+    if (esJornada && !["EFECTIVO", "TRANSFERENCIA", "TARJETA", "OTRO"].includes(metodoPago)) {
+      setMsg("msg-venta", "Selecciona la forma de pago antes de confirmar esta venta de Jornada.", false);
+      if (paymentSelect) paymentSelect.focus();
+      return;
+    }
+
     const total = ventaLineas.reduce((s, l) => s + l.subtotal, 0);
-    if (!window.confirm("¿Confirmar venta por $" + money(total) + "? Esto descuenta stock real.")) {
+    const confirmText = "¿Confirmar venta por $" + money(total) + "?" +
+      (esJornada ? " Forma de pago: " + metodoPago.toLowerCase() + ". Quedará vinculada a esta jornada." : "") +
+      " Esto descuenta stock real.";
+    if (!window.confirm(confirmText)) {
       return;
     }
 
@@ -719,9 +739,14 @@ safeInit("confirmar-venta", () => {
     setMsg("msg-venta", "Procesando venta…", true);
 
     const p_lineas = ventaLineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
-    const resultado = await ejecutarOperacion("venta", {
-      p_almacen_id: almacen_id, p_lineas,
-    });
+    const ventaPayload = { p_almacen_id: almacen_id, p_lineas };
+    const tipoOperacionVenta = esJornada ? "venta_jornada" : "venta";
+    if (esJornada) {
+      ventaPayload.p_turno_sesion_id = turnoActual.turno_sesion_id;
+      ventaPayload.p_turno_tramo_id = turnoActual.tramo_id;
+      ventaPayload.p_metodo_pago = metodoPago;
+    }
+    const resultado = await ejecutarOperacion(tipoOperacionVenta, ventaPayload);
 
     enviandoVenta = false;
 
@@ -735,6 +760,7 @@ safeInit("confirmar-venta", () => {
     btn.textContent = textoOriginal;
     setMsg("msg-venta-linea", "", true);
     ventaLineas = [];
+    if (paymentSelect) paymentSelect.value = "";
     renderVentaLineas(); // vuelve a deshabilitar "Confirmar venta" al quedar vacía
 
     if (resultado.offline) {
