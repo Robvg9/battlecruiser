@@ -162,11 +162,12 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
 
 
 test("Jornada POS payments, exact session provenance and offline queue are version aligned", () => {
-  assert.match(app, /\\["venta-turno-ui\\.js","9\\.4\\.46"\\]/);
-  assert.match(app, /\\["m27-6b-venta-payload-pres\\.js","27\\.6b2"\\]/);
-  assert.match(sw, /\\.\\/js\\/venta-turno-ui\\.js\\?v=9\\.4\\.46/);
-  assert.match(sw, /\\.\\/js\\/m27-6b-venta-payload-pres\\.js\\?v=27\\.6b2/);
-  assert.match(sw, /\\.\\/js\\/ventas\\.js\\?v=20261102\\.1/);
+  assert.ok(app.includes('["venta-turno-ui.js","9.4.46"]'));
+  assert.ok(app.includes('["m27-6b-venta-payload-pres.js","27.6b2"]'));
+  assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
+  assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
+  assert.ok(sw.includes("./js/ventas.js?v=20261102.1"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.54"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
