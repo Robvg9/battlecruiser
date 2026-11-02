@@ -311,6 +311,9 @@ async function main() {
     'storage_buckets',(SELECT count(*) FROM storage.buckets),
     'storage_bucket_ids',(SELECT jsonb_agg(id ORDER BY id) FROM storage.buckets),
     'storage_objects',(SELECT count(*) FROM storage.objects),
+    'synthetic_warehouses',(SELECT count(*) FROM public.almacenes WHERE nombre=${sqlLiteral(syntheticWarehouse)}),
+    'synthetic_audit_rows',(SELECT count(*) FROM public.auditoria_operaciones WHERE tipo='step12_synthetic_fixture' AND payload_resumen->>'fixture'=${sqlLiteral(syntheticTag)}),
+    'synthetic_auth_users',(SELECT count(*) FROM auth.users WHERE raw_user_meta_data->>'bc_step12_synthetic_fixture'='true'),
     'preserved',jsonb_build_object(
       'categorias',(SELECT count(*) FROM public.categorias),
       'permisos',(SELECT count(*) FROM public.permisos),
@@ -341,11 +344,17 @@ async function main() {
     postReset.auth_refresh_tokens===0 && postReset.auth_one_time_tokens===0,"STEP12_AUTH_CREDENTIALS_NOT_CLEARED");
   assert(postReset.storage_buckets===1 && JSON.stringify(postReset.storage_bucket_ids)==='["productos"]' &&
     postReset.storage_objects===0,"STEP12_STORAGE_POSTCONDITION_FAILED");
+  assert(postReset.synthetic_warehouses===0 && postReset.synthetic_audit_rows===0 &&
+    postReset.synthetic_auth_users===0,"STEP12_SYNTHETIC_FIXTURES_NOT_CLEARED");
   assert(postReset.empty.almacenes===0 && postReset.empty.usuarios===0 && postReset.empty.productos===0 &&
     postReset.empty.stock===0 && postReset.empty.turnos===0 && postReset.empty.ventas===0 &&
     postReset.empty.mensajes===0 && postReset.empty.auditoria_operaciones===1,"STEP12_OPERATIONAL_ROWS_NOT_CLEARED");
   for(const table of expectedPreserved){
     assert(postReset.preserved[table]===Number(manifest.public_rows[`public.${table}`]),`STEP12_PRESERVED_TABLE_CHANGED:${table}`);
+  }
+  const preservedFingerprintsAfter = Object.fromEntries(expectedPreserved.map(table=>[table,preservedTableFingerprint(table)]));
+  for(const table of expectedPreserved){
+    assert(preservedFingerprintsAfter[table]===preservedFingerprintsBefore[table],`STEP12_PRESERVED_TABLE_CONTENT_CHANGED:${table}`);
   }
   assert(postReset.reset_ledger===1 && postReset.reset_gate_consumed===true,"STEP12_RESET_LEDGER_OR_GATE_FAILED");
   assert(JSON.stringify(postReset.extension_names)===JSON.stringify(manifest.extensions),"STEP12_EXTENSIONS_CHANGED");
