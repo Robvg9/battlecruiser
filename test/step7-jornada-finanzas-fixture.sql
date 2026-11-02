@@ -12,6 +12,61 @@ CREATE TABLE IF NOT EXISTS public.sesiones_ciclo (
 ALTER TABLE public.usuarios ADD COLUMN IF NOT EXISTS nombre text;
 UPDATE public.usuarios SET nombre='Usuario fixture' WHERE nombre IS NULL;
 
+-- Disposable-only legacy sales contract. The production function remains the authority
+-- for pricing/FIFO/stock; this stub lets the Jornada wrapper test exact attribution and retry.
+CREATE TABLE IF NOT EXISTS public.ventas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  almacen_id uuid NOT NULL REFERENCES public.almacenes(id),
+  total numeric NOT NULL DEFAULT 0,
+  estado text NOT NULL DEFAULT 'completada',
+  creado_por uuid REFERENCES auth.users(id),
+  fecha timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.ventas_lineas (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  venta_id uuid NOT NULL REFERENCES public.ventas(id),
+  producto_id uuid NOT NULL REFERENCES public.productos(id),
+  cantidad numeric NOT NULL,
+  precio_unitario numeric NOT NULL,
+  subtotal numeric NOT NULL,
+  costo_unitario_fifo numeric
+);
+CREATE OR REPLACE FUNCTION public.registrar_venta(
+  p_almacen_id uuid,p_lineas jsonb,p_idempotency_key uuid,p_tipo_precio text
+) RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $fn$
+DECLARE
+  v_id uuid;
+  v_line jsonb;
+  v_producto uuid;
+  v_cantidad numeric;
+  v_total numeric:=0;
+BEGIN
+  IF p_tipo_precio NOT IN ('normal','mayorista') THEN RAISE EXCEPTION 'Tipo precio inválido'; END IF;
+  IF p_lineas IS NULL OR jsonb_typeof(p_lineas)<>'array' OR jsonb_array_length(p_lineas)=0 THEN
+    RAISE EXCEPTION 'Líneas inválidas';
+  END IF;
+  FOR v_line IN SELECT value FROM jsonb_array_elements(p_lineas) x(value) LOOP
+    v_producto:=nullif(v_line->>'producto_id','')::uuid;
+    v_cantidad:=nullif(v_line->>'cantidad','')::numeric;
+    IF v_producto IS NULL OR v_cantidad IS NULL OR v_cantidad<=0 THEN RAISE EXCEPTION 'Línea inválida'; END IF;
+    v_total:=v_total+(v_cantidad*10);
+  END LOOP;
+  INSERT INTO public.ventas(almacen_id,total,creado_por)
+  VALUES(p_almacen_id,v_total,auth.uid()) RETURNING id INTO v_id;
+  FOR v_line IN SELECT value FROM jsonb_array_elements(p_lineas) x(value) LOOP
+    v_producto:=(v_line->>'producto_id')::uuid;
+    v_cantidad:=(v_line->>'cantidad')::numeric;
+    INSERT INTO public.ventas_lineas(venta_id,producto_id,cantidad,precio_unitario,subtotal)
+    VALUES(v_id,v_producto,v_cantidad,10,v_cantidad*10);
+  END LOOP;
+  RETURN v_id;
+END
+$fn$;
+
 CREATE TABLE public.gastos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   almacen_id uuid REFERENCES public.almacenes(id),

@@ -28,7 +28,7 @@
     if(typeof ejecutarOperacion !== "function" || ejecutarOperacion.__bcVentaPayloadPres) return;
     var orig = ejecutarOperacion;
     window.ejecutarOperacion = async function(tipo, params){
-      if(tipo === "venta" && params && Array.isArray(ventaLineas) && ventaLineas.length){
+      if((tipo === "venta" || tipo === "venta_jornada") && params && Array.isArray(ventaLineas) && ventaLineas.length){
         params = Object.assign({}, params);
         params.p_lineas = buildLineas(ventaLineas);
       }

@@ -490,6 +490,7 @@ async function actualizarContadorColaPendiente() {
 const ETIQUETA_TIPO_OP = {
   compra: "Compra",
   venta: "Venta",
+  venta_jornada: "Venta de Jornada",
   transferencia: "Transferencia",
   vale: "Vale de salida",
   producto: "Creación de producto",
@@ -521,6 +522,7 @@ function resumenOperacionPendiente(op) {
       const costo = Number(p.p_costo_unitario);
       return "Entrada de stock · " + cant + (Number.isFinite(costo) ? " · $" + money(costo) + " c/u" : "");
     }
+    case "venta_jornada":
     case "venta": {
       const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
       const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
@@ -722,9 +724,15 @@ function detalleOperacionPendiente(op) {
       }
       cuerpo += fila("Costo unitario", Number.isFinite(Number(p.p_costo_unitario)) ? "$" + money(p.p_costo_unitario) : "\u2014");
       break;
+    case "venta_jornada":
     case "venta": {
       const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
       cuerpo += fila("Almac\u00e9n", resolverNombreAlmacen(p.p_almacen_id));
+      if (op.tipo === "venta_jornada") {
+        cuerpo += fila("Jornada", idCorto(p.p_turno_sesion_id));
+        cuerpo += fila("Tramo", idCorto(p.p_turno_tramo_id));
+        cuerpo += fila("Forma de pago", p.p_metodo_pago || "—");
+      }
       cuerpo += fila("L\u00edneas", lineas.length);
       lineas.forEach((l, i) => {
         cuerpo += fila("  " + (i + 1) + ". " + resolverNombreProducto(l.producto_id), (Number(l.cantidad) || 0) + " unidades");
@@ -1008,7 +1016,7 @@ function ajustePendiente(producto_id, almacen_id) {
       }
     } else if (op.tipo === "vale" && p.p_producto_id === producto_id && p.p_almacen_id === almacen_id) {
       ajuste -= Number(p.p_cantidad) || 0;
-    } else if (op.tipo === "venta" && p.p_almacen_id === almacen_id) {
+    } else if ((op.tipo === "venta" || op.tipo === "venta_jornada") && p.p_almacen_id === almacen_id) {
       (p.p_lineas || []).forEach((l) => {
         if (l.producto_id === producto_id) ajuste -= Number(l.cantidad) || 0;
       });
@@ -1027,6 +1035,7 @@ function ajustePendiente(producto_id, almacen_id) {
 const RPC_POR_TIPO = {
   compra: "registrar_compra",
   venta: "registrar_venta",
+  venta_jornada: "bc7_registrar_venta_jornada",
   transferencia: "registrar_transferencia",
   vale: "registrar_vale_salida",
   // que compra/venta/transferencia/vale, en vez de un INSERT directo aparte.
@@ -1060,6 +1069,7 @@ function tipoAuditableFrontend(tipo) {
     case "producto_estado":
     case "compra":
     case "venta":
+    case "venta_jornada":
     case "transferencia":
     case "vale":
       // Ya auditados por el trigger auditar_mutacion_operativa().
@@ -1176,6 +1186,7 @@ function reconciliarTrasOperacion(tipo, resultado) {
       marcarRefrescoPendiente("stock");
       break;
     case "venta":
+    case "venta_jornada":
       marcarRefrescoPendiente("stock");
       marcarRefrescoPendiente("ventas");
       break;

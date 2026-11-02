@@ -409,10 +409,13 @@
     const products=arr(detail.productos);
     const showExpenses=state.admin||can('gastos','ver');
     const showReinvestments=state.admin||can('reinversiones','ver');
+    const showSales=state.admin||can('ventas','ver');
     const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
     const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
-    if(!showExpenses&&!showReinvestments&&!createExpenses&&!createReinvestments)return '';
-    let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas de esta jornada</h4><p class="bc7-muted">Cada registro queda asociado a esta jornada y a la persona responsable. Los gastos esperan la aprobación del administrador. Las reinversiones se reflejan en el inventario y la caja por el proceso habitual.</p>';
+    if(!showExpenses&&!showReinvestments&&!showSales&&!createExpenses&&!createReinvestments)return '';
+    let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas de esta jornada</h4><p class="bc7-muted">Las ventas se muestran solo cuando están vinculadas al ID exacto de esta jornada. El método de pago queda guardado en cada venta nueva. El declarado, contado y diferencia del efectivo se muestran aparte; no se calcula un efectivo esperado a partir de ventas brutas ni de operaciones sin fuente de pago confirmada.</p>';
+    html+=cashDeclarationHtml(detail);
+    if(showSales)html+='<div id="bc7-sales-list"><div class="bc7-empty">Consultando ventas vinculadas a esta jornada…</div></div>';
     if(showExpenses)html+='<div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div>';
     else if(createExpenses)html+='<p class="bc7-muted">Puedes registrar un gasto. Para consultar su estado posterior necesitas autorización para ver los gastos.</p>';
     if(showReinvestments)html+='<div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div>';
@@ -437,6 +440,17 @@
     }
     return html+'</section>';
   }
+  function cashDeclarationHtml(detail){
+    const d=detail&&detail.declaracion_dinero;
+    if(!d)return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4><p class="bc7-muted">Todavía no hay una declaración de efectivo para esta jornada.</p></div>';
+    const counted=d.monto_contado!=null;
+    const difference=d.diferencia!=null;
+    return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4>'+
+      '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(d.monto))+' CUP</b></div>'+
+      '<div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(counted?esc(money(d.monto_contado))+' CUP':'Pendiente')+'</b></div>'+
+      '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(difference?esc(money(d.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
+      '<p class="bc7-muted">Estado: '+esc(humanStatus(d.estado_aprobacion||'ESPERANDO_APROBACION'))+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
+  }
   function renderFinanceList(host,rows,type){
     if(!host)return;
     if(!rows.length){
@@ -456,21 +470,55 @@
       ).join('')+'</div>';
     }
   }
+  function renderSalesLedger(host,data){
+    if(!host)return;
+    const rows=arr(data&&data.ventas),summary=data&&data.resumen||{};
+    const methods=[
+      ['Efectivo',summary.efectivo],
+      ['Transferencia',summary.transferencia],
+      ['Tarjeta',summary.tarjeta],
+      ['Otro',summary.otro],
+      ['Método no declarado',summary.sin_metodo]
+    ];
+    const cards='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Ventas vinculadas</small><b>'+esc(String(summary.cantidad||0))+'</b></div>'+
+      '<div class="bc7-overview-item"><small>Total de ventas</small><b>'+esc(money(summary.total||0))+' CUP</b></div></div>'+
+      '<div class="bc7-list">'+methods.map(function(item){
+        return '<article class="bc7-jornada"><strong>'+esc(item[0])+' · '+esc(money(item[1]||0))+' CUP</strong></article>';
+      }).join('')+'</div>';
+    const list=rows.length?'<h4>Ventas registradas</h4><div class="bc7-list">'+rows.map(function(v){
+      return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(money(v.total||0))+' CUP · '+esc(String(v.id||'').slice(0,8))+'</strong><p>'+esc(fmtDateHuman(v.fecha))+' · '+esc(String(v.metodo_pago||'NO_DECLARADO').replace(/_/g,' '))+'</p></div></div>'+
+        '<div class="bc7-muted">'+arr(v.lineas).map(function(line){return esc(line.producto||'Producto')+' · '+esc(qty(line.cantidad))+' × '+esc(money(line.precio_unitario))+' = '+esc(money(line.subtotal));}).join('<br>')+'</div></article>';
+    }).join('')+'</div>':'<div class="bc7-empty">No hay ventas nuevas vinculadas de forma verificable a esta jornada. Las ventas históricas sin ID de sesión siguen en el historial general y no se reasignan automáticamente.</div>';
+    host.innerHTML='<h4>Ventas por forma de pago</h4>'+cards+list+
+      '<p class="bc7-muted">Este desglose informa los importes registrados por método de pago. No equivale al efectivo esperado ni sustituye la declaración y el conteo físico.</p>';
+  }
   async function loadFinances(detail){
     const hasExpenses=state.admin||can('gastos','ver');
     const hasReinvestments=state.admin||can('reinversiones','ver');
-    if(!hasExpenses&&!hasReinvestments)return true;
-    try{
-      const data=await rpc('bc7_finanzas_jornada',{p_turno_sesion_id:detail.sesion.id})||{};
-      if(hasExpenses)renderFinanceList($('bc7-expenses-list'),arr(data.gastos),'gastos');
-      if(hasReinvestments)renderFinanceList($('bc7-reinvestments-list'),arr(data.reinversiones),'reinversiones');
-      return true;
-    }catch(e){
-      const text=friendlyError(e,'calendar')+' No se han modificado datos.';
-      if($('bc7-expenses-list'))msg($('bc7-expenses-list'),text,'error');
-      if($('bc7-reinvestments-list'))msg($('bc7-reinvestments-list'),text,'error');
-      return false;
+    const hasSales=state.admin||can('ventas','ver');
+    const hasFinance=hasExpenses||hasReinvestments;
+    if(!hasFinance&&!hasSales)return true;
+    const sessionId=detail.sesion.id;
+    let financeData={},salesData={};
+    if(hasFinance){
+      try{financeData=await rpc('bc7_finanzas_jornada',{p_turno_sesion_id:sessionId})||{};}
+      catch(e){
+        const message=friendlyError(e,'calendar')+' No se han modificado datos.';
+        if($('bc7-expenses-list'))msg($('bc7-expenses-list'),message,'error');
+        if($('bc7-reinvestments-list'))msg($('bc7-reinvestments-list'),message,'error');
+      }
     }
+    if(hasSales){
+      try{
+        salesData=await rpc('bc7_ventas_jornada',{p_turno_sesion_id:sessionId})||{};
+        renderSalesLedger($('bc7-sales-list'),salesData);
+      }catch(e){
+        if($('bc7-sales-list'))msg($('bc7-sales-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
+      }
+    }
+    if(hasExpenses)renderFinanceList($('bc7-expenses-list'),arr(financeData.gastos),'gastos');
+    if(hasReinvestments)renderFinanceList($('bc7-reinvestments-list'),arr(financeData.reinversiones),'reinversiones');
+    return true;
   }
   function freshIdempotencyKey(){
     if(window.crypto&&typeof window.crypto.randomUUID==='function')return window.crypto.randomUUID();

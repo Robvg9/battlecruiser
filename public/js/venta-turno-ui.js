@@ -167,6 +167,14 @@ async function bcVentaAbrirSesionClick() {
 function actualizarPanelAlmacenVenta() {
   const almId = obtenerAlmacenIdOperativoVenta();
   const puedeVender = !!almId;
+  const turnoActual = window._turnoActual || (typeof _turnoActual !== "undefined" ? _turnoActual : null);
+  const pagoJornada = document.getElementById("venta-jornada-payment-wrap");
+  const esJornadaActual = !!(turnoActual && String(turnoActual.bloque || "").toUpperCase() === "JORNADA"
+    && turnoActual.turno_sesion_id && turnoActual.tramo_id);
+  if (pagoJornada) {
+    pagoJornada.hidden = !esJornadaActual;
+    pagoJornada.classList.toggle("hidden", !esJornadaActual);
+  }
   const sinTurno = document.getElementById("venta-sin-turno");
   const bloque = document.getElementById("venta-operativa-bloque");
   const nombreEl = document.getElementById("venta-almacen-nombre");
