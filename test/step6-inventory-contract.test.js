@@ -6,6 +6,8 @@ const path = require("node:path");
 
 const migrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261023091903_step6_inventory_movements_adjustments_settlement.sql");
 const sql = fs.readFileSync(migrationPath, "utf8");
+const operationalMigrationPath = path.join(__dirname, "..", "supabase", "migrations", "20261102130000_step4_movements_operational_categories.sql");
+const operationalSql = fs.readFileSync(operationalMigrationPath, "utf8");
 
 test("Step 6 keeps the movement RPC signatures and stable result schemas", () => {
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.reporte_movimiento_inventario\(\s*p_desde date DEFAULT NULL,\s*p_hasta date DEFAULT NULL,\s*p_producto_id uuid DEFAULT NULL,\s*p_almacen_id uuid DEFAULT NULL,\s*p_limite integer DEFAULT 100,\s*p_offset integer DEFAULT 0/s);
@@ -66,4 +68,17 @@ test("The migration is additive and does not delete or truncate production histo
   assert.doesNotMatch(sql, /\bDROP\s+TABLE\b/i);
   assert.doesNotMatch(sql, /\bTRUNCATE\s+(?:TABLE\s+)?public\./i);
   assert.doesNotMatch(sql, /\bDELETE\s+FROM\s+public\.(?:stock|ventas|ventas_lineas|lotes_compra|transferencias|transferencias_lineas|vales_salida|mermas|bajas|cuadres)\b/i);
+});
+
+test("Step 4 movement RPC adds reinvestment and four operating categories", () => {
+  assert.match(operationalSql, /SELECT r\.fecha, 'reinversion'::text/);
+  assert.match(operationalSql, /public\.reinversiones_lineas rl ON rl\.reinversion_id=r\.id/);
+  assert.match(operationalSql, /p_tipo='reinversion'/);
+  assert.match(operationalSql, /p_tipo='movimiento_interno'/);
+  assert.match(operationalSql, /p_tipo='baja'/);
+  assert.match(operationalSql, /transferencia_salida/);
+  assert.match(operationalSql, /transferencia_entrada/);
+  assert.match(operationalSql, /REVOKE ALL ON FUNCTION public\.movimientos_producto/);
+  assert.match(operationalSql, /GRANT EXECUTE ON FUNCTION public\.movimientos_producto/);
+  assert.doesNotMatch(operationalSql, /UPDATE\s+public\.(stock|reinversiones|reinversiones_lineas)|DELETE\s+FROM\s+public\.(stock|reinversiones|reinversiones_lineas)/i);
 });
