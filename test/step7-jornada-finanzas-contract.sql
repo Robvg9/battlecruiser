@@ -252,6 +252,11 @@ BEGIN
   -- The assigned responsible can inspect the full financial and adjustment ledger
   -- for this one jornada with turnos.ver. No global finance .ver grants are required.
   PERFORM set_config('test.perms','turnos:ver,ventas:ver',false);
+  v_sales_data:=public.bc7_ventas_jornada(v_day2);
+  IF jsonb_array_length(v_sales_data->'ventas')<>1
+     OR (v_sales_data->'resumen'->>'efectivo')::numeric<>20 THEN
+    RAISE EXCEPTION 'FAIL: currently assigned responsible cannot read their own payment-channel sales ledger';
+  END IF;
   v_result:=public.bc7_finanzas_jornada(v_day2);
   IF jsonb_array_length(v_result->'gastos')<>1 OR jsonb_array_length(v_result->'reinversiones')<>1 THEN
     RAISE EXCEPTION 'FAIL: assigned responsible cannot read the complete own-session finance ledger';
