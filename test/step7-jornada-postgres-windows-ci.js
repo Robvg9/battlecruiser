@@ -273,6 +273,8 @@ function applySql(file) {
     log("\\r\\n=== 5/9 Apply Step 7 finance/carry-forward migration ===");
     applySql("supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql");
     applySql("supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql");
+    log("\\r\\n=== 5/10 Apply Jornada POS session, tranche and payment provenance ===");
+    applySql("supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql");
     log("\r\n=== 6/9 Apply forward expired-turn guard and exercise ADMIN recovery ===");
     applySql("test/force-close-turno-admin-fixture.sql");
     applySql("supabase/migrations/20261026170000_bc_force_close_admin_expiry_guard.sql");
@@ -296,7 +298,7 @@ function applySql(file) {
     applySql("test/turno-cash-handover-contract.sql");
     applySql("test/legacy-session-overdue-contract.sql");
     log("\\r\\n=== 12/13 Verify owner cash, legacy reconciliation and overdue-start guard contracts ===");
-    log("\\r\\nPASS Step 7 inventory + finance + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + ACL contracts.");
+    log("\\r\\nPASS Step 7 inventory + finance + Jornada POS sales provenance/payment/idempotency + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
