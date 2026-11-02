@@ -105,10 +105,16 @@ BEGIN
     AND s.bloque='JORNADA'
     AND s.jornada_programacion_id IS NOT NULL
     AND s.estado IN ('PENDIENTE','PROGRAMADA')
-    AND NOT EXISTS (SELECT 1 FROM public.turno_jornada_inventario_cortes c
-      WHERE c.turno_sesion_id=s.id AND c.tipo='INICIAL')
   ORDER BY s.created_at,s.id
   LIMIT 1;
+
+  -- A legacy INITIAL already recorded before this feature remains historical and is not relinked.
+  IF v_destino IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.turno_jornada_inventario_cortes c
+    WHERE c.turno_sesion_id=v_destino AND c.tipo='INICIAL'
+  ) THEN
+    RETURN NEW;
+  END IF;
 
   INSERT INTO public.turno_jornada_inventario_entregas
     (almacen_id,turno_id,origen_sesion_id,origen_corte_id,destino_sesion_id,fecha_destino,
@@ -554,8 +560,10 @@ BEGIN
     WHERE turno_sesion_id=v_s.id AND tipo='INICIAL') THEN
     RAISE EXCEPTION 'La jornada ya tiene un inventario inicial.' USING ERRCODE='23505';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.turno_jornada_inventario_entregas
-    WHERE destino_sesion_id=v_s.id AND estado<>'ACEPTADA') THEN
+  IF EXISTS (SELECT 1 FROM public.turno_jornada_inventario_entregas e
+    WHERE (e.destino_sesion_id=v_s.id OR (e.destino_sesion_id IS NULL
+      AND e.almacen_id=v_s.almacen_id AND e.fecha_destino=v_s.fecha
+      AND e.estado='PENDIENTE_PROGRAMACION')) AND e.estado<>'ACEPTADA') THEN
     RAISE EXCEPTION 'Primero debe resolverse la entrega compartida pendiente; no se permite regularizarla por separado.' USING ERRCODE='23514';
   END IF;
 
@@ -710,8 +718,11 @@ BEGIN
   IF NEW.tipo='INICIAL' THEN
     SELECT e.estado INTO v_estado
     FROM public.turno_jornada_inventario_entregas e
+    JOIN public.turno_sesiones s ON s.id=NEW.turno_sesion_id
     WHERE e.destino_sesion_id=NEW.turno_sesion_id
-    FOR UPDATE;
+       OR (e.destino_sesion_id IS NULL AND e.almacen_id=s.almacen_id
+           AND e.fecha_destino=s.fecha AND e.estado='PENDIENTE_PROGRAMACION')
+    ORDER BY e.creado_en DESC LIMIT 1 FOR UPDATE OF e;
     IF FOUND AND v_estado<>'ACEPTADA' THEN
       RAISE EXCEPTION 'La jornada debe recibir y resolver la entrega compartida antes de guardar el inventario inicial.' USING ERRCODE='23514';
     END IF;
@@ -744,7 +755,9 @@ BEGIN
       END IF;
       IF EXISTS (
         SELECT 1 FROM public.turno_jornada_inventario_entregas e
-        WHERE e.destino_sesion_id=NEW.id AND e.estado<>'ACEPTADA'
+        WHERE (e.destino_sesion_id=NEW.id OR (e.destino_sesion_id IS NULL
+          AND e.almacen_id=NEW.almacen_id AND e.fecha_destino=NEW.fecha
+          AND e.estado='PENDIENTE_PROGRAMACION')) AND e.estado<>'ACEPTADA'
       ) THEN
         RAISE EXCEPTION 'La entrega de inventario tiene una diferencia o recepción pendiente de decisión del dueño.' USING ERRCODE='23514';
       END IF;
