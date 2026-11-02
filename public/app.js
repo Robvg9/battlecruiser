@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.56 — ventas Jornada ligadas a sesión, tramo y método de pago; además, categorías operativas de movimientos y reinversiones
+// v9.5.57 — inventario físico compartido entre jornadas, conciliación de recepción y revisión del dueño
 (function hotfixV9475(){
-  const VERSION="9.5.56";
+  const VERSION="9.5.57";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -14,7 +14,7 @@
 })();
 (function cargarModulosDinamicos(){
   const modules=[
-    ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.7"],["bc7-jornada-ui.js","7.12"],
+    ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.7"],["bc7-jornada-ui.js","7.13"],
     ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.5"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js","20261023.2"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.31"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.2"],
