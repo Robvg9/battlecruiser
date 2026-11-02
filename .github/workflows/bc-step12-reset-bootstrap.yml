@@ -147,7 +147,8 @@ jobs:
           node scripts/bc-backup-restore-preflight.mjs restore
           node scripts/bc-backup-restore-preflight.mjs upload-storage
           node scripts/bc-backup-restore-preflight.mjs verify
-          node scripts/bc-step12-reset-bootstrap-preflight.mjs
+          node scripts/bc-step12-reset-bootstrap-preflight.mjs apply-migration
+          node scripts/bc-step12-reset-bootstrap-preflight.mjs rehearse
 
       - name: Persist encrypted backup and sanitized rehearsal evidence
         if: always()
