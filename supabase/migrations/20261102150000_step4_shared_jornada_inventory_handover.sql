@@ -105,7 +105,7 @@ BEGIN
     AND s.bloque='JORNADA'
     AND s.jornada_programacion_id IS NOT NULL
     AND s.estado IN ('PENDIENTE','PROGRAMADA')
-  ORDER BY s.created_at,s.id
+  ORDER BY s.id
   LIMIT 1;
 
   -- A legacy INITIAL already recorded before this feature remains historical and is not relinked.
