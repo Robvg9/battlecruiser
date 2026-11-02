@@ -43,7 +43,7 @@ test("Receipt is complete, idempotent, discrepancy-aware and blocks opening",()=
 });
 
 test("Only owner resolves discrepancies; legacy initial inventory recovery is audited",()=>{
-  for(const marker of ["Solo el dueño puede resolver una diferencia de recepción","INVENTARIO_RECEPCION_APROBADA","INVENTARIO_RECEPCION_RECHAZADA","Solo el dueño puede regularizar una jornada legacy abierta sin inventario inicial","INVENTARIO_INICIAL_LEGACY_REGULARIZADO","stock_global_modificado']){
+  for(const marker of ["Solo el dueño puede resolver una diferencia de recepción","INVENTARIO_RECEPCION_APROBADA","INVENTARIO_RECEPCION_RECHAZADA","Solo el dueño puede regularizar una jornada legacy abierta sin inventario inicial","INVENTARIO_INICIAL_LEGACY_REGULARIZADO","stock_global_modificado"]){
     assert.ok(sql.includes(marker),"missing owner/legacy invariant: "+marker);
   }
   for(const marker of ["Unauthorized worker approval","Recover a legacy open jornada that had no initial inventory","Reject this count; the employee must recount physically"]){
