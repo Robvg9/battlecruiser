@@ -106,7 +106,11 @@ BEGIN
 
   -- Exercise the exact cash read model used by the owner/responsible Jornada workspace.
   -- The declaration and owner count are fixture-only; no production cash rows are touched.
-  SELECT (public.bc_declarar_dinero(v_tramo,100::numeric)).id INTO v_declaration_id;
+  INSERT INTO public.turno_declaraciones(
+    turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,estado_aprobacion
+  ) VALUES(
+    v_turno,v_day2,v_tramo,v_owner,100,'CUP','ESPERANDO_APROBACION'
+  ) RETURNING id INTO v_declaration_id;
   UPDATE public.turno_declaraciones
   SET monto_contado=90,
       contado_por=v_owner,
