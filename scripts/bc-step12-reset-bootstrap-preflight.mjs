@@ -353,7 +353,8 @@ async function main() {
     status: "PASS",
     generated_at_utc: new Date().toISOString(),
     project_ref: manifest.project_ref,
-    source_public_table_count: expectedTableCount,\n    restored_storage_objects_removed_through_api: storageObjectsRemoved,
+    source_public_table_count: expectedTableCount,
+    restored_storage_objects_removed_through_api: storageObjectsRemoved,
     backup_manifest_generated_at_utc: manifest.generated_at_utc,
     checks: {
       backup_restored: true,
