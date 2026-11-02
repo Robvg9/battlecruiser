@@ -86,8 +86,14 @@ BEGIN
   IF (SELECT count(*) FROM public.turno_sesiones WHERE turno_id=v_turno AND numero_dia=3 AND bloque='JORNADA')<>1 THEN
     RAISE EXCEPTION 'FAIL: preparing the handover created a duplicate Day 3 session'; END IF;
   IF (SELECT cantidad_declarada FROM public.turno_jornada_inventario_entrega_lineas
-      WHERE entrega_id=v_entrega AND producto_id=v_pan)<>20 THEN
-    RAISE EXCEPTION 'FAIL: source FINAL declaration was not copied into the handover ledger'; END IF;
+      WHERE entrega_id=v_entrega AND producto_id=v_pan) IS DISTINCT FROM 20 THEN
+    RAISE EXCEPTION 'FAIL: source FINAL declaration was not copied into the handover ledger (delivery %, source cut %, source lines %, delivery lines %, pan quantity %)',
+      v_entrega,
+      (SELECT id FROM public.turno_jornada_inventario_cortes WHERE turno_sesion_id=v_day2 AND tipo='FINAL'),
+      (SELECT count(*) FROM public.turno_jornada_inventario_lineas WHERE corte_id=(SELECT id FROM public.turno_jornada_inventario_cortes WHERE turno_sesion_id=v_day2 AND tipo='FINAL')),
+      (SELECT count(*) FROM public.turno_jornada_inventario_entrega_lineas WHERE entrega_id=v_entrega),
+      (SELECT cantidad_declarada FROM public.turno_jornada_inventario_entrega_lineas WHERE entrega_id=v_entrega AND producto_id=v_pan);
+  END IF;
 
   -- The disposable fixture has an intentionally unreconciled cash difference.
   -- Exercise the inventory close barrier without manufacturing a cash approval.
