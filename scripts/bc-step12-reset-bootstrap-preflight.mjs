@@ -173,7 +173,7 @@ function applyMigration() {
 
 async function clearLocalStorageObjects() {
   const list = runPsql(["-c","SELECT name FROM storage.objects WHERE bucket_id='productos' ORDER BY name;"],"STEP12_STORAGE_LIST");
-  const paths = list.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const paths = list.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if (!paths.length) {
     const count = Number(runPsql(["-c","SELECT count(*) FROM storage.objects;"],"STEP12_STORAGE_EMPTY_CHECK"));
     assert(count===0,"STEP12_STORAGE_OTHER_BUCKET_OBJECTS_PRESENT");
@@ -353,7 +353,7 @@ async function main() {
     status: "PASS",
     generated_at_utc: new Date().toISOString(),
     project_ref: manifest.project_ref,
-    source_public_table_count: expectedTableCount,
+    source_public_table_count: expectedTableCount,\n    restored_storage_objects_removed_through_api: storageObjectsRemoved,
     backup_manifest_generated_at_utc: manifest.generated_at_utc,
     checks: {
       backup_restored: true,
@@ -403,7 +403,7 @@ async function main() {
     live_database_mutated: false,
     live_deployment_performed: false
   };
-  fs.writeFileSync(path.join(root,"step12-reset-bootstrap-report.json"), JSON.stringify(evidence,null,2)+"\\n", {mode:0o600});
+  fs.writeFileSync(path.join(root,"step12-reset-bootstrap-report.json"), JSON.stringify(evidence,null,2)+"\n", {mode:0o600});
   console.log("BC_STEP12_BOOTSTRAP=PASS; 5 bad attempts persisted, first owner created atomically in DB, replay idempotent, gate closed after one use");
   console.log("BC_STEP12_ISOLATED_DESTRUCTIVE_REHEARSAL=PASS");
 }
@@ -413,7 +413,7 @@ const task = mode === "apply-migration" ? Promise.resolve().then(applyMigration)
   : mode === "rehearse" ? main()
   : Promise.reject(new Error("STEP12_MODE_INVALID"));
 task.catch(error => {
-  const safe = String(error?.message || error).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi,"[EMAIL_REDACTED]");
+  const safe = String(error?.message || error).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[EMAIL_REDACTED]");
   console.error(safe);
   process.exitCode = 1;
 });
