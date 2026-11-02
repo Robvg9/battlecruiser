@@ -336,7 +336,8 @@ async function main() {
       schema_rls_policies_rpc_extensions_preserved: true,
       storage_bucket_preserved_objects_cleared: true,
       bootstrap_failed_attempts_persisted: true,
-      auth_user_and_owner_profile_created_atomically: true,\n      first_admin_created_with_owner_role: true,
+      auth_user_and_owner_profile_created_atomically: true,
+      first_admin_created_with_owner_role: true,
       bootstrap_finalize_idempotent: true,
       bootstrap_closed_after_use: true
     },
