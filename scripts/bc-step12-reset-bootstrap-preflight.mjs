@@ -311,6 +311,61 @@ async function main() {
   assert(bootstrapPost.auth_users===1 && bootstrapPost.app_users===1 && bootstrapPost.owners===1 &&
     bootstrapPost.consumed===true && bootstrapPost.remaining_token_hash===false && bootstrapPost.bootstrap_audit===1,
     "STEP12_BOOTSTRAP_POSTCONDITION_FAILED");
+  const resetExecution = outcomes.find(x => x.replayed !== true);
+  const evidence = {
+    format: "battlecruiser-step12-isolated-reset-bootstrap-v1",
+    status: "PASS",
+    generated_at_utc: new Date().toISOString(),
+    project_ref: manifest.project_ref,
+    source_public_table_count: expectedTableCount,
+    backup_manifest_generated_at_utc: manifest.generated_at_utc,
+    checks: {
+      backup_restored: true,
+      invalid_reset_token_rate_limit: true,
+      destructive_reset_rollback: true,
+      concurrent_reset_serialized: true,
+      same_request_id_replayed: true,
+      operational_data_cleared_in_isolation: true,
+      roles_permissions_catalogues_preserved: true,
+      schema_rls_policies_rpc_extensions_preserved: true,
+      storage_bucket_preserved_objects_cleared: true,
+      bootstrap_failed_attempts_persisted: true,
+      first_admin_created_with_owner_role: true,
+      bootstrap_finalize_idempotent: true,
+      bootstrap_closed_after_use: true
+    },
+    reset: {
+      request_id: resetRequestId,
+      concurrent_requests: 2,
+      successful_execution_count: 1,
+      idempotent_replay_count: 1,
+      public_rows_before: resetExecution.public_rows_before,
+      public_rows_after: resetExecution.public_rows_after,
+      preserved_tables: resetExecution.preserved_tables,
+      cleared_tables: resetExecution.cleared_tables,
+      public_policy_count_after: postReset.public_policy_count,
+      managed_policy_count_after: postReset.managed_policy_count,
+      public_function_count_after: postReset.public_function_count,
+      rls_table_count_after: postReset.rls_table_count,
+      storage_bucket_ids_after: postReset.storage_bucket_ids,
+      storage_objects_after: postReset.storage_objects
+    },
+    bootstrap: {
+      request_id: bootstrapRequestId,
+      invalid_attempts_before_success: 5,
+      total_attempts_after_success: 6,
+      auth_users_after: bootstrapPost.auth_users,
+      application_users_after: bootstrapPost.app_users,
+      active_owner_count_after: bootstrapPost.owners,
+      consumed: bootstrapPost.consumed,
+      token_hash_cleared: bootstrapPost.remaining_token_hash === false,
+      audit_events: bootstrapPost.bootstrap_audit
+    },
+    secrets_recorded: false,
+    live_database_mutated: false,
+    live_deployment_performed: false
+  };
+  fs.writeFileSync(path.join(root,"step12-reset-bootstrap-report.json"), JSON.stringify(evidence,null,2)+"\\n", {mode:0o600});
   console.log("BC_STEP12_BOOTSTRAP=PASS; 5 bad attempts persisted, first owner created atomically in DB, replay idempotent, gate closed after one use");
   console.log("BC_STEP12_ISOLATED_DESTRUCTIVE_REHEARSAL=PASS");
 }
