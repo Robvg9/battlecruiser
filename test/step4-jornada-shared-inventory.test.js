@@ -4,7 +4,8 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const read=p=>fs.readFileSync(path.join(__dirname,"..",p),"utf8");
-const sql=read("supabase/migrations/20261102150000_step4_shared_jornada_inventory_handover.sql");
+const sql=read("supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql");
+const indexes=read("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
 const ui=read("public/js/bc7-jornada-ui.js");
 const app=read("public/app.js");
 const sw=read("public/service-worker.js");
@@ -57,6 +58,29 @@ test("Jornada interface exposes assigned receipt, owner review, next-session lin
   }
 });
 
+test("Receipt and legacy recount accept valid decimal physical quantities",()=>{
+  for(const fn of ["saveReceipt","saveLegacyInitial"]){
+    const start=ui.indexOf("async function "+fn+"(form){");
+    assert.notEqual(start,-1,fn+" handler missing");
+    const validation=ui.slice(start).split(/\\r?\\n/).find(line=>line.includes("const bad=lines.find"));
+    assert.ok(validation,fn+" quantity validation missing");
+    assert.match(validation,/!\\/\\^\\\\d\\+/,"valid number matcher must use a single regex escape");
+    assert.doesNotMatch(validation,/\\\\\\\\d/,"double-escaped digit matcher would reject valid numbers");
+  }
+});
+
+test("Shared inventory foreign-key index migration covers all six new references",()=>{
+  assert.equal((indexes.match(/CREATE INDEX IF NOT EXISTS/g)||[]).length,6);
+  for(const column of [
+    "turno_jornada_inventario_entregas(turno_id)",
+    "turno_jornada_inventario_entregas(creado_por)",
+    "turno_jornada_inventario_entrega_lineas(producto_id)",
+    "turno_jornada_inventario_recepciones(recibido_por)",
+    "turno_jornada_inventario_recepciones(decision_por)",
+    "turno_jornada_inventario_recepcion_lineas(producto_id)"
+  ]) assert.ok(indexes.includes(column),"missing covering index: "+column);
+});
+
 test("PWA and service worker cache are aligned at 9.5.57 / Jornada module 7.13",()=>{
   const version=app.match(/const VERSION="([^"]+)"/);
   const swVersion=sw.match(/BC_SW_VERSION = "([^"]+)"/);
@@ -72,7 +96,7 @@ test("PWA and service worker cache are aligned at 9.5.57 / Jornada module 7.13",
 });
 
 test("PostgreSQL 17 disposable CI executes the Step 4 migration and contract",()=>{
-  for(const marker of ["supabase/migrations/20261102150000_step4_shared_jornada_inventory_handover.sql","test/step4-jornada-shared-inventory-contract.sql"]){
+  for(const marker of ["supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql","supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql","test/step4-jornada-shared-inventory-contract.sql"]){
     assert.ok(runner.includes(marker),"PostgreSQL runner missing "+marker);
     assert.ok(workflow.includes(marker),"workflow path filter missing "+marker);
   }
