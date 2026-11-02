@@ -643,9 +643,10 @@
     const outgoing=type==='FINAL'?(shared.salida||null):null;
 
     if(cut)return '<div class="bc7-note">El conteo '+(type==='INICIAL'?'inicial':'final')+' está confirmado e inmutable.</div>'+cutHtml(cut,arr(detail.productos),inbound||outgoing);
-    if(type==='INICIAL'&&shared.sin_vincular&&detail.is_admin){
+    if(type==='INICIAL'&&shared.sin_vincular){
       const d=shared.sin_vincular;
-      return '<div class="bc7-note"><b>Entrega pendiente de vincular</b><p class="bc7-muted">Existe un inventario final del día anterior para este almacén. Vincula esta jornada ya programada como destino; no se creará otra sesión.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-link-delivery="'+esc(d.id)+'" data-bc7-link-session="'+esc(session.id)+'">Vincular esta jornada</button></div></div>';
+      if(detail.is_admin)return '<div class="bc7-note"><b>Entrega pendiente de vincular</b><p class="bc7-muted">Existe un inventario final del día anterior para este almacén. Vincula esta jornada ya programada como destino; no se creará otra sesión.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-link-delivery="'+esc(d.id)+'" data-bc7-link-session="'+esc(session.id)+'">Vincular esta jornada</button></div></div>';
+      return '<div class="bc7-note"><b>Recepción bloqueada</b><p class="bc7-muted">Existe una entrega previa todavía no vinculada a esta jornada. El dueño debe vincular la sesión ya programada antes de registrar el conteo inicial.</p></div>';
     }
     if(type==='INICIAL'&&inbound){
       if(inbound.estado==='PENDIENTE_REVISION')return '<div class="bc7-note"><b>Recepción pendiente de decisión del dueño</b><p class="bc7-muted">Se registró el conteo recibido. No existe un inventario inicial confirmado y no se puede abrir esta jornada hasta resolver la diferencia.</p></div>';
