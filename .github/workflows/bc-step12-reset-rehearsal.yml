@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: battlecruiser-step12-reset-rehearsal
+  cancel-in-progress: true
+
 jobs:
   isolated-step12:
     if: github.ref_name == 'step12-reset-rehearsal-20261102'
@@ -28,6 +32,14 @@ jobs:
     steps:
       - name: Checkout isolated Step 12 branch
         uses: actions/checkout@v4
+
+      - name: Static syntax and scope validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/bc-backup-restore-preflight.mjs
+          node --check scripts/bc-step12-reset-rehearsal.mjs
+          node -e "const s=require('./config/bc-step12-reset-scope.json'); if(s.public_table_count!==61 || s.delete_public_tables.length!==58 || s.preserve_public_tables.length!==3) process.exit(1); if(new Set(s.delete_public_tables).size!==58) process.exit(2); console.log('BC_STEP12_SCOPE_STATIC=PASS')"
 
       - name: Initialize isolated workspace and verify secrets without printing them
         shell: bash
