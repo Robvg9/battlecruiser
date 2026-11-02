@@ -20,7 +20,7 @@ function redact(value) {
   for (const secret of [process.env.DB_URL, process.env.LOCAL_DB_URL, process.env.SERVICE_ROLE_KEY, process.env.BC_BACKUP_PASSPHRASE]) {
     if (secret) s = s.split(secret).join("[REDACTED]");
   }
-  return s.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, "[EMAIL_REDACTED]");
+  return s.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL_REDACTED]");
 }
 function guard() {
   if (process.env.BC_STEP12_REHEARSAL !== "1" || projectRef !== "papxnkkjtkxsitcsvcme") stop("STEP12_GUARD=FAIL");
@@ -88,7 +88,7 @@ function snapshot() {
 }
 function exact(a,b,label) { if(JSON.stringify(a)!==JSON.stringify(b)) stop(label+"=FAIL; counts differ"); }
 async function api(pathname,method="GET",body=undefined,expected=[200,201,204]) {
-  const base=(process.env.API_URL||"").replace(/\\/+$/,""), key=process.env.SERVICE_ROLE_KEY;
+  const base=(process.env.API_URL||"").replace(/\/+$/,""), key=process.env.SERVICE_ROLE_KEY;
   const res=await fetch(base+pathname,{method,headers:{apikey:key,Authorization:"Bearer "+key,...(body===undefined?{}:{"Content-Type":"application/json"})},...(body===undefined?{}:{body:JSON.stringify(body)})});
   const raw=await res.text();
   if(!expected.includes(res.status)) stop("STEP12_LOCAL_API=FAIL; "+method+" "+pathname.split("?")[0]+" HTTP "+res.status+" "+redact(raw).slice(0,500));
@@ -114,13 +114,13 @@ async function removeObjects(names) {
   for(let i=0;i<names.length;i+=100) await api("/storage/v1/object/productos","DELETE",{prefixes:names.slice(i,i+100)},[200,204]);
 }
 async function uploadObject(name,bytes) {
-  const base=(process.env.API_URL||"").replace(/\\/+$/,""), key=process.env.SERVICE_ROLE_KEY;
+  const base=(process.env.API_URL||"").replace(/\/+$/,""), key=process.env.SERVICE_ROLE_KEY;
   const url=base+"/storage/v1/object/productos/"+name.split("/").map(encodeURIComponent).join("/");
   const r=await fetch(url,{method:"POST",headers:{apikey:key,Authorization:"Bearer "+key,"Content-Type":"text/plain","x-upsert":"false"},body:bytes});
   if(![200,201].includes(r.status)) stop("STEP12_STORAGE_UPLOAD=FAIL; HTTP "+r.status);
 }
 async function downloadObject(name) {
-  const base=(process.env.API_URL||"").replace(/\\/+$/,""),key=process.env.SERVICE_ROLE_KEY;
+  const base=(process.env.API_URL||"").replace(/\/+$/,""),key=process.env.SERVICE_ROLE_KEY;
   const url=base+"/storage/v1/object/productos/"+name.split("/").map(encodeURIComponent).join("/");
   const r=await fetch(url,{headers:{apikey:key,Authorization:"Bearer "+key}});
   if(!r.ok) stop("STEP12_STORAGE_READBACK=FAIL; HTTP "+r.status);
