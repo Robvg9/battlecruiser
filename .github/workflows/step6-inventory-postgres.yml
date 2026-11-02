@@ -4,9 +4,11 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/20261023091903_step6_inventory_movements_adjustments_settlement.sql'
+      - 'supabase/migrations/20261102130000_step4_movements_operational_categories.sql'
       - 'test/step6-inventory-fixture.sql'
       - 'test/step6-inventory-contract.sql'
       - 'test/step6-inventory-contract.test.js'
+      - 'test/m51-movements-filters-functional.test.js'
       - '.github/workflows/step6-inventory-postgres.yml'
   workflow_dispatch:
 permissions:
@@ -53,6 +55,14 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_step6_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261023091903_step6_inventory_movements_adjustments_settlement.sql
+      - name: Apply Step 4 operational movement categories migration
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_step6_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261102130000_step4_movements_operational_categories.sql
       - name: Verify movement ledger, adjustments, ACL, and settlement transitions
         env:
           PGHOST: localhost

@@ -24,10 +24,13 @@
   let _lastError = null;
 
   const TIPO_META = {
-    compra: { label: 'Compra', badge: 'entrada', short: 'Entrada' },
-    venta: { label: 'Venta', badge: 'salida', short: 'Salida' },
-    transferencia_salida: { label: 'Transferencia de salida', badge: 'transf', short: 'Transf. salida' },
-    transferencia_entrada: { label: 'Transferencia de entrada', badge: 'transf', short: 'Transf. entrada' },
+    compra: { label: 'Compra', badge: 'entrada', short: 'Compra' },
+    reinversion: { label: 'Reinversión', badge: 'entrada', short: 'Reinversión' },
+    transferencia_salida: { label: 'Movimiento interno', badge: 'transf', short: 'Movimiento interno' },
+    transferencia_entrada: { label: 'Movimiento interno', badge: 'transf', short: 'Movimiento interno' },
+    merma: { label: 'Baja', badge: 'salida', short: 'Baja' },
+    baja: { label: 'Baja', badge: 'salida', short: 'Baja' },
+    venta: { label: 'Venta', badge: 'salida', short: 'Venta' },
     vale: { label: 'Vale de salida', badge: 'vale', short: 'Vale' },
     ajuste: { label: 'Ajuste', badge: 'ajuste', short: 'Ajuste' }
   };
@@ -101,8 +104,8 @@
   }
   function esEntrada(m) {
     const t = normalizarTipo(m.tipo);
-    if (t === 'compra' || t === 'transferencia_entrada') return true;
-    if (t === 'venta' || t === 'transferencia_salida' || t === 'vale') return false;
+    if (t === 'compra' || t === 'reinversion' || t === 'transferencia_entrada') return true;
+    if (t === 'venta' || t === 'transferencia_salida' || t === 'vale' || t === 'merma' || t === 'baja') return false;
     return num(m.cantidad) > 0;
   }
 
@@ -130,7 +133,7 @@
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible[open]>.bc-m51-group-head:after{content:"−"}',
       '#tab-movimientos.bc-m51 .bc-m51-group-collapsible .bc-m51-card{margin:8px;border-radius:8px}',
       '@media(max-width:640px){#tab-movimientos.bc-m51 .bc-m51-view-switch{align-items:stretch;flex-direction:column}#tab-movimientos.bc-m51 .bc-m51-view-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#tab-movimientos.bc-m51 .bc-m51-view-btn{width:100%;box-sizing:border-box}}',
-      '#tab-movimientos.bc-m51 .bc-m51-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}',
+      '#tab-movimientos.bc-m51 .bc-m51-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:14px}',
       '#tab-movimientos.bc-m51 .bc-m51-metric{min-width:0;padding:11px 12px;background:linear-gradient(180deg,rgba(26,56,48,.55),rgba(18,42,36,.88));border:1px solid rgba(212,176,92,.12);border-radius:10px}',
       '#tab-movimientos.bc-m51 .bc-m51-metric-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mist)}',
       '#tab-movimientos.bc-m51 .bc-m51-metric-value{margin-top:4px;font-size:1.2rem;font-weight:700;color:var(--text);line-height:1.1}',
@@ -245,7 +248,7 @@
       }
       const tipo = document.getElementById('mov-filtro-tipo') || document.createElement('select');
       tipo.id = 'mov-filtro-tipo';
-      tipo.innerHTML = '<option value="">Todos los tipos</option><option value="compra">Compra</option><option value="venta">Venta</option><option value="transferencia_salida">Transf. salida</option><option value="transferencia_entrada">Transf. entrada</option><option value="vale">Vale</option>';
+      tipo.innerHTML = '<option value="">Todas las operaciones</option><option value="compra">Compras</option><option value="reinversion">Reinversiones</option><option value="baja">Bajas</option><option value="movimiento_interno">Movimientos internos entre almacenes</option>';
 
       const buscar = document.createElement('input');
       buscar.type = 'search'; buscar.id = 'mov-buscar';
@@ -426,23 +429,25 @@
     const el = document.getElementById('mov-resumen-m51');
     if (!el) return;
     const rows = _filtered;
-    const counts = { total: rows.length, entradas: 0, salidas: 0, transferencias: 0, compras: 0, ventas: 0 };
+    const counts = { total: rows.length, compras: 0, reinversiones: 0, bajas: 0 };
+    const internalOperations = new Set();
     rows.forEach(function (m) {
       const t = normalizarTipo(m.tipo);
-      if (t === 'compra') { counts.compras++; counts.entradas++; }
-      else if (t === 'venta') { counts.ventas++; counts.salidas++; }
+      if (t === 'compra') counts.compras++;
+      else if (t === 'reinversion') counts.reinversiones++;
+      else if (t === 'merma' || t === 'baja') counts.bajas++;
       else if (t === 'transferencia_salida' || t === 'transferencia_entrada') {
-        counts.transferencias++;
-        if (t === 'transferencia_entrada') counts.entradas++; else counts.salidas++;
-      } else if (t === 'vale') counts.salidas++;
-      else if (esEntrada(m)) counts.entradas++;
-      else counts.salidas++;
+        internalOperations.add(String(m.operacion_id || m.id || (m.fecha + ':' + m.producto)));
+      }
     });
     function card(label, value) {
       return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(String(value)) + '</div></div>';
     }
-    el.innerHTML = card('Movimientos', counts.total) + card('Entradas', counts.entradas) + card('Salidas', counts.salidas) +
-      card('Transferencias', counts.transferencias) + card('Compras', counts.compras) + card('Ventas', counts.ventas);
+    el.innerHTML = card('Movimientos', counts.total) +
+      card('Compras', counts.compras) +
+      card('Reinversiones', counts.reinversiones) +
+      card('Bajas', counts.bajas) +
+      card('Movimientos internos', internalOperations.size);
   }
 
   function appendHistoryLimitNotice(host) {
@@ -572,7 +577,7 @@
       '<div class="bc-m51-section"><h5>Ubicación</h5>' + field('Almacén', m.almacen || '—') + '</div>' +
       costos +
       '<div class="bc-m51-section"><h5>Referencia</h5>' +
-      field('ID operación', m.operacion_id || '—') + field('Tipo (código)', normalizarTipo(m.tipo)) + '</div>';
+      field('ID operación', m.operacion_id || '—') + '</div>';
   }
 
   function paint() {
@@ -592,7 +597,12 @@
       if (input) input.value = '';
     });
     const tipo = document.getElementById('mov-filtro-tipo');
-    if (tipo) tipo.value = _pendingSummaryMove.tipo === 'vale' ? 'vale' : '';
+    if (tipo) {
+      const pendingType = _pendingSummaryMove.tipo;
+      const isInternal = pendingType === 'transferencia' || pendingType === 'transferencia_salida' || pendingType === 'transferencia_entrada';
+      const isWriteOff = pendingType === 'baja' || pendingType === 'merma';
+      tipo.value = isInternal ? 'movimiento_interno' : (isWriteOff ? 'baja' : (pendingType === 'compra' || pendingType === 'reinversion' ? pendingType : ''));
+    }
     const buscar = document.getElementById('mov-buscar');
     if (buscar) buscar.value = _pendingSummaryMove.id;
     _search = _pendingSummaryMove.id;
