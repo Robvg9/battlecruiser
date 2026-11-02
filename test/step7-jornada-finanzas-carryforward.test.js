@@ -105,8 +105,11 @@ test("Jornada POS records exact session/tranche and payment method without backf
   assert.match(SALES_MIGRATION, /WHERE v\.turno_sesion_id=v_s\.id/);
   assert.match(SALES_MIGRATION, /GRANT EXECUTE ON FUNCTION public\.bc7_registrar_venta_jornada/);
   assert.match(SALES_MIGRATION, /GRANT EXECUTE ON FUNCTION public\.bc7_ventas_jornada/);
-  assert.doesNotMatch(SALES_MIGRATION, /UPDATE\s+public\.ventas\s+SET\s+turno_sesion_id/i,
-    "the migration must not backfill or relink historical sales");
+  const schemaChanges = SALES_MIGRATION.slice(0, SALES_MIGRATION.indexOf("CREATE OR REPLACE FUNCTION"));
+  assert.doesNotMatch(schemaChanges, /UPDATE\s+public\.ventas\s+SET\s+turno_sesion_id/i,
+    "schema migration must not backfill or relink historical sales");
+  assert.match(SALES_MIGRATION, /UPDATE public\.ventas[\s\S]*WHERE id=v_venta_id AND creado_por=v_uid/,
+    "only the sale just created in the current transaction may receive its session provenance");
   assert.doesNotMatch(SALES_MIGRATION, /\bDELETE\s+FROM\s+public\.ventas\b|\bTRUNCATE\s+public\.ventas\b/i);
 });
 
