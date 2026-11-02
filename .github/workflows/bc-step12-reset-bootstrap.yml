@@ -12,6 +12,7 @@ on:
       - supabase/migrations/20261102170000_step12_reset_bootstrap_guard.sql
       - supabase/functions/bc-bootstrap-admin/index.ts
       - supabase/config.toml
+      - supabase/functions/deno.json
   workflow_dispatch:
 
 permissions:
@@ -65,7 +66,7 @@ jobs:
           set -euo pipefail
           node --check scripts/bc-backup-restore-preflight.mjs
           node --check scripts/bc-step12-reset-bootstrap-preflight.mjs
-          deno check supabase/functions/bc-bootstrap-admin/index.ts
+          deno check --config supabase/functions/deno.json supabase/functions/bc-bootstrap-admin/index.ts
           echo "BC_STEP12_SOURCE_SYNTAX=PASS"
           echo "BC_BOOTSTRAP_EDGE_TYPECHECK=PASS"
 
