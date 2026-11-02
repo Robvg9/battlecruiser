@@ -1,3 +1,5 @@
+# Step 12 refresh — 2026-11-02. This branch-only workflow re-captures the current LIVE snapshot,
+# encrypts it, and restores/verifies it on a disposable local Supabase stack. It never resets LIVE.
 name: BattleCruiser backup restore preflight
 
 on:
