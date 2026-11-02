@@ -1,0 +1,56 @@
+name: ARIA Step 11 — one-shot BattleCruiser runtime sandbox certification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - '.github/workflows/step11-aria-runtime-cert.yml'
+      - 'scripts/step11-runtime-cert.cjs'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: aria-step11-runtime-cert-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  one-shot-runtime-sandbox:
+    if: github.event.pull_request.head.ref == 'aria/step11-runtime-cert-run-20261102' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout BattleCruiser trigger branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Checkout exact ARIA runtime modules
+        uses: actions/checkout@v4
+        with:
+          repository: Robvg9/aria-worker
+          ref: f01c1007ca349b07e46d8376156c7645cc14dc8f
+          path: aria-worker
+          persist-credentials: false
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Execute one-shot ARIA runtime bridge
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          ARIA_WORKER_DIR: ${{ github.workspace }}/aria-worker
+          ARIA_WORKER_SHA: f01c1007ca349b07e46d8376156c7645cc14dc8f
+        run: node scripts/step11-runtime-cert.cjs
+      - name: Persist Step 11 runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aria-step11-runtime-evidence-${{ github.run_id }}
+          path: test-results/step11-autonomy-cert.json
+          if-no-files-found: warn
+          retention-days: 90
