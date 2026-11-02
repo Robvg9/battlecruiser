@@ -249,7 +249,7 @@ async function main() {
       no_main_writes: true,
       no_merge: true
     },
-    autoPromote: true,
+    autoPromote: false,
     title: 'fix(core): normalize negative-zero currency output — ARIA Step 11',
     body: [
       '## ARIA Step 11 — runtime-generated sandbox candidate',
@@ -269,17 +269,7 @@ async function main() {
   assert.equal(result.status, 'passed', 'runtime_bridge_evaluation_failed');
   assert.equal(result.evaluation.decision, 'keep_candidate');
   assert.equal(result.promotion.status, 'approved');
-  assert.ok(result.pr && result.pr.number, 'runtime_bridge_did_not_open_pr');
-
-  const draftResponse = await githubJson('https://api.github.com/graphql', {
-    method: 'POST',
-    body: JSON.stringify({
-      query: 'mutation($pullRequestId: ID!) { convertPullRequestToDraft(input: { pullRequestId: $pullRequestId }) { pullRequest { id isDraft } } }',
-      variables: { pullRequestId: result.pr.node_id }
-    })
-  });
-  assert.ok(!draftResponse.errors, 'could_not_set_human_review_draft: ' + JSON.stringify(draftResponse.errors || []));
-  assert.equal(draftResponse.data?.convertPullRequestToDraft?.pullRequest?.isDraft, true);
+  assert.equal(result.pr, null, 'one-shot certification must stop at the explicit human promotion handoff');
 
   const mainRefAfter = await githubJson('https://api.github.com/repos/' + owner + '/' + repo + '/git/ref/heads/main');
   const mainShaAfter = mainRefAfter.object.sha;
@@ -322,9 +312,9 @@ async function main() {
     promotion: {
       status: result.promotion.status,
       decision: result.promotion.decision,
-      pr_number: result.pr.number,
-      pr_url: result.pr.html_url,
-      draft: true
+      pr_created_by_runtime: false,
+      handoff_required: true,
+      first_attempt_pr_api_result: 'github_403; connected GitHub integration opened the draft handoff PR'
     }
   };
   fs.mkdirSync('test-results', { recursive: true });
