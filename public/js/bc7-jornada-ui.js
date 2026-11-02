@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.12 — baja unificada con causa y compatibilidad de permisos.
+// v7.13 — inventario compartido entre jornadas, recepción y revisión del dueño.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -583,27 +583,95 @@
     }finally{busy(btn,false);}
   }
 
-  function cutHtml(cut,products){
+  function cutHtml(cut,products,delivery){
     if(!cut)return '<div class="bc7-empty">Aún no hay conteo confirmado.</div>';
     const lines=arr(cut.lineas);
+    const sharedLines=new Map(arr(delivery&&delivery.lineas).map(x=>[String(x.producto_id),x]));
+    const accepted=!!delivery&&delivery.estado==='ACEPTADA';
+    const sharedNote=delivery
+      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">El expediente conserva el conteo declarado originalmente. La cantidad efectiva aprobada es el único saldo vigente y se muestra igual en el FINAL de origen y en el INITIAL de destino.</p>'+
+        (accepted?'<p class="bc7-note">Cantidad vigente compartida confirmada. Ambos expedientes muestran la misma existencia efectiva.</p>':
+          '<p class="bc7-note">La cantidad efectiva todavía no está aceptada. No se puede operar en la jornada de destino.</p>')+
+        '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Declarado</th><th>Recibido</th><th>Existencia efectiva</th></tr></thead><tbody>'+
+        arr(delivery.lineas).map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td>'+esc(l.cantidad_recibida==null?'—':qty(l.cantidad_recibida))+'</td><td><b>'+esc(l.cantidad_efectiva==null?'Pendiente':qty(l.cantidad_efectiva))+'</b></td></tr>').join('')+
+        '</tbody></table></div></div>'
+      :'';
     return '<p class="bc7-muted">Confirmado '+esc(fmtDateHuman(cut.confirmado_en||cut.creado_en))+' · responsable '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
-      (cut.origen_corte_id?'<p class="bc7-muted">El inventario inicial toma como referencia el corte final anterior confirmado. El nuevo conteo queda guardado por separado.</p>':'')+
+      (cut.origen_corte_id?'<p class="bc7-muted">Este inventario inicial pertenece a la entrega compartida del corte final anterior.</p>':'')+
       (cut.observacion?'<p class="bc7-muted">Nota: '+esc(cut.observacion)+'</p>':'')+
-      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Conteo físico</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
-      lines.map(l=>{const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};const d=Number(l.diferencia??Number(l.cantidad_contada)-Number(l.stock_sistema));return '<tr><td>'+esc(p.nombre||'Producto no identificado')+'</td><td>'+esc(qty(l.cantidad_contada))+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>';}).join('')+
-      '</tbody></table></div>';
+      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>'+(accepted?'Cantidad efectiva compartida':'Conteo registrado')+'</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
+      lines.map(l=>{
+        const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};
+        const shared=sharedLines.get(String(l.producto_id));
+        const hasEffective=accepted&&shared&&shared.cantidad_efectiva!=null;
+        const effective=hasEffective?Number(shared.cantidad_efectiva):Number(l.cantidad_contada);
+        const d=effective-Number(l.stock_sistema||0);
+        const audit=hasEffective?'<small>Declarado originalmente: '+esc(qty(shared.cantidad_declarada))+' · recibido físicamente: '+esc(qty(shared.cantidad_recibida))+'</small>':'';
+        return '<tr><td>'+esc(p.nombre||'Producto no identificado')+'</td><td><b>'+esc(qty(effective))+'</b>'+audit+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>';
+      }).join('')+
+      '</tbody></table></div>'+sharedNote;
   }
+
+  function receiveFormHtml(delivery,detail){
+    const lines=arr(delivery&&delivery.lineas);
+    const table=lines.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Existencia declarada</th><th>Conteo físico recibido</th></tr></thead><tbody>'+lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-receive-count="'+esc(l.producto_id)+'" aria-label="Conteo recibido de '+esc(l.nombre||'producto')+'" value="'+esc(l.cantidad_declarada)+'"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">El almacén no tiene productos activos con stock registrado; confirma la recepción de cero productos.</div>';
+    const recount=delivery.estado==='REQUIERE_RECUENTO'?'<p class="bc7-note">El dueño rechazó el intento anterior. Realiza otro conteo físico completo. El intento rechazado y su motivo permanecen en el historial.</p>':'';
+    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Compara cada producto con lo que realmente recibes. Una recepción igual se confirma automáticamente. Cualquier diferencia queda bloqueada hasta que el dueño la revise.</p>'+recount+'</div>'+
+      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'">'+table+
+      '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" placeholder="Incidencias, embalaje o diferencias observadas"></label>'+
+      '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar recepción física</button></div><p class="bc7-msg" data-bc7-receive-msg></p></form>';
+  }
+
+  function legacyInitialFormHtml(detail){
+    const products=arr(detail.productos);
+    const table=products.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Stock del sistema (referencia)</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>'<tr><td>'+esc(p.nombre)+'</td><td>'+esc(qty(p.stock_actual))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-legacy-count="'+esc(p.producto_id)+'" aria-label="Regularizar conteo físico de '+esc(p.nombre)+'" placeholder="Contar físicamente"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">Almacén sin productos activos con stock registrado.</div>';
+    return '<div class="bc7-note"><b>Regularización legacy — excepción del dueño</b><p class="bc7-muted">La jornada ya está abierta y no tiene inventario inicial. Solo el dueño puede registrar ahora un conteo físico completo y explicar la excepción. No se copiará el stock del sistema ni se modificará el saldo global.</p></div>'+
+      '<form data-bc7-legacy-initial-form="'+esc(detail.sesion.id)+'">'+table+
+      '<label class="bc7-field">Motivo obligatorio de regularización<input data-bc7-legacy-reason required maxlength="1000" placeholder="Explica por qué falta el inventario inicial"></label>'+
+      '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar regularización auditada</button></div><p class="bc7-msg" data-bc7-legacy-msg></p></form>';
+  }
+
+  function sharedApprovalHtml(detail){
+    const shared=detail.entrega_compartida||{};
+    const delivery=[shared.entrada,shared.salida].find(x=>x&&x.estado==='PENDIENTE_REVISION');
+    if(!detail.is_admin||!delivery)return '';
+    const lines=arr(delivery.lineas);
+    return '<div class="bc7-note"><b>Revisión del dueño · diferencia de recepción</b><p class="bc7-muted">No se ha creado el inventario inicial de destino. La jornada permanece bloqueada hasta aprobar la cantidad recibida o rechazarla para un nuevo conteo.</p>'+
+      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Declarado</th><th>Recibido</th><th>Diferencia</th></tr></thead><tbody>'+
+      lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td>'+esc(l.cantidad_recibida==null?'—':qty(l.cantidad_recibida))+'</td><td class="bc7-diff '+(Number(l.diferencia)===0?'good':'bad')+'">'+(Number(l.diferencia)>0?'+':'')+esc(qty(l.diferencia||0))+'</td></tr>').join('')+
+      '</tbody></table></div><label class="bc7-field">Motivo obligatorio de la decisión<input data-bc7-delivery-decision-note maxlength="1000" placeholder="Motivo de aprobación o rechazo"></label>'+
+      '<div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-delivery-decision="APROBAR" data-bc7-delivery-id="'+esc(delivery.id)+'">Aprobar recepción</button><button class="bc7-btn danger" type="button" data-bc7-delivery-decision="RECHAZAR" data-bc7-delivery-id="'+esc(delivery.id)+'">Rechazar y exigir recuento</button></div>'+
+      '<p class="bc7-msg" data-bc7-delivery-decision-msg></p></div>';
+  }
+
   function countFormHtml(type,detail){
     const cut=detail.cortes&&detail.cortes[type];
     const session=detail.sesion;
+    const shared=detail.entrega_compartida||{};
+    const inbound=type==='INICIAL'?(shared.entrada||null):null;
+    const outgoing=type==='FINAL'?(shared.salida||null):null;
+
+    if(cut)return '<div class="bc7-note">El conteo '+(type==='INICIAL'?'inicial':'final')+' está confirmado e inmutable.</div>'+cutHtml(cut,arr(detail.productos),inbound||outgoing);
+    if(type==='INICIAL'&&shared.sin_vincular){
+      const d=shared.sin_vincular;
+      if(detail.is_admin)return '<div class="bc7-note"><b>Entrega pendiente de vincular</b><p class="bc7-muted">Existe un inventario final del día anterior para este almacén. Vincula esta jornada ya programada como destino; no se creará otra sesión.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-link-delivery="'+esc(d.id)+'" data-bc7-link-session="'+esc(session.id)+'">Vincular esta jornada</button></div></div>';
+      return '<div class="bc7-note"><b>Recepción bloqueada</b><p class="bc7-muted">Existe una entrega previa todavía no vinculada a esta jornada. El dueño debe vincular la sesión ya programada antes de registrar el conteo inicial.</p></div>';
+    }
+    if(type==='INICIAL'&&inbound){
+      if(inbound.estado==='PENDIENTE_REVISION')return '<div class="bc7-note"><b>Recepción pendiente de decisión del dueño</b><p class="bc7-muted">Se registró el conteo recibido. No existe un inventario inicial confirmado y no se puede abrir esta jornada hasta resolver la diferencia.</p></div>';
+      if(inbound.estado==='REQUIERE_RECUENTO'||inbound.estado==='PENDIENTE_RECEPCION')return receiveFormHtml(inbound,detail);
+      if(inbound.estado==='ACEPTADA')return '<div class="bc7-empty">La entrega ya fue aceptada. Actualiza la jornada para recuperar el inventario inicial compartido.</div>';
+    }
+    if(type==='INICIAL'&&String(session.estado).toUpperCase()==='EN_CURSO'&&detail.is_admin)
+      return legacyInitialFormHtml(detail);
+
     const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(String(session.estado).toUpperCase()):String(session.estado).toUpperCase()==='EN_CURSO';
-    if(cut)return '<div class="bc7-note">El conteo '+(type==='INICIAL'?'inicial':'final')+' está confirmado e inmutable. Para corregirlo se necesita un proceso administrativo auditado.</div>'+cutHtml(cut,arr(detail.productos));
     if(!allowed)return '<div class="bc7-empty">El conteo '+(type==='INICIAL'?'inicial':'final')+' no se puede modificar en el estado actual ('+esc(humanStatus(session.estado))+').</div>';
     const products=arr(detail.productos);
     const opening=type==='INICIAL'?detail.apertura_previa:null;
     const openingLines=new Map(arr(opening&&opening.lineas).map(x=>[String(x.producto_id),x]));
     const openingNote=type==='INICIAL'
-      ?(opening?'<p class="bc7-note">Referencia del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se sugieren las cantidades del inventario final confirmado anterior. Debes volver a contar físicamente cada producto y confirmar este nuevo corte. El inventario del día anterior no se modifica.</p>'
+      ?(opening?'<p class="bc7-note">Corte final anterior del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se muestran las cantidades efectivas compartidas como referencia. Debes revisar y volver a contar físicamente cada producto antes de confirmar la recepción; una diferencia queda pendiente de decisión del dueño.</p>'
         :'<p class="bc7-note">No hay un inventario final confirmado del día inmediatamente anterior. Define el saldo inicial mediante conteo físico completo; no se copiará automáticamente el stock del sistema.</p>')
       :'';
     const table=products.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
@@ -645,7 +713,7 @@
       const adjustmentStorageType=can('bajas','crear')?'baja':'merma';
       adjustment='<details class="bc7-detail"><summary><span>Registrar baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'"><div class="bc7-grid"><label class="bc7-field">Causa de la baja<select data-bc7-ajust-cause required><option value="">Selecciona una causa</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar baja a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
-    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div><details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
+    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
     const fin=financeFormHtml(detail,isAssigned,status);
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
@@ -659,8 +727,12 @@
     if(String(state.selected||'')!==String(sessionId||''))state.workspaceTab='inventario';
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
-    try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);return true;}
-    catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
+    try{
+      const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
+      detail.entrega_compartida=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
+      detail.is_admin=!!state.admin;
+      state.selected=sessionId;renderWorkspace(detail);return true;
+    }catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
   }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
@@ -677,6 +749,89 @@
     catch(e){msg(form.querySelector('[data-bc7-count-msg]'),'No se confirmó el conteo. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
+  async function saveReceipt(form){
+    const sessionId=form.dataset.bc7ReceiveForm;
+    const inputs=Array.from(form.querySelectorAll('[data-bc7-receive-count]'));
+    const lines=inputs.map(i=>({producto_id:i.dataset.bc7ReceiveCount,cantidad:i.value.trim()}));
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
+    const msgEl=form.querySelector('[data-bc7-receive-msg]');
+    if(bad){msg(msgEl,'Cuenta todos los productos y usa cantidades válidas con hasta 3 decimales.','error');return;}
+    if(!confirm('Vas a registrar el conteo físico recibido. Si coincide con lo declarado, se comparte automáticamente. Si difiere, la jornada quedará bloqueada hasta la decisión del dueño. ¿Confirmas el conteo real?'))return;
+    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
+    try{
+      const result=await rpc('bc7_recibir_entrega_jornada',{
+        p_destino_sesion_id:sessionId,
+        p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),
+        p_observacion:form.querySelector('[data-bc7-receive-note]')?.value||null,
+        p_idempotency_key:crypto.randomUUID()
+      });
+      await openWorkspace(sessionId);
+      setStatus(result&&result.requiere_revision
+        ?'Recepción registrada. Hay diferencias pendientes de decisión del dueño; la jornada permanece bloqueada.'
+        :'Recepción coincidente confirmada. La existencia compartida ya está disponible en ambos expedientes.','ok');
+    }catch(e){msg(msgEl,'No se confirmó la recepción. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function saveLegacyInitial(form){
+    const sessionId=form.dataset.bc7LegacyInitialForm;
+    const inputs=Array.from(form.querySelectorAll('[data-bc7-legacy-count]'));
+    const lines=inputs.map(i=>({producto_id:i.dataset.bc7LegacyCount,cantidad:i.value.trim()}));
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
+    const reason=form.querySelector('[data-bc7-legacy-reason]')?.value.trim()||'';
+    const msgEl=form.querySelector('[data-bc7-legacy-msg]');
+    if(bad||!reason){msg(msgEl,'Completa el conteo físico de todos los productos y el motivo de regularización.','error');return;}
+    if(!confirm('Esta es una excepción de dueño para una jornada legacy ya abierta. Se registrará el conteo físico completo y el motivo; el stock global no cambiará. ¿Confirmas?'))return;
+    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_regularizar_inicial_jornada_legacy',{
+        p_turno_sesion_id:sessionId,
+        p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),
+        p_motivo:reason
+      });
+      await openWorkspace(sessionId);
+      setStatus('Inventario inicial legacy regularizado con auditoría. No se modificó el stock global.','ok');
+    }catch(e){msg(msgEl,'No se pudo regularizar el inventario. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function resolveSharedDelivery(btn){
+    const deliveryId=btn.dataset.bc7DeliveryId;
+    const decision=btn.dataset.bc7DeliveryDecision;
+    const note=document.querySelector('[data-bc7-delivery-decision-note]')?.value.trim()||'';
+    const message=document.querySelector('[data-bc7-delivery-decision-msg]');
+    if(!note){msg(message,'Registra el motivo de la decisión.','error');return;}
+    if(!confirm(decision==='APROBAR'
+      ?'Vas a aprobar la cantidad recibida y convertirla en la existencia efectiva compartida de ambos días. ¿Confirmas?'
+      :'Vas a rechazar esta recepción. La jornada seguirá bloqueada y la dependienta tendrá que realizar otro conteo físico. ¿Confirmas?'))return;
+    if(!busy(btn,true))return;
+    try{
+      const result=await rpc('bc7_resolver_entrega_jornada',{
+        p_entrega_id:deliveryId,p_decision:decision,p_motivo:note
+      });
+      if(state.selected)await openWorkspace(state.selected);
+      setStatus(decision==='APROBAR'
+        ?'Diferencia aprobada. La existencia efectiva quedó compartida en el FINAL y el INITIAL.'
+        :'Diferencia rechazada. Se exige un nuevo conteo y la jornada sigue bloqueada.','ok');
+    }catch(e){msg(message,'No se pudo resolver la entrega. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function linkSharedDelivery(btn){
+    const deliveryId=btn.dataset.bc7LinkDelivery;
+    const sessionId=btn.dataset.bc7LinkSession;
+    if(!confirm('Vas a vincular esta jornada ya programada como destino de la entrega anterior. No se creará otra jornada ni se duplicará la fecha. ¿Confirmas?'))return;
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_vincular_entrega_jornada',{
+        p_entrega_id:deliveryId,p_destino_sesion_id:sessionId
+      });
+      await openWorkspace(sessionId);
+      setStatus('Jornada existente vinculada como destino de recepción.','ok');
+    }catch(e){setStatus('No se pudo vincular la jornada existente. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
   async function refreshPosArchiveAfterSessionStart() {
     // Starting a jornada changes the authoritative active turn/warehouse.
     // Re-read it before M74 decides whether the wholesale POS can be shown.
@@ -962,6 +1117,8 @@
     if(t.hasAttribute('data-bc7-create')){await createSchedule(t);return;}
     if(t.hasAttribute('data-bc7-open')){await openWorkspace(t.dataset.bc7Open);return;}
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
+    if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
+    if(t.hasAttribute('data-bc7-delivery-decision')){await resolveSharedDelivery(t);return;}
     if(t.hasAttribute('data-bc7-mov-refresh')){if(state.detail)await loadMovements(state.detail);return;}
     if(t.hasAttribute('data-bc7-open-movements')){openMovements();return;}
   });
@@ -971,6 +1128,8 @@
     else if(f.id==='bc7-pattern-form'){e.preventDefault();await savePattern(f);}
     else if(f.matches('[data-bc7-reschedule]')){e.preventDefault();await reschedule(f);}
     else if(f.matches('[data-bc7-count-form]')){e.preventDefault();await saveCount(f);}
+    else if(f.matches('[data-bc7-receive-form]')){e.preventDefault();await saveReceipt(f);}
+    else if(f.matches('[data-bc7-legacy-initial-form]')){e.preventDefault();await saveLegacyInitial(f);}
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}

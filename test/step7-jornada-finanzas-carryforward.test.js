@@ -190,7 +190,7 @@ test("Step 7 shows prior count only as an editable physical recount reference", 
   assert.match(UI, /detail\.apertura_previa/);
   assert.match(UI, /openingLines\.get\(String\(p\.producto_id\)\)/);
   assert.match(UI, /prior\?esc\(prior\.cantidad_contada\)/);
-  assert.match(UI, /Debes volver a contar físicamente cada producto/);
+  assert.match(UI, /Debes revisar y volver a contar físicamente cada producto/);
   assert.match(UI, /nuevo corte requiere confirmación física explícita/);
   assert.match(UI, /corte final anterior/);
   assert.match(UI, /data-bc7-finance-form="gasto"/);
