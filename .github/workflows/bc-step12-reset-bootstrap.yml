@@ -18,6 +18,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: battlecruiser-step12-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   isolated-step12:
     if: github.ref_name == 'aria/sandbox/step12-reset-bootstrap-20261102'
@@ -27,7 +31,6 @@ jobs:
       PROJECT_REF: papxnkkjtkxsitcsvcme
       BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
       BC_BACKUP_PASSPHRASE: ${{ secrets.BC_BACKUP_PASSPHRASE }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       NODE_OPTIONS: --max-old-space-size=1536
 
     steps:
@@ -55,7 +58,6 @@ jobs:
           test -n "${BC_BACKUP_PASSPHRASE:-}" || { echo "BC_BACKUP_PASSPHRASE_PRESENT=NO"; exit 3; }
           pass_len=$(printf '%s' "$BC_BACKUP_PASSPHRASE" | wc -c | tr -d ' ')
           test "$pass_len" -ge 20 || { echo "BC_BACKUP_PASSPHRASE_VALIDATION=FAIL"; exit 4; }
-          test -n "${CLOUDFLARE_API_TOKEN:-}" && echo "BC_CLOUDFLARE_DEPLOY_SECRET_PRESENT=YES" || echo "BC_CLOUDFLARE_DEPLOY_SECRET_PRESENT=NO"
           echo "BC_DB_SECRET_PRESENT=YES; value not printed"
           echo "BC_BACKUP_PASSPHRASE_VALIDATION=PASS; value not printed"
           echo "BC_SUPABASE_PRODUCTION_EDGE_SECRETS=NOT_EXPORTED_OR_CHANGED"
