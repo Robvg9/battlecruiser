@@ -299,8 +299,11 @@ function applySql(file) {
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation and overdue-start guard ===");
     applySql("test/turno-cash-handover-contract.sql");
     applySql("test/legacy-session-overdue-contract.sql");
-    log("\\r\\n=== 12/13 Verify owner cash, legacy reconciliation and overdue-start guard contracts ===");
-    log("\\r\\nPASS Step 7 inventory + finance + Jornada POS sales provenance/payment/idempotency + owner cash count readback + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + ACL contracts.");
+    log("\\r\\n=== 13/14 Apply Step 4 shared inventory handover after legacy guards ===");
+    applySql("supabase/migrations/20261102150000_step4_shared_jornada_inventory_handover.sql");
+    log("\\r\\n=== 14/14 Verify shared receipt, owner decision, retry, next-day reuse, legacy recovery and ACL ===");
+    applySql("test/step4-jornada-shared-inventory-contract.sql");
+    log("\\r\\nPASS Step 7 inventory + finance + Jornada POS sales provenance/payment/idempotency + owner cash count readback + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + Step 4 shared inventory receipt/approval/recount/legacy recovery + ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
