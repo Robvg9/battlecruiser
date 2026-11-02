@@ -383,7 +383,9 @@ test("M33 jornada workbook fits mobile width without horizontal scrolling", asyn
       } };
       if (name === "bc7_movimientos_sesion") return { data: [], error: null };
       if (name === "bc7_finanzas_jornada") return { error: null, data: {
-        gastos: [], reinversiones: [], mermas: [{
+        gastos: [{ id: "g-1", concepto: "Luz", monto: 10, estado: "PENDIENTE", creado_en: "2026-10-20T13:00:00-04:00", creado_nombre: "Responsable fixture" }],
+        reinversiones: [{ id: "r-1", fecha: "2026-10-20T12:30:00-04:00", usuario_nombre: "Responsable fixture", proveedor: "Proveedor fixture", lineas: [{ producto_id: "p-1", producto: "Malta", cantidad_base: 1, costo_total: 5, costo_unitario: 5 }] }],
+        mermas: [{
           id: "m-1", producto: "Malta", cantidad: 2, motivo: "Fixture",
           estado: "PENDIENTE", creado_en: "2026-10-20T12:00:00-04:00",
           creado_nombre: "Responsable fixture"
@@ -416,6 +418,19 @@ test("M33 jornada workbook fits mobile width without horizontal scrolling", asyn
   const adjustmentTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
     table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Solicitudes de baja"));
   assert.ok(adjustmentTable, "pending adjustment table remains present");
+  const reinvestmentTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
+    table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Reinversiones detalladas"));
+  if (reinvestmentTable) assert.deepEqual(
+    Array.from(reinvestmentTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label")),
+    ["Fecha", "Producto", "Cantidad", "Costo unitario", "Total", "Responsable / proveedor"]
+  );
+  const expenseTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
+    table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Gastos"));
+  if (expenseTable) assert.deepEqual(
+    Array.from(expenseTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label")),
+    ["Fecha", "Concepto", "Importe", "Estado", "Responsable"]
+  );
+
   const adjustmentLabels = Array.from(adjustmentTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label"));
   if (adjustmentLabels.length) assert.deepEqual(adjustmentLabels, ["Fecha", "Tipo", "Producto", "Cantidad", "Motivo", "Estado", "Responsable"]);
   const style = window.document.getElementById("bc-m33-compact-sheet-css")?.textContent || "";
