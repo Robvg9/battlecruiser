@@ -93,6 +93,32 @@ SELECT jsonb_build_object(
   'public_policies', COALESCE((SELECT jsonb_agg(jsonb_build_object('schemaname', schemaname, 'tablename', tablename, 'policyname', policyname, 'permissive', permissive, 'roles', roles, 'cmd', cmd, 'qual', qual, 'with_check', with_check) ORDER BY schemaname, tablename, policyname) FROM pg_policies WHERE schemaname = 'public'), '[]'::jsonb),
   'managed_policies', COALESCE((SELECT jsonb_agg(jsonb_build_object('schemaname', schemaname, 'tablename', tablename, 'policyname', policyname, 'permissive', permissive, 'roles', roles, 'cmd', cmd, 'qual', qual, 'with_check', with_check) ORDER BY schemaname, tablename, policyname) FROM pg_policies WHERE schemaname IN ('auth', 'storage')), '[]'::jsonb),
   'public_function_signatures', COALESCE((SELECT jsonb_agg(n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' ORDER BY n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.prokind = 'f'), '[]'::jsonb),
+  'public_function_fingerprint', (SELECT md5(COALESCE(string_agg(
+    p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')|' || pg_get_function_result(p.oid) || '|' || pg_get_functiondef(p.oid),
+    E'\\\\n' ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
+  ),'')) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prokind='f'),
+  'public_trigger_count', (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT t.tgisinternal AND n.nspname='public'),
+  'public_trigger_fingerprint', (SELECT md5(COALESCE(string_agg(
+    c.relname || '|' || t.tgname || '|' || pg_get_triggerdef(t.oid,true) || '|' || pg_get_functiondef(t.tgfoid),
+    E'\\\\n' ORDER BY c.relname,t.tgname
+  ),'')) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT t.tgisinternal AND n.nspname='public'),
+  'public_columns_fingerprint', (SELECT md5(COALESCE(string_agg(
+    table_name || '|' || column_name || '|' || ordinal_position::text || '|' || data_type || '|' || is_nullable || '|' || COALESCE(column_default,''),
+    E'\\\\n' ORDER BY table_name,ordinal_position
+  ),'')) FROM information_schema.columns WHERE table_schema='public'),
+  'public_constraints_fingerprint', (SELECT md5(COALESCE(string_agg(
+    c.relname || '|' || con.conname || '|' || pg_get_constraintdef(con.oid,true),
+    E'\\\\n' ORDER BY c.relname,con.conname
+  ),'')) FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'),
+  'public_indexes_fingerprint', (SELECT md5(COALESCE(string_agg(
+    tablename || '|' || indexname || '|' || indexdef,
+    E'\\\\n' ORDER BY tablename,indexname
+  ),'')) FROM pg_indexes WHERE schemaname='public'),
+  'public_views_fingerprint', (SELECT md5(COALESCE(string_agg(
+    viewname || '|' || definition,
+    E'\\\\n' ORDER BY viewname
+  ),'')) FROM pg_views WHERE schemaname='public'),
+  'storage_bucket_manifest', COALESCE((SELECT jsonb_agg(to_jsonb(b) ORDER BY b.id) FROM storage.buckets b), '[]'::jsonb),
   'supabase_migration_count', (SELECT count(*) FROM supabase_migrations.schema_migrations),
   'supabase_migration_versions', COALESCE((SELECT jsonb_agg(version ORDER BY version) FROM supabase_migrations.schema_migrations), '[]'::jsonb),
   'supabase_migration_fingerprint', (SELECT md5(COALESCE(string_agg(
@@ -393,6 +419,21 @@ async function verify() {
   checks.supabase_migration_history_restored = checks.supabase_migration_count_match && checks.supabase_migration_versions_match && checks.supabase_migration_fingerprint_match;
   if (!checks.supabase_migration_history_restored) issues.push("application migration ledger versions/statements/rollback differ");
 
+  checks.public_function_definitions_match = source.public_function_fingerprint === target.public_function_fingerprint;
+  checks.public_trigger_definitions_match = source.public_trigger_fingerprint === target.public_trigger_fingerprint &&
+    Number(source.public_trigger_count) === Number(target.public_trigger_count);
+  checks.public_columns_match = source.public_columns_fingerprint === target.public_columns_fingerprint;
+  checks.public_constraints_match = source.public_constraints_fingerprint === target.public_constraints_fingerprint;
+  checks.public_indexes_match = source.public_indexes_fingerprint === target.public_indexes_fingerprint;
+  checks.public_views_match = source.public_views_fingerprint === target.public_views_fingerprint;
+  checks.storage_bucket_configuration_match = signature(source.storage_bucket_manifest || []) === signature(target.storage_bucket_manifest || []);
+  checks.extension_catalog_match = signature(source.extensions || []) === signature(target.extensions || []);
+  if (!checks.public_function_definitions_match || !checks.public_trigger_definitions_match ||
+      !checks.public_columns_match || !checks.public_constraints_match || !checks.public_indexes_match ||
+      !checks.public_views_match || !checks.storage_bucket_configuration_match || !checks.extension_catalog_match) {
+    issues.push("public schema/functions/triggers/indexes/constraints/Storage bucket configuration differs");
+  }
+
   checks.auth_users_match = Number(source.auth_users) === Number(target.auth_users);
   checks.auth_identities_match = Number(source.auth_identities) === Number(target.auth_identities);
   if (!checks.auth_users_match || !checks.auth_identities_match) issues.push("Auth user/identity counts differ");
@@ -424,6 +465,10 @@ async function verify() {
     project_ref: projectRef,
     generated_at_utc: new Date().toISOString(),
     checks,
+    source_public_function_count: (source.public_function_signatures || []).length,
+    restored_public_function_count: (target.public_function_signatures || []).length,
+    source_public_trigger_count: Number(source.public_trigger_count || 0),
+    restored_public_trigger_count: Number(target.public_trigger_count || 0),
     source_supabase_migration_count: Number(source.supabase_migration_count || 0),
     restored_supabase_migration_count: Number(target.supabase_migration_count || 0),
     supabase_migration_fingerprint_match: checks.supabase_migration_fingerprint_match,
