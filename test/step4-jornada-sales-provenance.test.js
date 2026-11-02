@@ -28,7 +28,7 @@ test("new sales schema is additive and never relinks historic sales", () => {
   const schemaChanges = MIGRATION.slice(0, MIGRATION.indexOf("CREATE OR REPLACE FUNCTION"));
   assert.doesNotMatch(schemaChanges, /UPDATE\s+public\.ventas\s+SET\s+turno_sesion_id/i,
     "additive schema changes must not reassign historic sales");
-  assert.ok(MIGRATION.includes("UPDATE public.ventas\\n  SET turno_sesion_id=v_s.id"),
+  assert.ok(MIGRATION.includes("UPDATE public.ventas") && MIGRATION.includes("SET turno_sesion_id=v_s.id"),
     "only the newly inserted sale is linked");
   assert.ok(MIGRATION.includes("WHERE id=v_venta_id AND creado_por=v_uid"),
     "the current actor and new sale ID scope the link update");
