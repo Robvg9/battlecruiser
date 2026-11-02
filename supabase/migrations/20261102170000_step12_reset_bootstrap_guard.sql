@@ -351,6 +351,55 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION private.bc_bootstrap_auth_user_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO pg_catalog, public, auth, private, pg_temp
+AS $function$
+DECLARE
+  v_request_id uuid;
+  v_gate private.bc_bootstrap_gate%ROWTYPE;
+  v_owner_role uuid;
+  v_nombre text;
+BEGIN
+  -- Only identities carrying the one-time request id use this first-owner path.
+  IF NEW.raw_user_meta_data IS NULL OR NOT (NEW.raw_user_meta_data ? 'bc_bootstrap_request_id') THEN
+    RETURN NEW;
+  END IF;
+  v_request_id := (NEW.raw_user_meta_data->>'bc_bootstrap_request_id')::uuid;
+  v_nombre := NULLIF(btrim(COALESCE(NEW.raw_user_meta_data->>'username','')),'');
+  IF v_request_id IS NULL OR v_nombre IS NULL OR length(v_nombre)>120 THEN
+    RAISE EXCEPTION 'BOOTSTRAP_PROFILE_PAYLOAD_INVALID' USING ERRCODE='42501';
+  END IF;
+  PERFORM pg_advisory_xact_lock(1111707218,13);
+  SELECT * INTO v_gate FROM private.bc_bootstrap_gate WHERE singleton=true FOR UPDATE;
+  IF NOT FOUND OR v_gate.consumed_at IS NOT NULL OR
+     v_gate.claim_request_id IS DISTINCT FROM v_request_id OR
+     v_gate.claim_expires_at IS NULL OR v_gate.claim_expires_at<=now() THEN
+    RAISE EXCEPTION 'BOOTSTRAP_CLAIM_REQUIRED' USING ERRCODE='42501';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.usuarios) OR EXISTS(SELECT 1 FROM auth.users WHERE id<>NEW.id) THEN
+    RAISE EXCEPTION 'BOOTSTRAP_REQUIRES_EMPTY_AUTH' USING ERRCODE='42501';
+  END IF;
+  SELECT id INTO v_owner_role FROM public.roles WHERE nombre='Dueño' AND activo=true;
+  IF v_owner_role IS NULL THEN
+    RAISE EXCEPTION 'BOOTSTRAP_OWNER_ROLE_MISSING' USING ERRCODE='P0001';
+  END IF;
+  -- This profile insert shares the Auth identity transaction; either both persist or neither.
+  INSERT INTO public.usuarios(id,nombre,role_id,activo,archivado)
+  VALUES(NEW.id,v_nombre,v_owner_role,true,false);
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS bc_bootstrap_admin_profile ON auth.users;
+CREATE TRIGGER bc_bootstrap_admin_profile
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION private.bc_bootstrap_auth_user_insert();
+
+REVOKE ALL ON FUNCTION private.bc_bootstrap_auth_user_insert() FROM PUBLIC,anon,authenticated,service_role;
 CREATE OR REPLACE FUNCTION private.bc_bootstrap_finalize(
   p_request_id uuid,
   p_auth_user_id uuid,
@@ -388,7 +437,10 @@ BEGIN
     RETURN jsonb_build_object('ok',false,'code','bootstrap_claim_invalid');
   END IF;
   IF NOT EXISTS(SELECT 1 FROM auth.users WHERE id=p_auth_user_id) OR
-     (SELECT count(*) FROM auth.users)<>1 OR EXISTS(SELECT 1 FROM public.usuarios) THEN
+     (SELECT count(*) FROM auth.users)<>1 OR
+     (SELECT count(*) FROM public.usuarios)<>1 OR
+     NOT EXISTS(SELECT 1 FROM public.usuarios u JOIN public.roles r ON r.id=u.role_id
+                 WHERE u.id=p_auth_user_id AND r.nombre='Dueño' AND u.activo=true) THEN
     RETURN jsonb_build_object('ok',false,'code','bootstrap_auth_state_invalid');
   END IF;
   SELECT id INTO v_owner_role FROM public.roles
@@ -397,8 +449,7 @@ BEGIN
     RETURN jsonb_build_object('ok',false,'code','owner_role_missing');
   END IF;
 
-  INSERT INTO public.usuarios(id,nombre,role_id,activo,archivado)
-  VALUES(p_auth_user_id,btrim(p_nombre),v_owner_role,true,false);
+  -- The auth.users trigger already created the profile in the same Auth transaction.
 
   UPDATE private.bc_bootstrap_gate
      SET consumed_at=now(),consumed_request_id=p_request_id,
