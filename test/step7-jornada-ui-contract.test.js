@@ -25,7 +25,7 @@ test("Step 7 has session-scoped, immutable inventory snapshots and gates start/c
 });
 
 test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write confirmations",()=>{
-  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
+  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc7_registrar_venta_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
     assert.ok(ui.includes(rpc),`UI no wired to ${rpc}`);
   }
   assert.match(ui,/confirm\(/);
@@ -47,6 +47,19 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/data-tab=.?ventas/);
 });
 
+
+test("Jornada POS UI separates payment methods and cash declaration from gross sales",()=>{
+  assert.match(ui,/cashDeclarationHtml\(detail\)/);
+  assert.match(ui,/renderSalesLedger\(host,data\)/);
+  assert.match(ui,/bc7_ventas_jornada/);
+  assert.match(ui,/Ventas por forma de pago/);
+  assert.match(ui,/NO_DECLARADO/);
+  assert.match(ui,/no se calcula un efectivo esperado/);
+  assert.match(ui,/ventas nuevas vinculadas de forma verificable/);
+  assert.match(sw,/ventas\.js\\?v=20261102\.1/);
+  assert.match(sw,/venta-turno-ui\.js\\?v=9\.4\.46/);
+  assert.match(sw,/m27-6b-venta-payload-pres\.js\\?v=27\.6b2/);
+});
 
 test("iniciar una jornada relee la sesión mayorista y recalcula el archivo POS",()=>{
   const helperAt=ui.indexOf("async function refreshPosArchiveAfterSessionStart()");
