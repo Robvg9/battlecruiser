@@ -75,19 +75,44 @@ BEGIN
   SELECT cantidad INTO v_before_pan FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen;
   SELECT cantidad INTO v_before_jugo FROM public.stock WHERE producto_id=v_jugo AND almacen_id=v_almacen;
 
-  -- A fresh physical count is required; it creates a new immutable INITIAL with a source link.
-  v_result:=public.bc7_guardar_inventario_jornada(v_day2,'INICIAL',
+  -- The next day already exists: link that exact session, receive physically, then let the owner approve 8->7.5 / 4->4.25.
+  v_result:=public.bc7_vincular_entrega_jornada(
+    (SELECT id FROM public.turno_jornada_inventario_entregas WHERE origen_sesion_id=v_day1),
+    v_day2
+  );
+  IF v_result->>'estado'<>'PENDIENTE_RECEPCION'
+     OR v_result->>'destino_sesion_id' IS DISTINCT FROM v_day2::text THEN
+    RAISE EXCEPTION 'FAIL: existing Day 2 session was not linked as the handover destination';
+  END IF;
+
+  v_result:=public.bc7_recibir_entrega_jornada(v_day2,
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',7.5),
       jsonb_build_object('producto_id',v_jugo,'cantidad',4.25)
-    ),'Day 2 physical recount fixture');
-  v_initial_id:=(v_result->>'id')::uuid;
-  IF v_result->>'estado'<>'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: Day 2 initial count not confirmed'; END IF;
+    ),'Day 2 physical receipt fixture',
+    '98000000-0000-0000-0000-000000000001');
+  IF v_result->>'estado'<>'PENDIENTE_REVISION'
+     OR coalesce((v_result->>'requiere_revision')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'FAIL: differing physical receipt must wait for owner review';
+  END IF;
+
+  v_result:=public.bc7_resolver_entrega_jornada(
+    (SELECT id FROM public.turno_jornada_inventario_entregas WHERE origen_sesion_id=v_day1),
+    'APROBAR','Fixture approval of the physically received quantities');
+  v_initial_id:=(v_result->>'inventario_inicial_id')::uuid;
+  IF v_result->>'estado'<>'ACEPTADA' OR v_initial_id IS NULL THEN
+    RAISE EXCEPTION 'FAIL: owner approval did not create the shared Day 2 INITIAL';
+  END IF;
   IF (SELECT origen_corte_id FROM public.turno_jornada_inventario_cortes WHERE id=v_initial_id) IS DISTINCT FROM v_final_id THEN
     RAISE EXCEPTION 'FAIL: Day 2 INITIAL did not preserve the previous FINAL provenance link';
   END IF;
   IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas WHERE corte_id=v_initial_id AND producto_id=v_pan)<>7.5 THEN
-    RAISE EXCEPTION 'FAIL: Day 2 count did not preserve the fresh physical quantity';
+    RAISE EXCEPTION 'FAIL: Day 2 accepted receipt quantity did not preserve the physical count';
+  END IF;
+  IF (SELECT cantidad_efectiva FROM public.turno_jornada_inventario_entrega_lineas
+      WHERE entrega_id=(SELECT id FROM public.turno_jornada_inventario_entregas WHERE origen_sesion_id=v_day1)
+        AND producto_id=v_pan)<>7.5 THEN
+    RAISE EXCEPTION 'FAIL: the accepted shared quantity was not stored as the single effective inventory';
   END IF;
   IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas l
       JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
