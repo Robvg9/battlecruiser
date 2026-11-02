@@ -337,10 +337,16 @@ BEGIN
   END IF;
 
   v_hash:=md5(p_lineas::text||'|'||coalesce(p_observacion,''));
+  -- Serialize retries sharing the same idempotency key, even across different sessions.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_idempotency_key::text,0));
   SELECT * INTO v_existing FROM public.turno_jornada_inventario_recepciones
   WHERE idempotency_key=p_idempotency_key;
   IF FOUND THEN
-    IF v_existing.recibido_por<>v_uid OR v_existing.payload_hash<>v_hash THEN
+    IF v_existing.recibido_por<>v_uid OR v_existing.payload_hash<>v_hash
+       OR v_existing.entrega_id IS DISTINCT FROM (
+         SELECT e.id FROM public.turno_jornada_inventario_entregas e
+         WHERE e.destino_sesion_id=p_destino_sesion_id
+       ) THEN
       RAISE EXCEPTION 'El identificador idempotente ya pertenece a otra recepción o a otro contenido.' USING ERRCODE='23505';
     END IF;
     RETURN jsonb_build_object('id',v_existing.id,'estado',v_existing.estado,
@@ -388,6 +394,16 @@ BEGIN
         WHERE s.almacen_id=v_s.almacen_id AND s.producto_id=p.id)
   ) THEN
     RAISE EXCEPTION 'Producto o cantidad de recepción inválida.' USING ERRCODE='22023';
+  END IF;
+  IF v_expected<>(SELECT count(*) FROM public.turno_jornada_inventario_entrega_lineas
+      WHERE entrega_id=v_e.id)
+     OR EXISTS (
+       SELECT 1 FROM jsonb_array_elements(p_lineas) AS x(value)
+       LEFT JOIN public.turno_jornada_inventario_entrega_lineas dl
+         ON dl.entrega_id=v_e.id AND dl.producto_id=(x.value->>'producto_id')::uuid
+       WHERE dl.id IS NULL
+     ) THEN
+    RAISE EXCEPTION 'El catálogo de productos cambió entre entrega y recepción. El dueño debe revisar el expediente; no se omitirá ningún producto.' USING ERRCODE='23514';
   END IF;
   IF NULLIF(btrim(coalesce(p_observacion,'')),'') IS NOT NULL AND length(p_observacion)>1000 THEN
     RAISE EXCEPTION 'La observación no puede superar 1000 caracteres.' USING ERRCODE='22023';
@@ -498,6 +514,7 @@ BEGIN
       AND dl.entrega_id=v_e.id;
     UPDATE public.turno_jornada_inventario_entregas
     SET estado='ACEPTADA',actualizado_en=now() WHERE id=v_e.id;
+    v_e.estado:='ACEPTADA';
     v_initial:=public._bc7_crear_inicial_desde_entrega(v_e.id,v_r.id,auth.uid(),
       'Diferencia revisada y aprobada por el dueño: '||left(btrim(p_motivo),900));
   ELSE
@@ -506,6 +523,7 @@ BEGIN
     WHERE id=v_r.id RETURNING * INTO v_r;
     UPDATE public.turno_jornada_inventario_entregas
     SET estado='REQUIERE_RECUENTO',actualizado_en=now() WHERE id=v_e.id;
+    v_e.estado:='REQUIERE_RECUENTO';
   END IF;
 
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=v_e.destino_sesion_id;
