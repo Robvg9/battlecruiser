@@ -356,3 +356,86 @@ test("M33 hydrates the assignment selectors from the authorized responsible-user
   assert.deepEqual(Object.keys(calls[0].params), ["p_incluir_archivados"]);
   assert.equal(window.document.querySelector("#bc-m33-compact-sheet-css") !== null, true);
 });
+
+test("M33 jornada workbook fits mobile width without horizontal scrolling", async (t) => {
+  const { window, sessions } = setup(t);
+  sessions.splice(0, sessions.length, {
+    ...session("jornada-responsive", 1, "2026-10-20", "JORNADA"),
+    estado: "COMPLETADA", responsable_id: "owner-fixture",
+    dinero_declarado: true, dinero_id: "cash-declaration-responsive", dinero_monto: 100,
+    dinero_moneda: "CUP", dinero_estado_aprobacion: "APROBADA", dinero_monto_contado: 100,
+    dinero_diferencia: 0, dinero_contado_por: "owner-fixture",
+    dinero_contado_nombre: "Dueño fixture", dinero_contado_at: "2026-10-20T22:15:00-04:00"
+  });
+  const calls = [];
+  window.client = {
+    rpc: async (name, params = {}) => {
+      calls.push({ name, params });
+      if (name === "listar_usuarios_admin") return { data: [
+        { id: "owner-fixture", nombre: "Dueño fixture", rol: "Dueño", activo: true, archivado: false }
+      ], error: null };
+      if (name === "bc7_obtener_inventario_jornada") return { error: null, data: {
+        productos: [{ producto_id: "p-1", nombre: "Malta", unidad: "ud" }],
+        cortes: {
+          INICIAL: { id: "i-1", estado: "CONFIRMADO", lineas: [{ producto_id: "p-1", cantidad_contada: 20 }] },
+          FINAL: { id: "f-1", estado: "CONFIRMADO", lineas: [{ producto_id: "p-1", cantidad_contada: 18 }] }
+        }
+      } };
+      if (name === "bc7_movimientos_sesion") return { data: [], error: null };
+      if (name === "bc7_finanzas_jornada") return { error: null, data: {
+        gastos: [{ id: "g-1", concepto: "Luz", monto: 10, estado: "PENDIENTE", creado_en: "2026-10-20T13:00:00-04:00", creado_nombre: "Responsable fixture" }],
+        reinversiones: [{ id: "r-1", fecha: "2026-10-20T12:30:00-04:00", usuario_nombre: "Responsable fixture", proveedor: "Proveedor fixture", lineas: [{ producto_id: "p-1", producto: "Malta", cantidad_base: 1, costo_total: 5, costo_unitario: 5 }] }],
+        mermas: [{
+          id: "m-1", producto: "Malta", cantidad: 2, motivo: "Fixture",
+          estado: "PENDIENTE", creado_en: "2026-10-20T12:00:00-04:00",
+          creado_nombre: "Responsable fixture"
+        }], bajas: []
+      } };
+      return { data: null, error: { code: "UNEXPECTED_RPC", message: name } };
+    },
+    from: () => ({ select: () => ({ in: async () => ({ data: [], error: null }) }) })
+  };
+  await window.__BC_M33.open("turno-closed-fixture");
+  const modal = window.document.getElementById("m33-bg");
+  modal.querySelector("#m33-next").click();
+  modal.querySelector("#m33-next").click();
+  modal.querySelector("#m33-next").click();
+  const host = modal.querySelector("[data-m33-inventory-host]");
+  assert.ok(await waitFor(() => host.querySelector(".m33-book-table tbody tr")));
+  const productCells = Array.from(host.querySelector(".m33-book-table tbody tr").cells);
+  assert.equal(productCells.length, 17, "all seventeen product ledger values remain available");
+  assert.deepEqual(productCells.map((cell) => cell.getAttribute("data-label")), [
+    "% Ganancia", "Ganancia por unidad", "Precio de costo", "Precio de venta", "Producto",
+    "Inventario inicial", "Entradas", "Reinversiones", "Bajas", "Otras salidas",
+    "Inventario teórico", "Inventario físico final", "Diferencia física", "Unidades vendidas POS",
+    "Ganancia POS", "Ingreso POS", "Valor de bajas"
+  ]);
+  const cashTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
+    table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Conciliación de dinero"));
+  assert.ok(cashTable, "cash reconciliation remains present");
+  const cashLabels = Array.from(cashTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label"));
+  if (cashLabels.length) assert.deepEqual(cashLabels, ["Fecha", "Responsable", "Declarado", "Contado por dueño", "Diferencia", "Estado"]);
+  const adjustmentTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
+    table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Solicitudes de baja"));
+  assert.ok(adjustmentTable, "pending adjustment table remains present");
+  const reinvestmentTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
+    table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Reinversiones detalladas"));
+  if (reinvestmentTable) assert.deepEqual(
+    Array.from(reinvestmentTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label")),
+    ["Fecha", "Producto", "Cantidad", "Costo unitario", "Total", "Responsable / proveedor"]
+  );
+  const expenseTable = Array.from(host.querySelectorAll(".m33-book-subtable")).find((table) =>
+    table.closest(".m33-book-section")?.querySelector("h4")?.textContent.includes("Gastos"));
+  if (expenseTable) assert.deepEqual(
+    Array.from(expenseTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label")),
+    ["Fecha", "Concepto", "Importe", "Estado", "Responsable"]
+  );
+
+  const adjustmentLabels = Array.from(adjustmentTable.querySelectorAll("tbody td[data-label]")).map((cell) => cell.getAttribute("data-label"));
+  if (adjustmentLabels.length) assert.deepEqual(adjustmentLabels, ["Fecha", "Tipo", "Producto", "Cantidad", "Motivo", "Estado", "Responsable"]);
+  const style = window.document.getElementById("bc-m33-compact-sheet-css")?.textContent || "";
+  assert.match(style, /m33-book-scroll\{overflow:visible!important\}/);
+  assert.match(style, /\.m33-book-table tbody tr,\.m33-book-subtable tbody tr\{display:grid!important/);
+  assert.doesNotMatch(style, /min-width:1220px|min-width:1320px/);
+  assert.equal(calls.filter((call) => !["listar_usuarios_admin","bc7_obtener_inventario_jornada","bc7_movimientos_sesion","bc7_finanzas_jornada"].includes(call.name)).length, 0);
+});
