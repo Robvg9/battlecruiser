@@ -587,19 +587,28 @@
     if(!cut)return '<div class="bc7-empty">Aún no hay conteo confirmado.</div>';
     const lines=arr(cut.lineas);
     const sharedLines=new Map(arr(delivery&&delivery.lineas).map(x=>[String(x.producto_id),x]));
+    const accepted=!!delivery&&delivery.estado==='ACEPTADA';
     const sharedNote=delivery
-      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">La cantidad declarada permanece en el expediente original. La cantidad efectiva solo cambia cuando la recepción coincide o el dueño aprueba la diferencia.</p>'+
-        (delivery.estado==='ACEPTADA'?'<p class="bc7-note">Cantidad vigente compartida confirmada. La misma cantidad se muestra en el FINAL de origen y en el INITIAL de destino.</p>':
+      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">El expediente conserva el conteo declarado originalmente. La cantidad efectiva aprobada es el único saldo vigente y se muestra igual en el FINAL de origen y en el INITIAL de destino.</p>'+
+        (accepted?'<p class="bc7-note">Cantidad vigente compartida confirmada. Ambos expedientes muestran la misma existencia efectiva.</p>':
           '<p class="bc7-note">La cantidad efectiva todavía no está aceptada. No se puede operar en la jornada de destino.</p>')+
         '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Declarado</th><th>Recibido</th><th>Existencia efectiva</th></tr></thead><tbody>'+
         arr(delivery.lineas).map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td>'+esc(l.cantidad_recibida==null?'—':qty(l.cantidad_recibida))+'</td><td><b>'+esc(l.cantidad_efectiva==null?'Pendiente':qty(l.cantidad_efectiva))+'</b></td></tr>').join('')+
         '</tbody></table></div></div>'
       :'';
     return '<p class="bc7-muted">Confirmado '+esc(fmtDateHuman(cut.confirmado_en||cut.creado_en))+' · responsable '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
-      (cut.origen_corte_id?'<p class="bc7-muted">Este inventario inicial pertenece a la entrega compartida del FINAL anterior.</p>':'')+
+      (cut.origen_corte_id?'<p class="bc7-muted">Este inventario inicial pertenece a la entrega compartida del corte final anterior.</p>':'')+
       (cut.observacion?'<p class="bc7-muted">Nota: '+esc(cut.observacion)+'</p>':'')+
-      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Conteo registrado</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
-      lines.map(l=>{const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};const shared=sharedLines.get(String(l.producto_id));const d=Number(l.diferencia??Number(l.cantidad_contada)-Number(l.stock_sistema));return '<tr><td>'+esc(p.nombre||'Producto no identificado')+'</td><td>'+esc(qty(l.cantidad_contada))+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>'+(shared&&delivery.estado==='ACEPTADA'?'<tr class="bc7-shared-row"><td colspan="4">Existencia efectiva compartida: <b>'+esc(qty(shared.cantidad_efectiva))+'</b> · declarada: '+esc(qty(shared.cantidad_declarada))+' · recibida: '+esc(qty(shared.cantidad_recibida))+'</td></tr>':'');}).join('')+
+      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>'+(accepted?'Cantidad efectiva compartida':'Conteo registrado')+'</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
+      lines.map(l=>{
+        const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};
+        const shared=sharedLines.get(String(l.producto_id));
+        const hasEffective=accepted&&shared&&shared.cantidad_efectiva!=null;
+        const effective=hasEffective?Number(shared.cantidad_efectiva):Number(l.cantidad_contada);
+        const d=effective-Number(l.stock_sistema||0);
+        const audit=hasEffective?'<small>Declarado originalmente: '+esc(qty(shared.cantidad_declarada))+' · recibido físicamente: '+esc(qty(shared.cantidad_recibida))+'</small>':'';
+        return '<tr><td>'+esc(p.nombre||'Producto no identificado')+'</td><td><b>'+esc(qty(effective))+'</b>'+audit+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>';
+      }).join('')+
       '</tbody></table></div>'+sharedNote;
   }
 
@@ -662,7 +671,7 @@
     const opening=type==='INICIAL'?detail.apertura_previa:null;
     const openingLines=new Map(arr(opening&&opening.lineas).map(x=>[String(x.producto_id),x]));
     const openingNote=type==='INICIAL'
-      ?(opening?'<p class="bc7-note">Referencia del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se sugieren las cantidades del inventario final confirmado anterior. Debes volver a contar físicamente cada producto y confirmar este nuevo corte. El inventario del día anterior no se modifica.</p>'
+      ?(opening?'<p class="bc7-note">Corte final anterior del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se muestran las cantidades efectivas compartidas como referencia. Debes revisar y volver a contar físicamente cada producto antes de confirmar la recepción; una diferencia queda pendiente de decisión del dueño.</p>'
         :'<p class="bc7-note">No hay un inventario final confirmado del día inmediatamente anterior. Define el saldo inicial mediante conteo físico completo; no se copiará automáticamente el stock del sistema.</p>')
       :'';
     const table=products.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
