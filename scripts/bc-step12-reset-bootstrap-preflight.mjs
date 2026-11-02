@@ -229,6 +229,12 @@ async function clearLocalStorageObjects() {
   return paths.length;
 }
 
+function preservedTableFingerprint(table) {
+  const allowed = new Set(["categorias","permisos","presentaciones","roles","turno_configuracion","unidades"]);
+  assert(allowed.has(table),"STEP12_PRESERVED_TABLE_NOT_ALLOWLISTED");
+  const sql = `SELECT md5(COALESCE(string_agg(row_json,'' ORDER BY row_json),'')) FROM (SELECT to_jsonb(t)::text AS row_json FROM public."${table}" AS t) AS source;`;
+  return runPsql(["-c",sql],`STEP12_PRESERVED_FINGERPRINT_${table.toUpperCase()}`);
+}
 async function main() {
   requireLocalTarget();
   const storageObjectsRemoved = await clearLocalStorageObjects();
@@ -236,6 +242,27 @@ async function main() {
   const expectedPreserved = ["categorias","permisos","presentaciones","roles","turno_configuracion","unidades"];
   const expectedTableCount = Object.keys(manifest.public_rows || {}).length;
   assert(expectedTableCount === 61, "STEP12_SOURCE_MANIFEST_TABLE_COUNT_DRIFT");
+
+  const syntheticTag = crypto.randomUUID();
+  const syntheticWarehouse = `STEP12-SYNTHETIC-${syntheticTag}`;
+  const syntheticAuditSql = `
+    INSERT INTO public.almacenes(nombre,tipo) VALUES (${sqlLiteral(syntheticWarehouse)},'almacenamiento');
+    INSERT INTO public.auditoria_operaciones(usuario_nombre,tipo,descripcion,estado,entidad_id,payload_resumen)
+    VALUES
+      ('step12-synthetic','step12_synthetic_fixture','Synthetic reset rehearsal fixture 1','synthetic',${sqlLiteral(syntheticTag+"-1")},jsonb_build_object('fixture',${sqlLiteral(syntheticTag)},'ordinal',1)),
+      ('step12-synthetic','step12_synthetic_fixture','Synthetic reset rehearsal fixture 2','synthetic',${sqlLiteral(syntheticTag+"-2")},jsonb_build_object('fixture',${sqlLiteral(syntheticTag)},'ordinal',2)),
+      ('step12-synthetic','step12_synthetic_fixture','Synthetic reset rehearsal fixture 3','synthetic',${sqlLiteral(syntheticTag+"-3")},jsonb_build_object('fixture',${sqlLiteral(syntheticTag)},'ordinal',3));
+  `;
+  runPsql(["-c",syntheticAuditSql],"STEP12_SYNTHETIC_FIXTURE_SEED");
+  const syntheticAuthEmail = `bc-step12-fixture-${crypto.randomBytes(8).toString("hex")}@example.test`;
+  const syntheticAuthPassword = `Synthetic-${crypto.randomBytes(24).toString("base64url")}Aa1!`;
+  const syntheticAuthUserId = await createSyntheticAuthUser(syntheticAuthEmail,syntheticAuthPassword);
+  const syntheticCounts = lastJson(runPsql(["-c",
+    `SELECT jsonb_build_object('warehouses',(SELECT count(*) FROM public.almacenes WHERE nombre=${sqlLiteral(syntheticWarehouse)}),'audit_rows',(SELECT count(*) FROM public.auditoria_operaciones WHERE tipo='step12_synthetic_fixture' AND payload_resumen->>'fixture'=${sqlLiteral(syntheticTag)}),'auth_users',(SELECT count(*) FROM auth.users WHERE id=${sqlLiteral(syntheticAuthUserId)}::uuid AND raw_user_meta_data->>'bc_step12_synthetic_fixture'='true'))::text;`
+  ],"STEP12_SYNTHETIC_FIXTURE_VERIFY"),"STEP12_SYNTHETIC_FIXTURE_VERIFY");
+  assert(syntheticCounts.warehouses===1 && syntheticCounts.audit_rows===3 && syntheticCounts.auth_users===1,"STEP12_SYNTHETIC_FIXTURE_SEED_FAILED");
+  console.log("BC_STEP12_SYNTHETIC_FIXTURE=PASS; one operational warehouse, three audit rows, one synthetic Auth identity seeded in local clone");
+  const preservedFingerprintsBefore = Object.fromEntries(expectedPreserved.map(table=>[table,preservedTableFingerprint(table)]));
 
   const resetToken = crypto.randomBytes(32).toString("hex");
   const resetRequestId = crypto.randomUUID();
