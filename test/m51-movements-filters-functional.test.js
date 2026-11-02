@@ -59,12 +59,18 @@ function setup(t, fixtures = FIXTURES, pendingSummaryMove = null) {
     rpc: async (name, params) => {
       rpcCalls.push({ name, params: { ...params } });
       if (name !== "movimientos_producto") return { data: [], error: null };
-      const rows = fixtures.filter((row) =>
-        (!params.p_tipo || row.tipo === params.p_tipo) &&
-        (!params.p_almacen_id || row.almacen_id === params.p_almacen_id) &&
-        (!params.p_desde || row.fecha.slice(0, 10) >= params.p_desde) &&
-        (!params.p_hasta || row.fecha.slice(0, 10) <= params.p_hasta)
-      );
+      const rows = fixtures.filter((row) => {
+        const typeMatches = !params.p_tipo ||
+          (params.p_tipo === "movimiento_interno"
+            ? row.tipo === "transferencia_salida" || row.tipo === "transferencia_entrada"
+            : params.p_tipo === "baja"
+              ? row.tipo === "baja" || row.tipo === "merma"
+              : row.tipo === params.p_tipo);
+        return typeMatches &&
+          (!params.p_almacen_id || row.almacen_id === params.p_almacen_id) &&
+          (!params.p_desde || row.fecha.slice(0, 10) >= params.p_desde) &&
+          (!params.p_hasta || row.fecha.slice(0, 10) <= params.p_hasta);
+      });
       return { data: rows.map((row) => ({ ...row })), error: null };
     }
   };
@@ -87,23 +93,23 @@ test("Paso 4 movimientos: filtrar por tipo y almacén envía los parámetros cor
   assert.ok(await waitFor(() => visibleRows(window).length === 4),
     "la carga inicial debe pintar los cuatro movimientos fixture");
   window.document.getElementById("mov-filtro-almacen").value = "alm-1";
-  window.document.getElementById("mov-filtro-tipo").value = "venta";
+  window.document.getElementById("mov-filtro-tipo").value = "compra";
   window.document.getElementById("mov-refrescar-btn").click();
   assert.ok(await waitFor(() => visibleRows(window).length === 1),
     "tipo=venta y almacén Principal deben mostrar una sola fila");
   const latest = c.rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
-  assert.equal(latest.params.p_tipo, "venta");
+  assert.equal(latest.params.p_tipo, "compra");
   assert.equal(latest.params.p_almacen_id, "alm-1");
   assert.match(visibleRows(window)[0], /Agua/);
-  assert.match(visibleRows(window)[0], /Salida/);
+  assert.match(visibleRows(window)[0], /Compra/);
   assert.doesNotMatch(window.document.getElementById("mov-detalle").textContent, /Azúcar|Harina/);
 });
 
 test("Paso 4 movimientos: Limpiar restablece filtros y recupera la lista completa", async (t) => {
   const { window } = setup(t);
   assert.ok(await waitFor(() => visibleRows(window).length === 4));
-  window.document.getElementById("mov-filtro-almacen").value = "alm-2";
-  window.document.getElementById("mov-filtro-tipo").value = "venta";
+  window.document.getElementById("mov-filtro-almacen").value = "alm-1";
+  window.document.getElementById("mov-filtro-tipo").value = "compra";
   window.document.getElementById("mov-refrescar-btn").click();
   assert.ok(await waitFor(() => visibleRows(window).length === 1));
   window.document.getElementById("mov-limpiar-btn").click();
@@ -221,69 +227,48 @@ test("Paso 4 R9: navegación desde el resumen conserva el tipo y selecciona un v
     "debe seleccionar el vale por ID");
   assert.match(window.document.getElementById("mov-drawer-body").textContent, /vale-summary-001/);
   assert.match(window.document.getElementById("mov-drawer-body").textContent, /Azúcar/);
-  assert.equal(window.document.getElementById("mov-filtro-tipo").value, "vale");
+  assert.equal(window.document.getElementById("mov-filtro-tipo").value, "");
 });
 
 
-test("Paso 4 movimientos: el filtro Tipo distingue transferencias de entrada, salida y vales", async (t) => {
+test("Paso 4 movimientos: la Dependienta ve cuatro categorías operativas y no clasifica una transferencia como venta", async (t) => {
   const fixtures = [
-    ...FIXTURES,
-    {
-      producto: "Aceite",
-      usuario: "Dueño",
-      tipo: "transferencia_salida",
-      almacen: "Principal",
-      almacen_id: "alm-1",
-      operacion_id: "op-transfer-out-1",
-      fecha: "2026-10-21T16:00:00Z",
-      cantidad: -3,
-      costo_unitario: 4
-    },
-    {
-      producto: "Café",
-      usuario: "Dueño",
-      tipo: "transferencia_entrada",
-      almacen: "Reserva",
-      almacen_id: "alm-2",
-      operacion_id: "op-transfer-in-1",
-      fecha: "2026-10-22T16:00:00Z",
-      cantidad: 4,
-      costo_unitario: 5
-    }
+    { producto: "Aceite", usuario: "Dueño", tipo: "compra", almacen: "Principal", almacen_id: "alm-1", operacion_id: "op-compra-1", fecha: "2026-10-21T09:00:00Z", cantidad: 10, costo_unitario: 4 },
+    { producto: "Café", usuario: "Dueño", tipo: "reinversion", almacen: "Principal", almacen_id: "alm-1", operacion_id: "op-reinvest-1", fecha: "2026-10-21T10:00:00Z", cantidad: 3, costo_unitario: 5 },
+    { producto: "Malta", usuario: "Dueño", tipo: "baja", almacen: "Principal", almacen_id: "alm-1", operacion_id: "op-writeoff-1", fecha: "2026-10-21T11:00:00Z", cantidad: -2, costo_unitario: 2 },
+    { producto: "Azúcar", usuario: "Dueño", tipo: "transferencia_salida", almacen: "Principal", almacen_id: "alm-1", operacion_id: "op-transfer-1", fecha: "2026-10-21T12:00:00Z", cantidad: -4, costo_unitario: 3 },
+    { producto: "Azúcar", usuario: "Dueño", tipo: "transferencia_entrada", almacen: "Reserva", almacen_id: "alm-2", operacion_id: "op-transfer-1", fecha: "2026-10-21T12:00:00Z", cantidad: 4, costo_unitario: 3 },
+    { producto: "Leche", usuario: "Dueño", tipo: "venta", almacen: "Principal", almacen_id: "alm-1", operacion_id: "op-pos-legacy", fecha: "2026-10-21T13:00:00Z", cantidad: -1, costo_unitario: 2 },
+    { producto: "Harina", usuario: "Dueño", tipo: "vale", almacen: "Principal", almacen_id: "alm-1", operacion_id: "op-vale-legacy", fecha: "2026-10-21T14:00:00Z", cantidad: -1, costo_unitario: 1 }
   ];
   const { window, rpcCalls } = setup(t, fixtures);
-  assert.ok(await waitFor(() => visibleRows(window).length === fixtures.length),
-    "el historial debe cargar los movimientos fixture antes de filtrar");
-
+  assert.ok(await waitFor(() => visibleRows(window).length === fixtures.length));
   const tipoSelect = window.document.getElementById("mov-filtro-tipo");
   const availableTypes = Array.from(tipoSelect.options).map((option) => option.value);
-  for (const type of ["transferencia_salida", "transferencia_entrada", "vale"]) {
-    assert.ok(availableTypes.includes(type), "el selector debe ofrecer " + type);
-  }
+  assert.deepEqual(availableTypes, ["", "compra", "reinversion", "baja", "movimiento_interno"]);
+  assert.doesNotMatch(tipoSelect.textContent, /Venta|Vale|Transferencia de salida|Transferencia de entrada/);
 
-  const cases = [
-    { type: "transferencia_salida", product: "Aceite", excluded: ["Café", "Harina"] },
-    { type: "transferencia_entrada", product: "Café", excluded: ["Aceite", "Harina"] },
-    { type: "vale", product: "Harina", excluded: ["Aceite", "Café"] }
+  const scenarios = [
+    { type: "compra", expected: 1, product: "Aceite" },
+    { type: "reinversion", expected: 1, product: "Café" },
+    { type: "baja", expected: 1, product: "Malta" },
+    { type: "movimiento_interno", expected: 2, product: "Azúcar" }
   ];
-
-  for (const scenario of cases) {
+  for (const scenario of scenarios) {
     tipoSelect.value = scenario.type;
     window.document.getElementById("mov-refrescar-btn").click();
     assert.ok(await waitFor(() => {
       const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
-      const rows = visibleRows(window);
-      return latest?.params?.p_tipo === scenario.type &&
-        rows.length === 1 &&
-        rows[0].includes(scenario.product);
-    }), "el filtro " + scenario.type + " debe enviar el tipo y mostrar solo su fixture");
-
+      return latest?.params?.p_tipo === scenario.type && visibleRows(window).length === scenario.expected;
+    }), "el filtro " + scenario.type + " debe devolver las filas operativas esperadas");
     const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
     assert.equal(latest.params.p_tipo, scenario.type);
-    assert.equal(visibleRows(window).length, 1);
-    assert.match(visibleRows(window)[0], new RegExp(scenario.product));
-    for (const excluded of scenario.excluded) {
-      assert.doesNotMatch(window.document.getElementById("mov-detalle").textContent, new RegExp(excluded));
-    }
+    assert.ok(visibleRows(window).every(row => row.includes(scenario.product)));
   }
+  const summary = window.document.getElementById("mov-resumen-m51").textContent;
+  assert.match(summary, /Compras/);
+  assert.match(summary, /Reinversiones/);
+  assert.match(summary, /Bajas/);
+  assert.match(summary, /Movimientos internos/);
+  assert.doesNotMatch(summary, /Ventas/);
 });
