@@ -13,6 +13,10 @@ const FINANCE_READ_MIGRATION = fs.readFileSync(
   path.join(__dirname, "..", "supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql"),
   "utf8"
 );
+const SALES_MIGRATION = fs.readFileSync(
+  path.join(__dirname, "..", "supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql"),
+  "utf8"
+);
 const UI = fs.readFileSync(
   path.join(__dirname, "..", "public/js/bc7-jornada-ui.js"),
   "utf8"
@@ -69,8 +73,13 @@ test("Reinvestment preserves provider and serializes actor/key retries", () => {
   assert.match(fn,/v_s\.turno_id,p_idempotency_key/);
 });
 
-test("PostgreSQL 17 workflow applies the new finance/carry-forward migration and exercises its contract", () => {
+test("PostgreSQL 17 workflow applies the finance and Jornada sales migration and exercises the contract", () => {
   assert.match(PG_CI,/test\/step7-jornada-finanzas-fixture\.sql/);
+  assert.match(PG_CI,/supabase\/migrations\/20261102010000_step4_jornada_sales_provenance\.sql/);
+  assert.match(PG_CI,/bc7_registrar_venta_jornada/);
+  assert.match(PG_CI,/test\/step7-jornada-finanzas-contract\.sql/);
+  assert.match(PG_WORKFLOW,/supabase\/migrations\/20261102010000_step4_jornada_sales_provenance\.sql/);
+  assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-contract\.sql/);
   assert.match(PG_CI,/supabase\/migrations\/20261031010121_step7_jornada_finanzas_carryforward\.sql/);
   assert.match(PG_CI,/supabase\/migrations\/20261101154629_step4_assigned_jornada_finance_read\.sql/);
   assert.match(PG_CI,/test\/step7-jornada-finanzas-contract\.sql/);
@@ -78,6 +87,27 @@ test("PostgreSQL 17 workflow applies the new finance/carry-forward migration and
   assert.match(PG_WORKFLOW,/supabase\/migrations\/20261101154629_step4_assigned_jornada_finance_read\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-fixture\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-contract\.sql/);
+});
+
+test("Jornada POS records exact session/tranche and payment method without backfilling legacy sales", () => {
+  assert.match(SALES_MIGRATION, /ADD COLUMN IF NOT EXISTS turno_sesion_id uuid/);
+  assert.match(SALES_MIGRATION, /ADD COLUMN IF NOT EXISTS turno_tramo_id uuid/);
+  assert.match(SALES_MIGRATION, /ADD COLUMN IF NOT EXISTS metodo_pago text NOT NULL DEFAULT 'NO_DECLARADO'/);
+  assert.match(SALES_MIGRATION, /ventas_jornada_link_pair_chk/);
+  assert.match(SALES_MIGRATION, /ventas_actor_idempotency_uidx/);
+  assert.match(SALES_MIGRATION, /bc7_validar_tramo_responsable_jornada\(p_turno_sesion_id\)/);
+  assert.match(SALES_MIGRATION, /v_t\.id IS DISTINCT FROM p_turno_tramo_id/);
+  assert.match(SALES_MIGRATION, /v_s\.bloque<>'JORNADA'/);
+  assert.match(SALES_MIGRATION, /p_metodo_pago NOT IN \('EFECTIVO','TRANSFERENCIA','TARJETA','OTRO'\)/);
+  assert.match(SALES_MIGRATION, /idempotency_payload_hash/);
+  assert.match(SALES_MIGRATION, /pg_advisory_xact_lock/);
+  assert.match(SALES_MIGRATION, /public\.registrar_venta\(v_s\.almacen_id,p_lineas,gen_random_uuid\(\),v_tipo_precio\)/);
+  assert.match(SALES_MIGRATION, /WHERE v\.turno_sesion_id=v_s\.id/);
+  assert.match(SALES_MIGRATION, /GRANT EXECUTE ON FUNCTION public\.bc7_registrar_venta_jornada/);
+  assert.match(SALES_MIGRATION, /GRANT EXECUTE ON FUNCTION public\.bc7_ventas_jornada/);
+  assert.doesNotMatch(SALES_MIGRATION, /UPDATE\s+public\.ventas\s+SET\s+turno_sesion_id/i,
+    "the migration must not backfill or relink historical sales");
+  assert.doesNotMatch(SALES_MIGRATION, /\bDELETE\s+FROM\s+public\.ventas\b|\bTRUNCATE\s+public\.ventas\b/i);
 });
 
 test("assigned responsible can read the full finance ledger for their own jornada only", () => {
