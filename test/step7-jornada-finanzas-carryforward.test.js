@@ -21,6 +21,10 @@ const UI = fs.readFileSync(
   path.join(__dirname, "..", "public/js/bc7-jornada-ui.js"),
   "utf8"
 );
+const FINANCE_CONTRACT = fs.readFileSync(
+  path.join(__dirname, "..", "test/step7-jornada-finanzas-contract.sql"),
+  "utf8"
+);
 const PG_CI = fs.readFileSync(
   path.join(__dirname, "..", "test/step7-jornada-postgres-windows-ci.js"),
   "utf8"
@@ -76,7 +80,7 @@ test("Reinvestment preserves provider and serializes actor/key retries", () => {
 test("PostgreSQL 17 workflow applies the finance and Jornada sales migration and exercises the contract", () => {
   assert.match(PG_CI,/test\/step7-jornada-finanzas-fixture\.sql/);
   assert.match(PG_CI,/supabase\/migrations\/20261102010000_step4_jornada_sales_provenance\.sql/);
-  assert.match(PG_CI,/bc7_registrar_venta_jornada/);
+  assert.match(FINANCE_CONTRACT,/bc7_registrar_venta_jornada/);
   assert.match(PG_CI,/test\/step7-jornada-finanzas-contract\.sql/);
   assert.match(PG_WORKFLOW,/supabase\/migrations\/20261102010000_step4_jornada_sales_provenance\.sql/);
   assert.match(PG_WORKFLOW,/test\/step7-jornada-finanzas-contract\.sql/);
