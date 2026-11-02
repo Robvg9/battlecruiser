@@ -324,7 +324,7 @@ BEGIN
     PERFORM public.bc7_estado_entrega_inventario_jornada(v_day2);
   EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
   END;
-  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unassigned worker read another day's handover'; END IF;
+  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: unassigned worker read another day''s handover'; END IF;
 
   RAISE NOTICE 'PASS Step 4 shared inventory: single effective quantity, owner approval/rejection, idempotent receipt, automatic equality, retry history, next-session reuse, stock isolation, legacy recovery and ACLs';
 END
