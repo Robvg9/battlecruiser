@@ -81,7 +81,10 @@ CREATE TABLE public.turno_declaraciones (
   usuario_id uuid NOT NULL REFERENCES auth.users(id),
   monto numeric NOT NULL, moneda text NOT NULL DEFAULT 'CUP',
   declarado_at timestamptz NOT NULL DEFAULT now(), created_at timestamptz NOT NULL DEFAULT now(),
-  estado_aprobacion text DEFAULT 'PENDIENTE', aprobado_por uuid, aprobado_at timestamptz
+  estado_aprobacion text DEFAULT 'PENDIENTE',
+  monto_contado numeric, contado_por uuid, contado_at timestamptz,
+  observacion_conteo text, diferencia numeric,
+  aprobado_por uuid, aprobado_at timestamptz
 );
 
 CREATE OR REPLACE FUNCTION public.bc_cerrar_turno_sesion(p_turno_sesion_id uuid)

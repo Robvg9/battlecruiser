@@ -18,6 +18,8 @@ DECLARE
   v_final_id uuid;
   v_initial_id uuid;
   v_tramo uuid;
+  v_declaration_id uuid;
+  v_cash_data jsonb;
   v_sale uuid;
   v_sale_retry uuid;
   v_sales_data jsonb;
@@ -101,6 +103,33 @@ BEGIN
   SELECT id INTO v_tramo FROM public.turno_tramos
   WHERE turno_sesion_id=v_day2 AND estado='ACTIVO' AND usuario_id=v_owner;
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: Day 2 did not open an active owner tranche'; END IF;
+
+  -- Exercise the exact cash read model used by the owner/responsible Jornada workspace.
+  -- The declaration and owner count are fixture-only; no production cash rows are touched.
+  INSERT INTO public.turno_declaraciones(
+    turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,estado_aprobacion
+  ) VALUES(
+    v_turno,v_day2,v_tramo,v_owner,100,'CUP','ESPERANDO_APROBACION'
+  ) RETURNING id INTO v_declaration_id;
+  UPDATE public.turno_declaraciones
+  SET monto_contado=90,
+      contado_por=v_owner,
+      contado_at=now(),
+      observacion_conteo='Owner count fixture',
+      diferencia=-10,
+      estado_aprobacion='CON_DIFERENCIA'
+  WHERE id=v_declaration_id;
+  v_cash_data:=public.bc7_obtener_inventario_jornada(v_day2);
+  IF v_cash_data->'declaracion_dinero'->>'id' IS DISTINCT FROM v_declaration_id::text
+     OR (v_cash_data->'declaracion_dinero'->>'monto')::numeric<>100
+     OR (v_cash_data->'declaracion_dinero'->>'monto_contado')::numeric<>90
+     OR (v_cash_data->'declaracion_dinero'->>'diferencia')::numeric<>-10
+     OR v_cash_data->'declaracion_dinero'->>'estado_aprobacion'<>'CON_DIFERENCIA'
+     OR (v_cash_data->'declaracion_dinero'->>'contado_por')::uuid IS DISTINCT FROM v_owner
+     OR v_cash_data->'declaracion_dinero'->>'observacion_conteo'<>'Owner count fixture'
+     OR v_cash_data->'declaracion_dinero'->>'contado_at' IS NULL THEN
+    RAISE EXCEPTION 'FAIL: Jornada inventory readback omitted owner counted cash, difference or count metadata';
+  END IF;
 
   -- New Jornada POS sales persist the exact active session/tranche and payment method.
   -- The same external idempotency key must never duplicate a sale or change its attribution.

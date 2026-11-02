@@ -7,6 +7,7 @@ on:
       - 'supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql'
       - 'supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql'
       - 'supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql'
+      - 'supabase/migrations/20261102020000_step4_jornada_cash_count_readback.sql'
       - 'public/js/bc7-jornada-ui.js'
       - 'public/js/ventas.js'
       - 'public/js/offline.js'

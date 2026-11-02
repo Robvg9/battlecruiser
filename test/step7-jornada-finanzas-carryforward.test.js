@@ -17,6 +17,10 @@ const SALES_MIGRATION = fs.readFileSync(
   path.join(__dirname, "..", "supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql"),
   "utf8"
 );
+const CASH_READBACK_MIGRATION = fs.readFileSync(
+  path.join(__dirname, "..", "supabase/migrations/20261102020000_step4_jornada_cash_count_readback.sql"),
+  "utf8"
+);
 const UI = fs.readFileSync(
   path.join(__dirname, "..", "public/js/bc7-jornada-ui.js"),
   "utf8"
@@ -115,6 +119,19 @@ test("Jornada POS records exact session/tranche and payment method without backf
   assert.match(SALES_MIGRATION, /UPDATE public\.ventas[\s\S]*WHERE id=v_venta_id AND creado_por=v_uid/,
     "only the sale just created in the current transaction may receive its session provenance");
   assert.doesNotMatch(SALES_MIGRATION, /\bDELETE\s+FROM\s+public\.ventas\b|\bTRUNCATE\s+public\.ventas\b/i);
+});
+
+test("Jornada read model returns owner-counted cash fields without writing declaration rows", () => {
+  assert.match(CASH_READBACK_MIGRATION, /CREATE OR REPLACE FUNCTION public\.bc7_obtener_inventario_jornada/);
+  for (const field of ["monto_contado","contado_por","contado_at","observacion_conteo","diferencia","aprobado_por","aprobado_at"]) {
+    assert.ok(CASH_READBACK_MIGRATION.includes("'"+field+"'"),"missing readback field "+field);
+  }
+  assert.match(CASH_READBACK_MIGRATION, /tiene_permiso\('turnos','ver'\)/);
+  assert.match(CASH_READBACK_MIGRATION, /turno_asignaciones a/);
+  assert.doesNotMatch(CASH_READBACK_MIGRATION, /\bINSERT\s+INTO\s+public\.turno_declaraciones\b|\bUPDATE\s+public\.turno_declaraciones\b|\bDELETE\s+FROM\s+public\.turno_declaraciones\b/i);
+  assert.match(FINANCE_CONTRACT, /Jornada inventory readback omitted owner counted cash/);
+  assert.match(PG_CI, /supabase\/migrations\/20261102020000_step4_jornada_cash_count_readback\.sql/);
+  assert.ok(PG_WORKFLOW.includes("supabase/migrations/20261102020000_step4_jornada_cash_count_readback.sql"));
 });
 
 test("assigned responsible can read the full finance ledger for their own jornada only", () => {
