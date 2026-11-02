@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.56 — categorías operativas de movimientos y reinversiones en historial
+// v9.5.56 — ventas Jornada ligadas a sesión, tramo y método de pago; además, categorías operativas de movimientos y reinversiones
 (function hotfixV9475(){
   const VERSION="9.5.56";
   window.__BC_VERSION__=VERSION;
