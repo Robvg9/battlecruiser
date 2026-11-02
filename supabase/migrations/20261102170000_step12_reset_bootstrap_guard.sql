@@ -8,7 +8,7 @@ GRANT USAGE ON SCHEMA private TO service_role;
 
 CREATE TABLE IF NOT EXISTS private.bc_reset_gate (
   singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
-  token_hash bytea NOT NULL CHECK (octet_length(token_hash) = 32),
+  token_hash bytea CHECK (token_hash IS NULL OR octet_length(token_hash) = 32),
   expires_at timestamptz NOT NULL,
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   max_attempts integer NOT NULL DEFAULT 5 CHECK (max_attempts BETWEEN 1 AND 10),
@@ -189,7 +189,7 @@ BEGIN
 
   SELECT array_agg(x ORDER BY x) INTO v_expected
   FROM unnest(v_wipe || v_preserve) AS x;
-  SELECT array_agg(tablename ORDER BY tablename) INTO v_actual
+  SELECT array_agg(tablename::text ORDER BY tablename) INTO v_actual
   FROM pg_tables WHERE schemaname = 'public';
   IF v_actual IS DISTINCT FROM v_expected THEN
     RETURN jsonb_build_object('ok',false,'code','public_schema_drift',
