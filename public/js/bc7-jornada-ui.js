@@ -753,7 +753,7 @@
     const sessionId=form.dataset.bc7ReceiveForm;
     const inputs=Array.from(form.querySelectorAll('[data-bc7-receive-count]'));
     const lines=inputs.map(i=>({producto_id:i.dataset.bc7ReceiveCount,cantidad:i.value.trim()}));
-    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\\d+(?:\\.\\d{1,3})?$/.test(x.cantidad));
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
     const msgEl=form.querySelector('[data-bc7-receive-msg]');
     if(bad){msg(msgEl,'Cuenta todos los productos y usa cantidades válidas con hasta 3 decimales.','error');return;}
     if(!confirm('Vas a registrar el conteo físico recibido. Si coincide con lo declarado, se comparte automáticamente. Si difiere, la jornada quedará bloqueada hasta la decisión del dueño. ¿Confirmas el conteo real?'))return;
@@ -777,7 +777,7 @@
     const sessionId=form.dataset.bc7LegacyInitialForm;
     const inputs=Array.from(form.querySelectorAll('[data-bc7-legacy-count]'));
     const lines=inputs.map(i=>({producto_id:i.dataset.bc7LegacyCount,cantidad:i.value.trim()}));
-    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\\d+(?:\\.\\d{1,3})?$/.test(x.cantidad));
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
     const reason=form.querySelector('[data-bc7-legacy-reason]')?.value.trim()||'';
     const msgEl=form.querySelector('[data-bc7-legacy-msg]');
     if(bad||!reason){msg(msgEl,'Completa el conteo físico de todos los productos y el motivo de regularización.','error');return;}
