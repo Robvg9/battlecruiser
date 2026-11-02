@@ -248,6 +248,13 @@ test("Paso 4 movimientos: la Dependienta ve cuatro categorías operativas y no c
   assert.deepEqual(availableTypes, ["", "compra", "reinversion", "baja", "movimiento_interno"]);
   assert.doesNotMatch(tipoSelect.textContent, /Venta|Vale|Transferencia de salida|Transferencia de entrada/);
 
+  const initialSummary = window.document.getElementById("mov-resumen-m51").textContent;
+  assert.match(initialSummary, /Compras/);
+  assert.match(initialSummary, /Reinversiones/);
+  assert.match(initialSummary, /Bajas/);
+  assert.match(initialSummary, /Movimientos internos/);
+  assert.doesNotMatch(initialSummary, /Ventas/);
+
   const scenarios = [
     { type: "compra", expected: 1, product: "Aceite" },
     { type: "reinversion", expected: 1, product: "Café" },
@@ -265,10 +272,11 @@ test("Paso 4 movimientos: la Dependienta ve cuatro categorías operativas y no c
     assert.equal(latest.params.p_tipo, scenario.type);
     assert.ok(visibleRows(window).every(row => row.includes(scenario.product)));
   }
-  const summary = window.document.getElementById("mov-resumen-m51").textContent;
-  assert.match(summary, /Compras/);
-  assert.match(summary, /Reinversiones/);
-  assert.match(summary, /Bajas/);
-  assert.match(summary, /Movimientos internos/);
-  assert.doesNotMatch(summary, /Ventas/);
+  const transferCard = window.document.querySelector("#mov-detalle .bc-m51-card");
+  assert.ok(transferCard, "el filtro interno debe dejar una transferencia visible");
+  transferCard.click();
+  const drawer = window.document.getElementById("mov-drawer-body").textContent;
+  assert.match(drawer, /Movimiento interno/);
+  assert.match(drawer, /Dirección/);
+  assert.match(drawer, /Entrada|Salida/);
 });
