@@ -183,7 +183,8 @@ test("Paso 4 RWHT 019/021: guardar edición envía el ID y la categoría exactos
       p_precio_mayorista: null
     }
   });
-  assert.match(c.document.getElementById("msg-productos").textContent, /Producto actualizado/i);
+  assert.ok(await waitFor(() => /Producto actualizado/i.test(c.document.getElementById("msg-productos").textContent)),
+    "la UI debe terminar la actualización, comunicar el éxito y limpiar el estado");
   assert.equal(c.document.getElementById("prod-editando-id").value, "");
   assert.equal(c.refreshCount, 1);
 });
@@ -238,6 +239,8 @@ test("Paso 4 RWHT 026: quitar imagen guardada envía null para el producto en ed
       p_imagen_url: null
     }
   });
+  assert.ok(await waitFor(() => /Imagen quitada/i.test(c.document.getElementById("msg-prod-imagen").textContent)),
+    "la UI debe terminar la eliminación y confirmar el resultado");
   assert.equal(c.document.getElementById("prod-imagen-preview").dataset.guardada, "false");
   assert.equal(c.document.getElementById("prod-imagen-preview-wrap").classList.contains("hidden"), true);
   assert.match(c.document.getElementById("msg-prod-imagen").textContent, /Imagen quitada/i);
