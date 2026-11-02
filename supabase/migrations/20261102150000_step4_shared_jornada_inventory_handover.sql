@@ -105,6 +105,8 @@ BEGIN
     AND s.bloque='JORNADA'
     AND s.jornada_programacion_id IS NOT NULL
     AND s.estado IN ('PENDIENTE','PROGRAMADA')
+    AND NOT EXISTS (SELECT 1 FROM public.turno_jornada_inventario_cortes c
+      WHERE c.turno_sesion_id=s.id AND c.tipo='INICIAL')
   ORDER BY s.created_at,s.id
   LIMIT 1;
 
@@ -146,8 +148,9 @@ END;
 $function$;
 
 DROP TRIGGER IF EXISTS bc7_preparar_entrega_inventario_jornada ON public.turno_jornada_inventario_cortes;
-CREATE TRIGGER bc7_preparar_entrega_inventario_jornada
+CREATE CONSTRAINT TRIGGER bc7_preparar_entrega_inventario_jornada
 AFTER INSERT ON public.turno_jornada_inventario_cortes
+DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION public.bc7_preparar_entrega_inventario_jornada();
 
 -- A manually linked destination must be the already scheduled next JORNADA, never a duplicate.
@@ -650,14 +653,18 @@ DECLARE
   v_in uuid;
   v_unlinked uuid;
 BEGIN
-  IF auth.uid() IS NULL OR NOT public.tiene_permiso('turnos','ver') THEN
-    RAISE EXCEPTION 'Se requiere permiso para consultar el inventario de jornada.' USING ERRCODE='42501';
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
   END IF;
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Jornada no encontrada.' USING ERRCODE='23503'; END IF;
+  v_admin:=public.bc_actor_is_admin();
+  IF NOT v_admin AND NOT public.tiene_permiso('turnos','ver') THEN
+    RAISE EXCEPTION 'Se requiere permiso para consultar el inventario de jornada.' USING ERRCODE='42501';
+  END IF;
   IF NOT FOUND OR v_s.bloque<>'JORNADA' THEN
     RAISE EXCEPTION 'Jornada no encontrada.' USING ERRCODE='23503';
   END IF;
-  v_admin:=public.bc_actor_is_admin();
   IF NOT v_admin AND NOT EXISTS (
     SELECT 1 FROM public.turno_asignaciones a
     WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
