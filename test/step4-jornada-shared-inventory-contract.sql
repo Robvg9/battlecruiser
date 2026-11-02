@@ -70,6 +70,11 @@ BEGIN
       jsonb_build_object('producto_id',v_jugo,'cantidad',6)
     ),'Shared handover Day 2 fixture');
   IF v_result->>'estado'<>'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: Day 2 FINAL not confirmed'; END IF;
+  -- A retry may return an already-confirmed FINAL. Touching that immutable snapshot
+  -- must still repair/prepare its one handover without creating another snapshot.
+  UPDATE public.turno_jornada_inventario_cortes
+  SET observacion=observacion
+  WHERE turno_sesion_id=v_day2 AND tipo='FINAL' AND estado='CONFIRMADO';
   SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada IMMEDIATE;
   SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada DEFERRED;
 
