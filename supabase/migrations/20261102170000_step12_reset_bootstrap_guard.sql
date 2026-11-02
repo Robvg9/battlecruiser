@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS private.bc_reset_operations (
 
 CREATE TABLE IF NOT EXISTS private.bc_bootstrap_gate (
   singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
-  token_hash bytea NOT NULL CHECK (octet_length(token_hash) = 32),
+  token_hash bytea CHECK (token_hash IS NULL OR octet_length(token_hash) = 32),
   expires_at timestamptz NOT NULL,
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   max_attempts integer NOT NULL DEFAULT 5 CHECK (max_attempts BETWEEN 1 AND 10),
@@ -316,36 +316,32 @@ BEGIN
   IF v_gate.expires_at <= clock_timestamp() THEN
     RETURN jsonb_build_object('ok',false,'code','bootstrap_gate_expired');
   END IF;
-  IF v_gate.attempts >= v_gate.max_attempts THEN
-    RETURN jsonb_build_object('ok',false,'code','bootstrap_locked');
-  END IF;
   IF p_token IS NULL OR p_token='' OR
      extensions.digest(p_token,'sha256') IS DISTINCT FROM v_gate.token_hash THEN
-    UPDATE private.bc_bootstrap_gate
-       SET attempts=attempts+1,updated_at=now()
-     WHERE singleton=true
-     RETURNING attempts,max_attempts INTO v_attempts,v_max;
+    UPDATE private.bc_bootstrap_gate SET attempts=attempts+1,updated_at=now()
+     WHERE singleton=true RETURNING attempts,max_attempts INTO v_attempts,v_max;
     RETURN jsonb_build_object('ok',false,'code','bootstrap_authorization_failed',
       'attempts_remaining',GREATEST(0,v_max-v_attempts));
   END IF;
 
+  -- A retry with the same idempotency key may resume an Auth identity created
+  -- just before a network interruption. It consumes no additional attempt.
+  IF v_gate.claim_request_id=p_request_id THEN
+    UPDATE private.bc_bootstrap_gate SET claim_expires_at=now()+interval '15 minutes',updated_at=now()
+     WHERE singleton=true;
+    RETURN jsonb_build_object('ok',true,'claimed',true,'replayed',true,'request_id',p_request_id);
+  END IF;
+  IF v_gate.attempts >= v_gate.max_attempts THEN
+    RETURN jsonb_build_object('ok',false,'code','bootstrap_locked');
+  END IF;
+  IF v_gate.claim_request_id IS NOT NULL AND v_gate.claim_expires_at > now() THEN
+    RETURN jsonb_build_object('ok',false,'code','bootstrap_in_progress');
+  END IF;
+  -- Expired claims with an Auth identity require operator recovery; do not
+  -- silently create a second identity or guess which account to preserve.
   IF EXISTS(SELECT 1 FROM public.usuarios) OR EXISTS(SELECT 1 FROM auth.users) THEN
     RETURN jsonb_build_object('ok',false,'code','bootstrap_requires_empty_auth');
   END IF;
-
-  IF v_gate.claim_request_id IS NOT NULL THEN
-    IF v_gate.claim_request_id=p_request_id THEN
-      UPDATE private.bc_bootstrap_gate
-         SET claim_expires_at=now()+interval '15 minutes',updated_at=now()
-       WHERE singleton=true;
-      RETURN jsonb_build_object('ok',true,'claimed',true,'replayed',true,
-        'request_id',p_request_id);
-    END IF;
-    IF v_gate.claim_expires_at > now() THEN
-      RETURN jsonb_build_object('ok',false,'code','bootstrap_in_progress');
-    END IF;
-  END IF;
-
   UPDATE private.bc_bootstrap_gate
      SET attempts=attempts+1,claim_request_id=p_request_id,
          claim_expires_at=now()+interval '15 minutes',updated_at=now()
