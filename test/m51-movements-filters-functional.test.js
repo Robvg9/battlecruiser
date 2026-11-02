@@ -223,3 +223,67 @@ test("Paso 4 R9: navegación desde el resumen conserva el tipo y selecciona un v
   assert.match(window.document.getElementById("mov-drawer-body").textContent, /Azúcar/);
   assert.equal(window.document.getElementById("mov-filtro-tipo").value, "vale");
 });
+
+
+test("Paso 4 movimientos: el filtro Tipo distingue transferencias de entrada, salida y vales", async (t) => {
+  const fixtures = [
+    ...FIXTURES,
+    {
+      producto: "Aceite",
+      usuario: "Dueño",
+      tipo: "transferencia_salida",
+      almacen: "Principal",
+      almacen_id: "alm-1",
+      operacion_id: "op-transfer-out-1",
+      fecha: "2026-10-21T16:00:00Z",
+      cantidad: -3,
+      costo_unitario: 4
+    },
+    {
+      producto: "Café",
+      usuario: "Dueño",
+      tipo: "transferencia_entrada",
+      almacen: "Reserva",
+      almacen_id: "alm-2",
+      operacion_id: "op-transfer-in-1",
+      fecha: "2026-10-22T16:00:00Z",
+      cantidad: 4,
+      costo_unitario: 5
+    }
+  ];
+  const { window, rpcCalls } = setup(t, fixtures);
+  assert.ok(await waitFor(() => visibleRows(window).length === fixtures.length),
+    "el historial debe cargar los movimientos fixture antes de filtrar");
+
+  const tipoSelect = window.document.getElementById("mov-filtro-tipo");
+  const availableTypes = Array.from(tipoSelect.options).map((option) => option.value);
+  for (const type of ["transferencia_salida", "transferencia_entrada", "vale"]) {
+    assert.ok(availableTypes.includes(type), "el selector debe ofrecer " + type);
+  }
+
+  const cases = [
+    { type: "transferencia_salida", product: "Aceite", excluded: ["Café", "Harina"] },
+    { type: "transferencia_entrada", product: "Café", excluded: ["Aceite", "Harina"] },
+    { type: "vale", product: "Harina", excluded: ["Aceite", "Café"] }
+  ];
+
+  for (const scenario of cases) {
+    tipoSelect.value = scenario.type;
+    window.document.getElementById("mov-refrescar-btn").click();
+    assert.ok(await waitFor(() => {
+      const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
+      const rows = visibleRows(window);
+      return latest?.params?.p_tipo === scenario.type &&
+        rows.length === 1 &&
+        rows[0].includes(scenario.product);
+    }), "el filtro " + scenario.type + " debe enviar el tipo y mostrar solo su fixture");
+
+    const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
+    assert.equal(latest.params.p_tipo, scenario.type);
+    assert.equal(visibleRows(window).length, 1);
+    assert.match(visibleRows(window)[0], new RegExp(scenario.product));
+    for (const excluded of scenario.excluded) {
+      assert.doesNotMatch(window.document.getElementById("mov-detalle").textContent, new RegExp(excluded));
+    }
+  }
+});
