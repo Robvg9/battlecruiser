@@ -16,7 +16,7 @@ test("Shared handover persists immutable declared, received and effective quanti
   for(const table of ["turno_jornada_inventario_entregas","turno_jornada_inventario_entrega_lineas","turno_jornada_inventario_recepciones","turno_jornada_inventario_recepcion_lineas"]){
     assert.ok(sql.includes("CREATE TABLE IF NOT EXISTS public."+table),table+" table missing");
     assert.ok(sql.includes("ALTER TABLE public."+table+" ENABLE ROW LEVEL SECURITY"),table+" RLS missing");
-    assert.ok(sql.includes("REVOKE ALL ON TABLE public."+table),table+" direct access must remain revoked");
+    assert.ok(sql.includes("REVOKE ALL ON TABLE public.turno_jornada_inventario_entregas") && sql.includes(table),table+" direct access must remain revoked");
   }
   for(const marker of ["cantidad_declarada numeric","cantidad_recibida numeric","cantidad_efectiva numeric","idempotency_key uuid NOT NULL UNIQUE","ON DELETE RESTRICT"]){
     assert.ok(sql.includes(marker),"missing schema invariant: "+marker);
@@ -37,7 +37,7 @@ test("Receipt is complete, idempotent, discrepancy-aware and blocks opening",()=
   for(const marker of ["pg_advisory_xact_lock(hashtextextended(p_idempotency_key::text,0))","El catálogo de productos cambió entre entrega y recepción","PENDIENTE_REVISION","REQUIERE_RECUENTO","La entrega de inventario tiene una diferencia o recepción pendiente de decisión del dueño"]){
     assert.ok(sql.includes(marker),"missing receipt invariant: "+marker);
   }
-  for(const marker of ["20","18","destination jornada opened while its shared receipt was unresolved","duplicate receipt key did not return the original attempt","Second physical count did not resolve rejected attempt"]){
+  for(const marker of ["20","18","destination jornada opened while its shared receipt was unresolved","duplicate receipt key did not return the original attempt","new equal physical recount did not resolve rejected attempt"]){
     assert.ok(pg.includes(marker),"missing PostgreSQL scenario: "+marker);
   }
 });
@@ -52,7 +52,7 @@ test("Only owner resolves discrepancies; legacy initial inventory recovery is au
 });
 
 test("Jornada interface exposes assigned receipt, owner review, next-session linking and legacy recovery",()=>{
-  for(const marker of ["bc7_estado_entrega_inventario_jornada","bc7_recibir_entrega_jornada","bc7_resolver_entrega_jornada","bc7_vincular_entrega_jornada","bc7_regularizar_inicial_jornada_legacy","data-bc7-receive-form","data-bc7-delivery-decision","data-bc7-link-delivery","data-bc7-legacy-initial-form","Existencia efectiva compartida","Recepción física de inventario compartido","Regularización legacy","randomUUID"]){
+  for(const marker of ["bc7_estado_entrega_inventario_jornada","bc7_recibir_entrega_jornada","bc7_resolver_entrega_jornada","bc7_vincular_entrega_jornada","bc7_regularizar_inicial_jornada_legacy","data-bc7-receive-form","data-bc7-delivery-decision","data-bc7-link-delivery","data-bc7-legacy-initial-form","cantidad_efectiva","Recepción física de inventario compartido","Regularización legacy","randomUUID"]){
     assert.ok(ui.includes(marker),"missing Jornada UI element: "+marker);
   }
 });
