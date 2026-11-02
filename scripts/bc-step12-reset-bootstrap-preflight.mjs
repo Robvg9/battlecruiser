@@ -143,26 +143,63 @@ function sqlLiteral(value) {
   return "'" + String(value).replaceAll("'", "''") + "'";
 }
 
-async function createLocalAuthUser(email, password, requestId) {
+async function createSyntheticAuthUser(email, password) {
   const response = await fetch(`${apiUrl}/auth/v1/admin/users`, {
     method: "POST",
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email, password, email_confirm: true,
-      user_metadata: { username: "Administrador de prueba", bc_bootstrap_request_id: requestId },
-    }),
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { bc_step12_synthetic_fixture: true } }),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.id) {
-    throw new Error(`STEP12_LOCAL_AUTH_CREATE=FAIL; HTTP ${response.status}; no response body persisted`);
-  }
+  if (!response.ok || !data.id) throw new Error(`STEP12_SYNTHETIC_AUTH_CREATE=FAIL; HTTP ${response.status}`);
   return data.id;
 }
 
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function startLocalBootstrapEdge(token) {
+  const entry = path.join(workspace,"supabase","functions","bc-bootstrap-admin","index.ts");
+  if (!fs.existsSync(entry)) throw new Error("STEP12_BOOTSTRAP_EDGE_FILE_MISSING");
+  const edgeEnv = {
+    PATH: process.env.PATH || "",
+    HOME: process.env.HOME || "",
+    SUPABASE_URL: apiUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceKey,
+    BC_BOOTSTRAP_TOKEN: token,
+  };
+  if (process.env.DENO_DIR) edgeEnv.DENO_DIR = process.env.DENO_DIR;
+  const child = spawn("deno",["run","--allow-net","--allow-env","--allow-read",entry],{
+    env: edgeEnv, stdio: ["ignore","ignore","pipe"], windowsHide: true
+  });
+  let stderr = "";
+  child.stderr.on("data",chunk => { stderr += String(chunk); });
+  child.on("error",error => { stderr += String(error?.message || error); });
+  const probeUrl = "http://127.0.0.1:8000/";
+  for (let i=0;i<120;i++) {
+    if (child.exitCode !== null || child.signalCode !== null) break;
+    try {
+      const probe = await fetch(probeUrl,{method:"OPTIONS",headers:{origin:"https://battlecruiser.robvg9.workers.dev"}});
+      if (probe.status === 204) return child;
+    } catch {}
+    await delay(250);
+  }
+  if (child.exitCode === null && child.signalCode === null) child.kill("SIGTERM");
+  throw new Error("STEP12_BOOTSTRAP_EDGE_START=FAIL; local Deno endpoint did not become ready");
+}
+
+async function stopLocalBootstrapEdge(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  child.kill("SIGTERM");
+  await Promise.race([new Promise(resolve=>child.once("exit",resolve)),delay(3000)]);
+  if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+}
+
+async function callLocalBootstrapEdge(token, body, origin = "https://battlecruiser.robvg9.workers.dev") {
+  return fetch("http://127.0.0.1:8000/",{
+    method:"POST",
+    headers:{origin,"Content-Type":"application/json","x-bc-bootstrap-token":token},
+    body:JSON.stringify(body),
+  });
+}
 function applyMigration() {
   requireLocalTarget();
   const migration = path.join(workspace,"supabase","migrations","20261102170000_step12_reset_bootstrap_guard.sql");
