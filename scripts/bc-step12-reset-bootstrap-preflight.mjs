@@ -258,9 +258,9 @@ async function main() {
   const syntheticAuthPassword = `Synthetic-${crypto.randomBytes(24).toString("base64url")}Aa1!`;
   const syntheticAuthUserId = await createSyntheticAuthUser(syntheticAuthEmail,syntheticAuthPassword);
   const syntheticCounts = lastJson(runPsql(["-c",
-    `SELECT jsonb_build_object('warehouses',(SELECT count(*) FROM public.almacenes WHERE nombre=${sqlLiteral(syntheticWarehouse)}),'audit_rows',(SELECT count(*) FROM public.auditoria_operaciones WHERE tipo='step12_synthetic_fixture' AND payload_resumen->>'fixture'=${sqlLiteral(syntheticTag)}),'auth_users',(SELECT count(*) FROM auth.users WHERE id=${sqlLiteral(syntheticAuthUserId)}::uuid AND raw_user_meta_data->>'bc_step12_synthetic_fixture'='true'))::text;`
+    `SELECT jsonb_build_object('warehouses',(SELECT count(*) FROM public.almacenes WHERE nombre=${sqlLiteral(syntheticWarehouse)}),'audit_rows',(SELECT count(*) FROM public.auditoria_operaciones WHERE tipo='step12_synthetic_fixture' AND payload_resumen->>'fixture'=${sqlLiteral(syntheticTag)}),'auth_users',(SELECT count(*) FROM auth.users WHERE id=${sqlLiteral(syntheticAuthUserId)}::uuid AND raw_user_meta_data->>'bc_step12_synthetic_fixture'='true'),'auth_identities',(SELECT count(*) FROM auth.identities i JOIN auth.users u ON u.id=i.user_id WHERE u.id=${sqlLiteral(syntheticAuthUserId)}::uuid))::text;`
   ],"STEP12_SYNTHETIC_FIXTURE_VERIFY"),"STEP12_SYNTHETIC_FIXTURE_VERIFY");
-  assert(syntheticCounts.warehouses===1 && syntheticCounts.audit_rows===3 && syntheticCounts.auth_users===1,"STEP12_SYNTHETIC_FIXTURE_SEED_FAILED");
+  assert(syntheticCounts.warehouses===1 && syntheticCounts.audit_rows===3 && syntheticCounts.auth_users===1 && syntheticCounts.auth_identities===1,"STEP12_SYNTHETIC_FIXTURE_SEED_FAILED");
   console.log("BC_STEP12_SYNTHETIC_FIXTURE=PASS; one operational warehouse, three audit rows, one synthetic Auth identity seeded in local clone");
   const preservedFingerprintsBefore = Object.fromEntries(expectedPreserved.map(table=>[table,preservedTableFingerprint(table)]));
 
@@ -314,6 +314,7 @@ async function main() {
     'synthetic_warehouses',(SELECT count(*) FROM public.almacenes WHERE nombre=${sqlLiteral(syntheticWarehouse)}),
     'synthetic_audit_rows',(SELECT count(*) FROM public.auditoria_operaciones WHERE tipo='step12_synthetic_fixture' AND payload_resumen->>'fixture'=${sqlLiteral(syntheticTag)}),
     'synthetic_auth_users',(SELECT count(*) FROM auth.users WHERE raw_user_meta_data->>'bc_step12_synthetic_fixture'='true'),
+    'synthetic_auth_identities',(SELECT count(*) FROM auth.identities i JOIN auth.users u ON u.id=i.user_id WHERE u.raw_user_meta_data->>'bc_step12_synthetic_fixture'='true'),
     'preserved',jsonb_build_object(
       'categorias',(SELECT count(*) FROM public.categorias),
       'permisos',(SELECT count(*) FROM public.permisos),
@@ -345,7 +346,7 @@ async function main() {
   assert(postReset.storage_buckets===1 && JSON.stringify(postReset.storage_bucket_ids)==='["productos"]' &&
     postReset.storage_objects===0,"STEP12_STORAGE_POSTCONDITION_FAILED");
   assert(postReset.synthetic_warehouses===0 && postReset.synthetic_audit_rows===0 &&
-    postReset.synthetic_auth_users===0,"STEP12_SYNTHETIC_FIXTURES_NOT_CLEARED");
+    postReset.synthetic_auth_users===0 && postReset.synthetic_auth_identities===0,"STEP12_SYNTHETIC_FIXTURES_NOT_CLEARED");
   assert(postReset.empty.almacenes===0 && postReset.empty.usuarios===0 && postReset.empty.productos===0 &&
     postReset.empty.stock===0 && postReset.empty.turnos===0 && postReset.empty.ventas===0 &&
     postReset.empty.mensajes===0 && postReset.empty.auditoria_operaciones===1,"STEP12_OPERATIONAL_ROWS_NOT_CLEARED");
@@ -379,6 +380,7 @@ async function main() {
   };
   const edgeChild = await startLocalBootstrapEdge(bootstrapToken);
   let authUserId = "";
+  let bootstrapEdgeEvidence = {};
   try {
     const preflight = await fetch("http://127.0.0.1:8000/",{method:"OPTIONS",headers:{origin:"https://battlecruiser.robvg9.workers.dev"}});
     assert(preflight.status===204,"STEP12_BOOTSTRAP_CORS_PREFLIGHT_FAILED");
@@ -417,6 +419,15 @@ async function main() {
     const secondBody = { ...bootstrapBody, email:`bc-step12-second-${crypto.randomBytes(8).toString("hex")}@example.test`, request_id:crypto.randomUUID() };
     const secondResponse = await callLocalBootstrapEdge(bootstrapToken,secondBody);
     assert(secondResponse.status===401,"STEP12_BOOTSTRAP_EDGE_NOT_CLOSED_AFTER_USE");
+    bootstrapEdgeEvidence = {
+      cors_preflight_status: preflight.status,
+      rejected_origin_status: rejectedOrigin.status,
+      invalid_token_responses: 5,
+      invalid_token_status: 401,
+      success_status: created.status,
+      same_request_replay_status: replayResponse.status,
+      second_request_status: secondResponse.status
+    };
   } finally {
     await stopLocalBootstrapEdge(edgeChild);
   }
@@ -447,11 +458,32 @@ async function main() {
       storage_bucket_preserved_objects_cleared: true,
       storage_deleted_via_api_before_reset: true,
       bootstrap_failed_attempts_persisted: true,
+      bootstrap_edge_function_e2e: true,
+      bootstrap_cors_preflight_and_origin_gate: true,
+      bootstrap_edge_replay_idempotent: true,
+      bootstrap_second_request_rejected: true,
       auth_user_and_owner_profile_created_atomically: true,
       first_admin_created_with_owner_role: true,
       bootstrap_finalize_idempotent: true,
-      bootstrap_closed_after_use: true
+      bootstrap_closed_after_use: true,
+      synthetic_fixtures_seeded_and_cleared: true,
+      preserved_table_content_fingerprints_match: true
     },
+    synthetic_fixtures: {
+      warehouse_rows_seeded: syntheticCounts.warehouses,
+      audit_rows_seeded: syntheticCounts.audit_rows,
+      auth_users_seeded: syntheticCounts.auth_users,
+      auth_identities_seeded: syntheticCounts.auth_identities,
+      all_cleared_after_reset: postReset.synthetic_warehouses===0 &&
+        postReset.synthetic_audit_rows===0 && postReset.synthetic_auth_users===0 &&
+        postReset.synthetic_auth_identities===0
+    },
+    preserved_table_content: {
+      tables: expectedPreserved,
+      fingerprints_unchanged: expectedPreserved.every(table=>
+        preservedFingerprintsBefore[table]===preservedFingerprintsAfter[table])
+    },
+    bootstrap_edge: bootstrapEdgeEvidence,
     reset: {
       request_id: resetRequestId,
       concurrent_requests: 2,
