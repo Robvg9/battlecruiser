@@ -26,10 +26,12 @@ test("new sales schema is additive and never relinks historic sales", () => {
   assert.match(MIGRATION, /ventas_actor_idempotency_uidx/);
   assert.match(MIGRATION, /ventas_jornada_fecha_idx/);
   const schemaChanges = MIGRATION.slice(0, MIGRATION.indexOf("CREATE OR REPLACE FUNCTION"));
-  assert.doesNotMatch(schemaChanges, /UPDATE\\s+public\\.ventas\\s+SET\\s+turno_sesion_id/i,
+  assert.doesNotMatch(schemaChanges, /UPDATE\s+public\.ventas\s+SET\s+turno_sesion_id/i,
     "additive schema changes must not reassign historic sales");
-  assert.match(MIGRATION, /UPDATE public\\.ventas[\\s\\S]*WHERE id=v_venta_id AND creado_por=v_uid/,
-    "only the sale created by the current transaction receives its Jornada link");
+  assert.ok(MIGRATION.includes("UPDATE public.ventas\\n  SET turno_sesion_id=v_s.id"),
+    "only the newly inserted sale is linked");
+  assert.ok(MIGRATION.includes("WHERE id=v_venta_id AND creado_por=v_uid"),
+    "the current actor and new sale ID scope the link update");
   assert.doesNotMatch(MIGRATION, /\bDELETE\s+FROM\s+public\.ventas\b|\bTRUNCATE\s+public\.ventas\b/i);
 });
 
