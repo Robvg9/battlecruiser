@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.53">
+<link rel="stylesheet" href="style.css?v=9.5.54">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 #app-shell.visible:not([data-bc-permisos-cargados="1"]) #tabs .tab-btn[data-tab],
@@ -295,6 +295,17 @@
       <p class="msg" id="msg-venta-linea"></p>
       <div id="venta-lineas" class="lista"><p class="lista-estado">Todavía no agregaste productos a esta venta.</p></div>
       <div class="venta-total" id="venta-total-wrap"><span>Total</span><span class="venta-total-valor" id="venta-total">$0.00</span></div>
+      <div id="venta-jornada-payment-wrap" class="hidden" hidden style="margin:10px 0;padding:10px;border:1px solid var(--gold-dim);border-radius:8px">
+        <label for="venta-metodo-pago" class="muted" style="display:block;margin-bottom:6px">Forma de pago de esta Jornada</label>
+        <select id="venta-metodo-pago" style="width:100%;min-height:42px;padding:9px;border:1px solid var(--gold-dim);border-radius:6px;background:var(--void);color:var(--text)">
+          <option value="">Selecciona la forma de pago</option>
+          <option value="EFECTIVO">Efectivo</option>
+          <option value="TRANSFERENCIA">Transferencia</option>
+          <option value="TARJETA">Tarjeta</option>
+          <option value="OTRO">Otro</option>
+        </select>
+        <p class="muted" style="margin:6px 0 0;font-size:11px">La venta quedará vinculada a la jornada y al tramo activo. No se asigna a la caja de efectivo si eliges otro medio de pago.</p>
+      </div>
       <button type="button" id="btn-confirmar-venta" class="btn-confirmar-venta">Confirmar venta</button>
       <p class="msg" id="msg-venta"></p>
       <h3>Historial de ventas</h3>
@@ -643,7 +654,7 @@
 <script src="js/almacenes.js"></script>
 <script src="js/transferencias.js"></script>
 <script src="js/vales.js"></script>
-<script src="js/ventas.js?v=20261016.1"></script>
+<script src="js/ventas.js?v=20261102.1"></script>
 <script src="js/catalogos.js?v=20261016.5"></script>
 <script src="js/usuarios-permisos.js"></script>
 <script src="js/mando.js"></script>
@@ -657,6 +668,6 @@
 <script src="js/comunicacion.js"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.53"></script>
+<script src="app.js?v=9.5.54"></script>
 </body>
 </html>
