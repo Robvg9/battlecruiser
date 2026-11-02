@@ -163,8 +163,38 @@ async function createLocalAuthUser(email, password, requestId) {
   return data.id;
 }
 
+function applyMigration() {
+  requireLocalTarget();
+  const migration = path.join(workspace,"supabase","migrations","20261102170000_step12_reset_bootstrap_guard.sql");
+  if (!fs.existsSync(migration)) throw new Error("STEP12_MIGRATION_FILE_MISSING");
+  runPsql(["-f","/workspace/supabase/migrations/20261102170000_step12_reset_bootstrap_guard.sql"],"STEP12_LOCAL_MIGRATION_APPLY");
+  console.log("BC_STEP12_MIGRATION=PASS; applied to guarded local loopback database only");
+}
+
+async function clearLocalStorageObjects() {
+  const list = runPsql(["-c","SELECT name FROM storage.objects WHERE bucket_id='productos' ORDER BY name;"],"STEP12_STORAGE_LIST");
+  const paths = list.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  if (!paths.length) {
+    const count = Number(runPsql(["-c","SELECT count(*) FROM storage.objects;"],"STEP12_STORAGE_EMPTY_CHECK"));
+    assert(count===0,"STEP12_STORAGE_OTHER_BUCKET_OBJECTS_PRESENT");
+    console.log("BC_STEP12_STORAGE_CLEANUP=PASS; no restored objects present");
+    return 0;
+  }
+  const response = await fetch(`${apiUrl}/storage/v1/object/productos`, {
+    method: "DELETE",
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: paths }),
+  });
+  if (!response.ok) throw new Error(`STEP12_STORAGE_API_DELETE=FAIL; HTTP ${response.status}`);
+  const remaining = Number(runPsql(["-c","SELECT count(*) FROM storage.objects;"],"STEP12_STORAGE_REMAINDER"));
+  assert(remaining===0,"STEP12_STORAGE_API_DID_NOT_REMOVE_ALL_OBJECTS");
+  console.log(`BC_STEP12_STORAGE_CLEANUP=PASS; ${paths.length} restored objects removed through the local Storage API; bucket preserved`);
+  return paths.length;
+}
+
 async function main() {
   requireLocalTarget();
+  const storageObjectsRemoved = await clearLocalStorageObjects();
   const manifest = JSON.parse(fs.readFileSync(path.join(root,"restored","manifest.json"),"utf8"));
   const expectedPreserved = ["categorias","permisos","presentaciones","roles","turno_configuracion","unidades"];
   const expectedTableCount = Object.keys(manifest.public_rows || {}).length;
@@ -334,7 +364,7 @@ async function main() {
       operational_data_cleared_in_isolation: true,
       roles_permissions_catalogues_preserved: true,
       schema_rls_policies_rpc_extensions_preserved: true,
-      storage_bucket_preserved_objects_cleared: true,
+      storage_bucket_preserved_objects_cleared: true,\n      storage_deleted_via_api_before_reset: true,
       bootstrap_failed_attempts_persisted: true,
       auth_user_and_owner_profile_created_atomically: true,
       first_admin_created_with_owner_role: true,
@@ -377,8 +407,12 @@ async function main() {
   console.log("BC_STEP12_ISOLATED_DESTRUCTIVE_REHEARSAL=PASS");
 }
 
-main().catch(error => {
-  const safe = String(error?.message || error).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[EMAIL_REDACTED]");
+const mode = process.argv[2] || "rehearse";
+const task = mode === "apply-migration" ? Promise.resolve().then(applyMigration)
+  : mode === "rehearse" ? main()
+  : Promise.reject(new Error("STEP12_MODE_INVALID"));
+task.catch(error => {
+  const safe = String(error?.message || error).replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi,"[EMAIL_REDACTED]");
   console.error(safe);
   process.exitCode = 1;
 });
