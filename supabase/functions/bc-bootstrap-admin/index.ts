@@ -111,19 +111,18 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    if (!await sameSecret(token, configuredToken)) {
-      return reply({ error: "No se pudo inicializar el administrador." }, 401);
-    }
-
+    const configuredSecretMatches = await sameSecret(token, configuredToken);
     const admin = createClient(url, serviceRole, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
 
+    // The database gate persists failed token attempts, even when the Edge
+    // secret differs, so invalid attempts cannot bypass the durable DB limit.
     const claim = await admin.rpc("bc_bootstrap_claim", {
       p_token: token,
       p_request_id: requestId,
     });
-    if (claim.error || !claim.data?.ok) {
+    if (!configuredSecretMatches || claim.error || !claim.data?.ok) {
       return reply({ error: "No se pudo inicializar el administrador." }, 401);
     }
 
