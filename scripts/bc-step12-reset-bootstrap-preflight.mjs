@@ -289,6 +289,12 @@ async function main() {
   const email = `bc-step12-${crypto.randomBytes(8).toString("hex")}@example.test`;
   const password = `Step12-${crypto.randomBytes(24).toString("base64url")}Aa1!`;
   const authUserId = await createLocalAuthUser(email,password,bootstrapRequestId);
+  const authAndProfile = lastJson(runPsql(["-c",
+    "SELECT jsonb_build_object('auth_users',(SELECT count(*) FROM auth.users),'profiles',(SELECT count(*) FROM public.usuarios),'owner_profile',(SELECT count(*) FROM public.usuarios u JOIN public.roles r ON r.id=u.role_id WHERE u.id='" + authUserId + "'::uuid AND r.nombre='Dueño' AND u.activo)::text;"
+  ],"STEP12_AUTH_TRIGGER_ATOMICITY"),"STEP12_AUTH_TRIGGER_ATOMICITY");
+  assert(authAndProfile.auth_users===1 && authAndProfile.profiles===1 && authAndProfile.owner_profile===1,
+    "STEP12_AUTH_PROFILE_NOT_ATOMIC");
+  console.log("BC_STEP12_AUTH_PROFILE_ATOMICITY=PASS; Auth user and owner profile inserted in the same database transaction");
   console.log("BC_STEP12_BOOTSTRAP_AUTH_CREATE=PASS; isolated Auth API only");
 
   const finalizeSql = `SELECT private.bc_bootstrap_finalize(${sqlLiteral(bootstrapRequestId)}::uuid,${sqlLiteral(authUserId)}::uuid,'Administrador de prueba')::text;`;
@@ -330,7 +336,7 @@ async function main() {
       schema_rls_policies_rpc_extensions_preserved: true,
       storage_bucket_preserved_objects_cleared: true,
       bootstrap_failed_attempts_persisted: true,
-      first_admin_created_with_owner_role: true,
+      auth_user_and_owner_profile_created_atomically: true,\n      first_admin_created_with_owner_role: true,
       bootstrap_finalize_idempotent: true,
       bootstrap_closed_after_use: true
     },
