@@ -130,14 +130,26 @@ BEGIN
     SELECT id INTO v_entrega
     FROM public.turno_jornada_inventario_entregas
     WHERE origen_sesion_id=v_s.id;
-  ELSE
-    INSERT INTO public.turno_jornada_inventario_entrega_lineas
-      (entrega_id,producto_id,cantidad_declarada)
-    SELECT v_entrega,l.producto_id,l.cantidad_contada
-    FROM public.turno_jornada_inventario_lineas l
-    WHERE l.corte_id=NEW.id
-    ON CONFLICT (entrega_id,producto_id) DO NOTHING;
+  END IF;
 
+  -- Always reconcile missing immutable detail rows on retry. The FINAL cut and its
+  -- line items may be persisted in separate statements before the deferred trigger fires.
+  INSERT INTO public.turno_jornada_inventario_entrega_lineas
+    (entrega_id,producto_id,cantidad_declarada)
+  SELECT v_entrega,l.producto_id,l.cantidad_contada
+  FROM public.turno_jornada_inventario_lineas l
+  WHERE l.corte_id=NEW.id
+  ON CONFLICT (entrega_id,producto_id) DO NOTHING;
+
+  IF EXISTS (
+    SELECT 1 FROM public.turno_jornada_eventos
+    WHERE tipo='INVENTARIO_ENTREGA_PREPARADA'
+      AND estado_despues->>'entrega_id'=v_entrega::text
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_entrega IS NOT NULL THEN
     INSERT INTO public.turno_jornada_eventos
       (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
     VALUES
