@@ -56,6 +56,8 @@ CREATE TABLE public.ventas_lineas(id uuid PRIMARY KEY,venta_id uuid NOT NULL,pro
 CREATE TABLE public.transferencias(id uuid PRIMARY KEY,almacen_origen_id uuid NOT NULL,almacen_destino_id uuid NOT NULL,estado text NOT NULL DEFAULT 'COMPLETADA',creado_por uuid,fecha timestamptz NOT NULL);
 CREATE TABLE public.transferencias_lineas(id uuid PRIMARY KEY,transferencia_id uuid NOT NULL,producto_id uuid NOT NULL,cantidad numeric NOT NULL);
 CREATE TABLE public.vales_salida(id uuid PRIMARY KEY,producto_id uuid NOT NULL,almacen_id uuid NOT NULL,tipo text,cantidad numeric NOT NULL,estado text NOT NULL DEFAULT 'CONFIRMADO',creado_por uuid,fecha timestamptz NOT NULL);
+CREATE TABLE public.reinversiones(id uuid PRIMARY KEY,almacen_id uuid NOT NULL,usuario_id uuid,usuario_nombre text,proveedor text,total numeric NOT NULL DEFAULT 0,fecha timestamptz NOT NULL);
+CREATE TABLE public.reinversiones_lineas(id uuid PRIMARY KEY,reinversion_id uuid NOT NULL,producto_id uuid NOT NULL,cantidad_base numeric NOT NULL,costo_unitario numeric NOT NULL,costo_total numeric NOT NULL DEFAULT 0);
 CREATE TABLE public.stock(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),producto_id uuid NOT NULL,almacen_id uuid NOT NULL,cantidad numeric NOT NULL,minimo numeric,updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(producto_id,almacen_id));
 CREATE TABLE public.mermas(
   id uuid PRIMARY KEY,almacen_id uuid NOT NULL,producto_id uuid NOT NULL,ciclo_id uuid,sesion_id uuid,
@@ -137,6 +139,13 @@ INSERT INTO auth.users(id) VALUES
 INSERT INTO public.usuarios(id,nombre) VALUES
  ('20000000-0000-0000-0000-000000000001','Dueño Fixture'),
  ('20000000-0000-0000-0000-000000000002','Revisor Fixture');
+
+INSERT INTO public.reinversiones(id,almacen_id,usuario_id,usuario_nombre,proveedor,total,fecha)
+VALUES('82000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001',
+       '20000000-0000-0000-0000-000000000001','Dueño Fixture','Proveedor fixture',15,'2030-01-09 15:00:00+00');
+INSERT INTO public.reinversiones_lineas(id,reinversion_id,producto_id,cantidad_base,costo_unitario,costo_total)
+VALUES('82100000-0000-0000-0000-000000000001','82000000-0000-0000-0000-000000000001',
+       '30000000-0000-0000-0000-000000000001',3,5,15);
 
 INSERT INTO public.lotes_compra(id,producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen,usuario_id)
 VALUES
