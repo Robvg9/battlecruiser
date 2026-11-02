@@ -1,6 +1,6 @@
 // BattleCruiser - M33 Turnos expediente (sin competencia HOME)
 // HOME listado = solo M29. Este módulo solo abre expediente / detalle.
-// v33.19 — una jornada visible por fecha, sin paneles legacy
+// v33.20 — libro de jornada adaptable, sin desplazamiento horizontal
 (function () {
   'use strict';
   if (window.__bcM33TurnosFinal) return;
@@ -138,9 +138,9 @@
         '.m33-book-metric b{display:block;font-size:12px;line-height:1.25;margin-top:3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}',
         '.m33-book-section{min-width:0}',
         '.m33-book-section h4{font-size:11px;margin:2px 0 5px!important}',
-        '.m33-book-scroll{width:100%;max-width:100%;overflow:auto;border:1px solid rgba(255,255,255,.11);border-radius:6px;-webkit-overflow-scrolling:touch}',
-        '.m33-book-table{width:100%;min-width:1320px;border-collapse:separate;border-spacing:0;font-size:10px;font-variant-numeric:tabular-nums}',
-        '.m33-book-table th,.m33-book-table td{padding:5px 6px;border-right:1px solid rgba(255,255,255,.055);border-bottom:1px solid rgba(255,255,255,.07);white-space:nowrap;text-align:right}',
+        '.m33-book-scroll{width:100%;max-width:100%;overflow:visible;border:1px solid rgba(255,255,255,.11);border-radius:6px}',
+        '.m33-book-table{width:100%;min-width:0;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:10px;font-variant-numeric:tabular-nums}',
+        '.m33-book-table th,.m33-book-table td{padding:5px 4px;border-right:1px solid rgba(255,255,255,.055);border-bottom:1px solid rgba(255,255,255,.07);white-space:normal;overflow-wrap:anywhere;text-align:right}',
         '.m33-book-table th{position:sticky;top:0;z-index:1;background:#202a32;color:#d9d2c2;font-size:9px;font-weight:700;text-align:center}',
         '.m33-book-table th:nth-child(5),.m33-book-table td:nth-child(5){position:sticky;left:0;z-index:2;text-align:left;background:#18241f;min-width:170px}',
         '.m33-book-table th:nth-child(5){z-index:3;background:#202a32}',
@@ -149,12 +149,13 @@
         '.m33-book-table .m33-negative{color:#ffaaa0}',
         '.m33-book-note{padding:6px 8px;border-left:2px solid rgba(201,162,77,.7);background:rgba(201,162,77,.06);font-size:10px;line-height:1.3}',
         '.m33-book-subtables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}',
-        '.m33-book-subtable{width:100%;border-collapse:collapse;font-size:10px}',
-        '.m33-book-subtable th,.m33-book-subtable td{padding:5px 6px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07)}',
+        '.m33-book-subtable{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:10px}',
+        '.m33-book-subtable th,.m33-book-subtable td{padding:5px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere;border-bottom:1px solid rgba(255,255,255,.07)}',
         '.m33-book-subtable th{font-size:9px;opacity:.65}',
         '.m33-book-empty{padding:7px 8px;border:1px dashed rgba(255,255,255,.15);border-radius:6px;font-size:10px;opacity:.72}',
-        '@media(max-width:720px){.m33-bg{padding:3px!important}.m33-modal{width:calc(100vw - 6px)!important;max-height:calc(100dvh - 6px)!important;border-radius:9px!important}.m33-head{padding:6px 8px 5px!important}.m33-title h3{font-size:.96rem!important}.m33-steps{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:2px!important}.m33-step{font-size:.56rem!important;padding:4px 1px!important;overflow-wrap:anywhere}.m33-body{padding:6px 8px!important}.m33-foot{padding:6px 8px!important}.m33-book-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-book-subtables{grid-template-columns:minmax(0,1fr)}.m33-book-table{min-width:1220px}}'
+        '@media(max-width:720px){.m33-bg{padding:3px!important}.m33-modal{width:calc(100vw - 6px)!important;max-height:calc(100dvh - 6px)!important;border-radius:9px!important}.m33-head{padding:6px 8px 5px!important}.m33-title h3{font-size:.96rem!important}.m33-steps{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:2px!important}.m33-step{font-size:.56rem!important;padding:4px 1px!important;overflow-wrap:anywhere}.m33-body{padding:6px 8px!important}.m33-foot{padding:6px 8px!important}.m33-book-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.m33-book-subtables{grid-template-columns:minmax(0,1fr)}.m33-book-table{min-width:0!important}}'
       ].join('');
+      compact.textContent += "@media(max-width:720px){\n.m33-book-scroll{overflow:visible!important}\n.m33-book-table,.m33-book-subtable{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;table-layout:auto!important}\n.m33-book-table thead,.m33-book-subtable thead{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}\n.m33-book-table tbody,.m33-book-table tfoot,.m33-book-subtable tbody{display:block!important;width:100%!important;min-width:0!important}\n.m33-book-table tbody tr,.m33-book-subtable tbody tr{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px;margin:0 0 8px!important;padding:5px 7px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.025)}\n.m33-book-table td[data-label],.m33-book-subtable td[data-label]{display:flex!important;align-items:flex-start;justify-content:space-between;gap:7px;min-width:0;padding:7px 2px!important;white-space:normal!important;text-align:right!important;overflow-wrap:anywhere;font-size:10px}\n.m33-book-table td[data-label]::before,.m33-book-subtable td[data-label]::before{content:attr(data-label);display:block;flex:0 1 55%;min-width:0;text-align:left;font-size:9px;line-height:1.25;font-weight:650;opacity:.72;overflow-wrap:anywhere}\n.m33-book-table tbody td:nth-child(5){grid-column:1/-1;justify-content:flex-start;text-align:left!important;font-size:12px;font-weight:700;border-bottom:1px solid rgba(255,255,255,.1)}\n.m33-book-table tbody td:nth-child(5)::before{flex:0 0 auto;margin-right:8px}\n.m33-book-table tfoot tr{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px;padding:6px 8px;background:rgba(212,176,92,.09)}\n.m33-book-table tfoot th[colspan]{grid-column:1/-1;padding:7px 2px!important;text-align:left!important}\n.m33-book-table tfoot td[data-label]{display:flex;justify-content:space-between;gap:7px;padding:6px 2px!important;white-space:normal;text-align:right!important;font-size:10px}\n.m33-book-table tfoot td[data-label]::before{content:attr(data-label);flex:0 1 55%;text-align:left;font-size:9px;opacity:.72}\n.m33-book-subtables{grid-template-columns:minmax(0,1fr)!important}\n.m33-book-subtable tbody tr td[colspan]{grid-column:1/-1;display:block!important;text-align:left!important}\n.m33-book-subtable tbody tr td[colspan]::before{content:none!important}\n.m33-book-section{min-width:0!important;max-width:100%!important}\n}\n@media(min-width:721px){\n.m33-book-scroll{overflow:visible}\n.m33-book-table{min-width:0;table-layout:fixed}\n.m33-book-table th,.m33-book-table td{white-space:normal;overflow-wrap:anywhere}\n.m33-book-subtable{min-width:0;table-layout:fixed}\n}";
       document.head.appendChild(compact);
     }
     if (!document.getElementById('bc-m33-dependent-card-css')) {
@@ -867,6 +868,12 @@
       const totalsApprox = tableRows.some(function (row) { return row.revenueApprox || row.profitApprox; });
       const totalLossApprox = tableRows.some(function (row) { return row.lossValueApprox; });
       const tableBody = tableRows.map(function (row) {
+        const labels = [
+          '% Ganancia', 'Ganancia por unidad', 'Precio de costo', 'Precio de venta', 'Producto',
+          'Inventario inicial', 'Entradas', 'Reinversiones', 'Bajas', 'Otras salidas',
+          'Inventario teórico', 'Inventario físico final', 'Diferencia física', 'Unidades vendidas POS',
+          'Ganancia POS', 'Ingreso POS', 'Valor de bajas'
+        ];
         const cells = [
           row.markup == null ? '—' : (row.markupApprox ? '≈ ' : '') + row.markup.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '%',
           fmtCell(row.unitGain, 'money', row.unitGainApprox),
@@ -887,22 +894,29 @@
           fmtCell(row.lossValue, 'money', row.lossValueApprox)
         ];
         return '<tr>' + cells.map(function (cell, index) {
-          return '<td' + ((index === 13 || index === 14 || index === 15) ? ' class="m33-num"' : '') + '>' + cell + '</td>';
+          return '<td data-label="' + esc(labels[index]) + '"' +
+            ((index === 13 || index === 14 || index === 15) ? ' class="m33-num"' : '') + '>' + cell + '</td>';
         }).join('') + '</tr>';
       }).join('');
+      const totalLabels = [
+        'Inventario inicial total', 'Entradas totales', 'Reinversiones totales', 'Bajas totales',
+        'Otras salidas totales', 'Inventario teórico total', 'Inventario físico total',
+        'Diferencia física total', 'Unidades vendidas POS', 'Ganancia POS total',
+        'Ingreso POS total', 'Valor de bajas total'
+      ];
+      const totalValues = [
+        allOpening ? bookQty(totals.opening) : '—', bookQty(totals.incoming),
+        bookQty(totals.reinvestment), bookQty(totals.losses), bookQty(totals.otherOut),
+        allOpening ? bookQty(totals.theoreticalFinal) : '—',
+        allFinal ? bookQty(totals.final) : '—',
+        allOpening && allFinal ? bookQty(totals.physicalDifference) : '—',
+        bookQty(totals.posSales), bookMoney(totals.profit, totalsApprox),
+        bookMoney(totals.revenue, totalsApprox), bookMoney(totals.lossValue, totalLossApprox)
+      ];
       const totalMarkup = '<tr><th colspan="5">TOTAL DEL TURNO</th>' +
-        '<td>' + (allOpening ? bookQty(totals.opening) : '—') + '</td>' +
-        '<td>' + bookQty(totals.incoming) + '</td>' +
-        '<td>' + bookQty(totals.reinvestment) + '</td>' +
-        '<td>' + bookQty(totals.losses) + '</td>' +
-        '<td>' + bookQty(totals.otherOut) + '</td>' +
-        '<td>' + (allOpening ? bookQty(totals.theoreticalFinal) : '—') + '</td>' +
-        '<td>' + (allFinal ? bookQty(totals.final) : '—') + '</td>' +
-        '<td>' + (allOpening && allFinal ? bookQty(totals.physicalDifference) : '—') + '</td>' +
-        '<td>' + bookQty(totals.posSales) + '</td>' +
-        '<td>' + bookMoney(totals.profit, totalsApprox) + '</td>' +
-        '<td>' + bookMoney(totals.revenue, totalsApprox) + '</td>' +
-        '<td>' + bookMoney(totals.lossValue, totalLossApprox) + '</td></tr>';
+        totalValues.map(function (value, index) {
+          return '<td data-label="' + esc(totalLabels[index]) + '">' + value + '</td>';
+        }).join('') + '</tr>';
       const reinvestmentBody = reinvestmentRows.length ? reinvestmentRows.map(function (row) {
         return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.product) + '</td><td>' + bookQty(row.quantity) +
           '</td><td>' + bookMoney(row.unitCost, false) + '</td><td>' + bookMoney(row.total, false) + '</td><td>' +
@@ -916,14 +930,31 @@
       const cashBody = cashRows.length ? cashRows.map(function (row) {
         const counted = row.collected == null ? '—' : bookMoney(row.collected, false);
         const difference = row.difference == null ? '—' : bookMoney(row.difference, false);
-        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.responsible) + '</td><td>' +
-          bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada') + '</td><td>' + counted +
-          '</td><td>' + difference + '</td><td>' + esc(row.status) + '</td></tr>';
+        const values = [
+          ['Fecha', esc(date(row.date))],
+          ['Responsable', esc(row.responsible)],
+          ['Declarado', bookMoney(row.declared, false) + ' ' + esc(row.currency || 'Sin moneda registrada')],
+          ['Contado por dueño', counted],
+          ['Diferencia', difference],
+          ['Estado', esc(row.status)]
+        ];
+        return '<tr>' + values.map(function (item) {
+          return '<td data-label="' + esc(item[0]) + '">' + item[1] + '</td>';
+        }).join('') + '</tr>';
       }).join('') : '<tr><td colspan="6">No hay declaraciones de dinero registradas.</td></tr>';
       const pendingAdjustmentBody = pendingAdjustmentRows.length ? pendingAdjustmentRows.map(function (row) {
-        return '<tr><td>' + esc(date(row.date)) + '</td><td>' + esc(row.kind) + '</td><td>' + esc(row.product) +
-          '</td><td>' + bookQty(row.quantity) + '</td><td>' + esc(row.reason) + '</td><td>' + esc(row.status) +
-          '</td><td>' + esc(row.actor) + '</td></tr>';
+        const values = [
+          ['Fecha', esc(date(row.date))],
+          ['Tipo', esc(row.kind)],
+          ['Producto', esc(row.product)],
+          ['Cantidad', bookQty(row.quantity)],
+          ['Motivo', esc(row.reason)],
+          ['Estado', esc(row.status)],
+          ['Responsable', esc(row.actor)]
+        ];
+        return '<tr>' + values.map(function (item) {
+          return '<td data-label="' + esc(item[0]) + '">' + item[1] + '</td>';
+        }).join('') + '</tr>';
       }).join('') : '<tr><td colspan="7">No hay solicitudes pendientes o rechazadas asociadas al turno.</td></tr>';
       const snapshotNote = (!hasOpening || !hasFinal)
         ? 'El inventario inicial y/o final no está confirmado en todas las fechas que delimitan el turno. La diferencia física queda sin cálculo hasta disponer de ambos cortes.'
