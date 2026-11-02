@@ -62,10 +62,11 @@ test("Receipt and legacy recount accept valid decimal physical quantities",()=>{
   for(const fn of ["saveReceipt","saveLegacyInitial"]){
     const start=ui.indexOf("async function "+fn+"(form){");
     assert.notEqual(start,-1,fn+" handler missing");
-    const validation=ui.slice(start).split(/\\r?\\n/).find(line=>line.includes("const bad=lines.find"));
+    const validation=ui.slice(start).split("\n").find(line=>line.includes("const bad=lines.find"));
     assert.ok(validation,fn+" quantity validation missing");
-    assert.match(validation,/!\\/\\^\\\\d\\+/,"valid number matcher must use a single regex escape");
-    assert.doesNotMatch(validation,/\\\\\\\\d/,"double-escaped digit matcher would reject valid numbers");
+    const digitEscape=String.fromCharCode(92)+"d";
+    assert.ok(validation.includes("!/^"+digitEscape+"+"),"valid number matcher must use a single regex escape");
+    assert.ok(!validation.includes("!/^"+digitEscape+digitEscape+"+"),"double-escaped digit matcher would reject valid numbers");
   }
 });
 
