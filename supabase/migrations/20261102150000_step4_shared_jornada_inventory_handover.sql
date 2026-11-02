@@ -320,8 +320,11 @@ DECLARE
   v_has_diff boolean;
   v_initial uuid;
 BEGIN
-  IF v_uid IS NULL OR NOT public.tiene_permiso('turnos','ver') THEN
-    RAISE EXCEPTION 'Se requiere autenticación y permiso para consultar turnos.' USING ERRCODE='42501';
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
+  END IF;
+  IF NOT public.bc_actor_is_admin() AND NOT public.tiene_permiso('turnos','ver') THEN
+    RAISE EXCEPTION 'Se requiere permiso para consultar turnos.' USING ERRCODE='42501';
   END IF;
   IF p_idempotency_key IS NULL OR p_lineas IS NULL OR jsonb_typeof(p_lineas)<>'array' THEN
     RAISE EXCEPTION 'La recepción necesita un identificador idempotente y una lista de cantidades.' USING ERRCODE='22023';
