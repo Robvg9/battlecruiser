@@ -339,6 +339,20 @@ BEGIN
   v_hash:=md5(p_lineas::text||'|'||coalesce(p_observacion,''));
   -- Serialize retries sharing the same idempotency key, even across different sessions.
   PERFORM pg_advisory_xact_lock(hashtextextended(p_idempotency_key::text,0));
+
+  SELECT * INTO v_s FROM public.turno_sesiones
+  WHERE id=p_destino_sesion_id FOR UPDATE;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La recepción solo se registra en una jornada única válida.' USING ERRCODE='23514';
+  END IF;
+  IF NOT public.bc_actor_is_admin() AND NOT EXISTS (
+    SELECT 1 FROM public.turno_asignaciones a
+    WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=v_uid AND a.retirado_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Solo la dependienta asignada puede recibir este inventario.' USING ERRCODE='42501';
+  END IF;
+
+  -- A retry remains idempotent after the jornada state changes, but only for the assigned receiver.
   SELECT * INTO v_existing FROM public.turno_jornada_inventario_recepciones
   WHERE idempotency_key=p_idempotency_key;
   IF FOUND THEN
@@ -347,23 +361,13 @@ BEGIN
          SELECT e.id FROM public.turno_jornada_inventario_entregas e
          WHERE e.destino_sesion_id=p_destino_sesion_id
        ) THEN
-      RAISE EXCEPTION 'El identificador idempotente ya pertenece a otra recepción o a otro contenido.' USING ERRCODE='23505';
+      RAISE EXCEPTION 'El identificador idempotente ya pertenece a otra recepción, entrega o contenido.' USING ERRCODE='23505';
     END IF;
     RETURN jsonb_build_object('id',v_existing.id,'estado',v_existing.estado,
       'intento',v_existing.intento,'idempotente',true);
   END IF;
-
-  SELECT * INTO v_s FROM public.turno_sesiones
-  WHERE id=p_destino_sesion_id FOR UPDATE;
-  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL
-     OR v_s.estado NOT IN ('PENDIENTE','PROGRAMADA') THEN
-    RAISE EXCEPTION 'La recepción solo se registra en una jornada única aún no iniciada.' USING ERRCODE='23514';
-  END IF;
-  IF NOT public.bc_actor_is_admin() AND NOT EXISTS (
-    SELECT 1 FROM public.turno_asignaciones a
-    WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=v_uid AND a.retirado_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Solo la dependienta asignada puede recibir este inventario.' USING ERRCODE='42501';
+  IF v_s.estado NOT IN ('PENDIENTE','PROGRAMADA') THEN
+    RAISE EXCEPTION 'La recepción solo se registra antes de abrir la jornada.' USING ERRCODE='23514';
   END IF;
 
   SELECT * INTO v_e FROM public.turno_jornada_inventario_entregas
