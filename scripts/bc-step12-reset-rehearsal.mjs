@@ -166,6 +166,17 @@ async function main() {
   if(before.migration_fingerprint!==afterRollback.migration_fingerprint || before.audit_rows!==afterRollback.audit_rows) stop("STEP12_ROLLBACK=FAIL");
 
   psql(labDdl(),"STEP12_LAB_STATE_MACHINE");
+  const lockHolder=psqlAsync("BEGIN; LOCK TABLE public.ventas IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(5); COMMIT;","STEP12_LOCK_HOLDER");
+  await new Promise(resolve=>setTimeout(resolve,300));
+  let lockTimeoutObserved=false;
+  try {
+    await psqlAsync("SELECT bc_step12_lab.run_reset('"+crypto.randomUUID()+"'::uuid);","STEP12_LOCK_TIMEOUT_TEST");
+  } catch (e) {
+    lockTimeoutObserved=String(e).toLowerCase().includes("lock timeout");
+  }
+  await lockHolder;
+  if(!lockTimeoutObserved || psql("SELECT status FROM bc_step12_lab.reset_state WHERE singleton=true","STEP12_LOCK_STATE").trim()!=="OPEN") stop("STEP12_LOCK_TIMEOUT_FAIL_CLOSED=FAIL");
+  exact(before.public_rows,snapshot().public_rows,"STEP12_LOCK_TIMEOUT_ROLLBACK");
   const keys=[crypto.randomUUID(),crypto.randomUUID()];
   const results=await Promise.all(keys.map((k,i)=>psqlAsync("SELECT bc_step12_lab.run_reset('"+k+"'::uuid)::text","STEP12_CONCURRENT_RESET_"+i)));
   const outcomes=results.map(x=>JSON.parse(x));
@@ -253,7 +264,7 @@ async function main() {
     reset_scope:{public_tables_deleted:58,public_tables_preserved:preserved,auth_users_deleted:deletedAuth,storage_objects_deleted:sourceNames.length},
     backup_restore:{public_table_count:Object.keys(source.public_rows||{}).length,auth_users:source.auth_users,storage_objects:source.storage_objects,
       migration_count:source.supabase_migration_count,migration_fingerprint_match:true},
-    checks:{pre_reset_exact_reconciliation:true,injected_sql_failure_rolled_back:true,concurrent_reset_single_winner:true,
+    checks:{pre_reset_exact_reconciliation:true,injected_sql_failure_rolled_back:true,lock_timeout_aborted_and_rolled_back:true,concurrent_reset_single_winner:true,
       reset_same_key_idempotent:true,reset_different_key_rejected:true,operational_tables_empty:true,roles_and_permissions_preserved:true,
       audit_table_preserved_and_written:true,migration_history_preserved:true,auth_users_deleted_via_admin_api:true,
       storage_objects_deleted_via_storage_api:true,products_bucket_preserved:true,storage_sha256_readback_and_cleanup:true,
