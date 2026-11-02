@@ -299,9 +299,12 @@ function applySql(file) {
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation and overdue-start guard ===");
     applySql("test/turno-cash-handover-contract.sql");
     applySql("test/legacy-session-overdue-contract.sql");
-    log("\\r\\n=== 13/14 Apply Step 4 shared inventory handover after legacy guards ===");
-    applySql("supabase/migrations/20261102150000_step4_shared_jornada_inventory_handover.sql");
-    log("\\r\\n=== 14/14 Verify shared receipt, owner decision, retry, next-day reuse, legacy recovery and ACL ===");
+    log("\\r\\n=== 13/15 Apply Step 4 shared inventory handover after legacy guards ===");
+    applySql("supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql");
+    log("\\r\\n=== 14/15 Apply Step 4 shared inventory foreign-key indexes ===");
+    applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
+
+    log("\\r\\n=== 15/15 Verify shared receipt, owner decision, retry, next-day reuse, legacy recovery and ACL ===");
     applySql("test/step4-jornada-shared-inventory-contract.sql");
     log("\\r\\nPASS Step 7 inventory + finance + Jornada POS sales provenance/payment/idempotency + owner cash count readback + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + Step 4 shared inventory receipt/approval/recount/legacy recovery + ACL contracts.");
   } catch (error) {
