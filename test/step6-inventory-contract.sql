@@ -19,7 +19,11 @@ BEGIN
   END IF;
   SELECT count(*) INTO v_count
   FROM public.movimientos_producto(NULL,NULL,DATE '2030-01-01',DATE '2030-01-10',NULL,100,0);
-  IF v_count<>7 THEN RAISE EXCEPTION 'Product movement ledger expected 7 rows incl. approved adjustments, got %',v_count; END IF;
+  IF v_count<>8 THEN RAISE EXCEPTION 'Product movement ledger expected 8 rows incl. reinvestment, purchases, sales, transfers, vouchers and approved adjustments, got %',v_count; END IF;
+  IF (SELECT count(*) FROM public.movimientos_producto(NULL,NULL,DATE '2030-01-01',DATE '2030-01-10','reinversion',100,0)
+      WHERE tipo='reinversion' AND cantidad=3)<>1 THEN
+    RAISE EXCEPTION 'The newly supported reinvestment row must be present in the read-only product ledger';
+  END IF;
   SELECT count(*) INTO v_count
   FROM public.movimientos_producto(NULL,NULL,DATE '2030-01-01',DATE '2030-01-10','merma',100,0);
   IF v_count<>1 THEN RAISE EXCEPTION 'Type filter for approved merma should yield one row, got %',v_count; END IF;
