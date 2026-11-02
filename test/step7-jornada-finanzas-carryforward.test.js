@@ -131,7 +131,7 @@ test("Jornada read model returns owner-counted cash fields without writing decla
   assert.doesNotMatch(CASH_READBACK_MIGRATION, /\bINSERT\s+INTO\s+public\.turno_declaraciones\b|\bUPDATE\s+public\.turno_declaraciones\b|\bDELETE\s+FROM\s+public\.turno_declaraciones\b/i);
   assert.match(FINANCE_CONTRACT, /Jornada inventory readback omitted owner counted cash/);
   assert.match(PG_CI, /supabase\/migrations\/20261102020000_step4_jornada_cash_count_readback\.sql/);
-  assert.match(PG_WORKFLOW, /supabase\\/migrations\\/20261102020000_step4_jornada_cash_count_readback\\.sql/);
+  assert.ok(PG_WORKFLOW.includes("supabase/migrations/20261102020000_step4_jornada_cash_count_readback.sql"));
 });
 
 test("assigned responsible can read the full finance ledger for their own jornada only", () => {
