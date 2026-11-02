@@ -369,51 +369,57 @@ async function main() {
   ].join(" ");
   runPsql(["-c",bootstrapGateSql],"STEP12_BOOTSTRAP_GATE_SETUP");
 
-  const bootstrapAttemptsSql = `DO $test$
-  DECLARE r jsonb; i integer; v_request uuid := ${sqlLiteral(bootstrapRequestId)}::uuid;
-  BEGIN
-    FOR i IN 1..5 LOOP
-      r := private.bc_bootstrap_claim('wrong-step12-token',gen_random_uuid());
-      IF r->>'code' <> 'bootstrap_authorization_failed' THEN
-        RAISE EXCEPTION 'STEP12_BOOTSTRAP_INVALID_ATTEMPT_NOT_REJECTED: %',r;
-      END IF;
-    END LOOP;
-    IF (SELECT attempts FROM private.bc_bootstrap_gate WHERE singleton=true) <> 5 THEN
-      RAISE EXCEPTION 'STEP12_BOOTSTRAP_ATTEMPTS_NOT_PERSISTED';
-    END IF;
-    r := private.bc_bootstrap_claim(${sqlLiteral(bootstrapToken)},v_request);
-    IF COALESCE((r->>'ok')::boolean,false) IS NOT TRUE OR r->>'claimed' <> 'true' THEN
-      RAISE EXCEPTION 'STEP12_BOOTSTRAP_VALID_CLAIM_FAILED: %',r;
-    END IF;
-  END;
-  $test$;`;
-  runPsql(["-c",bootstrapAttemptsSql],"STEP12_BOOTSTRAP_RATE_LIMIT");
+  const bootstrapEmail = `bc-step12-${crypto.randomBytes(8).toString("hex")}@example.test`;
+  const bootstrapPassword = `Step12-${crypto.randomBytes(24).toString("base64url")}Aa1!`;
+  const bootstrapBody = {
+    username: "Administrador de prueba",
+    email: bootstrapEmail,
+    password: bootstrapPassword,
+    request_id: bootstrapRequestId,
+  };
+  const edgeChild = await startLocalBootstrapEdge(bootstrapToken);
+  let authUserId = "";
+  try {
+    const preflight = await fetch("http://127.0.0.1:8000/",{method:"OPTIONS",headers:{origin:"https://battlecruiser.robvg9.workers.dev"}});
+    assert(preflight.status===204,"STEP12_BOOTSTRAP_CORS_PREFLIGHT_FAILED");
+    const rejectedOrigin = await callLocalBootstrapEdge(bootstrapToken,bootstrapBody,"https://untrusted.example");
+    assert(rejectedOrigin.status===403,"STEP12_BOOTSTRAP_ORIGIN_NOT_REJECTED");
+    const wrongToken = crypto.randomBytes(32).toString("hex");
+    for(let i=0;i<5;i++){
+      const badBody = {
+        username: "Invalid token test",
+        email: `bc-step12-invalid-${i}-${crypto.randomBytes(4).toString("hex")}@example.test`,
+        password: `Invalid-${crypto.randomBytes(20).toString("base64url")}Aa1!`,
+        request_id: crypto.randomUUID(),
+      };
+      const badResponse = await callLocalBootstrapEdge(wrongToken,badBody);
+      assert(badResponse.status===401,"STEP12_BOOTSTRAP_INVALID_TOKEN_NOT_REJECTED");
+    }
+    const recordedAttempts = Number(runPsql(["-c","SELECT attempts FROM private.bc_bootstrap_gate WHERE singleton=true;"],"STEP12_BOOTSTRAP_ATTEMPT_COUNT"));
+    assert(recordedAttempts===5,"STEP12_BOOTSTRAP_ATTEMPTS_NOT_PERSISTED");
+    console.log("BC_STEP12_BOOTSTRAP_INVALID_TOKEN=PASS; five failed Edge requests counted in the database");
 
-  const email = `bc-step12-${crypto.randomBytes(8).toString("hex")}@example.test`;
-  const password = `Step12-${crypto.randomBytes(24).toString("base64url")}Aa1!`;
-  const authUserId = await createLocalAuthUser(email,password,bootstrapRequestId);
-  const authAndProfile = lastJson(runPsql(["-c",
-    "SELECT jsonb_build_object('auth_users',(SELECT count(*) FROM auth.users),'profiles',(SELECT count(*) FROM public.usuarios),'owner_profile',(SELECT count(*) FROM public.usuarios u JOIN public.roles r ON r.id=u.role_id WHERE u.id='" + authUserId + "'::uuid AND r.nombre='Dueño' AND u.activo))::text;"
-  ],"STEP12_AUTH_TRIGGER_ATOMICITY"),"STEP12_AUTH_TRIGGER_ATOMICITY");
-  assert(authAndProfile.auth_users===1 && authAndProfile.profiles===1 && authAndProfile.owner_profile===1,
-    "STEP12_AUTH_PROFILE_NOT_ATOMIC");
-  console.log("BC_STEP12_AUTH_PROFILE_ATOMICITY=PASS; Auth user and owner profile inserted in the same database transaction");
-  console.log("BC_STEP12_BOOTSTRAP_AUTH_CREATE=PASS; isolated Auth API only");
+    const created = await callLocalBootstrapEdge(bootstrapToken,bootstrapBody);
+    const createdBody = await created.json().catch(()=>({}));
+    assert(created.status===201 && createdBody.initialized===true && createdBody.role==="Dueño","STEP12_BOOTSTRAP_EDGE_CREATE_FAILED");
+    authUserId = runPsql(["-c",`SELECT id FROM auth.users WHERE email=${sqlLiteral(bootstrapEmail)};`],"STEP12_BOOTSTRAP_AUTH_ID").trim();
+    assert(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authUserId),"STEP12_BOOTSTRAP_AUTH_ID_MISSING");
+    const authAndProfile = lastJson(runPsql(["-c",
+      `SELECT jsonb_build_object('auth_users',(SELECT count(*) FROM auth.users),'profiles',(SELECT count(*) FROM public.usuarios),'owner_profile',(SELECT count(*) FROM public.usuarios u JOIN public.roles r ON r.id=u.role_id WHERE u.id=${sqlLiteral(authUserId)}::uuid AND r.nombre='Dueño' AND u.activo))::text;`
+    ],"STEP12_AUTH_TRIGGER_ATOMICITY"),"STEP12_AUTH_TRIGGER_ATOMICITY");
+    assert(authAndProfile.auth_users===1 && authAndProfile.profiles===1 && authAndProfile.owner_profile===1,"STEP12_AUTH_PROFILE_NOT_ATOMIC");
+    console.log("BC_STEP12_AUTH_PROFILE_ATOMICITY=PASS; Edge request created Auth identity and Dueño profile through the database trigger");
+    console.log("BC_STEP12_BOOTSTRAP_EDGE=PASS; real Deno Edge Function returned 201 with the Dueño role");
 
-  const finalizeSql = `SELECT private.bc_bootstrap_finalize(${sqlLiteral(bootstrapRequestId)}::uuid,${sqlLiteral(authUserId)}::uuid,'Administrador de prueba')::text;`;
-  const finalized = lastJson(runPsql(["-c",finalizeSql],"STEP12_BOOTSTRAP_FINALIZE"),"STEP12_BOOTSTRAP_FINALIZE");
-  assert(finalized.ok===true && finalized.role==="Dueño" && finalized.consumed===true,"STEP12_BOOTSTRAP_FINALIZE_NOT_PASS");
-  const replay = lastJson(runPsql(["-c",finalizeSql],"STEP12_BOOTSTRAP_FINALIZE_REPLAY"),"STEP12_BOOTSTRAP_FINALIZE_REPLAY");
-  assert(replay.ok===true && replay.already_completed===true,"STEP12_BOOTSTRAP_FINALIZE_NOT_IDEMPOTENT");
-
-  const replayClaimSql = `SELECT private.bc_bootstrap_claim(${sqlLiteral(bootstrapToken)},${sqlLiteral(bootstrapRequestId)}::uuid)::text;`;
-  const replayClaim = lastJson(runPsql(["-c",replayClaimSql],"STEP12_BOOTSTRAP_CLAIM_REPLAY"),"STEP12_BOOTSTRAP_CLAIM_REPLAY");
-  assert(replayClaim.ok===true && replayClaim.already_completed===true,"STEP12_BOOTSTRAP_CLAIM_REPLAY_FAILED");
-
-  const secondClaimSql = `SELECT private.bc_bootstrap_claim(${sqlLiteral(bootstrapToken)},gen_random_uuid())::text;`;
-  const secondClaim = lastJson(runPsql(["-c",secondClaimSql],"STEP12_BOOTSTRAP_SECOND_CLAIM"),"STEP12_BOOTSTRAP_SECOND_CLAIM");
-  assert(secondClaim.ok===false && secondClaim.code==="bootstrap_already_used","STEP12_BOOTSTRAP_NOT_CLOSED_AFTER_USE");
-
+    const replayResponse = await callLocalBootstrapEdge(bootstrapToken,bootstrapBody);
+    const replayBody = await replayResponse.json().catch(()=>({}));
+    assert(replayResponse.status===200 && replayBody.initialized===true && replayBody.replayed===true,"STEP12_BOOTSTRAP_EDGE_REPLAY_NOT_IDEMPOTENT");
+    const secondBody = { ...bootstrapBody, email:`bc-step12-second-${crypto.randomBytes(8).toString("hex")}@example.test`, request_id:crypto.randomUUID() };
+    const secondResponse = await callLocalBootstrapEdge(bootstrapToken,secondBody);
+    assert(secondResponse.status===401,"STEP12_BOOTSTRAP_EDGE_NOT_CLOSED_AFTER_USE");
+  } finally {
+    await stopLocalBootstrapEdge(edgeChild);
+  }
   const bootstrapPost = lastJson(runPsql(["-c",
     "SELECT jsonb_build_object('auth_users',(SELECT count(*) FROM auth.users),'app_users',(SELECT count(*) FROM public.usuarios),'owners',(SELECT count(*) FROM public.usuarios u JOIN public.roles r ON r.id=u.role_id WHERE r.nombre='Dueño' AND u.activo),'consumed',(SELECT consumed_at IS NOT NULL FROM private.bc_bootstrap_gate WHERE singleton=true),'remaining_token_hash',(SELECT token_hash IS NOT NULL FROM private.bc_bootstrap_gate WHERE singleton=true),'bootstrap_audit',(SELECT count(*) FROM public.auditoria_operaciones WHERE tipo='bootstrap_admin'))::text;"
   ],"STEP12_BOOTSTRAP_POSTCONDITIONS"),"STEP12_BOOTSTRAP_POSTCONDITIONS");
