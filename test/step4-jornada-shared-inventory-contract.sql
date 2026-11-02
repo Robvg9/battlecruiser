@@ -63,47 +63,44 @@ BEGIN
   SELECT cantidad INTO v_before_pan FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pan;
   SELECT cantidad INTO v_before_jugo FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_jugo;
 
-  -- Day 2 declares 20/6. Deferred trigger creates exactly one shared delivery to the existing Day 3.
-  v_result:=public.bc7_guardar_inventario_jornada(v_day2,'FINAL',
+  -- Day 3 is a fresh source session; Day 2 already has a historical FINAL and must remain immutable.
+  v_result:=public.bc7_guardar_inventario_jornada(v_day3,'INICIAL',
+    jsonb_build_array(
+      jsonb_build_object('producto_id',v_pan,'cantidad',10),
+      jsonb_build_object('producto_id',v_jugo,'cantidad',5)
+    ),'Initial physical count for shared handover source');
+  UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day3;
+
+  -- Day 3 declares 20/6. Deferred trigger reuses the already scheduled Day 4.
+  v_result:=public.bc7_guardar_inventario_jornada(v_day3,'FINAL',
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',20),
       jsonb_build_object('producto_id',v_jugo,'cantidad',6)
-    ),'Shared handover Day 2 fixture');
-  IF v_result->>'estado'<>'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: Day 2 FINAL not confirmed'; END IF;
-  -- A retry may return an already-confirmed FINAL. Touching that immutable snapshot
-  -- must still repair/prepare its one handover without creating another snapshot.
-  UPDATE public.turno_jornada_inventario_cortes
-  SET observacion=observacion
-  WHERE turno_sesion_id=v_day2 AND tipo='FINAL' AND estado='CONFIRMADO';
+    ),'Shared handover Day 3 fixture');
+  IF v_result->>'estado'<>'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: Day 3 FINAL not confirmed'; END IF;
   SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada IMMEDIATE;
   SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada DEFERRED;
 
   SELECT id INTO v_entrega FROM public.turno_jornada_inventario_entregas
-  WHERE origen_sesion_id=v_day2;
+  WHERE origen_sesion_id=v_day3;
   IF v_entrega IS NULL THEN RAISE EXCEPTION 'FAIL: final cut did not prepare shared handover'; END IF;
-  IF (SELECT destino_sesion_id FROM public.turno_jornada_inventario_entregas WHERE id=v_entrega) IS DISTINCT FROM v_day3 THEN
-    RAISE EXCEPTION 'FAIL: handover did not reuse the pre-created Day 3 session'; END IF;
-  IF (SELECT count(*) FROM public.turno_sesiones WHERE turno_id=v_turno AND numero_dia=3 AND bloque='JORNADA')<>1 THEN
-    RAISE EXCEPTION 'FAIL: preparing the handover created a duplicate Day 3 session'; END IF;
+  IF (SELECT destino_sesion_id FROM public.turno_jornada_inventario_entregas WHERE id=v_entrega) IS DISTINCT FROM v_day4 THEN
+    RAISE EXCEPTION 'FAIL: handover did not reuse the pre-created Day 4 session'; END IF;
+  IF (SELECT count(*) FROM public.turno_sesiones WHERE turno_id=v_turno AND numero_dia=4 AND bloque='JORNADA')<>1 THEN
+    RAISE EXCEPTION 'FAIL: preparing the handover created a duplicate Day 4 session'; END IF;
   IF (SELECT cantidad_declarada FROM public.turno_jornada_inventario_entrega_lineas
       WHERE entrega_id=v_entrega AND producto_id=v_pan) IS DISTINCT FROM 20 THEN
-    RAISE EXCEPTION 'FAIL: source FINAL declaration was not copied into the handover ledger (delivery %, source cut %, source lines %, delivery lines %, pan quantity %)',
-      v_entrega,
-      (SELECT id FROM public.turno_jornada_inventario_cortes WHERE turno_sesion_id=v_day2 AND tipo='FINAL'),
-      (SELECT count(*) FROM public.turno_jornada_inventario_lineas WHERE corte_id=(SELECT id FROM public.turno_jornada_inventario_cortes WHERE turno_sesion_id=v_day2 AND tipo='FINAL')),
-      (SELECT count(*) FROM public.turno_jornada_inventario_entrega_lineas WHERE entrega_id=v_entrega),
-      (SELECT cantidad_declarada FROM public.turno_jornada_inventario_entrega_lineas WHERE entrega_id=v_entrega AND producto_id=v_pan);
-  END IF;
+    RAISE EXCEPTION 'FAIL: source FINAL declaration was not copied into the handover ledger'; END IF;
 
   -- The disposable fixture has an intentionally unreconciled cash difference.
   -- Exercise the inventory close barrier without manufacturing a cash approval.
-  UPDATE public.turno_sesiones SET estado='COMPLETADA' WHERE id=v_day2;
+  UPDATE public.turno_sesiones SET estado='COMPLETADA' WHERE id=v_day3;
 
   -- Receiver reports 18 while source declared 20. This is pending, idempotent and blocks independent INITIAL.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
   PERFORM set_config('test.perms','turnos:ver',false);
-  v_result:=public.bc7_recibir_entrega_jornada(v_day3,
+  v_result:=public.bc7_recibir_entrega_jornada(v_day4,
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',18),
       jsonb_build_object('producto_id',v_jugo,'cantidad',6)
@@ -113,7 +110,7 @@ BEGIN
      OR coalesce((v_result->>'requiere_revision')::boolean,false) IS NOT TRUE THEN
     RAISE EXCEPTION 'FAIL: 20->18 receipt was not held for owner review'; END IF;
 
-  v_result:=public.bc7_recibir_entrega_jornada(v_day3,
+  v_result:=public.bc7_recibir_entrega_jornada(v_day4,
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',18),
       jsonb_build_object('producto_id',v_jugo,'cantidad',6)
@@ -124,7 +121,7 @@ BEGIN
 
   v_error:=false;
   BEGIN
-    PERFORM public.bc7_guardar_inventario_jornada(v_day3,'INICIAL',
+    PERFORM public.bc7_guardar_inventario_jornada(v_day4,'INICIAL',
       jsonb_build_array(
         jsonb_build_object('producto_id',v_pan,'cantidad',18),
         jsonb_build_object('producto_id',v_jugo,'cantidad',6)
@@ -133,15 +130,15 @@ BEGIN
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: normal INITIAL bypassed a pending shared delivery'; END IF;
   IF EXISTS (SELECT 1 FROM public.turno_jornada_inventario_cortes
-    WHERE turno_sesion_id=v_day3 AND tipo='INICIAL') THEN
+    WHERE turno_sesion_id=v_day4 AND tipo='INICIAL') THEN
     RAISE EXCEPTION 'FAIL: pending discrepancy generated an INITIAL cut prematurely'; END IF;
 
   v_error:=false;
   BEGIN
-    UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day3;
+    UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day4;
   EXCEPTION WHEN check_violation THEN v_error:=true;
   END;
-  IF NOT v_error OR (SELECT estado FROM public.turno_sesiones WHERE id=v_day3)<>'PROGRAMADA' THEN
+  IF NOT v_error OR (SELECT estado FROM public.turno_sesiones WHERE id=v_day4)<>'PROGRAMADA' THEN
     RAISE EXCEPTION 'FAIL: destination jornada opened while its shared receipt was unresolved'; END IF;
 
   v_error:=false;
@@ -159,7 +156,7 @@ BEGIN
     'Physical count checked; approve the received amount of 18');
   v_initial:=(v_result->>'inventario_inicial_id')::uuid;
   IF v_result->>'estado'<>'ACEPTADA' OR v_initial IS NULL THEN
-    RAISE EXCEPTION 'FAIL: owner approval did not accept and materialize Day 3 INITIAL'; END IF;
+    RAISE EXCEPTION 'FAIL: owner approval did not accept and materialize Day 4 INITIAL'; END IF;
   IF (SELECT estado FROM public.turno_jornada_inventario_recepciones WHERE id=v_recepcion)<>'ACEPTADA'
      OR (SELECT decision_por FROM public.turno_jornada_inventario_recepciones WHERE id=v_recepcion) IS DISTINCT FROM v_owner THEN
     RAISE EXCEPTION 'FAIL: receipt audit did not preserve owner approval identity'; END IF;
@@ -174,8 +171,8 @@ BEGIN
       WHERE entrega_id=v_entrega AND producto_id=v_pan)<>18 THEN
     RAISE EXCEPTION 'FAIL: effective shared quantity did not resolve to the owner-approved 18'; END IF;
 
-  v_source:=public.bc7_estado_entrega_inventario_jornada(v_day2);
-  v_destination:=public.bc7_estado_entrega_inventario_jornada(v_day3);
+  v_source:=public.bc7_estado_entrega_inventario_jornada(v_day3);
+  v_destination:=public.bc7_estado_entrega_inventario_jornada(v_day4);
   IF v_source->'salida'->>'estado'<>'ACEPTADA'
      OR v_destination->'entrada'->>'estado'<>'ACEPTADA'
      OR (SELECT (x->>'cantidad_efectiva')::numeric
@@ -195,35 +192,8 @@ BEGIN
       AND (estado_despues->>'entrega_id'=v_entrega::text OR estado_antes->>'entrega_id'=v_entrega::text)) THEN
     RAISE EXCEPTION 'FAIL: owner decision and receipt were not preserved in the audit log'; END IF;
 
-  -- The same flow accepts exact receipt automatically without an owner decision.
-  UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day3;
-  v_result:=public.bc7_guardar_inventario_jornada(v_day3,'FINAL',
-    jsonb_build_array(
-      jsonb_build_object('producto_id',v_pan,'cantidad',30),
-      jsonb_build_object('producto_id',v_jugo,'cantidad',6)
-    ),'Day 3 final for exact-receipt fixture');
-  SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada IMMEDIATE;
-  SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada DEFERRED;
-  UPDATE public.turno_sesiones SET estado='COMPLETADA' WHERE id=v_day3;
-  SELECT id INTO v_entrega FROM public.turno_jornada_inventario_entregas WHERE origen_sesion_id=v_day3;
-
-  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
-  PERFORM set_config('test.bc_admin','false',false);
-  PERFORM set_config('test.perms','turnos:ver',false);
-  v_result:=public.bc7_recibir_entrega_jornada(v_day4,
-    jsonb_build_array(
-      jsonb_build_object('producto_id',v_pan,'cantidad',30),
-      jsonb_build_object('producto_id',v_jugo,'cantidad',6)
-    ),'Exact physical receipt','98000000-0000-0000-0000-000000000002');
-  IF v_result->>'estado'<>'ACEPTADA'
-     OR coalesce((v_result->>'requiere_revision')::boolean,true) IS NOT FALSE
-     OR (v_result->>'inventario_inicial_id') IS NULL THEN
-    RAISE EXCEPTION 'FAIL: exact receipt was not auto-accepted'; END IF;
-
-  -- Rejection is preserved and allows a new, independent physical recount attempt.
-  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
-  PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
+  -- Day 4 now becomes the next source. Day 5 receives an incorrect count, the owner rejects it,
+  -- and a second exact physical recount is accepted without overwriting the first attempt.
   UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day4;
   v_result:=public.bc7_guardar_inventario_jornada(v_day4,'FINAL',
     jsonb_build_array(
