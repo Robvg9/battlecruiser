@@ -8,8 +8,8 @@ Preparación para ensayo destructivo aislado. Este documento NO autoriza el rese
 - Corte de lectura: `2026-11-02T20:20:24Z`.
 - Esquema público: **61 tablas**, todas con RLS activo; **60 policies** públicas.
 - Catálogo de esquema: 207 funciones públicas, 31 triggers no internos, 1 vista pública, 103 CHECK, 171 FK, 61 PK y 32 UNIQUE.
-- Historial de migraciones `supabase_migrations.schema_migrations`: **272 versiones**. El repositorio `main` tiene **70 archivos SQL** en `supabase/migrations`; por tanto, no se debe reconstruir el historial a partir del directorio actual. El ensayo exporta y restaura la tabla completa de historial, incluidos `statements`, `rollback`, `name`, `version` y metadatos, y verifica su huella y versiones.
-- Supabase-managed migration ledgers que deben permanecer intactos: `auth.schema_migrations` 82; `storage.migrations` 74.
+- Historial de migraciones `supabase_migrations.schema_migrations`: **272 versiones**. El repositorio `main` tiene **70 archivos SQL** en `supabase/migrations`; por tanto, no se debe reconstruir el historial a partir del directorio actual. El backup exporta y restaura la tabla completa, incluidos `statements`, `rollback`, `name`, `version` y metadatos, y verifica versiones + fingerprint criptográfico. El restore también compara definiciones completas de funciones públicas, triggers, columnas, constraints, índices, vistas, extensiones, policies, RLS y configuración de buckets Storage.
+- Ledgers internos Supabase observados en origen: `auth.schema_migrations` 82; `storage.migrations` 74. Son propiedad de las versiones desplegadas de Auth/Storage, no migraciones de BattleCruiser. El ensayo no copia sus filas entre versiones del stack; la instancia local provisiona sus ledgers compatibles. El historial de aplicación que sí se preserva íntegro es `supabase_migrations.schema_migrations` (272).
 - Auth: 10 users, 10 identities, 1 session y 19 refresh tokens en el corte.
 - Storage: bucket público `productos`; 3 objetos; 3,927,366 bytes.
 - Funciones Edge LIVE: `bc-username-login` v4 (JWT verificado por su lógica; `verify_jwt=false` en plataforma), y `crear-usuario-sin-email` v2 (`verify_jwt=true`). No se cambia su versión durante este paso.
@@ -26,7 +26,7 @@ Preparación para ensayo destructivo aislado. Este documento NO autoriza el rese
 - `public.auditoria_operaciones` (482 filas al corte): registro histórico auditable. El reset añade un evento propio; el archivo cifrado conserva además el estado previo.
 - Todo el esquema: tablas, columnas, tipos, constraints, índices, vistas, secuencias, funciones, triggers, grants, RLS y policies.
 - Extensiones Postgres y configuración del proyecto.
-- `supabase_migrations.schema_migrations` y su historial íntegro (272); además los ledgers internos de Auth/Storage.
+- `supabase_migrations.schema_migrations` y su historial íntegro (272); Los ledgers internos Auth/Storage quedan bajo gestión de la versión de Supabase correspondiente; no se importan entre versiones de stack.
 - El bucket `productos`, sus reglas/policies y configuración. No se conservan los objetos binarios de los productos anteriores.
 - Edge Functions, configuración y secretos externos. Los valores de secretos nunca se exportan ni se escriben en artefactos; la recuperación depende de que sigan presentes en sus gestores de secretos.
 
@@ -34,7 +34,7 @@ Preparación para ensayo destructivo aislado. Este documento NO autoriza el rese
 - Varias tablas de jornada y eventos tienen FKs `ON DELETE RESTRICT` hacia `auth.users`. El orden obligatorio es: bloqueo/maintenance → vaciar tablas de negocio → eliminar usuarios por Auth Admin → limpiar Storage → reconciliar conteos → registrar auditoría.
 - `public.usuarios` es dependiente de `auth.users`; borrar el perfil no elimina Auth por sí solo.
 - La operación de Storage es externa a la transacción Postgres. Si falla, la misión no puede declarar reset completo; se requiere reintento idempotente o restaurar los objetos desde el backup verificado.
-- El bloqueo advisory serializa reset attempts; el `TRUNCATE` adquiere locks exclusivos y debe usar `lock_timeout` fail-closed. El sistema debe permanecer en maintenance hasta finalizar Auth, Storage y auditoría.
+- El bloqueo advisory serializa reset attempts; el `TRUNCATE` adquiere locks exclusivos y debe usar `lock_timeout` fail-closed. El sistema debe permanecer en maintenance hasta finalizar Auth, Storage y auditoría; el reset real usa `lock_timeout` fail-closed.
 - No se debe eliminar ni truncar `roles`, `permisos`, `auditoria_operaciones`, `supabase_migrations`, `auth.schema_migrations` o `storage.migrations`.
 
 ## Bootstrap de primer propietario
@@ -53,3 +53,11 @@ La comprobación de este modelo no se presenta como despliegue LIVE del endpoint
 4. Reporte sanitizado persistido junto al backup cifrado; entorno temporal detenido y datos de trabajo sin cifrar eliminados.
 5. El reset LIVE sigue bloqueado. El Paso 13 exige la frase exacta del propietario: `CONFIRMO REINICIAR BATTLECRUISER PRODUCCIÓN`.
 
+
+
+## Aclaración de ledgers y verificación del esquema
+
+- `supabase_migrations.schema_migrations` es el historial de aplicación de BattleCruiser: el backup incluye las 272 versiones y las sentencias forward/rollback; el restore verifica conteo, versiones y fingerprint.
+- `auth.schema_migrations` y `storage.migrations` son ledgers internos de servicios Supabase. Sus filas no se trasladan a otra versión de servicios; la restauración local usa la versión compatible del stack y deja esos ledgers gestionados por el stack. No se ejecuta ninguna migración sobre LIVE.
+- El restore compara fingerprints de cuerpos de funciones públicas, disparadores públicos, columnas, constraints, índices, vistas, policies, RLS, extensiones y configuración de buckets, además de los bytes SHA-256 de Storage.
+- El ensayo exige base local loopback `127.0.0.1:54322`, API loopback `127.0.0.1:54321` y bandera explícita `BC_STEP12_REHEARSAL=1`. No existe ruta de escritura a LIVE desde el script de reset.
