@@ -107,7 +107,9 @@ jobs:
           "$SUPABASE_CLI_BIN" init --force > "$ROOT/supabase-init.log" 2>&1
           sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
           if ! "$SUPABASE_CLI_BIN" start > "$ROOT/supabase-start.log" 2>&1; then
-            echo "BC_STEP12_LOCAL_STACK=FAIL; local stack logs suppressed"
+            echo "BC_STEP12_LOCAL_STACK=FAIL; sanitized diagnostics follow"
+            grep -Ei 'error|failed|panic|timeout|port is already allocated|not healthy|permission denied|cannot connect|no space|bind:|pull access denied' "$ROOT/supabase-start.log" | tail -n 30 | sed -E 's/[A-Za-z0-9_-]{32,}/[REDACTED]/g; s#(postgres(ql)?://)[^@[:space:]]+@#\\1[REDACTED]@#g' | cut -c1-600 > "$ROOT/step12-local-stack-diagnostic.txt" || true
+            cat "$ROOT/step12-local-stack-diagnostic.txt" || true
             exit 6
           fi
           if ! "$SUPABASE_CLI_BIN" status --output env > "$ROOT/local.env" 2> "$ROOT/supabase-status.log"; then
@@ -151,6 +153,7 @@ jobs:
             ${{ runner.temp }}/bc-backup-restore/restore-report.json
             ${{ runner.temp }}/bc-backup-restore/storage-restore-report.json
             ${{ runner.temp }}/bc-backup-restore/step12-reset-rehearsal.json
+            ${{ runner.temp }}/bc-backup-restore/step12-local-stack-diagnostic.txt
           if-no-files-found: warn
           retention-days: 90
 
