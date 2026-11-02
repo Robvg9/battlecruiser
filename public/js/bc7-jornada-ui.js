@@ -703,7 +703,7 @@
       const adjustmentStorageType=can('bajas','crear')?'baja':'merma';
       adjustment='<details class="bc7-detail"><summary><span>Registrar baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'"><div class="bc7-grid"><label class="bc7-field">Causa de la baja<select data-bc7-ajust-cause required><option value="">Selecciona una causa</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar baja a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
-    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div><details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
+    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
     const fin=financeFormHtml(detail,isAssigned,status);
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
@@ -717,8 +717,12 @@
     if(String(state.selected||'')!==String(sessionId||''))state.workspaceTab='inventario';
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
-    try{const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});state.selected=sessionId;renderWorkspace(detail);return true;}
-    catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
+    try{
+      const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
+      detail.entrega_compartida=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
+      detail.is_admin=!!state.admin;
+      state.selected=sessionId;renderWorkspace(detail);return true;
+    }catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
   }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
@@ -735,6 +739,89 @@
     catch(e){msg(form.querySelector('[data-bc7-count-msg]'),'No se confirmó el conteo. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
+  async function saveReceipt(form){
+    const sessionId=form.dataset.bc7ReceiveForm;
+    const inputs=Array.from(form.querySelectorAll('[data-bc7-receive-count]'));
+    const lines=inputs.map(i=>({producto_id:i.dataset.bc7ReceiveCount,cantidad:i.value.trim()}));
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\\d+(?:\\.\\d{1,3})?$/.test(x.cantidad));
+    const msgEl=form.querySelector('[data-bc7-receive-msg]');
+    if(bad){msg(msgEl,'Cuenta todos los productos y usa cantidades válidas con hasta 3 decimales.','error');return;}
+    if(!confirm('Vas a registrar el conteo físico recibido. Si coincide con lo declarado, se comparte automáticamente. Si difiere, la jornada quedará bloqueada hasta la decisión del dueño. ¿Confirmas el conteo real?'))return;
+    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
+    try{
+      const result=await rpc('bc7_recibir_entrega_jornada',{
+        p_destino_sesion_id:sessionId,
+        p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),
+        p_observacion:form.querySelector('[data-bc7-receive-note]')?.value||null,
+        p_idempotency_key:crypto.randomUUID()
+      });
+      await openWorkspace(sessionId);
+      setStatus(result&&result.requiere_revision
+        ?'Recepción registrada. Hay diferencias pendientes de decisión del dueño; la jornada permanece bloqueada.'
+        :'Recepción coincidente confirmada. La existencia compartida ya está disponible en ambos expedientes.','ok');
+    }catch(e){msg(msgEl,'No se confirmó la recepción. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function saveLegacyInitial(form){
+    const sessionId=form.dataset.bc7LegacyInitialForm;
+    const inputs=Array.from(form.querySelectorAll('[data-bc7-legacy-count]'));
+    const lines=inputs.map(i=>({producto_id:i.dataset.bc7LegacyCount,cantidad:i.value.trim()}));
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\\d+(?:\\.\\d{1,3})?$/.test(x.cantidad));
+    const reason=form.querySelector('[data-bc7-legacy-reason]')?.value.trim()||'';
+    const msgEl=form.querySelector('[data-bc7-legacy-msg]');
+    if(bad||!reason){msg(msgEl,'Completa el conteo físico de todos los productos y el motivo de regularización.','error');return;}
+    if(!confirm('Esta es una excepción de dueño para una jornada legacy ya abierta. Se registrará el conteo físico completo y el motivo; el stock global no cambiará. ¿Confirmas?'))return;
+    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_regularizar_inicial_jornada_legacy',{
+        p_turno_sesion_id:sessionId,
+        p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),
+        p_motivo:reason
+      });
+      await openWorkspace(sessionId);
+      setStatus('Inventario inicial legacy regularizado con auditoría. No se modificó el stock global.','ok');
+    }catch(e){msg(msgEl,'No se pudo regularizar el inventario. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function resolveSharedDelivery(btn){
+    const deliveryId=btn.dataset.bc7DeliveryId;
+    const decision=btn.dataset.bc7DeliveryDecision;
+    const note=document.querySelector('[data-bc7-delivery-decision-note]')?.value.trim()||'';
+    const message=document.querySelector('[data-bc7-delivery-decision-msg]');
+    if(!note){msg(message,'Registra el motivo de la decisión.','error');return;}
+    if(!confirm(decision==='APROBAR'
+      ?'Vas a aprobar la cantidad recibida y convertirla en la existencia efectiva compartida de ambos días. ¿Confirmas?'
+      :'Vas a rechazar esta recepción. La jornada seguirá bloqueada y la dependienta tendrá que realizar otro conteo físico. ¿Confirmas?'))return;
+    if(!busy(btn,true))return;
+    try{
+      const result=await rpc('bc7_resolver_entrega_jornada',{
+        p_entrega_id:deliveryId,p_decision:decision,p_motivo:note
+      });
+      if(state.selected)await openWorkspace(state.selected);
+      setStatus(decision==='APROBAR'
+        ?'Diferencia aprobada. La existencia efectiva quedó compartida en el FINAL y el INITIAL.'
+        :'Diferencia rechazada. Se exige un nuevo conteo y la jornada sigue bloqueada.','ok');
+    }catch(e){msg(message,'No se pudo resolver la entrega. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function linkSharedDelivery(btn){
+    const deliveryId=btn.dataset.bc7LinkDelivery;
+    const sessionId=btn.dataset.bc7LinkSession;
+    if(!confirm('Vas a vincular esta jornada ya programada como destino de la entrega anterior. No se creará otra jornada ni se duplicará la fecha. ¿Confirmas?'))return;
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_vincular_entrega_jornada',{
+        p_entrega_id:deliveryId,p_destino_sesion_id:sessionId
+      });
+      await openWorkspace(sessionId);
+      setStatus('Jornada existente vinculada como destino de recepción.','ok');
+    }catch(e){setStatus('No se pudo vincular la jornada existente. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
   async function refreshPosArchiveAfterSessionStart() {
     // Starting a jornada changes the authoritative active turn/warehouse.
     // Re-read it before M74 decides whether the wholesale POS can be shown.
@@ -1020,6 +1107,8 @@
     if(t.hasAttribute('data-bc7-create')){await createSchedule(t);return;}
     if(t.hasAttribute('data-bc7-open')){await openWorkspace(t.dataset.bc7Open);return;}
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
+    if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
+    if(t.hasAttribute('data-bc7-delivery-decision')){await resolveSharedDelivery(t);return;}
     if(t.hasAttribute('data-bc7-mov-refresh')){if(state.detail)await loadMovements(state.detail);return;}
     if(t.hasAttribute('data-bc7-open-movements')){openMovements();return;}
   });
@@ -1029,6 +1118,8 @@
     else if(f.id==='bc7-pattern-form'){e.preventDefault();await savePattern(f);}
     else if(f.matches('[data-bc7-reschedule]')){e.preventDefault();await reschedule(f);}
     else if(f.matches('[data-bc7-count-form]')){e.preventDefault();await saveCount(f);}
+    else if(f.matches('[data-bc7-receive-form]')){e.preventDefault();await saveReceipt(f);}
+    else if(f.matches('[data-bc7-legacy-initial-form]')){e.preventDefault();await saveLegacyInitial(f);}
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
