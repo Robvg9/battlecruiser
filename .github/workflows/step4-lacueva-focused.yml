@@ -8,6 +8,7 @@ on:
       - 'public/js/m33-turnos-final.js'
       - 'public/js/hotfix-turno-forceclose-20260902.js'
       - 'public/js/m51-movimientos-centro.js'
+      - 'test/m51-movements-filters-functional.test.js'
       - 'public/js/core.js'
       - 'public/js/vales.js'
       - 'public/js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js'
@@ -63,7 +64,7 @@ jobs:
         shell: cmd
         run: |
           if not exist test-results mkdir test-results
-          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/step4-jornada-purpose-ux.test.js test/step4-jornada-warehouse-options.test.js test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/step4-rwht-safe-form-e2e.test.js test/step4-movements-operations-modal.test.js test/step4-transfer-vale-details-accessible.test.js test/step4-product-edit-ui.test.js test/step4-update-app-action.test.js test/step4-role-create-ui.test.js test/step4-pending-sync-retry.test.js test/hotfix-turno-forceclose-eligibility.test.js test/m33-expired-turn-admin-recovery.test.js test/step4-forceclose-m33-runtime-integration.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
+          node -r ./test/node-global-compat.js --test --test-force-exit --test-timeout=120000 test/m51-movements-filters-functional.test.js test/step4-jornada-purpose-ux.test.js test/step4-jornada-warehouse-options.test.js test/m29-turnos-filter-functional.test.js test/step4-m33-turn-archive-ui.test.js test/step4-turno-movements-archive-ui.test.js test/step4-daily-history-edge-cases.test.js test/movimientos-history-search-functional.test.js test/step4-rwht-safe-form-e2e.test.js test/step4-movements-operations-modal.test.js test/step4-transfer-vale-details-accessible.test.js test/step4-product-edit-ui.test.js test/step4-update-app-action.test.js test/step4-role-create-ui.test.js test/step4-pending-sync-retry.test.js test/hotfix-turno-forceclose-eligibility.test.js test/m33-expired-turn-admin-recovery.test.js test/step4-forceclose-m33-runtime-integration.test.js test/version-alignment.test.js > test-results\step4-lacueva-focused.log 2>&1
           set TEST_EXIT=%ERRORLEVEL%
           type test-results\step4-lacueva-focused.log
           exit /b %TEST_EXIT%
