@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.55 — libro de jornada adaptable sin desplazamiento horizontal
+// v9.5.55 — ventas Jornada ligadas a sesión, tramo y método de pago; libro M33 adaptable
 (function hotfixV9475(){
   const VERSION="9.5.55";
   window.__BC_VERSION__=VERSION;
