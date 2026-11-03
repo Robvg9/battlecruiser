@@ -312,6 +312,10 @@
     if (nombre) setTimeout(function () { try { nombre.focus(); } catch (e) {} }, 0);
   }
 
+  // API estable para que el alta/edición use este único modal y no mueva el formulario entre overlays.
+  window.__BCM26_openProductModal = mostrarFormularioProducto;
+  window.__BCM26_closeProductModal = cerrarModalProducto;
+
   function ocultarFormularioProducto() {
     cerrarModalProducto(false);
   }
