@@ -42,6 +42,8 @@
       var el = document.getElementById(id), slot = document.getElementById(slots[id]);
       if (!el || !slot) return;
       var panel = el.closest('.tab-panel');
+      var adminEntry = document.getElementById('bc-product-catalog-entry');
+      var nomenclatureToolbar = document.getElementById('productos-tools-nomenclatura');
       var candidatos = [
         el.closest('.cc-bloque'),
         el.closest('.card'),
@@ -49,15 +51,17 @@
         el.closest('.presentaciones-producto'),
         el.parentElement
       ].filter(Boolean);
-      // Never move an ancestor that contains a tab panel. In particular, a
-      // shared .cc-bloque around #tab-config would hide Configuration in this
-      // modal even though #tab-config keeps the same direct parent.
+      // Never move an ancestor that contains a tab panel or M75's Administration
+      // entry. Catalogs can share a .cc-bloque with that entry; moving the whole
+      // block would silently detach the nomenclature toolbar from Administration.
       var bloque = candidatos.find(function (candidate) {
-        return !panel || (
+        return (!panel || (
           panel.contains(candidate) &&
           candidate !== panel &&
           !candidate.contains(panel)
-        );
+        )) &&
+        !(adminEntry && (candidate === adminEntry || candidate.contains(adminEntry))) &&
+        !(nomenclatureToolbar && (candidate === nomenclatureToolbar || candidate.contains(nomenclatureToolbar)));
       });
       if (!bloque) return; // catalogos.js wraps just the related heading/form/list on demand.
       if (!slot.contains(bloque)) slot.appendChild(bloque);
