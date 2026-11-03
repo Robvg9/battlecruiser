@@ -9,7 +9,7 @@ on:
       - scripts/bc-backup-restore-preflight.mjs
       - scripts/bc-step12-reset-bootstrap-preflight.mjs
       - test/step12-reset-bootstrap-preflight.sql
-      - supabase/migrations/20261102170000_step12_reset_bootstrap_guard.sql
+      - supabase/migrations/20261103014122_step12_reset_bootstrap_guard.sql
       - supabase/functions/bc-bootstrap-admin/index.ts
       - supabase/config.toml
       - supabase/functions/deno.json
