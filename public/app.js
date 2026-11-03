@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.58 — flujo de alta de almacenes y entrada al Centro de Control
+// v9.5.58 — inventario físico compartido entre jornadas, conciliación de recepción y revisión del dueño
 (function hotfixV9475(){
   const VERSION="9.5.58";
   window.__BC_VERSION__=VERSION;

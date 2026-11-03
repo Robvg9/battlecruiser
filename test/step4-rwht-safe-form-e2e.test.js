@@ -759,16 +759,16 @@ test("Paso 4 RWHT: modal de almacén rechaza nombre vacío y Cancelar no crea na
     "el runtime debe exponer el abridor del modal de alta");
   c.window.__BC_M277_openCreateAlmacen();
   const root = c.document.getElementById("bc-alm-modal");
-  const nombre = c.document.getElementById("bc-alm-modal-nombre");
-  const save = c.document.getElementById("bc-alm-modal-guardar");
+  const nombre = c.document.getElementById("bc-m277-modal-nombre");
+  const save = c.document.getElementById("bc-m277-modal-guardar");
   assert.ok(root && root.classList.contains("open"), "el diálogo de alta debe abrirse");
-  assert.equal(c.document.getElementById("bc-alm-modal-title").textContent, "Nuevo almacén");
+  assert.equal(c.document.getElementById("bc-m277-modal-title").textContent, "Nuevo almacén");
   const base = c.client.__writeCalls.length;
 
   nombre.value = "   ";
   save.click();
   assert.ok(await esperarHasta(() => /completá el nombre del almacén/i.test(
-    c.document.getElementById("bc-alm-modal-status").textContent
+    c.document.getElementById("bc-m277-modal-status").textContent
   )), "el modal debe mostrar validación clara para nombre vacío");
   assert.equal(nuevasEscrituras(c, base).length, 0, "un alta inválida no puede ejecutar RPC");
 
@@ -787,17 +787,17 @@ test("Paso 4 RWHT: modal de almacén edita el ID fixture y envía cambios al RPC
     "el runtime debe exponer el abridor del modal de edición");
   c.window.__BC_M277_openEditAlmacen("alm-edit-fixture");
   const root = c.document.getElementById("bc-alm-modal");
-  const nombre = c.document.getElementById("bc-alm-modal-nombre");
+  const nombre = c.document.getElementById("bc-m277-modal-nombre");
   const tipo = root.querySelector(".bc-alm-tipo[data-tipo='mayorista']");
   assert.ok(root.classList.contains("open"), "la edición debe abrirse");
-  assert.equal(c.document.getElementById("bc-alm-modal-id").value, "alm-edit-fixture",
+  assert.equal(c.document.getElementById("bc-m277-modal-id").value, "alm-edit-fixture",
     "el ID oculto debe conservar el registro que se está editando");
   assert.equal(nombre.value, "Almacén original fixture");
   nombre.value = "Almacén editado fixture";
   tipo.click();
 
   const base = c.client.__writeCalls.length;
-  c.document.getElementById("bc-alm-modal-guardar").click();
+  c.document.getElementById("bc-m277-modal-guardar").click();
   assert.ok(await esperarHasta(() => nuevasEscrituras(c, base).length > 0),
     "el formulario válido debe llegar al ejecutor RPC simulado");
   const call = nuevasEscrituras(c, base).find((item) => item.name === "editar_almacen");
@@ -805,7 +805,7 @@ test("Paso 4 RWHT: modal de almacén edita el ID fixture y envía cambios al RPC
   assert.equal(call.params.p_almacen_id, "alm-edit-fixture");
   assert.equal(call.params.p_nombre, "Almacén editado fixture");
   assert.equal(call.params.p_tipo, "mayorista");
-  assert.ok(await esperarHasta(() => /Almacén actualizado/i.test(c.document.getElementById("bc-alm-modal-status").textContent)),
+  assert.ok(await esperarHasta(() => /Almacén actualizado/i.test(c.document.getElementById("bc-m277-modal-status").textContent)),
     "el modal debe anunciar el resultado correcto tras respuesta simulada");
 });
 
@@ -1098,7 +1098,7 @@ test("Paso 4 RWHT 049-052/054: selector y menú de almacenes abren los modales r
   assert.equal(menu.classList.contains("hidden"), true, "Crear cierra el menú");
   assert.equal(c.document.getElementById("bc-alm-modal").classList.contains("open"), true,
     "Crear abre el modal real, no el formulario inline oculto");
-  assert.equal(c.document.getElementById("bc-alm-modal-title").textContent, "Nuevo almacén");
+  assert.equal(c.document.getElementById("bc-m277-modal-title").textContent, "Nuevo almacén");
   c.document.querySelector("#bc-alm-modal [data-bc-alm-close='1']").click();
 
   abrirMenu.click();
@@ -1106,7 +1106,7 @@ test("Paso 4 RWHT 049-052/054: selector y menú de almacenes abren los modales r
   assert.equal(menu.classList.contains("hidden"), true, "Editar cierra el menú");
   assert.equal(c.document.getElementById("bc-alm-modal").classList.contains("open"), true,
     "Editar abre el modal real");
-  assert.equal(c.document.getElementById("bc-alm-modal-id").value, almacen.id,
+  assert.equal(c.document.getElementById("bc-m277-modal-id").value, almacen.id,
     "la edición conserva el ID seleccionado en el control oculto del modal");
   assert.equal(c.document.getElementById("alm-editando-id").value, "",
     "el ID del formulario inline heredado no se usa para la edición nueva");
