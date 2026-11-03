@@ -10,30 +10,36 @@ const edge = fs.readFileSync("supabase/functions/bc-bootstrap-admin/index.ts", "
 const index = fs.readFileSync("public/index.html", "utf8");
 
 test("login exposes a dedicated first-owner bootstrap entry", () => {
-  assert.match(index, /href="bootstrap\\.html"/);
-  assert.match(html, /id="bc-bootstrap-form"/);
-  assert.match(html, /id="bc-bootstrap-token"/);
-  assert.match(html, /id="bc-bootstrap-password"/);
-  assert.match(html, /id="bc-bootstrap-confirm"/);
+  assert.ok(index.includes('href="bootstrap.html"'));
+  for (const id of [
+    "bc-bootstrap-form",
+    "bc-bootstrap-token",
+    "bc-bootstrap-password",
+    "bc-bootstrap-confirm"
+  ]) assert.ok(html.includes('id="' + id + '"'), "missing " + id);
 });
 
-test("bootstrap UI submits over HTTPS to the protected Edge Function", () => {
-  assert.match(js, /\\/functions\\/v1\\/bc-bootstrap-admin/);
-  assert.match(js, /x-bc-bootstrap-token/);
-  assert.match(js, /crypto\\.randomUUID\\(\\)/);
-  assert.match(js, /credentials: "omit"/);
-  assert.match(js, /cache: "no-store"/);
-  assert.match(js, /password\\.length < 12/);
-  assert.doesNotMatch(js, /localStorage/);
-  assert.doesNotMatch(js, /console\\.(log|warn|error)/);
+test("bootstrap UI submits to the protected Edge Function without persisting credentials", () => {
+  assert.ok(js.includes("/functions/v1/bc-bootstrap-admin"));
+  assert.ok(js.includes("x-bc-bootstrap-token"));
+  assert.ok(js.includes("crypto.randomUUID()"));
+  assert.ok(js.includes('credentials: "omit"'));
+  assert.ok(js.includes('cache: "no-store"'));
+  assert.ok(js.includes("password.length < 12"));
+  assert.ok(!js.includes("localStorage"));
+  assert.ok(!js.includes("console.log"));
+  assert.ok(!js.includes("console.warn"));
+  assert.ok(!js.includes("console.error"));
 });
 
 test("Edge Function delegates one-time authorization and profile creation to the database", () => {
-  assert.match(edge, /admin\\.rpc\\("bc_bootstrap_claim"/);
-  assert.match(edge, /admin\\.auth\\.admin\\.createUser/);
-  assert.match(edge, /bc_bootstrap_request_id/);
-  assert.match(edge, /admin\\.rpc\\("bc_bootstrap_finalize"/);
-  assert.match(edge, /No se pudo inicializar el administrador/);
-  assert.doesNotMatch(edge, /BC_BOOTSTRAP_TOKEN/);
-  assert.doesNotMatch(edge, /console\\.(log|warn|error)\\(/);
+  assert.ok(edge.includes('admin.rpc("bc_bootstrap_claim"'));
+  assert.ok(edge.includes("admin.auth.admin.createUser"));
+  assert.ok(edge.includes("bc_bootstrap_request_id"));
+  assert.ok(edge.includes('admin.rpc("bc_bootstrap_finalize"'));
+  assert.ok(edge.includes("No se pudo inicializar el administrador"));
+  assert.ok(!edge.includes("BC_BOOTSTRAP_TOKEN"));
+  assert.ok(!edge.includes("console.log("));
+  assert.ok(!edge.includes("console.warn("));
+  assert.ok(!edge.includes("console.error("));
 });
