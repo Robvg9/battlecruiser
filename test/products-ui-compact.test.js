@@ -81,7 +81,7 @@ function nativeModalFixture(){
   "<input id='prod-nombre' value=''><select id='prod-categoria'><option value=''>Sin categoría</option><option value='cat-secos'>Secos</option></select>",
   "<input id='prod-unidad' value='unidad'><input id='prod-precio-normal' value=''><input id='prod-precio-mayorista' value=''>",
   "<div class='prod-imagen-campo'><input id='prod-imagen-input' type='file'></div>",
-  "<div id='prod-imagen-preview-wrap' class='hidden'><img id='prod-imagen-preview' data-guardada='false'></div>",
+  "<div id='prod-imagen-preview-wrap' class='hidden'><img id='prod-imagen-preview' data-guardada='false'><button type='button' id='prod-imagen-quitar'>Quitar imagen</button></div>",
   "<div id='prod-presentaciones-config'></div>",
   "<button id='prod-cancelar-edicion' type='button' class='hidden'>Cancelar</button>",
   "<button id='prod-submit-btn' type='submit'>Guardar producto</button>",
