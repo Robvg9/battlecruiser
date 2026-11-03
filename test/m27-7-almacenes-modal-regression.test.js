@@ -35,7 +35,7 @@ function createContext(t) {
       '<button id="alm-crear-btn" type="button">Crear almacén</button>' +
       '<button id="alm-editar-btn" type="button">Editar almacén</button>' +
       '<button id="alm-toggle-btn" type="button">Activar / desactivar</button>' +
-      '<div id="msg-almacenes"></div></section></body></html>",
+      '<div id="msg-almacenes"></div></section></body></html>',
     { url: "https://battlecruiser-warehouse-modal.test/", runScripts: "outside-only" }
   );
   const { window } = dom;
