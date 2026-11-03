@@ -44,6 +44,15 @@ jobs:
           node-version: 24.19.0
           cache: npm
 
+      - name: Setup Deno for bootstrap Edge Function type-check
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check first-owner bootstrap Edge Function
+        shell: cmd
+        run: deno check --config supabase/functions/deno.json supabase/functions/bc-bootstrap-admin/index.ts
+
       - name: Production JS integrity and syntax
         shell: cmd
         run: node test/ci-preflight.js
