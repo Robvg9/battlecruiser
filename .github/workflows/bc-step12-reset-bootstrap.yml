@@ -1,0 +1,184 @@
+name: BattleCruiser Step 12 — isolated destructive reset rehearsal
+
+on:
+  push:
+    branches:
+      - aria/sandbox/step12-reset-bootstrap-20261102
+    paths:
+      - .github/workflows/bc-step12-reset-bootstrap.yml
+      - scripts/bc-backup-restore-preflight.mjs
+      - scripts/bc-step12-reset-bootstrap-preflight.mjs
+      - test/step12-reset-bootstrap-preflight.sql
+      - supabase/migrations/20261102170000_step12_reset_bootstrap_guard.sql
+      - supabase/functions/bc-bootstrap-admin/index.ts
+      - supabase/config.toml
+      - supabase/functions/deno.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: battlecruiser-step12-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-step12:
+    if: github.ref_name == 'aria/sandbox/step12-reset-bootstrap-20261102'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    env:
+      PROJECT_REF: papxnkkjtkxsitcsvcme
+      BC_SUPABASE_DB_URL: ${{ secrets.BC_SUPABASE_DB_URL }}
+      BC_BACKUP_PASSPHRASE: ${{ secrets.BC_BACKUP_PASSPHRASE }}
+      NODE_OPTIONS: --max-old-space-size=1536
+
+    steps:
+      - name: Checkout isolated Step 12 branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+
+      - name: Setup Deno for Edge Function type-check
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Initialize isolated workspace and check secret/config presence
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BC_BACKUP_ROOT="$RUNNER_TEMP/bc-backup-restore"
+          mkdir -p "$BC_BACKUP_ROOT"
+          echo "BC_BACKUP_ROOT=$BC_BACKUP_ROOT" >> "$GITHUB_ENV"
+          test -n "${BC_SUPABASE_DB_URL:-}" || { echo "BC_DB_SECRET_PRESENT=NO"; exit 2; }
+          test -n "${BC_BACKUP_PASSPHRASE:-}" || { echo "BC_BACKUP_PASSPHRASE_PRESENT=NO"; exit 3; }
+          pass_len=$(printf '%s' "$BC_BACKUP_PASSPHRASE" | wc -c | tr -d ' ')
+          test "$pass_len" -ge 20 || { echo "BC_BACKUP_PASSPHRASE_VALIDATION=FAIL"; exit 4; }
+          echo "BC_DB_SECRET_PRESENT=YES; value not printed"
+          echo "BC_BACKUP_PASSPHRASE_VALIDATION=PASS; value not printed"
+          echo "BC_SUPABASE_PRODUCTION_EDGE_SECRETS=NOT_EXPORTED_OR_CHANGED"
+
+      - name: Check test harness and bootstrap Edge Function syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/bc-backup-restore-preflight.mjs
+          node --check scripts/bc-step12-reset-bootstrap-preflight.mjs
+          deno check --config supabase/functions/deno.json supabase/functions/bc-bootstrap-admin/index.ts
+          echo "BC_STEP12_SOURCE_SYNTAX=PASS"
+          echo "BC_BOOTSTRAP_EDGE_TYPECHECK=PASS"
+
+      - name: Install pinned Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$BC_BACKUP_ROOT/cli" --no-save --no-package-lock supabase@2.121.0 >/dev/null
+          CLI="$BC_BACKUP_ROOT/cli/node_modules/.bin/supabase"
+          test -x "$CLI"
+          "$CLI" --version
+          "$CLI" db dump --help >/dev/null
+          "$CLI" init --help >/dev/null
+          "$CLI" start --help >/dev/null
+          "$CLI" status --help >/dev/null
+          echo "SUPABASE_CLI_BIN=$CLI" >> "$GITHUB_ENV"
+          echo "SUPABASE_CLI_DISCOVERY=PASS"
+
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17.6-alpine >/dev/null
+
+      - name: Export current LIVE database and Storage snapshot
+        shell: bash
+        run: node scripts/bc-backup-restore-preflight.mjs backup
+
+      - name: Encrypt backup, verify SHA-256, and reopen archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$BC_BACKUP_ROOT"
+          CLEAR="$ROOT/battlecruiser-backup.tar.gz"
+          ENCRYPTED="$ROOT/battlecruiser-backup.tar.gz.gpg"
+          DECRYPTED="$ROOT/decrypted.tar.gz"
+          tar -czf "$CLEAR" -C "$ROOT/stage" .
+          test -s "$CLEAR"
+          printf '%s' "$BC_BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 --output "$ENCRYPTED" "$CLEAR"
+          printf '%s' "$BC_BACKUP_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --decrypt --output "$DECRYPTED" "$ENCRYPTED" 2>/dev/null
+          cmp -s "$CLEAR" "$DECRYPTED"
+          tar -tzf "$DECRYPTED" >/dev/null
+          sha256sum "$ENCRYPTED" > "$ENCRYPTED.sha256"
+          echo "BC_BACKUP_ENCRYPTION=PASS; AES-256"
+          echo "BC_BACKUP_SHA256=$(sha256sum "$ENCRYPTED" | cut -d ' ' -f 1)"
+          mkdir -p "$ROOT/restored"
+          tar -xzf "$DECRYPTED" -C "$ROOT/restored"
+          cmp -s "$ROOT/stage/manifest.json" "$ROOT/restored/manifest.json"
+          rm -f "$CLEAR" "$DECRYPTED"
+          echo "BC_BACKUP_ARCHIVE_REOPEN=PASS"
+
+      - name: Start disposable local Supabase stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$BC_BACKUP_ROOT"
+          mkdir -p "$ROOT/local-project"
+          cd "$ROOT/local-project"
+          "$SUPABASE_CLI_BIN" init --force > "$ROOT/supabase-init.log" 2>&1
+          sed -i 's/^major_version = .*/major_version = 17/' supabase/config.toml
+          if ! "$SUPABASE_CLI_BIN" start > "$ROOT/supabase-start.log" 2>&1; then
+            echo "BC_LOCAL_STACK_START=FAIL; local generated credentials suppressed"
+            exit 6
+          fi
+          if ! "$SUPABASE_CLI_BIN" status --output env > "$ROOT/local.env" 2> "$ROOT/supabase-status.log"; then
+            echo "BC_LOCAL_STACK_STATUS=FAIL; local credentials suppressed"
+            exit 7
+          fi
+          for key in DB_URL API_URL SERVICE_ROLE_KEY; do
+            grep -q "^$key=" "$ROOT/local.env" || { echo "BC_LOCAL_STACK_STATUS=FAIL; missing local variable"; exit 8; }
+          done
+          echo "BC_LOCAL_STACK_START=PASS; disposable loopback target only"
+
+      - name: Restore backup and execute destructive reset/bootstrap rehearsal
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a
+          . "$BC_BACKUP_ROOT/local.env"
+          set +a
+          node scripts/bc-backup-restore-preflight.mjs restore
+          node scripts/bc-backup-restore-preflight.mjs upload-storage
+          node scripts/bc-backup-restore-preflight.mjs verify
+          node scripts/bc-step12-reset-bootstrap-preflight.mjs apply-migration
+          node scripts/bc-step12-reset-bootstrap-preflight.mjs rehearse
+
+      - name: Persist encrypted backup and sanitized rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-step12-reset-bootstrap-evidence-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/bc-backup-restore/battlecruiser-backup.tar.gz.gpg
+            ${{ runner.temp }}/bc-backup-restore/battlecruiser-backup.tar.gz.gpg.sha256
+            ${{ runner.temp }}/bc-backup-restore/restore-report.json
+            ${{ runner.temp }}/bc-backup-restore/storage-restore-report.json
+            ${{ runner.temp }}/bc-backup-restore/step12-reset-bootstrap-report.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Stop local stack and remove unencrypted temporary data
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          ROOT="$RUNNER_TEMP/bc-backup-restore"
+          CLI="$ROOT/cli/node_modules/.bin/supabase"
+          if [ -x "$CLI" ] && [ -f "$ROOT/local-project/supabase/config.toml" ]; then
+            (cd "$ROOT/local-project" && "$CLI" stop --no-backup >/dev/null 2>&1)
+            echo "BC_LOCAL_STACK_STOP=PASS; temporary stack only"
+          else
+            echo "BC_LOCAL_STACK_STOP=SKIPPED"
+          fi
+          rm -f "$ROOT/battlecruiser-backup.tar.gz" "$ROOT/decrypted.tar.gz" "$ROOT/local.env"
+          rm -rf "$ROOT/stage" "$ROOT/restored" "$ROOT/local-project" "$ROOT/tmp" "$ROOT/cli"
+          echo "BC_UNENCRYPTED_TEMP_CLEANUP=ATTEMPTED"

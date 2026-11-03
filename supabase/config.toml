@@ -2,3 +2,6 @@ project_id = "papxnkkjtkxsitcsvcme"
 
 [functions.bc-username-login]
 verify_jwt = false
+
+[functions.bc-bootstrap-admin]
+verify_jwt = false
