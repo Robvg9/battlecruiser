@@ -117,7 +117,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.58["']/);
+  assert.match(sw, /BC_SW_VERSION\\s*=\\s*["']9\\.5\\.59["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261030\.2/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261030\.3/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -140,7 +140,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.58 — inventario físico compartido entre jornadas, conciliación de recepción y revisión del dueño/);
+  assert.match(app, /v9\\.5\\.59 — inventario físico compartido entre jornadas, conciliación de recepción y revisión del dueño/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.58"><\/script>/);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
@@ -207,6 +207,6 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.9"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.58["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.58["']/);
+  assert.match(app, /const VERSION=["']9\\.5\\.59["']/);
+  assert.match(sw, /BC_SW_VERSION\\s*=\\s*["']9\\.5\\.59["']/);
 });
