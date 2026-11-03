@@ -199,7 +199,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
       c.getRefreshCalls()===1,
   "the existing Productos submit handler must call the create operation and refresh the list"
  );
- assert.deepEqual(c.operationCalls[0],{
+ assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[0])),{
   name:"producto",
   payload:{
    p_nombre:"Arroz",
