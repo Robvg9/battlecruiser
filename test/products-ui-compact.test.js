@@ -65,6 +65,7 @@ test("nomenclature moves to Administration and import is a single action inside 
 
 const PRODUCTOS_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","productos.js"),"utf8");
 const M26_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m26-ui-integridad.js"),"utf8");
+const M55_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m55-productos-import.js"),"utf8");
 const M171_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","hotfix-17-1-productos-import-flow-20260903.js"),"utf8");
 
 function nativeModalFixture(){
@@ -117,10 +118,13 @@ function nativeModalFixture(){
   return {ok:true,data:"producto-test-001",offline:false};
  };
  w.explicarError=function(){return "error simulado";};
- w.__BCM55_openOffline=function(){importCalls++;};
+ w.tienePermiso=function(){return true;};
  w.eval(PRODUCTOS_SOURCE);
  w.refrescarProductos=async function(){refreshCalls++;return {};};
  w.eval(M26_SOURCE);
+  w.eval(M55_SOURCE);
+  const nativeM55Open=w.__BCM55_openOffline;
+  w.__BCM55_openOffline=function(){importCalls++;return nativeM55Open.apply(this,arguments);};
  w.eval(M171_SOURCE);
  w.eval(SOURCE);
  return {
@@ -185,7 +189,35 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.equal(modal.classList.contains("hidden"),false);
  assert.equal(d.querySelectorAll("#bc-product-modal").length,1);
 
- d.getElementById("bc-product-import-open").click();
+ const importButton=d.getElementById("bc-product-import-open");
+ assert.ok(importButton.closest("#bc-product-modal"),"the single import action must stay inside the native M26 modal");
+ importButton.click();
+ const importOverlay=d.getElementById("bc-m55-overlay");
+ const importFile=d.getElementById("bc-m55-file");
+ assert.ok(importOverlay,"the real M55 import dialog must open");
+ assert.ok(importFile.accept.includes(".csv") && importFile.accept.includes(".xlsx"),"the importer must retain CSV and Excel support");
+ Object.defineProperty(importFile,"files",{configurable:true,value:[{
+  name:"productos.csv",
+  text:async function(){return "Nombre,Categoría,Unidad,Precio normal,Precio mayorista\nAvena,Secos,paquete,10,8";}
+ }]});
+ importFile.dispatchEvent(new w.Event("change",{bubbles:true}));
+ await waitFor(
+  ()=>!!d.getElementById("bc-m55-run") && /Estructura válida/.test(d.getElementById("bc-m55-body").textContent),
+  "M55 must parse the selected CSV and render a validated preview"
+ );
+ d.getElementById("bc-m55-run").click();
+ await waitFor(
+  ()=>c.operationCalls.length===2 && /1 producto\(s\) procesado\(s\)/.test(d.getElementById("bc-m55-body").textContent),
+  "M55 must process the CSV row through the existing product create operation"
+ );
+ assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[1])),{
+  name:"producto",
+  payload:{p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",p_precio_normal:10,p_precio_mayorista:8}
+ });
+ d.getElementById("bc-m55-cancel").click();
+ assert.equal(d.getElementById("bc-m55-overlay"),null,"closing import must remove its own overlay");
+ assert.equal(d.querySelectorAll("#bc-product-modal").length,1,"M26 must remain the only product-form modal");
+ assert.equal(modal.classList.contains("hidden"),false,"closing import must return to the native product form");
  assert.equal(c.getImportCalls(),1,"the single import entry must delegate to the existing M55 importer");
 
  d.getElementById("prod-nombre").value="Arroz";
