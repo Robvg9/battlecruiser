@@ -103,6 +103,7 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 });
 
 
+// PWA 9.5.59 rotates the shell cache and keeps the M68 fallback aligned.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.5\.59["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.59["']/);
