@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.57 — inventario físico compartido entre jornadas, conciliación de recepción y revisión del dueño
+// v9.5.58 — almacenes: flujo de alta y entrada en Centro de Control entre jornadas, conciliación de recepción y revisión del dueño
 (function hotfixV9475(){
-  const VERSION="9.5.57";
+  const VERSION="9.5.58";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -15,7 +15,7 @@
 (function cargarModulosDinamicos(){
   const modules=[
     ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.7"],["bc7-jornada-ui.js","7.13"],
-    ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.5"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
+    ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.1"],["permisos-navegacion.js","67.6"],["fix-permisos-rol.js","60.1"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js","20261023.2"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js",null],["aprobaciones-admin.js",null],
     ["m26-ui-integridad.js","26.31"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.2"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.2"],["ui-operaciones-hub.js","41.2"],
@@ -27,7 +27,7 @@
     ["m26-12-comunicacion-whatsapp.js","26.12"],["m26-13-comunicacion-ux.js","26.13"],["m26-15-comunicacion-layout.js","26.15b"],["fix-permisos-carga.js","26.18"],
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
     ["m27-5-ventas-precio-politica.js","27.5b5"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6b"],
-    ["m27-6b-venta-payload-pres.js","27.6b2"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7d"],
+    ["m27-6b-venta-payload-pres.js","27.6b2"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7e"],
     ["mision-d-stock-reposicion.js","D.10"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","inv.1"],["compra-multiple.js","27.9"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
     ["m29-turnos-organizacion.js","29.20"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.20"],["turno-cash-handover-ui.js","1.0"],["hotfix-turno-forceclose-20260902.js","20261030.1"],["m34-turnos-filter-final.js","34.3"],

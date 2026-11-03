@@ -51,8 +51,10 @@
   };
   var RUTAS_PERSONALES = { conectividad: true, preferencias: true };
   var PERMISOS_OPERACION = ["gastos", "mermas", "reinversiones", "responsabilidades", "incidencias"];
+  // El Centro de Control es la entrada por defecto cuando el rol tiene acceso.
+  // Jornada queda como fallback natural para perfiles sin permiso de reportes.
   var ORDEN_HOME = [
-    "jornada", "ciclos", "resumen", "comunicacion", "productos", "almacenes",
+    "resumen", "jornada", "ciclos", "comunicacion", "productos", "almacenes",
     "movimientos", "inventario", "reportes", "ventas", "operacion", "pendientes",
     "mando", "usuarios", "config", "conectividad", "preferencias"
   ];
