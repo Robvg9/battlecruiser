@@ -57,6 +57,7 @@ jobs:
         run: |
           node --check public/app.js
           node --check public/service-worker.js
+          node --check public/js/bootstrap.js
           node --check public/js/m33-turnos-final.js
           node --check public/js/bc7-jornada-ui.js
           node --check public/js/turnos-maestro.js
