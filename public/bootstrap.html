@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c1c18">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Inicializar administrador — BattleCruiser</title>
+  <link rel="stylesheet" href="style.css?v=9.5.57">
+  <style>
+    .bc-bootstrap-page{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px 14px}
+    .bc-bootstrap-card{width:min(100%,460px);max-height:none!important}
+    .bc-bootstrap-card h1{margin-bottom:8px}
+    .bc-bootstrap-intro{font-size:13px;line-height:1.55;color:var(--mist);margin:0 0 18px}
+    .bc-bootstrap-card .field{margin-bottom:13px}
+    .bc-bootstrap-card input{width:100%}
+    .bc-bootstrap-note{font-size:11px;line-height:1.5;color:var(--mist);margin:12px 0}
+    .bc-bootstrap-message{min-height:42px;margin:12px 0 0;font-size:13px;line-height:1.5}
+    .bc-bootstrap-message[data-kind="error"]{color:#e4a19a}
+    .bc-bootstrap-message[data-kind="success"]{color:#a8d9b3}
+    .bc-bootstrap-back{display:block;text-align:center;margin-top:14px;color:var(--gold);font-size:13px}
+    .bc-bootstrap-card button[type="submit"]{width:100%;margin-top:6px}
+    @media(max-width:480px){.bc-bootstrap-page{padding:14px}.bc-bootstrap-card{padding:20px 16px}}
+  </style>
+</head>
+<body>
+  <div class="stalactites"></div>
+  <div class="bc-bootstrap-page">
+    <form id="bc-bootstrap-form" class="card bc-bootstrap-card" novalidate>
+      <div class="lantern-wrap">
+        <div class="lantern-glow"></div>
+        <div class="status-line"><span class="status-dot"></span><span>Inicialización protegida</span></div>
+      </div>
+      <h1>Primer administrador</h1>
+      <p class="bc-bootstrap-intro">Crea la cuenta propietaria de BattleCruiser. Este proceso solo se permite una vez, con un código temporal de inicialización.</p>
+
+      <div class="field">
+        <label for="bc-bootstrap-name">Nombre del propietario</label>
+        <input id="bc-bootstrap-name" name="username" type="text" maxlength="120" autocomplete="name" required>
+      </div>
+      <div class="field">
+        <label for="bc-bootstrap-email">Correo de acceso</label>
+        <input id="bc-bootstrap-email" name="email" type="email" maxlength="254" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="bc-bootstrap-password">Nueva contraseña</label>
+        <input id="bc-bootstrap-password" name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required>
+      </div>
+      <div class="field">
+        <label for="bc-bootstrap-confirm">Confirmar contraseña</label>
+        <input id="bc-bootstrap-confirm" name="confirm" type="password" minlength="12" maxlength="256" autocomplete="new-password" required>
+      </div>
+      <div class="field">
+        <label for="bc-bootstrap-token">Código temporal de un solo uso</label>
+        <input id="bc-bootstrap-token" name="token" type="password" minlength="32" maxlength="512" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      </div>
+
+      <p class="bc-bootstrap-note">Usa la misma información si necesitas reintentar una solicitud interrumpida. La contraseña y el código solo se envían por HTTPS a Supabase; esta página no los guarda.</p>
+      <button type="submit" id="bc-bootstrap-submit">Crear cuenta Dueño</button>
+      <p class="bc-bootstrap-message" id="bc-bootstrap-message" role="status" aria-live="polite"></p>
+      <a class="bc-bootstrap-back" href="./">Volver al acceso</a>
+    </form>
+  </div>
+  <script src="js/bootstrap.js?v=step14.1"></script>
+</body>
+</html>
