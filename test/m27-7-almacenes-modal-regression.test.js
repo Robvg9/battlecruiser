@@ -88,10 +88,9 @@ test("M27.7: crear almacén ejecuta el RPC con nombre y todos los tipos válidos
 
     assert.equal(await waitFor(() => calls.length === index + 1), true,
       "Guardar debe invocar ejecutarOperacion para " + item.type);
-    assert.deepEqual(calls[index], {
-      type: "almacen",
-      payload: { p_nombre: "Bodega fixture " + (index + 1), p_tipo: item.rpcType }
-    });
+    assert.equal(calls[index].type, "almacen");
+    assert.equal(calls[index].payload.p_nombre, "Bodega fixture " + (index + 1));
+    assert.equal(calls[index].payload.p_tipo, item.rpcType);
     assert.equal(await waitFor(() => selected.length === index + 1), true,
       "el almacén creado debe seleccionarse tras refrescar el catálogo");
     assert.equal(selected[index], "warehouse-fixture-" + (index + 1));

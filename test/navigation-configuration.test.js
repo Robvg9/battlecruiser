@@ -231,7 +231,7 @@ test("app shell, application and Service Worker share 9.5.58 and load refreshed 
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.58"/);
   assert.match(index, /href="style\.css\?v=9\.5\.58"/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.58"><\/script>/);
-  assert.match(app, /\["permisos-navegacion\.js","67\.5"\]/);
+  assert.match(app, /\["permisos-navegacion\.js","67\.6"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261101\.1"\]/);
