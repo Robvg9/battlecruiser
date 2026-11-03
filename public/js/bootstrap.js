@@ -48,7 +48,11 @@
       showMessage("Escribe un nombre válido.", "error");
       return;
     }
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+    const atPosition = email.indexOf("@");
+    const lastDot = email.lastIndexOf(".");
+    if (atPosition < 1 || atPosition !== email.lastIndexOf("@") ||
+        lastDot <= atPosition + 1 || lastDot === email.length - 1 ||
+        email.includes(" ") || email.length > 254) {
       showMessage("Escribe un correo válido.", "error");
       return;
     }
@@ -71,6 +75,7 @@
 
     submit.disabled = true;
     submit.textContent = "Inicializando…";
+    let completed = false;
     try {
       const response = await fetch(FUNCTION_URL, {
         method: "POST",
@@ -92,7 +97,9 @@
       if (response.ok && result && result.initialized === true) {
         try { sessionStorage.removeItem(REQUEST_ID_KEY); } catch (_) {}
         form.reset();
-        form.hidden = true;
+        completed = true;
+        submit.disabled = true;
+        submit.textContent = "Cuenta Dueño creada";
         showMessage("Cuenta Dueño creada. Ya puedes volver al acceso e iniciar sesión con tu correo y la contraseña nueva.", "success");
         return;
       }
@@ -108,8 +115,10 @@
     } catch (_) {
       showMessage("No se pudo confirmar la respuesta. Mantén los mismos datos y reintenta esta solicitud.", "error");
     } finally {
-      submit.disabled = false;
-      submit.textContent = "Crear cuenta Dueño";
+      if (!completed) {
+        submit.disabled = false;
+        submit.textContent = "Crear cuenta Dueño";
+      }
     }
   });
 })();
