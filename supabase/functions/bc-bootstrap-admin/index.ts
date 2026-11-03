@@ -47,19 +47,6 @@ function validUuid(value: unknown): value is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-async function sameSecret(a: string, b: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const [ha, hb] = await Promise.all([
-    crypto.subtle.digest("SHA-256", encoder.encode(a)),
-    crypto.subtle.digest("SHA-256", encoder.encode(b)),
-  ]);
-  const aa = new Uint8Array(ha);
-  const bb = new Uint8Array(hb);
-  let difference = 0;
-  for (let i = 0; i < aa.length; i++) difference |= aa[i] ^ bb[i];
-  return difference === 0;
-}
-
 Deno.serve(async (req: Request) => {
   let origin: string | null = null;
   try {
@@ -105,13 +92,11 @@ Deno.serve(async (req: Request) => {
 
   const url = Deno.env.get("SUPABASE_URL");
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const configuredToken = Deno.env.get("BC_BOOTSTRAP_TOKEN");
-  if (!url || !serviceRole || !configuredToken) {
+  if (!url || !serviceRole) {
     return reply({ error: "El servicio de inicialización no está configurado." }, 503);
   }
 
   try {
-    const configuredSecretMatches = await sameSecret(token, configuredToken);
     const admin = createClient(url, serviceRole, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
@@ -122,7 +107,7 @@ Deno.serve(async (req: Request) => {
       p_token: token,
       p_request_id: requestId,
     });
-    if (!configuredSecretMatches || claim.error || !claim.data?.ok) {
+    if (claim.error || !claim.data?.ok) {
       return reply({ error: "No se pudo inicializar el administrador." }, 401);
     }
 
