@@ -451,7 +451,9 @@
         if (typeof cancelarEdicionProducto === 'function') {
           try { cancelarEdicionProducto(); } catch (err) {}
         }
-        mostrarFormularioProducto();
+        var openNativeProductModal = window.__BCM26_openProductModal;
+        if (typeof openNativeProductModal === 'function') openNativeProductModal();
+        else mostrarFormularioProducto();
       });
       controles.appendChild(agregar);
       barra.appendChild(controles);

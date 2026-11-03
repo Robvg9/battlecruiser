@@ -1,4 +1,4 @@
-// BattleCruiser M75 — interfaz compacta de Productos y encabezado global.
+// BattleCruiser M75 v75.2 — interfaz compacta de Productos y encabezado global.
 (function () {
   'use strict';
   if (window.__BCM75_PRODUCTS_UI) return;
@@ -39,7 +39,10 @@
       '#tab-productos #bc-productos-filtros{display:flex;align-items:center;flex:1 1 auto;min-width:0}',
       '#tab-productos #bc-productos-categoria-filter{width:100%;min-width:0;min-height:36px;box-sizing:border-box;padding:6px 30px 6px 10px;border:1px solid rgba(212,176,92,.22);border-radius:8px;background:var(--stone);color:var(--text);font:500 11.5px Inter,sans-serif}',
       '#tab-productos #bc-productos-agregar{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;min-height:36px!important;min-width:116px!important;margin:0!important;padding:7px 12px!important;border:1px solid var(--gold)!important;border-radius:8px!important;background:var(--gold)!important;color:#0c1c18!important;font-size:12px!important;font-weight:700!important;line-height:1.1!important;white-space:nowrap!important;visibility:visible!important;opacity:1!important}',
-      '#tab-productos #bc-productos-orden,#tab-productos #bc-productos-vista,#tab-productos .bc-m44-view-tools{display:none!important}',
+      '#tab-productos #bc-productos-orden,#tab-productos #bc-productos-vista{display:none!important}',
+      '#tab-productos #bc-productos-controles .bc-m44-view-tools{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:4px!important;flex:0 0 auto!important;margin:0!important;min-height:32px!important;padding:0!important}',
+      '#tab-productos #bc-productos-controles .bc-m44-view-label{display:none!important}',
+      '#tab-productos #bc-productos-controles .bc-m44-view-btn{min-height:32px!important;padding:6px 8px!important;font-size:10.5px!important;line-height:1!important}',
       '#tab-productos .bc-category-hidden{display:none!important}',
       '#tab-productos #productos-tools-nomenclatura{display:none!important}',
       '#bc-product-catalog-entry{margin:10px 0 14px;padding:12px 14px;border:1px solid rgba(212,176,92,.18);border-radius:10px;background:var(--stone)}',
@@ -70,7 +73,7 @@
       '#bc-product-modal .bc-product-form-actions #prod-submit-btn{min-height:40px!important;padding:10px 12px!important;font-size:13px!important;border-radius:9px!important}',
       '#bc-m55-overlay{z-index:11000!important;padding:8px!important}',
       '#bc-m55-overlay .bc-m55-modal{width:min(720px,100%)!important;margin:8px auto!important;padding:12px!important;border-radius:11px!important}',
-      '@media(max-width:700px){#tab-productos #bc-productos-controles{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:7px!important}#tab-productos #bc-productos-agregar{min-width:108px!important;padding:7px 9px!important;font-size:11px!important}#bc-product-modal{padding:7px!important}#bc-product-modal .bc-product-modal-dialog{width:100%!important;border-radius:12px!important}#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 92px!important;gap:7px!important}#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:92px!important;max-width:92px!important}#bc-product-modal .prod-pres-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}}'
+      '@media(max-width:700px){#tab-productos #bc-productos-controles{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"filters add" "views views"!important;gap:7px!important}#tab-productos #bc-productos-filtros{grid-area:filters;min-width:0}#tab-productos #bc-productos-agregar{grid-area:add;min-width:108px!important;padding:7px 9px!important;font-size:11px!important}#tab-productos #bc-productos-controles .bc-m44-view-tools{grid-area:views;justify-self:end!important}#tab-productos #bc-productos-controles .bc-m44-view-btn{padding:6px 8px!important}#bc-product-modal{padding:7px!important}#bc-product-modal .bc-product-modal-dialog{width:100%!important;border-radius:12px!important}#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 92px!important;gap:7px!important}#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:92px!important;max-width:92px!important}#bc-product-modal .prod-pres-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}}'
     ].join('\n');
     document.head.appendChild(style);
   }
@@ -146,6 +149,17 @@
       select.addEventListener('change', applyCategoryFilter);
     }
     refreshCategoryOptions(filterWrap.querySelector('select'));
+    // Keep the single M44 selector (Filas/Cuadros) but remove M26's legacy
+    // sort/view containers; M75 owns the compact toolbar layout.
+    var viewTools = controls.querySelector('.bc-m44-view-tools');
+    controls.querySelectorAll('#bc-productos-orden,#bc-productos-vista').forEach(function (node) { node.remove(); });
+    var duplicateViewTools = controls.querySelectorAll('.bc-m44-view-tools');
+    Array.prototype.slice.call(duplicateViewTools, 1).forEach(function (node) { node.remove(); });
+    controls.insertBefore(filterWrap, viewTools || add);
+    Array.from(controls.children).forEach(function (node) {
+      if (node === add || node === filterWrap || node.classList.contains('bc-m44-view-tools')) return;
+      node.remove();
+    });
     removeLegacyProductControls(panel);
     if (!listObserver) {
       var list = document.getElementById('lista-productos');
@@ -235,6 +249,7 @@
     var panel = document.getElementById('tab-productos');
     var modal = document.getElementById('bc-product-modal');
     var add = document.getElementById('bc-productos-agregar');
+    var controls = document.getElementById('bc-productos-controles');
     var tools = document.getElementById('productos-tools-nomenclatura');
     var importButton = document.getElementById('bc-product-import-open');
     return {
@@ -244,6 +259,8 @@
       }).length : 0,
       addLabel: add ? add.textContent : null,
       categoryFilter: !!document.getElementById('bc-productos-categoria-filter'),
+      viewButtonCount: panel ? panel.querySelectorAll('.bc-m44-view-tools .bc-m44-view-btn').length : 0,
+      viewControlsInToolbar: !!(controls && controls.querySelector('.bc-m44-view-tools')),
       nomenclatureInAdmin: !!(tools && document.getElementById('tab-config') && document.getElementById('tab-config').contains(tools)),
       importButtonCount: modal ? modal.querySelectorAll('#bc-product-import-open').length : 0,
       importButtonLabel: importButton ? importButton.textContent : null,

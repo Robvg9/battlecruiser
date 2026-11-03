@@ -65,6 +65,8 @@ test("nomenclature moves to Administration and import is a single action inside 
 
 const PRODUCTOS_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","productos.js"),"utf8");
 const M26_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m26-ui-integridad.js"),"utf8");
+const M44_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m44-productos-vistas.js"),"utf8");
+const M47_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m47-productos-vista-final.js"),"utf8");
 const M55_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m55-productos-import.js"),"utf8");
 const M171_SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","hotfix-17-1-productos-import-flow-20260903.js"),"utf8");
 
@@ -122,6 +124,8 @@ function nativeModalFixture(){
  w.eval(PRODUCTOS_SOURCE);
  w.refrescarProductos=async function(){refreshCalls++;return {};};
  w.eval(M26_SOURCE);
+  w.eval(M44_SOURCE);
+  w.eval(M47_SOURCE);
   w.eval(M55_SOURCE);
   const nativeM55Open=w.__BCM55_openOffline;
   w.__BCM55_openOffline=function(){importCalls++;return nativeM55Open.apply(this,arguments);};
@@ -160,6 +164,19 @@ test("native Add opens the single M26 modal and preserves the existing product c
   "M26, M17.1 and M75 must finish initializing around the native product modal"
  );
  w.__BCM75_apply();
+ await waitFor(
+  ()=>{const controls=d.getElementById("bc-productos-controles");const tools=d.querySelector(".bc-m44-view-tools");return !!(controls&&tools&&controls.contains(tools)&&tools.querySelectorAll(".bc-m44-view-btn").length===2);},
+  "M75 must preserve M44's single functional rows/cards selector"
+ );
+ const viewState=w.__BCM75_verify();
+ assert.equal(viewState.viewButtonCount,2,"the two existing M44 view actions must remain available");
+ assert.equal(viewState.viewControlsInToolbar,true,"the view selector must remain inside the compact Products toolbar");
+ const rowsButton=d.querySelector('.bc-m44-view-btn[data-view="rows"]');
+ const cardsButton=d.querySelector('.bc-m44-view-btn[data-view="cards"]');
+ rowsButton.click();
+ assert.ok(d.getElementById("lista-productos").classList.contains("bc-productos-filas"),"Filas must still change the product list");
+ cardsButton.click();
+ assert.ok(d.getElementById("lista-productos").classList.contains("bc-productos-cards"),"Cuadros must still change the product list");
  const add=d.getElementById("bc-productos-agregar");
  const modal=d.getElementById("bc-product-modal");
  const form=d.getElementById("form-producto");
@@ -173,7 +190,11 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.equal(w.__BCM75_verify().addButtonCount,1,"M75 must preserve only one visible Add action");
  assert.equal(w.__BC171_verify().singleOwner,true,"M17.1 must reuse M26's form owner");
 
+ let m26ApiCalls=0;
+ const nativeM26Open=w.__BCM26_openProductModal;
+ w.__BCM26_openProductModal=function(){m26ApiCalls++;return nativeM26Open.apply(this,arguments);};
  add.click();
+ assert.equal(m26ApiCalls,1,"the visible Add action must invoke the exported M26 open API exactly once");
  assert.equal(modal.classList.contains("hidden"),false,"clicking Add must open the M26 modal");
  assert.equal(modal.getAttribute("aria-hidden"),"false");
  assert.equal(form.dataset.bcProductFormOpen,"1");
@@ -181,11 +202,9 @@ test("native Add opens the single M26 modal and preserves the existing product c
 
  w.__BCM26_closeProductModal(false);
  assert.equal(modal.classList.contains("hidden"),true);
- let openApiCalls=0;
- const nativeOpen=w.__BCM26_openProductModal;
- w.__BCM26_openProductModal=function(){openApiCalls++;return nativeOpen.apply(this,arguments);};
+ const callsBeforeM171=m26ApiCalls;
  assert.equal(w.__BC171_open(),true,"M17.1 must open through the exported M26 API");
- assert.equal(openApiCalls,1,"M17.1 must call window.__BCM26_openProductModal exactly once");
+ assert.equal(m26ApiCalls-callsBeforeM171,1,"M17.1 must call window.__BCM26_openProductModal exactly once");
  assert.equal(modal.classList.contains("hidden"),false);
  assert.equal(d.querySelectorAll("#bc-product-modal").length,1);
 
@@ -207,10 +226,10 @@ test("native Add opens the single M26 modal and preserves the existing product c
  );
  d.getElementById("bc-m55-run").click();
  await waitFor(
-  ()=>c.operationCalls.length===2 && /1 producto\(s\) procesado\(s\)/.test(d.getElementById("bc-m55-body").textContent),
+  ()=>c.operationCalls.length===1 && /1 producto\(s\) procesado\(s\)/.test(d.getElementById("bc-m55-body").textContent),
   "M55 must process the CSV row through the existing product create operation"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[1])),{
+ assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[0])),{
   name:"producto",
   payload:{p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",p_precio_normal:10,p_precio_mayorista:8}
  });
@@ -226,12 +245,12 @@ test("native Add opens the single M26 modal and preserves the existing product c
  d.getElementById("prod-precio-mayorista").value="10.25";
  form.dispatchEvent(new w.Event("submit",{bubbles:true,cancelable:true}));
  await waitFor(
-  ()=>c.operationCalls.length===1 &&
+  ()=>c.operationCalls.length===2 &&
       c.messages.some(function(item){return item.id==="msg-productos" && item.message==="Producto creado.";}) &&
       c.getRefreshCalls()===1,
   "the existing Productos submit handler must call the create operation and refresh the list"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[0])),{
+ assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[1])),{
   name:"producto",
   payload:{
    p_nombre:"Arroz",
