@@ -1,0 +1,255 @@
+// BattleCruiser M75 — interfaz compacta de Productos y encabezado global.
+(function () {
+  'use strict';
+  if (window.__BCM75_PRODUCTS_UI) return;
+  window.__BCM75_PRODUCTS_UI = true;
+  var STYLE_ID = 'bc-m75-products-compact-style';
+  var listObserver = null;
+
+  function installStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    var style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = [
+      '#app-shell.visible > .app-header{box-sizing:border-box;padding:8px 16px!important;min-height:54px;gap:8px!important;margin-bottom:8px!important}',
+      '#app-shell.visible > .app-header .header-left{min-width:0;gap:9px!important;align-items:center}',
+      '#app-shell.visible > .app-header .header-left h1{font-size:clamp(16px,2vw,19px)!important;line-height:1.1!important;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis}',
+      '#app-shell.visible > .app-header .header-right{gap:6px 8px!important;font-size:11.5px!important;align-items:center}',
+      '#app-shell.visible > .app-header .header-right button{min-height:32px!important;padding:6px 10px!important;border-radius:8px!important;font-size:11.5px!important;line-height:1.1!important;white-space:nowrap!important}',
+      '#conn-status-app{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid rgba(212,176,92,.16);border-radius:999px;background:rgba(212,176,92,.055);font-size:10.5px!important;line-height:1.2}',
+      '#conn-status-app .status-dot{width:7px;height:7px;flex:0 0 7px}',
+      '#user-email{display:block;max-width:clamp(130px,22vw,260px);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px!important;line-height:1.2}',
+      '@media(max-width:759px),(hover:none) and (pointer:coarse){',
+      '#app-shell.visible > .app-header{display:grid!important;grid-template-columns:minmax(0,1fr) auto auto!important;grid-template-areas:"brand account logout" "status queue user"!important;align-items:center!important;gap:5px 7px!important;padding:7px 2px 8px!important;width:100%}',
+      '#app-shell.visible > .app-header .header-left{grid-area:brand;min-width:0;gap:7px!important;padding-left:0!important}',
+      '#app-shell.visible > .app-header .header-left h1{font-size:16px!important;max-width:100%}',
+      '#app-shell.visible > .app-header .header-right{display:contents!important}',
+      '#sidebar-toggle-btn{width:34px!important;height:34px!important;min-width:34px!important;margin:0!important;border-radius:8px!important}',
+      '#sidebar-toggle-btn svg{width:18px!important;height:18px!important}',
+      '#mi-cuenta-btn{grid-area:account;justify-self:end;min-height:30px!important;padding:5px 8px!important;font-size:10.5px!important}',
+      '#logout-btn{grid-area:logout;justify-self:end;min-height:30px!important;margin:0!important;padding:5px 8px!important;font-size:10.5px!important}',
+      '#conn-status-app{grid-area:status;justify-self:start;min-width:0;padding:4px 7px;font-size:10px!important}',
+      '#cola-pendientes-badge{grid-area:queue;justify-self:center;max-width:100%}',
+      '#user-email{grid-area:user;justify-self:end;max-width:40vw;text-align:right;font-size:10.5px!important}',
+      '}',
+      '#tab-productos #bc-productos-barra{position:relative!important;top:auto!important;display:flex!important;flex-direction:column!important;gap:8px!important;margin:0 0 12px!important;padding:0 0 8px!important;background:transparent!important;z-index:3!important}',
+      '#tab-productos #bc-productos-barra .bc-productos-search{width:100%!important;min-width:0!important}',
+      '#tab-productos #bc-productos-barra #productos-buscar{width:100%!important;min-height:40px!important;box-sizing:border-box!important;border-radius:9px!important;padding:8px 12px!important;font-size:13px!important}',
+      '#tab-productos #bc-productos-controles{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;flex-wrap:nowrap!important;width:100%!important}',
+      '#tab-productos #bc-productos-filtros{display:flex;align-items:center;flex:1 1 auto;min-width:0}',
+      '#tab-productos #bc-productos-categoria-filter{width:100%;min-width:0;min-height:36px;box-sizing:border-box;padding:6px 30px 6px 10px;border:1px solid rgba(212,176,92,.22);border-radius:8px;background:var(--stone);color:var(--text);font:500 11.5px Inter,sans-serif}',
+      '#tab-productos #bc-productos-agregar{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;min-height:36px!important;min-width:116px!important;margin:0!important;padding:7px 12px!important;border:1px solid var(--gold)!important;border-radius:8px!important;background:var(--gold)!important;color:#0c1c18!important;font-size:12px!important;font-weight:700!important;line-height:1.1!important;white-space:nowrap!important;visibility:visible!important;opacity:1!important}',
+      '#tab-productos #bc-productos-orden,#tab-productos #bc-productos-vista,#tab-productos .bc-m44-view-tools{display:none!important}',
+      '#tab-productos .bc-category-hidden{display:none!important}',
+      '#tab-productos #productos-tools-nomenclatura{display:none!important}',
+      '#bc-product-catalog-entry{margin:10px 0 14px;padding:12px 14px;border:1px solid rgba(212,176,92,.18);border-radius:10px;background:var(--stone)}',
+      '#bc-product-catalog-entry h3{margin:0 0 5px;font-size:16px}',
+      '#bc-product-catalog-entry p{margin:0 0 9px;font-size:11.5px;line-height:1.4;color:var(--mist)}',
+      '#bc-product-catalog-entry #productos-tools-nomenclatura{display:block!important;margin:0!important}',
+      '#bc-product-catalog-entry #productos-nomenclatura-btn{min-height:34px;padding:7px 11px;font-size:11.5px;border-radius:8px}',
+      '#bc-product-modal .bc-product-modal-head{display:flex!important;align-items:center!important;gap:8px!important;padding:9px 12px 5px!important}',
+      '#bc-product-modal .bc-product-modal-head h3{font-size:1.1rem!important;line-height:1.15!important;flex:1 1 auto;min-width:0}',
+      '#bc-product-modal #bc-product-import-open{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:31px;padding:6px 8px;border:1px solid rgba(212,176,92,.35);border-radius:8px;background:rgba(212,176,92,.1);color:var(--gold-bright);font:600 10.5px/1.1 Inter,sans-serif;white-space:nowrap;cursor:pointer}',
+      '#bc-product-modal #bc-product-form-host{padding:4px 12px 12px!important}',
+      '#bc-product-modal #form-producto,#bc-product-modal #form-producto.bc-producto-modal-form{gap:8px!important}',
+      '#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 104px!important;gap:8px!important}',
+      '#bc-product-modal .bc-product-form-fields{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}',
+      '#bc-product-modal .bc-product-field:nth-child(1),#bc-product-modal .bc-product-field:nth-child(2){grid-column:1/-1}',
+      '#bc-product-modal .bc-product-field input,#bc-product-modal .bc-product-field select{height:36px!important;min-height:36px!important;max-height:36px!important;padding:0 8px!important;font-size:11.5px!important;line-height:36px!important;border-radius:8px!important}',
+      '#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:104px!important;max-width:104px!important}',
+      '#bc-product-modal .prod-imagen-campo{gap:5px!important;padding:6px!important;border-radius:9px!important}',
+      '#bc-product-modal .prod-imagen-campo .prod-imagen-label{font-size:8px!important;line-height:1.2!important}',
+      '#bc-product-modal .prod-imagen-preview{height:58px!important;max-width:88px!important}',
+      '#bc-product-modal .prod-pres-config{padding:8px 9px!important;border-radius:9px!important}',
+      '#bc-product-modal .prod-pres-config legend{font-size:11.5px!important;font-weight:600}',
+      '#bc-product-modal .prod-pres-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}',
+      '#bc-product-modal .prod-pres-config .field{min-width:0!important;gap:3px!important}',
+      '#bc-product-modal .prod-pres-config .field label{font-size:9.5px!important;line-height:1.2!important}',
+      '#bc-product-modal .prod-pres-config small{font-size:8.5px!important;line-height:1.2!important}',
+      '#bc-product-modal .prod-pres-config select,#bc-product-modal .prod-pres-config input{width:100%;height:33px!important;min-height:33px!important;padding:0 7px!important;font-size:10.5px!important;border-radius:7px!important}',
+      '#bc-product-modal .bc-product-form-actions #prod-submit-btn{min-height:40px!important;padding:10px 12px!important;font-size:13px!important;border-radius:9px!important}',
+      '#bc-m55-overlay{z-index:11000!important;padding:8px!important}',
+      '#bc-m55-overlay .bc-m55-modal{width:min(720px,100%)!important;margin:8px auto!important;padding:12px!important;border-radius:11px!important}',
+      '@media(max-width:700px){#tab-productos #bc-productos-controles{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:7px!important}#tab-productos #bc-productos-agregar{min-width:108px!important;padding:7px 9px!important;font-size:11px!important}#bc-product-modal{padding:7px!important}#bc-product-modal .bc-product-modal-dialog{width:100%!important;border-radius:12px!important}#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 92px!important;gap:7px!important}#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:92px!important;max-width:92px!important}#bc-product-modal .prod-pres-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function removeLegacyProductControls(panel) {
+    if (!panel) return;
+    ['#bc164-add-open','#bc171-add','#bc-m55-template','#bc149-menu','.bc-m55-bar','.bc164-tools','.bc-product-toolbar'].forEach(function (selector) {
+      panel.querySelectorAll(selector).forEach(function (node) { node.remove(); });
+    });
+    var primary = document.getElementById('bc-productos-agregar');
+    panel.querySelectorAll('button').forEach(function (button) {
+      if (button === primary) return;
+      var label = (button.textContent || '').replace(/^[＋+]\s*/, '').trim().toLowerCase();
+      if (label === 'agregar producto' || label === 'registrar nuevo producto') button.remove();
+      if (/^(importar excel\s*\/\s*csv|importar productos|plantilla xlsx|plantilla csv)$/i.test(label)) button.remove();
+    });
+  }
+
+  function refreshCategoryOptions(select) {
+    if (!select) return;
+    var rows = window._cache && Array.isArray(window._cache.categorias) ? window._cache.categorias : [];
+    var current = select.value;
+    var signature = rows.map(function (row) { return String(row.id) + ':' + String(row.nombre || row.name || ''); }).join('|');
+    if (select.dataset.signature === signature) return;
+    select.dataset.signature = signature;
+    select.innerHTML = '';
+    var all = document.createElement('option');
+    all.value = '';
+    all.textContent = 'Todas las categorías';
+    select.appendChild(all);
+    rows.forEach(function (row) {
+      var option = document.createElement('option');
+      option.value = String(row.id);
+      option.textContent = String(row.nombre || row.name || 'Sin nombre');
+      select.appendChild(option);
+    });
+    if (rows.some(function (row) { return String(row.id) === current; })) select.value = current;
+    else select.value = '';
+  }
+
+  function applyCategoryFilter() {
+    var select = document.getElementById('bc-productos-categoria-filter');
+    var list = document.getElementById('lista-productos');
+    if (!select || !list) return;
+    var categoryId = String(select.value || '');
+    var products = window._cache && Array.isArray(window._cache.productos) ? window._cache.productos : [];
+    list.querySelectorAll('[data-ctx-tipo="producto"][data-ctx-id]').forEach(function (card) {
+      var product = products.find(function (row) { return String(row.id) === String(card.dataset.ctxId); });
+      var matches = !categoryId || (product && String(product.categoria_id || '') === categoryId);
+      card.classList.toggle('bc-category-hidden', !matches);
+    });
+  }
+
+  function ensureToolbar() {
+    var panel = document.getElementById('tab-productos');
+    var controls = document.getElementById('bc-productos-controles');
+    var add = document.getElementById('bc-productos-agregar');
+    var bar = document.getElementById('bc-productos-barra');
+    if (!panel || !controls || !add || !bar) return false;
+    add.textContent = 'Agregar producto';
+    add.setAttribute('aria-controls', 'bc-product-modal');
+    add.setAttribute('aria-haspopup', 'dialog');
+    Array.from(controls.children).forEach(function (node) { if (node !== add) node.remove(); });
+    var filterWrap = document.getElementById('bc-productos-filtros');
+    if (!filterWrap) {
+      filterWrap = document.createElement('div');
+      filterWrap.id = 'bc-productos-filtros';
+      var select = document.createElement('select');
+      select.id = 'bc-productos-categoria-filter';
+      select.setAttribute('aria-label', 'Filtrar productos por categoría');
+      filterWrap.appendChild(select);
+      controls.insertBefore(filterWrap, add);
+      select.addEventListener('change', applyCategoryFilter);
+    }
+    refreshCategoryOptions(filterWrap.querySelector('select'));
+    removeLegacyProductControls(panel);
+    if (!listObserver) {
+      var list = document.getElementById('lista-productos');
+      if (list && typeof MutationObserver === 'function') {
+        listObserver = new MutationObserver(function () { applyCategoryFilter(); });
+        listObserver.observe(list, { childList: true });
+      }
+    }
+    applyCategoryFilter();
+    return true;
+  }
+
+  function moveNomenclatureToAdmin() {
+    var tool = document.getElementById('productos-tools-nomenclatura');
+    var button = document.getElementById('productos-nomenclatura-btn');
+    var admin = document.getElementById('tab-config');
+    if (!tool || !button || !admin || button.dataset.bcM26 !== '1') return false;
+    var entry = document.getElementById('bc-product-catalog-entry');
+    if (!entry) {
+      entry = document.createElement('section');
+      entry.id = 'bc-product-catalog-entry';
+      var heading = document.createElement('h3');
+      heading.textContent = 'Catálogos de productos';
+      var note = document.createElement('p');
+      note.textContent = 'Gestiona categorías, unidades de medida y presentaciones comerciales.';
+      entry.appendChild(heading);
+      entry.appendChild(note);
+      var anchor = admin.querySelector('.cc-bloque') || admin.querySelector('h3') || admin.firstChild;
+      admin.insertBefore(entry, anchor);
+    }
+    if (!entry.contains(tool)) entry.appendChild(tool);
+    button.textContent = 'Nomenclatura y catálogos';
+    button.setAttribute('aria-label', 'Abrir nomenclatura y catálogos de productos');
+    return true;
+  }
+
+  function ensureModalImporter() {
+    var modal = document.getElementById('bc-product-modal');
+    var head = modal && modal.querySelector('.bc-product-modal-head');
+    if (!modal || !head) return false;
+    var button = document.getElementById('bc-product-import-open');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'bc-product-import-open';
+      button.textContent = 'Importar Excel / CSV';
+      button.setAttribute('aria-label', 'Importar productos desde Excel o CSV');
+      var close = head.querySelector('#bc-product-modal-close');
+      head.insertBefore(button, close || null);
+      button.addEventListener('click', function () {
+        if (typeof window.__BCM55_openOffline === 'function') window.__BCM55_openOffline();
+        else if (typeof window.setMsg === 'function') window.setMsg('msg-productos', 'El importador todavía está cargando. Cierra y vuelve a abrir la ventana.', false);
+      });
+    }
+    modal.querySelectorAll('button').forEach(function (candidate) {
+      if (candidate === button || candidate.id === 'bc-product-modal-close' || candidate.id === 'bc-product-modal-cancel') return;
+      var label = (candidate.textContent || '').trim().toLowerCase();
+      if (/importar|plantilla|excel|csv/.test(label)) candidate.remove();
+    });
+    return true;
+  }
+
+  function apply() {
+    installStyles();
+    var panel = document.getElementById('tab-productos');
+    removeLegacyProductControls(panel);
+    var a = ensureToolbar();
+    var b = moveNomenclatureToAdmin();
+    var c = ensureModalImporter();
+    var logout = document.getElementById('logout-btn');
+    if (logout) { logout.textContent = 'Salir'; logout.setAttribute('aria-label', 'Cerrar sesión'); logout.title = 'Cerrar sesión'; }
+    var account = document.getElementById('mi-cuenta-btn');
+    if (account) account.textContent = 'Mi cuenta';
+    var user = document.getElementById('user-email');
+    if (user && user.textContent) user.title = user.textContent.trim();
+    return { toolbar: a, nomenclature: b, importer: c };
+  }
+
+  function boot() {
+    var attempts = 0;
+    function retry() { attempts += 1; apply(); if (attempts < 24) window.setTimeout(retry, 400); }
+    retry();
+  }
+
+  window.__BCM75_apply = apply;
+  window.__BCM75_verify = function () {
+    var panel = document.getElementById('tab-productos');
+    var modal = document.getElementById('bc-product-modal');
+    var add = document.getElementById('bc-productos-agregar');
+    var tools = document.getElementById('productos-tools-nomenclatura');
+    var importButton = document.getElementById('bc-product-import-open');
+    return {
+      addButtonCount: panel ? Array.from(panel.querySelectorAll('button')).filter(function (button) {
+        var label = (button.textContent || '').replace(/^[＋+]\s*/, '').trim().toLowerCase();
+        return label === 'agregar producto' || label === 'registrar nuevo producto';
+      }).length : 0,
+      addLabel: add ? add.textContent : null,
+      categoryFilter: !!document.getElementById('bc-productos-categoria-filter'),
+      nomenclatureInAdmin: !!(tools && document.getElementById('tab-config') && document.getElementById('tab-config').contains(tools)),
+      importButtonCount: modal ? modal.querySelectorAll('#bc-product-import-open').length : 0,
+      importButtonLabel: importButton ? importButton.textContent : null,
+      formStillInNativeModal: !!(modal && modal.contains(document.getElementById('form-producto')))
+    };
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+})();
