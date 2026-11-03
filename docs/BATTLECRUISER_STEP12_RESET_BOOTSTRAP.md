@@ -50,7 +50,7 @@ Los conteos que se conservan se comparan con el manifiesto recién respaldado, n
 
 ## Protecciones del reset
 
-La migración candidata `20261102170000_step12_reset_bootstrap_guard.sql`:
+La migración candidata `20261103014122_step12_reset_bootstrap_guard.sql`:
 
 1. Mantiene la operación inactiva hasta que un administrador provisiona un hash de token temporal y su caducidad.
 2. Acepta únicamente `service_role` o el rol administrativo local, exige una clave de solicitud UUID y la frase exacta `CONFIRMO REINICIAR BATTLECRUISER PRODUCCIÓN`.
