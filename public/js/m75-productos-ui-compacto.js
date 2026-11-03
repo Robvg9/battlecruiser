@@ -1,4 +1,4 @@
-// BattleCruiser M75 v75.2 — interfaz compacta de Productos y encabezado global.
+// BattleCruiser M75 v75.3 — interfaz compacta de Productos y encabezado global.
 (function () {
   'use strict';
   if (window.__BCM75_PRODUCTS_UI) return;
@@ -136,7 +136,6 @@
     add.textContent = 'Agregar producto';
     add.setAttribute('aria-controls', 'bc-product-modal');
     add.setAttribute('aria-haspopup', 'dialog');
-    Array.from(controls.children).forEach(function (node) { if (node !== add) node.remove(); });
     var filterWrap = document.getElementById('bc-productos-filtros');
     if (!filterWrap) {
       filterWrap = document.createElement('div');

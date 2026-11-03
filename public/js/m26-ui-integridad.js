@@ -28,7 +28,9 @@
     var modal = document.getElementById('productos-nomenclatura-modal');
     if (!productos || !modal) return;
     document.querySelectorAll('#productos-tools-nomenclatura,#productos-nomenclatura-btn').forEach(function (el) {
-      if (!el.closest('#tab-productos')) el.remove();
+      // M75 owns the catalog entry in Administration. Keep its toolbar there
+      // when this routine prepares the native nomenclature modal.
+      if (!el.closest('#tab-productos') && !el.closest('#bc-product-catalog-entry')) el.remove();
     });
     var slots = {
       'lista-categorias': 'prod-nom-categorias-slot',
