@@ -1,6 +1,6 @@
 // BattleCruiser M27.7 — Almacenes: crear y editar mediante modal (Bloques 6 y 7)
 // Reutiliza: ejecutarOperacion("almacen"), editarAlmacen, refrescarAlmacenes.
-// v27.7d — DAP-1: mapear tipos UI→contrato RPC (minorista→venta; almacenamiento permitido tras m13b).
+// v27.7e — DAP-1: IDs aislados para evitar colisión con el modal Misión C: mapear tipos UI→contrato RPC (minorista→venta; almacenamiento permitido tras m13b).
 (function () {
   'use strict';
   if (window.__BC_M277_ALM__) return;
@@ -115,37 +115,37 @@
     root.id = 'bc-alm-modal';
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
-    root.setAttribute('aria-labelledby', 'bc-alm-modal-title');
+    root.setAttribute('aria-labelledby', 'bc-m277-modal-title');
     root.innerHTML =
       '<div class="bc-alm-backdrop" data-bc-alm-close="1"></div>' +
       '<div class="bc-alm-panel">' +
       '<div class="bc-alm-head">' +
-      '<h3 id="bc-alm-modal-title">Nuevo almacén</h3>' +
+      '<h3 id="bc-m277-modal-title">Nuevo almacén</h3>' +
       '<button type="button" class="bc-alm-close" data-bc-alm-close="1" aria-label="Cerrar">×</button>' +
       '</div>' +
-      '<input type="hidden" id="bc-alm-modal-id" value="">' +
+      '<input type="hidden" id="bc-m277-modal-id" value="">' +
       '<div class="bc-alm-field">' +
-      '<label for="bc-alm-modal-nombre">Nombre</label>' +
-      '<input id="bc-alm-modal-nombre" type="text" placeholder="Nombre del almacén" autocomplete="off">' +
+      '<label for="bc-m277-modal-nombre">Nombre</label>' +
+      '<input id="bc-m277-modal-nombre" type="text" placeholder="Nombre del almacén" autocomplete="off">' +
       '</div>' +
       '<div class="bc-alm-field"><label>Tipo de almacén</label>' +
-      '<div class="bc-alm-tipos" id="bc-alm-modal-tipos">' +
+      '<div class="bc-alm-tipos" id="bc-m277-modal-tipos">' +
       TIPOS.map(function (t) {
         return '<button type="button" class="bc-alm-tipo" data-tipo="' + t.value + '">' +
           '<span>' + t.label + '<small>' + t.hint + '</small></span></button>';
       }).join('') +
       '</div></div>' +
-      '<div class="bc-alm-status" id="bc-alm-modal-status"></div>' +
+      '<div class="bc-alm-status" id="bc-m277-modal-status"></div>' +
       '<div class="bc-alm-actions">' +
       '<button type="button" class="cc-accion" data-bc-alm-close="1">Cancelar</button>' +
-      '<button type="button" class="bc-alm-save" id="bc-alm-modal-guardar">Guardar</button>' +
+      '<button type="button" class="bc-alm-save" id="bc-m277-modal-guardar">Guardar</button>' +
       '</div></div>';
     document.body.appendChild(root);
     return root;
   }
 
   function setStatus(text, ok) {
-    var el = document.getElementById('bc-alm-modal-status');
+    var el = document.getElementById('bc-m277-modal-status');
     if (!el) return;
     el.textContent = text || '';
     el.className = 'bc-alm-status' + (text ? (ok ? ' ok' : ' err') : '');
@@ -173,15 +173,15 @@
 
   function openCreate() {
     var root = ensureModal();
-    document.getElementById('bc-alm-modal-title').textContent = 'Nuevo almacén';
-    document.getElementById('bc-alm-modal-id').value = '';
-    document.getElementById('bc-alm-modal-nombre').value = '';
+    document.getElementById('bc-m277-modal-title').textContent = 'Nuevo almacén';
+    document.getElementById('bc-m277-modal-id').value = '';
+    document.getElementById('bc-m277-modal-nombre').value = '';
     selectTipo('minorista');
     setStatus('', true);
-    document.getElementById('bc-alm-modal-guardar').textContent = 'Crear almacén';
+    document.getElementById('bc-m277-modal-guardar').textContent = 'Crear almacén';
     root.classList.add('open');
     setTimeout(function () {
-      var n = document.getElementById('bc-alm-modal-nombre');
+      var n = document.getElementById('bc-m277-modal-nombre');
       if (n) n.focus();
     }, 40);
   }
@@ -202,15 +202,15 @@
       return;
     }
     var root = ensureModal();
-    document.getElementById('bc-alm-modal-title').textContent = 'Editar almacén';
-    document.getElementById('bc-alm-modal-id').value = a.id;
-    document.getElementById('bc-alm-modal-nombre').value = a.nombre || '';
+    document.getElementById('bc-m277-modal-title').textContent = 'Editar almacén';
+    document.getElementById('bc-m277-modal-id').value = a.id;
+    document.getElementById('bc-m277-modal-nombre').value = a.nombre || '';
     selectTipo(normTipo(a.tipo) || 'minorista');
     setStatus('', true);
-    document.getElementById('bc-alm-modal-guardar').textContent = 'Guardar cambios';
+    document.getElementById('bc-m277-modal-guardar').textContent = 'Guardar cambios';
     root.classList.add('open');
     setTimeout(function () {
-      var n = document.getElementById('bc-alm-modal-nombre');
+      var n = document.getElementById('bc-m277-modal-nombre');
       if (n) n.focus();
     }, 40);
   }
@@ -228,12 +228,12 @@
   }
 
   async function save() {
-    var id = (document.getElementById('bc-alm-modal-id') || {}).value || '';
-    var nombreEl = document.getElementById('bc-alm-modal-nombre');
+    var id = (document.getElementById('bc-m277-modal-id') || {}).value || '';
+    var nombreEl = document.getElementById('bc-m277-modal-nombre');
     var nombre = nombreEl ? nombreEl.value.trim() : '';
     var tipoUi = getSelectedTipo();
     var tipoRpc = tipoUiARpc(tipoUi);
-    var btn = document.getElementById('bc-alm-modal-guardar');
+    var btn = document.getElementById('bc-m277-modal-guardar');
     var accion = id ? 'editar almacén' : 'crear almacén';
 
     if (!nombre) {
@@ -366,7 +366,7 @@
         closeModal();
         return;
       }
-      if (e.target.closest('#bc-alm-modal-guardar')) {
+      if (e.target.closest('#bc-m277-modal-guardar')) {
         e.preventDefault();
         save();
       }
