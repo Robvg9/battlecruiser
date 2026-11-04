@@ -49,5 +49,13 @@ test("Conectividad exposes diagnostic actions; Configuración remains for admin/
   assert.match(index, /id="tab-config"/);
   assert.match(index, /id="form-nuevo-rol"/, "role creation remains available in Configuración");
   assert.match(index, /id="form-categoria"/);
-  assert.match(index, /id="form-unidad"/);
+  assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/,
+    "Administración no debe conservar un catálogo paralelo de unidades");
+  assert.equal((index.match(/class="presentaciones-panel"/g) || []).length, 1,
+    "catálogo y asociaciones deben vivir en un solo panel");
+  for (const id of ["form-presentacion-nueva", "lista-presentaciones-catalogo", "pp-producto-select", "pp-lista-asociaciones", "form-pp-nueva"]) {
+    assert.equal((index.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " debe aparecer una sola vez");
+  }
+  assert.match(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/,
+    "la presentación base debe sugerir opciones del catálogo único");
 });
