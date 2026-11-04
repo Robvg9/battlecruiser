@@ -50,6 +50,9 @@ test("minorista and mayorista are independent optional label/factor pairs", () =
   assert.ok(salesLines.includes("line.presentacion_id=p.presentacion_id"));
   assert.ok(salesLines.includes("line.cantidad_presentacion=Number(line.cantidad||0)/factor"));
   assert.ok(salesLines.includes("function buildPLineasFromCart(lineas)"));
+  assert.ok(salesLines.includes("input.value=String(qty)"));
+  assert.ok(salesLines.includes("packages*factor"));
+  assert.ok(salesLines.includes("event.stopImmediatePropagation()"));
   assert.ok(catalogRpcMigration.includes("(v_norm_name is null) <> (p_factor_normal is null)"));
   assert.ok(catalogRpcMigration.includes("(v_wh_name is null) <> (p_factor_mayorista is null)"));
 });
