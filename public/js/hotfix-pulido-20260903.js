@@ -83,7 +83,7 @@
   async function preloadStock(force){
     if(STOCK_LOADING && !force) return;
     if(STOCK_READY && !force) return;
-    if(typeof window.client==='undefined'||!client||typeof client.rpc!=='function') return;
+    if(typeof client==='undefined'||!client||typeof client.rpc!=='function') return;
     STOCK_LOADING=true;
     try{
       var r=await client.rpc('bc_stock_operativo');
@@ -182,7 +182,7 @@
   }
   async function ensureWarehouses(){
     fillWarehouseSelects();
-    if(getAlmList().length||typeof window.client==='undefined'||!client||!client.from)return;
+    if(getAlmList().length||typeof client==='undefined'||!client||!client.from)return;
     try{var r=await client.from('almacenes').select('id,nombre,tipo,activo').eq('activo',true).order('nombre');if(!r.error){if(window._cache)_cache.almacenes=r.data||[];fillWarehouseSelects();}}catch(_){ }
   }
 
@@ -190,7 +190,7 @@
     var list=Array.isArray(window._presentacionesCache)?window._presentacionesCache:[];
     if(list.length)PRES_CACHE=list.slice();
     if(PRES_CACHE.length)return Promise.resolve(PRES_CACHE);
-    if(typeof window.client==='undefined'||!client||!client.from)return Promise.resolve(PRES_CACHE);
+    if(typeof client==='undefined'||!client||!client.from)return Promise.resolve(PRES_CACHE);
     return client.from('presentaciones').select('id,nombre,activo,created_at').eq('activo',true).order('nombre').then(function(r){if(!r.error&&Array.isArray(r.data)){PRES_CACHE=r.data.slice();window._presentacionesCache=PRES_CACHE.slice();}return PRES_CACHE;}).catch(function(){return PRES_CACHE;});
   }
   function ensurePresFields(){
@@ -228,7 +228,7 @@
   }
 
   async function loadProductPres(productId){
-    if(!productId||typeof window.client==='undefined'||!client||!client.from)return[];
+    if(!productId||typeof client==='undefined'||!client||!client.from)return[];
     try{
       var r=await client.from('producto_presentaciones')
         .select('id,presentacion_id,factor,activo,presentaciones(id,nombre)')
@@ -350,7 +350,7 @@
         if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
         return true;
       }
-      if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
+      if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var params={p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())};
       var r=await client.rpc('bc_guardar_producto_catalogo',params);
       if(r.error)throw r.error;
@@ -434,7 +434,7 @@
         if(!normalPair)throw Error('Fila '+(i+2)+': la presentación minorista requiere etiqueta y factor positivo, o ambos vacíos.');
         if(!wholesalePair)throw Error('Fila '+(i+2)+': la presentación mayorista requiere etiqueta y factor positivo, o ambos vacíos.');
         if(normName&&whName&&norm(normName)===norm(whName))throw Error('Fila '+(i+2)+': las etiquetas minorista y mayorista deben ser distintas.');
-        if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
+        if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
         var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:val(r,'unidad',['unidad','unit','uom'])||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normName||null,p_factor_normal:nf,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
         var rr=await client.rpc('bc_guardar_producto_catalogo',p);if(rr.error)throw rr.error;ok++;
       }catch(err){fail++;if(errors.length<10)errors.push(err.message||String(err));}
