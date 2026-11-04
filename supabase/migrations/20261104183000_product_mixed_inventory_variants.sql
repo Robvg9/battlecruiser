@@ -426,7 +426,7 @@ CREATE TRIGGER bc_seed_mixed_stock_for_warehouse
 CREATE OR REPLACE FUNCTION public.inventario_mixto_enriquecido(p_almacen_id uuid DEFAULT NULL)
 RETURNS TABLE(
   producto_id uuid, producto text, almacen text, cantidad numeric, minimo numeric,
-  estado text, costo_promedio numeric, valor_inventario numeric, variantes jsonb
+  estado text, costo_promedio numeric, valor_inventario numeric, unidad text, variantes jsonb
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -452,6 +452,7 @@ BEGIN
       THEN coalesce(sum(coalesce(lv.valor_inventario,0))/nullif(sum(coalesce(s.cantidad,0)),0),0)
       ELSE 0 END,
     coalesce(sum(coalesce(lv.valor_inventario,0)),0)::numeric,
+    p.unidad,
     coalesce(jsonb_agg(
       jsonb_build_object(
         'producto_id',v.id,
