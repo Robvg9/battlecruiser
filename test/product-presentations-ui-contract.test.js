@@ -81,6 +81,7 @@ test("product registration has one commercial-options owner and no legacy duplic
   const productModal = read("public/js/m26-ui-integridad.js");
   const presentationUi = read("public/js/hotfix-pulido-20260903.js");
   const presentationSave = read("public/js/hotfix-pulido-20260903b.js");
+  const legacyProductSave = read("public/js/hotfix-17-2-productos-save-20260903.js");
 
   assert.doesNotMatch(
     catalogos,
@@ -113,4 +114,11 @@ test("product registration has one commercial-options owner and no legacy duplic
     "the retired M17 overlay must not disable the current product saver");
   assert.ok(presentationUi.includes("document.getElementById('prod-submit-btn')||document.getElementById('bc171-save')"),
     "the native save button must be disabled during a save attempt");
+  assert.doesNotMatch(legacyProductSave, /addEventListener\(['"]submit['"]/,
+    "the retired M17.2 module must not register a second product submit handler");
+  assert.ok(legacyProductSave.includes("normal.required=true"));
+  assert.ok(legacyProductSave.includes("wholesale.required=false"));
+  assert.ok(legacyProductSave.includes("legacySubmitHandler:false"));
+  assert.ok(presentationUi.includes("form.addEventListener('submit',saveCatalogoProduct,true)"),
+    "the unified Pulido saver must be the only product-specific submit handler");
 });
