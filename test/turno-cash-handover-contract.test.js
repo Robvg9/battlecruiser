@@ -28,6 +28,13 @@ const PG_CI = read("test/step7-jornada-postgres-windows-ci.js");
 const PG_WORKFLOW = read(".github/workflows/step7-jornada-postgres.yml");
 const QUALITY = read(".github/workflows/quality.yml");
 
+test("disposable legacy-session fixtures use the same America/Havana business date as Step 7", () => {
+  assert.match(FIXTURE, /\(now\(\) AT TIME ZONE 'America\/Havana'\)::date/);
+  assert.doesNotMatch(FIXTURE, /\bCURRENT_DATE\b/i);
+  assert.match(CONTRACT, /\(now\(\) AT TIME ZONE 'America\/Havana'\)::date\s*\+\s*1/);
+  assert.doesNotMatch(CONTRACT, /\bCURRENT_DATE\b/i);
+});
+
 test("cash handover extends the modern declaration and difference records additively", () => {
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS monto_contado numeric/);
   assert.match(MIGRATION, /ADD COLUMN IF NOT EXISTS contado_por uuid/);
@@ -164,13 +171,13 @@ test("the owner can start a scheduled legacy day while non-worked placeholders d
   assert.ok(TURNOS_MASTER_UI.includes("no requieren declaración de efectivo"));
 });
 
-test("PWA release 9.5.60 loads and precaches the cash handover UI", () => {
-  assert.match(APP, /const VERSION="9\.5\.60"/);
+test("PWA preview release 9.5.61 loads and precaches the dashboard and cash handover UI", () => {
+  assert.match(APP, /const VERSION="9\.5\.61"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.60"/);
+  assert.match(SW, /BC_SW_VERSION = "9\.5\.61"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.60/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.60/);
+  assert.match(INDEX, /app\.js\?v=9\.5\.61/);
+  assert.match(INDEX, /style\.css\?v=9\.5\.61/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);

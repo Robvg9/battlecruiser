@@ -355,17 +355,27 @@ test("B2.3-K: proyección de stock reutiliza ajustePendiente (no recalcula)", as
   assert.strictEqual(proj.proyeccion, 80);
 });
 
-test("B2.3-L: actividad reciente reutiliza _cache (sin consultas nuevas)", async () => {
-  const { window } = montarEntorno();
+test("B2.3-L: Últimos movimientos usa el renderer único y reutiliza _cache (sin consultas)", async () => {
+  const { window, document, client } = montarEntorno();
   marcarOnline(window);
   await esperar(30);
-  window._cache.ventas = [{ fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } }];
+  window._cache.ventas = [{ id: "venta-1", fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } }];
   window._cache.transferencias = [];
   window._cache.vales = [];
-  const movs = window.construirActividadReciente();
-  assert.strictEqual(movs.length, 1);
-  assert.ok(/Venta/.test(movs[0].texto));
-  assert.strictEqual(movs[0].resultado, "$250.00");
+  const refrescarOriginal = window.refrescarCentroControl;
+  window.refrescarCentroControl = async () => {};
+  const rpcAntes = client.__rpcCalls.length;
+  try {
+    window.renderResumen();
+  } finally {
+    window.refrescarCentroControl = refrescarOriginal;
+  }
+  const movs = document.getElementById("resumen-movs-lista");
+  assert.strictEqual(movs.querySelectorAll(".resumen-mov-item").length, 1);
+  assert.ok(/venta/i.test(movs.textContent));
+  assert.ok(movs.textContent.includes("Caja 1"));
+  assert.ok(movs.textContent.includes("$250.00"));
+  assert.strictEqual(client.__rpcCalls.length, rpcAntes, "el render de movimientos no consulta al servidor");
 });
 
 test("B2.3-M: no hay roles reales — la vista no inventa distinción admin/trabajador", async () => {
@@ -470,6 +480,7 @@ test("R3: la cabecera de alertas muestra la cantidad de productos bajo mínimo",
   window.renderResumen();
   const alertas = document.getElementById("resumen-alertas-lista");
   assert.ok(/2 producto\(s\) bajo mínimo/.test(alertas.innerHTML), "cabecera con cantidad afectada");
+  assert.ok(/Agotado/.test(alertas.innerHTML), "distinguishes zero stock from merely being below minimum");
   assert.ok(/Ver inventario/.test(alertas.innerHTML), "botón Ver inventario presente");
 });
 

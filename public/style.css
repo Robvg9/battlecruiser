@@ -927,3 +927,62 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* 9.5.61 — single compact operational dashboard */
+.cc-dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0 14px;
+}
+.cc-dashboard-header h2 { margin: 0; }
+.cc-dashboard-header p { margin: 4px 0 0; font-size: 12px; }
+#tab-resumen .cc-estado,
+#tab-resumen .cc-bloque { margin-bottom: 0; }
+#tab-resumen .cc-grid { align-items: start; gap: 14px; }
+#tab-resumen .cc-col-ppal { gap: 14px; }
+#tab-resumen .cc-dashboard-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 9px;
+  margin: 0 0 14px;
+}
+#tab-resumen .cc-dashboard-kpis .resumen-card { padding: 12px 10px; }
+#tab-resumen .cc-dashboard-kpis .valor { font-size: 27px; }
+#tab-resumen .cc-bloque { padding: 13px; }
+#tab-resumen .cc-bloque h3 { margin: 0 0 10px; }
+.cc-avisos-lista { display: grid; gap: 8px; }
+.cc-aviso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--gold-dim);
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+  background: var(--stone);
+}
+.cc-aviso-critico { border-left-color: var(--wine); }
+.cc-aviso-atencion { border-left-color: var(--gold); }
+.cc-aviso-copy { display: grid; gap: 3px; min-width: 0; }
+.cc-aviso-copy strong { font-size: 12.5px; line-height: 1.3; color: var(--text); }
+.cc-aviso-copy span { font-size: 11.5px; line-height: 1.4; color: var(--mist); overflow-wrap: anywhere; }
+.cc-aviso > .cc-accion { flex: 0 0 auto; white-space: nowrap; }
+#tab-mando .mando-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#tab-mando .mando-filtros select { min-width: 150px; flex: 1 1 160px; }
+#tab-mando .cc-bloque { padding: 14px; }
+@media (max-width: 520px) {
+  .cc-dashboard-header { align-items: flex-start; margin-bottom: 11px; }
+  #tab-resumen .cc-dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #tab-resumen .cc-bloque { padding: 11px; }
+  .cc-aviso { align-items: flex-start; padding: 9px 10px; }
+  .cc-aviso > .cc-accion { padding: 7px 9px; font-size: 11px; }
+  #tab-mando .mando-filtros { display: grid; grid-template-columns: 1fr; }
+  #tab-mando .mando-filtros select,
+  #tab-mando .mando-filtros button { width: 100%; }
+}
+
+#tab-resumen .cc-col-lateral { display: flex; flex-direction: column; gap: 14px; }

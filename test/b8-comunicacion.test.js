@@ -3,7 +3,7 @@
 // ============================================================
 // Verifica: conversaciones (general, privada, soporte, contextuales),
 // mensajes, idempotencia, privacidad, no leídos, offline, auditoría,
-// integración B3/B4/B7 y ausencia de duplicaciones arquitectónicas.
+// integración B3/B4/B7, Dashboard único y ausencia de duplicaciones arquitectónicas.
 //
 // Ejecutar: node --test test/b8-comunicacion.test.js
 // ============================================================
@@ -443,14 +443,18 @@ test("B8.24: auditoría se registra al enviar mensaje (reutiliza B4)", async () 
   assert.ok(aud, "se llama a registrar_auditoria");
 });
 
-test("B8.25: Centro de Mando integra alertas de comunicación", async () => {
-  const { window } = montarEntorno(perfil());
+test("B8.25: Comunicación alimenta el bloque único de avisos del Dashboard", async () => {
+  const { window, document } = montarEntorno(perfil());
   marcarOnline(window);
   await esperar(120);
   assert.strictEqual(typeof window.construirAlertasB8, "function");
-  assert.strictEqual(typeof window.construirAlertasMandoB8Completo, "function");
+  assert.strictEqual(typeof window.refrescarAlertasB8, "function");
+  assert.strictEqual(typeof window.renderAvisosOperativosControl, "function");
+  assert.ok(document.querySelector("#tab-resumen #cc-avisos-operativos"), "el Dashboard contiene el feed de avisos");
+  assert.strictEqual(document.querySelector("#tab-mando #cc-avisos-operativos"), null, "Auditoría no duplica avisos");
+  assert.strictEqual(typeof window.construirAlertasMandoB8Completo, "undefined", "no existe un segundo combinador de alertas");
   const a = window.construirAlertasB8();
-  assert.ok(Array.isArray(a), "devuelve array de alertas");
+  assert.ok(Array.isArray(a), "la fuente B8 devuelve un array de alertas");
 });
 
 test("B8.26: compatibilidad con B3 — tienePermiso para comunicacion", async () => {
@@ -507,36 +511,31 @@ test("B8.30: una sola fuente — RPC_POR_TIPO incluye mensaje/conversacion sin d
 // B8.5 — Tests de corrección de bugs encontrados en auditoría
 // ============================================================
 
-test("B8.5.1: renderEstadoMando usa _usuarioActual como variable (no función)", async () => {
-  // BUG corregido: _usuarioActual es `let`, no function. Antes se comprobaba
-  // typeof === "function" (siempre false) → nunca mostraba la sesión en el Centro de Mando.
+test("B8.5.1: el estado operativo aparece una sola vez en el Dashboard", async () => {
   const { window, document } = montarEntorno(perfil());
   marcarOnline(window);
   await esperar(120);
-  // Forzar el render del estado del Centro de Mando.
   const ops = await window.obtenerOperacionesVisiblesPanel();
-  const estado = window.calcularEstadoMando(ops, false);
-  window.renderEstadoMando(estado);
-  const el = document.getElementById("mando-estado");
-  assert.ok(el.innerHTML.includes("Sesión"), "debe mostrar la sesión del usuario");
-  assert.ok(el.innerHTML.includes("Roberto"), "debe mostrar el nombre del usuario");
+  const estado = window.calcularEstadoOperacional(ops, false);
+  window.renderEstadoNegocio(estado);
+  const panel = document.getElementById("tab-resumen");
+  assert.strictEqual(panel.querySelectorAll("#cc-estado").length, 1);
+  assert.ok(document.getElementById("cc-estado").textContent.length > 0);
+  assert.strictEqual(document.querySelector("#tab-mando #mando-estado"), null, "Auditoría no duplica el estado");
 });
 
-test("B8.5.2: construirAlertasMando detecta usuario inactivo (variable, no función)", async () => {
-  // BUG corregido: la alerta de usuario inactivo nunca se generaba porque
-  // se comprobaba typeof _usuarioActual === "function" (siempre false).
-  const { window } = montarEntorno({
+test("B8.5.2: el Dashboard conserva la alerta crítica de usuario inactivo", async () => {
+  const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Inactivo", activo: false, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "comunicacion", accion: "ver" }, { seccion: "comunicacion", accion: "crear" }],
   });
   marcarOnline(window);
   await esperar(120);
-  const ops = [];
-  const alertas = window.construirAlertasMando(ops);
-  // _usuarioActual.activo === false → debe generar la alerta.
-  const inactivoAlerta = alertas.find((a) => a.tipo === "Usuario inactivo");
-  assert.ok(inactivoAlerta, "debe generar alerta de usuario inactivo");
-  assert.strictEqual(inactivoAlerta.nivel, "critico");
+  window.renderAvisosOperativosControl([]);
+  const feed = document.getElementById("cc-avisos-operativos");
+  assert.ok(feed.textContent.includes("Usuario inactivo"), "el aviso aparece en el Dashboard único");
+  assert.strictEqual(feed.querySelectorAll(".cc-aviso").length, 1, "no se duplica en otra vista");
+  assert.strictEqual(document.querySelector("#tab-mando #mando-alertas"), null);
 });
 
 test("B8.5.3: contar_no_leidos_global no duplica el total (lógica SQL)", () => {

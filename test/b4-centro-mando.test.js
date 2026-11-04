@@ -1,8 +1,8 @@
 // ============================================================
-// B4 — Pruebas automatizadas: Centro de Mando + Auditoría + Trazabilidad
+// B4 — Pruebas automatizadas: Dashboard único + Auditoría + Trazabilidad
 // ============================================================
 // Usa fake-indexeddb + jsdom + mock de Supabase. Verifica la capa frontend
-// del Centro de Mando, alertas reales, auditoría con filtros y la integración
+// del Dashboard operativo y del panel de Auditoría, filtros y trazabilidad
 // con B2/B3 (sin duplicar mecanismos).
 //
 // Ejecutar: node --test test/b4-centro-mando.test.js
@@ -26,7 +26,7 @@ async function esperarHasta(condicion, timeoutMs = 2000, intervaloMs = 10) {
   return Boolean(condicion());
 }
 
-function mockCliente({ perfil, permisos, usuarios, roles, auditoria } = {}) {
+function mockCliente({ perfil, permisos, usuarios, roles, auditoria, alertas } = {}) {
   const rpcCalls = [];
   const client = {
     auth: {
@@ -45,6 +45,16 @@ function mockCliente({ perfil, permisos, usuarios, roles, auditoria } = {}) {
       if (nombre === "usuario_esta_activo") return { data: perfil ? !!perfil[0].activo : null, error: null };
       if (nombre === "registrar_auditoria") return { data: 1, error: null };
       if (nombre === "listar_auditoria_admin") return { data: auditoria || [], error: null };
+      if (nombre === "listar_turnos") return { data: (alertas && alertas.turnos) || [], error: null };
+      if (nombre === "listar_cuadres") return {
+        data: params && params.p_estado === "CON_DIFERENCIA"
+          ? ((alertas && alertas.cuadresDiferencia) || [])
+          : ((alertas && alertas.cuadresPendientes) || []),
+        error: null,
+      };
+      if (nombre === "listar_responsabilidades") return { data: (alertas && alertas.responsabilidades) || [], error: null };
+      if (nombre === "listar_incidencias") return { data: (alertas && alertas.incidencias) || [], error: null };
+      if (nombre === "listar_conversaciones_usuario") return { data: (alertas && alertas.conversaciones) || [], error: null };
       if (nombre === "asignar_rol_usuario" || nombre === "cambiar_estado_usuario") return { data: null, error: null };
       // Fase 1 (fix data.id): crear_producto en producción devuelve UUID
       // escalar, NO un objeto {id: ...}. El mock replica ese contrato real.
@@ -105,66 +115,74 @@ function marcarOnline(window) {
 
 // ---- tests ----
 
-test("B4.2/A: el Centro de Mando muestra estado general derivado de la cola real", async () => {
+test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventario; Auditoría queda separada", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
-    permisos: [{ seccion: "auditoria", accion: "ver" }],
+    permisos: [
+      { seccion: "auditoria", accion: "ver" },
+      { seccion: "turnos", accion: "ver" },
+      { seccion: "comunicacion", accion: "ver" },
+    ],
+    alertas: {
+      turnos: [{ id: "turno-1" }],
+      cuadresPendientes: [{ id: "cuadre-1" }],
+      cuadresDiferencia: [{ id: "cuadre-2" }],
+      responsabilidades: [{ id: "responsabilidad-1" }],
+      incidencias: [{ id: "incidencia-1" }],
+      conversaciones: [
+        { tipo: "SOPORTE", no_leidos: 1 },
+        { tipo: "PRIVADA", no_leidos: 2 },
+      ],
+    },
   });
   marcarOnline(window);
-  await esperar(80);
-  // Crear una operación REQUIERE_ATENCION en la cola real.
-  const op = window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [] });
-  op.estado = "REQUIERE_ATENCION"; op.ultimo_error = "Stock insuficiente.";
-  await window.guardarOperacionPendiente(op);
-  await window.refrescarCentroMando();
-  await esperar(20);
-  const estado = document.getElementById("mando-estado");
-  assert.ok(estado.className.includes("cc-estado-critico"), "estado crítico con REQUIERE_ATENCION");
+  if (window.__bcTestSyncState) window.__bcTestSyncState.markOnline();
+  await esperar(100);
+
+  const btnDashboard = document.querySelector('.tab-btn[data-tab="resumen"]');
+  const btnAuditoria = document.querySelector('.tab-btn[data-tab="mando"]');
+  assert.match(btnDashboard.textContent, /Centro de Control/);
+  assert.match(btnAuditoria.textContent, /Auditoría/);
+
+  const dashboard = document.getElementById("tab-resumen");
+  const auditPanel = document.getElementById("tab-mando");
+  assert.ok(dashboard.querySelector("#cc-estado"), "dashboard retains the single operational status");
+  assert.ok(dashboard.querySelector("#resumen-grid"), "dashboard retains the real KPI cards");
+  assert.ok(dashboard.querySelector("#cc-atencion"), "dashboard retains queue items requiring attention");
+  assert.ok(dashboard.querySelector("#cc-pendientes"), "dashboard retains pending operations");
+  assert.ok(dashboard.querySelector("#resumen-alertas-lista"), "dashboard retains actionable low-stock items");
+  assert.ok(dashboard.querySelector("#resumen-movs-lista"), "dashboard retains recent real business movements");
+  assert.equal(auditPanel.querySelector("#mando-estado"), null, "audit panel does not duplicate the operational status");
+  assert.equal(auditPanel.querySelector("#mando-alertas"), null, "audit panel does not duplicate alerts");
+  assert.equal(auditPanel.querySelector("#mando-actividad"), null, "audit panel does not duplicate recent activity");
+  assert.equal(auditPanel.querySelector("#mando-resumen-grid"), null, "audit panel does not duplicate KPI cards");
+  assert.ok(auditPanel.querySelector("#mando-auditoria"), "audit panel preserves audit list");
+  assert.ok(auditPanel.querySelector("#filtro-aud-tipo"), "audit type filter remains available");
+  assert.ok(auditPanel.querySelector("#filtro-aud-estado"), "audit state filter remains available");
+
+  const ahora = Date.now();
+  window.obtenerOperacionesVisiblesPanel = async () => [
+    { id: "op-old", tipo: "venta", estado: "PENDIENTE", creado_en: new Date(ahora - 48 * 60 * 60 * 1000).toISOString() },
+    { id: "trf-pending", tipo: "transferencia", estado: "SINCRONIZANDO", creado_en: new Date(ahora - 5 * 60 * 1000).toISOString() },
+  ];
+  window.renderResumen();
+  await window.refrescarCentroControl();
+  const avisos = document.getElementById("cc-avisos-operativos");
+  assert.ok(avisos.textContent.includes("Cuadre con diferencia"), "includes the unique cash-difference alert");
+  assert.ok(avisos.textContent.includes("Incidencias abiertas"), "includes the unique incident alert");
+  assert.ok(avisos.textContent.includes("Cuadres pendientes"), "includes pending cash reconciliations");
+  assert.ok(avisos.textContent.includes("Responsabilidades pendientes"), "includes pending responsibility alerts");
+  assert.ok(avisos.textContent.includes("Soporte pendiente"), "includes unread support conversations");
+  assert.ok(avisos.textContent.includes("Pendientes prolongados"), "keeps the unique >24h warning from the former dashboard");
+  assert.ok(avisos.textContent.includes("Transferencias pendientes"), "keeps the unique queued-transfer warning");
+  assert.equal(avisos.querySelectorAll(".cc-aviso").length, 7, "shows each unique alert once");
+  const destinations = [...avisos.querySelectorAll("button[data-ir-tab]")].map((button) => button.dataset.irTab);
+  for (const tab of ["ciclos", "operacion", "turnos", "comunicacion"]) {
+    assert.ok(destinations.includes(tab), "alert action leads to " + tab);
+  }
 });
 
-test("B4.2/C: alertas aparecen con REQUIERE_ATENCION y desaparecen al resolver", async () => {
-  const { window, document } = montarEntorno({
-    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
-    permisos: [{ seccion: "auditoria", accion: "ver" }],
-  });
-  marcarOnline(window);
-  await esperar(80);
-  const op = window.crearOperacionPendiente("venta", { p_almacen_id: "a1", p_lineas: [] });
-  op.estado = "REQUIERE_ATENCION"; op.ultimo_error = "Stock insuficiente.";
-  await window.guardarOperacionPendiente(op);
-  await window.refrescarCentroMando();
-  await esperar(20);
-  const alertas = document.getElementById("mando-alertas");
-  assert.ok(alertas.querySelector(".cc-asunto"), "debe aparecer la alerta crítica");
-  assert.ok(alertas.innerHTML.includes("Stock insuficiente"), "debe mostrar el error");
-  // Resolver: eliminar la operación.
-  await window.eliminarOperacionPendiente(op.id);
-  await window.refrescarCentroMando();
-  await esperar(20);
-  assert.ok(/Sin alertas/.test(alertas.innerHTML), "debe desaparecer la alerta tras resolver");
-});
-
-test("B4.2/B: actividad reciente se carga desde _cache (sin consultas nuevas)", async () => {
-  const { window, document } = montarEntorno({
-    perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
-    permisos: [{ seccion: "auditoria", accion: "ver" }],
-  });
-  marcarOnline(window);
-  await esperar(80);
-  // Poblar _cache.ventas como haría refrescarVentasHistorial.
-  window._cache.ventas = [{ fecha: "2026-08-15T10:00:00Z", total: 250, almacenes: { nombre: "Caja 1" } }];
-  window._cache.transferencias = [];
-  window._cache.vales = [];
-  // Esta prueba valida el render a partir de caché, no el refresco de datos.
-  // Renderizar directamente evita una carrera con el refresco inicial de ventas,
-  // que puede ejecutarse en paralelo en CI y reemplazar _cache.ventas por [].
-  window.renderActividadMando();
-  const act = document.getElementById("mando-actividad");
-  assert.ok(act.innerHTML.includes("Venta"), "debe mostrar la venta de _cache");
-  assert.ok(act.innerHTML.includes("$250.00"), "debe mostrar el total almacenado en caché");
-});
-
-test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando", async () => {
+test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Auditoría", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Dep", activo: true, role_id: "r2", rol: "Dependiente" }],
     permisos: [{ seccion: "ventas", accion: "ver" }], // sin auditoria.ver
@@ -178,11 +196,11 @@ test("B4.7: usuario sin permiso auditoria.ver no ve la pestaña Centro de Mando"
       !!btnMando && (btnMando.style.display === "none" || btnMando.classList.contains("hidden")),
     5000,
     10
-  ), "el contexto de permisos debe quedar listo y ocultar Centro de Mando sin auditoria.ver");
-  assert.ok(btnMando.style.display === "none" || btnMando.classList.contains("hidden"), "Centro de Mando oculto sin permiso");
+  ), "el contexto de permisos debe quedar listo y ocultar Auditoría sin auditoria.ver");
+  assert.ok(btnMando.style.display === "none" || btnMando.classList.contains("hidden"), "Auditoría oculto sin permiso");
 });
 
-test("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", async () => {
+test("B4.7: usuario con permiso auditoria.ver ve la pestaña Auditoría", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -195,8 +213,8 @@ test("B4.7: usuario con permiso auditoria.ver ve la pestaña Centro de Mando", a
       !!btnMando && btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"),
     5000,
     10
-  ), "el contexto de permisos debe quedar listo y mostrar Centro de Mando con auditoria.ver");
-  assert.ok(btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"), "Centro de Mando visible con permiso");
+  ), "el contexto de permisos debe quedar listo y mostrar Auditoría con auditoria.ver");
+  assert.ok(btnMando.style.display !== "none" && !btnMando.classList.contains("hidden"), "Auditoría visible con permiso");
 });
 
 test("R2 B4/B1: ejecutarOperacion registra el UUID real (no undefined) cuando el RPC devuelve UUID escalar", async () => {
@@ -239,7 +257,7 @@ test("B4.5: auditoría se carga con filtros y respeta permiso", async () => {
   });
   marcarOnline(window);
   await esperar(80);
-  await window.refrescarCentroMando();
+  await window.refrescarPanelAuditoria();
   await esperar(20);
   const aud = document.getElementById("mando-auditoria");
   assert.ok(aud.innerHTML.includes("Venta ejecutada online"), "debe mostrar el registro de auditoría");
@@ -295,13 +313,13 @@ test("B4.8: offline no inventa datos de auditoría", async () => {
   marcarOnline(window);
   await esperar(80);
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
-  await window.refrescarCentroMando();
+  await window.refrescarPanelAuditoria();
   await esperar(20);
   const aud = document.getElementById("mando-auditoria");
   assert.ok(/Sin conexión|offline|no disponible/i.test(aud.innerHTML), "offline no debe inventar datos de auditoría");
 });
 
-test("B4.11: reconexión refresca el Centro de Mando", async () => {
+test("B4.11: la reconexión actualiza la pestaña Auditoría", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -317,7 +335,7 @@ test("B4.11: reconexión refresca el Centro de Mando", async () => {
     "la sincronización de arranque debe finalizar antes de verificar el indicador de conexión"
   );
   window.__bcTestSyncState.markOnline();
-  await window.refrescarCentroMando();
+  await window.refrescarPanelAuditoria();
   assert.ok(
     await esperarHasta(() => /Conectado/.test(conn.textContent), 2000, 10),
     "debe mostrar conectado tras refrescar; estado observado: " + conn.textContent
@@ -344,9 +362,9 @@ test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos",
     await esperarHasta(() => !window.__bcTestSyncState.active, 2000, 10),
     "la sincronización inicial debe terminar antes de probar la cola offline"
   );
-  // No existe refrescarCentroMando2 ni _sincronizando2 (no duplicados).
-  assert.strictEqual(typeof window.refrescarCentroMando, "function");
-  assert.strictEqual(window.refrescarCentroMando2, undefined);
+  // No existe refrescarPanelAuditoria2 ni _sincronizando2 (no duplicados).
+  assert.strictEqual(typeof window.refrescarPanelAuditoria, "function");
+  assert.strictEqual(window.refrescarPanelAuditoria2, undefined);
   assert.strictEqual(window._sincronizando2, undefined);
   // idempotency_key permanece intacta tras encolar offline.
   Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
@@ -355,7 +373,7 @@ test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos",
   assert.ok(res.operacion.idempotency_key, "conserva idempotency_key");
 });
 
-test("B4.9: cambio A → B no contamina el Centro de Mando", async () => {
+test("B4.9: cambio A → B no contamina el contexto de Auditoría", async () => {
   const { window, client } = montarEntorno({
     perfil: [{ id: "u-a", nombre: "A", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -397,9 +415,9 @@ test("B4.20: no se crean stores IndexedDB adicionales", async () => {
   });
   marcarOnline(window);
   await esperar(80);
-  // El Centro de Mando reutiliza obtenerOperacionesVisiblesPanel (mismo store
+  // El Auditoría reutiliza obtenerOperacionesVisiblesPanel (mismo store
   // operaciones_pendientes). No hay una segunda función de cola propia.
-  assert.strictEqual(typeof window.refrescarCentroMando, "function");
+  assert.strictEqual(typeof window.refrescarPanelAuditoria, "function");
   assert.strictEqual(typeof window.obtenerOperacionesVisiblesPanel, "function");
   // No existe un store de auditoría en IndexedDB (la auditoría es en Supabase).
   assert.strictEqual(window._auditoriaStore, undefined, "no hay store IndexedDB de auditoría");
@@ -413,7 +431,7 @@ test("B4.5: respuesta no-array de listar_auditoria_admin no rompe la UI ni se pr
   });
   marcarOnline(window);
   await esperar(80);
-  await window.refrescarCentroMando();
+  await window.refrescarPanelAuditoria();
   await esperar(20);
   const aud = document.getElementById("mando-auditoria");
   assert.match(aud.textContent, /respuesta inválida del servidor/i,

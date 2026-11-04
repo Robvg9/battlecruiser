@@ -364,32 +364,30 @@ function volverListaConversaciones() {
 let _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
 
 async function refrescarAlertasB8() {
-  if (!navigator.onLine || !tienePermiso("comunicacion", "ver")) return;
+  if (!navigator.onLine) return;
+  // Never carry unread counts into a different user's session or permission set.
+  _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
+  if (!tienePermiso("comunicacion", "ver")) return;
   try {
     const { data } = await client.rpc("listar_conversaciones_usuario", { p_solo_activas: true, p_limite: 50 });
     const convs = data || [];
     _b8CacheAlertas.soportePendiente = convs.filter((c) => c.tipo === "SOPORTE" && Number(c.no_leidos || 0) > 0).length;
     _b8CacheAlertas.convRecientes = convs.filter((c) => Number(c.no_leidos || 0) > 0).length;
-  } catch (e) { /* RPC no existe */ }
+  } catch (e) {
+    // Do not retain unread counts after an unsuccessful refresh.
+    _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
+  }
 }
 
 function construirAlertasB8() {
   const a = [];
   if (_b8CacheAlertas.soportePendiente > 0) {
-    a.push({ nivel: "atencion", tipo: "Soporte pendiente", texto: _b8CacheAlertas.soportePendiente + " conversación(es) de soporte con mensajes nuevos.", op: null });
+    a.push({ nivel: "atencion", tipo: "Soporte pendiente", texto: _b8CacheAlertas.soportePendiente + " conversación(es) de soporte con mensajes nuevos.", op: null, tab: "comunicacion" });
   }
   if (_b8CacheAlertas.convRecientes > 0 && _b8CacheAlertas.convRecientes !== _b8CacheAlertas.soportePendiente) {
-    a.push({ nivel: "normal", tipo: "Mensajes nuevos", texto: "Tenés " + _comNoLeidosTotal + " mensaje(s) sin leer.", op: null });
+    a.push({ nivel: "normal", tipo: "Mensajes nuevos", texto: "Tenés " + _comNoLeidosTotal + " mensaje(s) sin leer.", op: null, tab: "comunicacion" });
   }
   return a;
-}
-
-function construirAlertasMandoB8Completo(ops) {
-  const base = (typeof construirAlertasMandoB7Completo === "function") ? construirAlertasMandoB7Completo(ops) : [];
-  return base.concat(construirAlertasB8()).sort((a, b) => {
-    const orden = { critico: 0, atencion: 1, normal: 2 };
-    return (orden[a.nivel] != null ? orden[a.nivel] : 3) - (orden[b.nivel] != null ? orden[b.nivel] : 3);
-  });
 }
 
 safeInit("b8-comunicacion", () => {
