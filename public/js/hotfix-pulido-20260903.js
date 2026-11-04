@@ -212,8 +212,8 @@
     box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
     box.innerHTML=
       '<div class="bc-pres-section-title">Presentaciones y factores</div>'+
-      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Minorista</strong><input id="bc-pres-normal-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Unidad)" aria-label="Etiqueta de presentación minorista"><input id="bc-pres-normal-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 1)" aria-label="Factor numérico minorista"></div>'+
-      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Bolso)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
+      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Formato minorista</strong><input id="bc-pres-normal-name" type="text" maxlength="60" list="presentaciones-comunes" placeholder="Etiqueta (ej. Botella)" aria-label="Etiqueta de presentación minorista"><input id="bc-pres-normal-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 1)" aria-label="Factor numérico minorista"></div>'+
+      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Formato mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" list="presentaciones-comunes" placeholder="Etiqueta (ej. Caja)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
       '<p class="bc-pres-optional-note">Configura únicamente las presentaciones que utilices. Cada una requiere etiqueta y factor positivo; deja ambas vacías si no aplica.</p>';
     host.appendChild(box);
     loadPresentaciones();
@@ -451,21 +451,9 @@
     ov.querySelector('#bc-pulido-import-file').onchange=async function(){var f=this.files&&this.files[0],body=ov.querySelector('#bc-pulido-import-body');if(!f||!body)return;body.innerHTML='<p>Validando archivo…</p>';try{await importRows(f,body);}catch(err){body.innerHTML='<p class="bc-pulido-import-error">'+esc(err.message||String(err))+'</p>';}};
   }
 
-  function buildPresentationCatalog(){
-    var panel=document.querySelector('#tab-productos .presentaciones-panel');if(!panel)return;
-    var catalog=panel.querySelector('.presentaciones-catalogo');if(!catalog)return;
-    var old=catalog.querySelector('.bc-catalog-pres-panel');if(old)old.remove();
-    var wrap=document.createElement('div');wrap.className='bc-catalog-pres-panel';
-    wrap.innerHTML='<div class="bc-catalog-pres-toolbar"><strong>Presentaciones comerciales</strong><button type="button" id="bc-pres-refresh">Actualizar</button></div><div id="bc-pres-catalog-list" class="bc-catalog-pres-list"></div>';
-    catalog.appendChild(wrap);
-    wrap.querySelector('#bc-pres-refresh').onclick=function(){renderPresentationCatalog();};
-  }
-  async function renderPresentationCatalog(){
-    var el=document.getElementById('bc-pres-catalog-list');if(!el)return;await loadPresentaciones();el.innerHTML=PRES_CACHE.map(function(p){return '<div class="bc-catalog-pres-card"><strong>'+esc(p.nombre)+'</strong><span>Activa · disponible para asociar a productos</span></div>';}).join('')||'<div class="lista-estado">No hay presentaciones comerciales creadas.</div>';
-  }
-  function ensurePresentationCreateForm(){
+  // El catálogo único lo mantiene presentaciones.js dentro de Administración.,  // No crear un segundo listado ni un segundo botón de actualización.,  function buildPresentationCatalog(){ return false; },  async function renderPresentationCatalog(){ return false; },  function ensurePresentationCreateForm(){
     var f=document.getElementById('form-presentacion-nueva');if(!f)return;f.classList.remove('hidden');if(f.dataset.bcPulido==='1')return;f.dataset.bcPulido='1';
-    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();renderPresentationCatalog();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
+    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();if(typeof window.refrescarPresentacionesCatalogo==='function')await window.refrescarPresentacionesCatalogo();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
   }
 
   function cleanCommunicationEmpty(){
@@ -493,11 +481,11 @@
   function boot(){
     css();
     ensureWarehouses();preloadStock();patchStockGetter();bindCatalogClicks();
-    ensurePresFields();patchProductSubmit();patchEditBridge();ensurePresentationCreateForm();buildPresentationCatalog();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
+    ensurePresFields();patchProductSubmit();patchEditBridge();ensurePresentationCreateForm();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
     setTimeout(function(){preloadStock(true);ensureWarehouses();patchStockGetter();patchEditBridge();},800);
-    setTimeout(function(){productModalPolish();ensurePresFields();renderPresentationCatalog();discoverEditButtons();repaintStockCards();},1400);
+    setTimeout(function(){productModalPolish();ensurePresFields();discoverEditButtons();repaintStockCards();},1400);
     setTimeout(function(){normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
-    window.__BC_PULIDO_20260903_VERIFY=function(){var panel=document.getElementById('bc-product-commercial-panel');var fields=document.getElementById('bc-product-commercial-fields');return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialPanel:!!panel,commercialPanelExpanded:!!(panel&&!panel.hidden),commercialFields:!!fields,commercialFieldCount:fields?fields.querySelectorAll('input').length:0,legacyPresentationBlock:!!document.getElementById('prod-presentaciones-config')}};
+    window.__BC_PULIDO_20260903_VERIFY=function(){var panel=document.getElementById('bc-product-commercial-panel');var fields=document.getElementById('bc-product-commercial-fields');return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-config .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialPanel:!!panel,commercialPanelExpanded:!!(panel&&!panel.hidden),commercialFields:!!fields,commercialFieldCount:fields?fields.querySelectorAll('input').length:0,legacyPresentationBlock:!!document.getElementById('prod-presentaciones-config')}};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('online',function(){setTimeout(function(){preloadStock(true);ensureWarehouses();},300);});
