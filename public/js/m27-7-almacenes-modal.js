@@ -1,6 +1,6 @@
 // BattleCruiser M27.7 — Almacenes: crear y editar mediante modal (Bloques 6 y 7)
 // Reutiliza: ejecutarOperacion("almacen"), editarAlmacen, refrescarAlmacenes.
-// v27.7e — DAP-1: IDs aislados para evitar colisión con el modal Misión C: mapear tipos UI→contrato RPC (minorista→venta; almacenamiento permitido tras m13b).
+// v27.7f — IDs aislados y tipos UI→contrato RPC canónico (minorista se mantiene minorista; venta solo alias legacy).
 (function () {
   'use strict';
   if (window.__BC_M277_ALM__) return;
@@ -19,13 +19,13 @@
     venta: 'Minorista'
   };
 
-  /** UI → valor aceptado por crear_almacen / editar_almacen (contrato m13 + m13b). */
+  /** Normaliza el tipo al contrato real de crear_almacen / editar_almacen. */
   function tipoUiARpc(t) {
     var s = String(t || '').toLowerCase();
-    if (s === 'minorista' || s === 'venta') return 'venta';
-    if (s === 'mayorista') return 'mayorista';
-    if (s === 'almacenamiento') return 'almacenamiento';
-    return s;
+    // 'venta' is a legacy alias only; Supabase accepts 'minorista'.
+    if (s === 'venta') return 'minorista';
+    if (s === 'minorista' || s === 'mayorista' || s === 'almacenamiento') return s;
+    return '';
   }
 
   function normTipo(t) {
