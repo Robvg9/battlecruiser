@@ -48,7 +48,9 @@ export default {
     // A browser POST from the preview must carry its exact same-origin marker.
     // A GET is allowed only as a no-credential diagnostic: the upstream function
     // returns 405 before its rate limiter or auth/database logic can run.
-    if (requestOrigin !== PREVIEW_ORIGIN) {
+    const foreignOrigin = requestOrigin && requestOrigin !== PREVIEW_ORIGIN;
+    if ((request.method === "POST" && requestOrigin !== PREVIEW_ORIGIN) ||
+        (request.method === "GET" && foreignOrigin)) {
       return json({ error: "Origen no permitido." }, 403);
     }
     if (request.method !== "POST" && request.method !== "GET") {
