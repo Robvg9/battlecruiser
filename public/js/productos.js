@@ -260,7 +260,7 @@ function renderProductosLista() {
       : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
     const unidadTxt = p.unidad ? escHtml(p.unidad) : "—";
     const stockTot = stockTotalProducto(p.id);
-    div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""} · ${unidadTxt}</span> ${estadoTxt}</span>
+    div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""} · Base: ${unidadTxt}${p.presentacion_id && p.presentaciones ? " · Mayorista: " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
         <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)} · Stock ${money(stockTot)}</span>
         ${botones}`;
     lista.appendChild(div);
