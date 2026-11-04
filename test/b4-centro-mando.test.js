@@ -160,7 +160,12 @@ test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventa
   assert.ok(auditPanel.querySelector("#filtro-aud-tipo"), "audit type filter remains available");
   assert.ok(auditPanel.querySelector("#filtro-aud-estado"), "audit state filter remains available");
 
+  const ahora = Date.now();
   window.renderResumen();
+  window.renderAvisosOperativosControl([
+    { id: "op-old", tipo: "venta", estado: "PENDIENTE", creado_en: new Date(ahora - 48 * 60 * 60 * 1000).toISOString() },
+    { id: "trf-pending", tipo: "transferencia", estado: "SINCRONIZANDO", creado_en: new Date(ahora - 5 * 60 * 1000).toISOString() },
+  ]);
   await window.refrescarCentroControl();
   const avisos = document.getElementById("cc-avisos-operativos");
   assert.ok(avisos.textContent.includes("Cuadre con diferencia"), "includes the unique cash-difference alert");
@@ -168,7 +173,9 @@ test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventa
   assert.ok(avisos.textContent.includes("Cuadres pendientes"), "includes pending cash reconciliations");
   assert.ok(avisos.textContent.includes("Responsabilidades pendientes"), "includes pending responsibility alerts");
   assert.ok(avisos.textContent.includes("Soporte pendiente"), "includes unread support conversations");
-  assert.equal(avisos.querySelectorAll(".cc-aviso").length, 5, "shows each unique alert once");
+  assert.ok(avisos.textContent.includes("Pendientes prolongados"), "keeps the unique >24h warning from the former dashboard");
+  assert.ok(avisos.textContent.includes("Transferencias pendientes"), "keeps the unique queued-transfer warning");
+  assert.equal(avisos.querySelectorAll(".cc-aviso").length, 7, "shows each unique alert once");
   const destinations = [...avisos.querySelectorAll("button[data-ir-tab]")].map((button) => button.dataset.irTab);
   for (const tab of ["ciclos", "operacion", "turnos", "comunicacion"]) {
     assert.ok(destinations.includes(tab), "alert action leads to " + tab);
