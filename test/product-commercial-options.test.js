@@ -92,8 +92,14 @@ test("a new product starts collapsed; editing an existing configured product ope
   const toggle = d.getElementById("bc-product-commercial-toggle");
 
   w.__BCM26_openProductModal();
-  assert.equal(d.getElementById("bc-product-modal").classList.contains("hidden"), false);
+  const modal = d.getElementById("bc-product-modal");
+  assert.equal(modal.classList.contains("hidden"), false);
   assert.equal(panel.hidden, true, "new products start with optional settings collapsed");
+
+  d.getElementById("bc-product-modal-close").click();
+  assert.equal(modal.classList.contains("hidden"), true, "the visible close button must close the product modal");
+  w.__BCM26_openProductModal();
+  assert.equal(modal.classList.contains("hidden"), false, "the one Add action must reopen the same modal");
 
   d.getElementById("prod-editando-id").value = "product-existing";
   d.getElementById("prod-categoria").value = "cat-1";
@@ -103,6 +109,9 @@ test("a new product starts collapsed; editing an existing configured product ope
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
   assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1,
     "opening and reopening edit must not create duplicate controls");
+
+  d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(modal.classList.contains("hidden"), true, "Escape must close the native product modal");
 });
 
 test("the legacy M17.2 module keeps price constraints but never adds a second submit handler", async (t) => {
