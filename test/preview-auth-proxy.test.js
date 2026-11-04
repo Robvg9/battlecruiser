@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const worker = require("../preview-worker.mjs").default;
+const authSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public", "js", "auth.js"), "utf8");
 
 const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
@@ -91,7 +92,6 @@ test("preview GET diagnostic reaches the Edge Function without counting an auth 
 
   const response = await worker.fetch(new Request(PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
     method: "GET",
-    headers: { Origin: PREVIEW_ORIGIN },
   }), { ASSETS: assetsBinding() });
 
   assert.equal(capturedInit.method, "GET");
@@ -106,4 +106,13 @@ test("non-proxy paths remain static assets", async () => {
   });
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "static asset");
+});
+
+test("frontend uses the exact preview-only same-origin login endpoint and keeps LIVE direct", () => {
+  assert.match(authSource, /function bcUsernameLoginEndpoint\(\)/);
+  assert.match(authSource, /window\.location\.origin === "https:\/\/bc-pr-224-battlecruiser\.robvg9\.workers\.dev"/);
+  assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
+  assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
+  assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 3,
+    "the login and password-recovery requests must both use the endpoint selector");
 });
