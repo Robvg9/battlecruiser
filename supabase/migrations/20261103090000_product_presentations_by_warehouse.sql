@@ -106,4 +106,83 @@ COMMENT ON FUNCTION public.registrar_venta(uuid,jsonb,uuid) IS
 COMMENT ON FUNCTION public.registrar_venta(uuid,jsonb,uuid,text) IS
   'Registers sales only when the selected product presentation matches the warehouse channel; price override remains independent from warehouse channel.';
 
+CREATE OR REPLACE FUNCTION public.bc_guardar_producto_catalogo(p_producto_id uuid DEFAULT NULL::uuid, p_nombre text DEFAULT NULL::text, p_categoria_id uuid DEFAULT NULL::uuid, p_unidad text DEFAULT NULL::text, p_precio_normal numeric DEFAULT NULL::numeric, p_precio_mayorista numeric DEFAULT NULL::numeric, p_presentacion_normal text DEFAULT NULL::text, p_factor_normal numeric DEFAULT NULL::numeric, p_presentacion_mayorista text DEFAULT NULL::text, p_factor_mayorista numeric DEFAULT NULL::numeric, p_idempotency_key uuid DEFAULT NULL::uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare
+  v_id uuid;
+  v_pres_normal uuid;
+  v_pres_mayorista uuid;
+  v_norm_name text := nullif(btrim(p_presentacion_normal), '');
+  v_wh_name text := nullif(btrim(p_presentacion_mayorista), '');
+  v_idem uuid;
+begin
+  if auth.uid() is null then raise exception 'No hay sesión activa.' using errcode='42501'; end if;
+  if p_idempotency_key is null then raise exception 'Se requiere idempotency_key'; end if;
+  if p_nombre is null or btrim(p_nombre)='' then raise exception 'El nombre del producto es requerido'; end if;
+  if p_precio_normal is not null and p_precio_normal < 0 then raise exception 'El precio normal debe ser mayor o igual a cero'; end if;
+  if p_precio_mayorista is not null and p_precio_mayorista < 0 then raise exception 'El precio mayorista debe ser mayor o igual a cero'; end if;
+  if v_norm_name is not null and (p_factor_normal is null or p_factor_normal <= 0) then raise exception 'El factor de la presentación normal debe ser mayor que cero'; end if;
+  if (v_norm_name is null) <> (p_factor_normal is null) then
+    raise exception 'La presentación minorista debe tener etiqueta y factor, o ambos campos vacíos';
+  end if;
+  if (v_wh_name is null) <> (p_factor_mayorista is null) then
+    raise exception 'La presentación mayorista debe tener etiqueta y factor, o ambos campos vacíos';
+  end if;
+  if v_norm_name is not null and v_wh_name is not null
+     and lower(v_norm_name)=lower(v_wh_name) then
+    raise exception 'Las etiquetas minorista y mayorista deben ser distintas';
+  end if;
+  if v_wh_name is not null and (p_factor_mayorista is null or p_factor_mayorista <= 0) then raise exception 'El factor de la presentación mayorista debe ser mayor que cero'; end if;
+  if p_factor_normal is not null and p_factor_normal <= 0 then raise exception 'Factor de presentación normal inválido'; end if;
+  if p_factor_mayorista is not null and p_factor_mayorista <= 0 then raise exception 'Factor de presentación mayorista inválido'; end if;
+  if p_categoria_id is not null and not exists(select 1 from public.categorias where id=p_categoria_id) then raise exception 'Categoría no encontrada'; end if;
+  if not public.tiene_permiso('productos','crear') and not public.tiene_permiso('productos','editar') then raise exception 'Sin permiso para guardar productos' using errcode='42501'; end if;
+
+  v_idem := private.reclamar_idempotencia(p_idempotency_key, auth.uid(),'bc_guardar_producto_catalogo',jsonb_build_object('producto_id',p_producto_id,'nombre',p_nombre));
+  if v_idem is not null then return v_idem; end if;
+
+  if p_producto_id is null then
+    if not public.tiene_permiso('productos','crear') then raise exception 'Sin permiso para crear productos' using errcode='42501'; end if;
+    insert into public.productos(nombre,categoria_id,unidad,precio_normal,precio_mayorista)
+    values(btrim(p_nombre),p_categoria_id,nullif(btrim(p_unidad),''),coalesce(p_precio_normal,0),p_precio_mayorista)
+    returning id into v_id;
+  else
+    if not public.tiene_permiso('productos','editar') then raise exception 'Sin permiso para editar productos' using errcode='42501'; end if;
+    update public.productos set nombre=btrim(p_nombre),categoria_id=p_categoria_id,unidad=nullif(btrim(p_unidad),''),precio_normal=coalesce(p_precio_normal,0),precio_mayorista=p_precio_mayorista where id=p_producto_id returning id into v_id;
+    if v_id is null then raise exception 'Producto no encontrado'; end if;
+  end if;
+
+  if v_norm_name is not null then
+    select id into v_pres_normal from public.presentaciones where lower(btrim(nombre))=lower(v_norm_name) and activo=true order by created_at asc limit 1;
+    if v_pres_normal is null then insert into public.presentaciones(nombre) values(v_norm_name) returning id into v_pres_normal; end if;
+  end if;
+  if v_wh_name is not null then
+    select id into v_pres_mayorista from public.presentaciones where lower(btrim(nombre))=lower(v_wh_name) and activo=true order by created_at asc limit 1;
+    if v_pres_mayorista is null then insert into public.presentaciones(nombre) values(v_wh_name) returning id into v_pres_mayorista; end if;
+  end if;
+
+  delete from public.producto_presentaciones where producto_id=v_id;
+  if v_pres_normal is not null then
+    insert into public.producto_presentaciones(producto_id,presentacion_id,factor,activo) values(v_id,v_pres_normal,p_factor_normal,true);
+  end if;
+  if v_pres_mayorista is not null then
+    if v_pres_normal is not null and v_pres_mayorista=v_pres_normal and p_factor_mayorista<>p_factor_normal then
+      raise exception 'La misma presentación no puede tener dos factores para un producto';
+    end if;
+    insert into public.producto_presentaciones(producto_id,presentacion_id,factor,activo) values(v_id,v_pres_mayorista,p_factor_mayorista,true);
+    update public.productos set presentacion_id=v_pres_mayorista where id=v_id;
+  else
+    update public.productos set presentacion_id=null where id=v_id;
+  end if;
+
+  update private.operaciones_idempotencia set resultado_id=v_id where idempotency_key=p_idempotency_key;
+  return v_id;
+end;
+$function$
+
+
 COMMIT;
