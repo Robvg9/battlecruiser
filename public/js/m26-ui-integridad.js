@@ -23,74 +23,10 @@
     form.setAttribute('aria-hidden', 'true');
   }
 
-  function fijarNomenclaturaSoloProductos() {
-    var productos = document.getElementById('tab-productos');
-    var modal = document.getElementById('productos-nomenclatura-modal');
-    if (!productos || !modal) return;
-    document.querySelectorAll('#productos-tools-nomenclatura,#productos-nomenclatura-btn').forEach(function (el) {
-      // M75 owns the catalog entry in Administration. Keep its toolbar there
-      // when this routine prepares the native nomenclature modal.
-      if (!el.closest('#tab-productos') && !el.closest('#bc-product-presentations-entry')) el.remove();
-    });
-    // Categorías y unidades permanecen en Administración. Solo se reúnen las presentaciones.
-    var slots = {
-      'lista-presentaciones-catalogo': 'prod-nom-presentaciones-slot',
-      'pp-lista-asociaciones': 'prod-nom-presentaciones-slot'
-    };
-    Object.keys(slots).forEach(function (id) {
-      var el = document.getElementById(id), slot = document.getElementById(slots[id]);
-      if (!el || !slot) return;
-      var panel = el.closest('.tab-panel');
-      var adminEntry = document.getElementById('bc-product-presentations-entry');
-      var nomenclatureToolbar = document.getElementById('productos-tools-nomenclatura');
-      var candidatos = [
-        el.closest('.cc-bloque'),
-        el.closest('.card'),
-        el.closest('.presentaciones-catalogo'),
-        el.closest('.presentaciones-producto'),
-        el.parentElement
-      ].filter(Boolean);
-      // Never move an ancestor that contains a tab panel or M75's Administration
-      // entry. Catalogs can share a .cc-bloque with that entry; moving the whole
-      // block would silently detach the nomenclature toolbar from Administration.
-      var bloque = candidatos.find(function (candidate) {
-        return (!panel || (
-          panel.contains(candidate) &&
-          candidate !== panel &&
-          !candidate.contains(panel)
-        )) &&
-        !(adminEntry && (candidate === adminEntry || candidate.contains(adminEntry))) &&
-        !(nomenclatureToolbar && (candidate === nomenclatureToolbar || candidate.contains(nomenclatureToolbar)));
-      });
-      if (!bloque) return; // catalogos.js wraps just the related heading/form/list on demand.
-      if (!slot.contains(bloque)) slot.appendChild(bloque);
-    });
-  }
-
-  function prepararNomenclatura() {
-    var modal = document.getElementById('productos-nomenclatura-modal');
-    var btn = document.getElementById('productos-nomenclatura-btn');
-    if (!modal || !btn || !btn.closest('#tab-productos')) return;
-    fijarNomenclaturaSoloProductos();
-    if (btn.dataset.bcM26 === '1') return;
-    btn.dataset.bcM26 = '1';
-    btn.addEventListener('click', function () {
-      fijarNomenclaturaSoloProductos();
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-    });
-    var close = document.getElementById('productos-nomenclatura-cerrar');
-    if (close) close.addEventListener('click', function () {
-      modal.classList.add('hidden');
-      modal.style.display = '';
-    });
-    modal.addEventListener('click', function (e) {
-      if (e.target === modal) {
-        modal.classList.add('hidden');
-        modal.style.display = '';
-      }
-    });
-  }
+  // El catálogo de Presentaciones ya vive directamente en Administración.
+  // No mover DOM ni crear/abrir una segunda ventana desde Productos.
+  function fijarNomenclaturaSoloProductos() { return false; }
+  function prepararNomenclatura() { return false; }
 
   function limpiarInterfazAgregarProducto() {
     var panel = document.getElementById('tab-productos');
@@ -633,8 +569,6 @@
   function run() {
     unificarTurnos();
     ocultarCompraEnProductos();
-    prepararNomenclatura();
-    fijarNomenclaturaSoloProductos();
     limpiarInterfazAgregarProducto();
     simplificarProductos();
     arreglarEdicionProducto();
