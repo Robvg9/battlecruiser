@@ -38,6 +38,10 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.match(products, /p_variantes:\s*mixedEnabled \? variants : \[\]/);
   assert.match(products, /nombre: \(row\.querySelector\("\.prod-variante-nombre"\)/);
   assert.match(products, /new Set\(names\)\.size !== names\.length/);
+  assert.match(products, /async function ejecutarProductoMixtoSinCola\(editandoId, payload\)/);
+  assert.match(products, /El producto mixto no se guardó ni se encoló/);
+  assert.match(products, /needsMixedConfig\s*\? await ejecutarProductoMixtoSinCola/);
+  assert.match(products, /String\(v\.producto_padre_id\) === String\(p\.id\) && v\.activo !== false/);
 });
 
 test("Every operational product picker selects child flavor IDs, not the mixed parent", () => {
