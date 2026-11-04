@@ -157,7 +157,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
   assert.match(app, /v9\.5\.61 — Dashboard único y Auditoría separada/);
-  assert.match(index, /<script src="app\.js\?v=20261104\.1"><\/script>/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.61"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.61',
     'js/centro-control.js?v=9.5.61',
