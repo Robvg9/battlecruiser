@@ -480,7 +480,8 @@ function iniciarEdicionProducto(p) {
   document.getElementById("prod-nombre").value = p.nombre || "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
   if (mixedToggle) mixedToggle.checked = !!p.inventario_mixto;
-  const currentVariants = productosEnCacheActual().filter((v) =>
+  const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
+  const currentVariants = cachedProducts.filter((v) =>
     String(v.producto_padre_id) === String(p.id) && v.activo !== false
   );
   renderEditorVariantesProducto(currentVariants);
@@ -563,8 +564,9 @@ safeInit("form-producto", () => {
     const mixedToggle = document.getElementById("prod-inventario-mixto");
     const mixedEnabled = !!(mixedToggle && mixedToggle.checked);
     const variants = obtenerVariantesFormularioProducto();
+    const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
     const previousProduct = editandoId
-      ? productosEnCacheActual().find((p) => String(p.id) === String(editandoId))
+      ? cachedProducts.find((p) => String(p.id) === String(editandoId))
       : null;
     const needsMixedConfig = mixedEnabled || !!(previousProduct && previousProduct.inventario_mixto);
     if (mixedEnabled) {
