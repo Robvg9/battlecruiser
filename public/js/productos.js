@@ -419,7 +419,7 @@ safeInit("form-producto", () => {
 
     const editandoId = document.getElementById("prod-editando-id").value || null;
     const archivoImagenInput = document.getElementById("prod-imagen-input");
-    const archivoImagen = archivoImagenInput.files && archivoImagenInput.files[0];
+    const archivoImagen = _productoImagenProcesada || (archivoImagenInput.files && archivoImagenInput.files[0]);
     if (archivoImagen) {
       const errorArchivo = validarArchivoImagenProducto(archivoImagen);
       if (errorArchivo) {
