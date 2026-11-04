@@ -50,6 +50,9 @@ DECLARE
   v_failed boolean;
   v_created_product uuid;
   v_catalog_wholesale uuid;
+  v_retail_only_product uuid;
+  v_wholesale_only_product uuid;
+  v_only_presentation uuid;
   v_association_count integer;
   v_error text;
 BEGIN
@@ -84,6 +87,22 @@ BEGIN
     RAISE EXCEPTION 'Retail sale did not preserve its unit presentation and normal warehouse price';
   END IF;
 
+  -- A retail warehouse must reject the product's wholesale presentation.
+  v_failed:=false;
+  BEGIN
+    PERFORM public.registrar_venta(v_retail_warehouse,jsonb_build_array(jsonb_build_object(
+      'producto_id',v_product,'cantidad',1,
+      'presentacion_id',v_wholesale_presentation,'cantidad_presentacion',1
+    )),'99999999-9999-4999-8999-999999999980');
+  EXCEPTION WHEN OTHERS THEN
+    v_failed:=true;
+    GET STACKED DIAGNOSTICS v_error=MESSAGE_TEXT;
+    IF position('solo tiene presentación mayorista' IN v_error)=0 THEN
+      RAISE EXCEPTION 'Unexpected retail/wholesale mismatch rejection: %',v_error;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Retail warehouse accepted a wholesale-only package'; END IF;
+
   -- Wholesale warehouse consumes the wholesale case presentation.
   UPDATE public.turnos SET almacen_id=v_wholesale_warehouse WHERE id=v_turno;
   v_sale:=public.registrar_venta(v_wholesale_warehouse,jsonb_build_array(jsonb_build_object(
@@ -95,6 +114,22 @@ BEGIN
   IF v_qty<>6 OR v_price<>80 THEN
     RAISE EXCEPTION 'Wholesale sale did not preserve its case presentation and wholesale warehouse price';
   END IF;
+
+  -- A wholesale warehouse must reject the product's retail unit presentation.
+  v_failed:=false;
+  BEGIN
+    PERFORM public.registrar_venta(v_wholesale_warehouse,jsonb_build_array(jsonb_build_object(
+      'producto_id',v_product,'cantidad',1,
+      'presentacion_id',v_retail_presentation,'cantidad_presentacion',1
+    )),'99999999-9999-4999-8999-999999999981');
+  EXCEPTION WHEN OTHERS THEN
+    v_failed:=true;
+    GET STACKED DIAGNOSTICS v_error=MESSAGE_TEXT;
+    IF position('no tiene presentación mayorista definida' IN v_error)=0 THEN
+      RAISE EXCEPTION 'Unexpected wholesale/retail mismatch rejection: %',v_error;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Wholesale warehouse accepted a retail-only presentation'; END IF;
 
   -- Selecting a wholesale price must not force wholesale presentation in a retail warehouse.
   UPDATE public.turnos SET almacen_id=v_retail_warehouse WHERE id=v_turno;
@@ -159,6 +194,81 @@ BEGIN
   IF v_association_count<>2 OR v_catalog_wholesale IS NULL THEN
     RAISE EXCEPTION 'Catalog RPC did not persist both independent presentation pairs';
   END IF;
+
+  -- The catalog RPC rejects a label without its factor and a factor without its label.
+  v_failed:=false;
+  BEGIN
+    PERFORM public.bc_guardar_producto_catalogo(
+      NULL,'Producto sin factor',NULL,NULL,10,NULL,
+      'Unidad incompleta',NULL,NULL,NULL,
+      '99999999-9999-4999-8999-999999999970'
+    );
+  EXCEPTION WHEN OTHERS THEN v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Catalog RPC accepted a presentation label with no factor'; END IF;
+
+  v_failed:=false;
+  BEGIN
+    PERFORM public.bc_guardar_producto_catalogo(
+      NULL,'Producto sin etiqueta',NULL,NULL,10,NULL,
+      NULL,1,NULL,NULL,
+      '99999999-9999-4999-8999-999999999971'
+    );
+  EXCEPTION WHEN OTHERS THEN v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Catalog RPC accepted a factor with no presentation label'; END IF;
+
+  -- Optionality also works independently: a retail-only product never sells wholesale.
+  v_retail_only_product:=public.bc_guardar_producto_catalogo(
+    NULL,'Solo minorista',NULL,NULL,12,NULL,
+    'Unidad minorista única',1,NULL,NULL,
+    '99999999-9999-4999-8999-999999999972'
+  );
+  SELECT pp.presentacion_id INTO v_only_presentation
+    FROM public.producto_presentaciones pp WHERE pp.producto_id=v_retail_only_product;
+  INSERT INTO public.stock(producto_id,almacen_id,cantidad) VALUES
+    (v_retail_only_product,v_wholesale_warehouse,20);
+  UPDATE public.turnos SET almacen_id=v_wholesale_warehouse WHERE id=v_turno;
+  v_failed:=false;
+  BEGIN
+    PERFORM public.registrar_venta(v_wholesale_warehouse,jsonb_build_array(jsonb_build_object(
+      'producto_id',v_retail_only_product,'cantidad',1,
+      'presentacion_id',v_only_presentation,'cantidad_presentacion',1
+    )),'99999999-9999-4999-8999-999999999973');
+  EXCEPTION WHEN OTHERS THEN
+    v_failed:=true;
+    GET STACKED DIAGNOSTICS v_error=MESSAGE_TEXT;
+    IF position('no tiene presentación mayorista definida' IN v_error)=0 THEN
+      RAISE EXCEPTION 'Unexpected retail-only wholesale rejection: %',v_error;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Wholesale warehouse sold a retail-only product'; END IF;
+
+  -- And a wholesale-only product cannot sell from a retail warehouse.
+  v_wholesale_only_product:=public.bc_guardar_producto_catalogo(
+    NULL,'Solo mayorista',NULL,NULL,NULL,75,
+    NULL,NULL,'Bolso mayorista único',50,
+    '99999999-9999-4999-8999-999999999974'
+  );
+  SELECT pp.presentacion_id INTO v_only_presentation
+    FROM public.producto_presentaciones pp WHERE pp.producto_id=v_wholesale_only_product;
+  INSERT INTO public.stock(producto_id,almacen_id,cantidad) VALUES
+    (v_wholesale_only_product,v_retail_warehouse,20);
+  UPDATE public.turnos SET almacen_id=v_retail_warehouse WHERE id=v_turno;
+  v_failed:=false;
+  BEGIN
+    PERFORM public.registrar_venta(v_retail_warehouse,jsonb_build_array(jsonb_build_object(
+      'producto_id',v_wholesale_only_product,'cantidad',1,
+      'presentacion_id',v_only_presentation,'cantidad_presentacion',1
+    )),'99999999-9999-4999-8999-999999999975');
+  EXCEPTION WHEN OTHERS THEN
+    v_failed:=true;
+    GET STACKED DIAGNOSTICS v_error=MESSAGE_TEXT;
+    IF position('solo tiene presentación mayorista' IN v_error)=0 THEN
+      RAISE EXCEPTION 'Unexpected wholesale-only retail rejection: %',v_error;
+    END IF;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Retail warehouse sold a wholesale-only product'; END IF;
 
   -- Reject malformed JSON input before creating a sale.
   v_failed:=false;
