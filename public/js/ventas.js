@@ -783,20 +783,23 @@ async function refrescarVentas() {
   ventaAlmacenesTipo = {};
   almacenes.forEach((a) => { ventaAlmacenesTipo[a.id] = a.tipo; });
 
+  const productosVenta = typeof productosOperativos === "function"
+    ? productosOperativos(productos)
+    : productos.filter((p) => !p.inventario_mixto || !!p.producto_padre_id);
   ventaProductosPrecios = {};
-  productos.forEach((p) => {
+  productosVenta.forEach((p) => {
     ventaProductosPrecios[p.id] = {
       nombre: p.nombre, precio_normal: p.precio_normal, precio_mayorista: p.precio_mayorista,
     };
   });
 
-  ventaProductosLista = productos;
+  ventaProductosLista = productosVenta;
   ventaCategoriasLista = categorias;
   const buscarInput = document.getElementById("venta-producto-buscar");
   if (buscarInput) buscarInput.value = "";
 
   fillSelect(document.getElementById("venta-almacen"), almacenes, "id", (a) => a.nombre, true);
-  fillSelect(document.getElementById("venta-producto"), productos, "id", (p) => p.nombre, true);
+  fillSelect(document.getElementById("venta-producto"), productosVenta, "id", (p) => p.nombre, true);
   renderVentaLineas();
   actualizarStockDisponibleUI();
   renderCatalogoCategorias();
