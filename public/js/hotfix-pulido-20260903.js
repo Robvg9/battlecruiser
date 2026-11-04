@@ -271,7 +271,16 @@ s=await loadProductPres(productId);if(!rows.length)return;
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
     if((pn!==null&&!Number.isFinite(pn))||(pm!==null&&!Number.isFinite(pm))){msg('Los precios deben ser números válidos.',false);if(save)save.disabled=false;return true;}
     var normal=selectedPres('normal'), wholesale=selectedPres('wholesale');
-    if((normal.name&&!normal.factor&&normal.id==null)||(wholesale.name&&!wholesale.factor&&wholesale.id==null)){msg('Una presentación nueva necesita definir cuántas unidades base contiene.',false);if(save)save.disabled=false;return true;}
+    function presentationValid(value){
+      var hasName=!!(value.name&&String(value.name).trim());
+      var factor=Number(value.factor);
+      var hasFactor=Number.isFinite(factor)&&factor>0;
+      return (!hasName&&!hasFactor)||(hasName&&hasFactor);
+    }
+    if(!presentationValid(normal)||!presentationValid(wholesale)){
+      msg('Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero. Deja ambos vacíos si no aplica.',false);
+      if(save)save.disabled=false;return true;
+    }
     if((normal.id&&!normal.factor)){
       var hitN=PRES_CACHE.find(function(p){return String(p.id)===String(normal.id);});normal.name=hitN?.nombre||null;normal.factor=null;
       try{var rn=await client.from('producto_presentaciones').select('factor').eq('producto_id',id||'00000000-0000-0000-0000-000000000000').eq('presentacion_id',normal.id).limit(1);if(rn.data?.[0])normal.factor=Number(rn.data[0].factor)||1;}catch(_){normal.factor=1;}
