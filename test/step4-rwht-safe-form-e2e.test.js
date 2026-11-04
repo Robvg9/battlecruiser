@@ -21,7 +21,7 @@ const WRITE_RPCS = new Set([
   "registrar_cuadre", "revisar_cuadre", "crear_responsabilidad",
   "actualizar_responsabilidad", "crear_incidencia", "resolver_incidencia",
   "crear_conversacion", "enviar_mensaje", "crear_usuario", "crear_rol",
-  "crear_categoria", "crear_unidad"
+  "crear_categoria", "crear_unidad", "bc_guardar_producto_catalogo"
 ]);
 
 const PERMISSIONS = [
@@ -107,7 +107,8 @@ function crearClienteSupabaseMock() {
     crear_usuario: { id: "usuario-fixture" },
     crear_rol: { id: "rol-fixture" },
     crear_categoria: { id: "categoria-fixture" },
-    crear_unidad: { id: "unidad-fixture" }
+    crear_unidad: { id: "unidad-fixture" },
+    bc_guardar_producto_catalogo: { id: "producto-catalogo-fixture" }
   };
 
   const client = {
@@ -170,6 +171,13 @@ function crearClienteSupabaseMock() {
     __writeCalls: validaciones
   };
   return client;
+}
+
+function evaluarModulo(context, relativePath) {
+  const source = fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8");
+  const script = context.document.createElement("script");
+  script.textContent = source;
+  context.document.body.appendChild(script);
 }
 
 function crearContexto() {
@@ -297,36 +305,83 @@ test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backen
     "una entrada inválida nunca debe llegar al RPC de escritura");
 });
 
-test("Paso 4 UI: producto válido envía el payload por el RPC mock y limpia el formulario", async (t) => {
+test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y acepta precio mayorista vacío", async (t) => {
   const c = await contextoListo();
-  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
+  evaluarModulo(c, "public/js/m26-ui-integridad.js");
+  evaluarModulo(c, "public/js/hotfix-pulido-20260903.js");
+
+  const ready = await esperarHasta(() =>
+    !!c.document.getElementById("bc-product-commercial-toggle") &&
+    !!c.document.getElementById("bc-product-commercial-panel") &&
+    !!c.document.getElementById("bc-pres-normal-name") &&
+    !!c.document.getElementById("bc-pres-normal-factor") &&
+    !!c.document.getElementById("bc-pres-wholesale-name") &&
+    !!c.document.getElementById("bc-pres-wholesale-factor") &&
+    !!c.document.getElementById("bc-product-modal"),
+    6500,
+    25
+  );
+  assert.ok(ready, "M26 and the presentation editor must initialize inside the native product modal");
+
+  const d = c.document;
+  const form = d.getElementById("form-producto");
+  const modal = d.getElementById("bc-product-modal");
+  const toggle = d.getElementById("bc-product-commercial-toggle");
+  const panel = d.getElementById("bc-product-commercial-panel");
+  assert.ok(modal.contains(form), "the original product form must belong to the only M26 modal");
+  assert.equal(d.querySelectorAll("#bc-product-modal").length, 1);
+  assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1);
+  assert.equal(d.getElementById("prod-presentaciones-config"), null);
+  assert.equal(d.querySelectorAll("#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado").length, 0);
+  assert.equal(d.getElementById("prod-precio-mayorista").required, false);
+
   const base = c.client.__writeCalls.length;
-  c.document.getElementById("prod-nombre").value = "Producto UI fixture";
-  c.document.getElementById("prod-unidad").value = "unidad";
-  c.document.getElementById("prod-precio-normal").value = "12.50";
-  c.document.getElementById("prod-precio-mayorista").value = "";
-  const presentacionMinorista = c.document.getElementById("prod-pres-min");
-  assert.ok(presentacionMinorista, "la UI debe exponer la presentación minorista obligatoria");
-  addOption(presentacionMinorista, "pres-min-fixture", "Unidad fixture");
-  presentacionMinorista.value = "pres-min-fixture";
+  d.getElementById("prod-nombre").value = "Producto UI fixture";
+  d.getElementById("prod-categoria").value = "c-step4-fixture";
+  d.getElementById("prod-unidad").value = "unidad";
+  d.getElementById("prod-precio-normal").value = "12.50";
+  d.getElementById("prod-precio-mayorista").value = "";
+  d.getElementById("bc-pres-normal-name").value = "Unidad fixture";
+  d.getElementById("bc-pres-normal-factor").value = "1";
+  d.getElementById("bc-pres-wholesale-name").value = "Paquete x 12";
+  d.getElementById("bc-pres-wholesale-factor").value = "12";
+
+  if (panel.hidden) toggle.click();
+  assert.equal(panel.hidden, false);
   enviarSubmit(c, "form-producto");
 
-  const reachedCreate = await esperarHasta(() => nuevasEscrituras(c, base).some((call) => call.name === "crear_producto"));
-  assert.ok(reachedCreate,
-    "el submit real del DOM debe llegar a crear_producto en el cliente mock; mensaje=" +
-    c.document.getElementById("msg-productos").textContent +
-    "; RPC recientes=" + JSON.stringify(c.client.__rpcCalls.slice(-12)) +
-    "; escrituras nuevas=" + JSON.stringify(nuevasEscrituras(c, base)));
-  const call = nuevasEscrituras(c, base).find((item) => item.name === "crear_producto");
+  const reachedSave = await esperarHasta(() =>
+    nuevasEscrituras(c, base).some((call) => call.name === "bc_guardar_producto_catalogo"),
+    6500,
+    25
+  );
+  assert.ok(reachedSave,
+    "the native product saver must call bc_guardar_producto_catalogo; writes=" +
+    JSON.stringify(nuevasEscrituras(c, base)) +
+    "; message=" + d.getElementById("msg-productos").textContent);
+
+  const writes = nuevasEscrituras(c, base);
+  const catalogSaves = writes.filter((call) => call.name === "bc_guardar_producto_catalogo");
+  assert.equal(catalogSaves.length, 1, "one form submission must create exactly one catalog RPC write");
+  assert.equal(writes.some((call) => call.name === "crear_producto"), false,
+    "the retired legacy create route must never race the catalog RPC");
+  const call = catalogSaves[0];
   assert.equal(call.params.p_nombre, "Producto UI fixture");
+  assert.equal(call.params.p_categoria_id, "c-step4-fixture");
   assert.equal(call.params.p_unidad, "unidad");
   assert.equal(call.params.p_precio_normal, 12.5);
-  assert.ok(call.params.p_idempotency_key, "el RPC debe recibir la clave de idempotencia");
-  assert.ok(await esperarHasta(() => /Producto creado con presentación minorista/i.test(c.document.getElementById("msg-productos").textContent)),
-    "la UI debe anunciar éxito tras la respuesta mock");
-  assert.equal(c.document.getElementById("prod-nombre").value, "", "el formulario debe resetearse tras éxito");
+  assert.equal(call.params.p_precio_mayorista, null,
+    "wholesale price is optional even when a wholesale presentation is configured");
+  assert.equal(call.params.p_presentacion_normal, "Unidad fixture");
+  assert.equal(call.params.p_factor_normal, 1);
+  assert.equal(call.params.p_presentacion_mayorista, "Paquete x 12");
+  assert.equal(call.params.p_factor_mayorista, 12);
+  assert.ok(call.params.p_idempotency_key, "catalog save must include an idempotency key");
+  assert.ok(await esperarHasta(() => /Producto creado/i.test(d.getElementById("msg-productos").textContent)),
+    "the form must show success only after the catalog RPC responds");
+  assert.ok(await esperarHasta(() => modal.classList.contains("hidden")),
+    "the native modal must close after successful creation");
 });
-
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
   // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
