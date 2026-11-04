@@ -214,7 +214,7 @@
   function patchAdd(){
     if(typeof agregarLineaVenta!=='function'||agregarLineaVenta.__bcM275)return;
     const orig=agregarLineaVenta;
-    window.agregarLineaVenta=function(pid,cantidad,almacen){
+    window.agregarLineaVenta=function(pid,cantidad,almacen,opts){
       const t=getWarehouseType();const p=getProducts().find(x=>String(x.id)===String(pid));if(!p)return false;
       if(isSellType(t)&&!channelAvailable(p,t)){
         if(typeof setMsg==='function')setMsg('msg-venta-linea',presentationChannelsLoaded
@@ -232,7 +232,7 @@
           if(typeof setMsg==='function')setMsg('msg-venta-linea','No se puede vender: falta una presentación válida para este almacén.',false);
           return false;
         }
-        const baseQuantity=Number(cantidad)*factor;
+        const baseQuantity=opts&&opts.__bcQuantityIsBase?Number(cantidad):Number(cantidad)*factor;
         const stock=typeof obtenerStockDisponible==='function'?obtenerStockDisponible(pid,almacen):{valor:Infinity};
         const existing=lines.find(l=>String(l.producto_id)===String(pid));const current=existing?Number(existing.cantidad)||0:0;
         if(current+baseQuantity>Number(stock.valor)){if(typeof setMsg==='function')setMsg('msg-venta-linea','No hay suficiente stock de '+p.nombre+' (disponible: '+money(Number(stock.valor)||0)+').',false);return false;}
