@@ -8,21 +8,27 @@ function _cfgEnsurePanel() {
   if (!tab || document.getElementById("cfg-mantenimiento")) return;
 
   const block = document.createElement("div");
-  block.className = "cc-bloque";
+  block.className = "cc-bloque cfg-maintenance-panel";
   block.id = "cfg-mantenimiento";
   block.innerHTML =
+    '<div class="cfg-panel-heading">' +
     "<h3>Conectividad y mantenimiento</h3>" +
-    '<p class="muted">Estado de las rutas Auth y Data API, reintentos y mantenimiento. Un timeout aislado no demuestra una caída total.</p>' +
-    '<div id="cfg-diag-grid" class="rep-grid"></div>' +
-    '<div class="btn-row" style="margin-top:12px;flex-wrap:wrap;gap:8px">' +
+    '<p class="muted">Estado operativo de Auth, Data API y PWA.</p>' +
+    "</div>" +
+    '<div id="cfg-diag-grid" class="cfg-diag-grid" role="list" aria-label="Indicadores de conectividad y sesión"></div>' +
+    '<p id="cfg-probe-summary" class="cfg-probe-summary" role="status" aria-live="polite"></p>' +
+    '<div class="cfg-actions" aria-label="Acciones de mantenimiento">' +
     '<button type="button" id="cfg-ir-pendientes" class="cc-accion">Ir a Pendientes</button>' +
     '<button type="button" id="cfg-ir-mando" class="cc-accion">Centro de Mando / Auditoría</button>' +
     '<button type="button" id="cfg-actualizar-app" class="cc-accion">Actualizar app / borrar caché</button>' +
     '<button type="button" id="cfg-refrescar-diag" class="cc-accion">Refrescar diagnóstico</button>' +
     "</div>" +
-    '<p class="msg" id="msg-config-diag"></p>' +
+    '<p class="msg" id="msg-config-diag" role="status" aria-live="polite"></p>' +
+    '<details id="cfg-detalles-tecnicos" class="cfg-details">' +
+    "<summary>Detalles técnicos y respaldo</summary>" +
     '<p class="muted" id="cfg-backend-probe-note"></p>' +
-    '<p class="muted" id="cfg-backup-nota"></p>';
+    '<p class="muted" id="cfg-backup-nota"></p>' +
+    "</details>";
 
   tab.insertBefore(block, tab.firstChild);
 }
@@ -48,7 +54,7 @@ function renderDiagnosticoConfig() {
   const pend = _cfgContarPendientes();
   const user = typeof _usuarioActual !== "undefined" && _usuarioActual ? ((_usuarioActual.nombre || "—") + (_usuarioActual.rol ? " · " + _usuarioActual.rol : "")) : "—";
   const b3 = typeof contextoB3Disponible === "function" && contextoB3Disponible();
-  function card(valor, etiqueta) { return '<div class="resumen-card"><div class="valor">' + valor + '</div><div class="etiqueta">' + etiqueta + "</div></div>"; }
+  function card(valor, etiqueta) { return '<div class="resumen-card cfg-metric" role="listitem"><div class="valor">' + valor + '</div><div class="etiqueta">' + etiqueta + "</div></div>"; }
   const probe = window.__BC_BACKEND_PROBE__ || null;
   const probeLabel = !probe ? "Sin prueba"
     : probe.status === "online" ? "Respuesta recibida"
@@ -62,6 +68,20 @@ function renderDiagnosticoConfig() {
     : probe.reason === "probe_error" ? "Error de sondeo"
     : "Sin respuesta";
   grid.innerHTML = card(online ? "🟢 Online" : "⚪ Offline", "Conexión") + card(_cfgVersiónShell(), "Versión UI") + card(pend == null ? "—" : String(pend), "Ops. pendientes (memoria)") + card(b3 ? "OK" : "Degradado", "Contexto roles/permisos") + card(typeof escHtml === "function" ? escHtml(user) : user, "Usuario actual") + card(probeLabel, "Último sondeo backend");
+  const probeSummary = document.getElementById("cfg-probe-summary");
+  if (probeSummary) {
+    if (!probe) {
+      probeSummary.textContent = "Último sondeo: pendiente";
+      probeSummary.removeAttribute("title");
+    } else {
+      const summaryParts = [];
+      if (probe.service) summaryParts.push(probe.service);
+      if (typeof probe.httpStatus === "number") summaryParts.push("HTTP " + probe.httpStatus);
+      if (typeof probe.durationMs === "number") summaryParts.push(probe.durationMs + " ms");
+      if (probe.checkedAt) summaryParts.push(new Date(probe.checkedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      probeSummary.textContent = "Último sondeo: " + probeLabel + (summaryParts.length ? " · " + summaryParts.join(" · ") : "");
+    }
+  }
   const probeNote = document.getElementById("cfg-backend-probe-note");
   if (probeNote) {
     const watcherNote = " Vigilancia: consulta Auth y Data API, sondea cada 30 s en primer plano y reintenta en 3–30 s; al volver a la app comprueba de inmediato. Un fallo aislado se tolera; Android puede pausar la PWA en segundo plano.";
