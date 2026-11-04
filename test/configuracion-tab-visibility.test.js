@@ -40,7 +40,12 @@ test('the canonical permission engine owns Administración visibility', () => {
   const navigation = read('public/js/navegacion.js');
   const labelHotfix = read('public/js/hotfix-secciones-visibles-20260903.js');
   const adminLabel = read('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js');
-  assert.match(permissions, /if \(tab === "config"\)[\s\S]*?tienePermiso\("usuarios", "ver"\)[\s\S]*?tienePermiso\("categorias", "ver"\)[\s\S]*?tienePermiso\("unidades", "ver"\)/);
+  const configGate = permissions.match(/if \(tab === "config"\)\s*\{([\s\S]*?)\n\s*\}/);
+  assert.ok(configGate, "Administración debe tener una regla de acceso centralizada");
+  assert.match(configGate[1], /tienePermiso\("usuarios", "ver"\)/);
+  assert.match(configGate[1], /tienePermiso\("categorias", "ver"\)/);
+  assert.match(configGate[1], /tienePermiso\("presentaciones", "ver"\)/);
+  assert.doesNotMatch(configGate[1], /unidades/, "el permiso histórico de unidades no debe abrir un catálogo duplicado");
   assert.match(permissions, /RUTAS_PERSONALES = \{ conectividad: true, preferencias: true \}/);
   assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
   assert.doesNotMatch(labelHotfix, /MutationObserver|setImportant|style\.display|setAttribute\(["']data-tab/);
