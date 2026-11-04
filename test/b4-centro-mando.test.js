@@ -160,6 +160,7 @@ test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventa
   assert.ok(auditPanel.querySelector("#filtro-aud-tipo"), "audit type filter remains available");
   assert.ok(auditPanel.querySelector("#filtro-aud-estado"), "audit state filter remains available");
 
+  window.renderResumen();
   await window.refrescarCentroControl();
   const avisos = document.getElementById("cc-avisos-operativos");
   assert.ok(avisos.textContent.includes("Cuadre con diferencia"), "includes the unique cash-difference alert");
