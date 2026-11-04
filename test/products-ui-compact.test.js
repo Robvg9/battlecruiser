@@ -50,6 +50,7 @@ test("Products has one add action, a live category filter and keeps search",(t)=
  assert.ok(c.document.querySelector("[data-ctx-id='p-1']").classList.contains("bc-category-hidden"));
  assert.ok(!c.document.querySelector("[data-ctx-id='p-2']").classList.contains("bc-category-hidden"));
 });
+// Base presentation remains a product attribute; the commercial formats share one Administration catalogue.
 test("Administration keeps one presentations panel and M75 removes the legacy modal entry",(t)=>{
  const c=fixture();t.after(()=>c.dom.window.close());
  const state=c.window.__BCM75_verify();
