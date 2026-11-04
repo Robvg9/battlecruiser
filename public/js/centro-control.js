@@ -299,6 +299,67 @@ function renderInventarioControl() {
   el.appendChild(ir);
 }
 
+// Avisos complementarios de Jornada/Operación y Comunicación.
+// El Centro de Control ya muestra las alertas de cola, inventario y actividad: aquí
+// se incluyen solo los avisos únicos B7/B8 para evitar repetirlos.
+let _refrescandoAvisosOperativos = null;
+
+function renderAvisosOperativosControl() {
+  const el = document.getElementById("cc-avisos-operativos");
+  if (!el) return;
+  el.textContent = "";
+  if (!navigator.onLine || (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado())) {
+    el.innerHTML = '<p class="lista-estado">Conéctate para actualizar los avisos de jornada y comunicación.</p>';
+    return;
+  }
+  const avisos = [];
+  if (typeof construirAlertasB7 === "function") avisos.push(...construirAlertasB7());
+  if (typeof construirAlertasB8 === "function") avisos.push(...construirAlertasB8());
+  const importantes = avisos.filter((a) => a.nivel === "critico" || a.nivel === "atencion");
+  if (importantes.length === 0) {
+    el.innerHTML = '<p class="lista-estado">Sin asuntos adicionales que requieran atención.</p>';
+    return;
+  }
+  importantes.forEach((aviso) => {
+    const row = document.createElement("div");
+    row.className = "cc-aviso cc-aviso-" + (aviso.nivel === "critico" ? "critico" : "atencion");
+    const copy = document.createElement("div");
+    copy.className = "cc-aviso-copy";
+    const title = document.createElement("strong");
+    title.textContent = aviso.tipo || "Aviso operativo";
+    const detail = document.createElement("span");
+    detail.textContent = aviso.texto || "";
+    copy.append(title, detail);
+    row.appendChild(copy);
+    if (aviso.tab) {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "cc-accion";
+      action.dataset.irTab = aviso.tab;
+      action.textContent = "Abrir";
+      action.setAttribute("aria-label", "Abrir " + (aviso.tipo || "sección"));
+      row.appendChild(action);
+    }
+    el.appendChild(row);
+  });
+}
+
+async function refrescarAvisosOperativosControl() {
+  if (_refrescandoAvisosOperativos) return _refrescandoAvisosOperativos;
+  _refrescandoAvisosOperativos = (async () => {
+    const tareas = [];
+    if (typeof refrescarAlertasB7 === "function") tareas.push(refrescarAlertasB7());
+    if (typeof refrescarAlertasB8 === "function") tareas.push(refrescarAlertasB8());
+    await Promise.allSettled(tareas);
+    renderAvisosOperativosControl();
+  })();
+  try {
+    await _refrescandoAvisosOperativos;
+  } finally {
+    _refrescandoAvisosOperativos = null;
+  }
+}
+
 // Orquestador único del Centro de Control. Lee la cola una sola vez
 async function refrescarCentroControl() {
   if (!appShell || !appShell.classList.contains("visible")) return;
@@ -310,6 +371,7 @@ async function refrescarCentroControl() {
   renderPendientesCompacto(asuntos);
   renderInventarioControl();
   renderActividadReciente();
+  await refrescarAvisosOperativosControl();
   refrescarBadgeCentroControl(asuntos);
 }
 
