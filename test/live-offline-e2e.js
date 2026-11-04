@@ -7,6 +7,7 @@ const crypto = require("node:crypto");
 const { spawn, execFileSync } = require("node:child_process");
 
 const BASE_URL = (process.env.BC_LIVE_BASE_URL || "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");
+const PREVIEW_BASE_URL = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 const OUTPUT_DIR = path.join(process.cwd(), "test-results");
 const REPORT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.json");
@@ -599,6 +600,18 @@ async function main() {
   assert(initial.version === expectedVersion, "Versión de navegador " + initial.version + " distinta de la esperada " + expectedVersion + ".");
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
+
+  // The preview login proxy must reach the real Edge Function with its allowlisted
+  // production Origin. GET is a no-credential diagnostic: the expected upstream
+  // response is 405, before the login rate limiter or auth/database code runs.
+  if (BASE_URL === PREVIEW_BASE_URL) {
+    const previewLoginProxy = await evaluate("(async()=>{try{const r=await fetch('/__bc_preview/functions/v1/bc-username-login',{method:'GET',cache:'no-store'});const body=await r.json().catch(()=>null);return {status:r.status,body,origin:location.origin};}catch(error){return {status:0,error:String(error),origin:location.origin};}})()");
+    report.evidence.previewLoginProxy = previewLoginProxy;
+    assert(previewLoginProxy.status === 405 &&
+      previewLoginProxy.body && previewLoginProxy.body.error === "Método no permitido." &&
+      previewLoginProxy.origin === PREVIEW_BASE_URL,
+      "El proxy same-origin del preview no alcanzó bc-username-login con el Origin permitido: " + JSON.stringify(previewLoginProxy));
+  }
 
 
   // Step 4/15 — real Chromium check of the visible Sales view toggle.
