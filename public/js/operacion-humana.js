@@ -537,30 +537,21 @@ async function refrescarAlertasB7() {
 function construirAlertasB7() {
   const a = [];
   if (_b7CacheAlertas.cuadresDiferencia > 0) {
-    a.push({ nivel: "critico", tipo: "Cuadre con diferencia", texto: _b7CacheAlertas.cuadresDiferencia + " cuadre(s) con diferencia requieren revisión.", op: null });
+    a.push({ nivel: "critico", tipo: "Cuadre con diferencia", texto: _b7CacheAlertas.cuadresDiferencia + " cuadre(s) con diferencia requieren revisión.", op: null, tab: "ciclos" });
   }
   if (_b7CacheAlertas.incAbiertas > 0) {
-    a.push({ nivel: "critico", tipo: "Incidencias abiertas", texto: _b7CacheAlertas.incAbiertas + " incidencia(s) abierta(s).", op: null });
+    a.push({ nivel: "critico", tipo: "Incidencias abiertas", texto: _b7CacheAlertas.incAbiertas + " incidencia(s) abierta(s).", op: null, tab: "operacion" });
   }
   if (_b7CacheAlertas.cuadresPendientes > 0) {
-    a.push({ nivel: "atencion", tipo: "Cuadres pendientes", texto: _b7CacheAlertas.cuadresPendientes + " cuadre(s) pendiente(s) de declarar.", op: null });
+    a.push({ nivel: "atencion", tipo: "Cuadres pendientes", texto: _b7CacheAlertas.cuadresPendientes + " cuadre(s) pendiente(s) de declarar.", op: null, tab: "ciclos" });
   }
   if (_b7CacheAlertas.respPendientes > 0) {
-    a.push({ nivel: "atencion", tipo: "Responsabilidades pendientes", texto: _b7CacheAlertas.respPendientes + " responsabilidad(es) pendiente(s).", op: null });
+    a.push({ nivel: "atencion", tipo: "Responsabilidades pendientes", texto: _b7CacheAlertas.respPendientes + " responsabilidad(es) pendiente(s).", op: null, tab: "turnos" });
   }
   if (_b7CacheAlertas.turnosAbiertos > 0) {
-    a.push({ nivel: "normal", tipo: "Turnos abiertos", texto: _b7CacheAlertas.turnosAbiertos + " turno(s) abierto(s).", op: null });
+    a.push({ nivel: "normal", tipo: "Turnos abiertos", texto: _b7CacheAlertas.turnosAbiertos + " turno(s) abierto(s).", op: null, tab: "ciclos" });
   }
   return a;
-}
-
-// Hook: integrar las alertas B7 en el Centro de Mando.
-function construirAlertasMandoB7Completo(ops) {
-  const base = (typeof construirAlertasMandoCompleto === "function") ? construirAlertasMandoCompleto(ops) : [];
-  return base.concat(construirAlertasB7()).sort((a, b) => {
-    const orden = { critico: 0, atencion: 1, normal: 2 };
-    return (orden[a.nivel] != null ? orden[a.nivel] : 3) - (orden[b.nivel] != null ? orden[b.nivel] : 3);
-  });
 }
 
 // Inicialización de las pestañas Turnos y Operación.
