@@ -610,7 +610,7 @@ safeInit("password-recovery-request", () => {
     recoveryBtn.disabled = true;
     recoveryBtn.textContent = "Enviando correo…";
     try {
-      const response = await fetch(bcUsernameLoginEndpoint(), {
+      const response = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
         method: "POST",
         headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "password-recovery", username: identifier }),
