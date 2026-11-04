@@ -30,13 +30,13 @@ test("Administration has one compact home for roles, categories and units", () =
 });
 
 test("presentations and role permissions have one Administration entry, not duplicate management actions", () => {
-  assert.match(m75, /bc-product-presentations-entry/);
-  assert.match(m75, /Administrar presentaciones comerciales/);
+  assert.match(m75, /function moveNomenclatureToAdmin\(\)/);
+  assert.doesNotMatch(m75, /Administrar presentaciones comerciales/);
   assert.match(catalogos, /Presentaciones comerciales/);
   assert.doesNotMatch(catalogos, /prod-nom-categorias-slot|prod-nom-unidades-slot/);
   assert.doesNotMatch(m26, /'lista-categorias':\s*'prod-nom-|\s*'lista-unidades':\s*'prod-nom-/);
-  assert.match(m26, /'lista-presentaciones-catalogo':\s*'prod-nom-presentaciones-slot'/);
-  assert.match(m26, /'pp-lista-asociaciones':\s*'prod-nom-presentaciones-slot'/);
+  assert.doesNotMatch(m26, /lista-presentaciones-catalogo.*prod-nom-/);
+  assert.doesNotMatch(m26, /pp-lista-asociaciones.*prod-nom-/);
   assert.ok(!roles.includes("rolesBtn = document.createElement"));
   assert.match(roles, /bc-btn-config-roles/);
   assert.ok(roles.includes("max-height:min(84vh,680px)"));
