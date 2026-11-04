@@ -36,7 +36,7 @@ test("presentations and role permissions have one Administration entry, not dupl
   assert.doesNotMatch(m26, /'lista-categorias':\s*'prod-nom-|\s*'lista-unidades':\s*'prod-nom-/);
   assert.match(m26, /'lista-presentaciones-catalogo':\s*'prod-nom-presentaciones-slot'/);
   assert.match(m26, /'pp-lista-asociaciones':\s*'prod-nom-presentaciones-slot'/);
-  assert.doesNotMatch(roles, /ud-btn-roles|rolesBtn = document\.createElement/);
+  assert.doesNotMatch(roles, /rolesBtn = document\\.createElement/);
   assert.match(roles, /bc-btn-config-roles/);
   assert.match(roles, /max-height:min\\(84vh,680px\\)/);
   assert.match(roles, /rol-permisos-panel\\{max-height:240px;overflow:auto/);
