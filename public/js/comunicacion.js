@@ -376,20 +376,12 @@ async function refrescarAlertasB8() {
 function construirAlertasB8() {
   const a = [];
   if (_b8CacheAlertas.soportePendiente > 0) {
-    a.push({ nivel: "atencion", tipo: "Soporte pendiente", texto: _b8CacheAlertas.soportePendiente + " conversación(es) de soporte con mensajes nuevos.", op: null });
+    a.push({ nivel: "atencion", tipo: "Soporte pendiente", texto: _b8CacheAlertas.soportePendiente + " conversación(es) de soporte con mensajes nuevos.", op: null, tab: "comunicacion" });
   }
   if (_b8CacheAlertas.convRecientes > 0 && _b8CacheAlertas.convRecientes !== _b8CacheAlertas.soportePendiente) {
-    a.push({ nivel: "normal", tipo: "Mensajes nuevos", texto: "Tenés " + _comNoLeidosTotal + " mensaje(s) sin leer.", op: null });
+    a.push({ nivel: "normal", tipo: "Mensajes nuevos", texto: "Tenés " + _comNoLeidosTotal + " mensaje(s) sin leer.", op: null, tab: "comunicacion" });
   }
   return a;
-}
-
-function construirAlertasMandoB8Completo(ops) {
-  const base = (typeof construirAlertasMandoB7Completo === "function") ? construirAlertasMandoB7Completo(ops) : [];
-  return base.concat(construirAlertasB8()).sort((a, b) => {
-    const orden = { critico: 0, atencion: 1, normal: 2 };
-    return (orden[a.nivel] != null ? orden[a.nivel] : 3) - (orden[b.nivel] != null ? orden[b.nivel] : 3);
-  });
 }
 
 safeInit("b8-comunicacion", () => {
