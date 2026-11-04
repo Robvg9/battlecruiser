@@ -59,6 +59,10 @@ function productoEsVariante(p) {
   return !!(p && p.producto_padre_id);
 }
 
+function productosEnCacheActual() {
+  return typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
+}
+
 async function ejecutarProductoMixtoSinCola(editandoId, payload) {
   if (typeof usuarioPuedeOperar === "function" && !(await usuarioPuedeOperar())) {
     return { ok: false, error: { message: "Tu usuario está inactivo. Contacta al administrador." } };
@@ -476,7 +480,7 @@ function iniciarEdicionProducto(p) {
   document.getElementById("prod-nombre").value = p.nombre || "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
   if (mixedToggle) mixedToggle.checked = !!p.inventario_mixto;
-  const currentVariants = (_cache.productos || []).filter((v) =>
+  const currentVariants = productosEnCacheActual().filter((v) =>
     String(v.producto_padre_id) === String(p.id) && v.activo !== false
   );
   renderEditorVariantesProducto(currentVariants);
@@ -560,7 +564,7 @@ safeInit("form-producto", () => {
     const mixedEnabled = !!(mixedToggle && mixedToggle.checked);
     const variants = obtenerVariantesFormularioProducto();
     const previousProduct = editandoId
-      ? (_cache.productos || []).find((p) => String(p.id) === String(editandoId))
+      ? productosEnCacheActual().find((p) => String(p.id) === String(editandoId))
       : null;
     const needsMixedConfig = mixedEnabled || !!(previousProduct && previousProduct.inventario_mixto);
     if (mixedEnabled) {
