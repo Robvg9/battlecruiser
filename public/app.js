@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.60 — encabezado compacto y Productos simplificado
+// v9.5.61 — Dashboard único y Auditoría separada
 (function hotfixV9475(){
-  const VERSION="9.5.60";
+  const VERSION="9.5.61";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
