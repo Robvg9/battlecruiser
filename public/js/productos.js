@@ -83,6 +83,7 @@ function prepararImagenProductoCuadrada(file) {
         const context = canvas.getContext("2d");
         if (!context) throw new Error("Este navegador no puede preparar la imagen.");
         context.drawImage(image, left, top, cropSide, cropSide, 0, 0, outputSide, outputSide);
+        window.__BC_PRODUCT_IMAGE_DIMENSIONS__ = { width: outputSide, height: outputSide, cropLeft: left, cropTop: top, cropSide: cropSide };
         canvas.toBlob((blob) => {
           cleanup();
           if (!blob) { reject(new Error("No se pudo comprimir la imagen.")); return; }
@@ -140,6 +141,7 @@ safeInit("prod-imagen-input", () => {
   input.addEventListener("change", async () => {
     const file = input.files && input.files[0];
     _productoImagenProcesada = null;
+    window.__BC_PRODUCT_IMAGE_FILE__ = null;
     input.dataset.processing = "false";
     revocarPreviewImagenProducto();
     setMsg("msg-prod-imagen", "", true);
@@ -159,6 +161,7 @@ safeInit("prod-imagen-input", () => {
     try {
       const processed = await prepararImagenProductoCuadrada(file);
       _productoImagenProcesada = processed;
+      window.__BC_PRODUCT_IMAGE_FILE__ = processed;
       _productoImagenPreviewObjectUrl = URL.createObjectURL(processed);
       img.src = _productoImagenPreviewObjectUrl;
       img.dataset.guardada = "false";
