@@ -211,10 +211,19 @@
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
         <div class="prod-imagen-campo">
-          <label for="prod-imagen-input" class="prod-imagen-label">Imagen del producto (JPG o PNG, opcional)</label>
-          <input type="file" id="prod-imagen-input" accept="image/jpeg,image/png,image/jpg">
+          <label class="prod-imagen-label">Imagen del producto</label>
+          <div class="prod-imagen-selector">
+            <input type="file" id="prod-imagen-input" class="prod-imagen-input-oculto" accept="image/jpeg,image/png,image/jpg" aria-label="Archivo de imagen del producto">
+            <button type="button" id="prod-imagen-elegir" class="prod-imagen-elegir" title="Seleccionar imagen" aria-label="Seleccionar imagen del producto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3A1.5 1.5 0 0 1 21.5 9v9A1.5 1.5 0 0 1 20 19.5H4A1.5 1.5 0 0 1 2.5 18V9A1.5 1.5 0 0 1 4 7.5Z"/>
+                <circle cx="12" cy="13" r="3.2"/>
+              </svg>
+            </button>
+            <span id="prod-imagen-nombre" class="prod-imagen-nombre">Sin imagen</span>
+          </div>
           <div id="prod-imagen-preview-wrap" class="prod-imagen-preview-wrap hidden">
-            <img id="prod-imagen-preview" class="prod-imagen-preview" alt="Vista previa de la imagen del producto">
+            <img id="prod-imagen-preview" class="prod-imagen-preview" alt="Vista previa cuadrada de la imagen del producto">
             <button type="button" id="prod-imagen-quitar" class="btn-quitar-imagen">Quitar imagen</button>
           </div>
           <div id="msg-prod-imagen" class="msg"></div>
@@ -650,7 +659,7 @@
 <script src="js/loading-guard.js"></script>
 <script src="js/centro-control.js"></script>
 <script src="js/navegacion.js?v=20261030.1"></script>
-<script src="js/productos.js?v=20261015.1"></script>
+<script src="js/productos.js?v=20261103.1"></script>
 <script src="js/presentaciones.js"></script>
 <script src="js/almacenes.js"></script>
 <script src="js/transferencias.js"></script>
