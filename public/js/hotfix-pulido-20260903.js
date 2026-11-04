@@ -317,7 +317,7 @@
     var save=document.getElementById('prod-submit-btn')||document.getElementById('bc171-save');if(save)save.disabled=true;
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'';var pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
-    if(pn!==null&&(!Number.isFinite(pn)||pn<0)){msg('El precio normal debe ser un número válido o dejarse vacío.',false);if(save)save.disabled=false;return true;}
+    if(pn===null||!Number.isFinite(pn)||pn<0.01){msg('El precio normal debe ser mayor a 0.',false);if(save)save.disabled=false;return true;}
     if(pm!==null&&(!Number.isFinite(pm)||pm<0)){msg('El precio mayorista debe ser un número válido o dejarse vacío.',false);if(save)save.disabled=false;return true;}
     var normal=selectedPres('normal'), wholesale=selectedPres('wholesale');
     function presentationValid(value){
