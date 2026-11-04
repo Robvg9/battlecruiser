@@ -62,16 +62,25 @@
     presentationChannelsLoaded=false;
     presentationChannelsLoading=(async function(){
       try{
-        const result=await client.from('producto_presentaciones').select('producto_id,presentacion_id,activo').eq('activo',true);
+        const result=await client.from('producto_presentaciones').select('producto_id,presentacion_id,factor,activo,presentaciones(nombre)').eq('activo',true);
         if(result.error)throw result.error;
         const rows=Array.isArray(result.data)?result.data:[];
         const next={};
         getProducts().forEach(function(product){
           const linked=rows.filter(function(row){return String(row.producto_id)===String(product.id);});
           const wholesaleId=product.presentacion_id?String(product.presentacion_id):null;
-          const hasWholesale=!!(wholesaleId&&linked.some(function(row){return String(row.presentacion_id)===wholesaleId;}));
-          const hasRetail=linked.some(function(row){return !wholesaleId||String(row.presentacion_id)!==wholesaleId;});
-          next[String(product.id)]={minorista:hasRetail,mayorista:hasWholesale};
+          const wholesaleRows=wholesaleId?linked.filter(function(row){return String(row.presentacion_id)===wholesaleId;}):[];
+          const retailRows=linked.filter(function(row){return !wholesaleId||String(row.presentacion_id)!==wholesaleId;});
+          function shape(row){
+            if(!row)return null;
+            return{presentacion_id:String(row.presentacion_id),factor:Number(row.factor),nombre:String(row.presentaciones&&row.presentaciones.nombre||'')};
+          }
+          // Each channel must resolve to exactly one association. Ambiguous legacy
+          // products fail closed instead of selecting an arbitrary package size.
+          next[String(product.id)]={
+            minorista:retailRows.length===1&&Number(retailRows[0].factor)>0?shape(retailRows[0]):null,
+            mayorista:wholesaleRows.length===1&&Number(wholesaleRows[0].factor)>0?shape(wholesaleRows[0]):null
+          };
         });
         presentationChannels=next;
         presentationChannelsLoaded=true;
@@ -94,7 +103,7 @@
     if(!isSellType(type))return true;
     if(!presentationChannelsLoaded||!product)return false;
     const channels=presentationChannels[String(product.id)];
-    return !!(channels&&channels[type]===true);
+    return !!(channels&&channels[type]&&channels[type].presentacion_id&&channels[type].factor>0);
   }
 
   function patchRefreshVentas(){
@@ -272,6 +281,13 @@
   window.__BC_M275_productChannelAllowed=function(productId,type){
     const product=getProducts().find(function(p){return String(p.id)===String(productId);});
     return channelAvailable(product,normalizeType(type));
+  };
+  window.__BC_M275_getProductPresentation=function(productId,type){
+    const product=getProducts().find(function(p){return String(p.id)===String(productId);});
+    const channel=normalizeType(type);
+    if(!channelAvailable(product,channel))return null;
+    const entry=presentationChannels[String(productId)];
+    return entry?entry[channel]:null;
   };
   function boot(){
     injectStyles();
