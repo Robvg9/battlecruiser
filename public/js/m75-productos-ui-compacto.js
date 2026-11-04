@@ -24,7 +24,7 @@
       '#app-shell.visible > .app-header .header-left{grid-area:brand;min-width:0;gap:7px!important;padding-left:0!important}',
       '#app-shell.visible > .app-header .header-left h1{font-size:16px!important;max-width:100%}',
       '#app-shell.visible > .app-header .header-right{display:contents!important}',
-      '#sidebar-toggle-btn{width:34px!important;height:34px!important;min-width:34px!important;margin:0!important;border-radius:8px!important}',
+      '#sidebar-toggle-btn{width:36px!important;height:34px!important;min-width:36px!important;flex:0 0 36px!important;margin:0!important;border-radius:8px!important}',
       '#sidebar-toggle-btn svg{width:18px!important;height:18px!important}',
       '#mi-cuenta-btn{grid-area:account;justify-self:end;min-height:30px!important;padding:5px 8px!important;font-size:10.5px!important}',
       '#logout-btn{grid-area:logout;justify-self:end;min-height:30px!important;margin:0!important;padding:5px 8px!important;font-size:10.5px!important}',
