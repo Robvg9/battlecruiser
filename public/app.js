@@ -39,7 +39,7 @@
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.1"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.2"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.6"],["hotfix-17-final-loader-20260903.js","20261030.2"],
-    ["hotfix-pulido-20260903.js","20261103.2"],["hotfix-pulido-20260903b.js","20261103.1"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20261103.1"],
+    ["hotfix-pulido-20260903.js","20261103.3"],["hotfix-pulido-20260903b.js","20261103.1"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20261103.1"],
     ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.4"]
   ];
   let resolveUIReady;window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});window.__BC_UI_READY_RESOLVED__=false;
