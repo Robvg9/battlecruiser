@@ -194,6 +194,7 @@ test("Paso 4 catálogos: editar categoría actualiza el mismo registro y conserv
   c.window.document.getElementById("cat-nombre").value = "Bebidas";
   submit(c.window, "form-categoria");
   assert.ok(await waitFor(() => c.updates.some((x) => x.table === "categorias" && x.id === "cat-existing" && x.payload.nombre === "Bebidas")));
+  assert.ok(await waitFor(() => c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas")));
   assert.equal(c.tables.categorias.find((row) => row.id === "cat-existing").nombre, "Bebidas");
   assert.ok(c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas"));
   assert.equal(c.window.document.querySelector("#form-categoria button[type=submit]").textContent, "Agregar categoría");
