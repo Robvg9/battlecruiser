@@ -87,7 +87,7 @@ function prepararImagenProductoCuadrada(file) {
         canvas.toBlob((blob) => {
           cleanup();
           if (!blob) { reject(new Error("No se pudo comprimir la imagen.")); return; }
-          const baseName = String(file.name || "producto").replace(/\\.[^.]+$/, "") || "producto";
+          const baseName = String(file.name || "producto").replace(/\.[^.]+$/, "") || "producto";
           try {
             resolve(new File([blob], baseName + ".jpg", {
               type: "image/jpeg",
