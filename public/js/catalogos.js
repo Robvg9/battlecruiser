@@ -107,56 +107,10 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
       modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
     }
 
-    if (!document.getElementById("prod-presentaciones-config")) {
-      const cfg = document.createElement("fieldset");
-      cfg.id = "prod-presentaciones-config";
-      cfg.className = "prod-pres-config";
-      cfg.innerHTML = `
-        <legend>Presentaciones del producto <span class="prod-required">obligatorio</span></legend>
-        <div class="prod-pres-grid">
-          <div class="field"><label for="prod-pres-min">Presentación minorista</label><select id="prod-pres-min" required><option value="">Selecciona presentación</option></select><small>Factor fijo: 1 unidad base.</small></div>
-          <div class="field"><label for="prod-pres-may-habilitado">¿Maneja mayorista?</label><select id="prod-pres-may-habilitado"><option value="no">No</option><option value="si">Sí</option></select><small>Solo si el producto se comercializará por mayor.</small></div>
-          <div class="field prod-pres-may-field hidden"><label for="prod-pres-may">Presentación mayorista</label><select id="prod-pres-may"><option value="">Selecciona presentación</option></select></div>
-          <div class="field prod-pres-may-field hidden"><label for="prod-pres-may-factor">Unidades base por presentación mayorista</label><input id="prod-pres-may-factor" type="number" min="2" step="1" inputmode="numeric" placeholder="Ej. 24"><small>Ej.: 1 caja = 24 unidades.</small></div>
-        </div>`;
-      const imageField = form.querySelector(".prod-imagen-campo");
-      if (imageField) imageField.insertAdjacentElement("beforebegin", cfg); else form.appendChild(cfg);
-
-      const toggle = document.getElementById("prod-pres-may-habilitado");
-      toggle.addEventListener("change", () => {
-        const visible = toggle.value === "si";
-        form.querySelectorAll(".prod-pres-may-field").forEach((el) => el.classList.toggle("hidden", !visible));
-        document.getElementById("prod-pres-may").required = visible;
-        document.getElementById("prod-pres-may-factor").required = visible;
-      });
-    }
-
-    cargarSelectsPresentacionesProducto();
+    // Product-specific presentations and prices are managed only by the single
+    // commercial-options panel. This file owns master catalog management only.
     instalarEstilosNomenclatura();
-    instalarValidacionCreacionProducto();
   };
-
-  function cargarSelectsPresentacionesProducto() {
-    const min = document.getElementById("prod-pres-min");
-    const may = document.getElementById("prod-pres-may");
-    if (!min || !may) return;
-    const cargar = async () => {
-      let rows = [];
-      try {
-        if (typeof cargarPresentacionesTodas === "function") rows = await cargarPresentacionesTodas();
-        else rows = await withCache("presentaciones", () => client.from("presentaciones").select("id, nombre, activo").order("nombre"));
-      } catch (e) { console.warn("[Battlecruiser] No se pudieron cargar presentaciones:", e); return; }
-      const activas = (rows || []).filter((p) => p.activo !== false);
-      [min, may].forEach((select) => {
-        const actual = select.value;
-        select.innerHTML = '<option value="">Selecciona presentación</option>';
-        activas.forEach((p) => { const o = document.createElement("option"); o.value = p.id; o.textContent = p.nombre; select.appendChild(o); });
-        if (actual && activas.some((p) => p.id === actual)) select.value = actual;
-      });
-    };
-    cargar();
-    window._recargarPresentacionesProducto = cargar;
-  }
 
   let nomenclaturaOrigenes = [];
 
@@ -237,74 +191,6 @@ initCatalogoSimple({ tabla: "unidades", formId: "form-unidad", inputId: "uni-nom
       }
     });
     nomenclaturaOrigenes = [];
-  }
-
-  function instalarValidacionCreacionProducto() {
-    const form = document.getElementById("form-producto");
-    if (!form || form.dataset.presGuard === "1") return;
-    form.dataset.presGuard = "1";
-    form.addEventListener("submit", async (e) => {
-      const editando = document.getElementById("prod-editando-id")?.value;
-      if (editando) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      await crearProductoConPresentaciones(e);
-    }, true);
-  }
-
-  async function crearProductoConPresentaciones(e) {
-    const form = e.target;
-    const nombre = document.getElementById("prod-nombre")?.value.trim();
-    const categoria_id = document.getElementById("prod-categoria")?.value || null;
-    const unidad = document.getElementById("prod-unidad")?.value.trim() || null;
-    const precio_normal = parseFloat(document.getElementById("prod-precio-normal")?.value);
-    const precio_mayorista_raw = document.getElementById("prod-precio-mayorista")?.value.trim();
-    const precio_mayorista = precio_mayorista_raw === "" ? null : parseFloat(precio_mayorista_raw);
-    const presMin = document.getElementById("prod-pres-min")?.value;
-    const mayorista = document.getElementById("prod-pres-may-habilitado")?.value === "si";
-    const presMay = document.getElementById("prod-pres-may")?.value;
-    const factorMay = parseFloat(document.getElementById("prod-pres-may-factor")?.value);
-    const imagen = document.getElementById("prod-imagen-input")?.files?.[0] || null;
-    const submitBtn = form.querySelector("button[type='submit']");
-
-    if (!nombre) return setMsg("msg-productos", "El nombre del producto es obligatorio.", false);
-    if (!(precio_normal > 0)) return setMsg("msg-productos", "El precio normal debe ser mayor a 0.", false);
-    if (precio_mayorista !== null && !(precio_mayorista > 0)) return setMsg("msg-productos", "El precio mayorista debe ser mayor a 0.", false);
-    if (!presMin) return setMsg("msg-productos", "Debes definir la presentación minorista.", false);
-    if (mayorista && (!presMay || !(factorMay >= 2))) return setMsg("msg-productos", "Define la presentación mayorista y cuántas unidades base contiene.", false);
-    if (imagen && typeof validarArchivoImagenProducto === "function") {
-      const errorImagen = validarArchivoImagenProducto(imagen);
-      if (errorImagen) return setMsg("msg-prod-imagen", errorImagen, false);
-    }
-    if (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado()) return setMsg("msg-productos", "Para crear un producto con sus presentaciones necesitas conexión. Así evitamos crear un producto sin su configuración obligatoria.", false);
-
-    submitBtn.disabled = true;
-    const resultado = await ejecutarOperacion("producto", { p_nombre: nombre, p_categoria_id: categoria_id, p_unidad: unidad, p_precio_normal: precio_normal, p_precio_mayorista: mayorista ? precio_mayorista : null });
-    if (!resultado.ok || resultado.offline || !resultado.data) {
-      submitBtn.disabled = false;
-      return setMsg("msg-productos", resultado.offline ? "El producto necesita conexión para guardar sus presentaciones obligatorias." : "No se pudo crear el producto: " + explicarError(resultado.error, "crear producto"), false);
-    }
-
-    const productoId = resultado.data;
-    const asociaciones = [{ producto_id: productoId, presentacion_id: presMin, factor: 1 }];
-    if (mayorista) asociaciones.push({ producto_id: productoId, presentacion_id: presMay, factor: factorMay });
-    const { error: errorPres } = await client.from("producto_presentaciones").insert(asociaciones);
-    if (errorPres) {
-      try { await client.from("productos").delete().eq("id", productoId); } catch (_) {}
-      submitBtn.disabled = false;
-      return setMsg("msg-productos", "El producto no quedó creado porque no se pudieron guardar sus presentaciones: " + explicarError(errorPres, "guardar presentaciones"), false);
-    }
-
-    if (imagen && typeof subirImagenProducto === "function") {
-      const rImg = await subirImagenProducto(productoId, imagen);
-      if (!rImg.ok) setMsg("msg-productos", "Producto creado con sus presentaciones, pero la imagen no pudo subirse: " + explicarError(rImg.error, "subir imagen"), false);
-    }
-
-    submitBtn.disabled = false;
-    if (typeof cancelarEdicionProducto === "function") cancelarEdicionProducto();
-    setMsg("msg-productos", mayorista ? "✓ Producto creado con presentación minorista y mayorista." : "✓ Producto creado con presentación minorista.", true);
-    if (typeof refrescarProductos === "function") await refrescarProductos();
-    if (typeof window._recargarPresentacionesProducto === "function") window._recargarPresentacionesProducto();
   }
 
   function instalarEstilosNomenclatura() {
