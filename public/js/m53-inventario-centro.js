@@ -41,6 +41,12 @@
     const s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent = [
+      '#tab-inventario .bc-m53-variant-details{margin-top:8px;padding-top:7px;border-top:1px solid rgba(212,176,92,.14);font-size:10px}',
+      '#tab-inventario .bc-m53-variant-details summary{cursor:pointer;color:var(--gold-bright);font-weight:600;list-style-position:inside}',
+      '#tab-inventario .bc-m53-variant-list{display:flex;flex-direction:column;gap:4px;margin-top:6px}',
+      '#tab-inventario .bc-m53-variant-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:var(--mist)}',
+      '#tab-inventario .bc-m53-variant-row strong{color:var(--text);font-weight:600}',
+
       '#tab-inventario.bc-m53{max-width:1100px}',
       '#tab-inventario.bc-m53 .bc-m53-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(212,176,92,.14)}',
       "#tab-inventario.bc-m53 .bc-m53-hero h3{margin:0;font-family:'Cormorant Garamond',serif;font-size:1.85rem;line-height:1.1;color:var(--text)}",
@@ -424,15 +430,336 @@
       const thumb = img
         ? '<img class="bc-m53-thumb" src="' + esc(img) + '" alt="" loading="lazy">'
         : '<div class="bc-m53-thumb bc-m53-thumb-empty" aria-hidden="true">Sin imagen</div>';
-      const valorTxt = num(s.valor_inventario) > 0 ? ' · $' + moneyFmt(s.valor_inventario) : '';
+      const valorTxt = num(s.valor_inventario) > 0 ? ' · 
+    }).join('');
+
+    if (pag) {
+      pag.innerHTML = '';
+      const totalPages = Math.max(1, Math.ceil(_filtered.length / PAGE_SIZE));
+      if (_page > 0) {
+        const ant = document.createElement('button');
+        ant.type = 'button';
+        ant.className = 'bc-m53-btn';
+        ant.textContent = '← Anterior';
+        ant.addEventListener('click', function () { _page--; paintListOnly(); });
+        pag.appendChild(ant);
+      }
+      const span = document.createElement('span');
+      span.className = 'muted';
+      span.textContent = 'Página ' + (_page + 1) + ' de ' + totalPages + ' · ' + _filtered.length + ' registros';
+      pag.appendChild(span);
+      if (_page < totalPages - 1) {
+        const sig = document.createElement('button');
+        sig.type = 'button';
+        sig.className = 'bc-m53-btn';
+        sig.textContent = 'Siguiente →';
+        sig.addEventListener('click', function () { _page++; paintListOnly(); });
+        pag.appendChild(sig);
+      }
+    }
+  }
+
+  function paintListOnly() {
+    applyFilters();
+    renderChips();
+    renderGrid();
+  }
+
+  function paint() {
+    ensureShell();
+    relocateStockBajoBtn();
+    applyFilters();
+    renderMetrics();
+    renderAlerts();
+    renderChips();
+    renderGrid();
+  }
+
+  function syncEstadoSelect() {
+    const sel = document.getElementById('inv-filtro-estado-select');
+    if (sel && sel.value !== _estado) sel.value = _estado;
+    // Compat con variable global usada por nucleo-operativo
+    if (typeof window._invFiltroEstado !== 'undefined') window._invFiltroEstado = _estado;
+  }
+
+  function limpiarFiltrosUI() {
+    const alm = document.getElementById('inv-filtro-almacen');
+    if (alm) alm.value = '';
+    const bus = document.getElementById('inv-buscar');
+    if (bus) bus.value = '';
+    _search = '';
+    _estado = 'todos';
+    _page = 0;
+    syncEstadoSelect();
+  }
+
+  async function cargarInventario() {
+    ensureShell();
+    relocateStockBajoBtn();
+    const conn = document.getElementById('inv-conn-info');
+
+    if (typeof window.tienePermiso === 'function' && !window.tienePermiso('reportes', 'ver')) {
+      _allRows = [];
+      _filtered = [];
+      _lastError = null;
+      _loading = false;
+      window._invFilas = [];
+      const el = document.getElementById('inv-detalle');
+      if (el) {
+        el.className = '';
+        el.innerHTML = '<div class="bc-m53-empty">No tenés permiso para ver inventario.</div>';
+      }
+      const metrics = document.getElementById('inv-resumen');
+      if (metrics) metrics.innerHTML = '';
+      const alerts = document.getElementById('inv-alertas-m53');
+      if (alerts) alerts.innerHTML = '';
+      return;
+    }
+
+    if (!navigator.onLine) {
+      if (conn) conn.textContent = '⚪ Sin conexión — datos no disponibles';
+      _allRows = [];
+      _filtered = [];
+      _lastError = null;
+      _loading = false;
+      window._invFilas = [];
+      const el = document.getElementById('inv-detalle');
+      if (el) {
+        el.className = '';
+        el.innerHTML = '<div class="bc-m53-empty">⚪ Sin conexión — el inventario enriquecido requiere datos de Supabase.</div>';
+      }
+      const metrics = document.getElementById('inv-resumen');
+      if (metrics) metrics.innerHTML = '<div class="bc-m53-empty" style="padding:12px">Sin conexión.</div>';
+      return;
+    }
+
+    if (conn) conn.textContent = '🟢 Datos de Supabase';
+    if (typeof window.poblarSelectAlmacenes === 'function') {
+      window.poblarSelectAlmacenes(document.getElementById('inv-filtro-almacen'));
+    }
+
+    _loading = true;
+    _lastError = null;
+    paint();
+
+    const sel = document.getElementById('inv-filtro-almacen');
+    const almacen = sel ? (sel.value || null) : null;
+
+    try {
+      const client = window.client;
+      if (!client) throw new Error('Cliente Supabase no disponible');
+      const [res, mixedRes] = await Promise.all([
+        client.rpc('inventario_enriquecido', { p_almacen_id: almacen }),
+        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen })
+      ]);
+      if (res.error) {
+        if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
+          _lastError = 'rpc_missing';
+        } else {
+          _lastError = String(res.error.message || res.error.code || res.error);
+        }
+        _allRows = [];
+        _filtered = [];
+        window._invFilas = [];
+        _loading = false;
+        paint();
+        return;
+      }
+      const ordinaryRows = Array.isArray(res.data) ? res.data : [];
+      let mixedRows = [];
+      if (!mixedRes.error) {
+        mixedRows = Array.isArray(mixedRes.data) ? mixedRes.data : [];
+      } else if (!(typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(mixedRes.error))) {
+        throw new Error(String(mixedRes.error.message || mixedRes.error.code || mixedRes.error));
+      }
+      const mixedVariantIds = new Set();
+      mixedRows.forEach(function (row) {
+        (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
+          if (variant && variant.producto_id) mixedVariantIds.add(String(variant.producto_id));
+        });
+      });
+      // Replace child SKU rows with one parent summary; their real product IDs
+      // remain in the expandable details and in every transactional table.
+      _allRows = ordinaryRows.filter(function (row) {
+        return !mixedVariantIds.has(String(row.producto_id));
+      }).concat(mixedRows);
+      window._invFilas = _allRows;
+      _page = 0;
+      _loading = false;
+      _lastError = null;
+      paint();
+    } catch (e) {
+      console.warn('[BattleCruiser] M53 inventario_enriquecido:', e);
+      _lastError = String(e && e.message ? e.message : e);
+      _allRows = [];
+      _filtered = [];
+      window._invFilas = [];
+      _loading = false;
+      paint();
+    }
+  }
+
+  function installHooks() {
+    window.refrescarInventario = function () { return cargarInventario(); };
+    window.refrescarInventario.__m53 = true;
+    window.renderInventario = function (filas) {
+      _allRows = Array.isArray(filas) ? filas : [];
+      window._invFilas = _allRows;
+      _page = 0;
+      _loading = false;
+      _lastError = null;
+      paint();
+    };
+  }
+
+  function bindEvents() {
+    const tab = document.getElementById('tab-inventario');
+    if (!tab || tab.dataset.m53Bound) return;
+    tab.dataset.m53Bound = '1';
+
+    tab.addEventListener('click', function (e) {
+      if (e.target.closest('#inv-retry-btn, #inv-empty-clear')) {
+        if (e.target.closest('#inv-empty-clear')) {
+          limpiarFiltrosUI();
+          cargarInventario();
+        } else {
+          cargarInventario();
+        }
+        return;
+      }
+      if (e.target.closest('#inv-chips-clear')) {
+        limpiarFiltrosUI();
+        cargarInventario();
+        return;
+      }
+      const chipBtn = e.target.closest('.bc-m53-chip button');
+      if (chipBtn) {
+        const chip = chipBtn.closest('.bc-m53-chip');
+        const key = chip && chip.getAttribute('data-chip');
+        if (key === 'almacen') {
+          const a = document.getElementById('inv-filtro-almacen');
+          if (a) a.value = '';
+          cargarInventario();
+        } else if (key === 'estado') {
+          _estado = 'todos';
+          _page = 0;
+          syncEstadoSelect();
+          paintListOnly();
+        } else if (key === 'search') {
+          const b = document.getElementById('inv-buscar');
+          if (b) b.value = '';
+          _search = '';
+          _page = 0;
+          paintListOnly();
+        }
+        return;
+      }
+
+      const openSb = e.target.closest('[data-m53-open-stock-bajo]');
+      if (openSb) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.__BC_openStockBajo === 'function') window.__BC_openStockBajo();
+        else {
+          const btn = document.getElementById('bc-stock-bajo-btn');
+          if (btn) btn.click();
+        }
+        return;
+      }
+
+      const filterBtn = e.target.closest('[data-m53-filter]');
+      if (filterBtn) {
+        const f = filterBtn.getAttribute('data-m53-filter');
+        if (f) {
+          _estado = f;
+          _page = 0;
+          syncEstadoSelect();
+          paintListOnly();
+        }
+        return;
+      }
+
+      if (e.target.closest('#inv-refrescar-btn')) {
+        const b = document.getElementById('inv-buscar');
+        _search = b ? b.value.trim() : '';
+        const est = document.getElementById('inv-filtro-estado-select');
+        if (est) _estado = est.value || 'todos';
+        _page = 0;
+        syncEstadoSelect();
+        cargarInventario();
+        return;
+      }
+      if (e.target.closest('#inv-limpiar-btn')) {
+        limpiarFiltrosUI();
+        cargarInventario();
+        return;
+      }
+
+      // Click en card: inventario-detalle.js también escucha .rep-fila[data-inv-producto]
+      // No interceptamos para no romper el modal existente.
+    });
+
+    tab.addEventListener('change', function (e) {
+      if (e.target && e.target.id === 'inv-filtro-estado-select') {
+        _estado = e.target.value || 'todos';
+        _page = 0;
+        if (typeof window._invFiltroEstado !== 'undefined') window._invFiltroEstado = _estado;
+        paintListOnly();
+      }
+      if (e.target && e.target.id === 'inv-filtro-almacen') {
+        _page = 0;
+        cargarInventario();
+      }
+    });
+
+    tab.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'inv-buscar') {
+        _search = e.target.value.trim();
+        _page = 0;
+        paintListOnly();
+      }
+    });
+  }
+
+  function boot() {
+    ensureShell();
+    installHooks();
+    bindEvents();
+    relocateStockBajoBtn();
+    const tab = document.getElementById('tab-inventario');
+    if (tab && tab.classList.contains('visible')) cargarInventario();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  // Reubicar botón stock bajo cuando mision-d lo inyecte (una sola pasada diferida mínima)
+  requestAnimationFrame(function () {
+    ensureShell();
+    installHooks();
+    bindEvents();
+    relocateStockBajoBtn();
+  });
+})();
+ + moneyFmt(s.valor_inventario) : '';
+      const unidad = s.unidad || 'u';
+      const variantes = Array.isArray(s.variantes) ? s.variantes : [];
+      const detalle = variantes.length
+        ? '<details class="bc-m53-variant-details"><summary>Ver stock detallado (' + variantes.length + ')</summary><div class="bc-m53-variant-list">' +
+          variantes.map(function (v) {
+            return '<div class="bc-m53-variant-row"><span>' + esc(v.nombre || 'Variante') + '</span><strong>' +
+              qtyFmt(v.cantidad) + ' ' + esc(v.unidad || unidad) + '</strong></div>';
+          }).join('') + '</div></details>'
+        : '';
       return '<article class="bc-m53-card rep-fila" data-idx="' + i + '" data-inv-producto="' +
         esc(s.producto_id || '') + '" role="button" tabindex="0">' +
         thumb +
         '<h4 class="bc-m53-card-name">' + esc(s.producto || '—') + '</h4>' +
-        '<div class="bc-m53-card-stock">' + qtyFmt(s.cantidad) + ' u</div>' +
+        '<div class="bc-m53-card-stock">' + qtyFmt(s.cantidad) + ' ' + esc(unidad) + '</div>' +
         '<div class="bc-m53-card-meta">' + esc(s.almacen || '—') +
         (s.minimo != null ? ' · mín ' + qtyFmt(s.minimo) : '') + valorTxt + '</div>' +
         '<span class="bc-m53-badge bc-m53-badge-' + meta.cls + '">' + esc(meta.label) + '</span>' +
+        detalle +
         '</article>';
     }).join('');
 
@@ -551,7 +878,10 @@
     try {
       const client = window.client;
       if (!client) throw new Error('Cliente Supabase no disponible');
-      const res = await client.rpc('inventario_enriquecido', { p_almacen_id: almacen });
+      const [res, mixedRes] = await Promise.all([
+        client.rpc('inventario_enriquecido', { p_almacen_id: almacen }),
+        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen })
+      ]);
       if (res.error) {
         if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
           _lastError = 'rpc_missing';
@@ -565,7 +895,24 @@
         paint();
         return;
       }
-      _allRows = Array.isArray(res.data) ? res.data : [];
+      const ordinaryRows = Array.isArray(res.data) ? res.data : [];
+      let mixedRows = [];
+      if (!mixedRes.error) {
+        mixedRows = Array.isArray(mixedRes.data) ? mixedRes.data : [];
+      } else if (!(typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(mixedRes.error))) {
+        throw new Error(String(mixedRes.error.message || mixedRes.error.code || mixedRes.error));
+      }
+      const mixedVariantIds = new Set();
+      mixedRows.forEach(function (row) {
+        (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
+          if (variant && variant.producto_id) mixedVariantIds.add(String(variant.producto_id));
+        });
+      });
+      // Replace child SKU rows with one parent summary; their real product IDs
+      // remain in the expandable details and in every transactional table.
+      _allRows = ordinaryRows.filter(function (row) {
+        return !mixedVariantIds.has(String(row.producto_id));
+      }).concat(mixedRows);
       window._invFilas = _allRows;
       _page = 0;
       _loading = false;
