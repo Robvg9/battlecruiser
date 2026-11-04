@@ -233,6 +233,17 @@
           </div>
           <div id="msg-prod-imagen" class="msg"></div>
         </div>
+        <section id="prod-inventario-mixto-settings" class="prod-inventario-mixto-settings">
+          <label class="prod-inventario-mixto-toggle" for="prod-inventario-mixto">
+            <input type="checkbox" id="prod-inventario-mixto">
+            <span><strong>Controlar inventario por sabores / variantes</strong><small>Opcional. Solo se activa en este producto. Cada sabor tendrá stock, compras y transferencias independientes.</small></span>
+          </label>
+          <div id="prod-variantes-editor" class="prod-variantes-editor hidden" hidden>
+            <div class="prod-variantes-heading"><strong>Sabores o variantes</strong><small>Escribe tú el nombre de cada uno. Ejemplo: Manzana, Pera, Piña.</small></div>
+            <div id="prod-variantes-lista" class="prod-variantes-lista"></div>
+            <button type="button" id="prod-variante-agregar" class="cc-accion">+ Agregar sabor o variante</button>
+          </div>
+        </section>
         <button type="submit" id="prod-submit-btn">Agregar producto</button>
         <button type="button" id="prod-cancelar-edicion" class="hidden">Cancelar edición</button>
       </form>
