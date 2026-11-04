@@ -196,8 +196,10 @@
       '<div class="bc-pres-row"><strong class="bc-pres-row-title">Mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Bolso)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
       '<p class="bc-pres-optional-note">Configura solo las presentaciones que utilizarás. Cada una necesita etiqueta y factor.</p>';
     var submit=form.querySelector('#prod-submit-btn');
-    var host=submit&&submit.parentNode===form?submit.parentNode:null;
-    if(host)form.insertBefore(box,host.querySelector('.prod-imagen-campo')||submit);else form.appendChild(box);
+    var actions=form.querySelector('.bc-product-form-actions');
+    if(actions&&actions.parentNode===form)form.insertBefore(box,actions);
+    else if(submit&&submit.parentNode)submit.parentNode.insertBefore(box,submit);
+    else form.appendChild(box);
     loadPresentaciones();
     return true;
   }
