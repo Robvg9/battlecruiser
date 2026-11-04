@@ -27,6 +27,7 @@ function fixture() {
         <input id="prod-precio-mayorista" type="number" value="">
         <div class="prod-imagen-campo"><input id="prod-imagen-input" type="file"></div>
         <fieldset id="prod-presentaciones-config"></fieldset>
+        <section id="prod-inventario-mixto-settings"><input type="checkbox" id="prod-inventario-mixto"><div id="prod-variantes-editor" hidden><div id="prod-variantes-lista"></div><button type="button" id="prod-variante-agregar">Agregar sabor</button></div></section>
         <button type="submit" id="prod-submit-btn">Guardar producto</button>
         <button type="button" id="prod-cancelar-edicion" class="hidden">Cancelar edición</button>
       </form>
@@ -72,11 +73,26 @@ test("Productos: alta usa el modal M26 existente y no crea un segundo overlay", 
   assert.equal(c.document.getElementById("bc171-add"), null, "no debe crearse otro botón de alta");
   assert.equal(c.document.getElementById("bc171-overlay"), null, "no debe crearse un segundo overlay");
   assert.equal(form.parentElement.id, "bc-product-form-host", "el formulario debe permanecer dentro del host M26");
+  const save = c.document.getElementById("prod-submit-btn");
+  assert.equal(save.type, "submit");
+  assert.equal(save.closest("form"), form, "Guardar debe seguir asociado al formulario real");
+  assert.equal(save.style.display, "inline-flex", "Guardar debe ser visible después del montaje del modal");
+  assert.equal(save.hidden, false);
+  assert.equal(save.classList.contains("hidden"), false);
+  assert.equal(c.document.getElementById("prod-inventario-mixto-settings").closest("form"), form,
+    "el editor mixto debe permanecer dentro del formulario real");
+  assert.equal(c.document.getElementById("prod-variantes-editor").hidden, true,
+    "las variantes permanecen ocultas mientras la opción no esté activa");
   assert.ok(modal.classList.contains("hidden"), "el modal inicia cerrado");
 
   // Simula el clic humano real en el botón que M26 administra.
   button.click();
   assert.equal(modal.classList.contains("hidden"), false, "el modal nativo debe abrir sin bloquear la PWA");
+  assert.equal(save.closest("form"), form);
+  assert.equal(save.style.display, "inline-flex");
+  assert.equal(save.type, "submit");
+  assert.equal(c.document.getElementById("prod-inventario-mixto-settings").parentElement, form,
+    "M26 debe reubicar el editor opcional junto al resto de campos del formulario");
   assert.equal(c.document.getElementById("bc171-overlay"), null);
   assert.equal(c.document.getElementById("form-producto"), form, "el mismo formulario debe conservarse");
 
