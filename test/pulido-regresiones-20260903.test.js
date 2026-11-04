@@ -57,7 +57,11 @@ test('pulido: configuración queda visible y comunicación elimina el estado vac
 test('pulido: la UI de presentaciones incluye Otro y factores comerciales', () => {
   const src = read('public/js/hotfix-pulido-20260903.js');
   const srcB = read('public/js/hotfix-pulido-20260903b.js');
-  assert.match(src, /Otro…|__otro__|Otro/);
+  assert.match(src, /bc-pres-normal-name/);
+  assert.match(src, /bc-pres-normal-factor/);
+  assert.match(src, /bc-pres-wholesale-name/);
+  assert.match(src, /bc-pres-wholesale-factor/);
+  assert.match(src, /Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero/);
   assert.match(srcB, /bc-pres-[^'\"]+-factor/);
   assert.match(srcB, /actualizar_presentacion/);
   assert.match(srcB, /cambiar_estado_presentacion/);
