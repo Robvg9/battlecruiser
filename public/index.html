@@ -111,7 +111,7 @@
         <button class="tab-btn" data-tab="ciclos">Ciclos Operativos</button>
         <button class="tab-btn" data-tab="operacion">Operación</button>
         <button class="tab-btn" data-tab="comunicacion">Comunicación <span id="com-tab-badge" class="pendientes-tab-badge hidden"></span></button>
-        <button class="tab-btn" data-tab="mando">Centro de Mando</button>
+        <button class="tab-btn" data-tab="mando">Auditoría</button>
         <button class="tab-btn" data-tab="usuarios">Usuarios</button>
         <button class="tab-btn" data-tab="config">Administración</button>
         <div class="bc-nav-group expanded" id="nav-config-group">
@@ -182,22 +182,27 @@
       </form>
     </div>
 
-    <section id="tab-resumen" class="tab-panel visible">
+    <section id="tab-resumen" class="tab-panel visible" aria-label="Dashboard operativo">
+      <header class="cc-dashboard-header">
+        <div>
+          <h2>Centro de Control</h2>
+          <p class="muted">Estado, prioridades e inventario en una sola vista.</p>
+        </div>
+      </header>
+      <div class="cc-estado" id="cc-estado"></div>
+      <div class="resumen-grid cc-dashboard-kpis" id="resumen-grid">
+        <div class="resumen-card"><div class="valor">—</div><div class="etiqueta">Resumen</div></div>
+      </div>
       <div class="cc-grid">
-        <div class="cc-col-ppal"><div class="cc-estado" id="cc-estado"></div>
+        <div class="cc-col-ppal">
           <div class="cc-bloque"><h3>Requiere atención</h3><div id="cc-atencion" class="lista"></div></div>
           <div class="cc-bloque"><h3>Operaciones pendientes</h3><div id="cc-pendientes" class="lista"></div></div>
+          <div class="cc-bloque"><h3>Jornada y comunicación</h3><div id="cc-avisos-operativos" class="cc-avisos-lista lista"></div></div>
         </div>
         <aside class="cc-col-lateral">
           <div class="cc-bloque"><h3>Inventario</h3><div id="cc-inventario" class="lista"></div></div>
           <div class="cc-bloque"><h3>Actividad reciente</h3><div id="cc-actividad" class="lista"></div></div>
         </aside>
-      </div>
-      <div class="rule-orn"><svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg></div>
-      <div class="resumen-grid" id="resumen-grid"><div class="resumen-card"><div class="valor">—</div><div class="etiqueta">Productos</div></div></div>
-      <div class="seccion-cuerpo">
-        <div class="seccion-principal"><div class="resumen-movs"><h3>Últimos movimientos</h3><div id="resumen-movs-lista" class="lista"></div></div></div>
-        <aside class="seccion-panel"><div class="resumen-alertas"><h3>Stock bajo mínimo</h3><div id="resumen-alertas-lista" class="lista"></div></div></aside>
       </div>
     </section>
 
@@ -580,19 +585,18 @@
       </div>
     </section>
 
-    <section id="tab-mando" class="tab-panel">
-      <div class="pendientes-header"><h3>Centro de Mando</h3><span id="mando-conn-info" class="muted"></span></div>
-      <div class="cc-estado" id="mando-estado"></div>
-      <div class="cc-bloque"><h3>Alertas</h3><div id="mando-alertas" class="lista"></div></div>
-      <div class="cc-bloque"><h3>Actividad reciente</h3><div id="mando-actividad" class="lista"></div></div>
+    <section id="tab-mando" class="tab-panel" aria-label="Auditoría y trazabilidad">
+      <div class="pendientes-header">
+        <div><h2>Auditoría</h2><p class="muted">Registro trazable de acciones y cambios.</p></div>
+        <span id="mando-conn-info" class="muted"></span>
+      </div>
       <div class="cc-bloque">
-        <h3>Auditoría</h3>
         <div class="mando-filtros" id="mando-filtros">
-          <select id="filtro-aud-tipo"><option value="">Todos los tipos</option></select>
-          <select id="filtro-aud-estado"><option value="">Todos los estados</option></select>
+          <select id="filtro-aud-tipo" aria-label="Filtrar auditoría por tipo"><option value="">Todos los tipos</option></select>
+          <select id="filtro-aud-estado" aria-label="Filtrar auditoría por estado"><option value="">Todos los estados</option></select>
           <button type="button" id="aud-limpiar-btn" class="cc-accion">Limpiar filtros</button>
         </div>
-        <div id="mando-auditoria" class="lista"></div>
+        <div id="mando-auditoria" class="lista" aria-live="polite"></div>
         <div class="mando-paginacion" id="mando-paginacion"></div>
       </div>
     </section>
