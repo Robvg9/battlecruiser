@@ -412,25 +412,41 @@
         (hasF ? '<br><button type="button" class="bc-m53-btn" id="inv-empty-clear" style="margin-top:10px">Limpiar filtros</button>' : '') +
         '</div>';
       if (pag) pag.innerHTML = '';
-      // Mantener _invFilas alineado para inventario-detalle
       if (typeof window._invFilas !== 'undefined') window._invFilas = [];
       return;
     }
 
     el.className = 'bc-m53-grid';
     const start = _page * PAGE_SIZE;
-    const slice = _filtered.slice(start, start + PAGE_SIZE);
+    const visibleRows = _filtered.slice(start, start + PAGE_SIZE);
+    window._invFilas = visibleRows;
 
-    // inventario-detalle.js espera .rep-fila y _invFilas alineado por índice de filas visibles
-    window._invFilas = slice;
-
-    el.innerHTML = slice.map(function (s, i) {
+    el.innerHTML = visibleRows.map(function (s, i) {
       const meta = estadoMeta(s.estado);
       const img = imagenProducto(s.producto_id);
       const thumb = img
         ? '<img class="bc-m53-thumb" src="' + esc(img) + '" alt="" loading="lazy">'
         : '<div class="bc-m53-thumb bc-m53-thumb-empty" aria-hidden="true">Sin imagen</div>';
-      const valorTxt = num(s.valor_inventario) > 0 ? ' · 
+      const valueText = num(s.valor_inventario) > 0 ? ' · $' + moneyFmt(s.valor_inventario) : '';
+      const unit = s.unidad || 'u';
+      const variants = Array.isArray(s.variantes) ? s.variantes : [];
+      const variantDetails = variants.length
+        ? '<details class="bc-m53-variant-details"><summary>Ver stock detallado (' + variants.length + ')</summary><div class="bc-m53-variant-list">' +
+          variants.map(function (v) {
+            return '<div class="bc-m53-variant-row"><span>' + esc(v.nombre || 'Variante') + '</span><strong>' +
+              qtyFmt(v.cantidad) + ' ' + esc(v.unidad || unit) + '</strong></div>';
+          }).join('') + '</div></details>'
+        : '';
+      return '<article class="bc-m53-card rep-fila" data-idx="' + i + '" data-inv-producto="' +
+        esc(s.producto_id || '') + '" role="button" tabindex="0">' +
+        thumb +
+        '<h4 class="bc-m53-card-name">' + esc(s.producto || '—') + '</h4>' +
+        '<div class="bc-m53-card-stock">' + qtyFmt(s.cantidad) + ' ' + esc(unit) + '</div>' +
+        '<div class="bc-m53-card-meta">' + esc(s.almacen || '—') +
+        (s.minimo != null ? ' · mín ' + qtyFmt(s.minimo) : '') + valueText + '</div>' +
+        '<span class="bc-m53-badge bc-m53-badge-' + meta.cls + '">' + esc(meta.label) + '</span>' +
+        variantDetails +
+        '</article>';
     }).join('');
 
     if (pag) {
