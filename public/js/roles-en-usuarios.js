@@ -1,7 +1,7 @@
-// BattleCruiser — Roles dentro de Usuarios (v9.2.33.1 · Micro-misión 001-CORRECCIÓN)
-// Gestión de Roles y Permisos vía modal (no card inferior permanente).
+// BattleCruiser — Roles dentro de Administración.
+// Gestión de Roles y Permisos vía el modal único de Administración.
 // Reutiliza IDs, handlers y RPCs de usuarios-permisos-rest.js (B3/M11).
-// Flujo: Usuarios → botón Roles → modal Roles y Permisos → Nuevo Rol → modal Nuevo Rol
+// Usuarios conserva la asignación del rol a cada cuenta.
 // v9.2.33.1: restaurar + Nuevo Usuario (race con dashboard) + input rol compacto
 (function () {
   'use strict';
@@ -282,7 +282,7 @@
       hero.id = 'ud-hero';
       hero.className = 'ud-hero';
       hero.innerHTML =
-        '<div><h2>Usuarios</h2><p>Gestioná usuarios, roles y permisos del sistema.</p></div>' +
+        '<div><h2>Usuarios</h2><p>Gestiona las cuentas y el acceso asignado a cada persona.</p></div>' +
         '<div class="ud-hero-actions"></div>';
       tab.insertBefore(hero, tab.firstChild);
     }
@@ -314,18 +314,10 @@
       }
     }
 
-    var rolesBtn = document.getElementById('ud-btn-roles');
-    if (!rolesBtn) {
-      rolesBtn = document.createElement('button');
-      rolesBtn.type = 'button';
-      rolesBtn.className = 'ud-btn-secondary';
-      rolesBtn.id = 'ud-btn-roles';
-      rolesBtn.textContent = 'Roles';
-      actions.appendChild(rolesBtn);
-    } else {
-      rolesBtn.textContent = 'Roles';
-      if (rolesBtn.parentElement !== actions) actions.appendChild(rolesBtn);
-    }
+    // Role management has one canonical entry in Administration.
+    // Remove any stale shortcut left by a previously cached module.
+    var legacyRolesButton = document.getElementById('ud-btn-roles');
+    if (legacyRolesButton) legacyRolesButton.remove();
   }
 
   function wireHeroButtons() {
@@ -340,14 +332,6 @@
       });
     }
 
-    var btn = document.getElementById('ud-btn-roles');
-    if (btn && !btn.dataset.bcRolesBound) {
-      btn.dataset.bcRolesBound = '1';
-      btn.addEventListener('click', function () {
-        unificar();
-        openRolesModal();
-      });
-    }
   }
 
   function boot() {
