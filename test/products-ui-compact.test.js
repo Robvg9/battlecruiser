@@ -14,7 +14,7 @@ function fixture(){
   "<div id='bc-productos-controles'><div id='bc-productos-orden'><button>A–Z</button><button>Z–A</button></div><div id='bc-productos-vista'><button>Filas</button><button>Cuadros</button></div>",
   "<button type='button' id='bc-productos-agregar'>Registrar nuevo producto</button><button type='button'>Agregar producto</button></div></div>",
   "<div id='lista-productos'><div class='lista-item' data-ctx-tipo='producto' data-ctx-id='p-1'>Cerveza</div><div class='lista-item' data-ctx-tipo='producto' data-ctx-id='p-2'>Arroz</div></div></section>",
-  "<section id='tab-config' class='tab-panel'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn' data-bc-m26='1'>Nomenclatura y catálogos</button></div></section>",
+  "<section id='tab-config' class='tab-panel'><div class='presentaciones-panel'><div id='lista-presentaciones-catalogo'></div><div id='pp-lista-asociaciones'></div></div></section>",
   "<div id='bc-product-modal' class='hidden'><div class='bc-product-modal-head'><h3 id='bc-product-modal-title'>Agregar producto</h3><button id='bc-product-modal-close'>×</button></div><div id='bc-product-form-host'><form id='form-producto'></form></div></div>",
   "</div></body></html>"
  ].join("");
