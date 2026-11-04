@@ -111,7 +111,7 @@ safeInit("tabs", function () {
     } else if (t === "comunicacion") {
       if (typeof refrescarComunicacion === "function") refrescarComunicacion();
     } else if (t === "mando") {
-      if (typeof refrescarCentroMando === "function") refrescarCentroMando();
+      if (typeof refrescarPanelAuditoria === "function") refrescarPanelAuditoria();
     } else if (t === "usuarios") {
       var infoEl = document.getElementById("usuario-actual-info");
       if (infoEl && typeof _usuarioActual !== "undefined" && _usuarioActual) {
