@@ -50,11 +50,13 @@ test("Products has one add action, a live category filter and keeps search",(t)=
  assert.ok(c.document.querySelector("[data-ctx-id='p-1']").classList.contains("bc-category-hidden"));
  assert.ok(!c.document.querySelector("[data-ctx-id='p-2']").classList.contains("bc-category-hidden"));
 });
-test("nomenclature moves to Administration and import is a single action inside native product modal",(t)=>{
+test("the Administration shortcut opens a compact presentations dialog and import stays a single action",(t)=>{
  const c=fixture();t.after(()=>c.dom.window.close());
  const state=c.window.__BCM75_verify();
  assert.ok(state.nomenclatureInAdmin);
- assert.ok(c.document.getElementById("tab-config").contains(c.document.getElementById("productos-tools-nomenclatura")));
+ assert.equal(state.duplicateCatalogModal,false);
+ assert.ok(c.document.getElementById("bc-product-presentations-entry").contains(c.document.getElementById("productos-tools-nomenclatura")));
+ assert.equal(c.document.getElementById("productos-nomenclatura-btn").textContent,"Administrar presentaciones");
  assert.equal(state.importButtonCount,1);
  assert.equal(state.importButtonLabel,"Importar Excel / CSV");
  c.document.getElementById("bc-product-import-open").click();
@@ -151,12 +153,14 @@ async function waitFor(predicate,message,timeoutMs){
  assert.ok(predicate(),message);
 }
 
-test("M26 moves catalog content without detaching M75 Administration nomenclature entry",async(t)=>{
+test("M26 keeps category/unit catalogs in Administration and moves only presentation controls into the dialog",async(t)=>{
  const html=[
   "<!doctype html><html><head></head><body>",
-  "<section id='tab-productos' class='tab-panel'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn'>Nomenclatura y catálogos</button></div></section>",
-  "<section id='tab-config' class='tab-panel'><div class='cc-bloque'><section id='bc-product-catalog-entry'></section><div class='card'><h3>Categorías</h3><div id='lista-categorias'></div></div></div></section>",
-  "<div id='productos-nomenclatura-modal' class='hidden'><button id='productos-nomenclatura-cerrar'>Cerrar</button><div id='prod-nom-categorias-slot'></div><div id='prod-nom-unidades-slot'></div><div id='prod-nom-presentaciones-slot'></div></div>",
+  "<section id='tab-productos' class='tab-panel'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn'>Presentaciones comerciales</button></div>",
+  "<div class='presentaciones-catalogo'><h4>Catálogo</h4><form id='form-presentacion-nueva'></form><div id='lista-presentaciones-catalogo'></div></div>",
+  "<div class='presentaciones-producto'><h4>Por producto</h4><select id='pp-producto-select'></select><div id='pp-lista-asociaciones'></div></div></section>",
+  "<section id='tab-config' class='tab-panel'><div class='bc-admin-grid'><section id='bc-product-presentations-entry'></section><div class='bc-admin-catalog-grid'><section><form id='form-categoria'></form><div id='lista-categorias'></div></section><section><form id='form-unidad'></form><div id='lista-unidades'></div></section></div></div></section>",
+  "<div id='productos-nomenclatura-modal' class='prod-nom-modal hidden'><button id='productos-nomenclatura-cerrar'>Cerrar</button><div id='prod-nom-presentaciones-slot'></div></div>",
   "</body></html>"
  ].join("");
  const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
@@ -164,16 +168,22 @@ test("M26 moves catalog content without detaching M75 Administration nomenclatur
  const w=dom.window,d=w.document;
  w.eval(M26_SOURCE);
  const button=d.getElementById("productos-nomenclatura-btn");
- await waitFor(()=>button.dataset.bcM26==="1","M26 must bind the native nomenclature handler before M75 relocates its toolbar");
- const entry=d.getElementById("bc-product-catalog-entry");
+ await waitFor(()=>button.dataset.bcM26==="1","M26 must bind the single presentations dialog before M75 relocates its shortcut");
+ const entry=d.getElementById("bc-product-presentations-entry");
  const toolbar=d.getElementById("productos-tools-nomenclatura");
- entry.appendChild(toolbar); // reproduce M75's move only after M26 really binds the native handler
+ entry.appendChild(toolbar);
  button.click();
- await waitFor(()=>!d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"M26 nomenclature modal should open");
- assert.ok(d.getElementById("tab-config").contains(entry),"M26 must not detach M75's Administration entry");
- assert.ok(entry.contains(toolbar),"M26 must preserve the nomenclature toolbar inside the Administration entry");
- assert.ok(d.getElementById("prod-nom-categorias-slot").contains(d.getElementById("lista-categorias")),"the category catalog must still move into its modal slot");
- assert.ok(!d.getElementById("productos-nomenclatura-modal").contains(entry),"the catalog modal must never take ownership of the Administration entry");
+ await waitFor(()=>!d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"the presentations dialog should open");
+ for(const id of ["form-categoria","lista-categorias","form-unidad","lista-unidades"]){
+  assert.ok(d.getElementById("tab-config").contains(d.getElementById(id)),id+" must remain in Administration");
+  assert.ok(!d.getElementById("productos-nomenclatura-modal").contains(d.getElementById(id)),id+" must not be duplicated in the product dialog");
+ }
+ const slot=d.getElementById("prod-nom-presentaciones-slot");
+ assert.ok(slot.contains(d.getElementById("form-presentacion-nueva")),"presentation form stays with its catalog");
+ assert.ok(slot.contains(d.getElementById("pp-lista-asociaciones")),"product presentation associations stay together");
+ assert.ok(d.getElementById("tab-config").contains(entry),"M26 must not detach the Administration shortcut");
+ d.getElementById("productos-nomenclatura-cerrar").click();
+ assert.ok(d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"dialog closes normally");
 });
 
 test("native Add opens the single M26 modal and preserves the existing product creation submit",async(t)=>{
@@ -194,7 +204,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
   "M75 must preserve M44's single functional rows/cards selector"
  );
  await waitFor(
-  ()=>{const admin=d.getElementById("tab-config");const entry=d.getElementById("bc-product-catalog-entry");const tool=d.getElementById("productos-tools-nomenclatura");const button=d.getElementById("productos-nomenclatura-btn");return !!(admin&&entry&&tool&&button&&admin.contains(entry)&&entry.contains(tool)&&tool.contains(button));},
+  ()=>{const admin=d.getElementById("tab-config");const entry=d.getElementById("bc-product-presentations-entry");const tool=d.getElementById("productos-tools-nomenclatura");const button=d.getElementById("productos-nomenclatura-btn");return !!(admin&&entry&&tool&&button&&admin.contains(entry)&&entry.contains(tool)&&tool.contains(button));},
   "M75 must keep the nomenclature toolbar inside Administration"
  );
  const nomenclatureButton=d.getElementById("productos-nomenclatura-btn");
@@ -204,8 +214,8 @@ test("native Add opens the single M26 modal and preserves the existing product c
   ()=>!nomenclatureModal.classList.contains("hidden"),
   "M26 must open the native nomenclature modal from Administration"
  );
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("bc-product-catalog-entry")),"opening nomenclature must not remove its Administration entry");
- assert.ok(d.getElementById("bc-product-catalog-entry").contains(d.getElementById("productos-tools-nomenclatura")),"M26 must preserve the single toolbar in Administration while opening the modal");
+ assert.ok(d.getElementById("tab-config").contains(d.getElementById("bc-product-presentations-entry")),"opening nomenclature must not remove its Administration entry");
+ assert.ok(d.getElementById("bc-product-presentations-entry").contains(d.getElementById("productos-tools-nomenclatura")),"M26 must preserve the single toolbar in Administration while opening the modal");
  d.getElementById("productos-nomenclatura-cerrar").click();
  await waitFor(
   ()=>nomenclatureModal.classList.contains("hidden"),
