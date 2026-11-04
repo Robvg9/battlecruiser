@@ -31,8 +31,18 @@ async function cargarPermisosPresentaciones() {
   }
 }
 
-async function cargarPresentacionesTodas() {
-  return withCache("presentaciones", () => client.from("presentaciones").select("id, nombre, activo").order("nombre"));
+async function cargarPresentacionesTodas(force) {
+  if (force && navigator.onLine) {
+    const { data, error } = await client.from("presentaciones").select("id, nombre, activo").order("nombre");
+    if (error) throw error;
+    _presentacionesCache = Array.isArray(data) ? data : [];
+    window._presentacionesCache = _presentacionesCache.slice();
+    return _presentacionesCache;
+  }
+  const data = await withCache("presentaciones", () => client.from("presentaciones").select("id, nombre, activo").order("nombre"));
+  _presentacionesCache = Array.isArray(data) ? data : [];
+  window._presentacionesCache = _presentacionesCache.slice();
+  return _presentacionesCache;
 }
 
 const _factoresConocidos = {}; // "producto_id::presentacion_id" -> factor
@@ -87,9 +97,9 @@ function renderCatalogoPresentaciones() {
   });
 }
 
-async function refrescarPresentacionesCatalogo() {
+async function refrescarPresentacionesCatalogo(force) {
   setLoading("lista-presentaciones-catalogo", "Cargando…");
-  _presentacionesCache = await cargarPresentacionesTodas();
+  _presentacionesCache = await cargarPresentacionesTodas(!!force);
   renderCatalogoPresentaciones();
   actualizarSelectPresentacionesDisponibles();
   actualizarDatalistPresentaciones();
@@ -192,16 +202,21 @@ safeInit("presentaciones-catalogo", () => {
     if (!nombre) return;
     const submitBtn = form.querySelector("button[type='submit']");
     submitBtn.disabled = true;
-    const { error } = await client.from("presentaciones").insert({ nombre });
-    submitBtn.disabled = false;
-    if (error) {
-      const msg = error.code === "23505" ? "Ya existe una presentación con ese nombre." : explicarError(error, "crear presentación");
+    try {
+      const { error } = await client.rpc("crear_presentacion", {
+        p_nombre: nombre,
+        p_idempotency_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + Math.random())
+      });
+      if (error) throw error;
+      setMsg("msg-presentaciones", "Presentación creada.", true);
+      form.reset();
+      await refrescarPresentacionesCatalogo(true);
+    } catch (error) {
+      const msg = error && error.code === "23505" ? "Ya existe una presentación con ese nombre." : explicarError(error, "crear presentación");
       setMsg("msg-presentaciones", "No se pudo crear: " + msg, false);
-      return;
+    } finally {
+      submitBtn.disabled = false;
     }
-    setMsg("msg-presentaciones", "Presentación creada.", true);
-    form.reset();
-    await refrescarPresentacionesCatalogo();
   });
 
   lista.addEventListener("click", async (e) => {
@@ -246,7 +261,7 @@ safeInit("presentaciones-catalogo", () => {
         return;
       }
       setMsg("msg-presentaciones", "Presentación actualizada.", true);
-      await refrescarPresentacionesCatalogo();
+      await refrescarPresentacionesCatalogo(true);
       return;
     }
 
@@ -264,7 +279,7 @@ safeInit("presentaciones-catalogo", () => {
         setMsg("msg-presentaciones", "No se pudo actualizar: " + explicarError(error, "cambiar estado de presentación"), false);
         return;
       }
-      await refrescarPresentacionesCatalogo();
+      await refrescarPresentacionesCatalogo(true);
       // El nombre/estado de una presentación pudo cambiar: si hay un
       // producto elegido, sus asociaciones se vuelven a pintar con datos al día.
       if (_productoPresentacionesActual) await refrescarAsociacionesProducto(_productoPresentacionesActual);
@@ -277,13 +292,15 @@ safeInit("presentaciones-catalogo", () => {
       if (!window.confirm("¿Eliminar \"" + nombre + "\" definitivamente? Solo puede eliminarse si no está vinculada a productos.")) return;
       eliminarBtn.disabled = true;
       try {
-        const [asociaciones, productos] = await Promise.all([
+        const [asociaciones, productos, baseProducts] = await Promise.all([
           client.from("producto_presentaciones").select("id", { count: "exact", head: true }).eq("presentacion_id", id),
-          client.from("productos").select("id", { count: "exact", head: true }).eq("presentacion_id", id)
+          client.from("productos").select("id", { count: "exact", head: true }).eq("presentacion_id", id),
+          client.from("productos").select("id", { count: "exact", head: true }).eq("unidad", nombre)
         ]);
         if (asociaciones.error) throw asociaciones.error;
         if (productos.error) throw productos.error;
-        const referencias = Number(asociaciones.count || 0) + Number(productos.count || 0);
+        if (baseProducts.error) throw baseProducts.error;
+        const referencias = Number(asociaciones.count || 0) + Number(productos.count || 0) + Number(baseProducts.count || 0);
         if (referencias > 0) {
           setMsg("msg-presentaciones", "No se puede eliminar: está vinculada a " + referencias + " referencia(s). Desactívala para conservar el historial.", false);
           eliminarBtn.disabled = false;
@@ -292,7 +309,7 @@ safeInit("presentaciones-catalogo", () => {
         const { error } = await client.from("presentaciones").delete().eq("id", id);
         if (error) throw error;
         setMsg("msg-presentaciones", "Presentación eliminada.", true);
-        await refrescarPresentacionesCatalogo();
+        await refrescarPresentacionesCatalogo(true);
       } catch (error) {
         eliminarBtn.disabled = false;
         setMsg("msg-presentaciones", "No se pudo eliminar: " + explicarError(error, "eliminar presentación"), false);
@@ -315,7 +332,7 @@ safeInit("presentaciones-por-producto", () => {
       formNueva.classList.add("hidden");
       return;
     }
-    formNueva.classList.toggle("hidden", !_permisosPresentaciones.crear);
+    formNueva.classList.toggle("hidden", !(_permisosPresentaciones.crear || _permisosPresentaciones.editar));
     await refrescarAsociacionesProducto(producto_id);
   });
 
