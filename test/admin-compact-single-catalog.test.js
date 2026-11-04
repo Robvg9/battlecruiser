@@ -38,6 +38,8 @@ test("presentations and role permissions have one Administration entry, not dupl
   assert.match(m26, /'pp-lista-asociaciones':\s*'prod-nom-presentaciones-slot'/);
   assert.doesNotMatch(roles, /ud-btn-roles|rolesBtn = document\.createElement/);
   assert.match(roles, /bc-btn-config-roles/);
+  assert.match(roles, /max-height:min\\(84vh,680px\\)/);
+  assert.match(roles, /rol-permisos-panel\\{max-height:240px;overflow:auto/);
 });
 
 test("Administration module styles are compact and catalog lists are bounded", () => {
