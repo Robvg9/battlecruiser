@@ -156,6 +156,7 @@ test("D13 inventario: al perder conexión se descartan filas antiguas y al recon
   }];
   const reads = [];
   window.client.rpc = async (name, params) => {
+    if (name === "inventario_mixto_enriquecido") return { data: [], error: null };
     reads.push({ name, params });
     assert.equal(name, "inventario_enriquecido");
     return { data: serverRows.map((row) => ({ ...row })), error: null };
