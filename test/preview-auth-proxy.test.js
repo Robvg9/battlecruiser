@@ -113,6 +113,8 @@ test("frontend uses the exact preview-only same-origin login endpoint and keeps 
   assert.match(authSource, /window\.location\.origin === "https:\/\/bc-pr-224-battlecruiser\.robvg9\.workers\.dev"/);
   assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
-  assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 3,
-    "the login and password-recovery requests must both use the endpoint selector");
+  assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 2,
+    "only login must use the preview endpoint selector");
+  assert.match(authSource, /const response = await fetch\(SUPABASE_URL \+ "\/functions\/v1\/bc-username-login",/,
+    "password recovery must preserve its existing direct Edge Function endpoint");
 });
