@@ -1,8 +1,8 @@
 // ============================================================
-// B4 — Pruebas automatizadas: Auditoría + Auditoría + Trazabilidad
+// B4 — Pruebas automatizadas: Dashboard único + Auditoría + Trazabilidad
 // ============================================================
 // Usa fake-indexeddb + jsdom + mock de Supabase. Verifica la capa frontend
-// del Auditoría, alertas reales, auditoría con filtros y la integración
+// del Dashboard operativo y del panel de Auditoría, filtros y trazabilidad
 // con B2/B3 (sin duplicar mecanismos).
 //
 // Ejecutar: node --test test/b4-centro-mando.test.js
@@ -136,6 +136,7 @@ test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventa
     },
   });
   marcarOnline(window);
+  if (window.__bcTestSyncState) window.__bcTestSyncState.markOnline();
   await esperar(100);
 
   const btnDashboard = document.querySelector('.tab-btn[data-tab="resumen"]');
@@ -310,7 +311,7 @@ test("B4.8: offline no inventa datos de auditoría", async () => {
   assert.ok(/Sin conexión|offline|no disponible/i.test(aud.innerHTML), "offline no debe inventar datos de auditoría");
 });
 
-test("B4.11: reconexión refresca el Auditoría", async () => {
+test("B4.11: la reconexión actualiza la pestaña Auditoría", async () => {
   const { window, document } = montarEntorno({
     perfil: [{ id: "u-test", nombre: "Roberto", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
@@ -364,7 +365,7 @@ test("B4.12/13/14/19: no hay refrescos duplicados ni sincronizadores paralelos",
   assert.ok(res.operacion.idempotency_key, "conserva idempotency_key");
 });
 
-test("B4.9: cambio A → B no contamina el Auditoría", async () => {
+test("B4.9: cambio A → B no contamina el contexto de Auditoría", async () => {
   const { window, client } = montarEntorno({
     perfil: [{ id: "u-a", nombre: "A", activo: true, role_id: "r1", rol: "Dueño" }],
     permisos: [{ seccion: "auditoria", accion: "ver" }],
