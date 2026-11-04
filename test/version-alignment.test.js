@@ -110,7 +110,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261030\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
-  assert.match(app, /\["hotfix-pulido-20260903\.js","20261103\.5"\]/);
+  assert.match(app, /\["hotfix-pulido-20260903\.js","20261103\.6"\]/);
   assert.match(app, /\["hotfix-pulido-20260903b\.js","20261103\.1"\]/);
   assert.match(app, /\["hotfix-17-final-loader-20260903\.js","20261030\.2"\]/);
   assert.doesNotMatch(app, /\["hotfix-17-13-configuracion-admin-visible-20260903\.js"/, "the legacy config label helper must not participate in route visibility");
@@ -119,7 +119,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.60["']/);
-  assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261103\.5/);
+  assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261103\.6/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261103\.1/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
@@ -131,8 +131,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.33"\]/);
-  assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.3"\]/, "the legacy compatibility module must refresh without duplicating product save");
-  assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.3/, "the single-owner compatibility module must be cached for offline use");
+  assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
+  assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
   assert.match(sw, /\.\/js\/m26-ui-integridad\.js\?v=26\.33/, "the unified commercial-options panel must be available offline");
   assert.match(sw, /\.\/js\/catalogos\.js\?v=20261103\.2/, "the updated master catalog loader must be available offline");
   assert.ok(app.includes('["m27-5-ventas-precio-politica.js","27.5b7"]'));
