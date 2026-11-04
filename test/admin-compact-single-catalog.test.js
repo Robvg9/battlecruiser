@@ -19,12 +19,13 @@ test("Administration has one compact home for roles, categories and units", () =
     assert.ok(admin && admin.querySelector(".bc-admin-grid"));
     assert.ok(admin.querySelector(".bc-admin-roles"));
     assert.ok(admin.querySelector(".bc-admin-catalogs"));
-    for (const id of ["form-nuevo-rol","form-categoria","lista-categorias","form-unidad","lista-unidades"]) {
+    for (const id of ["form-nuevo-rol","form-categoria","lista-categorias","form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) {
       assert.equal(d.querySelectorAll("#" + id).length, 1, id + " must remain unique");
     }
-    for (const id of ["form-categoria","lista-categorias","form-unidad","lista-unidades"]) {
-      assert.ok(admin.querySelector(".bc-admin-subcard #" + id));
-    }
+    assert.ok(admin.querySelector(".bc-admin-subcard #form-categoria"));
+    assert.equal(d.querySelectorAll("#form-unidad,#lista-unidades").length, 0, "units must not be a second catalogue");
+    assert.ok(admin.querySelector(".presentaciones-panel"));
+    assert.equal(d.querySelectorAll("#tab-productos .presentaciones-panel").length, 0);
   } finally { dom.window.close(); }
 });
 
