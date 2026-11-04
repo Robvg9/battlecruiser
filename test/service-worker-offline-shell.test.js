@@ -98,9 +98,9 @@ test('install precaches the document shell and essential static assets', async (
   await dispatchInstall(worker);
   const appVersion = source.match(/BC_SW_VERSION\s*=\s*["'](\d+\.\d+\.\d+)["']/)[1];
   for (const asset of [
-    '/', '/index.html', '/app.js?v=' + appVersion, '/style.css?v=' + appVersion,
+    '/', '/index.html', '/app.js', '/style.css',
     '/manifest.json', '/favicon.png', '/icons/icon-192x192.png', '/icons/icon-512x512.png',
-    '/js/mi-cuenta.js?v=1.2', '/js/offline.js', '/js/hotfix-configuracion-20260902.js?v=20261020.4', '/js/configuracion-ajustes-migrados-20260903.js?v=9.2', '/js/hotfix-secciones-visibles-20260903.js?v=20261030.1'
+    '/js/mi-cuenta.js', '/js/offline.js', '/js/hotfix-configuracion-20260902.js', '/js/configuracion-ajustes-migrados-20260903.js', '/js/hotfix-secciones-visibles-20260903.js'
   ]) {
     assert.ok(worker.precacheRequests.includes(asset), 'missing precache entry: ' + asset);
   }
