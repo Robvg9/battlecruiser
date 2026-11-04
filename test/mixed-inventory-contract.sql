@@ -77,6 +77,31 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.stock WHERE almacen_id=v_warehouse_c AND producto_id IN (v_apple,v_pear);
   IF v_count<>2 THEN RAISE EXCEPTION 'New warehouse was not seeded with every active flavor'; END IF;
 
+  -- A parent with open flavor stock cannot be deactivated or have its base unit changed.
+  v_failed:=false;
+  BEGIN
+    UPDATE public.productos SET activo=false WHERE id=v_parent;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Mixed parent was deactivated while flavor stock remained'; END IF;
+
+  v_failed:=false;
+  BEGIN
+    UPDATE public.productos SET unidad='latas' WHERE id=v_parent;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Mixed parent base unit changed while flavor stock remained'; END IF;
+
+  v_failed:=false;
+  BEGIN
+    UPDATE public.productos SET activo=false WHERE id=v_apple;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Variant with stock was deactivated directly'; END IF;
+
   -- A transfer selects the flavor's own product ID; the other flavor is untouched.
   UPDATE public.stock SET cantidad=cantidad-5
    WHERE producto_id=v_apple AND almacen_id=v_warehouse_a;
