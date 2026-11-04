@@ -268,7 +268,6 @@ async function refrescarCentroControl() {
   renderEstadoNegocio(estado);
   renderRequiereAtencion(asuntos);
   renderPendientesCompacto(asuntos);
-  renderResumen();
   await refrescarAvisosOperativosControl();
   refrescarBadgeCentroControl(asuntos);
 }
@@ -430,6 +429,7 @@ function renderResumen() {
       });
     }
   }
-  // El refresco operativo invoca este renderer; evitar llamadas recursivas.
+  // Mantiene el ciclo existente: el cache se pinta y luego se refresca el estado operativo.
+  if (typeof refrescarCentroControl === "function") refrescarCentroControl();
 }
 
