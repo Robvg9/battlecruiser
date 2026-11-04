@@ -60,20 +60,22 @@
 
   function ocultarCampoUnidad(form) {
     if (!form) return;
+    // Compatibility field: stored as productos.unidad, presented to the user
+    // as the single base presentation sourced from the master catalogue.
     var unidad = document.getElementById('prod-unidad');
     if (unidad) {
-      unidad.value = '';
-      unidad.removeAttribute('required');
-      unidad.setAttribute('aria-hidden', 'true');
-      unidad.tabIndex = -1;
-      unidad.style.display = 'none';
+      unidad.removeAttribute('aria-hidden');
+      unidad.removeAttribute('tabindex');
+      unidad.setAttribute('aria-label', 'Presentación base del inventario');
+      unidad.placeholder = 'Presentación base (ej. botella, kg)';
+      unidad.style.display = '';
       var wrap = unidad.closest('.field');
       if (wrap) {
-        wrap.style.display = 'none';
-        wrap.setAttribute('aria-hidden', 'true');
+        wrap.style.display = '';
+        wrap.removeAttribute('aria-hidden');
       }
     }
-    var dl = document.getElementById('unidades-comunes');
+    var dl = document.getElementById('presentaciones-comunes');
     if (dl) dl.style.display = 'none';
   }
 
@@ -174,13 +176,14 @@
     actions.appendChild(submitBtn);
 
     var unidad = document.getElementById('prod-unidad');
-    var dl = document.getElementById('unidades-comunes');
+    var dl = document.getElementById('presentaciones-comunes');
     if (editId) form.appendChild(editId);
     form.appendChild(top);
     form.appendChild(commercial);
     if (unidad) {
-      unidad.style.display = 'none';
-      form.appendChild(unidad);
+      unidad.style.display = '';
+      unidad.removeAttribute('aria-hidden');
+      commercialFields.appendChild(fieldBlock(unidad, 'Presentación base del inventario', 'bc-product-commercial-field'));
     }
     if (dl) {
       dl.style.display = 'none';
@@ -346,7 +349,7 @@
       '#bc-product-modal #bc-product-form-host{padding:6px 16px 16px}',
       '#bc-product-modal #form-producto,#bc-product-modal #form-producto.bc-producto-modal-form{display:flex!important;flex-direction:column;gap:12px;visibility:visible!important;height:auto!important;overflow:visible!important}',
       '#bc-product-modal #form-producto.hidden{display:flex!important}',
-      '#bc-product-modal #prod-unidad,#bc-product-modal #unidades-comunes{display:none!important}',
+      '#bc-product-modal #presentaciones-comunes{display:none!important}',
       '#bc-product-modal .bc-product-form-top{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:12px;align-items:start}',
       '#bc-product-modal .bc-product-form-fields{display:flex;flex-direction:column;gap:8px;min-width:0;align-self:start}',
       '#bc-product-modal .bc-product-field{display:block;flex:none!important;height:auto!important;min-height:0!important}',
