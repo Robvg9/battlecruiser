@@ -10,18 +10,18 @@
       var r=await client.from('producto_presentaciones').select('presentacion_id,factor,presentaciones(id,nombre)').eq('producto_id',id).eq('activo',true).order('created_at');
       var rows=Array.isArray(r.data)?r.data:[];
       var prod=(Array.isArray(window._cache?.productos)?_cache.productos:[]).find(function(p){return String(p.id)===String(id);});
-      var wId=prod?.presentacion_id||null;
-      var normal=rows.find(function(x){return Number(x.factor)===1;})||rows[0]||null;
-      var wholesale=wId?rows.find(function(x){return String(x.presentacion_id)===String(wId);})||null:(rows.length>1?rows[rows.length-1]:null);
+      var wholesaleId=prod&&prod.presentacion_id?String(prod.presentacion_id):null;
+      var wholesale=wholesaleId?rows.find(function(x){return String(x.presentacion_id)===wholesaleId;}):null;
+      var normal=rows.find(function(x){return !wholesaleId||String(x.presentacion_id)!==wholesaleId;})||null;
       function set(kind,row){
-        if(!row)return;
-        var sel=document.getElementById(kind==='wholesale'?'bc-pres-wholesale':'bc-pres-normal');
-        var factor=document.getElementById('bc-pres-'+kind+'-factor');
-        if(sel&&row.presentacion_id){sel.value=String(row.presentacion_id);}
-        if(factor)factor.value=String(row.factor??'');
-        var custom=document.getElementById('bc-pres-'+kind+'-custom');if(custom)custom.classList.add('hidden');
+        var isW=kind==='wholesale';
+        var name=document.getElementById(isW?'bc-pres-wholesale-name':'bc-pres-normal-name');
+        var factor=document.getElementById(isW?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+        if(name)name.value=row&&row.presentaciones?String(row.presentaciones.nombre||''):'';
+        if(factor)factor.value=row&&row.factor!=null?String(row.factor):'';
       }
-      set('normal',normal);set('wholesale',wholesale);
+      set('normal',normal);
+      set('wholesale',wholesale);
     }catch(_){ }
   }
   function boot(){setTimeout(hydrate,120);setTimeout(hydrate,700);setTimeout(hydrate,1600);}
