@@ -30,11 +30,10 @@
     document.querySelectorAll('#productos-tools-nomenclatura,#productos-nomenclatura-btn').forEach(function (el) {
       // M75 owns the catalog entry in Administration. Keep its toolbar there
       // when this routine prepares the native nomenclature modal.
-      if (!el.closest('#tab-productos') && !el.closest('#bc-product-catalog-entry')) el.remove();
+      if (!el.closest('#tab-productos') && !el.closest('#bc-product-presentations-entry')) el.remove();
     });
+    // Categorías y unidades permanecen en Administración. Solo se reúnen las presentaciones.
     var slots = {
-      'lista-categorias': 'prod-nom-categorias-slot',
-      'lista-unidades': 'prod-nom-unidades-slot',
       'lista-presentaciones-catalogo': 'prod-nom-presentaciones-slot',
       'pp-lista-asociaciones': 'prod-nom-presentaciones-slot'
     };
@@ -42,7 +41,7 @@
       var el = document.getElementById(id), slot = document.getElementById(slots[id]);
       if (!el || !slot) return;
       var panel = el.closest('.tab-panel');
-      var adminEntry = document.getElementById('bc-product-catalog-entry');
+      var adminEntry = document.getElementById('bc-product-presentations-entry');
       var nomenclatureToolbar = document.getElementById('productos-tools-nomenclatura');
       var candidatos = [
         el.closest('.cc-bloque'),
