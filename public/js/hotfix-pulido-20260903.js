@@ -302,6 +302,10 @@
       msg('Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero. Deja ambos vacíos si no aplica.',false);
       if(save)save.disabled=false;return true;
     }
+    if(normal.name&&wholesale.name&&norm(normal.name)===norm(wholesale.name)){
+      msg('Las etiquetas minorista y mayorista deben ser distintas.',false);
+      if(save)save.disabled=false;return true;
+    }
     if((normal.id&&!normal.factor)){
       var hitN=PRES_CACHE.find(function(p){return String(p.id)===String(normal.id);});normal.name=hitN?.nombre||null;normal.factor=null;
       try{var rn=await client.from('producto_presentaciones').select('factor').eq('producto_id',id||'00000000-0000-0000-0000-000000000000').eq('presentacion_id',normal.id).limit(1);if(rn.data?.[0])normal.factor=Number(rn.data[0].factor)||1;}catch(_){normal.factor=1;}
@@ -384,7 +388,12 @@
         var pn=pnRaw===''?null:Number(pnRaw),pm=pmRaw===''?null:Number(pmRaw);if(pn!==null&&!Number.isFinite(pn))throw Error('Fila '+(i+2)+': precio_normal inválido.');if(pm!==null&&!Number.isFinite(pm))throw Error('Fila '+(i+2)+': precio_mayorista inválido.');
         var normName=val(r,'presentacion_normal',['presentacion_normal','presentación normal','presentacion']),normFacRaw=val(r,'factor_normal',['factor_normal','factor normal']);
         var whName=val(r,'presentacion_mayorista',['presentacion_mayorista','presentación mayorista']),whFacRaw=val(r,'factor_mayorista',['factor_mayorista','factor mayorista']);
-        var nf=normName?(normFacRaw===''?1:Number(normFacRaw)):null,wf=whName?(whFacRaw===''?null:Number(whFacRaw)):null;if(normName&&(!(nf>0)))throw Error('Fila '+(i+2)+': factor_normal inválido.');if(whName&&(!(wf>0)))throw Error('Fila '+(i+2)+': factor_mayorista inválido.');
+        var nf=normFacRaw===''?null:Number(normFacRaw),wf=whFacRaw===''?null:Number(whFacRaw);
+        var normalPair=(!normName&&normFacRaw==='')||(!!normName&&Number.isFinite(nf)&&nf>0);
+        var wholesalePair=(!whName&&whFacRaw==='')||(!!whName&&Number.isFinite(wf)&&wf>0);
+        if(!normalPair)throw Error('Fila '+(i+2)+': la presentación minorista requiere etiqueta y factor positivo, o ambos vacíos.');
+        if(!wholesalePair)throw Error('Fila '+(i+2)+': la presentación mayorista requiere etiqueta y factor positivo, o ambos vacíos.');
+        if(normName&&whName&&norm(normName)===norm(whName))throw Error('Fila '+(i+2)+': las etiquetas minorista y mayorista deben ser distintas.');
         if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
         var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:val(r,'unidad',['unidad','unit','uom'])||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normName||null,p_factor_normal:nf,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
         var rr=await client.rpc('bc_guardar_producto_catalogo',p);if(rr.error)throw rr.error;ok++;
@@ -414,7 +423,7 @@
   }
   function ensurePresentationCreateForm(){
     var f=document.getElementById('form-presentacion-nueva');if(!f)return;f.classList.remove('hidden');if(f.dataset.bcPulido==='1')return;f.dataset.bcPulido='1';
-    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();fillPresSelect('bc-pres-normal',PRES_CACHE);fillPresSelect('bc-pres-wholesale',PRES_CACHE);renderPresentationCatalog();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
+    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();renderPresentationCatalog();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
   }
 
   function cleanCommunicationEmpty(){
