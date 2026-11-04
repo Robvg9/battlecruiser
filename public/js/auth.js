@@ -505,6 +505,14 @@ client.auth.onAuthStateChange(function (event, session) {
   }
 });
 
+function bcUsernameLoginEndpoint() {
+  // The shared PR preview is a different origin from production. Route only
+  // that exact host through its isolated Worker proxy; LIVE keeps direct Supabase.
+  return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
+    ? "/__bc_preview/functions/v1/bc-username-login"
+    : SUPABASE_URL + "/functions/v1/bc-username-login";
+}
+
 safeInit("login", () => {
   const usuarioInput = document.getElementById("email");
   const usuarioLabel = document.querySelector('label[for="email"]');
@@ -534,7 +542,7 @@ safeInit("login", () => {
 
       let respuestaLogin;
       try {
-        respuestaLogin = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
+        respuestaLogin = await fetch(bcUsernameLoginEndpoint(), {
           method: "POST",
           headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({ username: nombreUsuario, password }),
@@ -602,7 +610,7 @@ safeInit("password-recovery-request", () => {
     recoveryBtn.disabled = true;
     recoveryBtn.textContent = "Enviando correo…";
     try {
-      const response = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
+      const response = await fetch(bcUsernameLoginEndpoint(), {
         method: "POST",
         headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "password-recovery", username: identifier }),
