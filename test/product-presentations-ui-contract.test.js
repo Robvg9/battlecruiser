@@ -46,6 +46,7 @@ test("minorista and mayorista are independent optional label/factor pairs", () =
   assert.ok(saver.includes("return (!hasName&&!hasFactor)||(hasName&&hasFactor)"));
   assert.ok(saver.includes("Las etiquetas minorista y mayorista deben ser distintas"));
   assert.ok(salesLines.includes("baseQuantity=packageQuantity*factor"));
+  assert.ok(salesLines.includes("__bcQuantityIsBase:true"));
   assert.ok(salesLines.includes("line.presentacion_id=p.presentacion_id"));
   assert.ok(salesLines.includes("line.cantidad_presentacion=Number(line.cantidad||0)/factor"));
   assert.ok(salesLines.includes("function buildPLineasFromCart(lineas)"));
@@ -58,6 +59,7 @@ test("warehouse channel is checked independently from the selected price type", 
   const migration = read("supabase/migrations/20261103090000_product_presentations_by_warehouse.sql");
 
   assert.ok(sales.includes("if(isSellType(t)&&!channelAvailable(p,t))"));
+  assert.ok(sales.includes("opts&&opts.__bcQuantityIsBase?Number(cantidad):Number(cantidad)*factor"));
   assert.ok(sales.includes("from('producto_presentaciones')"));
   assert.ok(sales.includes("window.__BC_M275_getProductPresentation"));
   const saleLines = read("public/js/m27-6-ventas-presentaciones.js");
