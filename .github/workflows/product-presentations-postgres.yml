@@ -6,6 +6,7 @@ on:
     paths:
       - 'supabase/migrations/20261103090000_product_presentations_by_warehouse.sql'
       - 'test/product-presentations-warehouse-contract.sql'
+      - 'test/product-presentations-warehouse-fixture.sql'
       - '.github/workflows/product-presentations-postgres.yml'
   workflow_dispatch:
 
@@ -39,6 +40,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
+
+      - name: Prepare isolated schema fixture
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_test
+        run: psql -v ON_ERROR_STOP=1 -f test/product-presentations-warehouse-fixture.sql
 
       - name: Install migration on disposable database
         env:
