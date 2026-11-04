@@ -984,3 +984,5 @@ textarea:focus-visible {
   #tab-mando .mando-filtros select,
   #tab-mando .mando-filtros button { width: 100%; }
 }
+
+#tab-resumen .cc-col-lateral { display: flex; flex-direction: column; gap: 14px; }
