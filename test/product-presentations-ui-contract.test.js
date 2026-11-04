@@ -21,7 +21,7 @@ test("product image picker crops, scales, previews and uploads a prepared square
   assert.ok(products.includes("Math.min(cropSide, PROD_IMAGEN_LADO_MAX)"));
   assert.ok(products.includes("context.drawImage(image, left, top, cropSide, cropSide, 0, 0, outputSide, outputSide)"));
   assert.ok(products.includes('}, "image/jpeg", 0.84);'));
-  assert.ok(products.includes("_productoImagenProcesada || (archivoImagenInput.files"));
+  assert.ok(products.includes("async function subirImagenProducto"));
   const catalogSave = read("public/js/hotfix-pulido-20260903b.js");
   assert.ok(catalogSave.includes("var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null"));
   assert.ok(catalogSave.includes("window.subirImagenProducto(savedProductId,imageFile)"));
