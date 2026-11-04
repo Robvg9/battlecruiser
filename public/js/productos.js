@@ -32,22 +32,77 @@ async function cargarProductos() {
 }
 
 const PROD_IMAGEN_TIPOS_VALIDOS = ["image/jpeg", "image/png", "image/jpg"];
-const PROD_IMAGEN_TAMANO_MAX = 5 * 1024 * 1024;
+const PROD_IMAGEN_TAMANO_ORIGINAL_MAX = 15 * 1024 * 1024;
+const PROD_IMAGEN_LADO_MAX = 512;
+let _productoImagenProcesada = null;
+let _productoImagenPreviewObjectUrl = null;
 
 function validarArchivoImagenProducto(file) {
   if (!file) return null;
-  if (!PROD_IMAGEN_TIPOS_VALIDOS.includes(file.type)) {
-    return "Formato no permitido. Usa JPG o PNG.";
-  }
-  if (file.size > PROD_IMAGEN_TAMANO_MAX) {
-    return "La imagen es muy grande (máximo 5MB).";
-  }
+  if (!PROD_IMAGEN_TIPOS_VALIDOS.includes(file.type)) return "Formato no permitido. Usa JPG o PNG.";
+  if (file.size > PROD_IMAGEN_TAMANO_ORIGINAL_MAX) return "La imagen original supera el máximo de 15MB.";
   return null;
 }
 
 function extensionImagen(file) {
-  if (file.type === "image/png") return "png";
-  return "jpg";
+  return file && file.type === "image/png" ? "png" : "jpg";
+}
+
+function revocarPreviewImagenProducto() {
+  if (_productoImagenPreviewObjectUrl && typeof URL.revokeObjectURL === "function") {
+    try { URL.revokeObjectURL(_productoImagenPreviewObjectUrl); } catch (e) {}
+  }
+  _productoImagenPreviewObjectUrl = null;
+}
+
+function prepararImagenProductoCuadrada(file) {
+  return new Promise((resolve, reject) => {
+    const sourceUrl = URL.createObjectURL(file);
+    const image = new Image();
+    let closed = false;
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      if (typeof URL.revokeObjectURL === "function") {
+        try { URL.revokeObjectURL(sourceUrl); } catch (e) {}
+      }
+    };
+    image.onerror = () => { cleanup(); reject(new Error("No se pudo leer la imagen seleccionada.")); };
+    image.onload = () => {
+      try {
+        const width = Number(image.naturalWidth || image.width);
+        const height = Number(image.naturalHeight || image.height);
+        if (!(width > 0 && height > 0)) throw new Error("La imagen no tiene dimensiones válidas.");
+        const cropSide = Math.min(width, height);
+        const outputSide = Math.min(cropSide, PROD_IMAGEN_LADO_MAX);
+        const left = Math.floor((width - cropSide) / 2);
+        const top = Math.floor((height - cropSide) / 2);
+        const canvas = document.createElement("canvas");
+        canvas.width = outputSide;
+        canvas.height = outputSide;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Este navegador no puede preparar la imagen.");
+        context.drawImage(image, left, top, cropSide, cropSide, 0, 0, outputSide, outputSide);
+        canvas.toBlob((blob) => {
+          cleanup();
+          if (!blob) { reject(new Error("No se pudo comprimir la imagen.")); return; }
+          const baseName = String(file.name || "producto").replace(/\\.[^.]+$/, "") || "producto";
+          try {
+            resolve(new File([blob], baseName + ".jpg", {
+              type: "image/jpeg",
+              lastModified: Date.now()
+            }));
+          } catch (e) {
+            reject(new Error("Este navegador no pudo preparar el archivo de imagen."));
+          }
+        }, "image/jpeg", 0.84);
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    };
+    image.src = sourceUrl;
+  });
 }
 
 async function subirImagenProducto(productoId, file) {
@@ -55,17 +110,13 @@ async function subirImagenProducto(productoId, file) {
   const { error: errorSubida } = await client.storage
     .from("productos")
     .upload(nombreArchivo, file, { upsert: true, contentType: file.type });
-  if (errorSubida) {
-    return { ok: false, error: errorSubida };
-  }
+  if (errorSubida) return { ok: false, error: errorSubida };
   const { data: urlData } = client.storage.from("productos").getPublicUrl(nombreArchivo);
   const { error: errorRpc } = await client.rpc("actualizar_imagen_producto", {
     p_producto_id: productoId,
     p_imagen_url: urlData.publicUrl,
   });
-  if (errorRpc) {
-    return { ok: false, error: errorRpc };
-  }
+  if (errorRpc) return { ok: false, error: errorRpc };
   return { ok: true, url: urlData.publicUrl };
 }
 
@@ -81,8 +132,16 @@ safeInit("prod-imagen-input", () => {
   const input = document.getElementById("prod-imagen-input");
   const wrap = document.getElementById("prod-imagen-preview-wrap");
   const img = document.getElementById("prod-imagen-preview");
-  input.addEventListener("change", () => {
+  const pickButton = document.getElementById("prod-imagen-elegir");
+  const fileName = document.getElementById("prod-imagen-nombre");
+  if (!input || !wrap || !img) return;
+
+  if (pickButton) pickButton.addEventListener("click", () => input.click());
+  input.addEventListener("change", async () => {
     const file = input.files && input.files[0];
+    _productoImagenProcesada = null;
+    input.dataset.processing = "false";
+    revocarPreviewImagenProducto();
     setMsg("msg-prod-imagen", "", true);
     if (!file) { wrap.classList.add("hidden"); return; }
     const error = validarArchivoImagenProducto(file);
@@ -90,18 +149,44 @@ safeInit("prod-imagen-input", () => {
       setMsg("msg-prod-imagen", error, false);
       input.value = "";
       wrap.classList.add("hidden");
+      if (fileName) fileName.textContent = "Sin imagen";
       return;
     }
-    const url = URL.createObjectURL(file);
-    img.src = url;
-    wrap.classList.remove("hidden");
+
+    input.dataset.processing = "true";
+    if (pickButton) pickButton.disabled = true;
+    if (fileName) fileName.textContent = "Preparando imagen…";
+    try {
+      const processed = await prepararImagenProductoCuadrada(file);
+      _productoImagenProcesada = processed;
+      _productoImagenPreviewObjectUrl = URL.createObjectURL(processed);
+      img.src = _productoImagenPreviewObjectUrl;
+      img.dataset.guardada = "false";
+      wrap.classList.remove("hidden");
+      if (fileName) fileName.textContent = processed.name + " · " + Math.max(1, Math.round(processed.size / 1024)) + " KB";
+      setMsg("msg-prod-imagen", "Imagen recortada a formato cuadrado y optimizada (máximo 512 × 512).", true);
+    } catch (errorProcesamiento) {
+      setMsg("msg-prod-imagen", errorProcesamiento && errorProcesamiento.message
+        ? errorProcesamiento.message : "No se pudo preparar la imagen.", false);
+      input.value = "";
+      wrap.classList.add("hidden");
+      if (fileName) fileName.textContent = "Sin imagen";
+    } finally {
+      input.dataset.processing = "false";
+      if (pickButton) pickButton.disabled = false;
+    }
   });
 
-  document.getElementById("prod-imagen-quitar").addEventListener("click", async () => {
+  const removeButton = document.getElementById("prod-imagen-quitar");
+  if (removeButton) removeButton.addEventListener("click", async () => {
     const editandoId = document.getElementById("prod-editando-id").value || null;
     input.value = "";
-    document.getElementById("prod-imagen-preview-wrap").classList.add("hidden");
-    if (editandoId && document.getElementById("prod-imagen-preview").dataset.guardada === "true") {
+    input.dataset.processing = "false";
+    _productoImagenProcesada = null;
+    revocarPreviewImagenProducto();
+    wrap.classList.add("hidden");
+    if (fileName) fileName.textContent = "Sin imagen";
+    if (editandoId && img.dataset.guardada === "true") {
       if (estaRealmenteDesconectado()) {
         setMsg("msg-prod-imagen", "Necesitas conexión para quitar la imagen guardada.", false);
         return;
@@ -111,7 +196,7 @@ safeInit("prod-imagen-input", () => {
         setMsg("msg-prod-imagen", "No se pudo quitar la imagen.", false);
         return;
       }
-      document.getElementById("prod-imagen-preview").dataset.guardada = "false";
+      img.dataset.guardada = "false";
       setMsg("msg-prod-imagen", "Imagen quitada.", true);
       await refrescarProductos();
     }
