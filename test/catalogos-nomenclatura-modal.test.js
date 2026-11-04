@@ -13,7 +13,7 @@ test('category and unit catalog management has one canonical owner in Administra
     assert.equal((index.match(new RegExp('id="' + id + '"', 'g')) || []).length, 1, id + ' must exist once');
   }
   assert.match(index, /bc-admin-categories[\s\S]*?bc-categories-open/);
-  assert.match(index, /id="bc-modal-categorias"[\\s\\S]*?id="form-categoria"[\\s\\S]*?id="lista-categorias"/);
+  assert.match(index, /id="bc-modal-categorias"[\s\S]*?id="form-categoria"[\s\S]*?id="lista-categorias"/);
   assert.equal((index.match(/id="bc-modal-categorias"/g)||[]).length,1);
   assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/);
   assert.match(index, /presentaciones-panel[\s\S]*?lista-presentaciones-catalogo[\s\S]*?pp-lista-asociaciones/);
