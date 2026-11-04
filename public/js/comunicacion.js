@@ -364,13 +364,19 @@ function volverListaConversaciones() {
 let _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
 
 async function refrescarAlertasB8() {
-  if (!navigator.onLine || !tienePermiso("comunicacion", "ver")) return;
+  if (!navigator.onLine) return;
+  // Never carry unread counts into a different user's session or permission set.
+  _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
+  if (!tienePermiso("comunicacion", "ver")) return;
   try {
     const { data } = await client.rpc("listar_conversaciones_usuario", { p_solo_activas: true, p_limite: 50 });
     const convs = data || [];
     _b8CacheAlertas.soportePendiente = convs.filter((c) => c.tipo === "SOPORTE" && Number(c.no_leidos || 0) > 0).length;
     _b8CacheAlertas.convRecientes = convs.filter((c) => Number(c.no_leidos || 0) > 0).length;
-  } catch (e) { /* RPC no existe */ }
+  } catch (e) {
+    // Do not retain unread counts after an unsuccessful refresh.
+    _b8CacheAlertas = { soportePendiente: 0, convRecientes: 0 };
+  }
 }
 
 function construirAlertasB8() {
