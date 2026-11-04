@@ -10,6 +10,10 @@ const SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "catalogos.js"),
   "utf8"
 );
+const INDEX_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "index.html"),
+  "utf8"
+);
 
 function setup(t) {
   const dom = new JSDOM(
@@ -17,17 +21,13 @@ function setup(t) {
     "<section>" +
       "<form id='form-categoria'><input id='cat-nombre'><button type='submit'>Agregar categoría</button></form>" +
       "<div id='lista-categorias'></div>" +
-      "<form id='form-unidad'><input id='uni-nombre'><button type='submit'>Agregar unidad</button></form>" +
-      "<div id='lista-unidades'></div>" +
       "<div id='msg-config'></div>" +
     "</section></body></html>",
     { url: "https://battlecruiser-catalogs.test/", runScripts: "outside-only", pretendToBeVisual: true }
   );
   const { window } = dom;
   const tables = {
-    categorias: [{ id: "cat-existing", nombre: "General", activo: true }],
-    unidades: [{ id: "uni-existing", nombre: "unidad", activo: true }]
-  };
+    categorias: [{ id: "cat-existing", nombre: "General", activo: true }]  };
   const inserts = [];
   const updates = [];
   let sequence = 0;
@@ -127,27 +127,32 @@ test("Paso 4 catálogos: categoría válida inserta una fila fixture, confirma y
     "lista debe refrescar y mostrar el registro fixture creado");
 });
 
-test("Paso 4 catálogos: unidad válida inserta una fila fixture y confirma el resultado", async (t) => {
-  const c = setup(t);
-  c.window.document.getElementById("uni-nombre").value = "paquete fixture";
-  submit(c.window, "form-unidad");
-  assert.ok(await waitFor(() => c.inserts.some((x) => x.table === "unidades" && x.payload.nombre === "paquete fixture")),
-    "unidad válida debe llamar el insert mock");
-  assert.ok(await waitFor(() => /Unidad creada\./i.test(c.window.document.getElementById("msg-config").textContent)),
-    "debe mostrar confirmación de creación");
-  assert.equal(c.window.document.getElementById("uni-nombre").value, "");
-  assert.ok(c.window.document.getElementById("lista-unidades").textContent.includes("paquete fixture"));
+test("Paso 4: no existe CRUD separado de unidades; presentación base y formatos comparten el catálogo maestro", () => {
+  const dom = new JSDOM(INDEX_SOURCE);
+  try {
+    const d = dom.window.document;
+    assert.equal(d.getElementById("form-unidad"), null);
+    assert.equal(d.getElementById("lista-unidades"), null);
+    assert.equal(d.querySelectorAll(".presentaciones-panel").length, 1);
+    for (const id of ["form-presentacion-nueva", "lista-presentaciones-catalogo", "pp-producto-select", "pp-lista-asociaciones", "form-pp-nueva"]) {
+      assert.equal(d.querySelectorAll("#" + id).length, 1, id + " debe existir una sola vez");
+    }
+    const base = d.getElementById("prod-unidad");
+    assert.ok(base && base.getAttribute("list") === "presentaciones-comunes",
+      "la presentación base debe sugerir opciones del catálogo único");
+    assert.ok(d.getElementById("presentaciones-comunes"));
+    assert.doesNotMatch(SOURCE, /initCatalogoSimple\(\{\s*tabla:\s*["']unidades["']/,
+      "catalogos.js no debe iniciar otro CRUD de unidades");
+  } finally { dom.window.close(); }
 });
 
-test("Paso 4 catálogos: nombre vacío no crea categoría ni unidad", async (t) => {
+test("Paso 4 catálogos: nombre vacío no crea una categoría", async (t) => {
   const c = setup(t);
   c.window.document.getElementById("cat-nombre").value = "   ";
-  c.window.document.getElementById("uni-nombre").value = "";
   submit(c.window, "form-categoria");
-  submit(c.window, "form-unidad");
   await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(c.inserts.filter((x) => x.table === "categorias" || x.table === "unidades").length, 0,
-    "campos vacíos no llegan al backend mock");
+  assert.equal(c.inserts.filter((x) => x.table === "categorias").length, 0,
+    "los campos vacíos no llegan al backend mock");
 });
 
 test("Paso 4 catálogos: error de duplicado se muestra sin limpiar ni ocultar el motivo", async (t) => {
