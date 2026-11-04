@@ -59,6 +59,34 @@ function productoEsVariante(p) {
   return !!(p && p.producto_padre_id);
 }
 
+async function ejecutarProductoMixtoSinCola(editandoId, payload) {
+  if (typeof usuarioPuedeOperar === "function" && !(await usuarioPuedeOperar())) {
+    return { ok: false, error: { message: "Tu usuario está inactivo. Contacta al administrador." } };
+  }
+  if (typeof sincronizarUsuarioIdParaOperaciones === "function") sincronizarUsuarioIdParaOperaciones();
+  const rpc = editandoId ? "actualizar_producto" : "crear_producto";
+  const args = Object.assign({}, payload, { p_idempotency_key: crypto.randomUUID() });
+  try {
+    const run = () => client.rpc(rpc, args);
+    const result = typeof withNetworkTimeout === "function"
+      ? await withNetworkTimeout(run, 15000, "guardar producto con inventario mixto")
+      : await run();
+    if (result.error) {
+      if (typeof esErrorDeRed === "function" && esErrorDeRed(result.error)) {
+        if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+        return { ok: false, error: { message: "No se pudo confirmar la conexión con Supabase. El producto mixto no se guardó ni se encoló." } };
+      }
+      if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+      return { ok: false, error: result.error };
+    }
+    if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+    return { ok: true, offline: false, data: result.data };
+  } catch (error) {
+    if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+    return { ok: false, error: { message: "No se pudo confirmar el guardado con el servidor. El producto mixto no se guardó ni se encoló." } };
+  }
+}
+
 
 const PROD_IMAGEN_TIPOS_VALIDOS = ["image/jpeg", "image/png", "image/jpg"];
 const PROD_IMAGEN_TAMANO_ORIGINAL_MAX = 15 * 1024 * 1024;
@@ -557,22 +585,23 @@ safeInit("form-producto", () => {
       }
     }
     submitBtn.disabled = true;
-    const resultado = editandoId
-      ? await ejecutarOperacion("producto_actualizar", {
-          p_producto_id: editandoId,
-          p_nombre: nombre,
-          p_categoria_id: categoria_id,
-          p_unidad: unidad,
-          p_precio_normal: precio_normal,
-          p_precio_mayorista: precio_mayorista,
-        })
-      : await ejecutarOperacion("producto", {
-          p_nombre: nombre,
-          p_categoria_id: categoria_id,
-          p_unidad: unidad,
-          p_precio_normal: precio_normal,
-          p_precio_mayorista: precio_mayorista,
-        });
+    const payload = editandoId ? {
+      p_producto_id: editandoId,
+      p_nombre: nombre,
+      p_categoria_id: categoria_id,
+      p_unidad: unidad,
+      p_precio_normal: precio_normal,
+      p_precio_mayorista: precio_mayorista,
+    } : {
+      p_nombre: nombre,
+      p_categoria_id: categoria_id,
+      p_unidad: unidad,
+      p_precio_normal: precio_normal,
+      p_precio_mayorista: precio_mayorista,
+    };
+    const resultado = needsMixedConfig
+      ? await ejecutarProductoMixtoSinCola(editandoId, payload)
+      : await ejecutarOperacion(editandoId ? "producto_actualizar" : "producto", payload);
     submitBtn.disabled = false;
 
     if (!resultado.ok) {
