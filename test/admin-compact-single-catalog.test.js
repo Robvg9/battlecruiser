@@ -19,11 +19,15 @@ test("Administration has one compact home for roles, categories and the single p
     const d = dom.window.document, admin = d.getElementById("tab-config");
     assert.ok(admin && admin.querySelector(".bc-admin-grid"));
     assert.ok(admin.querySelector(".bc-admin-roles"));
-    assert.ok(admin.querySelector(".bc-admin-catalogs"));
-    for (const id of ["form-nuevo-rol","form-categoria","lista-categorias","form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) {
+    assert.ok(admin.querySelector(".bc-admin-categories"));
+    for (const id of ["form-nuevo-rol","form-categoria","lista-categorias","msg-config","form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) {
       assert.equal(d.querySelectorAll("#" + id).length, 1, id + " must remain unique");
     }
-    assert.ok(admin.querySelector(".bc-admin-subcard #form-categoria"));
+    assert.ok(admin.querySelector("#bc-modal-categorias #form-categoria"));
+    assert.ok(admin.querySelector("#bc-modal-categorias #lista-categorias"));
+    assert.ok(admin.querySelector("#bc-modal-categorias[role=dialog]"));
+    assert.ok(admin.querySelector(".bc-admin-roles #bc-btn-config-roles") || admin.querySelector(".bc-admin-roles"));
+    assert.ok(admin.querySelector(".bc-admin-categories #bc-categories-open"));
     assert.equal(d.querySelectorAll("#form-unidad,#lista-unidades").length, 0, "units must not be a second catalogue");
     assert.ok(admin.querySelector(".presentaciones-panel"));
     assert.equal(d.querySelectorAll("#tab-productos .presentaciones-panel").length, 0);
@@ -73,4 +77,20 @@ test("roles permissions help uses one canonical guide and never relocates repeat
   assert.match(helper,/host\.innerHTML/);
   assert.doesNotMatch(helper,/appendChild\(block\)/);
   assert.match(helper,/Los usuarios heredan los permisos del rol/);
+});
+
+
+test("Categories open from an Administration tile and reuse one existing modal/form/list",()=>{
+  const {JSDOM}=require("jsdom");
+  const dom=new JSDOM(index);
+  try {
+    const d=dom.window.document;
+    const modal=d.getElementById("bc-modal-categorias");
+    assert.ok(d.getElementById("bc-categories-open"));
+    assert.ok(modal);
+    assert.equal(modal.getAttribute("aria-hidden"),"true");
+    assert.equal(d.querySelectorAll("#form-categoria").length,1);
+    assert.equal(d.querySelectorAll("#lista-categorias").length,1);
+    assert.equal(d.querySelectorAll("#msg-config").length,1);
+  } finally { dom.window.close(); }
 });
