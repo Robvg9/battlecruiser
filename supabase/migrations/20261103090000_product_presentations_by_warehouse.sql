@@ -182,7 +182,7 @@ begin
   update private.operaciones_idempotencia set resultado_id=v_id where idempotency_key=p_idempotency_key;
   return v_id;
 end;
-$function$
+$function$;
 
 
 COMMIT;
