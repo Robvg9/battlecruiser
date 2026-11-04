@@ -107,4 +107,10 @@ test("product registration has one commercial-options owner and no legacy duplic
   assert.ok(presentationSave.includes("p_presentacion_mayorista:wholesale.name"));
   assert.ok(presentationUi.includes("No se guardó el producto ni se creó parcialmente."),
     "offline save must not silently discard configured presentation pairs");
+  assert.ok(presentationUi.includes("if(!form||!modal||!modal.contains(form))return false;"),
+    "the single product saver must bind to the native M26 modal, not a retired second overlay");
+  assert.ok(!presentationUi.includes("if(!document.getElementById('bc171-overlay'))return false;"),
+    "the retired M17 overlay must not disable the current product saver");
+  assert.ok(presentationUi.includes("document.getElementById('prod-submit-btn')||document.getElementById('bc171-save')"),
+    "the native save button must be disabled during a save attempt");
 });
