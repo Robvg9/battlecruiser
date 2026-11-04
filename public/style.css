@@ -986,3 +986,33 @@ textarea:focus-visible {
 }
 
 #tab-resumen .cc-col-lateral { display: flex; flex-direction: column; gap: 14px; }
+
+
+/* Connectivity & maintenance: compact operational overview for the Android viewport. */
+#tab-conectividad #cfg-mantenimiento { display:grid; gap:8px; margin:0; padding:12px; }
+#tab-conectividad #cfg-mantenimiento .cfg-panel-heading { display:grid; gap:3px; min-width:0; }
+#tab-conectividad #cfg-mantenimiento .cfg-panel-heading h3 { margin:0; font-size:clamp(21px,5vw,25px); line-height:1.1; }
+#tab-conectividad #cfg-mantenimiento .cfg-panel-heading p { margin:0; font-size:11.5px; line-height:1.35; }
+#tab-conectividad #cfg-diag-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; min-width:0; }
+#tab-conectividad #cfg-diag-grid .cfg-metric { display:flex; min-width:0; min-height:68px; flex-direction:column; justify-content:center; gap:4px; margin:0; padding:8px 9px; overflow:hidden; }
+#tab-conectividad #cfg-diag-grid .cfg-metric .valor { min-width:0; font-size:clamp(17px,4.6vw,23px); line-height:1.08; overflow-wrap:anywhere; }
+#tab-conectividad #cfg-diag-grid .cfg-metric .etiqueta { margin:0; color:var(--mist); font-size:9px; line-height:1.2; letter-spacing:.045em; }
+#tab-conectividad #cfg-diag-grid .cfg-metric:nth-child(3) .valor { font-family:'IBM Plex Mono',monospace; font-size:20px; }
+#tab-conectividad #cfg-diag-grid .cfg-metric:nth-child(5) .valor { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; font-family:'Inter',sans-serif; font-size:12px; font-weight:600; line-height:1.25; }
+#tab-conectividad #cfg-probe-summary { min-width:0; margin:0; padding:7px 9px; border-left:2px solid var(--gold-dim); border-radius:5px; background:rgba(212,176,92,.06); color:var(--mist); font-family:'IBM Plex Mono',monospace; font-size:10px; line-height:1.35; overflow-wrap:anywhere; }
+#tab-conectividad #cfg-mantenimiento .cfg-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; min-width:0; margin:0; }
+#tab-conectividad #cfg-mantenimiento .cfg-actions .cc-accion { min-width:0; min-height:44px; height:auto; margin:0; padding:7px 8px; font-size:11px; line-height:1.25; white-space:normal; overflow-wrap:anywhere; }
+#tab-conectividad #msg-config-diag { min-height:0; margin:0; font-size:11px; line-height:1.3; }
+#tab-conectividad #cfg-mantenimiento .cfg-details { min-width:0; margin:0; padding-top:6px; border-top:1px solid rgba(212,176,92,.18); }
+#tab-conectividad #cfg-mantenimiento .cfg-details summary { display:flex; min-height:30px; align-items:center; color:var(--mist); font-size:11px; cursor:pointer; }
+#tab-conectividad #cfg-mantenimiento .cfg-details p { margin:6px 0 0; color:var(--mist); font-size:10.5px; line-height:1.4; overflow-wrap:anywhere; }
+@media (min-width:700px) {
+  #tab-conectividad #cfg-diag-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  #tab-conectividad #cfg-mantenimiento .cfg-actions { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  #tab-conectividad #cfg-mantenimiento { padding:16px; gap:10px; }
+}
+@media (max-width:360px) {
+  #tab-conectividad #cfg-mantenimiento { padding:9px; gap:7px; }
+  #tab-conectividad #cfg-diag-grid .cfg-metric { min-height:62px; padding:7px; }
+  #tab-conectividad #cfg-mantenimiento .cfg-actions .cc-accion { font-size:10px; }
+}

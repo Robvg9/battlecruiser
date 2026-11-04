@@ -128,7 +128,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
-  assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
+  assert.match(app, /\["configuracion\.js","20261104\.1"\]/, "connectivity panel must bypass stale cached layout");
   assert.ok(index.includes('<script src="js/navegacion.js?v=9.5.61"></script>'), "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.61"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.61/, "the fixed Turnos module must be available in the offline shell");
@@ -240,4 +240,14 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
   assert.match(app, /const VERSION=["']9\.5\.61["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.61["']/);
+});
+
+
+test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
+  assert.ok(index.includes('style.css?v=9.5.61'));
+  assert.ok(index.includes('app.js?v=9.5.61'));
+  assert.ok(sw.includes('./style.css?v=9.5.61'));
+  assert.ok(sw.includes('./app.js?v=9.5.61'));
+  assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
+  assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
