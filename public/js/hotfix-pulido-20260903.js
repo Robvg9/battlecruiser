@@ -43,6 +43,8 @@
       +'.bc-pres-grid-compact{display:flex!important;flex-direction:column!important;gap:7px!important;margin-top:8px!important}'
       +'.bc-pres-section-title{font-size:10.5px;font-weight:700;color:var(--mist);margin:2px 0 0}'
       +'.bc-pres-grid-compact .bc-pres-row{grid-template-columns:84px minmax(0,1fr) 92px}'
+      + '@media(max-width:700px){.bc-pres-grid-compact .bc-pres-row{grid-template-columns:64px minmax(0,1fr) 78px;gap:5px;padding:6px}.bc-pres-row-title{font-size:9.5px}}'
+      + '@media(max-width:360px){.bc-pres-grid-compact .bc-pres-row{grid-template-columns:1fr 1fr}.bc-pres-row-title{grid-column:1/-1}}'
       +'.bc-pres-row{display:grid;grid-template-columns:84px minmax(0,1fr) 92px;gap:7px;align-items:center;padding:7px;border:1px solid rgba(212,176,92,.14);border-radius:8px;background:rgba(8,20,17,.28)}'
       +'.bc-pres-row-title{font-size:10.5px;color:var(--gold-bright);white-space:nowrap}'
       +'.bc-pres-row input{min-width:0;width:100%;height:34px;min-height:34px;padding:0 8px;font-size:10.5px;box-sizing:border-box}'
@@ -320,9 +322,9 @@
     var normal=selectedPres('normal'), wholesale=selectedPres('wholesale');
     function presentationValid(value){
       var hasName=!!(value.name&&String(value.name).trim());
+      var hasFactor=value.factor!==null&&value.factor!==undefined;
       var factor=Number(value.factor);
-      var hasFactor=Number.isFinite(factor)&&factor>0;
-      return (!hasName&&!hasFactor)||(hasName&&hasFactor);
+      return (!hasName&&!hasFactor)||(hasName&&hasFactor&&Number.isFinite(factor)&&factor>0);
     }
     if(!presentationValid(normal)||!presentationValid(wholesale)){
       msg('Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero. Deja ambos vacíos si no aplica.',false);
