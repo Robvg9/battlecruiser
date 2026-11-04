@@ -233,10 +233,10 @@ test("Paso 4 RWHT 025: una imagen JPG/PNG se recorta al centro, limita a 512x512
 
   assert.ok(await waitFor(() => preview.src === "blob:fixture:producto.jpg"), "la previsualización debe usar el archivo procesado");
   assert.equal(wrap.classList.contains("hidden"), false);
-  assert.deepEqual(c.window.__BC_CANVAS_SIZE__, {
+  assert.deepEqual(JSON.parse(JSON.stringify(c.window.__BC_CANVAS_SIZE__)), {
     width: 512, height: 512, type: "image/jpeg", quality: 0.84
   });
-  assert.deepEqual(c.window.__BC_PRODUCT_IMAGE_DIMENSIONS__, {
+  assert.deepEqual(JSON.parse(JSON.stringify(c.window.__BC_PRODUCT_IMAGE_DIMENSIONS__)), {
     width: 512, height: 512, cropLeft: 350, cropTop: 0, cropSide: 900
   });
   assert.equal(c.window.__BC_PRODUCT_IMAGE_FILE__.type, "image/jpeg");
