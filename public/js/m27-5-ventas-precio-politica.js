@@ -42,6 +42,20 @@
   }
   function isSellType(t){ return t==='mayorista'||t==='minorista'; }
 
+  function presentationChannelSignature(){
+    return getProducts().map(function(p){return String(p.id)+':'+String(p.presentacion_id||'')+':'+String(p.activo!==false);}).sort().join('|');
+  }
+  function restoreCachedPresentationChannels(){
+    try{
+      const saved=JSON.parse(localStorage.getItem('bc-product-presentation-channels-v1')||'null');
+      if(!saved||saved.signature!==presentationChannelSignature()||!saved.channels)return false;
+      presentationChannels=saved.channels;
+      presentationChannelsLoaded=true;
+      window.__BC_M275_PRESENTATION_CHANNELS=presentationChannels;
+      return true;
+    }catch(e){return false;}
+  }
+
   async function refreshPresentationChannels(){
     if(presentationChannelsLoading)return presentationChannelsLoading;
     if(!window.client||!client.from)return false;
@@ -62,12 +76,13 @@
         presentationChannels=next;
         presentationChannelsLoaded=true;
         window.__BC_M275_PRESENTATION_CHANNELS=next;
+        try{localStorage.setItem('bc-product-presentation-channels-v1',JSON.stringify({signature:presentationChannelSignature(),channels:next}));}catch(e){}
         return true;
       }catch(error){
         presentationChannels={};
-        presentationChannelsLoaded=false;
+        presentationChannelsLoaded=restoreCachedPresentationChannels();
         window.__BC_M275_PRESENTATION_CHANNEL_ERROR=String(error&&error.message||error||'error');
-        return false;
+        return presentationChannelsLoaded;
       }finally{
         presentationChannelsLoading=null;
       }
@@ -244,7 +259,9 @@
     ensureControl();updateLabel();
     const grid=document.getElementById('catalogo-grid');
     if(isSellType(getWarehouseType())&&!presentationChannelsLoaded&&grid){
-      grid.innerHTML='<p class="lista-estado">Verificando presentaciones compatibles con este almacén…</p>';
+      grid.innerHTML='<p class="lista-estado">'+(window.__BC_M275_PRESENTATION_CHANNEL_ERROR
+        ?'No se pudo verificar la compatibilidad de presentaciones. Revisa la conexión y vuelve a intentar.'
+        :'Verificando presentaciones compatibles con este almacén…')+'</p>';
       return;
     }
     if(typeof renderCatalogoGrid==='function')try{renderCatalogoGrid();}catch(e){}
