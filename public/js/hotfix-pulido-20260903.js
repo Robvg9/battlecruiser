@@ -36,6 +36,8 @@
       +'.bc-pres-meta{font-size:11px;color:var(--mist);margin-top:5px;line-height:1.35}'
       +'.bc-pres-custom{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:8px;margin-top:8px}'
       +'.bc-pres-grid-compact{display:flex!important;flex-direction:column!important;gap:7px!important;margin-top:8px!important}'
+      +'.bc-pres-section-title{font-size:10.5px;font-weight:700;color:var(--mist);margin:2px 0 0}'
+      +'.bc-pres-grid-compact .bc-pres-row{grid-template-columns:84px minmax(0,1fr) 92px}'
       +'.bc-pres-row{display:grid;grid-template-columns:84px minmax(0,1fr) 92px;gap:7px;align-items:center;padding:7px;border:1px solid rgba(212,176,92,.14);border-radius:8px;background:rgba(8,20,17,.28)}'
       +'.bc-pres-row-title{font-size:10.5px;color:var(--gold-bright);white-space:nowrap}'
       +'.bc-pres-row input{min-width:0;width:100%;height:34px;min-height:34px;padding:0 8px;font-size:10.5px;box-sizing:border-box}'
@@ -189,17 +191,24 @@
   function ensurePresFields(){
     var form=document.getElementById('form-producto');if(!form)return false;
     form.classList.add('bc-pulido-form');
-    if(document.getElementById('bc-product-commercial-fields'))return true;
-    var box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
+    if(typeof window.__BCM26_ensureCommercialOptions==='function')window.__BCM26_ensureCommercialOptions();
+    // Remove any stale copy left by an older cached script before building the
+    // sole approved label + factor editor inside the commercial-options panel.
+    var legacy=document.getElementById('prod-presentaciones-config');if(legacy)legacy.remove();
+    var host=document.getElementById('bc-product-commercial-panel');
+    if(!host)return false;
+    var box=document.getElementById('bc-product-commercial-fields');
+    if(box){
+      if(box.parentNode!==host)host.appendChild(box);
+      return true;
+    }
+    box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
     box.innerHTML=
+      '<div class="bc-pres-section-title">Presentaciones y factores</div>'+
       '<div class="bc-pres-row"><strong class="bc-pres-row-title">Minorista</strong><input id="bc-pres-normal-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Unidad)" aria-label="Etiqueta de presentación minorista"><input id="bc-pres-normal-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 1)" aria-label="Factor numérico minorista"></div>'+
       '<div class="bc-pres-row"><strong class="bc-pres-row-title">Mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Bolso)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
-      '<p class="bc-pres-optional-note">Configura solo las presentaciones que utilizarás. Cada una necesita etiqueta y factor.</p>';
-    var submit=form.querySelector('#prod-submit-btn');
-    var actions=form.querySelector('.bc-product-form-actions');
-    if(actions&&actions.parentNode===form)form.insertBefore(box,actions);
-    else if(submit&&submit.parentNode)submit.parentNode.insertBefore(box,submit);
-    else form.appendChild(box);
+      '<p class="bc-pres-optional-note">Configura únicamente las presentaciones que utilices. Cada una requiere etiqueta y factor positivo; deja ambas vacías si no aplica.</p>';
+    host.appendChild(box);
     loadPresentaciones();
     return true;
   }
@@ -240,6 +249,12 @@
     }
     setRow('normal',normal);
     setRow('wholesale',wholesale);
+    var category=document.getElementById('prod-categoria')?.value||'';
+    var wholesalePrice=document.getElementById('prod-precio-mayorista')?.value?.trim()||'';
+    var hasPresentation=!!(normal||wholesale);
+    if(typeof window.__BCM26_setCommercialOptionsExpanded==='function'){
+      window.__BCM26_setCommercialOptionsExpanded(!!(category||wholesalePrice||hasPresentation));
+    }
   }
 
   function patchEditBridge(){
@@ -291,7 +306,8 @@
     var save=document.getElementById('bc171-save');if(save)save.disabled=true;
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'';var pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
-    if((pn!==null&&!Number.isFinite(pn))||(pm!==null&&!Number.isFinite(pm))){msg('Los precios deben ser números válidos.',false);if(save)save.disabled=false;return true;}
+    if(pn===null||!Number.isFinite(pn)||pn<=0){msg('El precio normal debe ser mayor a 0.',false);if(save)save.disabled=false;return true;}
+    if(pm!==null&&(!Number.isFinite(pm)||pm<=0)){msg('El precio mayorista debe ser mayor a 0 o dejarse vacío.',false);if(save)save.disabled=false;return true;}
     var normal=selectedPres('normal'), wholesale=selectedPres('wholesale');
     function presentationValid(value){
       var hasName=!!(value.name&&String(value.name).trim());
@@ -317,8 +333,12 @@
     }
     try{
       if(!navigator.onLine&&typeof window.ejecutarOperacion==='function'){
+        if(normal.name||normal.factor!==null||wholesale.name||wholesale.factor!==null){
+          msg('Para guardar presentaciones y factores necesitas conexión. No se guardó el producto ni se creó parcialmente.',false);
+          return true;
+        }
         var q=await window.ejecutarOperacion(id?'producto_actualizar':'producto',{...(id?{p_producto_id:id}:{}),p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm});
-        if(q?.ok){msg('✓ Producto guardado localmente. Las asociaciones comerciales se completarán al sincronizar.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;window.__BC171_close&&window.__BC171_close();}else msg('No se pudo guardar offline.',false);
+        if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;window.__BC171_close&&window.__BC171_close();}else msg('No se pudo guardar offline.',false);
         return true;
       }
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
@@ -466,7 +486,7 @@
     setTimeout(function(){preloadStock(true);ensureWarehouses();patchStockGetter();patchEditBridge();},800);
     setTimeout(function(){productModalPolish();ensurePresFields();renderPresentationCatalog();discoverEditButtons();repaintStockCards();},1400);
     setTimeout(function(){normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
-    window.__BC_PULIDO_20260903_VERIFY=function(){return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialFields:!!document.getElementById('bc-product-commercial-fields')}};
+    window.__BC_PULIDO_20260903_VERIFY=function(){var panel=document.getElementById('bc-product-commercial-panel');var fields=document.getElementById('bc-product-commercial-fields');return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialPanel:!!panel,commercialPanelExpanded:!!(panel&&!panel.hidden),commercialFields:!!fields,commercialFieldCount:fields?fields.querySelectorAll('input').length:0,legacyPresentationBlock:!!document.getElementById('prod-presentaciones-config')}};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('online',function(){setTimeout(function(){preloadStock(true);ensureWarehouses();},300);});
