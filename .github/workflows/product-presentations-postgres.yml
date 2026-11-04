@@ -1,0 +1,59 @@
+name: Product presentations — PostgreSQL 17 contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20261103090000_product_presentations_by_warehouse.sql'
+      - 'test/product-presentations-warehouse-contract.sql'
+      - '.github/workflows/product-presentations-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  presentation-contract:
+    name: Disposable PostgreSQL presentation contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: battlecruiser_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d battlecruiser_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Install migration on disposable database
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261103090000_product_presentations_by_warehouse.sql
+
+      - name: Assert both sale RPC contracts
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_test
+        run: psql -v ON_ERROR_STOP=1 -f test/product-presentations-warehouse-contract.sql
