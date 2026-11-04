@@ -73,11 +73,11 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
 });
 
 
-test("Configuración agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
+test("Sistema agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
   const normalizedIndex = index.replace(/\r\n/g, "\n");
   const groupStart = normalizedIndex.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
   const groupStop = normalizedIndex.indexOf("</div>\n        </div>", groupStart);
-  assert.ok(groupStart >= 0, "debe existir el grupo padre Configuración");
+  assert.ok(groupStart >= 0, "debe existir el grupo padre Sistema");
   assert.ok(groupStop > groupStart, "el grupo y las subsecciones deben estar anidados");
   const groupMarkup = normalizedIndex.slice(groupStart, groupStop);
   assert.match(groupMarkup, /id="nav-config-toggle"[^>]*aria-expanded="true"/);
