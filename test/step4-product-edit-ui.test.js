@@ -57,6 +57,18 @@ function createContext() {
     window.__lastPreviewFile = file;
     return "blob:product-fixture-preview";
   };
+  window.URL.revokeObjectURL = () => {};
+  window.Image = class {
+    constructor() { this.naturalWidth = 1600; this.naturalHeight = 900; }
+    set src(value) { this._src = value; if (typeof this.onload === "function") this.onload(); }
+  };
+  window.HTMLCanvasElement.prototype.getContext = function () {
+    return { drawImage: (...args) => { window.__cropArgs = args; } };
+  };
+  window.HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+    window.__canvasSize = { width: this.width, height: this.height, type, quality };
+    callback(new window.Blob(["optimized"], { type: "image/jpeg" }));
+  };
   window._cache = { productos: [], stock: [] };
   window.document.getElementById("form-producto").scrollIntoView = () => {};
   window.eval(SOURCE);
@@ -123,7 +135,7 @@ test("Paso 4 RWHT 019/028: cancelar edición limpia el ID y restaura el formular
   }
 });
 
-test("Paso 4 RWHT 025: archivo PNG válido crea vista previa local sin subirlo", () => {
+test("Paso 4 RWHT 025: archivo PNG se recorta a cuadrado y se optimiza antes de previsualizar", async () => {
   const { dom, window } = createContext();
   try {
     const file = { name: "fixture.png", type: "image/png", size: 128 };
@@ -131,10 +143,14 @@ test("Paso 4 RWHT 025: archivo PNG válido crea vista previa local sin subirlo",
     window.document.getElementById("prod-imagen-input").dispatchEvent(
       new window.Event("change", { bubbles: true })
     );
-    assert.equal(window.__lastPreviewFile, file);
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    assert.equal(window.__lastPreviewFile.type, "image/jpeg");
+    assert.equal(window.__lastPreviewFile.name, "fixture.jpg");
+    assert.deepEqual(window.__canvasSize, { width: 512, height: 512, type: "image/jpeg", quality: 0.84 });
+    assert.deepEqual(window.__cropArgs.slice(1), [350, 0, 900, 900, 0, 0, 512, 512]);
     assert.equal(window.document.getElementById("prod-imagen-preview").getAttribute("src"), "blob:product-fixture-preview");
     assert.equal(window.document.getElementById("prod-imagen-preview-wrap").classList.contains("hidden"), false);
-    assert.equal(window.document.getElementById("msg-prod-imagen").textContent, "");
+    assert.match(window.document.getElementById("msg-prod-imagen").textContent, /cuadrado y optimizada/);
   } finally {
     dom.window.close();
   }
@@ -155,14 +171,14 @@ test("Paso 4 RWHT 025: tipo de imagen no permitido se rechaza y no muestra vista
   }
 });
 
-test("Paso 4 RWHT 025: imágenes que exceden 5 MB se rechazan sin previsualizar", () => {
+test("Paso 4 RWHT 025: imágenes originales que exceden 15 MB se rechazan sin previsualizar", () => {
   const { dom, window } = createContext();
   try {
-    setSelectedFile(window, { name: "large.png", type: "image/png", size: 5 * 1024 * 1024 + 1 });
+    setSelectedFile(window, { name: "large.png", type: "image/png", size: 15 * 1024 * 1024 + 1 });
     window.document.getElementById("prod-imagen-input").dispatchEvent(
       new window.Event("change", { bubbles: true })
     );
-    assert.match(window.document.getElementById("msg-prod-imagen").textContent, /máximo 5MB/);
+    assert.match(window.document.getElementById("msg-prod-imagen").textContent, /máximo de 15MB/);
     assert.equal(window.document.getElementById("prod-imagen-preview-wrap").classList.contains("hidden"), true);
     assert.equal(window.__lastPreviewFile, undefined);
   } finally {
