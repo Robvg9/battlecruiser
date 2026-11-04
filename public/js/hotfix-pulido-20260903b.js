@@ -73,17 +73,9 @@
   function hideEmptyCommunication(){
     document.querySelectorAll('#tab-comunicacion .lista-estado,#tab-comunicacion .lista > p').forEach(function(el){var t=norm(el.textContent||'');if(t.indexOf('no tenes conversaciones')===0||t.indexOf('no tienes conversaciones')===0||t.indexOf('inicia una nueva conversacion')>=0||t.indexOf('iniciá una nueva conversación')>=0)el.style.display='none';});
   }
-  function enhancePresentationCatalog(){
-    var panel=document.querySelector('#tab-productos .presentaciones-panel');if(!panel||document.getElementById('bc-pres-crud'))return;
-    var box=document.createElement('div');box.id='bc-pres-crud';box.style.marginTop='12px';box.innerHTML='<div class="bc-catalog-pres-toolbar"><strong>Presentaciones comerciales</strong><button type="button" id="bc-pres-crud-refresh">Actualizar</button></div><div id="bc-pres-crud-list" class="bc-catalog-pres-list"></div>';
-    var host=panel.querySelector('.presentaciones-catalogo')||panel;host.appendChild(box);box.querySelector('#bc-pres-crud-refresh').onclick=renderCrud;
-    renderCrud();
-  }
-  async function renderCrud(){
-    var el=document.getElementById('bc-pres-crud-list');if(!el)return;var ps=await fetchPres();el.innerHTML=ps.map(function(p){return '<div class="bc-catalog-pres-card"><strong>'+esc(p.nombre)+'</strong><span>Activa</span><div class="bc-pulido-actions"><button type="button" data-pres-edit="'+esc(p.id)+'">Editar</button><button type="button" data-pres-toggle="'+esc(p.id)+'">Desactivar</button></div></div>';}).join('')||'<div class="lista-estado">No hay presentaciones.</div>';
-    el.querySelectorAll('[data-pres-edit]').forEach(function(b){b.onclick=async function(){var p=ps.find(function(x){return String(x.id)===String(b.dataset.presEdit)});if(!p)return;var n=prompt('Nuevo nombre de la presentación',p.nombre);if(n==null||!n.trim())return;try{var r=await client.rpc('actualizar_presentacion',{p_presentacion_id:p.id,p_nombre:n.trim(),p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;await fetchPres();renderCrud();}catch(e){alert(e.message||String(e));}};});
-    el.querySelectorAll('[data-pres-toggle]').forEach(function(b){b.onclick=async function(){try{var r=await client.rpc('cambiar_estado_presentacion',{p_presentacion_id:b.dataset.presToggle,p_activo:false,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;await fetchPres();renderCrud();}catch(e){alert(e.message||String(e));}};});
-  }
+  // Presentaciones se administra en un solo panel; evitar una segunda lista CRUD.
+  function enhancePresentationCatalog(){ return false; }
+  async function renderCrud(){ return false; }
   function customImport(){
     if(document.getElementById('bc-pulido-import'))return;
     var ov=document.createElement('div');ov.id='bc-pulido-import';ov.className='bc-pulido-import-overlay';ov.innerHTML='<div class="bc-pulido-dialog" role="dialog" aria-modal="true"><h3>Importar productos</h3><p>Seleccioná únicamente la <strong>plantilla CSV</strong> descargada desde el Paso 1.</p><input id="bc-pulido-import-file" type="file" accept=".csv,text/csv"><div id="bc-pulido-import-body"></div><div class="bc-pulido-dialog-actions"><button type="button" id="bc-pulido-import-cancel">Cancelar</button></div></div>';
@@ -109,8 +101,8 @@
   }
   function boot(){
     document.addEventListener('submit',formCapture,true);
-    var obs=new MutationObserver(function(){patchProductModal();addFactorControls();hideEmptyCommunication();enhancePresentationCatalog();var tr=document.querySelector('#tabs [data-tab="transferencias"]');if(tr)tr.remove();var sec=document.getElementById('tab-transferencias');if(sec)sec.classList.remove('visible');});obs.observe(document.body,{childList:true,subtree:true});
-    patchProductModal();addFactorControls();hideEmptyCommunication();enhancePresentationCatalog();
+    var obs=new MutationObserver(function(){patchProductModal();addFactorControls();hideEmptyCommunication();var tr=document.querySelector('#tabs [data-tab="transferencias"]');if(tr)tr.remove();var sec=document.getElementById('tab-transferencias');if(sec)sec.classList.remove('visible');});obs.observe(document.body,{childList:true,subtree:true});
+    patchProductModal();addFactorControls();hideEmptyCommunication();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.__BC_PULIDO_B_VERIFY=function(){return{productSubmitCapture:true,commercialFactorFields:!!document.getElementById('bc-pres-normal-factor')&&!!document.getElementById('bc-pres-wholesale-factor'),importButton:!!document.querySelector('#bc171-overlay #bc171-import'),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),communicationEmptyHidden:Array.from(document.querySelectorAll('#tab-comunicacion .lista-estado')).every(function(x){return getComputedStyle(x).display==='none';})}};
