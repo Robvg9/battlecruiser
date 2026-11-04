@@ -96,7 +96,7 @@ test('Service Worker version matches the canonical application version', () => {
 test('install precaches the document shell and essential static assets', async () => {
   const worker = createWorker();
   await dispatchInstall(worker);
-  const appVersion = source.match(/BC_SW_VERSION\\s*=\\s*["'](\\d+\\.\\d+\\.\\d+)["']/)[1];
+  const appVersion = source.match(/BC_SW_VERSION\s*=\s*["'](\d+\.\d+\.\d+)["']/)[1];
   for (const asset of [
     '/', '/index.html', '/app.js?v=' + appVersion, '/style.css?v=' + appVersion,
     '/manifest.json', '/favicon.png', '/icons/icon-192x192.png', '/icons/icon-512x512.png',
