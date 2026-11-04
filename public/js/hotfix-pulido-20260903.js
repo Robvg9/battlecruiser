@@ -12,6 +12,11 @@
   function norm(v){return String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ')}
   function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]})}
   function msg(t,ok){if(typeof window.setMsg==='function') window.setMsg('msg-productos',t,ok); else {var e=document.getElementById('msg-productos');if(e)e.textContent=t;}}
+  function closeProductModal(){
+    if(typeof window.__BCM26_closeProductModal==='function')return window.__BCM26_closeProductModal(false);
+    if(typeof window.__BC171_close==='function')return window.__BC171_close();
+    return false;
+  }
   function key(prod,alm){return String(prod||'')+'::'+String(alm||'')}
   function getAlmList(){
     var a=Array.isArray(window._cache&&_cache.almacenes)?_cache.almacenes:[];
@@ -342,7 +347,7 @@
           return true;
         }
         var q=await window.ejecutarOperacion(id?'producto_actualizar':'producto',{...(id?{p_producto_id:id}:{}),p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm});
-        if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;window.__BC171_close&&window.__BC171_close();}else msg('No se pudo guardar offline.',false);
+        if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
         return true;
       }
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
@@ -362,7 +367,7 @@
       if(typeof window.refrescarProductos==='function')await window.refrescarProductos();
       await loadPresentaciones();
       msg((id?'✓ Producto actualizado.':'✓ Producto creado.')+imageNotice,!imageNotice);
-      window.__BC171_close&&window.__BC171_close();
+      closeProductModal();
     }catch(err){msg((err&&err.message)||'No se pudo guardar el producto.',false);}finally{if(save)save.disabled=false;}
     return true;
   }
