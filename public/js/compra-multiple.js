@@ -11,7 +11,8 @@
     });
   }
   function productos(){
-    return (typeof _cache !== 'undefined' && Array.isArray(_cache.productos)) ? _cache.productos : [];
+    var rows = (typeof _cache !== 'undefined' && Array.isArray(_cache.productos)) ? _cache.productos : [];
+    return typeof productosOperativos === 'function' ? productosOperativos(rows) : rows.filter(function(p){ return !p.inventario_mixto || !!p.producto_padre_id; });
   }
   function almacenes(){
     return (typeof _cache !== 'undefined' && Array.isArray(_cache.almacenes)) ? _cache.almacenes : [];
