@@ -513,7 +513,10 @@ async function refrescarOperacion() {
 let _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
 
 async function refrescarAlertasB7() {
-  if (!navigator.onLine || !tienePermiso("turnos", "ver")) return;
+  if (!navigator.onLine) return;
+  // Reset before loading to avoid showing a previous user's cached alerts after a role change.
+  _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
+  if (!tienePermiso("turnos", "ver")) return;
   try {
     // Turnos abiertos.
     const { data: turnos } = await client.rpc("listar_turnos", { p_estado: "ABIERTO", p_limite: 100, p_offset: 0 });
@@ -531,6 +534,7 @@ async function refrescarAlertasB7() {
     _b7CacheAlertas.incAbiertas = (inc || []).length;
   } catch (e) {
     // Si los RPC no existen o fallan, no agregar alertas (no inventar).
+    _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
   }
 }
 
