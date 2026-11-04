@@ -26,17 +26,25 @@
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw),pm=String(pmRaw).trim()===''?null:Number(pmRaw);
     if((pn!==null&&!Number.isFinite(pn))||(pm!==null&&!Number.isFinite(pm))){msg('Los precios deben ser números válidos.',false);return;}
     function readPres(kind){
-      var isW=kind==='wholesale',sel=document.getElementById(isW?'bc-pres-wholesale':'bc-pres-normal'),factorEl=document.getElementById('bc-pres-'+kind+'-factor'),customName=document.getElementById(isW?'bc-pres-wholesale-custom-name':'bc-pres-normal-custom-name'),customFactor=document.getElementById(isW?'bc-pres-wholesale-custom-factor':'bc-pres-normal-custom-factor');
-      if(!sel||!sel.value)return{name:null,factor:null,id:null};
-      if(sel.value==='__otro__')return{name:(customName?.value||'').trim()||null,factor:Number((customFactor?.value||factorEl?.value||''))||null,id:null};
-      var hit=listPres().find(function(p){return String(p.id)===String(sel.value);});
-      return{name:hit?.nombre||null,factor:Number(factorEl?.value||'')||null,id:sel.value};
+      var isW=kind==='wholesale';
+      var nameEl=document.getElementById(isW?'bc-pres-wholesale-name':'bc-pres-normal-name');
+      var factorEl=document.getElementById(isW?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+      var name=nameEl?(nameEl.value||'').trim():'';
+      var raw=factorEl?(factorEl.value||'').trim():'';
+      if(!name&&!raw)return{name:null,factor:null,id:null};
+      return{name:name||null,factor:raw===''?null:Number(raw),id:null};
     }
     var normal=readPres('normal'),wholesale=readPres('wholesale');
     var save=document.getElementById('bc171-save');if(save)save.disabled=true;
     try{
-      if(normal.name&&!Number(normal.factor)>0)throw Error('Definí el factor de la presentación normal.');
-      if(wholesale.name&&!Number(wholesale.factor)>0)throw Error('Definí el factor de la presentación mayorista.');
+      function validPresentation(value){
+        var hasName=!!(value.name&&String(value.name).trim());
+        var factor=Number(value.factor);
+        var hasFactor=Number.isFinite(factor)&&factor>0;
+        return (!hasName&&!hasFactor)||(hasName&&hasFactor);
+      }
+      if(!validPresentation(normal))throw Error('La presentación minorista necesita una etiqueta y un factor numérico mayor que cero, o ambos campos vacíos.');
+      if(!validPresentation(wholesale))throw Error('La presentación mayorista necesita una etiqueta y un factor numérico mayor que cero, o ambos campos vacíos.');
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var r=await client.rpc('bc_guardar_producto_catalogo',{p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())});
       if(r.error)throw r.error;
