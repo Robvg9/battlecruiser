@@ -407,9 +407,11 @@
     // Siempre: CSS + ocultar form (idempotente, aunque ya se haya simplificado)
     inyectarEstilosProductos();
     asegurarModalProducto();
-    ocultarFormularioProducto();
 
+    // The boot retry may run after the owner has already opened the modal.
+    // Once compact mode is initialized, do not close an active form on retries.
     if (panel.dataset.bcSimple === '1') return true;
+    ocultarFormularioProducto();
     panel.dataset.bcSimple = '1';
     limpiarInterfazAgregarProducto();
     form = document.getElementById('form-producto');
