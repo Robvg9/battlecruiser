@@ -451,7 +451,11 @@
     ov.querySelector('#bc-pulido-import-file').onchange=async function(){var f=this.files&&this.files[0],body=ov.querySelector('#bc-pulido-import-body');if(!f||!body)return;body.innerHTML='<p>Validando archivo…</p>';try{await importRows(f,body);}catch(err){body.innerHTML='<p class="bc-pulido-import-error">'+esc(err.message||String(err))+'</p>';}};
   }
 
-  // El catálogo único lo mantiene presentaciones.js dentro de Administración.,  // No crear un segundo listado ni un segundo botón de actualización.,  function buildPresentationCatalog(){ return false; },  async function renderPresentationCatalog(){ return false; },  function ensurePresentationCreateForm(){
+  // El catálogo único lo mantiene presentaciones.js dentro de Administración.
+  // No crear un segundo listado ni un segundo botón de actualización.
+  function buildPresentationCatalog(){ return false; }
+  async function renderPresentationCatalog(){ return false; }
+  function ensurePresentationCreateForm(){
     var f=document.getElementById('form-presentacion-nueva');if(!f)return;f.classList.remove('hidden');if(f.dataset.bcPulido==='1')return;f.dataset.bcPulido='1';
     f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();if(typeof window.refrescarPresentacionesCatalogo==='function')await window.refrescarPresentacionesCatalogo();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
   }
