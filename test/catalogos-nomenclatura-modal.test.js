@@ -19,9 +19,9 @@ test('category and unit catalog management has one canonical owner in Administra
   assert.doesNotMatch(m26, /'lista-categorias'\s*:\s*'prod-nom-|\s*'lista-unidades'\s*:\s*'prod-nom-/);
 });
 
-test('the compact product dialog is dedicated to commercial presentations only', () => {
-  assert.match(source, /Presentaciones comerciales/);
-  assert.match(source, /Presentaciones comerciales/);
+test('catalogos.js does not create a second presentations management path', () => {
+  assert.match(source, /tabla: "categorias"/);
+  assert.doesNotMatch(source, /bc166-presentaciones|bc1614-asignacion|bc-pres-crud/);
   assert.doesNotMatch(source, /prod-nom-categorias-slot|prod-nom-unidades-slot/);
   assert.doesNotMatch(m26, /lista-presentaciones-catalogo.*prod-nom-/);
   assert.doesNotMatch(m26, /pp-lista-asociaciones.*prod-nom-/);
