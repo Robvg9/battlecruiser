@@ -93,6 +93,7 @@
     var submitBtn = document.getElementById('prod-submit-btn');
     var cancelEdit = document.getElementById('prod-cancelar-edicion');
     var editId = document.getElementById('prod-editando-id');
+    var mixedSettings = document.getElementById('prod-inventario-mixto-settings');
 
     if (!nombre || !categoria || !normal || !mayorista || !imageWrap || !submitBtn) return;
 
@@ -188,6 +189,7 @@
     if (editId) form.appendChild(editId);
     form.appendChild(top);
     form.appendChild(commercial);
+    if (mixedSettings) form.appendChild(mixedSettings);
     if (unidad) {
       unidad.style.display = '';
       unidad.removeAttribute('aria-hidden');
@@ -199,6 +201,28 @@
     }
     form.appendChild(actions);
 
+    var mixedStyle = document.getElementById('bc-product-mixed-stock-css');
+    if (!mixedStyle) {
+      mixedStyle = document.createElement('style');
+      mixedStyle.id = 'bc-product-mixed-stock-css';
+      mixedStyle.textContent =
+        '.prod-inventario-mixto-settings{margin:2px 0 0;padding:11px;border:1px solid rgba(201,162,77,.2);border-radius:10px;background:rgba(8,18,15,.32)}' +
+        '.prod-inventario-mixto-toggle{display:flex;align-items:flex-start;gap:9px;cursor:pointer}' +
+        '.prod-inventario-mixto-toggle input{flex:0 0 auto;margin:2px 0 0;accent-color:var(--gold,#c9a24d)}' +
+        '.prod-inventario-mixto-toggle span,.prod-variantes-heading{display:flex;flex-direction:column;gap:3px}' +
+        '.prod-inventario-mixto-toggle strong,.prod-variantes-heading strong{font-size:11.5px;color:var(--gold-bright)}' +
+        '.prod-inventario-mixto-toggle small,.prod-variantes-heading small{font-size:10px;line-height:1.35;color:var(--mist)}' +
+        '.prod-variantes-editor{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(201,162,77,.13)}' +
+        '.prod-variantes-editor[hidden]{display:none!important}' +
+        '.prod-variantes-lista{display:flex;flex-direction:column;gap:6px}' +
+        '.prod-variante-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center}' +
+        '.prod-variante-row input{width:100%;min-width:0;height:34px;min-height:34px;padding:6px 9px;font-size:11px}' +
+        '.prod-variante-row button{min-height:32px;margin:0;padding:5px 8px;font-size:10px}' +
+        '#prod-variante-agregar{align-self:flex-start;min-height:32px;margin:0;padding:6px 9px;font-size:10.5px}' +
+        '.producto-mixto-tag{display:inline-block;margin:4px 0 0;padding:3px 6px;border:1px solid rgba(201,162,77,.24);border-radius:6px;color:var(--gold-bright);font-size:9px}' +
+        '@media(max-width:560px){.prod-inventario-mixto-settings{padding:9px}.prod-variante-row input{font-size:12px}}';
+      document.head.appendChild(mixedStyle);
+    }
     form.dataset.bcLayoutV925 = '1';
     form.classList.add('bc-producto-modal-form');
   }
