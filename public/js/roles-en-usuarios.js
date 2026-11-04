@@ -43,7 +43,29 @@
       '.ud-btn-secondary{background:rgba(201,162,77,.1)!important;color:var(--gold-bright)!important;border:1px solid rgba(201,162,77,.35)!important;font-weight:600;padding:10px 16px!important;border-radius:10px!important;cursor:pointer}',
       '.ud-btn-secondary:hover{border-color:var(--gold);background:rgba(201,162,77,.16)!important}',
       '#ud-hero .ud-hero-actions{display:flex!important;gap:8px;flex-wrap:wrap;align-items:center}',
-      '#ud-scroll-crear{display:inline-flex!important}'
+      '#ud-scroll-crear{display:inline-flex!important}',
+      '#' + MODAL_ROLES_ID + ' .bc-roles-panel{display:flex;flex-direction:column;gap:8px;width:min(760px,100%);max-height:min(84vh,680px);max-height:min(84dvh,680px);overflow:hidden;padding:13px 14px 12px;border-radius:12px}',
+      '#' + MODAL_ROLES_ID + ' .bc-roles-head{margin:0 0 2px}',
+      '#' + MODAL_ROLES_ID + ' .bc-roles-head h3{font-size:1.18rem;line-height:1.1}',
+      '#' + MODAL_ROLES_ID + ' .bc-roles-close{width:32px;height:32px}',
+      '#' + MODAL_ROLES_ID + ' .bc-roles-hint{margin:0;font-size:10.5px;line-height:1.3}',
+      '#' + MODAL_ROLES_ID + ' .bc-roles-actions{margin:0;gap:6px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles{max-height:min(46vh,320px);overflow:auto;overscroll-behavior:contain}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .rol-item{gap:6px;padding:8px 10px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .rol-item .usuario-acciones{gap:5px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .rol-item .cc-accion{min-height:30px;padding:5px 8px;font-size:10.5px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .rol-permisos-panel{max-height:240px;overflow:auto;overscroll-behavior:contain;padding:8px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .permisos-tabla{font-size:10px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .permisos-tabla th,#' + MODAL_ROLES_ID + ' #lista-roles .permisos-tabla td{padding:5px 6px}',
+      '#' + MODAL_ROLES_ID + ' #lista-roles .permisos-tabla input[type=checkbox]{width:14px;height:14px}',
+      '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-panel{max-height:min(78vh,360px);max-height:min(78dvh,360px);padding:14px;gap:8px;border-radius:12px}',
+      '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-head{margin:0 0 2px}',
+      '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-head h3{font-size:1.1rem}',
+      '#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-close{width:32px;height:32px}',
+      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol{gap:7px}',
+      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol #rol-nombre{height:36px;min-height:36px;max-height:36px;font-size:12px}',
+      '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol button[type=submit]{min-height:36px;padding:8px 10px}',
+      '@media(max-width:650px){#' + MODAL_ROLES_ID + '{align-items:flex-end;padding:8px}#' + MODAL_ROLES_ID + ' .bc-roles-panel{width:100%;max-height:min(86vh,700px);max-height:min(86dvh,700px);border-radius:12px 12px 10px 10px}#' + MODAL_NUEVO_ROL_ID + '{align-items:flex-end;padding:8px}#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-panel{width:100%;max-width:420px;max-height:min(70vh,360px);max-height:min(70dvh,360px)}}'
     ].join('');
     document.head.appendChild(s);
   }
