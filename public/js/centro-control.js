@@ -198,22 +198,61 @@ function renderPendientesCompacto(asuntos) {
   el.appendChild(lista);
 }
 
+// Alertas únicas que estaban en Centro de Mando: ahora se integran aquí sin repetir
+// la cola crítica, el stock bajo ni el estado offline ya visibles en el Dashboard.
+function construirAvisosAdicionalesControl(ops) {
+  const avisos = [];
+  const filas = Array.isArray(ops) ? ops : [];
+  const ahora = Date.now();
+  const prolongados = filas.filter((op) => {
+    if (op.estado !== "PENDIENTE" || !op.creado_en) return false;
+    const fecha = new Date(op.creado_en).getTime();
+    return Number.isFinite(fecha) && ahora - fecha > 24 * 60 * 60 * 1000;
+  });
+  if (prolongados.length > 0) {
+    avisos.push({
+      nivel: "atencion",
+      tipo: "Pendientes prolongados",
+      texto: prolongados.length + (prolongados.length === 1 ? " operación lleva más de 24 horas pendiente." : " operaciones llevan más de 24 horas pendientes."),
+      op: prolongados[0],
+      tab: "pendientes",
+    });
+  }
+  const transferencias = filas.filter((op) => op.tipo === "transferencia" && (op.estado === "PENDIENTE" || op.estado === "SINCRONIZANDO"));
+  if (transferencias.length > 0) {
+    avisos.push({
+      nivel: "atencion",
+      tipo: "Transferencias pendientes",
+      texto: transferencias.length + (transferencias.length === 1 ? " transferencia en cola de sincronización." : " transferencias en cola de sincronización."),
+      op: transferencias[0],
+      tab: "pendientes",
+    });
+  }
+  if (typeof _usuarioActual !== "undefined" && _usuarioActual && _usuarioActual.activo === false) {
+    avisos.push({
+      nivel: "critico",
+      tipo: "Usuario inactivo",
+      texto: "Tu usuario está inactivo. No puedes operar.",
+      op: null,
+      tab: null,
+    });
+  }
+  return avisos;
+}
+
 // Avisos complementarios de Jornada/Operación y Comunicación.
 // El Centro de Control ya muestra las alertas de cola, inventario y actividad: aquí
 // se incluyen solo los avisos únicos B7/B8 para evitar repetirlos.
 let _refrescandoAvisosOperativos = null;
 
-function renderAvisosOperativosControl() {
+function renderAvisosOperativosControl(ops) {
   const el = document.getElementById("cc-avisos-operativos");
   if (!el) return;
   el.textContent = "";
-  if (!navigator.onLine || (typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado())) {
-    el.innerHTML = '<p class="lista-estado">Conéctate para actualizar los avisos de jornada y comunicación.</p>';
-    return;
-  }
-  const avisos = [];
-  if (typeof construirAlertasB7 === "function") avisos.push(...construirAlertasB7());
-  if (typeof construirAlertasB8 === "function") avisos.push(...construirAlertasB8());
+  const conectado = navigator.onLine && !(typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado());
+  const avisos = construirAvisosAdicionalesControl(ops);
+  if (conectado && typeof construirAlertasB7 === "function") avisos.push(...construirAlertasB7());
+  if (conectado && typeof construirAlertasB8 === "function") avisos.push(...construirAlertasB8());
   const importantes = avisos.filter((a) => a.nivel === "critico" || a.nivel === "atencion");
   if (importantes.length === 0) {
     el.innerHTML = '<p class="lista-estado">Sin asuntos adicionales que requieran atención.</p>';
@@ -243,14 +282,15 @@ function renderAvisosOperativosControl() {
   });
 }
 
-async function refrescarAvisosOperativosControl() {
+async function refrescarAvisosOperativosControl(ops) {
   if (_refrescandoAvisosOperativos) return _refrescandoAvisosOperativos;
   _refrescandoAvisosOperativos = (async () => {
     const tareas = [];
-    if (typeof refrescarAlertasB7 === "function") tareas.push(refrescarAlertasB7());
-    if (typeof refrescarAlertasB8 === "function") tareas.push(refrescarAlertasB8());
+    const conectado = navigator.onLine && !(typeof estaRealmenteDesconectado === "function" && estaRealmenteDesconectado());
+    if (conectado && typeof refrescarAlertasB7 === "function") tareas.push(refrescarAlertasB7());
+    if (conectado && typeof refrescarAlertasB8 === "function") tareas.push(refrescarAlertasB8());
     await Promise.allSettled(tareas);
-    renderAvisosOperativosControl();
+    renderAvisosOperativosControl(ops);
   })();
   try {
     await _refrescandoAvisosOperativos;
@@ -268,7 +308,7 @@ async function refrescarCentroControl() {
   renderEstadoNegocio(estado);
   renderRequiereAtencion(asuntos);
   renderPendientesCompacto(asuntos);
-  await refrescarAvisosOperativosControl();
+  await refrescarAvisosOperativosControl(ops);
   refrescarBadgeCentroControl(asuntos);
 }
 
@@ -380,8 +420,9 @@ function renderResumen() {
         div.setAttribute("tabindex", "0");
         const prodNombre = s.productos && s.productos.nombre ? s.productos.nombre : "?";
         const almNombre = s.almacenes && s.almacenes.nombre ? s.almacenes.nombre : "?";
+        const nivelStock = Number(s.cantidad) <= 0 ? "Agotado" : "Bajo mínimo";
         div.innerHTML = `<span>${escHtml(prodNombre)} <span class="muted">· ${escHtml(almNombre)}</span></span>
-          <span class="muted" style="color:var(--wine)">${money(s.cantidad)} ⚠</span>`;
+          <span class="muted" style="color:var(--wine)">${escHtml(nivelStock)} · ${money(s.cantidad)} ⚠</span>`;
         alertasEl.appendChild(div);
       });
     }
