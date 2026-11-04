@@ -150,8 +150,8 @@ test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventa
   assert.ok(dashboard.querySelector("#resumen-grid"), "dashboard retains the real KPI cards");
   assert.ok(dashboard.querySelector("#cc-atencion"), "dashboard retains queue items requiring attention");
   assert.ok(dashboard.querySelector("#cc-pendientes"), "dashboard retains pending operations");
-  assert.ok(dashboard.querySelector("#cc-inventario"), "dashboard retains inventory summary");
-  assert.ok(dashboard.querySelector("#cc-actividad"), "dashboard retains recent activity");
+  assert.ok(dashboard.querySelector("#resumen-alertas-lista"), "dashboard retains actionable low-stock items");
+  assert.ok(dashboard.querySelector("#resumen-movs-lista"), "dashboard retains recent real business movements");
   assert.equal(auditPanel.querySelector("#mando-estado"), null, "audit panel does not duplicate the operational status");
   assert.equal(auditPanel.querySelector("#mando-alertas"), null, "audit panel does not duplicate alerts");
   assert.equal(auditPanel.querySelector("#mando-actividad"), null, "audit panel does not duplicate recent activity");
