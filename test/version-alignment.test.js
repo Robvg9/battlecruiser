@@ -131,6 +131,10 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.32"\]/);
+  assert.ok(app.includes('["m27-5-ventas-precio-politica.js","27.5b7"]'));
+  assert.ok(app.includes('["m27-6-ventas-presentaciones.js","27.6f"]'));
+  assert.ok(sw.includes("./js/m27-5-ventas-precio-politica.js?v=27.5b7"));
+  assert.ok(sw.includes("./js/m27-6-ventas-presentaciones.js?v=27.6f"));
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.4"\]/, "M75 must load with its refreshed module cache key");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.4/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
