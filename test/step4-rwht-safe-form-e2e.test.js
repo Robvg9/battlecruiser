@@ -447,7 +447,12 @@ test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden que
     nuevasEscrituras(c, base).some((call) => call.name === "bc_guardar_producto_catalogo"),
     6500,
     25
-  ), "the product must save with only the retail price and all other optional settings blank");
+  ), "the product must save with only the retail price and all other optional settings blank; " +
+    "message=" + d.getElementById("msg-productos").textContent +
+    "; writes=" + JSON.stringify(nuevasEscrituras(c, base)) +
+    "; rpc=" + JSON.stringify(c.client.__rpcCalls.slice(-10)) +
+    "; online=" + String(c.window.navigator.onLine) +
+    "; modalContainsForm=" + String(d.getElementById("bc-product-modal")?.contains(d.getElementById("form-producto"))));
   const call = nuevasEscrituras(c, base).find((item) => item.name === "bc_guardar_producto_catalogo");
   assert.equal(call.params.p_categoria_id, null);
   assert.equal(call.params.p_unidad, null);
