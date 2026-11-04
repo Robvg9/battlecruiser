@@ -50,13 +50,13 @@ test("Products has one add action, a live category filter and keeps search",(t)=
  assert.ok(c.document.querySelector("[data-ctx-id='p-1']").classList.contains("bc-category-hidden"));
  assert.ok(!c.document.querySelector("[data-ctx-id='p-2']").classList.contains("bc-category-hidden"));
 });
-test("the Administration shortcut opens a compact presentations dialog and import stays a single action",(t)=>{
+test("Administration keeps one presentations panel and M75 removes the legacy modal entry",(t)=>{
  const c=fixture();t.after(()=>c.dom.window.close());
  const state=c.window.__BCM75_verify();
- assert.ok(state.nomenclatureInAdmin);
  assert.equal(state.duplicateCatalogModal,false);
- assert.ok(c.document.getElementById("bc-product-presentations-entry").contains(c.document.getElementById("productos-tools-nomenclatura")));
- assert.equal(c.document.getElementById("productos-nomenclatura-btn").textContent,"Administrar presentaciones");
+ assert.equal(state.presentationsPanelInAdministration,true);
+ assert.equal(state.presentationsPanelOutsideProducts,true);
+ assert.equal(c.document.querySelectorAll("#productos-nomenclatura-modal,#bc-product-presentations-entry,#productos-tools-nomenclatura").length,0);
  assert.equal(state.importButtonCount,1);
  assert.equal(state.importButtonLabel,"Importar Excel / CSV");
  c.document.getElementById("bc-product-import-open").click();
@@ -153,39 +153,20 @@ async function waitFor(predicate,message,timeoutMs){
  assert.ok(predicate(),message);
 }
 
-test("M26 keeps category/unit catalogs in Administration and moves only presentation controls into the dialog",async(t)=>{
- const html=[
-  "<!doctype html><html><head></head><body>",
-  "<section id='tab-productos' class='tab-panel'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn'>Presentaciones comerciales</button></div>",
-  "<div class='presentaciones-catalogo'><h4>Catálogo</h4><form id='form-presentacion-nueva'></form><div id='lista-presentaciones-catalogo'></div></div>",
-  "<div class='presentaciones-producto'><h4>Por producto</h4><select id='pp-producto-select'></select><div id='pp-lista-asociaciones'></div></div></section>",
-  "<section id='tab-config' class='tab-panel'><div class='bc-admin-grid'><section id='bc-product-presentations-entry'></section><div class='bc-admin-catalog-grid'><section><form id='form-categoria'></form><div id='lista-categorias'></div></section><section><form id='form-unidad'></form><div id='lista-unidades'></div></section></div></div></section>",
-  "<div id='productos-nomenclatura-modal' class='prod-nom-modal hidden'><button id='productos-nomenclatura-cerrar'>Cerrar</button><div id='prod-nom-presentaciones-slot'></div></div>",
-  "</body></html>"
- ].join("");
+test("M26 leaves the canonical presentations panel in Administration without creating another modal",(t)=>{
+ const html=["<!doctype html><html><head></head><body>",
+ "<section id='tab-productos' class='tab-panel'><form id='form-producto'><input id='prod-unidad'></form></section>",
+ "<section id='tab-config' class='tab-panel'><div class='presentaciones-panel'><div id='lista-presentaciones-catalogo'></div><div id='pp-lista-asociaciones'></div></div></section>",
+ "</body></html>"].join("");
  const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
  t.after(()=>dom.window.close());
- const w=dom.window,d=w.document;
- w.eval(M26_SOURCE);
- const button=d.getElementById("productos-nomenclatura-btn");
- await waitFor(()=>button.dataset.bcM26==="1","M26 must bind the single presentations dialog before M75 relocates its shortcut");
- const entry=d.getElementById("bc-product-presentations-entry");
- const toolbar=d.getElementById("productos-tools-nomenclatura");
- entry.appendChild(toolbar);
- button.click();
- await waitFor(()=>!d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"the presentations dialog should open");
- for(const id of ["form-categoria","lista-categorias","form-unidad","lista-unidades"]){
-  assert.ok(d.getElementById("tab-config").contains(d.getElementById(id)),id+" must remain in Administration");
-  assert.ok(!d.getElementById("productos-nomenclatura-modal").contains(d.getElementById(id)),id+" must not be duplicated in the product dialog");
- }
- const slot=d.getElementById("prod-nom-presentaciones-slot");
- assert.ok(slot.contains(d.getElementById("form-presentacion-nueva")),"presentation form stays with its catalog");
- assert.ok(slot.contains(d.getElementById("pp-lista-asociaciones")),"product presentation associations stay together");
- assert.ok(d.getElementById("tab-config").contains(entry),"M26 must not detach the Administration shortcut");
- d.getElementById("productos-nomenclatura-cerrar").click();
- assert.ok(d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"dialog closes normally");
+ const d=dom.window.document;
+ dom.window.eval(M26_SOURCE);
+ assert.ok(d.getElementById("tab-config").contains(d.getElementById("lista-presentaciones-catalogo")));
+ assert.ok(d.getElementById("tab-config").contains(d.getElementById("pp-lista-asociaciones")));
+ assert.equal(d.querySelectorAll(".presentaciones-panel").length,1);
+ assert.equal(d.querySelectorAll("#productos-nomenclatura-modal,#prod-nom-presentaciones-slot").length,0);
 });
-
 test("native Add opens the single M26 modal and preserves the existing product creation submit",async(t)=>{
  const c=nativeModalFixture();
  t.after(()=>c.dom.window.close());
