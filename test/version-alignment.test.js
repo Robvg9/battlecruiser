@@ -131,6 +131,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.33"\]/);
+  assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.3"\]/, "the legacy compatibility module must refresh without duplicating product save");
+  assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.3/, "the single-owner compatibility module must be cached for offline use");
   assert.match(sw, /\.\/js\/m26-ui-integridad\.js\?v=26\.33/, "the unified commercial-options panel must be available offline");
   assert.match(sw, /\.\/js\/catalogos\.js\?v=20261103\.2/, "the updated master catalog loader must be available offline");
   assert.ok(app.includes('["m27-5-ventas-precio-politica.js","27.5b7"]'));
