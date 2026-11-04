@@ -117,7 +117,7 @@
         <div class="bc-nav-group expanded" id="nav-config-group">
           <button class="bc-nav-group-toggle" id="nav-config-toggle" type="button" aria-expanded="true" aria-controls="nav-config-subtabs">
             <span class="bc-nav-group-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
-            <span class="bc-nav-group-label">Configuración</span>
+            <span class="bc-nav-group-label">Sistema</span>
             <span class="bc-nav-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
           </button>
           <div class="bc-nav-group-items" id="nav-config-subtabs">
@@ -622,31 +622,39 @@
     <section id="tab-preferencias" class="tab-panel" aria-label="Preferencias personales"></section>
 
     <section id="tab-config" class="tab-panel">
-      <div class="pendientes-header"><h2>Administración</h2></div>
-      <p class="muted">Gestión de roles, permisos y catálogos maestros del salón.</p>
-      <div class="cc-bloque">
-        <h3>Roles y permisos</h3>
-        <form id="form-nuevo-rol" class="inline-form">
-          <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
-          <button type="submit">Crear rol</button>
-        </form>
-        <p class="msg" id="msg-roles"></p>
-        <div id="lista-roles" class="lista"></div>
+      <div class="bc-admin-content">
+        <header class="bc-admin-heading">
+          <div><h2>Administración</h2><p class="muted">Accesos y catálogos maestros del negocio, organizados en un solo espacio.</p></div>
+        </header>
+        <div class="bc-admin-grid">
+          <section class="cc-bloque bc-admin-card bc-admin-roles">
+            <div class="bc-admin-card-heading"><h3>Roles y permisos</h3><span class="bc-admin-tag">Acceso</span></div>
+            <p class="muted">Define lo que cada rol puede consultar y gestionar.</p>
+            <form id="form-nuevo-rol" class="inline-form">
+              <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
+              <button type="submit">Crear rol</button>
+            </form>
+            <p class="msg" id="msg-roles"></p><div id="lista-roles" class="lista"></div>
+          </section>
+          <section class="cc-bloque bc-admin-card bc-admin-catalogs">
+            <div class="bc-admin-card-heading"><h3>Catálogos maestros</h3><span class="bc-admin-tag">Datos base</span></div>
+            <div class="bc-admin-catalog-grid">
+              <section class="bc-admin-subcard">
+                <h4>Categorías</h4>
+                <form id="form-categoria" class="inline-form"><input id="cat-nombre" placeholder="Nombre de la categoría" required><button type="submit">Agregar categoría</button></form>
+                <div id="lista-categorias" class="lista"></div>
+              </section>
+              <section class="bc-admin-subcard">
+                <h4>Unidades de medida</h4>
+                <form id="form-unidad" class="inline-form"><input id="uni-nombre" placeholder="Nombre de la unidad" required><button type="submit">Agregar unidad</button></form>
+                <div id="lista-unidades" class="lista"></div>
+              </section>
+            </div>
+          </section>
+        </div>
+        <p class="msg" id="msg-config" role="status" aria-live="polite"></p>
       </div>
-      <h3>Categorías</h3>
-      <form id="form-categoria" class="inline-form">
-        <input id="cat-nombre" placeholder="Nombre de la categoría" required>
-        <button type="submit">Agregar categoría</button>
-      </form>
-      <div id="lista-categorias" class="lista"></div>
-      <h3>Unidades de medida</h3>
-      <form id="form-unidad" class="inline-form">
-        <input id="uni-nombre" placeholder="Nombre de la unidad" required>
-        <button type="submit">Agregar unidad</button>
-      </form>
-      <div id="lista-unidades" class="lista"></div>
-      <p class="msg" id="msg-config"></p>
-    </section>
+    </section>    </section>
     </main>
 
     <footer class="app-footer">
@@ -669,7 +677,7 @@
 <script src="js/transferencias.js"></script>
 <script src="js/vales.js"></script>
 <script src="js/ventas.js?v=20261102.1"></script>
-<script src="js/catalogos.js?v=20261103.2"></script>
+<script src="js/catalogos.js?v=20261104.2"></script>
 <script src="js/usuarios-permisos.js"></script>
 <script src="js/mando.js?v=9.5.61"></script>
 <script src="js/reportes.js?v=20261022.2"></script>
