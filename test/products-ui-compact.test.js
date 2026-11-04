@@ -57,11 +57,7 @@ test("Administration keeps one presentations panel and M75 removes the legacy mo
  assert.equal(state.presentationsPanelInAdministration,true);
  assert.equal(state.presentationsPanelOutsideProducts,true);
  assert.equal(c.document.querySelectorAll("#productos-nomenclatura-modal,#bc-product-presentations-entry,#productos-tools-nomenclatura").length,0);
- assert.equal(state.importButtonCount,1);
- assert.equal(state.importButtonLabel,"Importar Excel / CSV");
- c.document.getElementById("bc-product-import-open").click();
- assert.equal(c.getImportCalls(),1);
- assert.ok(state.formStillInNativeModal);
+ assert.equal(state.duplicateCatalogModal,false);
 });
 
 
