@@ -162,10 +162,10 @@ test("B4.0: un único Dashboard integra estado, jornada, comunicación e inventa
 
   const ahora = Date.now();
   window.renderResumen();
-  window.renderAvisosOperativosControl([
+  window._operacionesPendientesCache = [
     { id: "op-old", tipo: "venta", estado: "PENDIENTE", creado_en: new Date(ahora - 48 * 60 * 60 * 1000).toISOString() },
     { id: "trf-pending", tipo: "transferencia", estado: "SINCRONIZANDO", creado_en: new Date(ahora - 5 * 60 * 1000).toISOString() },
-  ]);
+  ];
   await window.refrescarCentroControl();
   const avisos = document.getElementById("cc-avisos-operativos");
   assert.ok(avisos.textContent.includes("Cuadre con diferencia"), "includes the unique cash-difference alert");
