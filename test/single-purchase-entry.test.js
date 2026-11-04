@@ -33,7 +33,7 @@ test("Productos hides the duplicate legacy purchase form and points to the singl
 });
 
 test("purchase and movement modal cache keys match the active release", () => {
-  assert.ok(app.includes('["compra-multiple.js","27.9"]'));
+  assert.ok(app.includes('["compra-multiple.js","27.10"]'));
   assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.9"]'));
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/);
   const workerVersion = serviceWorker.match(/BC_SW_VERSION = "([^"]+)"/);
