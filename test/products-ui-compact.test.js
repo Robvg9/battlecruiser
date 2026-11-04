@@ -269,7 +269,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
   payload:{
    p_nombre:"Arroz",
    p_categoria_id:"cat-secos",
-   p_unidad:null,
+   p_unidad:"unidad",
    p_precio_normal:12.5,
    p_precio_mayorista:10.25
   }
