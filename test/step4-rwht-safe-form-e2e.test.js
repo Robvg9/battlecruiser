@@ -291,20 +291,35 @@ function nuevasEscrituras(context, baseIndex) {
   return context.client.__writeCalls.slice(baseIndex);
 }
 
-test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backend mock", async (t) => {
+test("Paso 4 UI: precio minorista vacío o cero se rechaza antes de cualquier RPC", async (t) => {
   const c = await contextoListo();
-  // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
-  const base = c.client.__writeCalls.length;
-  c.document.getElementById("prod-nombre").value = "Producto inválido fixture";
-  c.document.getElementById("prod-precio-normal").value = "0";
-  c.document.getElementById("prod-precio-mayorista").value = "";
-  enviarSubmit(c, "form-producto");
-  assert.ok(await esperarHasta(() => /precio normal debe ser mayor a 0/i.test(c.document.getElementById("msg-productos").textContent)),
-    "la UI debe mostrar el motivo del rechazo");
-  assert.equal(nuevasEscrituras(c, base).some((call) => call.name === "crear_producto"), false,
-    "una entrada inválida nunca debe llegar al RPC de escritura");
-});
+  evaluarModulo(c, "public/js/m26-ui-integridad.js");
+  evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
+  evaluarModulo(c, "public/js/hotfix-pulido-20260903.js");
+  const ready = await esperarHasta(() =>
+    !!c.document.getElementById("bc-product-commercial-toggle") &&
+    c.document.getElementById("form-producto").dataset.bc172Prepared === "1",
+    6500,
+    25
+  );
+  assert.ok(ready, "the unified product saver must be installed");
 
+  const d = c.document;
+  const base = c.client.__writeCalls.length;
+  d.getElementById("prod-nombre").value = "Producto inválido fixture";
+  d.getElementById("prod-precio-mayorista").value = "";
+
+  for (const invalidPrice of ["", "0"]) {
+    d.getElementById("prod-precio-normal").value = invalidPrice;
+    enviarSubmit(c, "form-producto");
+    assert.ok(await esperarHasta(() => /precio normal debe ser mayor a 0/i.test(d.getElementById("msg-productos").textContent)),
+      "the UI must reject retail price " + JSON.stringify(invalidPrice));
+    assert.equal(nuevasEscrituras(c, base).length, 0,
+      "an invalid retail price must not reach any backend write");
+    assert.equal(d.getElementById("prod-submit-btn").disabled, false,
+      "the save button must be restored after validation rejection");
+  }
+});
 test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y acepta precio mayorista vacío", async (t) => {
   const c = await contextoListo();
   evaluarModulo(c, "public/js/m26-ui-integridad.js");
@@ -401,7 +416,7 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.ok(await esperarHasta(() => modal.classList.contains("hidden")),
     "the native modal must close after successful creation");
 });
-test("Paso 4 UI: precio normal, mayorista y presentaciones pueden quedar vacíos", async (t) => {
+test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden quedar vacíos", async (t) => {
   const c = await contextoListo();
   evaluarModulo(c, "public/js/m26-ui-integridad.js");
   evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
@@ -417,10 +432,10 @@ test("Paso 4 UI: precio normal, mayorista y presentaciones pueden quedar vacíos
   assert.ok(ready, "the unified product form must initialize");
   const d = c.document;
   const base = c.client.__writeCalls.length;
-  d.getElementById("prod-nombre").value = "Producto sin precios fixture";
+  d.getElementById("prod-nombre").value = "Producto con opciones vacías fixture";
   d.getElementById("prod-categoria").value = "";
   d.getElementById("prod-unidad").value = "";
-  d.getElementById("prod-precio-normal").value = "";
+  d.getElementById("prod-precio-normal").value = "1.00";
   d.getElementById("prod-precio-mayorista").value = "";
   d.getElementById("bc-pres-normal-name").value = "";
   d.getElementById("bc-pres-normal-factor").value = "";
@@ -432,18 +447,17 @@ test("Paso 4 UI: precio normal, mayorista y presentaciones pueden quedar vacíos
     nuevasEscrituras(c, base).some((call) => call.name === "bc_guardar_producto_catalogo"),
     6500,
     25
-  ), "the product must still save when every optional commercial field is blank");
+  ), "the product must save with only the retail price and all other optional settings blank");
   const call = nuevasEscrituras(c, base).find((item) => item.name === "bc_guardar_producto_catalogo");
   assert.equal(call.params.p_categoria_id, null);
   assert.equal(call.params.p_unidad, null);
-  assert.equal(call.params.p_precio_normal, null);
+  assert.equal(call.params.p_precio_normal, 1);
   assert.equal(call.params.p_precio_mayorista, null);
   assert.equal(call.params.p_presentacion_normal, null);
   assert.equal(call.params.p_factor_normal, null);
   assert.equal(call.params.p_presentacion_mayorista, null);
   assert.equal(call.params.p_factor_mayorista, null);
 });
-
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
   // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
