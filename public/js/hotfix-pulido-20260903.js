@@ -285,6 +285,7 @@
     if(!document.getElementById('bc171-overlay'))return false;
     e.preventDefault();e.stopImmediatePropagation();
     var id=document.getElementById('prod-editando-id')?.value||null;
+    var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return true;}
     var save=document.getElementById('bc171-save');if(save)save.disabled=true;
@@ -317,16 +318,26 @@
     try{
       if(!navigator.onLine&&typeof window.ejecutarOperacion==='function'){
         var q=await window.ejecutarOperacion(id?'producto_actualizar':'producto',{...(id?{p_producto_id:id}:{}),p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm});
-        if(q?.ok){msg('✓ Producto guardado localmente. Las asociaciones comerciales se completarán al sincronizar.',true);window.__BC171_close&&window.__BC171_close();}else msg('No se pudo guardar offline.',false);
+        if(q?.ok){msg('✓ Producto guardado localmente. Las asociaciones comerciales se completarán al sincronizar.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;window.__BC171_close&&window.__BC171_close();}else msg('No se pudo guardar offline.',false);
         return true;
       }
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var params={p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())};
       var r=await client.rpc('bc_guardar_producto_catalogo',params);
       if(r.error)throw r.error;
+      var imageNotice='';
+      if(imageFile){
+        var savedProductId=id||r.data;
+        if(!savedProductId)throw Error('El producto se guardó, pero no se obtuvo su ID para subir la imagen.');
+        if(typeof window.subirImagenProducto!=='function')throw Error('El módulo de carga de imágenes no está disponible; selecciona de nuevo la imagen al editarlo.');
+        var imageResult=await window.subirImagenProducto(savedProductId,imageFile);
+        if(!imageResult.ok)imageNotice=' La imagen no se pudo subir; vuelve a seleccionarla al editar el producto.';
+        window.__BC_PRODUCT_IMAGE_FILE__=null;
+        var imageInput=document.getElementById('prod-imagen-input');if(imageInput)imageInput.value='';
+      }
       if(typeof window.refrescarProductos==='function')await window.refrescarProductos();
       await loadPresentaciones();
-      msg(id?'✓ Producto actualizado.':'✓ Producto creado.',true);
+      msg((id?'✓ Producto actualizado.':'✓ Producto creado.')+imageNotice,!imageNotice);
       window.__BC171_close&&window.__BC171_close();
     }catch(err){msg((err&&err.message)||'No se pudo guardar el producto.',false);}finally{if(save)save.disabled=false;}
     return true;
