@@ -11,12 +11,12 @@
   var _catalogoCache = null;
 
   // Secciones legadas retiradas de la matriz: bajas, vales_salida
-  var SECCIONES_EXCLUIDAS = { bajas: true, vales_salida: true, vales: true };
+  var SECCIONES_EXCLUIDAS = { bajas: true, vales_salida: true, vales: true, unidades: true };
 
   var SECCIONES_FALLBACK = [
     "productos", "categorias", "almacenes", "stock",
     "transferencias", "ventas", "reportes", "usuarios",
-    "presentaciones", "auditoria", "turnos", "comunicacion", "unidades",
+    "presentaciones", "auditoria", "turnos", "comunicacion",
     "ciclos", "entregas_caja",
     "gastos", "mermas", "reinversiones"
   ];
