@@ -123,7 +123,7 @@
       if(!(packageQuantity>0)){if(typeof setMsg==="function")setMsg("msg-venta-linea","La cantidad debe ser mayor que cero.",false);return false;}
       var factor=Number(check.presentation.factor);
       var baseQuantity=packageQuantity*factor;
-      var result=old.call(this,producto_id,baseQuantity,almacen_id,opts);
+      var result=old.call(this,producto_id,baseQuantity,almacen_id,Object.assign({},opts,{__bcQuantityIsBase:true}));
       if(result!==false){
         var lines=getCartLines();
         var line=lines.find(function(item){return String(item.producto_id)===String(producto_id);})||null;
