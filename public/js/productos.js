@@ -448,7 +448,9 @@ function iniciarEdicionProducto(p) {
   document.getElementById("prod-nombre").value = p.nombre || "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
   if (mixedToggle) mixedToggle.checked = !!p.inventario_mixto;
-  const currentVariants = (_cache.productos || []).filter((v) => String(v.producto_padre_id) === String(p.id));
+  const currentVariants = (_cache.productos || []).filter((v) =>
+    String(v.producto_padre_id) === String(p.id) && v.activo !== false
+  );
   renderEditorVariantesProducto(currentVariants);
   sincronizarEditorVariantesProducto();
   document.getElementById("prod-unidad").value = p.unidad || "";
