@@ -10,19 +10,15 @@
     var normal=document.getElementById('prod-precio-normal');
     var wholesale=document.getElementById('prod-precio-mayorista');
 
-    // El precio normal sigue siendo obligatorio. El mayorista es opcional.
-    if(normal){
-      normal.required=true;
-      normal.setAttribute('required','');
-      normal.min='0.01';
-      normal.step='0.01';
-    }
-    if(wholesale){
-      wholesale.required=false;
-      wholesale.removeAttribute('required');
-      wholesale.removeAttribute('min');
-      wholesale.step='0.01';
-    }
+    // Ambos precios son opcionales según la regla existente del producto.
+    // El nombre se mantiene como único campo obligatorio del alta.
+    [normal,wholesale].forEach(function(field){
+      if(!field)return;
+      field.required=false;
+      field.removeAttribute('required');
+      field.removeAttribute('min');
+      field.step='0.01';
+    });
 
     var submit=document.getElementById('prod-submit-btn');
     if(submit)submit.type='submit';
@@ -47,7 +43,7 @@
       form:!!form,
       prepared:!!(form&&form.dataset.bc172Prepared==='1'),
       legacySubmitHandler:false,
-      normalPriceRequired:!!(normal&&normal.required&&normal.hasAttribute('required')),
+      normalPriceOptional:!!(normal&&!normal.required&&!normal.hasAttribute('required')),
       wholesalePriceOptional:!!(wholesale&&!wholesale.required&&!wholesale.hasAttribute('required')),
       saveOwner:'hotfix-pulido-20260903.js'
     };
