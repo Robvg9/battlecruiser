@@ -435,7 +435,22 @@ async function inicializarPresentaciones() {
 
   const formCrear = document.getElementById("form-presentacion-nueva");
   if (formCrear) formCrear.classList.toggle("hidden", !_permisosPresentaciones.crear);
+  const formAsociar = document.getElementById("form-pp-nueva");
+  if (formAsociar) formAsociar.classList.add("hidden");
 
   await refrescarPresentacionesCatalogo();
 }
+
+function bootPresentacionesUnicas() {
+  const start = () => {
+    if (!document.querySelector("#tab-config .presentaciones-panel")) return;
+    inicializarPresentaciones().catch((error) => {
+      console.error("[BattleCruiser] No se pudo iniciar el panel de Presentaciones:", error);
+      setMsg("msg-presentaciones", "No se pudo cargar el catálogo de Presentaciones.", false);
+    });
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+  else start();
+}
+bootPresentacionesUnicas();
 
