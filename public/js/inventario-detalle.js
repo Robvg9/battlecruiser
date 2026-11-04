@@ -33,6 +33,14 @@
       ['Valor del inventario', moneySafe(fila.valor_inventario)],
       ['Producto ID', fila.producto_id]
     ].map(([k,v]) => '<div class="bc-inv-detail-row"><span>' + esc(k) + '</span><strong>' + esc(v) + '</strong></div>').join('');
+    const variants = Array.isArray(fila.variantes) ? fila.variantes : [];
+    if (variants.length) {
+      body.innerHTML += '<h3 class="bc-inv-variants-title">Existencias por sabor / variante</h3>' +
+        variants.map(function (v) {
+          return '<div class="bc-inv-detail-row"><span>' + esc(v.nombre || 'Variante') +
+            '</span><strong>' + esc((v.cantidad ?? 0) + ' ' + (v.unidad || 'u')) + '</strong></div>';
+        }).join('');
+    }
     modal.classList.remove('hidden');
     modal.querySelector('.bc-inv-modal-card').focus();
   }
