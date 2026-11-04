@@ -3,6 +3,7 @@ DO $$
 DECLARE
   legacy_definition text;
   typed_definition text;
+  catalog_definition text;
 BEGIN
   SELECT lower(pg_get_functiondef('public.registrar_venta(uuid,jsonb,uuid)'::regprocedure))
     INTO legacy_definition;
@@ -27,7 +28,15 @@ BEGIN
   IF position('v_tipo_precio_linea:=coalesce' IN typed_definition)=0 THEN
     RAISE EXCEPTION 'Price selection was unexpectedly removed while enforcing the warehouse channel';
   END IF;
+
+  SELECT lower(pg_get_functiondef('public.bc_guardar_producto_catalogo(uuid,text,uuid,text,numeric,numeric,text,numeric,text,numeric,uuid)'::regprocedure))
+    INTO catalog_definition;
+  IF position('(v_norm_name is null) <> (p_factor_normal is null)' IN catalog_definition)=0
+     OR position('(v_wh_name is null) <> (p_factor_mayorista is null)' IN catalog_definition)=0
+     OR position('lower(v_norm_name)=lower(v_wh_name)' IN catalog_definition)=0 THEN
+    RAISE EXCEPTION 'Catalog RPC does not require a complete, independent name/factor pair for each optional presentation';
+  END IF;
 END
 $$;
 
-SELECT 'PASS: both registrar_venta overloads enforce warehouse-specific presentations' AS result;
+SELECT 'PASS: catalog and both sale RPCs enforce independent warehouse-specific presentations' AS result;
