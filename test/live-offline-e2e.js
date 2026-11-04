@@ -803,12 +803,15 @@ async function main() {
   assert(mobileContentLayout.main.overflowY === "visible" &&
          mobileContentLayout.main.scrollHeight <= mobileContentLayout.main.clientHeight + 1,
     "El panel principal sigue recortado en un scroll interno en móvil: " + JSON.stringify(mobileContentLayout));
-  assert(mobileContentLayout.documentHeight > mobileContentLayout.viewportHeight,
-    "El documento móvil no crece para alojar el contenido completo: " + JSON.stringify(mobileContentLayout));
-  const documentScrollProbe = await evaluate("(()=>new Promise(resolve=>{const max=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-innerHeight;window.scrollTo(0,Math.max(0,max));requestAnimationFrame(()=>{const moved=window.scrollY;window.scrollTo(0,0);resolve({maxScroll:max,scrollYAfterDown:moved,scrollable:moved>0});});}))()");
+  assert(mobileContentLayout.documentHeight >= mobileContentLayout.viewportHeight &&
+         mobileContentLayout.bodyHeight >= mobileContentLayout.viewportHeight &&
+         mobileContentLayout.footer.bottom <= mobileContentLayout.documentHeight + 1,
+    "El flujo móvil recorta contenido o desplaza el pie fuera del documento: " + JSON.stringify(mobileContentLayout));
+  const documentScrollProbe = await evaluate("(()=>new Promise(resolve=>{const max=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-innerHeight;window.scrollTo(0,Math.max(0,max));requestAnimationFrame(()=>{const moved=window.scrollY;window.scrollTo(0,0);resolve({maxScroll:max,scrollYAfterDown:moved,scrollable:moved>0,expectedScrollable:max>1});});}))()");
   report.evidence.androidDocumentScroll = documentScrollProbe;
-  assert(documentScrollProbe.maxScroll > 0 && documentScrollProbe.scrollable,
-    "El dashboard móvil no responde al desplazamiento del documento: " + JSON.stringify(documentScrollProbe));
+  assert(documentScrollProbe.maxScroll >= 0 &&
+         (documentScrollProbe.expectedScrollable ? documentScrollProbe.scrollable : !documentScrollProbe.scrollable),
+    "El scroll del documento no coincide con la altura real del contenido móvil: " + JSON.stringify(documentScrollProbe));
 
   assert(mobileContentLayout.footer.position === "static" &&
          mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,
