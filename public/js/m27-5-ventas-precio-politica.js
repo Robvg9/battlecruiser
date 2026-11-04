@@ -7,6 +7,9 @@
 
   const LS='bc-ventas-precio-alternativo-v1';
   let allowAlt=false;
+  let presentationChannels={};
+  let presentationChannelsLoaded=false;
+  let presentationChannelsLoading=null;
 
   function normalizeType(t){
     const s=String(t||'').toLowerCase();
@@ -38,6 +41,60 @@
     return [];
   }
   function isSellType(t){ return t==='mayorista'||t==='minorista'; }
+
+  async function refreshPresentationChannels(){
+    if(presentationChannelsLoading)return presentationChannelsLoading;
+    if(!window.client||!client.from)return false;
+    presentationChannelsLoaded=false;
+    presentationChannelsLoading=(async function(){
+      try{
+        const result=await client.from('producto_presentaciones').select('producto_id,presentacion_id,activo').eq('activo',true);
+        if(result.error)throw result.error;
+        const rows=Array.isArray(result.data)?result.data:[];
+        const next={};
+        getProducts().forEach(function(product){
+          const linked=rows.filter(function(row){return String(row.producto_id)===String(product.id);});
+          const wholesaleId=product.presentacion_id?String(product.presentacion_id):null;
+          const hasWholesale=!!(wholesaleId&&linked.some(function(row){return String(row.presentacion_id)===wholesaleId;}));
+          const hasRetail=linked.some(function(row){return !wholesaleId||String(row.presentacion_id)!==wholesaleId;});
+          next[String(product.id)]={minorista:hasRetail,mayorista:hasWholesale};
+        });
+        presentationChannels=next;
+        presentationChannelsLoaded=true;
+        window.__BC_M275_PRESENTATION_CHANNELS=next;
+        return true;
+      }catch(error){
+        presentationChannels={};
+        presentationChannelsLoaded=false;
+        window.__BC_M275_PRESENTATION_CHANNEL_ERROR=String(error&&error.message||error||'error');
+        return false;
+      }finally{
+        presentationChannelsLoading=null;
+      }
+    })();
+    return presentationChannelsLoading;
+  }
+
+  function channelAvailable(product,type){
+    if(!isSellType(type))return true;
+    if(!presentationChannelsLoaded||!product)return false;
+    const channels=presentationChannels[String(product.id)];
+    return !!(channels&&channels[type]===true);
+  }
+
+  function patchRefreshVentas(){
+    const original=window.refrescarVentas;
+    if(typeof original!=='function'||original.__bcM275PresentationWrapped)return;
+    const wrapped=async function(){
+      const result=await original.apply(this,arguments);
+      await refreshPresentationChannels();
+      render();
+      return result;
+    };
+    wrapped.__bcM275PresentationWrapped=true;
+    window.refrescarVentas=wrapped;
+    try{refrescarVentas=wrapped;}catch(e){}
+  }
   function hasBase(p,t){
     if(!isSellType(t)) return p.precio_normal!=null||p.precio_mayorista!=null;
     return t==='mayorista' ? p.precio_mayorista!=null : p.precio_normal!=null;
@@ -90,6 +147,7 @@
     return getProducts().filter(p=>{
       if(!p||p.activo===false)return false;
       if(!t||t==='almacenamiento')return true;
+      if(!channelAvailable(p,t))return false;
       return hasBase(p,t)||(allowAlt&&hasAlt(p,t));
     });
   }
@@ -133,6 +191,12 @@
     const orig=agregarLineaVenta;
     window.agregarLineaVenta=function(pid,cantidad,almacen){
       const t=getWarehouseType();const p=getProducts().find(x=>String(x.id)===String(pid));if(!p)return false;
+      if(isSellType(t)&&!channelAvailable(p,t)){
+        if(typeof setMsg==='function')setMsg('msg-venta-linea',presentationChannelsLoaded
+          ?(t==='mayorista'?'Este producto no tiene presentación mayorista y no puede venderse desde un almacén mayorista.':'Este producto no tiene presentación minorista y no puede venderse desde un almacén minorista.')
+          :'No se pudo verificar la presentación del producto. Actualiza el catálogo e inténtalo de nuevo.',false);
+        return false;
+      }
       const effectiveType=typeFor(p,t);
       const isAltOnly=allowAlt&&t&&((t==='mayorista'&&p.precio_mayorista==null&&p.precio_normal!=null)||(t==='minorista'&&p.precio_normal==null&&p.precio_mayorista!=null));
       if(isAltOnly){
@@ -176,9 +240,28 @@
       render();
     });
   }
-  function render(){ensureControl();updateLabel();if(typeof renderCatalogoGrid==='function')try{renderCatalogoGrid();}catch(e){}}
-  // API para que otros módulos (m26-9, refrescarProductos) invaliden el catálogo sin reload.
+  function render(){
+    ensureControl();updateLabel();
+    const grid=document.getElementById('catalogo-grid');
+    if(isSellType(getWarehouseType())&&!presentationChannelsLoaded&&grid){
+      grid.innerHTML='<p class="lista-estado">Verificando presentaciones compatibles con este almacén…</p>';
+      return;
+    }
+    if(typeof renderCatalogoGrid==='function')try{renderCatalogoGrid();}catch(e){}
+  }
+  // API para que otros módulos invaliden el catálogo sin reload.
   window.__BC_M275_refreshCatalog=function(){try{render();}catch(e){}};
-  function boot(){injectStyles();try{allowAlt=localStorage.getItem(LS)==='1';}catch(e){allowAlt=false;}ensureControl();patchGrid();patchAdd();patchOperation();patchAlmacenChange();render();}
+  window.__BC_M275_reloadPresentationChannels=async function(){const ok=await refreshPresentationChannels();render();return ok;};
+  window.__BC_M275_productChannelAllowed=function(productId,type){
+    const product=getProducts().find(function(p){return String(p.id)===String(productId);});
+    return channelAvailable(product,normalizeType(type));
+  };
+  function boot(){
+    injectStyles();
+    try{allowAlt=localStorage.getItem(LS)==='1';}catch(e){allowAlt=false;}
+    ensureControl();patchGrid();patchAdd();patchOperation();patchAlmacenChange();patchRefreshVentas();render();
+    setTimeout(async function(){patchRefreshVentas();await refreshPresentationChannels();render();},900);
+    window.addEventListener('online',async function(){await refreshPresentationChannels();render();});
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700));else setTimeout(boot,700);
 })();
