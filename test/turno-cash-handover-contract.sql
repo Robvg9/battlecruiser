@@ -300,7 +300,7 @@ INSERT INTO public.turno_sesiones(
   '96000000-0000-0000-0000-000000000002',
   '95000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000001',
-  2,'TARDE',CURRENT_DATE+1,'PROGRAMADA'
+  2,'TARDE',(now() AT TIME ZONE 'America/Havana')::date+1,'PROGRAMADA'
 );
 INSERT INTO public.turno_asignaciones(
   turno_sesion_id,turno_id,usuario_id,asignado_por
