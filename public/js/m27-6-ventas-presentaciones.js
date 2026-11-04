@@ -140,7 +140,12 @@
     if(typeof window.renderVentaLineas!=="function"||window.renderVentaLineas.__bcM276Presentation)return;
     var old=window.renderVentaLineas;
     function render(){
-      getCartLines().forEach(function(line){if(line&&line.presentacion_id)line.cantidad_presentacion=Number(line.cantidad||0)/Number(line.factor_presentacion||1);});
+      getCartLines().forEach(function(line){
+        if(line&&line.presentacion_id){
+          var factor=Number(line.factor_presentacion)||1;
+          line.cantidad_presentacion=Number(line.cantidad||0)/factor;
+        }
+      });
       var result=old.apply(this,arguments);
       var container=document.getElementById("venta-lineas");
       if(container){
@@ -148,10 +153,19 @@
           var line=getCartLines()[index];
           var host=row.querySelector(".venta-linea-info");
           if(!line||!host||!line.presentacion_id)return;
+          var factor=Number(line.factor_presentacion)||1;
+          var qty=Number(line.cantidad_presentacion)||0;
+          var input=row.querySelector(".venta-linea-cant-input");
+          if(input){
+            input.value=String(qty);
+            input.step="1";
+            input.min="1";
+            input.setAttribute("step","1");
+            input.setAttribute("min","1");
+          }
           var badge=row.querySelector(".bc-m276-pres-label");
           if(!badge){badge=document.createElement("span");badge.className="bc-m276-pres-label muted";host.appendChild(badge);}
-          var qty=Number(line.cantidad_presentacion)||0;
-          badge.textContent=(line.presentacion_nombre||"Presentación")+" · "+qty+" × "+Number(line.factor_presentacion||1)+" u";
+          badge.textContent=(line.presentacion_nombre||"Presentación")+" · "+qty+" × "+factor+" u";
         });
       }
       return result;
@@ -159,6 +173,38 @@
     render.__bcM276Presentation=true;
     window.renderVentaLineas=render;
     try{renderVentaLineas=render;}catch(e){}
+    patchCartQuantityControls();
+  }
+
+  function patchCartQuantityControls(){
+    if(typeof window.actualizarCantidadLinea==="function"&&!window.actualizarCantidadLinea.__bcM276Quantity){
+      var original=window.actualizarCantidadLinea;
+      function updateQuantity(index,packageQuantity){
+        var line=getCartLines()[index];
+        if(!line||!line.presentacion_id)return original.apply(this,arguments);
+        var packages=Number(packageQuantity);
+        var factor=Number(line.factor_presentacion)||1;
+        if(!Number.isFinite(packages))return;
+        return original.call(this,index,packages<=0?0:packages*factor);
+      }
+      updateQuantity.__bcM276Quantity=true;
+      updateQuantity.__bcM276QuantityOrig=original;
+      window.actualizarCantidadLinea=updateQuantity;
+      try{actualizarCantidadLinea=updateQuantity;}catch(e){}
+    }
+    var container=document.getElementById("venta-lineas");
+    if(!container||container.dataset.bcM276QuantityControls==="1")return;
+    container.dataset.bcM276QuantityControls="1";
+    container.addEventListener("click",function(event){
+      var button=event.target&&event.target.closest?event.target.closest(".venta-linea-mas,.venta-linea-menos"):null;
+      if(!button)return;
+      var index=Number(button.dataset.idx),line=getCartLines()[index];
+      if(!line||!line.presentacion_id)return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      var current=Number(line.cantidad_presentacion)||0;
+      window.actualizarCantidadLinea(index,current+(button.classList.contains("venta-linea-mas")?1:-1));
+    },true);
   }
   function patchOp(){if(typeof window.ejecutarOperacion!=="function"||window.ejecutarOperacion.__bcM276)return;var old=window.ejecutarOperacion;function op(tipo,params){if(tipo==="venta"&&params){params=Object.assign({},params);var lines=getCartLines();if(lines.length)params.p_lineas=buildPLineasFromCart(lines);var t=almTipo();if(t==="mayorista")params.p_tipo_precio=params.p_tipo_precio||"mayorista";else if(t==="minorista")params.p_tipo_precio=params.p_tipo_precio||"normal";}return old.apply(this,arguments);}op.__bcM276=true;window.ejecutarOperacion=op;try{ejecutarOperacion=op;}catch(e){}}
   function boot(){ensureUI();patchAdd();patchCartPresentation();patchOp();updatePresentationHint();}
