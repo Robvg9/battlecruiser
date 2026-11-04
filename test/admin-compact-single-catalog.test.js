@@ -61,3 +61,16 @@ test("Administration module styles are compact and catalog lists are bounded", (
   assert.ok(m75.includes("max-height:132px;overflow:auto"));
   assert.ok(index.includes('bc-nav-group-label">Sistema</span>'));
 });
+
+
+test("roles permissions help uses one canonical guide and never relocates repeated role matrices",()=>{
+  const source=fs.readFileSync(path.join(__dirname,"..","public","js","roles-en-usuarios.js"),"utf8");
+  const start=source.indexOf("function relocateSmartPermissionsHelp()");
+  const end=source.indexOf("function ensureSmartPermissionsObserver()",start);
+  assert.ok(start>=0 && end>start,"canonical help function must exist");
+  const helper=source.slice(start,end);
+  assert.match(helper,/data-bc-roles-help-single/);
+  assert.match(helper,/host\.innerHTML/);
+  assert.doesNotMatch(helper,/appendChild\(block\)/);
+  assert.match(helper,/Los usuarios heredan los permisos del rol/);
+});
