@@ -275,12 +275,12 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'Antes de desactivar el inventario mixto, todas las variantes deben quedar sin existencias ni lotes pendientes.' USING ERRCODE='23514';
     END IF;
+    UPDATE public.productos SET inventario_mixto=false WHERE id=p_producto_id;
     INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
     SELECT p_producto_id,m.almacen_id,0,m.minimo
     FROM public.productos_stock_mixto_minimos m
     WHERE m.producto_id=p_producto_id
     ON CONFLICT (producto_id,almacen_id) DO UPDATE SET minimo=EXCLUDED.minimo,updated_at=now();
-    UPDATE public.productos SET inventario_mixto=false WHERE id=p_producto_id;
     UPDATE public.productos SET activo=false WHERE producto_padre_id=p_producto_id;
     DELETE FROM public.stock s USING public.productos v
     WHERE v.id=s.producto_id AND v.producto_padre_id=p_producto_id AND s.cantidad=0;
