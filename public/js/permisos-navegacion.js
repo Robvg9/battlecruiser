@@ -79,7 +79,7 @@
     if (tab === "config") {
       return tienePermiso("usuarios", "ver") ||
         tienePermiso("categorias", "ver") ||
-        tienePermiso("unidades", "ver");
+        tienePermiso("presentaciones", "ver");
     }
     if (tab === "ventas" && esDependienta()) return false;
     var seccion = TAB_A_SECCION[tab];
@@ -206,7 +206,6 @@
     var formVale = document.getElementById("form-vale");
     if (formVale) formVale.classList.add("hidden");
     toggleForm("form-categoria", "categorias", "crear");
-    toggleForm("form-unidad", "unidades", "crear");
     toggleForm("form-nuevo-usuario", "usuarios", "crear");
 
     var visibles = Array.prototype.filter.call(
