@@ -63,6 +63,16 @@
       '#bc-product-modal .prod-imagen-campo{gap:5px!important;padding:6px!important;border-radius:9px!important}',
       '#bc-product-modal .prod-imagen-campo .prod-imagen-label{font-size:8px!important;line-height:1.2!important}',
       '#bc-product-modal .prod-imagen-preview{height:58px!important;max-width:88px!important}',
+      '#bc-product-modal .prod-imagen-campo{align-items:flex-start!important;gap:6px!important}',
+      '#bc-product-modal .prod-imagen-selector{display:flex!important;align-items:center!important;gap:8px!important;width:100%!important;min-height:34px!important}',
+      '#bc-product-modal .prod-imagen-input-oculto{display:none!important}',
+      '#bc-product-modal .prod-imagen-selector .prod-imagen-elegir{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;padding:6px!important;border:1px solid rgba(212,176,92,.4)!important;border-radius:8px!important;background:rgba(212,176,92,.12)!important;color:var(--gold-bright)!important;cursor:pointer!important}',
+      '#bc-product-modal .prod-imagen-selector .prod-imagen-elegir svg{display:block!important;width:19px!important;height:19px!important}',
+      '#bc-product-modal .prod-imagen-selector .prod-imagen-elegir:disabled{opacity:.55!important;cursor:wait!important}',
+      '#bc-product-modal .prod-imagen-nombre{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:9px!important;color:var(--mist)!important}',
+      '#bc-product-modal .prod-imagen-preview-wrap{align-items:flex-start!important;flex-direction:row!important;justify-content:flex-start!important;gap:7px!important}',
+      '#bc-product-modal .prod-imagen-preview{width:88px!important;height:88px!important;max-width:88px!important;aspect-ratio:1/1!important;object-fit:cover!important;border-radius:9px!important}'
+
       '#bc-product-modal .prod-pres-config{padding:8px 9px!important;border-radius:9px!important}',
       '#bc-product-modal .prod-pres-config legend{font-size:11.5px!important;font-weight:600}',
       '#bc-product-modal .prod-pres-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}',
