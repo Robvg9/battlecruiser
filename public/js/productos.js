@@ -25,10 +25,18 @@ async function cargarAlmacenes() {
 }
 
 async function cargarProductos() {
-  return withCache("productos", () => client
-    .from("productos")
-    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, inventario_mixto, producto_padre_id, variante_nombre, categorias(nombre), presentaciones(nombre)")
-    .order("nombre"));
+  return withCache("productos", async () => {
+    const extended = await client.from("productos")
+      .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, inventario_mixto, producto_padre_id, variante_nombre, categorias(nombre), presentaciones(nombre)")
+      .order("nombre");
+    if (!extended.error) return extended;
+    const errorText = String(extended.error.message || extended.error.code || extended.error).toLowerCase();
+    // PR preview and pre-migration deployments keep the original catalog usable.
+    if (!/inventario_mixto|producto_padre_id|variante_nombre|column .* does not exist|schema cache/i.test(errorText)) return extended;
+    return client.from("productos")
+      .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, categorias(nombre), presentaciones(nombre)")
+      .order("nombre");
+  });
 }
 
 // A mixed parent is catalog-only; operational pickers select one of its child variants.
