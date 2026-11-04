@@ -12,7 +12,9 @@ test('category and unit catalog management has one canonical owner in Administra
   for (const id of ['form-categoria','lista-categorias','form-presentacion-nueva','lista-presentaciones-catalogo','pp-producto-select','pp-lista-asociaciones','form-pp-nueva']) {
     assert.equal((index.match(new RegExp('id="' + id + '"', 'g')) || []).length, 1, id + ' must exist once');
   }
-  assert.match(index, /bc-admin-catalog-grid[\s\S]*?form-categoria[\s\S]*?lista-categorias/);
+  assert.match(index, /bc-admin-categories[\s\S]*?bc-categories-open/);
+  assert.match(index, /id="bc-modal-categorias"[\\s\\S]*?id="form-categoria"[\\s\\S]*?id="lista-categorias"/);
+  assert.equal((index.match(/id="bc-modal-categorias"/g)||[]).length,1);
   assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/);
   assert.match(index, /presentaciones-panel[\s\S]*?lista-presentaciones-catalogo[\s\S]*?pp-lista-asociaciones/);
   assert.doesNotMatch(source, /prod-nom-categorias-slot|prod-nom-unidades-slot|nomenclaturaOrigenes|prepararNomenclatura/);
