@@ -113,6 +113,7 @@
       const result=await original.apply(this,arguments);
       await refreshPresentationChannels();
       render();
+      if(typeof window.__BC_M276_updatePresentationHint==='function')window.__BC_M276_updatePresentationHint();
       return result;
     };
     wrapped.__bcM275PresentationWrapped=true;
@@ -225,11 +226,21 @@
       const isAltOnly=allowAlt&&t&&((t==='mayorista'&&p.precio_mayorista==null&&p.precio_normal!=null)||(t==='minorista'&&p.precio_normal==null&&p.precio_mayorista!=null));
       if(isAltOnly){
         const price=priceFor(p,t);const lines=ventaLineas;if(!Array.isArray(lines))return orig.apply(this,arguments);
+        const presentation=typeof window.__BC_M275_getProductPresentation==='function'?window.__BC_M275_getProductPresentation(pid,t):null;
+        const factor=presentation?Number(presentation.factor):0;
+        if(!presentation||!(factor>0)){
+          if(typeof setMsg==='function')setMsg('msg-venta-linea','No se puede vender: falta una presentación válida para este almacén.',false);
+          return false;
+        }
+        const baseQuantity=Number(cantidad)*factor;
         const stock=typeof obtenerStockDisponible==='function'?obtenerStockDisponible(pid,almacen):{valor:Infinity};
         const existing=lines.find(l=>String(l.producto_id)===String(pid));const current=existing?Number(existing.cantidad)||0:0;
-        if(current+cantidad>Number(stock.valor)){if(typeof setMsg==='function')setMsg('msg-venta-linea','No hay suficiente stock de '+p.nombre+' (disponible: '+money(Number(stock.valor)||0)+').',false);return false;}
-        if(existing){existing.cantidad=current+cantidad;existing.precio_unitario=price;existing.subtotal=existing.cantidad*price;existing.tipo_precio=effectiveType;}
-        else lines.push({producto_id:p.id,nombre:p.nombre,cantidad:cantidad,precio_unitario:price,subtotal:cantidad*price,tipo_precio:effectiveType});
+        if(current+baseQuantity>Number(stock.valor)){if(typeof setMsg==='function')setMsg('msg-venta-linea','No hay suficiente stock de '+p.nombre+' (disponible: '+money(Number(stock.valor)||0)+').',false);return false;}
+        var line;
+        if(existing){existing.cantidad=current+baseQuantity;existing.precio_unitario=price;existing.subtotal=existing.cantidad*price;existing.tipo_precio=effectiveType;line=existing;}
+        else {line={producto_id:p.id,nombre:p.nombre,cantidad:baseQuantity,precio_unitario:price,subtotal:baseQuantity*price,tipo_precio:effectiveType};lines.push(line);}
+        if(typeof window.__BC_M276_attachLinePresentation==='function')window.__BC_M276_attachLinePresentation(pid,line);
+        else {line.presentacion_id=presentation.presentacion_id;line.factor_presentacion=factor;line.presentacion_nombre=presentation.nombre;line.cantidad_presentacion=baseQuantity/factor;}
         if(typeof renderVentaLineas==='function')renderVentaLineas();return true;
       }
       return orig.apply(this,arguments);
@@ -293,7 +304,7 @@
     injectStyles();
     try{allowAlt=localStorage.getItem(LS)==='1';}catch(e){allowAlt=false;}
     ensureControl();patchGrid();patchAdd();patchOperation();patchAlmacenChange();patchRefreshVentas();render();
-    setTimeout(async function(){patchRefreshVentas();await refreshPresentationChannels();render();},900);
+    setTimeout(async function(){patchRefreshVentas();await refreshPresentationChannels();render();if(typeof window.__BC_M276_updatePresentationHint==='function')window.__BC_M276_updatePresentationHint();},900);
     window.addEventListener('online',async function(){await refreshPresentationChannels();render();});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,700));else setTimeout(boot,700);
