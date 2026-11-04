@@ -3,7 +3,7 @@
 // ============================================================
 // Verifica: conversaciones (general, privada, soporte, contextuales),
 // mensajes, idempotencia, privacidad, no leídos, offline, auditoría,
-// integración B3/B4/B7 y ausencia de duplicaciones arquitectónicas.
+// integración B3/B4/B7, Dashboard único y ausencia de duplicaciones arquitectónicas.
 //
 // Ejecutar: node --test test/b8-comunicacion.test.js
 // ============================================================
