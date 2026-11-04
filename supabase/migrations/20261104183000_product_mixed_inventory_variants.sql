@@ -422,6 +422,13 @@ CREATE TRIGGER bc_seed_mixed_stock_for_warehouse
   AFTER INSERT OR UPDATE OF activo ON public.almacenes
   FOR EACH ROW EXECUTE FUNCTION public.bc_seed_mixed_stock_for_warehouse();
 
+REVOKE ALL ON FUNCTION public.bc_guard_mixed_product_fields() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.bc_guard_mixed_stock_sku() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.bc_guard_mixed_product_deactivation() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.bc_sync_mixed_variant_metadata() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.bc_sync_mixed_variant_presentations() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.bc_seed_mixed_stock_for_warehouse() FROM PUBLIC, anon;
+
 -- Separate aggregate RPC for the Inventory screen; the legacy function remains unchanged.
 CREATE OR REPLACE FUNCTION public.inventario_mixto_enriquecido(p_almacen_id uuid DEFAULT NULL)
 RETURNS TABLE(
