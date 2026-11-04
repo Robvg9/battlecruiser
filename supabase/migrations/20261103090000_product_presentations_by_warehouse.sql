@@ -49,7 +49,7 @@ begin
   update public.stock set cantidad=cantidad-v_cantidad_final where producto_id=v_producto_id and almacen_id=v_almacen_real;
  end loop;
  update public.ventas set total=v_total where id=v_venta_id;update private.operaciones_idempotencia set resultado_id=v_venta_id where idempotency_key=p_idempotency_key;return v_venta_id;
-end;$function$
+end;$function$;
 
 
 CREATE OR REPLACE FUNCTION public.registrar_venta(p_almacen_id uuid, p_lineas jsonb, p_idempotency_key uuid, p_tipo_precio text)
@@ -97,7 +97,7 @@ begin
   insert into public.ventas_lineas(venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo) values(v_venta_id,v_producto_id,v_cantidad_final,v_precio,v_subtotal,v_costo_unitario_fifo);update public.stock set cantidad=cantidad-v_cantidad_final where producto_id=v_producto_id and almacen_id=v_almacen_real;
  end loop;
  update public.ventas set total=v_total where id=v_venta_id;update private.operaciones_idempotencia set resultado_id=v_venta_id where idempotency_key=p_idempotency_key;return v_venta_id;
-end;$function$
+end;$function$;
 
 
 COMMENT ON FUNCTION public.registrar_venta(uuid,jsonb,uuid) IS
