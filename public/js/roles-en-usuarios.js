@@ -67,6 +67,19 @@
       '#' + MODAL_NUEVO_ROL_ID + ' #form-nuevo-rol button[type=submit]{min-height:36px;padding:8px 10px}',
       '@media(max-width:650px){#' + MODAL_ROLES_ID + '{align-items:flex-end;padding:8px}#' + MODAL_ROLES_ID + ' .bc-roles-panel{width:100%;max-height:min(86vh,700px);max-height:min(86dvh,700px);border-radius:12px 12px 10px 10px}#' + MODAL_NUEVO_ROL_ID + '{align-items:flex-end;padding:8px}#' + MODAL_NUEVO_ROL_ID + ' .bc-roles-panel{width:100%;max-width:420px;max-height:min(70vh,360px);max-height:min(70dvh,360px)}}'
     ].join('');
+    s.textContent += '\n' +
+      '#'+MODAL_ROLES_ID+' .bc-roles-head{display:flex;align-items:center;justify-content:space-between;gap:8px}' +
+      '#'+MODAL_ROLES_ID+' .bc-roles-head-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}' +
+      '#'+MODAL_ROLES_ID+' .bc-roles-help-trigger{width:32px;height:32px;border-radius:50%;border:1px solid rgba(201,162,77,.4);background:rgba(201,162,77,.1);color:var(--gold-bright);font-size:17px;line-height:1;cursor:pointer}' +
+      '#bc-modal-roles-help{position:fixed;inset:0;z-index:1450;display:none;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}' +
+      '#bc-modal-roles-help.open{display:flex}' +
+      '#bc-modal-roles-help .bc-roles-help-backdrop{position:absolute;inset:0;background:rgba(4,10,8,.78);backdrop-filter:blur(3px)}' +
+      '#bc-modal-roles-help .bc-roles-help-panel{position:relative;z-index:1;width:min(620px,100%);max-height:min(82dvh,640px);overflow:auto;padding:14px;border:1px solid rgba(201,162,77,.28);border-radius:13px;background:linear-gradient(180deg,var(--stone-2),var(--stone));box-shadow:0 24px 64px rgba(0,0,0,.55)}' +
+      '#bc-modal-roles-help .bc-roles-help-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}' +
+      '#bc-modal-roles-help .bc-roles-help-head h3{margin:0;font-size:1.15rem;color:var(--gold-bright)}' +
+      '#bc-roles-help-content{font-size:12px;line-height:1.5}' +
+      '#bc-roles-help-content p{margin:6px 0}' +
+      '@media(max-width:650px){#bc-modal-roles-help{align-items:flex-end;padding:8px}#bc-modal-roles-help .bc-roles-help-panel{max-height:78dvh;border-radius:12px}}';
     document.head.appendChild(s);
   }
 
@@ -74,6 +87,8 @@
     var modal = document.getElementById(MODAL_ROLES_ID);
     if (!modal) { unificar(); modal = document.getElementById(MODAL_ROLES_ID); }
     if (!modal) return;
+    ensureRolesHelpModal();
+    relocateSmartPermissionsHelp();
     modal.classList.add('open');
     if (typeof refrescarRolesAdmin === 'function') refrescarRolesAdmin();
   }
@@ -111,6 +126,93 @@
   function closeNuevoRolModal() {
     var modal = document.getElementById(MODAL_NUEVO_ROL_ID);
     if (modal) modal.classList.remove('open');
+  }
+
+  function ensureRolesHelpModal() {
+    var modal = document.getElementById('bc-modal-roles-help');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'bc-modal-roles-help';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-labelledby', 'bc-modal-roles-help-title');
+      modal.innerHTML =
+        '<div class="bc-roles-help-backdrop" data-bc-roles-help-close="1"></div>' +
+        '<section class="bc-roles-help-panel">' +
+        '<header class="bc-roles-help-head"><h3 id="bc-modal-roles-help-title">Cómo funcionan los permisos</h3>' +
+        '<button type="button" class="bc-roles-close" data-bc-roles-help-close="1" aria-label="Cerrar ayuda">×</button></header>' +
+        '<div id="bc-roles-help-content">' +
+        '<div id="bc-roles-help-default"><p><strong>Ver:</strong> consultar información.</p><p><strong>Crear:</strong> registrar información nueva.</p><p><strong>Editar:</strong> modificar registros existentes.</p><p><strong>Borrar:</strong> eliminar cuando las reglas y referencias del negocio lo permitan.</p><p>Los permisos se configuran para el rol seleccionado. Después de guardar, ese rol aplica a las cuentas que lo tengan asignado.</p></div>' +
+        '</div></section>';
+      document.body.appendChild(modal);
+      ensureRolesHelpModal();
+      modal.addEventListener('click', function (e) {
+        if (e.target && e.target.getAttribute('data-bc-roles-help-close') === '1') closeRolesHelp();
+      });
+    }
+    var info = document.getElementById('bc-btn-roles-help');
+    if (info && !info.dataset.bcHelpBound) {
+      info.dataset.bcHelpBound = '1';
+      info.addEventListener('click', function (e) {
+        e.preventDefault();
+        ensureRolesHelpModal();
+        relocateSmartPermissionsHelp();
+        openRolesHelp();
+      });
+    }
+    return modal;
+  }
+
+  function openRolesHelp() {
+    var modal = ensureRolesHelpModal();
+    if (!modal) return;
+    modal.classList.add('open');
+    var close = modal.querySelector('[data-bc-roles-help-close="1"].bc-roles-close');
+    if (close) close.focus();
+  }
+
+  function closeRolesHelp() {
+    var modal = document.getElementById('bc-modal-roles-help');
+    if (modal) modal.classList.remove('open');
+  }
+
+  function relocateSmartPermissionsHelp() {
+    var admin = document.getElementById('tab-config');
+    var host = document.getElementById('bc-roles-help-content');
+    if (!admin || !host) return false;
+    var headings = Array.prototype.slice.call(admin.querySelectorAll('h1,h2,h3,h4,h5,strong,summary'));
+    var heading = headings.find(function (el) {
+      return /permisos inteligentes/i.test((el.textContent || '').replace(/\\s+/g, ' ').trim());
+    });
+    if (!heading) return false;
+    var roleForm = document.getElementById('form-nuevo-rol');
+    var roleList = document.getElementById('lista-roles');
+    var selectors = '.bc-permisos-inteligentes,.permisos-inteligentes,.bc-admin-permissions-help,.bc-admin-subcard,.cc-bloque,.bc-admin-card,.card,section,article';
+    var block = heading.closest(selectors);
+    if (!block || block === admin || block.contains(roleForm) || block.contains(roleList) || block.classList.contains('bc-admin-roles')) {
+      block = heading.parentElement;
+      while (block && block !== admin && (block.contains(roleForm) || block.contains(roleList) || block === document.querySelector('#tab-config .bc-admin-roles'))) {
+        block = block.parentElement;
+      }
+    }
+    if (!block || block === admin || block.contains(roleForm) || block.contains(roleList)) return false;
+    if (!host.contains(block)) {
+      host.appendChild(block);
+      var fallback = document.getElementById('bc-roles-help-default');
+      if (fallback) fallback.remove();
+    }
+    return true;
+  }
+
+  function ensureSmartPermissionsObserver() {
+    var admin = document.getElementById('tab-config');
+    if (!admin || admin.dataset.bcSmartPermissionsObserver === '1') return;
+    admin.dataset.bcSmartPermissionsObserver = '1';
+    if (typeof MutationObserver !== 'function') return;
+    var observer = new MutationObserver(function () {
+      relocateSmartPermissionsHelp();
+    });
+    observer.observe(admin, { childList: true, subtree: true });
   }
 
   function openNuevoUsuarioModal() {
@@ -170,7 +272,8 @@
         '<div class="bc-roles-backdrop" data-bc-roles-close="1"></div>' +
         '<div class="bc-roles-panel">' +
         '<div class="bc-roles-head"><h3 id="bc-modal-roles-title">Roles y Permisos</h3>' +
-        '<button type="button" class="bc-roles-close" data-bc-roles-close="1" aria-label="Cerrar">×</button></div>' +
+        '<div class="bc-roles-head-actions"><button type="button" class="bc-roles-help-trigger" id="bc-btn-roles-help" aria-label="Ayuda sobre los permisos" title="Ayuda sobre los permisos">ⓘ</button>' +
+        '<button type="button" class="bc-roles-close" data-bc-roles-close="1" aria-label="Cerrar">×</button></div></div>' +
         '<p class="bc-roles-hint">Gestioná roles existentes y asignales permisos. Después asigná el rol a cada usuario en la lista de Usuarios.</p>' +
         '<div class="bc-roles-actions"><button type="button" class="cc-accion ud-btn-primary" id="bc-btn-abrir-nuevo-rol">+ Nuevo Rol</button></div>' +
         '<div class="bc-roles-body" id="bc-roles-lista-wrap"></div>' +
@@ -181,6 +284,8 @@
       });
       document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
+        var help = document.getElementById('bc-modal-roles-help');
+        if (help && help.classList.contains('open')) { closeRolesHelp(); return; }
         var nr = document.getElementById(MODAL_NUEVO_ROL_ID);
         if (nr && nr.classList.contains('open')) { closeNuevoRolModal(); return; }
         if (modal.classList.contains('open')) closeRolesModal();
@@ -358,6 +463,9 @@
 
   function boot() {
     unificar();
+    ensureRolesHelpModal();
+    relocateSmartPermissionsHelp();
+    ensureSmartPermissionsObserver();
     wireNav();
     injectHeroButtons();
     wireHeroButtons();
@@ -369,6 +477,8 @@
   }
 
   window.bcOpenRolesModal = openRolesModal;
+  window.bcOpenRolesHelp = openRolesHelp;
+  window.bcCloseRolesHelp = closeRolesHelp;
   window.bcCloseRolesModal = closeRolesModal;
   window.bcOpenNuevoRolModal = openNuevoRolModal;
   window.bcCloseNuevoRolModal = closeNuevoRolModal;
