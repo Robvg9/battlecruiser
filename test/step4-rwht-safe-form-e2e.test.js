@@ -308,11 +308,13 @@ test("Paso 4 UI: producto rechaza precio normal no positivo sin llamar al backen
 test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y acepta precio mayorista vacío", async (t) => {
   const c = await contextoListo();
   evaluarModulo(c, "public/js/m26-ui-integridad.js");
+  evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
   evaluarModulo(c, "public/js/hotfix-pulido-20260903.js");
 
   const ready = await esperarHasta(() =>
     !!c.document.getElementById("bc-product-commercial-toggle") &&
     !!c.document.getElementById("bc-product-commercial-panel") &&
+    c.document.getElementById("form-producto").dataset.bc172Prepared === "1" &&
     !!c.document.getElementById("bc-pres-normal-name") &&
     !!c.document.getElementById("bc-pres-normal-factor") &&
     !!c.document.getElementById("bc-pres-wholesale-name") &&
@@ -333,7 +335,10 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1);
   assert.equal(d.getElementById("prod-presentaciones-config"), null);
   assert.equal(d.querySelectorAll("#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado").length, 0);
+  assert.equal(d.getElementById("prod-precio-normal").required, true);
   assert.equal(d.getElementById("prod-precio-mayorista").required, false);
+  assert.equal(w.__BC172_verify().legacySubmitHandler, false,
+    "the legacy module must not intercept the native form submit");
 
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto UI fixture";
