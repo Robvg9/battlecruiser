@@ -116,11 +116,14 @@ test("product registration has one commercial-options owner and no legacy duplic
     "the native save button must be disabled during a save attempt");
   assert.doesNotMatch(legacyProductSave, /addEventListener\(['"]submit['"]/,
     "the retired M17.2 module must not register a second product submit handler");
-  assert.ok(legacyProductSave.includes("field.required=false"));
-  assert.ok(legacyProductSave.includes("field.removeAttribute('required')"));
-  assert.ok(legacyProductSave.includes("normalPriceOptional:"));
+  assert.ok(legacyProductSave.includes("normal.required=true"));
+  assert.ok(legacyProductSave.includes("normal.min='0.01'"));
+  assert.ok(legacyProductSave.includes("wholesale.required=false"));
+  assert.ok(legacyProductSave.includes("normalPriceRequired:"));
   assert.ok(legacyProductSave.includes("wholesalePriceOptional:"));
   assert.ok(legacyProductSave.includes("legacySubmitHandler:false"));
+  assert.ok(presentationUi.includes("pn===null||!Number.isFinite(pn)||pn<0.01"),
+    "the unified saver must enforce the same required retail price as the native form");
   assert.ok(presentationUi.includes("form.addEventListener('submit',saveCatalogoProduct,true)"),
     "the unified Pulido saver must be the only product-specific submit handler");
 });
