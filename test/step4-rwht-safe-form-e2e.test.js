@@ -353,6 +353,18 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
 
   if (panel.hidden) toggle.click();
   assert.equal(panel.hidden, false);
+
+  // A factor of zero is present but invalid; do not send any write.
+  d.getElementById("bc-pres-normal-factor").value = "0";
+  enviarSubmit(c, "form-producto");
+  assert.ok(await esperarHasta(() => /factor numérico mayor que cero/i.test(d.getElementById("msg-productos").textContent)),
+    "a zero presentation factor must be rejected in the form");
+  assert.equal(nuevasEscrituras(c, base).length, 0,
+    "an invalid presentation must not reach the catalog RPC");
+  assert.equal(d.getElementById("prod-submit-btn").disabled, false,
+    "the save button must be restored after validation rejection");
+
+  d.getElementById("bc-pres-normal-factor").value = "1";
   enviarSubmit(c, "form-producto");
 
   const reachedSave = await esperarHasta(() =>
