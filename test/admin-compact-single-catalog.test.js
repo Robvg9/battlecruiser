@@ -36,14 +36,14 @@ test("presentations and role permissions have one Administration entry, not dupl
   assert.doesNotMatch(m26, /'lista-categorias':\s*'prod-nom-|\s*'lista-unidades':\s*'prod-nom-/);
   assert.match(m26, /'lista-presentaciones-catalogo':\s*'prod-nom-presentaciones-slot'/);
   assert.match(m26, /'pp-lista-asociaciones':\s*'prod-nom-presentaciones-slot'/);
-  assert.doesNotMatch(roles, /rolesBtn = document\\.createElement/);
+  assert.ok(!roles.includes("rolesBtn = document.createElement"));
   assert.match(roles, /bc-btn-config-roles/);
-  assert.match(roles, /max-height:min\\(84vh,680px\\)/);
-  assert.match(roles, /rol-permisos-panel\\{max-height:240px;overflow:auto/);
+  assert.ok(roles.includes("max-height:min(84vh,680px)"));
+  assert.ok(roles.includes("rol-permisos-panel{max-height:240px;overflow:auto"));
 });
 
 test("Administration module styles are compact and catalog lists are bounded", () => {
-  assert.match(m75, /#tab-config \.bc-admin-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(m75, /max-height:132px;overflow:auto/);
-  assert.match(index, /bc-nav-group-label">Sistema<\/span>/);
+  assert.ok(m75.includes("#tab-config .bc-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))"));
+  assert.ok(m75.includes("max-height:132px;overflow:auto"));
+  assert.ok(index.includes('bc-nav-group-label">Sistema</span>'));
 });
