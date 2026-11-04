@@ -480,6 +480,7 @@ test("R3: la cabecera de alertas muestra la cantidad de productos bajo mínimo",
   window.renderResumen();
   const alertas = document.getElementById("resumen-alertas-lista");
   assert.ok(/2 producto\(s\) bajo mínimo/.test(alertas.innerHTML), "cabecera con cantidad afectada");
+  assert.ok(/Agotado/.test(alertas.innerHTML), "distinguishes zero stock from merely being below minimum");
   assert.ok(/Ver inventario/.test(alertas.innerHTML), "botón Ver inventario presente");
 });
 
