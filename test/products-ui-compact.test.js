@@ -163,11 +163,12 @@ test("M26 moves catalog content without detaching M75 Administration nomenclatur
  t.after(()=>dom.window.close());
  const w=dom.window,d=w.document;
  w.eval(M26_SOURCE);
+ const button=d.getElementById("productos-nomenclatura-btn");
+ await waitFor(()=>button.dataset.bcM26==="1","M26 must bind the native nomenclature handler before M75 relocates its toolbar");
  const entry=d.getElementById("bc-product-catalog-entry");
  const toolbar=d.getElementById("productos-tools-nomenclatura");
- entry.appendChild(toolbar); // reproduce M75's move after M26 binds the native handler
- d.getElementById("productos-nomenclatura-btn").dataset.bcM26="1";
- d.getElementById("productos-nomenclatura-btn").click();
+ entry.appendChild(toolbar); // reproduce M75's move only after M26 really binds the native handler
+ button.click();
  await waitFor(()=>!d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"M26 nomenclature modal should open");
  assert.ok(d.getElementById("tab-config").contains(entry),"M26 must not detach M75's Administration entry");
  assert.ok(entry.contains(toolbar),"M26 must preserve the nomenclature toolbar inside the Administration entry");
