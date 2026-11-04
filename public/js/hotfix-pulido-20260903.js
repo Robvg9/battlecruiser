@@ -455,10 +455,8 @@
   // No crear un segundo listado ni un segundo botón de actualización.
   function buildPresentationCatalog(){ return false; }
   async function renderPresentationCatalog(){ return false; }
-  function ensurePresentationCreateForm(){
-    var f=document.getElementById('form-presentacion-nueva');if(!f)return;f.classList.remove('hidden');if(f.dataset.bcPulido==='1')return;f.dataset.bcPulido='1';
-    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();if(typeof window.refrescarPresentacionesCatalogo==='function')await window.refrescarPresentacionesCatalogo();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
-  }
+  // El único submit handler del catálogo vive en presentaciones.js.
+  function ensurePresentationCreateForm(){ return false; }
 
   function cleanCommunicationEmpty(){
     document.querySelectorAll('#tab-comunicacion *').forEach(function(el){var t=norm(el.textContent||'');if((t==='no tenes conversaciones todavia inicia una nueva conversacion'||t==='no tienes conversaciones todavía. iniciá una nueva conversación para comenzar a chatear.')&&el.children.length===0)el.classList.add('bc-pulido-empty-chat');});
@@ -485,7 +483,7 @@
   function boot(){
     css();
     ensureWarehouses();preloadStock();patchStockGetter();bindCatalogClicks();
-    ensurePresFields();patchProductSubmit();patchEditBridge();ensurePresentationCreateForm();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
+    ensurePresFields();patchProductSubmit();patchEditBridge();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
     setTimeout(function(){preloadStock(true);ensureWarehouses();patchStockGetter();patchEditBridge();},800);
     setTimeout(function(){productModalPolish();ensurePresFields();discoverEditButtons();repaintStockCards();},1400);
     setTimeout(function(){normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
