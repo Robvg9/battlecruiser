@@ -20,6 +20,7 @@
   }
   async function saveProduct(){
     var id=document.getElementById('prod-editando-id')?.value||null;
+    var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return;}
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'',pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
@@ -49,7 +50,17 @@
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var r=await client.rpc('bc_guardar_producto_catalogo',{p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())});
       if(r.error)throw r.error;
-      msg(id?'✓ Cambios guardados.':'✓ Producto registrado correctamente.',true);
+      var imageNotice='';
+      if(imageFile){
+        var savedProductId=id||r.data;
+        if(!savedProductId)throw Error('El producto se guardó, pero no se obtuvo su ID para subir la imagen.');
+        if(typeof window.subirImagenProducto!=='function')throw Error('El producto se guardó, pero el módulo de carga de imágenes no está disponible. Selecciona de nuevo la imagen al editarlo.');
+        var imageResult=await window.subirImagenProducto(savedProductId,imageFile);
+        if(!imageResult.ok)imageNotice=' La imagen no se pudo subir; vuelve a seleccionarla al editar el producto. '+String(imageResult.error&&imageResult.error.message||'');
+        window.__BC_PRODUCT_IMAGE_FILE__=null;
+        var imageInput=document.getElementById('prod-imagen-input');if(imageInput)imageInput.value='';
+      }
+      msg((id?'✓ Cambios guardados.':'✓ Producto registrado correctamente.')+imageNotice,!imageNotice);
       if(typeof window.refrescarProductos==='function')await window.refrescarProductos();
       await fetchPres();
       if(window.__BC171_close)window.__BC171_close();
