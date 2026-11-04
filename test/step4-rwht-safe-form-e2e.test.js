@@ -400,6 +400,49 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.ok(await esperarHasta(() => modal.classList.contains("hidden")),
     "the native modal must close after successful creation");
 });
+test("Paso 4 UI: precio normal, mayorista y presentaciones pueden quedar vacíos", async (t) => {
+  const c = await contextoListo();
+  evaluarModulo(c, "public/js/m26-ui-integridad.js");
+  evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
+  evaluarModulo(c, "public/js/hotfix-pulido-20260903.js");
+
+  const ready = await esperarHasta(() =>
+    !!c.document.getElementById("bc-product-commercial-toggle") &&
+    !!c.document.getElementById("bc-pres-normal-name") &&
+    c.document.getElementById("form-producto").dataset.bc172Prepared === "1",
+    6500,
+    25
+  );
+  assert.ok(ready, "the unified product form must initialize");
+  const d = c.document;
+  const base = c.client.__writeCalls.length;
+  d.getElementById("prod-nombre").value = "Producto sin precios fixture";
+  d.getElementById("prod-categoria").value = "";
+  d.getElementById("prod-unidad").value = "";
+  d.getElementById("prod-precio-normal").value = "";
+  d.getElementById("prod-precio-mayorista").value = "";
+  d.getElementById("bc-pres-normal-name").value = "";
+  d.getElementById("bc-pres-normal-factor").value = "";
+  d.getElementById("bc-pres-wholesale-name").value = "";
+  d.getElementById("bc-pres-wholesale-factor").value = "";
+  enviarSubmit(c, "form-producto");
+
+  assert.ok(await esperarHasta(() =>
+    nuevasEscrituras(c, base).some((call) => call.name === "bc_guardar_producto_catalogo"),
+    6500,
+    25
+  ), "the product must still save when every optional commercial field is blank");
+  const call = nuevasEscrituras(c, base).find((item) => item.name === "bc_guardar_producto_catalogo");
+  assert.equal(call.params.p_categoria_id, null);
+  assert.equal(call.params.p_unidad, null);
+  assert.equal(call.params.p_precio_normal, null);
+  assert.equal(call.params.p_precio_mayorista, null);
+  assert.equal(call.params.p_presentacion_normal, null);
+  assert.equal(call.params.p_factor_normal, null);
+  assert.equal(call.params.p_presentacion_mayorista, null);
+  assert.equal(call.params.p_factor_mayorista, null);
+});
+
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
   // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
