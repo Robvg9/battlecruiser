@@ -151,6 +151,28 @@ async function waitFor(predicate,message,timeoutMs){
  assert.ok(predicate(),message);
 }
 
+test("M26 moves catalog content without detaching M75 Administration nomenclature entry",async(t)=>{
+ const html=[
+  "<!doctype html><html><head></head><body>",
+  "<section id='tab-productos' class='tab-panel'></section>",
+  "<section id='tab-config' class='tab-panel'><div class='cc-bloque'><section id='bc-product-catalog-entry'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn' data-bc-m26='1'>Nomenclatura y catálogos</button></div></section><h3>Categorías</h3><div id='lista-categorias'></div></div></section>",
+  "<div id='productos-nomenclatura-modal' class='hidden'><button id='productos-nomenclatura-cerrar'>Cerrar</button><div id='prod-nom-categorias-slot'></div><div id='prod-nom-unidades-slot'></div><div id='prod-nom-presentaciones-slot'></div></div>",
+  "</body></html>"
+ ].join("");
+ const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
+ t.after(()=>dom.window.close());
+ const w=dom.window,d=w.document;
+ w.eval(M26_SOURCE);
+ d.getElementById("productos-nomenclatura-btn").click();
+ await waitFor(()=>!d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"M26 nomenclature modal should open");
+ const entry=d.getElementById("bc-product-catalog-entry");
+ const toolbar=d.getElementById("productos-tools-nomenclatura");
+ assert.ok(d.getElementById("tab-config").contains(entry),"M26 must not detach M75's Administration entry");
+ assert.ok(entry.contains(toolbar),"M26 must preserve the nomenclature toolbar inside the Administration entry");
+ assert.ok(d.getElementById("prod-nom-categorias-slot").contains(d.getElementById("lista-categorias")),"the category catalog must still move into its modal slot");
+ assert.ok(!d.getElementById("productos-nomenclatura-modal").contains(entry),"the catalog modal must never take ownership of the Administration entry");
+});
+
 test("native Add opens the single M26 modal and preserves the existing product creation submit",async(t)=>{
  const c=nativeModalFixture();
  t.after(()=>c.dom.window.close());
