@@ -184,25 +184,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
   ()=>{const controls=d.getElementById("bc-productos-controles");const tools=d.querySelector(".bc-m44-view-tools");return !!(controls&&tools&&controls.contains(tools)&&tools.querySelectorAll(".bc-m44-view-btn").length===2);},
   "M75 must preserve M44's single functional rows/cards selector"
  );
- await waitFor(
-  ()=>{const admin=d.getElementById("tab-config");const entry=d.getElementById("bc-product-presentations-entry");const tool=d.getElementById("productos-tools-nomenclatura");const button=d.getElementById("productos-nomenclatura-btn");return !!(admin&&entry&&tool&&button&&admin.contains(entry)&&entry.contains(tool)&&tool.contains(button));},
-  "M75 must keep the nomenclature toolbar inside Administration"
- );
- const nomenclatureButton=d.getElementById("productos-nomenclatura-btn");
- const nomenclatureModal=d.getElementById("productos-nomenclatura-modal");
- nomenclatureButton.click();
- await waitFor(
-  ()=>!nomenclatureModal.classList.contains("hidden"),
-  "M26 must open the native nomenclature modal from Administration"
- );
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("bc-product-presentations-entry")),"opening nomenclature must not remove its Administration entry");
- assert.ok(d.getElementById("bc-product-presentations-entry").contains(d.getElementById("productos-tools-nomenclatura")),"M26 must preserve the single toolbar in Administration while opening the modal");
- d.getElementById("productos-nomenclatura-cerrar").click();
- await waitFor(
-  ()=>nomenclatureModal.classList.contains("hidden"),
-  "the nomenclature modal must close normally"
- );
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("productos-tools-nomenclatura")),"closing nomenclature must leave the toolbar in Administration");
+ assert.equal(d.querySelectorAll("#productos-nomenclatura-modal,#bc-product-presentations-entry,#productos-tools-nomenclatura").length,0,"the old presentations shortcut and dialog must be removed");
  const viewState=w.__BCM75_verify();
  assert.equal(viewState.viewButtonCount,2,"the two existing M44 view actions must remain available");
  assert.equal(viewState.viewControlsInToolbar,true,"the view selector must remain inside the compact Products toolbar");
