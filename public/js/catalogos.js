@@ -20,9 +20,19 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       if (cancelarBtn) cancelarBtn.classList.add("hidden");
     }
 
-    async function refrescar() {
+    async function refrescar(forzarServidor) {
       setLoading(listaId, "Cargando…");
-      const data = await withCache(tabla, () => client.from(tabla).select("id, nombre, activo").order("nombre"));
+      let data;
+      if (forzarServidor) {
+        const result = await client.from(tabla).select("id, nombre, activo").order("nombre");
+        if (result.error) {
+          setMsg("msg-config", "No se pudo actualizar la lista: " + explicarError(result.error, "leer " + singular), false);
+          return;
+        }
+        data = result.data;
+      } else {
+        data = await withCache(tabla, () => client.from(tabla).select("id, nombre, activo").order("nombre"));
+      }
       filasActuales = Array.isArray(data) ? data : [];
       if (filasActuales.length === 0) {
         setEmpty(listaId, mensajeListaVacia(tabla, "Todavía no hay " + tabla + " cargadas."));
@@ -75,7 +85,7 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       const wasEditing = !!editandoId;
       setMsg("msg-config", singular.charAt(0).toUpperCase() + singular.slice(1) + (wasEditing ? " actualizada." : " creada."), true);
       cancelarEdicion();
-      await refrescar();
+      await refrescar(true);
     });
 
     lista.addEventListener("click", async (e) => {
