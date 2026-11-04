@@ -54,17 +54,29 @@ test('pulido: configuración queda visible y comunicación elimina el estado vac
   assert.match(srcB, /iniciá una nueva conversación|inicia una nueva conversacion/);
 });
 
-test('pulido: la UI de presentaciones incluye Otro y factores comerciales', () => {
+test('pulido: el catálogo único de presentaciones posee crear, editar, activar/desactivar y eliminar con protección de referencias', () => {
   const src = read('public/js/hotfix-pulido-20260903.js');
   const srcB = read('public/js/hotfix-pulido-20260903b.js');
+  const presentations = read('public/js/presentaciones.js');
+
   assert.match(src, /bc-pres-normal-name/);
   assert.match(src, /bc-pres-normal-factor/);
   assert.match(src, /bc-pres-wholesale-name/);
   assert.match(src, /bc-pres-wholesale-factor/);
   assert.match(src, /Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero/);
-  assert.match(srcB, /bc-pres-[^'\"]+-factor/);
-  assert.match(srcB, /actualizar_presentacion/);
-  assert.match(srcB, /cambiar_estado_presentacion/);
+  assert.match(srcB, /bc-pres-[^'"]+-factor/);
+
+  assert.match(presentations, /client\.rpc\("crear_presentacion"/);
+  assert.match(presentations, /client\.rpc\("actualizar_presentacion"/);
+  assert.match(presentations, /client\.rpc\("cambiar_estado_presentacion"/);
+  assert.match(presentations, /pres-editar-btn/);
+  assert.match(presentations, /pres-toggle-btn/);
+  assert.match(presentations, /pres-eliminar-btn/);
+  assert.match(presentations, /client\.from\("presentaciones"\)\.delete\(\)/);
+  assert.match(presentations, /producto_presentaciones[\s\S]*?eq\("presentacion_id", id\)/);
+  assert.match(presentations, /eq\("unidad", nombre\)/);
+  assert.doesNotMatch(srcB, /actualizar_presentacion|cambiar_estado_presentacion/,
+    "el módulo heredado no debe ser otro dueño del catálogo");
 });
 
 test('pulido: el submit del producto se captura antes del listener heredado', () => {
