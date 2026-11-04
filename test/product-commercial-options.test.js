@@ -10,6 +10,10 @@ const M26_SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "m26-ui-integridad.js"),
   "utf8"
 );
+const M172_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "hotfix-17-2-productos-save-20260903.js"),
+  "utf8"
+);
 
 function fixture() {
   const html = [
@@ -99,4 +103,36 @@ test("a new product starts collapsed; editing an existing configured product ope
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
   assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1,
     "opening and reopening edit must not create duplicate controls");
+});
+
+test("the legacy M17.2 module keeps price constraints but never adds a second submit handler", async (t) => {
+  const dom = new JSDOM(
+    "<!doctype html><html><body><form id='form-producto'>" +
+      "<input id='prod-precio-normal' type='number'>" +
+      "<input id='prod-precio-mayorista' type='number'>" +
+      "<button id='prod-submit-btn' type='button'>Save</button>" +
+      "</form></body></html>",
+    { runScripts: "outside-only", url: "https://battlecruiser.test/", pretendToBeVisual: true }
+  );
+  t.after(() => dom.window.close());
+  const w = dom.window;
+  const d = w.document;
+  let submitListeners = 0;
+  const nativeAdd = w.EventTarget.prototype.addEventListener;
+  w.EventTarget.prototype.addEventListener = function(type, listener, options) {
+    if (type === "submit" && this.id === "form-producto") submitListeners += 1;
+    return nativeAdd.call(this, type, listener, options);
+  };
+
+  w.eval(M172_SOURCE);
+  await new Promise((resolve) => w.setTimeout(resolve, 20));
+
+  const verify = w.__BC172_verify();
+  assert.equal(submitListeners, 0, "the retired module must not own the product submit");
+  assert.equal(verify.legacySubmitHandler, false);
+  assert.equal(verify.normalPriceRequired, true);
+  assert.equal(verify.wholesalePriceOptional, true);
+  assert.equal(d.getElementById("prod-precio-normal").min, "0.01");
+  assert.equal(d.getElementById("prod-precio-mayorista").hasAttribute("min"), false);
+  assert.equal(d.getElementById("prod-submit-btn").type, "submit");
 });
