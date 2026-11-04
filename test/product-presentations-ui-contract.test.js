@@ -75,3 +75,36 @@ test("warehouse channel is checked independently from the selected price type", 
   assert.ok(migration.includes("v_tipo_precio_linea:=coalesce"));
   assert.ok(!migration.includes("La presentación mayorista indicada no coincide con la presentación definida del producto"));
 });
+
+test("product registration has one commercial-options owner and no legacy duplicate selector/save path", () => {
+  const catalogos = read("public/js/catalogos.js");
+  const productModal = read("public/js/m26-ui-integridad.js");
+  const presentationUi = read("public/js/hotfix-pulido-20260903.js");
+  const presentationSave = read("public/js/hotfix-pulido-20260903b.js");
+
+  assert.doesNotMatch(
+    catalogos,
+    /prod-presentaciones-config|prod-pres-min|prod-pres-may-habilitado|crearProductoConPresentaciones|instalarValidacionCreacionProducto/,
+    "catalogos.js must not inject the old mandatory presentation form or intercept product creation"
+  );
+  assert.match(productModal, /bc-product-commercial-toggle/);
+  assert.match(productModal, /bc-product-commercial-panel/);
+  assert.match(productModal, /fieldBlock\(categoria, 'Categoría \(opcional\)'/);
+  assert.match(productModal, /fieldBlock\(mayorista, 'Precio mayorista \(opcional\)'/);
+  assert.match(productModal, /window\.__BCM26_setCommercialOptionsExpanded/);
+
+  assert.ok(presentationUi.includes("window.__BCM26_ensureCommercialOptions()"));
+  assert.ok(presentationUi.includes("document.getElementById('bc-product-commercial-panel')"));
+  assert.ok(presentationUi.includes("host.appendChild(box)"));
+  assert.ok(presentationUi.includes("var legacy=document.getElementById('prod-presentaciones-config');if(legacy)legacy.remove();"));
+  assert.equal((presentationUi.match(/id="bc-pres-normal-name"/g) || []).length, 1);
+  assert.equal((presentationUi.match(/id="bc-pres-normal-factor"/g) || []).length, 1);
+  assert.equal((presentationUi.match(/id="bc-pres-wholesale-name"/g) || []).length, 1);
+  assert.equal((presentationUi.match(/id="bc-pres-wholesale-factor"/g) || []).length, 1);
+
+  assert.ok(presentationSave.includes("p_precio_mayorista:pm"));
+  assert.ok(presentationSave.includes("p_presentacion_normal:normal.name"));
+  assert.ok(presentationSave.includes("p_presentacion_mayorista:wholesale.name"));
+  assert.ok(presentationUi.includes("No se guardó el producto ni se creó parcialmente."),
+    "offline save must not silently discard configured presentation pairs");
+});
