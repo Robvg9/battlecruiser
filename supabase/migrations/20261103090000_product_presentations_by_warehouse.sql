@@ -9,10 +9,10 @@ CREATE OR REPLACE FUNCTION public.registrar_venta(p_almacen_id uuid, p_lineas js
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-declare v_venta_id uuid;v_tipo_almacen text;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_turno record;v_almacen_real uuid;v_factor numeric;v_presentacion_producto uuid;
+declare v_venta_id uuid;v_tipo_almacen text;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_turno record;v_almacen_real uuid;v_factor numeric;v_presentacion_producto uuid;v_presentacion_count integer;
 begin
  if not public.tiene_permiso('ventas','crear') then raise exception 'Sin permiso para registrar ventas'; end if;
- if p_lineas is null or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto'; end if;
+ if p_lineas is null or jsonb_typeof(p_lineas) is distinct from 'array' or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto'; end if;
  if p_idempotency_key is null then raise exception 'Se requiere idempotency_key'; end if;
  v_uid:=auth.uid(); if v_uid is null then raise exception 'No hay sesión activa.' using errcode='42501'; end if;
  v_idempotente:=private.reclamar_idempotencia(p_idempotency_key,v_uid,'registrar_venta',jsonb_build_object('almacen_id',p_almacen_id,'lineas',p_lineas)); if v_idempotente is not null then return v_idempotente; end if;
@@ -31,7 +31,7 @@ begin
   if v_cantidad_final is null or v_cantidad_final<=0 then raise exception 'Cantidad inválida en línea de venta'; end if;
   select precio_normal,precio_mayorista,presentacion_id into v_precio_normal,v_precio_mayorista,v_presentacion_producto from public.productos where id=v_producto_id;
   if v_precio_normal is null and v_precio_mayorista is null then raise exception 'El producto % no tiene precio configurado',v_producto_id; end if;
-  if v_tipo_almacen not in ('minorista','mayorista') then raise exception 'Este tipo de almacén no admite ventas'; end if;
+  if v_tipo_almacen is null or v_tipo_almacen not in ('minorista','mayorista') then raise exception 'Este tipo de almacén no admite ventas'; end if;
   if v_tipo_almacen='mayorista' then
     if v_presentacion_producto is null or v_presentacion_id is distinct from v_presentacion_producto then
       raise exception 'El producto % no tiene presentación mayorista definida para este almacén',v_producto_id;
@@ -40,6 +40,23 @@ begin
     raise exception 'El producto % solo tiene presentación mayorista y no puede venderse en un almacén minorista',v_producto_id;
   end if;
   
+  if v_tipo_almacen='mayorista' then
+    select count(*)::integer into v_presentacion_count
+      from public.producto_presentaciones pp
+     where pp.producto_id=v_producto_id
+       and pp.presentacion_id=v_presentacion_producto
+       and pp.activo is distinct from false;
+  else
+    select count(*)::integer into v_presentacion_count
+      from public.producto_presentaciones pp
+     where pp.producto_id=v_producto_id
+       and pp.presentacion_id is distinct from v_presentacion_producto
+       and pp.activo is distinct from false;
+  end if;
+  if v_presentacion_count<>1 then
+    raise exception 'El producto % no tiene una única presentación activa para el almacén %',v_producto_id,v_tipo_almacen;
+  end if;
+
   if v_tipo_almacen='mayorista' then if v_precio_mayorista is null or v_precio_mayorista<=0 then raise exception 'El producto % no tiene precio mayorista configurado',v_producto_id; end if; v_precio:=v_precio_mayorista; else if v_precio_normal is null or v_precio_normal<=0 then raise exception 'El producto % no tiene precio normal configurado',v_producto_id; end if; v_precio:=v_precio_normal; end if;
   select cantidad into v_stock_actual from public.stock where producto_id=v_producto_id and almacen_id=v_almacen_real for update; if v_stock_actual is null or v_stock_actual<v_cantidad_final then raise exception 'Stock insuficiente para el producto %',v_producto_id; end if;
   v_subtotal:=v_cantidad_final*v_precio;v_total:=v_total+v_subtotal;v_restante:=v_cantidad_final;v_costo_total_linea:=0;
@@ -58,10 +75,10 @@ CREATE OR REPLACE FUNCTION public.registrar_venta(p_almacen_id uuid, p_lineas js
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
 AS $function$
-declare v_venta_id uuid;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_tipo_precio_linea text;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_tramo record;v_almacen_real uuid;v_presentacion_producto uuid;v_factor numeric;v_tipo_almacen text;
+declare v_venta_id uuid;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_tipo_precio_linea text;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_tramo record;v_almacen_real uuid;v_presentacion_producto uuid;v_factor numeric;v_tipo_almacen text;v_presentacion_count integer;
 begin
  if not public.tiene_permiso('ventas','crear') then raise exception 'Sin permiso para registrar ventas';end if;
- if p_lineas is null or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto';end if;
+ if p_lineas is null or jsonb_typeof(p_lineas) is distinct from 'array' or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto';end if;
  if p_idempotency_key is null then raise exception 'Se requiere idempotency_key';end if;
  if p_tipo_precio not in ('normal','mayorista') then raise exception 'Tipo de precio inválido';end if;
  v_uid:=auth.uid();if v_uid is null then raise exception 'No hay sesión activa.' using errcode='42501';end if;
@@ -89,6 +106,23 @@ begin
     raise exception 'El producto % solo tiene presentación mayorista y no puede venderse en un almacén minorista',v_producto_id;
   end if;
   
+  if v_tipo_almacen='mayorista' then
+    select count(*)::integer into v_presentacion_count
+      from public.producto_presentaciones pp
+     where pp.producto_id=v_producto_id
+       and pp.presentacion_id=v_presentacion_producto
+       and pp.activo is distinct from false;
+  else
+    select count(*)::integer into v_presentacion_count
+      from public.producto_presentaciones pp
+     where pp.producto_id=v_producto_id
+       and pp.presentacion_id is distinct from v_presentacion_producto
+       and pp.activo is distinct from false;
+  end if;
+  if v_presentacion_count<>1 then
+    raise exception 'El producto % no tiene una única presentación activa para el almacén %',v_producto_id,v_tipo_almacen;
+  end if;
+
   if v_tipo_precio_linea='mayorista' then if v_precio_mayorista is null or v_precio_mayorista<=0 then raise exception 'El producto % no tiene precio mayorista configurado',v_producto_id;end if;v_precio:=v_precio_mayorista;else if v_precio_normal is null or v_precio_normal<=0 then raise exception 'El producto % no tiene precio normal configurado',v_producto_id;end if;v_precio:=v_precio_normal;end if;
   select cantidad into v_stock_actual from public.stock where producto_id=v_producto_id and almacen_id=v_almacen_real for update;if v_stock_actual is null or v_stock_actual<v_cantidad_final then raise exception 'Stock insuficiente para el producto %',v_producto_id;end if;
   v_subtotal:=v_cantidad_final*v_precio;v_total:=v_total+v_subtotal;v_restante:=v_cantidad_final;v_costo_total_linea:=0;
