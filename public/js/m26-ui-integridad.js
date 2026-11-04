@@ -172,6 +172,14 @@
       cancelEdit.classList.add('hidden');
       cancelEdit.style.display = 'none';
     }
+    // El botón final debe seguir siendo el submit real del formulario incluso
+    // después de moverlo al modal; se fuerza visibilidad para evitar que herede
+    // estados/estilos de la antigua presentación inline.
+    submitBtn.type = 'submit';
+    submitBtn.classList.remove('hidden');
+    submitBtn.removeAttribute('hidden');
+    submitBtn.style.display = 'inline-flex';
+    submitBtn.textContent = 'Guardar producto';
     actions.appendChild(cancelBtn);
     actions.appendChild(submitBtn);
 
@@ -323,6 +331,8 @@
       '#tab-productos #form-producto{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important}',
       '#form-producto:not(.bc-producto-modal-form){display:none!important}',
       '#bc-product-modal.hidden #form-producto{display:none!important}',
+      '#bc-product-modal .bc-product-form-actions{display:flex!important;justify-content:flex-end;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(201,162,77,.18)}',
+      '#bc-product-modal #prod-submit-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;align-items:center;justify-content:center;min-height:40px;padding:10px 16px;border-radius:10px;font-weight:700}',
       '#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}',
       '#bc-productos-barra .bc-productos-search{width:100%}',
       '#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}',
