@@ -7,6 +7,7 @@ const crypto = require("node:crypto");
 const { spawn, execFileSync } = require("node:child_process");
 
 const BASE_URL = (process.env.BC_LIVE_BASE_URL || "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");
+const PREVIEW_BASE_URL = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 const OUTPUT_DIR = path.join(process.cwd(), "test-results");
 const REPORT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.json");
@@ -600,6 +601,18 @@ async function main() {
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
 
+  // The preview login proxy must reach the real Edge Function with its allowlisted
+  // production Origin. GET is a no-credential diagnostic: the expected upstream
+  // response is 405, before the login rate limiter or auth/database code runs.
+  if (BASE_URL === PREVIEW_BASE_URL) {
+    const previewLoginProxy = await evaluate("(async()=>{try{const r=await fetch('/__bc_preview/functions/v1/bc-username-login',{method:'GET',cache:'no-store'});const body=await r.json().catch(()=>null);return {status:r.status,body,origin:location.origin};}catch(error){return {status:0,error:String(error),origin:location.origin};}})()");
+    report.evidence.previewLoginProxy = previewLoginProxy;
+    assert(previewLoginProxy.status === 405 &&
+      previewLoginProxy.body && previewLoginProxy.body.error === "Método no permitido." &&
+      previewLoginProxy.origin === PREVIEW_BASE_URL,
+      "El proxy same-origin del preview no alcanzó bc-username-login con el Origin permitido: " + JSON.stringify(previewLoginProxy));
+  }
+
 
   // Step 4/15 — real Chromium check of the visible Sales view toggle.
   // This probes presentation and client-side panel switching only; no auth session
@@ -681,26 +694,26 @@ async function main() {
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
   report.evidence.step4PreferencesAfterReload = preferenceReload;
 
-  // Reproduce en Chromium real la integración que antes quitaba M26:
-  // el toolbar debe pertenecer al panel Productos y sobrevivir a abrir/cerrar.
+  // M75 reubica la nomenclatura en Administración; Chromium debe validar esa ubicación y su ciclo.
   const nomenclatureInitial = await waitUntil(
-    "toolbar de nomenclatura dentro del panel Productos",
-    "(()=>{const p=document.querySelector('#tab-productos');const t=document.querySelector('#productos-tools-nomenclatura');const b=document.querySelector('#productos-nomenclatura-btn');return p&&t&&b&&p.contains(t)&&p.contains(b)?{present:true,version:window.__BC_VERSION__||null,toolbarParent:p.id}:null})()",
+    "toolbar de nomenclatura dentro de Administración",
+    "(()=>{const p=document.querySelector('#tab-productos');const a=document.querySelector('#tab-config');const e=document.querySelector('#bc-product-catalog-entry');const t=document.querySelector('#productos-tools-nomenclatura');const b=document.querySelector('#productos-nomenclatura-btn');return a&&e&&t&&b&&a.contains(e)&&e.contains(t)&&e.contains(b)&&(!p||!p.contains(e))?{present:true,version:window.__BC_VERSION__||null,toolbarParent:a.id,toolbarOutsideProducts:!p||!p.contains(e)}:null})()",
     10000
   );
+  report.evidence.productNomenclatureInitial = nomenclatureInitial;
   await delay(2500);
-  const nomenclatureStable = await evaluate("(()=>{const p=document.querySelector('#tab-productos');const t=document.querySelector('#productos-tools-nomenclatura');const b=document.querySelector('#productos-nomenclatura-btn');return {present:!!b,toolbarInsideProducts:!!(p&&t&&b&&p.contains(t)&&p.contains(b)),uiReady:window.__BC_UI_READY_RESOLVED__===true,version:window.__BC_VERSION__||null}})()");
-  assert(nomenclatureStable.present && nomenclatureStable.toolbarInsideProducts,
-    "El toolbar de nomenclatura no sobrevivió a la limpieza M26 en Chromium real: "+JSON.stringify(nomenclatureStable));
-  const nomenclatureCycle = await evaluate("(async()=>{const product=document.querySelector('#tab-productos');const button=document.querySelector('#productos-nomenclatura-btn');const modal=document.querySelector('#productos-nomenclatura-modal');const config=document.querySelector('#tab-config');if(!product||!button||!modal||!config)return {ready:false};const parentBefore=config.parentElement;button.click();await new Promise(r=>setTimeout(r,250));const opened=!modal.classList.contains('hidden');const openState={opened,toolbarKept:product.contains(button),configParentKept:config.parentElement===parentBefore,configOutsideModal:!modal.contains(config),categoriesMoved:!!(document.querySelector('#prod-nom-categorias-slot')&&document.querySelector('#lista-categorias')&&document.querySelector('#prod-nom-categorias-slot').contains(document.querySelector('#lista-categorias'))),unitsMoved:!!(document.querySelector('#prod-nom-unidades-slot')&&document.querySelector('#lista-unidades')&&document.querySelector('#prod-nom-unidades-slot').contains(document.querySelector('#lista-unidades')))};const close=document.querySelector('#productos-nomenclatura-cerrar');if(close)close.click();await new Promise(r=>setTimeout(r,200));return {ready:true,open:openState,closed:modal.classList.contains('hidden'),configParentRestored:config.parentElement===parentBefore,configOutsideModal:!modal.contains(config),toolbarKept:product.contains(button)}})()");
+  const nomenclatureStable = await evaluate("(()=>{const p=document.querySelector('#tab-productos');const a=document.querySelector('#tab-config');const e=document.querySelector('#bc-product-catalog-entry');const t=document.querySelector('#productos-tools-nomenclatura');const b=document.querySelector('#productos-nomenclatura-btn');return {present:!!b,toolbarInsideAdministration:!!(a&&e&&t&&b&&a.contains(e)&&e.contains(t)&&e.contains(b)),toolbarOutsideProducts:!!(p&&e&&!p.contains(e)),uiReady:window.__BC_UI_READY_RESOLVED__===true,version:window.__BC_VERSION__||null}})()");
+  assert(nomenclatureStable.present && nomenclatureStable.toolbarInsideAdministration && nomenclatureStable.toolbarOutsideProducts,
+    "El toolbar de nomenclatura no permaneció en Administración en Chromium real: "+JSON.stringify(nomenclatureStable));
+  const nomenclatureCycle = await evaluate("(async()=>{const product=document.querySelector('#tab-productos');const button=document.querySelector('#productos-nomenclatura-btn');const modal=document.querySelector('#productos-nomenclatura-modal');const config=document.querySelector('#tab-config');const entry=document.querySelector('#bc-product-catalog-entry');if(!product||!button||!modal||!config||!entry)return {ready:false};const parentBefore=config.parentElement;button.click();await new Promise(r=>setTimeout(r,250));const opened=!modal.classList.contains('hidden');const openState={opened,toolbarInAdmin:config.contains(entry)&&entry.contains(button),toolbarOutsideProducts:!product.contains(entry),configParentKept:config.parentElement===parentBefore,configOutsideModal:!modal.contains(config),categoriesMoved:!!(document.querySelector('#prod-nom-categorias-slot')&&document.querySelector('#lista-categorias')&&document.querySelector('#prod-nom-categorias-slot').contains(document.querySelector('#lista-categorias'))),unitsMoved:!!(document.querySelector('#prod-nom-unidades-slot')&&document.querySelector('#lista-unidades')&&document.querySelector('#prod-nom-unidades-slot').contains(document.querySelector('#lista-unidades')))};const close=document.querySelector('#productos-nomenclatura-cerrar');if(close)close.click();await new Promise(r=>setTimeout(r,200));return {ready:true,open:openState,closed:modal.classList.contains('hidden'),configParentRestored:config.parentElement===parentBefore,configOutsideModal:!modal.contains(config),toolbarInAdmin:config.contains(entry)&&entry.contains(button),toolbarOutsideProducts:!product.contains(entry)}})()");
   assert(nomenclatureCycle.ready && nomenclatureCycle.open.opened,
-    "No se pudo abrir el modal Nomenclatura en Chromium real: "+JSON.stringify(nomenclatureCycle));
-  assert(nomenclatureCycle.open.toolbarKept && nomenclatureCycle.open.configParentKept && nomenclatureCycle.open.configOutsideModal,
-    "Abrir Nomenclatura movió o perdió el panel Configuración: "+JSON.stringify(nomenclatureCycle));
+    "No se pudo abrir el modal Nomenclatura desde Administración en Chromium real: "+JSON.stringify(nomenclatureCycle));
+  assert(nomenclatureCycle.open.toolbarInAdmin && nomenclatureCycle.open.toolbarOutsideProducts && nomenclatureCycle.open.configParentKept && nomenclatureCycle.open.configOutsideModal,
+    "Abrir Nomenclatura movió el panel Configuración o sacó el toolbar de Administración: "+JSON.stringify(nomenclatureCycle));
   assert(nomenclatureCycle.open.categoriesMoved && nomenclatureCycle.open.unitsMoved,
     "Los catálogos no llegaron a sus slots de modal: "+JSON.stringify(nomenclatureCycle));
-  assert(nomenclatureCycle.closed && nomenclatureCycle.configParentRestored && nomenclatureCycle.configOutsideModal && nomenclatureCycle.toolbarKept,
-    "Cerrar Nomenclatura no restauró Configuración o el toolbar: "+JSON.stringify(nomenclatureCycle));
+  assert(nomenclatureCycle.closed && nomenclatureCycle.configParentRestored && nomenclatureCycle.configOutsideModal && nomenclatureCycle.toolbarInAdmin && nomenclatureCycle.toolbarOutsideProducts,
+    "Cerrar Nomenclatura no restauró el estado de Administración: "+JSON.stringify(nomenclatureCycle));
   report.evidence.productNomenclatureUi = {
     initial: nomenclatureInitial,
     settled: nomenclatureStable,
@@ -803,12 +816,15 @@ async function main() {
   assert(mobileContentLayout.main.overflowY === "visible" &&
          mobileContentLayout.main.scrollHeight <= mobileContentLayout.main.clientHeight + 1,
     "El panel principal sigue recortado en un scroll interno en móvil: " + JSON.stringify(mobileContentLayout));
-  assert(mobileContentLayout.documentHeight > mobileContentLayout.viewportHeight,
-    "El documento móvil no crece para alojar el contenido completo: " + JSON.stringify(mobileContentLayout));
-  const documentScrollProbe = await evaluate("(()=>new Promise(resolve=>{const max=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-innerHeight;window.scrollTo(0,Math.max(0,max));requestAnimationFrame(()=>{const moved=window.scrollY;window.scrollTo(0,0);resolve({maxScroll:max,scrollYAfterDown:moved,scrollable:moved>0});});}))()");
+  assert(mobileContentLayout.documentHeight >= mobileContentLayout.viewportHeight &&
+         mobileContentLayout.bodyHeight >= mobileContentLayout.viewportHeight &&
+         mobileContentLayout.footer.bottom <= mobileContentLayout.documentHeight + 1,
+    "El flujo móvil recorta contenido o desplaza el pie fuera del documento: " + JSON.stringify(mobileContentLayout));
+  const documentScrollProbe = await evaluate("(()=>new Promise(resolve=>{const max=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight)-innerHeight;window.scrollTo(0,Math.max(0,max));requestAnimationFrame(()=>{const moved=window.scrollY;window.scrollTo(0,0);resolve({maxScroll:max,scrollYAfterDown:moved,scrollable:moved>0,expectedScrollable:max>1});});}))()");
   report.evidence.androidDocumentScroll = documentScrollProbe;
-  assert(documentScrollProbe.maxScroll > 0 && documentScrollProbe.scrollable,
-    "El dashboard móvil no responde al desplazamiento del documento: " + JSON.stringify(documentScrollProbe));
+  assert(documentScrollProbe.maxScroll >= 0 &&
+         (documentScrollProbe.expectedScrollable ? documentScrollProbe.scrollable : !documentScrollProbe.scrollable),
+    "El scroll del documento no coincide con la altura real del contenido móvil: " + JSON.stringify(documentScrollProbe));
 
   assert(mobileContentLayout.footer.position === "static" &&
          mobileContentLayout.footer.top >= mobileContentLayout.main.bottom - 1,

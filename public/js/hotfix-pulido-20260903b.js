@@ -20,27 +20,47 @@
   }
   async function saveProduct(){
     var id=document.getElementById('prod-editando-id')?.value||null;
+    var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return;}
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'',pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw),pm=String(pmRaw).trim()===''?null:Number(pmRaw);
     if((pn!==null&&!Number.isFinite(pn))||(pm!==null&&!Number.isFinite(pm))){msg('Los precios deben ser números válidos.',false);return;}
     function readPres(kind){
-      var isW=kind==='wholesale',sel=document.getElementById(isW?'bc-pres-wholesale':'bc-pres-normal'),factorEl=document.getElementById('bc-pres-'+kind+'-factor'),customName=document.getElementById(isW?'bc-pres-wholesale-custom-name':'bc-pres-normal-custom-name'),customFactor=document.getElementById(isW?'bc-pres-wholesale-custom-factor':'bc-pres-normal-custom-factor');
-      if(!sel||!sel.value)return{name:null,factor:null,id:null};
-      if(sel.value==='__otro__')return{name:(customName?.value||'').trim()||null,factor:Number((customFactor?.value||factorEl?.value||''))||null,id:null};
-      var hit=listPres().find(function(p){return String(p.id)===String(sel.value);});
-      return{name:hit?.nombre||null,factor:Number(factorEl?.value||'')||null,id:sel.value};
+      var isW=kind==='wholesale';
+      var nameEl=document.getElementById(isW?'bc-pres-wholesale-name':'bc-pres-normal-name');
+      var factorEl=document.getElementById(isW?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+      var name=nameEl?(nameEl.value||'').trim():'';
+      var raw=factorEl?(factorEl.value||'').trim():'';
+      if(!name&&!raw)return{name:null,factor:null,id:null};
+      return{name:name||null,factor:raw===''?null:Number(raw),id:null};
     }
     var normal=readPres('normal'),wholesale=readPres('wholesale');
     var save=document.getElementById('bc171-save');if(save)save.disabled=true;
     try{
-      if(normal.name&&!Number(normal.factor)>0)throw Error('Definí el factor de la presentación normal.');
-      if(wholesale.name&&!Number(wholesale.factor)>0)throw Error('Definí el factor de la presentación mayorista.');
+      function validPresentation(value){
+        var hasName=!!(value.name&&String(value.name).trim());
+        var factor=Number(value.factor);
+        var hasFactor=Number.isFinite(factor)&&factor>0;
+        return (!hasName&&!hasFactor)||(hasName&&hasFactor);
+      }
+      if(!validPresentation(normal))throw Error('La presentación minorista necesita una etiqueta y un factor numérico mayor que cero, o ambos campos vacíos.');
+      if(!validPresentation(wholesale))throw Error('La presentación mayorista necesita una etiqueta y un factor numérico mayor que cero, o ambos campos vacíos.');
+      if(normal.name&&wholesale.name&&norm(normal.name)===norm(wholesale.name))throw Error('Las etiquetas minorista y mayorista deben ser distintas.');
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var r=await client.rpc('bc_guardar_producto_catalogo',{p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())});
       if(r.error)throw r.error;
-      msg(id?'✓ Cambios guardados.':'✓ Producto registrado correctamente.',true);
+      var imageNotice='';
+      if(imageFile){
+        var savedProductId=id||r.data;
+        if(!savedProductId)throw Error('El producto se guardó, pero no se obtuvo su ID para subir la imagen.');
+        if(typeof window.subirImagenProducto!=='function')throw Error('El producto se guardó, pero el módulo de carga de imágenes no está disponible. Selecciona de nuevo la imagen al editarlo.');
+        var imageResult=await window.subirImagenProducto(savedProductId,imageFile);
+        if(!imageResult.ok)imageNotice=' La imagen no se pudo subir; vuelve a seleccionarla al editar el producto. '+String(imageResult.error&&imageResult.error.message||'');
+        window.__BC_PRODUCT_IMAGE_FILE__=null;
+        var imageInput=document.getElementById('prod-imagen-input');if(imageInput)imageInput.value='';
+      }
+      msg((id?'✓ Cambios guardados.':'✓ Producto registrado correctamente.')+imageNotice,!imageNotice);
       if(typeof window.refrescarProductos==='function')await window.refrescarProductos();
       await fetchPres();
       if(window.__BC171_close)window.__BC171_close();
@@ -69,7 +89,12 @@
     var ov=document.createElement('div');ov.id='bc-pulido-import';ov.className='bc-pulido-import-overlay';ov.innerHTML='<div class="bc-pulido-dialog" role="dialog" aria-modal="true"><h3>Importar productos</h3><p>Seleccioná únicamente la <strong>plantilla CSV</strong> descargada desde el Paso 1.</p><input id="bc-pulido-import-file" type="file" accept=".csv,text/csv"><div id="bc-pulido-import-body"></div><div class="bc-pulido-dialog-actions"><button type="button" id="bc-pulido-import-cancel">Cancelar</button></div></div>';
     document.body.appendChild(ov);ov.querySelector('#bc-pulido-import-cancel').onclick=function(){ov.remove();};
     ov.querySelector('#bc-pulido-import-file').onchange=async function(){var f=this.files&&this.files[0],body=document.getElementById('bc-pulido-import-body');if(!f||!body)return;try{var lines=(await f.text()).replace(/^\uFEFF/,'').split(/\r?\n/).filter(function(x){return x.trim()});if(lines.length<2)throw Error('La plantilla está vacía.');function split(line){var a=[],c='',q=false;for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='\"'){if(q&&line[i+1]==='\"'){c+='\"';i++;}else q=!q;}else if(ch===','&&!q){a.push(c.trim());c='';}else c+=ch;}a.push(c.trim());return a;}var h=split(lines[0]).map(norm),rows=lines.slice(1).map(function(line){var v=split(line),o={};h.forEach(function(k,i){o[k]=v[i]??''});return o;});if(h.indexOf('nombre')<0)throw Error('Falta la columna nombre.');var ok=0,fail=[];
-        for(var i=0;i<rows.length;i++){var r=rows[i],name=String(r.nombre||'').trim();try{if(!name)throw Error('Fila '+(i+2)+': falta nombre.');var cat=String(r.categoria||'').trim(),cats=Array.isArray(window._cache?.categorias)?_cache.categorias:[],catId=null;if(cat){var hit=cats.find(function(c){return norm(c.nombre)===norm(cat)});if(!hit)throw Error('Fila '+(i+2)+': categoría no existe: '+cat);catId=hit.id;}var pn=String(r.precio_normal||'').trim()===''?null:Number(r.precio_normal),pm=String(r.precio_mayorista||'').trim()===''?null:Number(r.precio_mayorista);if(pn!==null&&!Number.isFinite(pn))throw Error('Fila '+(i+2)+': precio_normal inválido.');if(pm!==null&&!Number.isFinite(pm))throw Error('Fila '+(i+2)+': precio_mayorista inválido.');var nName=String(r.presentacion_normal||'').trim(),nFac=String(r.factor_normal||'').trim()===''?null:Number(r.factor_normal),wName=String(r.presentacion_mayorista||'').trim(),wFac=String(r.factor_mayorista||'').trim()===''?null:Number(r.factor_mayorista);if(nName&&!(nFac>0))throw Error('Fila '+(i+2)+': factor_normal inválido.');if(wName&&!(wFac>0))throw Error('Fila '+(i+2)+': factor_mayorista inválido.');var rr=await client.rpc('bc_guardar_producto_catalogo',{p_producto_id:null,p_nombre:name,p_categoria_id:catId,p_unidad:String(r.unidad||'').trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:nName||null,p_factor_normal:nFac,p_presentacion_mayorista:wName||null,p_factor_mayorista:wFac,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)});if(rr.error)throw rr.error;ok++;}catch(err){if(fail.length<10)fail.push(err.message||String(err));}}
+        for(var i=0;i<rows.length;i++){var r=rows[i],name=String(r.nombre||'').trim();try{if(!name)throw Error('Fila '+(i+2)+': falta nombre.');var cat=String(r.categoria||'').trim(),cats=Array.isArray(window._cache?.categorias)?_cache.categorias:[],catId=null;if(cat){var hit=cats.find(function(c){return norm(c.nombre)===norm(cat)});if(!hit)throw Error('Fila '+(i+2)+': categoría no existe: '+cat);catId=hit.id;}var pn=String(r.precio_normal||'').trim()===''?null:Number(r.precio_normal),pm=String(r.precio_mayorista||'').trim()===''?null:Number(r.precio_mayorista);if(pn!==null&&!Number.isFinite(pn))throw Error('Fila '+(i+2)+': precio_normal inválido.');if(pm!==null&&!Number.isFinite(pm))throw Error('Fila '+(i+2)+': precio_mayorista inválido.');var nName=String(r.presentacion_normal||'').trim(),nRaw=String(r.factor_normal||'').trim(),nFac=nRaw===''?null:Number(nRaw),wName=String(r.presentacion_mayorista||'').trim(),wRaw=String(r.factor_mayorista||'').trim(),wFac=wRaw===''?null:Number(wRaw);
+        var nValid=(!nName&&nRaw==='')||(!!nName&&nRaw!==''&&Number.isFinite(nFac)&&nFac>0);
+        var wValid=(!wName&&wRaw==='')||(!!wName&&wRaw!==''&&Number.isFinite(wFac)&&wFac>0);
+        if(!nValid)throw Error('Fila '+(i+2)+': la presentación minorista requiere etiqueta y factor positivo, o ambos vacíos.');
+        if(!wValid)throw Error('Fila '+(i+2)+': la presentación mayorista requiere etiqueta y factor positivo, o ambos vacíos.');
+        if(nName&&wName&&norm(nName)===norm(wName))throw Error('Fila '+(i+2)+': las etiquetas minorista y mayorista deben ser distintas.');var rr=await client.rpc('bc_guardar_producto_catalogo',{p_producto_id:null,p_nombre:name,p_categoria_id:catId,p_unidad:String(r.unidad||'').trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:nName||null,p_factor_normal:nFac,p_presentacion_mayorista:wName||null,p_factor_mayorista:wFac,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)});if(rr.error)throw rr.error;ok++;}catch(err){if(fail.length<10)fail.push(err.message||String(err));}}
         body.innerHTML='<p class="'+(fail.length?'bc-pulido-import-warn':'bc-pulido-import-ok')+'">'+ok+' producto(s) importado(s).'+(fail.length?' '+fail.length+' con error.':'')+'</p>'+(fail.length?'<p class="bc-pulido-import-error">'+fail.map(esc).join('<br>')+'</p>':'');if(typeof window.refrescarProductos==='function')await window.refrescarProductos();await fetchPres();
       }catch(err){body.innerHTML='<p class="bc-pulido-import-error">'+esc(err.message||String(err))+'</p>';}};
   }

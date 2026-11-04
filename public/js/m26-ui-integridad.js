@@ -28,7 +28,9 @@
     var modal = document.getElementById('productos-nomenclatura-modal');
     if (!productos || !modal) return;
     document.querySelectorAll('#productos-tools-nomenclatura,#productos-nomenclatura-btn').forEach(function (el) {
-      if (!el.closest('#tab-productos')) el.remove();
+      // M75 owns the catalog entry in Administration. Keep its toolbar there
+      // when this routine prepares the native nomenclature modal.
+      if (!el.closest('#tab-productos') && !el.closest('#bc-product-catalog-entry')) el.remove();
     });
     var slots = {
       'lista-categorias': 'prod-nom-categorias-slot',
@@ -40,6 +42,8 @@
       var el = document.getElementById(id), slot = document.getElementById(slots[id]);
       if (!el || !slot) return;
       var panel = el.closest('.tab-panel');
+      var adminEntry = document.getElementById('bc-product-catalog-entry');
+      var nomenclatureToolbar = document.getElementById('productos-tools-nomenclatura');
       var candidatos = [
         el.closest('.cc-bloque'),
         el.closest('.card'),
@@ -47,15 +51,17 @@
         el.closest('.presentaciones-producto'),
         el.parentElement
       ].filter(Boolean);
-      // Never move an ancestor that contains a tab panel. In particular, a
-      // shared .cc-bloque around #tab-config would hide Configuration in this
-      // modal even though #tab-config keeps the same direct parent.
+      // Never move an ancestor that contains a tab panel or M75's Administration
+      // entry. Catalogs can share a .cc-bloque with that entry; moving the whole
+      // block would silently detach the nomenclature toolbar from Administration.
       var bloque = candidatos.find(function (candidate) {
-        return !panel || (
+        return (!panel || (
           panel.contains(candidate) &&
           candidate !== panel &&
           !candidate.contains(panel)
-        );
+        )) &&
+        !(adminEntry && (candidate === adminEntry || candidate.contains(adminEntry))) &&
+        !(nomenclatureToolbar && (candidate === nomenclatureToolbar || candidate.contains(nomenclatureToolbar)));
       });
       if (!bloque) return; // catalogos.js wraps just the related heading/form/list on demand.
       if (!slot.contains(bloque)) slot.appendChild(bloque);
@@ -146,7 +152,7 @@
     var normal = document.getElementById('prod-precio-normal');
     var mayorista = document.getElementById('prod-precio-mayorista');
     var imageWrap = form.querySelector('.prod-imagen-campo');
-    var presCfg = document.getElementById('prod-presentaciones-config');
+    var legacyPresCfg = document.getElementById('prod-presentaciones-config');
     var submitBtn = document.getElementById('prod-submit-btn');
     var cancelEdit = document.getElementById('prod-cancelar-edicion');
     var editId = document.getElementById('prod-editando-id');
@@ -160,9 +166,9 @@
     var right = document.createElement('div');
     right.className = 'bc-product-form-image';
 
-    function fieldBlock(el, labelText) {
+    function fieldBlock(el, labelText, className) {
       var box = document.createElement('div');
-      box.className = 'bc-product-field';
+      box.className = className || 'bc-product-field';
       var lab = document.createElement('label');
       lab.textContent = labelText;
       if (el.id) lab.setAttribute('for', el.id);
@@ -172,22 +178,47 @@
     }
 
     left.appendChild(fieldBlock(nombre, 'Nombre'));
-    left.appendChild(fieldBlock(categoria, 'Categoría'));
     left.appendChild(fieldBlock(normal, 'Precio normal'));
-    left.appendChild(fieldBlock(mayorista, 'Precio mayorista'));
     right.appendChild(imageWrap);
     top.appendChild(left);
     top.appendChild(right);
 
-    var presSection = document.createElement('div');
-    presSection.className = 'bc-product-form-pres';
-    if (presCfg) {
-      var presTitle = document.createElement('div');
-      presTitle.className = 'bc-product-form-pres-title';
-      presTitle.textContent = 'Presentación';
-      presSection.appendChild(presTitle);
-      presSection.appendChild(presCfg);
-    }
+    // The product modal has one commercial-options owner. Category, wholesale
+    // price and the last approved label/factor pairs all live in this panel.
+    if (legacyPresCfg) legacyPresCfg.remove();
+    mayorista.removeAttribute('required');
+    mayorista.placeholder = 'Precio mayorista (opcional)';
+
+    var commercial = document.createElement('section');
+    commercial.id = 'bc-product-commercial-settings';
+    commercial.className = 'bc-product-commercial-settings';
+
+    var commercialToggle = document.createElement('button');
+    commercialToggle.type = 'button';
+    commercialToggle.id = 'bc-product-commercial-toggle';
+    commercialToggle.className = 'bc-product-commercial-toggle';
+    commercialToggle.setAttribute('aria-expanded', 'false');
+    commercialToggle.setAttribute('aria-controls', 'bc-product-commercial-panel');
+    commercialToggle.innerHTML =
+      '<span class="bc-product-commercial-toggle-copy"><strong>Configurar opciones comerciales</strong><small>Categoría, precio mayorista, presentaciones y factores</small></span>' +
+      '<span class="bc-product-commercial-chevron" aria-hidden="true">⌄</span>';
+
+    var commercialPanel = document.createElement('div');
+    commercialPanel.id = 'bc-product-commercial-panel';
+    commercialPanel.className = 'bc-product-commercial-panel hidden';
+    commercialPanel.hidden = true;
+
+    var commercialFields = document.createElement('div');
+    commercialFields.className = 'bc-product-commercial-fields';
+    commercialFields.appendChild(fieldBlock(categoria, 'Categoría (opcional)', 'bc-product-commercial-field'));
+    commercialFields.appendChild(fieldBlock(mayorista, 'Precio mayorista (opcional)', 'bc-product-commercial-field'));
+    commercialPanel.appendChild(commercialFields);
+    commercialToggle.addEventListener('click', function () {
+      setCommercialOptionsExpanded(commercialToggle.getAttribute('aria-expanded') !== 'true');
+    });
+    commercial.appendChild(commercialToggle);
+    commercial.appendChild(commercialPanel);
+    setCommercialOptionsExpanded(false);
 
     var actions = document.createElement('div');
     actions.className = 'bc-product-form-actions';
@@ -211,6 +242,7 @@
     var dl = document.getElementById('unidades-comunes');
     if (editId) form.appendChild(editId);
     form.appendChild(top);
+    form.appendChild(commercial);
     if (unidad) {
       unidad.style.display = 'none';
       form.appendChild(unidad);
@@ -219,7 +251,6 @@
       dl.style.display = 'none';
       form.appendChild(dl);
     }
-    form.appendChild(presSection);
     form.appendChild(actions);
 
     form.dataset.bcLayoutV925 = '1';
@@ -303,6 +334,10 @@
     var edit = !!(editando && editando.value);
     if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
     if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
+    setCommercialOptionsExpanded(edit && !!(
+      (document.getElementById('prod-categoria') && document.getElementById('prod-categoria').value) ||
+      (document.getElementById('prod-precio-mayorista') && document.getElementById('prod-precio-mayorista').value.trim())
+    ));
     ocultarCampoUnidad(form);
     form.classList.remove('hidden');
     modal.classList.remove('hidden');
@@ -312,9 +347,30 @@
     if (nombre) setTimeout(function () { try { nombre.focus(); } catch (e) {} }, 0);
   }
 
-  // API estable para que el alta/edición use este único modal y no mueva el formulario entre overlays.
+  function setCommercialOptionsExpanded(expanded) {
+    var button = document.getElementById('bc-product-commercial-toggle');
+    var panel = document.getElementById('bc-product-commercial-panel');
+    if (!button || !panel) return false;
+    var open = !!expanded;
+    panel.hidden = !open;
+    panel.classList.toggle('hidden', !open);
+    button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var chevron = button.querySelector('.bc-product-commercial-chevron');
+    if (chevron) chevron.textContent = open ? '⌃' : '⌄';
+    return true;
+  }
+
+  // API estable para que el alta/edición use este único modal y comparta una sola
+  // configuración comercial entre categoría, mayorista y pares etiqueta/factor.
   window.__BCM26_openProductModal = mostrarFormularioProducto;
   window.__BCM26_closeProductModal = cerrarModalProducto;
+  window.__BCM26_setCommercialOptionsExpanded = setCommercialOptionsExpanded;
+  window.__BCM26_ensureCommercialOptions = function () {
+    var form = document.getElementById('form-producto');
+    if (!form) return false;
+    if (form.dataset.bcLayoutV925 !== '1') aplicarLayoutFormularioProducto(form);
+    return !!document.getElementById('bc-product-commercial-panel');
+  };
 
   function ocultarFormularioProducto() {
     cerrarModalProducto(false);
@@ -370,13 +426,19 @@
       '#bc-product-modal .prod-imagen-preview-wrap.hidden{display:none!important}',
       '#bc-product-modal .prod-imagen-preview{display:block;width:100%;max-width:110px;height:72px;object-fit:cover;border-radius:8px;background:rgba(255,255,255,.04)}',
       '#bc-product-modal .btn-quitar-imagen{width:100%;font-size:11px;padding:6px 8px;margin:0;border-radius:8px;line-height:1.2;white-space:normal}',
-      '#bc-product-modal .bc-product-form-pres{margin:0}',
-      '#bc-product-modal .bc-product-form-pres-title{display:none}',
-      '#bc-product-modal .prod-pres-config{margin:0;padding:12px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(10,22,18,.55)}',
-      '#bc-product-modal .prod-pres-config legend{padding:0 4px;font-weight:600;font-size:13px}',
-      '#bc-product-modal .prod-pres-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
-      '#bc-product-modal .prod-pres-config .field label,#bc-product-modal .prod-pres-config small{font-size:11px}',
-      '#bc-product-modal .prod-pres-config select,#bc-product-modal .prod-pres-config input{height:38px;min-height:38px;box-sizing:border-box}',
+      '#bc-product-modal .bc-product-commercial-settings{width:100%;border:1px solid rgba(201,162,77,.22);border-radius:11px;background:rgba(10,22,18,.44);overflow:hidden}',
+      '#bc-product-modal .bc-product-commercial-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border:0;background:rgba(201,162,77,.08);color:var(--text);text-align:left;cursor:pointer}',
+      '#bc-product-modal .bc-product-commercial-toggle-copy{display:flex;flex-direction:column;gap:3px;min-width:0}',
+      '#bc-product-modal .bc-product-commercial-toggle strong{font-size:12.5px;font-weight:700;color:var(--gold-bright)}',
+      '#bc-product-modal .bc-product-commercial-toggle small{font-size:10px;line-height:1.35;color:var(--mist)}',
+      '#bc-product-modal .bc-product-commercial-chevron{flex:0 0 auto;font-size:20px;line-height:1;color:var(--gold-bright)}',
+      '#bc-product-modal .bc-product-commercial-panel{display:block;padding:10px 12px 12px}',
+      '#bc-product-modal .bc-product-commercial-panel[hidden],#bc-product-modal .bc-product-commercial-panel.hidden{display:none!important}',
+      '#bc-product-modal .bc-product-commercial-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:8px}',
+      '#bc-product-modal .bc-product-commercial-field{display:flex;flex-direction:column;gap:4px;min-width:0}',
+      '#bc-product-modal .bc-product-commercial-field label{display:block!important;font-size:10px;font-weight:600;line-height:1.25;color:var(--mist)}',
+      '#bc-product-modal .bc-product-commercial-field input,#bc-product-modal .bc-product-commercial-field select{width:100%;height:36px;min-height:36px;box-sizing:border-box;padding:0 9px;border-radius:8px;background:#0a1612;border:1px solid rgba(255,255,255,.12);color:inherit;font:500 11.5px Inter,sans-serif}',
+      '#bc-product-modal .bc-product-commercial-field input:focus,#bc-product-modal .bc-product-commercial-field select:focus{outline:none;border-color:#c9a24d;box-shadow:0 0 0 1px rgba(201,162,77,.25)}',
       '#bc-product-modal .bc-product-form-actions{display:flex;flex-direction:column;gap:0;border-top:none;padding-top:2px;margin-top:0}',
       '#bc-product-modal .bc-product-form-actions #bc-product-modal-cancel{display:none!important}',
       '#bc-product-modal .bc-product-form-actions #prod-submit-btn{margin:0;width:100%;border:0;border-radius:12px;padding:13px 16px;font-weight:600;font-size:15px;background:#c9a24d;color:#0c1c18;cursor:pointer;height:auto!important;min-height:0!important}',
@@ -385,7 +447,7 @@
       '#bc-product-modal #form-producto.inline-form{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:12px!important}',
       '#bc-product-modal #form-producto.inline-form>*{flex:none!important;width:auto}',
       '#bc-product-modal #form-producto.inline-form input,#bc-product-modal #form-producto.inline-form select{flex:none!important}',
-      '@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}#bc-product-modal{padding:8px;align-items:flex-start}#bc-product-modal .bc-product-modal-dialog{width:100%;border-radius:14px}#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:start}#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:120px}#bc-product-modal .bc-product-field input,#bc-product-modal .bc-product-field select{height:40px!important;min-height:40px!important;max-height:40px!important;line-height:40px}#bc-product-modal .prod-pres-grid{grid-template-columns:1fr}}'
+      '@media(max-width:700px){#lista-productos.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#lista-productos.bc-grid>.lista-item{padding:7px}#bc-product-modal{padding:8px;align-items:flex-start}#bc-product-modal .bc-product-modal-dialog{width:100%;border-radius:14px}#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 120px;gap:10px;align-items:start}#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:120px}#bc-product-modal .bc-product-field input,#bc-product-modal .bc-product-field select{height:40px!important;min-height:40px!important;max-height:40px!important;line-height:40px}#bc-product-modal .bc-product-commercial-fields{grid-template-columns:1fr}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -401,9 +463,11 @@
     // Siempre: CSS + ocultar form (idempotente, aunque ya se haya simplificado)
     inyectarEstilosProductos();
     asegurarModalProducto();
-    ocultarFormularioProducto();
 
+    // The boot retry may run after the owner has already opened the modal.
+    // Once compact mode is initialized, do not close an active form on retries.
     if (panel.dataset.bcSimple === '1') return true;
+    ocultarFormularioProducto();
     panel.dataset.bcSimple = '1';
     limpiarInterfazAgregarProducto();
     form = document.getElementById('form-producto');
@@ -451,7 +515,9 @@
         if (typeof cancelarEdicionProducto === 'function') {
           try { cancelarEdicionProducto(); } catch (err) {}
         }
-        mostrarFormularioProducto();
+        var openNativeProductModal = window.__BCM26_openProductModal;
+        if (typeof openNativeProductModal === 'function') openNativeProductModal();
+        else mostrarFormularioProducto();
       });
       controles.appendChild(agregar);
       barra.appendChild(controles);

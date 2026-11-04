@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.59">
+<link rel="stylesheet" href="style.css?v=9.5.60">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 #app-shell.visible:not([data-bc-permisos-cargados="1"]) #tabs .tab-btn[data-tab],
@@ -82,7 +82,7 @@
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
       <a class="login-utility bc-bootstrap-entry" id="bootstrap-first-admin-link" href="bootstrap.html">Inicializar primer administrador</a>
-      <p class="footnote app-version-label">v9.5.59 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.60 — BattleCruiser</p>
     </form>
   </div>
 
@@ -211,10 +211,19 @@
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
         <div class="prod-imagen-campo">
-          <label for="prod-imagen-input" class="prod-imagen-label">Imagen del producto (JPG o PNG, opcional)</label>
-          <input type="file" id="prod-imagen-input" accept="image/jpeg,image/png,image/jpg">
+          <label class="prod-imagen-label">Imagen del producto</label>
+          <div class="prod-imagen-selector">
+            <input type="file" id="prod-imagen-input" class="prod-imagen-input-oculto" accept="image/jpeg,image/png,image/jpg" aria-label="Archivo de imagen del producto">
+            <button type="button" id="prod-imagen-elegir" class="prod-imagen-elegir" title="Seleccionar imagen" aria-label="Seleccionar imagen del producto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3A1.5 1.5 0 0 1 21.5 9v9A1.5 1.5 0 0 1 20 19.5H4A1.5 1.5 0 0 1 2.5 18V9A1.5 1.5 0 0 1 4 7.5Z"/>
+                <circle cx="12" cy="13" r="3.2"/>
+              </svg>
+            </button>
+            <span id="prod-imagen-nombre" class="prod-imagen-nombre">Sin imagen</span>
+          </div>
           <div id="prod-imagen-preview-wrap" class="prod-imagen-preview-wrap hidden">
-            <img id="prod-imagen-preview" class="prod-imagen-preview" alt="Vista previa de la imagen del producto">
+            <img id="prod-imagen-preview" class="prod-imagen-preview" alt="Vista previa cuadrada de la imagen del producto">
             <button type="button" id="prod-imagen-quitar" class="btn-quitar-imagen">Quitar imagen</button>
           </div>
           <div id="msg-prod-imagen" class="msg"></div>
@@ -650,13 +659,13 @@
 <script src="js/loading-guard.js"></script>
 <script src="js/centro-control.js"></script>
 <script src="js/navegacion.js?v=20261030.1"></script>
-<script src="js/productos.js?v=20261015.1"></script>
+<script src="js/productos.js?v=20261103.2"></script>
 <script src="js/presentaciones.js"></script>
 <script src="js/almacenes.js"></script>
 <script src="js/transferencias.js"></script>
 <script src="js/vales.js"></script>
 <script src="js/ventas.js?v=20261102.1"></script>
-<script src="js/catalogos.js?v=20261016.5"></script>
+<script src="js/catalogos.js?v=20261103.2"></script>
 <script src="js/usuarios-permisos.js"></script>
 <script src="js/mando.js"></script>
 <script src="js/reportes.js?v=20261022.2"></script>
@@ -669,6 +678,6 @@
 <script src="js/comunicacion.js"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.59"></script>
+<script src="app.js?v=9.5.60"></script>
 </body>
 </html>

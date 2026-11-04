@@ -12,6 +12,11 @@
   function norm(v){return String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ')}
   function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]})}
   function msg(t,ok){if(typeof window.setMsg==='function') window.setMsg('msg-productos',t,ok); else {var e=document.getElementById('msg-productos');if(e)e.textContent=t;}}
+  function closeProductModal(){
+    if(typeof window.__BCM26_closeProductModal==='function')return window.__BCM26_closeProductModal(false);
+    if(typeof window.__BC171_close==='function')return window.__BC171_close();
+    return false;
+  }
   function key(prod,alm){return String(prod||'')+'::'+String(alm||'')}
   function getAlmList(){
     var a=Array.isArray(window._cache&&_cache.almacenes)?_cache.almacenes:[];
@@ -35,6 +40,15 @@
       +'.bc-pres-box .field{margin:0 0 8px}'
       +'.bc-pres-meta{font-size:11px;color:var(--mist);margin-top:5px;line-height:1.35}'
       +'.bc-pres-custom{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:8px;margin-top:8px}'
+      +'.bc-pres-grid-compact{display:flex!important;flex-direction:column!important;gap:7px!important;margin-top:8px!important}'
+      +'.bc-pres-section-title{font-size:10.5px;font-weight:700;color:var(--mist);margin:2px 0 0}'
+      +'.bc-pres-grid-compact .bc-pres-row{grid-template-columns:84px minmax(0,1fr) 92px}'
+      + '@media(max-width:700px){.bc-pres-grid-compact .bc-pres-row{grid-template-columns:64px minmax(0,1fr) 78px;gap:5px;padding:6px}.bc-pres-row-title{font-size:9.5px}}'
+      + '@media(max-width:360px){.bc-pres-grid-compact .bc-pres-row{grid-template-columns:1fr 1fr}.bc-pres-row-title{grid-column:1/-1}}'
+      +'.bc-pres-row{display:grid;grid-template-columns:84px minmax(0,1fr) 92px;gap:7px;align-items:center;padding:7px;border:1px solid rgba(212,176,92,.14);border-radius:8px;background:rgba(8,20,17,.28)}'
+      +'.bc-pres-row-title{font-size:10.5px;color:var(--gold-bright);white-space:nowrap}'
+      +'.bc-pres-row input{min-width:0;width:100%;height:34px;min-height:34px;padding:0 8px;font-size:10.5px;box-sizing:border-box}'
+      +'.bc-pres-optional-note{grid-column:1/-1;margin:0;font-size:9.5px;color:var(--mist);line-height:1.3}'
       +'.bc-product-save-status{grid-column:1/-1;min-height:18px;font-size:12px}'
       +'.bc-catalog-pres-panel{margin-top:14px}'
       +'.bc-catalog-pres-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}'
@@ -71,7 +85,7 @@
   async function preloadStock(force){
     if(STOCK_LOADING && !force) return;
     if(STOCK_READY && !force) return;
-    if(typeof window.client==='undefined'||!client||typeof client.rpc!=='function') return;
+    if(typeof client==='undefined'||!client||typeof client.rpc!=='function') return;
     STOCK_LOADING=true;
     try{
       var r=await client.rpc('bc_stock_operativo');
@@ -170,7 +184,7 @@
   }
   async function ensureWarehouses(){
     fillWarehouseSelects();
-    if(getAlmList().length||typeof window.client==='undefined'||!client||!client.from)return;
+    if(getAlmList().length||typeof client==='undefined'||!client||!client.from)return;
     try{var r=await client.from('almacenes').select('id,nombre,tipo,activo').eq('activo',true).order('nombre');if(!r.error){if(window._cache)_cache.almacenes=r.data||[];fillWarehouseSelects();}}catch(_){ }
   }
 
@@ -178,65 +192,103 @@
     var list=Array.isArray(window._presentacionesCache)?window._presentacionesCache:[];
     if(list.length)PRES_CACHE=list.slice();
     if(PRES_CACHE.length)return Promise.resolve(PRES_CACHE);
-    if(typeof window.client==='undefined'||!client||!client.from)return Promise.resolve(PRES_CACHE);
+    if(typeof client==='undefined'||!client||!client.from)return Promise.resolve(PRES_CACHE);
     return client.from('presentaciones').select('id,nombre,activo,created_at').eq('activo',true).order('nombre').then(function(r){if(!r.error&&Array.isArray(r.data)){PRES_CACHE=r.data.slice();window._presentacionesCache=PRES_CACHE.slice();}return PRES_CACHE;}).catch(function(){return PRES_CACHE;});
   }
   function ensurePresFields(){
     var form=document.getElementById('form-producto');if(!form)return false;
     form.classList.add('bc-pulido-form');
-    if(document.getElementById('bc-product-commercial-fields'))return true;
-    var box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid';box.innerHTML=
-      '<div class="bc-pres-box"><h4>Presentación normal</h4><div class="field"><label for="bc-pres-normal">Presentación</label><select id="bc-pres-normal"><option value="">Sin presentación</option></select></div><div id="bc-pres-normal-custom" class="bc-pres-custom hidden"><input id="bc-pres-normal-custom-name" placeholder="Ej. Paquete x 7"><input id="bc-pres-normal-custom-factor" type="number" step="0.0001" min="0.0001" placeholder="Unidades base"></div><div class="bc-pres-meta">Ej.: Unidad = 1. Se usa para la venta normal.</div></div>'+
-      '<div class="bc-pres-box"><h4>Presentación mayorista</h4><div class="field"><label for="bc-pres-wholesale">Presentación</label><select id="bc-pres-wholesale"><option value="">Sin presentación</option></select></div><div id="bc-pres-wholesale-custom" class="bc-pres-custom hidden"><input id="bc-pres-wholesale-custom-name" placeholder="Ej. Paquete x 7"><input id="bc-pres-wholesale-custom-factor" type="number" step="0.0001" min="0.0001" placeholder="7 unidades base"></div><div class="bc-pres-meta">Ej.: Paquete x 7 + factor 7 = cada venta descuenta 7 unidades base.</div></div>';
-    var submit=form.querySelector('#prod-submit-btn');
-    var host=submit&&submit.parentNode===form?submit.parentNode:null;
-    if(host)form.insertBefore(box,host.querySelector('.prod-imagen-campo')||submit); else form.appendChild(box);
-    ['bc-pres-normal','bc-pres-wholesale'].forEach(function(id){var s=document.getElementById(id);if(!s)return;s.addEventListener('change',function(){var custom=document.getElementById(id==='bc-pres-normal'?'bc-pres-normal-custom':'bc-pres-wholesale-custom');if(custom)custom.classList.toggle('hidden',s.value!=='__otro__');});});
-    loadPresentaciones().then(function(list){fillPresSelect('bc-pres-normal',list);fillPresSelect('bc-pres-wholesale',list);});
+    if(typeof window.__BCM26_ensureCommercialOptions==='function')window.__BCM26_ensureCommercialOptions();
+    // Remove any stale copy left by an older cached script before building the
+    // sole approved label + factor editor inside the commercial-options panel.
+    var legacy=document.getElementById('prod-presentaciones-config');if(legacy)legacy.remove();
+    var host=document.getElementById('bc-product-commercial-panel');
+    if(!host)return false;
+    var box=document.getElementById('bc-product-commercial-fields');
+    if(box){
+      if(box.parentNode!==host)host.appendChild(box);
+      return true;
+    }
+    box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
+    box.innerHTML=
+      '<div class="bc-pres-section-title">Presentaciones y factores</div>'+
+      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Minorista</strong><input id="bc-pres-normal-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Unidad)" aria-label="Etiqueta de presentación minorista"><input id="bc-pres-normal-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 1)" aria-label="Factor numérico minorista"></div>'+
+      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Bolso)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
+      '<p class="bc-pres-optional-note">Configura únicamente las presentaciones que utilices. Cada una requiere etiqueta y factor positivo; deja ambas vacías si no aplica.</p>';
+    host.appendChild(box);
+    loadPresentaciones();
     return true;
   }
-  function fillPresSelect(id,list){var s=document.getElementById(id);if(!s)return;var old=s.value;var html='<option value="">Sin presentación</option>';list.forEach(function(p){html+='<option value="'+esc(p.id)+'">'+esc(p.nombre)+'</option>';});html+='<option value="__otro__">Otro…</option>';s.innerHTML=html;if(old&&Array.from(s.options).some(function(o){return o.value===old;}))s.value=old;}
   function selectedPres(which){
-    var isW=which==='wholesale',sel=document.getElementById(isW?'bc-pres-wholesale':'bc-pres-normal');
-    if(!sel||!sel.value)return{name:null,factor:null,id:null};
-    if(sel.value==='__otro__'){
-      var name=document.getElementById(isW?'bc-pres-wholesale-custom-name':'bc-pres-normal-custom-name')?.value?.trim()||'';
-      var fac=Number(document.getElementById(isW?'bc-pres-wholesale-custom-factor':'bc-pres-normal-custom-factor')?.value);
-      return{name:name||null,factor:fac>0?fac:null,id:null};
-    }
-    var hit=PRES_CACHE.find(function(p){return String(p.id)===String(sel.value);});
-    return{name:hit?hit.nombre:null,factor:null,id:sel.value};
+    var isWholesale=which==='wholesale';
+    var nameEl=document.getElementById(isWholesale?'bc-pres-wholesale-name':'bc-pres-normal-name');
+    var factorEl=document.getElementById(isWholesale?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+    var name=nameEl?(nameEl.value||'').trim():'';
+    var raw=factorEl?(factorEl.value||'').trim():'';
+    if(!name&&!raw)return{name:null,factor:null,id:null};
+    return{name:name||null,factor:raw===''?null:Number(raw),id:null};
   }
+
   async function loadProductPres(productId){
-    if(!productId||typeof window.client==='undefined'||!client||!client.from)return[];
-    try{var r=await client.from('producto_presentaciones').select('id,presentacion_id,factor,activo,presentaciones(id,nombre)').eq('producto_id',productId).eq('activo',true).order('created_at');if(!r.error&&Array.isArray(r.data))return r.data;}
-    catch(_){ }
+    if(!productId||typeof client==='undefined'||!client||!client.from)return[];
+    try{
+      var r=await client.from('producto_presentaciones')
+        .select('id,presentacion_id,factor,activo,presentaciones(id,nombre)')
+        .eq('producto_id',productId).eq('activo',true).order('created_at');
+      if(!r.error&&Array.isArray(r.data))return r.data;
+    }catch(_){ }
     return[];
   }
+
   async function hydrateEditPres(productId){
-    ensurePresFields();await loadPresentaciones();fillPresSelect('bc-pres-normal',PRES_CACHE);fillPresSelect('bc-pres-wholesale',PRES_CACHE);
-    var rows=await loadProductPres(productId);if(!rows.length)return;
-    var normal=rows.find(function(r){return Number(r.factor)===1;})||rows[0];
-    var wholesale=null;
-    try{var prod=activeProducts().find(function(p){return String(p.id)===String(productId);});if(prod&&prod.presentacion_id)wholesale=rows.find(function(r){return String(r.presentacion_id)===String(prod.presentacion_id);})||null;}catch(_){ }
-    if(!wholesale&&rows.length>1)wholesale=rows[rows.length-1];
-    function setRow(selId,customId,row){var s=document.getElementById(selId);if(!s||!row)return;var pid=row.presentacion_id;if(PRES_CACHE.some(function(p){return String(p.id)===String(pid);}))s.value=pid;else{s.value='__otro__';} if(s.value==='__otro__'){var ov=document.getElementById(customId);if(ov)ov.classList.remove('hidden');var nm=document.getElementById(customId==='bc-pres-normal-custom'?'bc-pres-normal-custom-name':'bc-pres-wholesale-custom-name');var fc=document.getElementById(customId==='bc-pres-normal-custom'?'bc-pres-normal-custom-factor':'bc-pres-wholesale-custom-factor');if(nm)nm.value=row.presentaciones?.nombre||'';if(fc)fc.value=row.factor||'';}}
-    setRow('bc-pres-normal','bc-pres-normal-custom',normal);if(wholesale) setRow('bc-pres-wholesale','bc-pres-wholesale-custom',wholesale);
+    ensurePresFields();
+    var rows=await loadProductPres(productId);
+    var prod=activeProducts().find(function(p){return String(p.id)===String(productId);});
+    var wholesaleId=prod&&prod.presentacion_id?String(prod.presentacion_id):null;
+    var wholesale=wholesaleId?rows.find(function(r){return String(r.presentacion_id)===wholesaleId;}):null;
+    var normal=rows.find(function(r){return !wholesaleId||String(r.presentacion_id)!==wholesaleId;})||null;
+    function setRow(kind,row){
+      var isW=kind==='wholesale';
+      var nameEl=document.getElementById(isW?'bc-pres-wholesale-name':'bc-pres-normal-name');
+      var factorEl=document.getElementById(isW?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+      if(nameEl)nameEl.value=row&&row.presentaciones?String(row.presentaciones.nombre||''):'';
+      if(factorEl)factorEl.value=row&&row.factor!=null?String(row.factor):'';
+    }
+    setRow('normal',normal);
+    setRow('wholesale',wholesale);
+    var category=document.getElementById('prod-categoria')?.value||'';
+    var wholesalePrice=document.getElementById('prod-precio-mayorista')?.value?.trim()||'';
+    var hasPresentation=!!(normal||wholesale);
+    if(typeof window.__BCM26_setCommercialOptionsExpanded==='function'){
+      window.__BCM26_setCommercialOptionsExpanded(!!(category||wholesalePrice||hasPresentation));
+    }
   }
+
   function patchEditBridge(){
     if(typeof window.iniciarEdicionProducto==='function'&&window.iniciarEdicionProducto.__bcPulido)return;
     var orig=window.iniciarEdicionProducto;
     window.iniciarEdicionProducto=function(p){
-      if(!p){return;}
-      var set=function(id,v){var e=document.getElementById(id);if(e)e.value=v==null?'':String(v);};
-      set('prod-editando-id',p.id);set('prod-nombre',p.nombre);set('prod-categoria',p.categoria_id);set('prod-unidad',p.unidad);set('prod-precio-normal',p.precio_normal);set('prod-precio-mayorista',p.precio_mayorista);
-      ensurePresFields();window.__BC171_open&&window.__BC171_open();hydrateEditPres(p.id);
-      var title=document.querySelector('#bc171-overlay .bc171-head h3');if(title)title.textContent='Editar producto';
-      var save=document.getElementById('bc171-save');if(save)save.textContent='Guardar cambios';
+      if(!p)return;
+      function set(id,value){var el=document.getElementById(id);if(el)el.value=value==null?'':String(value);}
+      set('prod-editando-id',p.id);
+      set('prod-nombre',p.nombre);
+      set('prod-categoria',p.categoria_id);
+      set('prod-unidad',p.unidad);
+      set('prod-precio-normal',p.precio_normal);
+      set('prod-precio-mayorista',p.precio_mayorista);
+      ensurePresFields();
+      if(typeof window.__BC171_open==='function')window.__BC171_open();
+      hydrateEditPres(p.id);
+      var title=document.querySelector('#bc171-overlay .bc171-head h3');
+      if(title)title.textContent='Editar producto';
+      var save=document.getElementById('bc171-save');
+      if(save)save.textContent='Guardar cambios';
       return true;
     };
-    window.iniciarEdicionProducto.__bcPulido=true;window.iniciarEdicionProducto.__bcPulidoOrig=orig;
+    window.iniciarEdicionProducto.__bcPulido=true;
+    window.iniciarEdicionProducto.__bcPulidoOrig=orig;
   }
+
   function discoverEditButtons(){
     document.querySelectorAll('#lista-productos button').forEach(function(b){
       if(!/editar/i.test(b.textContent||''))return;
@@ -252,17 +304,36 @@
     });
   }
   async function saveCatalogoProduct(e){
-    if(!document.getElementById('bc171-overlay'))return false;
+    var form=document.getElementById('form-producto');
+    var modal=document.getElementById('bc-product-modal');
+    // The sole supported owner is M26's native modal. Do not depend on the
+    // retired M17 overlay, which is intentionally absent in the current UI.
+    if(!form||!modal||!modal.contains(form))return false;
     e.preventDefault();e.stopImmediatePropagation();
     var id=document.getElementById('prod-editando-id')?.value||null;
+    var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return true;}
-    var save=document.getElementById('bc171-save');if(save)save.disabled=true;
+    var save=document.getElementById('prod-submit-btn')||document.getElementById('bc171-save');if(save)save.disabled=true;
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'';var pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
-    if((pn!==null&&!Number.isFinite(pn))||(pm!==null&&!Number.isFinite(pm))){msg('Los precios deben ser números válidos.',false);if(save)save.disabled=false;return true;}
+    if(pn===null||!Number.isFinite(pn)||pn<0.01){msg('El precio normal debe ser mayor a 0.',false);if(save)save.disabled=false;return true;}
+    if(pm!==null&&(!Number.isFinite(pm)||pm<0)){msg('El precio mayorista debe ser un número válido o dejarse vacío.',false);if(save)save.disabled=false;return true;}
     var normal=selectedPres('normal'), wholesale=selectedPres('wholesale');
-    if((normal.name&&!normal.factor&&normal.id==null)||(wholesale.name&&!wholesale.factor&&wholesale.id==null)){msg('Una presentación nueva necesita definir cuántas unidades base contiene.',false);if(save)save.disabled=false;return true;}
+    function presentationValid(value){
+      var hasName=!!(value.name&&String(value.name).trim());
+      var hasFactor=value.factor!==null&&value.factor!==undefined;
+      var factor=Number(value.factor);
+      return (!hasName&&!hasFactor)||(hasName&&hasFactor&&Number.isFinite(factor)&&factor>0);
+    }
+    if(!presentationValid(normal)||!presentationValid(wholesale)){
+      msg('Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero. Deja ambos vacíos si no aplica.',false);
+      if(save)save.disabled=false;return true;
+    }
+    if(normal.name&&wholesale.name&&norm(normal.name)===norm(wholesale.name)){
+      msg('Las etiquetas minorista y mayorista deben ser distintas.',false);
+      if(save)save.disabled=false;return true;
+    }
     if((normal.id&&!normal.factor)){
       var hitN=PRES_CACHE.find(function(p){return String(p.id)===String(normal.id);});normal.name=hitN?.nombre||null;normal.factor=null;
       try{var rn=await client.from('producto_presentaciones').select('factor').eq('producto_id',id||'00000000-0000-0000-0000-000000000000').eq('presentacion_id',normal.id).limit(1);if(rn.data?.[0])normal.factor=Number(rn.data[0].factor)||1;}catch(_){normal.factor=1;}
@@ -273,18 +344,32 @@
     }
     try{
       if(!navigator.onLine&&typeof window.ejecutarOperacion==='function'){
+        if(normal.name||normal.factor!==null||wholesale.name||wholesale.factor!==null){
+          msg('Para guardar presentaciones y factores necesitas conexión. No se guardó el producto ni se creó parcialmente.',false);
+          return true;
+        }
         var q=await window.ejecutarOperacion(id?'producto_actualizar':'producto',{...(id?{p_producto_id:id}:{}),p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm});
-        if(q?.ok){msg('✓ Producto guardado localmente. Las asociaciones comerciales se completarán al sincronizar.',true);window.__BC171_close&&window.__BC171_close();}else msg('No se pudo guardar offline.',false);
+        if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
         return true;
       }
-      if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
+      if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var params={p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())};
       var r=await client.rpc('bc_guardar_producto_catalogo',params);
       if(r.error)throw r.error;
+      var imageNotice='';
+      if(imageFile){
+        var savedProductId=id||r.data;
+        if(!savedProductId)throw Error('El producto se guardó, pero no se obtuvo su ID para subir la imagen.');
+        if(typeof window.subirImagenProducto!=='function')throw Error('El módulo de carga de imágenes no está disponible; selecciona de nuevo la imagen al editarlo.');
+        var imageResult=await window.subirImagenProducto(savedProductId,imageFile);
+        if(!imageResult.ok)imageNotice=' La imagen no se pudo subir; vuelve a seleccionarla al editar el producto.';
+        window.__BC_PRODUCT_IMAGE_FILE__=null;
+        var imageInput=document.getElementById('prod-imagen-input');if(imageInput)imageInput.value='';
+      }
       if(typeof window.refrescarProductos==='function')await window.refrescarProductos();
       await loadPresentaciones();
-      msg(id?'✓ Producto actualizado.':'✓ Producto creado.',true);
-      window.__BC171_close&&window.__BC171_close();
+      msg((id?'✓ Producto actualizado.':'✓ Producto creado.')+imageNotice,!imageNotice);
+      closeProductModal();
     }catch(err){msg((err&&err.message)||'No se pudo guardar el producto.',false);}finally{if(save)save.disabled=false;}
     return true;
   }
@@ -345,8 +430,13 @@
         var pn=pnRaw===''?null:Number(pnRaw),pm=pmRaw===''?null:Number(pmRaw);if(pn!==null&&!Number.isFinite(pn))throw Error('Fila '+(i+2)+': precio_normal inválido.');if(pm!==null&&!Number.isFinite(pm))throw Error('Fila '+(i+2)+': precio_mayorista inválido.');
         var normName=val(r,'presentacion_normal',['presentacion_normal','presentación normal','presentacion']),normFacRaw=val(r,'factor_normal',['factor_normal','factor normal']);
         var whName=val(r,'presentacion_mayorista',['presentacion_mayorista','presentación mayorista']),whFacRaw=val(r,'factor_mayorista',['factor_mayorista','factor mayorista']);
-        var nf=normName?(normFacRaw===''?1:Number(normFacRaw)):null,wf=whName?(whFacRaw===''?null:Number(whFacRaw)):null;if(normName&&(!(nf>0)))throw Error('Fila '+(i+2)+': factor_normal inválido.');if(whName&&(!(wf>0)))throw Error('Fila '+(i+2)+': factor_mayorista inválido.');
-        if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
+        var nf=normFacRaw===''?null:Number(normFacRaw),wf=whFacRaw===''?null:Number(whFacRaw);
+        var normalPair=(!normName&&normFacRaw==='')||(!!normName&&Number.isFinite(nf)&&nf>0);
+        var wholesalePair=(!whName&&whFacRaw==='')||(!!whName&&Number.isFinite(wf)&&wf>0);
+        if(!normalPair)throw Error('Fila '+(i+2)+': la presentación minorista requiere etiqueta y factor positivo, o ambos vacíos.');
+        if(!wholesalePair)throw Error('Fila '+(i+2)+': la presentación mayorista requiere etiqueta y factor positivo, o ambos vacíos.');
+        if(normName&&whName&&norm(normName)===norm(whName))throw Error('Fila '+(i+2)+': las etiquetas minorista y mayorista deben ser distintas.');
+        if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
         var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:val(r,'unidad',['unidad','unit','uom'])||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normName||null,p_factor_normal:nf,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
         var rr=await client.rpc('bc_guardar_producto_catalogo',p);if(rr.error)throw rr.error;ok++;
       }catch(err){fail++;if(errors.length<10)errors.push(err.message||String(err));}
@@ -375,7 +465,7 @@
   }
   function ensurePresentationCreateForm(){
     var f=document.getElementById('form-presentacion-nueva');if(!f)return;f.classList.remove('hidden');if(f.dataset.bcPulido==='1')return;f.dataset.bcPulido='1';
-    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();fillPresSelect('bc-pres-normal',PRES_CACHE);fillPresSelect('bc-pres-wholesale',PRES_CACHE);renderPresentationCatalog();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
+    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();renderPresentationCatalog();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
   }
 
   function cleanCommunicationEmpty(){
@@ -407,7 +497,7 @@
     setTimeout(function(){preloadStock(true);ensureWarehouses();patchStockGetter();patchEditBridge();},800);
     setTimeout(function(){productModalPolish();ensurePresFields();renderPresentationCatalog();discoverEditButtons();repaintStockCards();},1400);
     setTimeout(function(){normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
-    window.__BC_PULIDO_20260903_VERIFY=function(){return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialFields:!!document.getElementById('bc-product-commercial-fields')}};
+    window.__BC_PULIDO_20260903_VERIFY=function(){var panel=document.getElementById('bc-product-commercial-panel');var fields=document.getElementById('bc-product-commercial-fields');return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialPanel:!!panel,commercialPanelExpanded:!!(panel&&!panel.hidden),commercialFields:!!fields,commercialFieldCount:fields?fields.querySelectorAll('input').length:0,legacyPresentationBlock:!!document.getElementById('prod-presentaciones-config')}};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('online',function(){setTimeout(function(){preloadStock(true);ensureWarehouses();},300);});

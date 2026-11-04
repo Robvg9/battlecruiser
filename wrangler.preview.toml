@@ -1,0 +1,9 @@
+name = "battlecruiser-preview"
+account_id = "8146f4242cfc2ac9c1f89aa44e7b823d"
+main = "./preview-worker.mjs"
+compatibility_date = "2026-09-24"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/__bc_preview/*"]
