@@ -139,9 +139,11 @@ test("the legacy M17.2 module keeps price constraints but never adds a second su
   const verify = w.__BC172_verify();
   assert.equal(submitListeners, 0, "the retired module must not own the product submit");
   assert.equal(verify.legacySubmitHandler, false);
-  assert.equal(verify.normalPriceRequired, true);
+  assert.equal(verify.normalPriceOptional, true);
   assert.equal(verify.wholesalePriceOptional, true);
-  assert.equal(d.getElementById("prod-precio-normal").min, "0.01");
+  assert.equal(d.getElementById("prod-precio-normal").hasAttribute("required"), false);
+  assert.equal(d.getElementById("prod-precio-mayorista").hasAttribute("required"), false);
+  assert.equal(d.getElementById("prod-precio-normal").hasAttribute("min"), false);
   assert.equal(d.getElementById("prod-precio-mayorista").hasAttribute("min"), false);
   assert.equal(d.getElementById("prod-submit-btn").type, "submit");
 });
