@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function productos(){return(typeof _cache!=='undefined'&&Array.isArray(_cache.productos))?_cache.productos:[];}
+function productos(){const rows=(typeof _cache!=='undefined'&&Array.isArray(_cache.productos))?_cache.productos:[];return typeof productosOperativos==='function'?productosOperativos(rows):rows.filter(p=>!p.inventario_mixto||!!p.producto_padre_id);}
 function almacenes(){return(typeof _cache!=='undefined'&&Array.isArray(_cache.almacenes))?_cache.almacenes:[];}
 let lineas=[];
 function msg(t,ok){const e=document.getElementById('mov-multiple-msg');if(e){e.textContent=t;e.className='msg '+(ok?'success':'error');}}
