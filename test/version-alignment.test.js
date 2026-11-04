@@ -114,8 +114,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261030\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
-  assert.match(app, /\["hotfix-pulido-20260903\.js","20261103\.7"\]/);
-  assert.match(app, /\["hotfix-pulido-20260903b\.js","20261103\.1"\]/);
+  assert.match(app, /\["hotfix-pulido-20260903\.js","20261104\.3"\]/);
+  assert.match(app, /\["hotfix-pulido-20260903b\.js","20261104\.3"\]/);
   assert.match(app, /\["hotfix-17-final-loader-20260903\.js","20261030\.2"\]/);
   assert.doesNotMatch(app, /\["hotfix-17-13-configuracion-admin-visible-20260903\.js"/, "the legacy config label helper must not participate in route visibility");
   assert.match(sw, /\.\/js\/hotfix-17-13-configuracion-admin-visible-20260903\.js\?v=20261030\.3/, "the label-only helper remains available to the offline shell");
@@ -123,8 +123,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.61["']/);
-  assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261103\.7/);
-  assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261103\.1/);
+  assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261104\.3/);
+  assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261104\.3/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
@@ -255,7 +255,7 @@ test('Conectividad compacta: estilos y recursos críticos comparten caché renov
 
 test('Administration UI modules refresh their cache keys', () => {
   assert.match(app, /\["m26-ui-integridad\.js","26\.36"\]/);
-  assert.match(app, /\["roles-en-usuarios\.js","33\.3"\]/);
+  assert.match(app, /\["roles-en-usuarios\.js","33\.4"\]/);
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.6"\]/);
   assert.match(sw, /m26-ui-integridad\.js\?v=26\.36/);
   assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.6/);
