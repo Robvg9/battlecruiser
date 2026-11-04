@@ -95,43 +95,6 @@ function construirAsuntosAtencion(ops) {
     });
 }
 
-// (transferencias + vales + ventas), NO hace consultas nuevas. Cada
-// actividad indica tipo, hora y resultado. No crea una segunda auditoría.
-function construirActividadReciente() {
-  const movs = [];
-  (_cache.transferencias || []).forEach((t) => {
-    movs.push({
-      icono: "↔",
-      texto: "Transferencia: " + (t.origen && t.origen.nombre ? t.origen.nombre : "?") + " → " + (t.destino && t.destino.nombre ? t.destino.nombre : "?"),
-      fecha: t.fecha,
-      resultado: t.estado || "",
-    });
-  });
-  (_cache.vales || []).forEach((v) => {
-    movs.push({
-      icono: "📋",
-      texto: "Vale (" + (v.tipo || "?") + "): " + (v.productos && v.productos.nombre ? v.productos.nombre : "?") + " · " + (v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"),
-      fecha: v.fecha,
-      resultado: money(v.cantidad) + " u",
-    });
-  });
-  (_cache.ventas || []).forEach((v) => {
-    movs.push({
-      icono: "🛒",
-      texto: "Venta: " + (v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"),
-      fecha: v.fecha,
-      resultado: "$" + money(v.total),
-    });
-  });
-  return movs.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);
-}
-
-// ajustePendiente() (autoridad existente). El Centro de Control solo
-// presenta; NO recalcula stock independientemente.
-function construirStockBajo() {
-  return (_cache.stock || []).filter((s) => s.minimo != null && s.cantidad <= s.minimo);
-}
-
 function proyeccionStock(producto_id, almacen_id, stockReal) {
   const { ajuste, noCalculable } = ajustePendiente(producto_id, almacen_id);
   return {
@@ -235,70 +198,6 @@ function renderPendientesCompacto(asuntos) {
   el.appendChild(lista);
 }
 
-function renderActividadReciente() {
-  const el = document.getElementById("cc-actividad");
-  if (!el) return;
-  const movs = construirActividadReciente();
-  if (movs.length === 0) {
-    el.innerHTML = '<p class="lista-estado">Todavía no hay actividad registrada.</p>';
-    return;
-  }
-  el.innerHTML = "";
-  movs.forEach((m) => {
-    const div = document.createElement("div");
-    div.className = "cc-actividad-item cc-prioridad-normal";
-    const fechaTxt = m.fecha ? fechaHora(m.fecha) : "";
-    div.innerHTML =
-      '<span class="cc-actividad-icono">' + escHtml(m.icono) + "</span>" +
-      '<span class="cc-actividad-texto">' + escHtml(m.texto) + "</span>" +
-      '<span class="cc-actividad-meta">' +
-        '<span class="muted">' + escHtml(fechaTxt) + "</span>" +
-        '<span class="cc-actividad-resultado">' + escHtml(m.resultado) + "</span>" +
-      "</span>";
-    el.appendChild(div);
-  });
-}
-
-function renderInventarioControl() {
-  const el = document.getElementById("cc-inventario");
-  if (!el) return;
-  const bajo = construirStockBajo();
-  if (bajo.length === 0) {
-    el.innerHTML = '<p class="lista-estado">Nada bajo el mínimo por ahora.</p>';
-    return;
-  }
-  el.innerHTML = "";
-  bajo.slice(0, 5).forEach((s) => {
-    const prodId = s.producto_id;
-    const almId = s.almacen_id;
-    const div = document.createElement("div");
-    div.className = "cc-stock-item";
-    // existente). No recalcula stock independientemente.
-    const proj = proyeccionStock(prodId, almId, s.cantidad);
-    const ajusteTxt = proj.noCalculable
-      ? '<span class="muted">proyección no calculable</span>'
-      : (proj.ajuste === 0
-          ? ""
-          : '<span class="cc-stock-ajuste">' + (proj.ajuste > 0 ? "+" : "") + money(proj.ajuste) + " pend.</span>");
-    div.innerHTML =
-      '<span class="cc-stock-principal">' +
-        '<span class="cc-stock-nombre">' + escHtml(s.productos && s.productos.nombre ? s.productos.nombre : "?") +
-          ' <span class="muted">· ' + escHtml(s.almacenes && s.almacenes.nombre ? s.almacenes.nombre : "?") + "</span></span>" +
-        '<span class="cc-stock-proyeccion">' +
-          '<span class="cc-stock-real">' + money(s.cantidad) + "</span>" +
-          ajusteTxt +
-          (proj.noCalculable ? "" : '<span class="cc-stock-proj">Proy: ' + money(proj.proyeccion) + "</span>") +
-        "</span>" +
-      "</span>";
-    el.appendChild(div);
-  });
-  const ir = document.createElement("button");
-  ir.type = "button";
-  ir.className = "cc-accion cc-ir-inventario-btn";
-  ir.textContent = "Ver inventario";
-  el.appendChild(ir);
-}
-
 // Avisos complementarios de Jornada/Operación y Comunicación.
 // El Centro de Control ya muestra las alertas de cola, inventario y actividad: aquí
 // se incluyen solo los avisos únicos B7/B8 para evitar repetirlos.
@@ -369,8 +268,7 @@ async function refrescarCentroControl() {
   renderEstadoNegocio(estado);
   renderRequiereAtencion(asuntos);
   renderPendientesCompacto(asuntos);
-  renderInventarioControl();
-  renderActividadReciente();
+  renderResumen();
   await refrescarAvisosOperativosControl();
   refrescarBadgeCentroControl(asuntos);
 }
@@ -466,7 +364,7 @@ function renderResumen() {
     if (bajoMinimo.length === 0) {
       alertasEl.innerHTML = '<p class="lista-estado">Nada bajo el mínimo por ahora.</p>';
     } else {
-      // R3: alertas accionables. Misma defensa que renderInventarioControl:
+      // R3: alertas accionables. Misma defensa que el renderer único:
       // filas de stock pueden llegar sin joins productos/almacenes embebidos
       // (p.ej. proyección offline o datos parciales en _cache).
       alertasEl.innerHTML = "";
@@ -495,7 +393,7 @@ function renderResumen() {
     // R9: cada movimiento lleva tipo + id reales para ser accionable
     // (click/Enter navega a la sección correspondiente). Reutiliza _cache
     // (no consulta nueva). Incluye ventas (R2), transferencias y vales.
-    // Defensa idéntica a construirActividadReciente: joins pueden faltar.
+    // Defensa de datos parciales: joins pueden faltar.
     const movs = [
       ...(_cache.ventas || []).map((v) => ({
         tipo: "venta", id: v.id, fecha: v.fecha,
@@ -532,8 +430,6 @@ function renderResumen() {
       });
     }
   }
-  // actividad reciente e inventario. Cuando _cache cambia, refrescar el
-  // Centro tambien. No hace consultas nuevas: solo pinta desde _cache.
-  if (typeof refrescarCentroControl === "function") refrescarCentroControl();
+  // El refresco operativo invoca este renderer; evitar llamadas recursivas.
 }
 
