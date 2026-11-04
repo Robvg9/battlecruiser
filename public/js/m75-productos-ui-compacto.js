@@ -71,7 +71,7 @@
       '#bc-product-modal .prod-imagen-selector .prod-imagen-elegir:disabled{opacity:.55!important;cursor:wait!important}',
       '#bc-product-modal .prod-imagen-nombre{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:9px!important;color:var(--mist)!important}',
       '#bc-product-modal .prod-imagen-preview-wrap{align-items:flex-start!important;flex-direction:row!important;justify-content:flex-start!important;gap:7px!important}',
-      '#bc-product-modal .prod-imagen-preview{width:88px!important;height:88px!important;max-width:88px!important;aspect-ratio:1/1!important;object-fit:cover!important;border-radius:9px!important}'
+      '#bc-product-modal .prod-imagen-preview{width:88px!important;height:88px!important;max-width:88px!important;aspect-ratio:1/1!important;object-fit:cover!important;border-radius:9px!important}',
 
       '#bc-product-modal .prod-pres-config{padding:8px 9px!important;border-radius:9px!important}',
       '#bc-product-modal .prod-pres-config legend{font-size:11.5px!important;font-weight:600}',
