@@ -614,6 +614,11 @@
             </form>
             <p class="msg" id="msg-roles"></p><div id="lista-roles" class="lista"></div>
           </section>
+          <section class="cc-bloque bc-admin-card bc-admin-categories">
+            <div class="bc-admin-card-heading"><h3>Categorías</h3><span class="bc-admin-tag">Catálogo</span></div>
+            <p class="muted">Administra las categorías que organizan tus productos.</p>
+            <button type="button" id="bc-categories-open" class="cc-accion">Administrar categorías</button>
+          </section>
           <!-- One canonical commercial-presentation catalogue; no separate units CRUD or product-side copy. -->
           <section class="cc-bloque bc-admin-card bc-admin-presentations">
             <div class="bc-admin-card-heading"><h3>Presentaciones</h3><span class="bc-admin-tag">Catálogo único</span></div>
@@ -646,15 +651,22 @@
             </div>
             <p class="msg" id="msg-presentaciones" role="status" aria-live="polite"></p>
           </section>
-          <section class="cc-bloque bc-admin-card bc-admin-catalogs">
-            <div class="bc-admin-card-heading"><h3>Catálogos maestros</h3><span class="bc-admin-tag">Datos base</span></div>
-            <div class="bc-admin-catalog-grid">
+          <section id="bc-modal-categorias" class="bc-categories-modal" role="dialog" aria-modal="true" aria-labelledby="bc-categories-title" aria-hidden="true">
+            <div class="bc-categories-backdrop" data-bc-categories-close="1"></div>
+            <div class="bc-categories-panel">
+              <header class="bc-categories-head">
+                <div><h3 id="bc-categories-title">Categorías</h3><p class="muted">Añade categorías o cambia sus nombres sin alterar los productos asociados.</p></div>
+                <button type="button" class="bc-categories-close" data-bc-categories-close="1" aria-label="Cerrar categorías">×</button>
+              </header>
               <section class="bc-admin-subcard">
-                <h4>Categorías</h4>
-                <form id="form-categoria" class="inline-form"><input id="cat-nombre" placeholder="Nombre de la categoría" required><button type="submit">Agregar categoría</button></form>
+                <form id="form-categoria" class="inline-form">
+                  <input id="cat-nombre" placeholder="Nombre de la categoría" maxlength="80" required>
+                  <button type="submit">Agregar categoría</button>
+                  <button type="button" id="cat-cancelar-edicion" class="cc-accion hidden">Cancelar</button>
+                </form>
                 <div id="lista-categorias" class="lista"></div>
               </section>
-            </div>
+                  </div>
           </section>
         </div>
         <p class="msg" id="msg-config" role="status" aria-live="polite"></p>
