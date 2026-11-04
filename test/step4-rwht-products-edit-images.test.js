@@ -23,8 +23,11 @@ assert.ok(IMAGE_START >= 0 && IMAGE_END > IMAGE_START, "production image handler
 assert.ok(FORM_START >= 0 && FORM_END > FORM_START, "production product form handler must exist");
 
 const PRODUCTION_HANDLERS = [
-  "const PROD_IMAGEN_TIPOS_VALIDOS = ['image/jpeg', 'image/png'];",
-  "const PROD_IMAGEN_TAMANO_MAX = 5 * 1024 * 1024;",
+  "const PROD_IMAGEN_TIPOS_VALIDOS = ['image/jpeg', 'image/png', 'image/jpg'];",
+  "const PROD_IMAGEN_TAMANO_ORIGINAL_MAX = 15 * 1024 * 1024;",
+  "const PROD_IMAGEN_LADO_MAX = 512;",
+  "let _productoImagenProcesada = null;",
+  "let _productoImagenPreviewObjectUrl = null;",
   SOURCE.slice(EDIT_START, EDIT_END),
   SOURCE.slice(IMAGE_START, IMAGE_END),
   SOURCE.slice(FORM_START, FORM_END)
@@ -69,6 +72,18 @@ function setup() {
 
   window.HTMLElement.prototype.scrollIntoView = function () {};
   window.URL.createObjectURL = (file) => "blob:fixture:" + file.name;
+  window.URL.revokeObjectURL = () => {};
+  window.Image = class {
+    constructor() { this.naturalWidth = 1600; this.naturalHeight = 900; }
+    set src(value) { this._src = value; if (typeof this.onload === "function") this.onload(); }
+  };
+  window.HTMLCanvasElement.prototype.getContext = function () {
+    return { drawImage: (...args) => { window.__BC_DRAW_IMAGE_ARGS__ = args; } };
+  };
+  window.HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+    window.__BC_CANVAS_SIZE__ = { width: this.width, height: this.height, type, quality };
+    callback(new window.Blob(["optimized-image"], { type: "image/jpeg" }));
+  };
   window.safeInit = (name, callback) => {
     if (["prod-cancelar-edicion", "prod-imagen-input", "form-producto"].includes(name)) {
       callback();
@@ -200,13 +215,13 @@ test("Paso 4 RWHT 025: el selector de imagen rechaza formatos no permitidos y ar
   assert.match(c.document.getElementById("msg-prod-imagen").textContent, /Formato no permitido/i);
   assert.equal(wrap.classList.contains("hidden"), true);
 
-  setFiles(input, [{ name: "gigante.jpg", type: "image/jpeg", size: 5 * 1024 * 1024 + 1 }]);
+  setFiles(input, [{ name: "gigante.jpg", type: "image/jpeg", size: 15 * 1024 * 1024 + 1 }]);
   input.dispatchEvent(new c.window.Event("change", { bubbles: true }));
-  assert.match(c.document.getElementById("msg-prod-imagen").textContent, /máximo 5MB/i);
+  assert.match(c.document.getElementById("msg-prod-imagen").textContent, /máximo de 15MB/i);
   assert.equal(wrap.classList.contains("hidden"), true);
 });
 
-test("Paso 4 RWHT 025: una imagen JPG/PNG permitida genera vista previa sin subirla", (t) => {
+test("Paso 4 RWHT 025: una imagen JPG/PNG se recorta al centro, limita a 512x512 y genera vista previa sin subirla", async (t) => {
   const c = setup();
   t.after(() => c.dom.window.close());
   const input = c.document.getElementById("prod-imagen-input");
@@ -216,8 +231,17 @@ test("Paso 4 RWHT 025: una imagen JPG/PNG permitida genera vista previa sin subi
   setFiles(input, [{ name: "producto.png", type: "image/png", size: 2048 }]);
   input.dispatchEvent(new c.window.Event("change", { bubbles: true }));
 
-  assert.equal(preview.src, "blob:fixture:producto.png");
+  assert.ok(await waitFor(() => preview.src === "blob:fixture:producto.jpg"), "la previsualización debe usar el archivo procesado");
   assert.equal(wrap.classList.contains("hidden"), false);
+  assert.deepEqual(c.window.__BC_CANVAS_SIZE__, {
+    width: 512, height: 512, type: "image/jpeg", quality: 0.84
+  });
+  assert.deepEqual(c.window.__BC_PRODUCT_IMAGE_DIMENSIONS__, {
+    width: 512, height: 512, cropLeft: 350, cropTop: 0, cropSide: 900
+  });
+  assert.equal(c.window.__BC_PRODUCT_IMAGE_FILE__.type, "image/jpeg");
+  assert.equal(c.window.__BC_PRODUCT_IMAGE_FILE__.size, 15);
+  assert.match(c.document.getElementById("msg-prod-imagen").textContent, /formato cuadrado/i);
   assert.equal(c.rpcCalls.length, 0, "seleccionar una imagen no debe subirla ni escribir en backend");
   assert.equal(c.calls.length, 0);
 });
