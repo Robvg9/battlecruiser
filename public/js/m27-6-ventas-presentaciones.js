@@ -27,9 +27,7 @@
       :"Este producto no tiene una presentación minorista configurada."};
     if(!(Number(presentation.factor)>0)||!presentation.presentacion_id)
       return{ok:false,msg:"La presentación del producto no tiene un factor válido."};
-    if(type==="mayorista"&&prod.precio_mayorista==null&&!prod.precio_normal)
-      return{ok:false,msg:"Este producto no tiene precio configurado."};
-    if(type==="minorista"&&prod.precio_normal==null&&!prod.precio_mayorista)
+    if(prod.precio_normal==null&&prod.precio_mayorista==null)
       return{ok:false,msg:"Este producto no tiene precio configurado."};
     return{ok:true,presentation:presentation};
   }
@@ -44,6 +42,7 @@
     line.cantidad_presentacion=Number(line.cantidad||0)/factor;
     return true;
   }
+  window.__BC_M276_updatePresentationHint=updatePresentationHint;
   window.__BC_M276_attachLinePresentation=attachLinePresentation;
   function buildPLineasFromCart(lineas){
     return(lineas||[]).map(function(l){
