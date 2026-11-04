@@ -74,7 +74,7 @@ test("Mixed inventory migration keeps existing product IDs as the transaction an
   assert.match(migration, /CREATE TRIGGER bc_sync_mixed_variant_presentations/);
   assert.match(migration, /l\.producto_id=v\.id AND l\.almacen_id=a\.id/);
   assert.match(migration, /inventario_mixto_enriquecido/);
-  assert.match(migration, /No se repartirá automáticamente/);
+  assert.match(migration, /no se repartirá automáticamente/);
   assert.match(migration, /No puedes quitar una variante que todavía conserva stock o lotes pendientes/);
   assert.match(migration, /CREATE TRIGGER bc_seed_mixed_stock_for_warehouse/);
 });
