@@ -145,7 +145,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(sw.includes("./js/m27-6-ventas-presentaciones.js?v=27.6g"));
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.6"\]/, "M75 must load with its refreshed module cache key");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.6/, "the offline shell must precache the same M75 module version");
-  assert.match(m26, /panel\.contains\(candidate\)/, "M26 must move only containers inside their owning tab panel");
+  assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
   assert.match(index, /<script src="js\/productos\.js\?v=20261104\.1"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261104\.1/, "the offline shell must precache the existing product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261102\.1"><\/script>/);
