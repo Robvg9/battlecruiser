@@ -103,10 +103,10 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 });
 
 
-// PWA 9.5.60 rotates the shell cache and keeps the M68 fallback aligned.
+// PWA 9.5.61 rotates the shell cache and keeps the M68 fallback aligned.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.60["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.60["']/);
+  assert.match(app, /const VERSION=["']9\.5\.61["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.61["']/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261030\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
@@ -118,14 +118,14 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.60["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.61["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261103\.7/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261103\.1/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261023\.2"\]/, "connectivity module must bypass stale cached settings");
-  assert.ok(index.includes('<script src="js/navegacion.js?v=20261030.1"></script>'), "new navigation sections need a cache-busted script");
+  assert.ok(index.includes('<script src="js/navegacion.js?v=9.5.61"></script>'), "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=20261024\.1"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=20261024\.1/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
@@ -152,8 +152,23 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.60 — encabezado compacto y Productos simplificado/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.60"><\/script>/);
+  assert.match(app, /v9\.5\.61 — Dashboard único y Auditoría separada/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.61"><\/script>/);
+  for (const asset of [
+    'style.css?v=9.5.61',
+    'js/centro-control.js?v=9.5.61',
+    'js/navegacion.js?v=9.5.61',
+    'js/mando.js?v=9.5.61',
+    'js/operacion-humana.js?v=9.5.61',
+    'js/comunicacion.js?v=9.5.61',
+  ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
+  for (const asset of [
+    './js/centro-control.js?v=9.5.61',
+    './js/navegacion.js?v=9.5.61',
+    './js/mando.js?v=9.5.61',
+    './js/operacion-humana.js?v=9.5.61',
+    './js/comunicacion.js?v=9.5.61',
+  ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
   assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.13/, "the Step 7 workflow is available in the offline static cache");
@@ -219,6 +234,6 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.9"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.60["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.60["']/);
+  assert.match(app, /const VERSION=["']9\.5\.61["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.61["']/);
 });
