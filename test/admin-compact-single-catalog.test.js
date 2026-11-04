@@ -10,8 +10,9 @@ const m75 = read("public/js/m75-productos-ui-compacto.js");
 const catalogos = read("public/js/catalogos.js");
 const m26 = read("public/js/m26-ui-integridad.js");
 const roles = read("public/js/roles-en-usuarios.js");
+const presentations = read("public/js/presentaciones.js");
 
-test("Administration has one compact home for roles, categories and units", () => {
+test("Administration has one compact home for roles, categories and the single presentations catalogue", () => {
   const { JSDOM } = require("jsdom");
   const dom = new JSDOM(index);
   try {
@@ -41,6 +42,17 @@ test("presentations and role permissions have one Administration entry, not dupl
   assert.ok(!roles.includes("rolesBtn = document.createElement"));
   assert.match(roles, /bc-btn-config-roles/);
   assert.ok(roles.includes("max-height:min(84vh,680px)"));
+  assert.match(roles, /bc-btn-roles-help/);
+  assert.match(roles, /bc-modal-roles-help/);
+  assert.match(roles, /function openRolesHelp\(\)/);
+  assert.match(roles, /relocateSmartPermissionsHelp\(\)/);
+  assert.match(roles, /ensureSmartPermissionsObserver\(\)/);
+  assert.match(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/);
+  assert.match(presentations, /function actualizarDatalistPresentaciones\(\)/);
+  assert.match(presentations, /client\.rpc\("crear_presentacion"/);
+  assert.match(presentations, /client\.rpc\("actualizar_presentacion"/);
+  assert.match(presentations, /client\.rpc\("cambiar_estado_presentacion"/);
+  assert.match(presentations, /pres-eliminar-btn/);
   assert.ok(roles.includes("rol-permisos-panel{max-height:240px;overflow:auto"));
 });
 
