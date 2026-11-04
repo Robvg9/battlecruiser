@@ -82,6 +82,7 @@ test("Configuración agrupa Conectividad y Preferencias; Administración conserv
   const groupMarkup = normalizedIndex.slice(groupStart, groupStop);
   assert.match(groupMarkup, /id="nav-config-toggle"[^>]*aria-expanded="true"/);
   assert.match(groupMarkup, /id="nav-config-subtabs"/);
+  assert.match(groupMarkup, /bc-nav-group-label">Sistema<\/span>/);
   assert.match(groupMarkup, /data-tab="conectividad">Conectividad/);
   assert.match(groupMarkup, /data-tab="preferencias">Preferencias/);
   assert.match(index, /<button class="tab-btn" data-tab="config">Administración<\/button>/);
