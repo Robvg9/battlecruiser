@@ -335,8 +335,9 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1);
   assert.equal(d.getElementById("prod-presentaciones-config"), null);
   assert.equal(d.querySelectorAll("#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado").length, 0);
-  assert.equal(d.getElementById("prod-precio-normal").required, true);
+  assert.equal(d.getElementById("prod-precio-normal").required, false);
   assert.equal(d.getElementById("prod-precio-mayorista").required, false);
+  assert.equal(w.__BC172_verify().normalPriceOptional, true);
   assert.equal(w.__BC172_verify().legacySubmitHandler, false,
     "the legacy module must not intercept the native form submit");
 
