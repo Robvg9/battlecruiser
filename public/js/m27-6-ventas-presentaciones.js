@@ -125,7 +125,8 @@
       var baseQuantity=packageQuantity*factor;
       var result=old.call(this,producto_id,baseQuantity,almacen_id,opts);
       if(result!==false){
-        var lines=getCartLines();\n        var line=lines.find(function(item){return String(item.producto_id)===String(producto_id);})||null;
+        var lines=getCartLines();
+        var line=lines.find(function(item){return String(item.producto_id)===String(producto_id);})||null;
         if(line)attachLinePresentation(producto_id,line);
         if(typeof window.renderVentaLineas==="function")window.renderVentaLineas();
       }
