@@ -771,9 +771,12 @@ function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
     producto_presentaciones: []
   };
   const inserts = [];
+  const rpcCalls = [];
   let sequence = 0;
   window.safeInit = (_selector, callback) => callback();
   window.tienePermiso = () => true;
+  window.explicarError = (error) => error && error.message ? error.message : "error fixture";
+  window._cache = { productos: [{ id: "p-fixture", nombre: "Producto fixture", categoria_id: null, unidad: "unidad", precio_normal: 100, precio_mayorista: 80, presentacion_id: null, activo: true }] };
   window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
   window.setLoading = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
   window.setEmpty = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
@@ -797,7 +800,7 @@ function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
     return result?.data ?? [];
   };
   window.client = {
-    rpc: async () => ({ data: true, error: null }),
+    rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: true, error: null }; },
     from(table) {
       const query = {
         select() { return query; },
@@ -828,7 +831,7 @@ function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
   };
   const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "presentaciones.js"), "utf8");
   window.eval(source);
-  return { dom, window, database, inserts };
+  return { dom, window, database, inserts, rpcCalls };
 }
 
 test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock", async (t) => {
@@ -844,12 +847,12 @@ test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock
 
   input.value = "Caja fixture";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
-  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "presentaciones")),
-    "el formulario válido debe insertar en el cliente fixture");
+  assert.ok(await esperarHasta(() => c.rpcCalls.some((x) => x.name === "crear_presentacion")),
+    "el formulario válido debe llamar al RPC transaccional");
   assert.ok(await esperarHasta(() => /Presentación creada/i.test(
     c.window.document.getElementById("msg-presentaciones").textContent
   )), "la UI debe completar el éxito antes de comprobar el reset");
-  assert.deepEqual(c.inserts.find((x) => x.table === "presentaciones").payload, { nombre: "Caja fixture" });
+  assert.equal(c.rpcCalls.find((x) => x.name === "crear_presentacion").args.p_nombre, "Caja fixture");
   assert.equal(input.value, "", "el formulario se limpia tras el éxito simulado");
 });
 
@@ -876,13 +879,15 @@ test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor vá
 
   factor.value = "12";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
-  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "producto_presentaciones")),
-    "la asociación válida debe llegar al cliente fixture");
-  assert.ok(await esperarHasta(() => /Presentación agregada/i.test(
+  assert.ok(await esperarHasta(() => c.rpcCalls.some((x) => x.name === "bc_guardar_producto_catalogo")),
+    "la asociación válida debe llegar al RPC transaccional del producto");
+  assert.ok(await esperarHasta(() => /Formato minorista actualizado/i.test(
     c.window.document.getElementById("msg-presentaciones").textContent
   )), "la UI debe completar la asociación antes de comprobar el mensaje");
-  assert.deepEqual(c.inserts.find((x) => x.table === "producto_presentaciones").payload,
-    { producto_id: "p-fixture", presentacion_id: "pres-fixture", factor: 12 });
+  const payload = c.rpcCalls.find((x) => x.name === "bc_guardar_producto_catalogo").args;
+  assert.equal(payload.p_producto_id, "p-fixture");
+  assert.equal(payload.p_presentacion_normal, "Caja fixture");
+  assert.equal(payload.p_factor_normal, 12);
 });
 
 
