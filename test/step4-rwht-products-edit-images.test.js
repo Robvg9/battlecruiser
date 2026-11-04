@@ -13,12 +13,15 @@ const SOURCE = fs.readFileSync(
 
 const EDIT_START = SOURCE.indexOf("function iniciarEdicionProducto(p) {");
 const EDIT_END = SOURCE.indexOf('safeInit("form-producto"', EDIT_START);
+const VARIANT_HELPERS_START = SOURCE.indexOf("function renderEditorVariantesProducto(variantes) {");
+const VARIANT_HELPERS_END = SOURCE.indexOf("let _productosBusqueda", VARIANT_HELPERS_START);
 const IMAGE_START = SOURCE.indexOf("function validarArchivoImagenProducto(file) {");
 const IMAGE_END = SOURCE.indexOf("let _productosBusqueda", IMAGE_START);
 const FORM_START = SOURCE.indexOf('safeInit("form-producto"', IMAGE_START);
 const FORM_END = SOURCE.indexOf("let _compraAsociacionesCache", FORM_START);
 
 assert.ok(EDIT_START >= 0 && EDIT_END > EDIT_START, "production edit/cancel handlers must exist");
+assert.ok(VARIANT_HELPERS_START >= 0 && VARIANT_HELPERS_END > VARIANT_HELPERS_START, "production mixed-inventory editor helpers must exist");
 assert.ok(IMAGE_START >= 0 && IMAGE_END > IMAGE_START, "production image handlers must exist");
 assert.ok(FORM_START >= 0 && FORM_END > FORM_START, "production product form handler must exist");
 
@@ -29,6 +32,7 @@ const PRODUCTION_HANDLERS = [
   "let _productoImagenProcesada = null;",
   "let _productoImagenPreviewObjectUrl = null;",
   SOURCE.slice(EDIT_START, EDIT_END),
+  SOURCE.slice(VARIANT_HELPERS_START, VARIANT_HELPERS_END),
   SOURCE.slice(IMAGE_START, IMAGE_END),
   SOURCE.slice(FORM_START, FORM_END)
 ].join("\n");
