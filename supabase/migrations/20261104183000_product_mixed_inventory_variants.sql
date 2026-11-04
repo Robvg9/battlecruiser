@@ -128,17 +128,32 @@ SECURITY DEFINER
 SET search_path TO 'public','pg_temp'
 AS $$
 BEGIN
-  IF OLD.producto_padre_id IS NULL AND OLD.inventario_mixto AND OLD.activo AND NOT NEW.activo THEN
+  IF OLD.producto_padre_id IS NULL AND OLD.inventario_mixto THEN
+    IF NEW.unidad IS DISTINCT FROM OLD.unidad AND (
+      EXISTS (
+        SELECT 1 FROM public.stock s
+        JOIN public.productos v ON v.id=s.producto_id
+        WHERE v.producto_padre_id=OLD.id AND s.cantidad<>0
+      ) OR EXISTS (
+        SELECT 1 FROM public.lotes_compra l
+        JOIN public.productos v ON v.id=l.producto_id
+        WHERE v.producto_padre_id=OLD.id AND l.cantidad_restante>0
+      )
+    ) THEN
+      RAISE EXCEPTION 'No se puede cambiar la unidad base: una o más variantes conservan existencias o lotes pendientes.' USING ERRCODE='23514';
+    END IF;
+    IF OLD.activo AND NOT NEW.activo THEN
+      RAISE EXCEPTION 'Desactiva primero el inventario por sabores y deja todas las variantes sin existencias ni lotes pendientes.' USING ERRCODE='23514';
+    END IF;
+  ELSIF OLD.producto_padre_id IS NOT NULL AND OLD.activo AND NOT NEW.activo THEN
     IF EXISTS (
       SELECT 1 FROM public.stock s
-      JOIN public.productos v ON v.id=s.producto_id
-      WHERE v.producto_padre_id=OLD.id AND s.cantidad<>0
+      WHERE s.producto_id=OLD.id AND s.cantidad<>0
     ) OR EXISTS (
       SELECT 1 FROM public.lotes_compra l
-      JOIN public.productos v ON v.id=l.producto_id
-      WHERE v.producto_padre_id=OLD.id AND l.cantidad_restante>0
+      WHERE l.producto_id=OLD.id AND l.cantidad_restante>0
     ) THEN
-      RAISE EXCEPTION 'No se puede desactivar el producto: una o más variantes todavía tienen existencias.' USING ERRCODE='23514';
+      RAISE EXCEPTION 'No se puede desactivar este sabor mientras conserve existencias o lotes pendientes.' USING ERRCODE='23514';
     END IF;
   END IF;
   RETURN NEW;
@@ -147,7 +162,7 @@ $$;
 
 DROP TRIGGER IF EXISTS bc_guard_mixed_product_deactivation ON public.productos;
 CREATE TRIGGER bc_guard_mixed_product_deactivation
-  BEFORE UPDATE OF activo ON public.productos
+  BEFORE UPDATE OF activo, unidad ON public.productos
   FOR EACH ROW EXECUTE FUNCTION public.bc_guard_mixed_product_deactivation();
 
 -- Parent metadata changes are reflected in each flavor's product display without
