@@ -297,13 +297,17 @@
     });
   }
   async function saveCatalogoProduct(e){
-    if(!document.getElementById('bc171-overlay'))return false;
+    var form=document.getElementById('form-producto');
+    var modal=document.getElementById('bc-product-modal');
+    // The sole supported owner is M26's native modal. Do not depend on the
+    // retired M17 overlay, which is intentionally absent in the current UI.
+    if(!form||!modal||!modal.contains(form))return false;
     e.preventDefault();e.stopImmediatePropagation();
     var id=document.getElementById('prod-editando-id')?.value||null;
     var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return true;}
-    var save=document.getElementById('bc171-save');if(save)save.disabled=true;
+    var save=document.getElementById('prod-submit-btn')||document.getElementById('bc171-save');if(save)save.disabled=true;
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'';var pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
     if(pn===null||!Number.isFinite(pn)||pn<=0){msg('El precio normal debe ser mayor a 0.',false);if(save)save.disabled=false;return true;}
