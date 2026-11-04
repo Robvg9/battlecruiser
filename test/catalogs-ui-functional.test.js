@@ -181,3 +181,20 @@ test("Paso 4 catálogos: activar/desactivar un elemento actualizado llama update
   const updated = c.tables.categorias.find((row) => row.id === "cat-existing");
   assert.equal(updated.activo, false);
 });
+
+
+test("Paso 4 catálogos: editar categoría actualiza el mismo registro y conserva su identidad", async (t) => {
+  const c = setup(t);
+  await c.window._refrescarCatalogo_categorias();
+  const edit = c.window.document.querySelector("#lista-categorias .catalogo-edit-btn");
+  assert.ok(edit, "cada categoría debe ofrecer edición");
+  edit.click();
+  assert.equal(c.window.document.getElementById("cat-nombre").value, "General");
+  assert.equal(c.window.document.querySelector("#form-categoria button[type=submit]").textContent, "Guardar cambios");
+  c.window.document.getElementById("cat-nombre").value = "Bebidas";
+  submit(c.window, "form-categoria");
+  assert.ok(await waitFor(() => c.updates.some((x) => x.table === "categorias" && x.id === "cat-existing" && x.payload.nombre === "Bebidas")));
+  assert.equal(c.tables.categorias.find((row) => row.id === "cat-existing").nombre, "Bebidas");
+  assert.ok(c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas"));
+  assert.equal(c.window.document.querySelector("#form-categoria button[type=submit]").textContent, "Agregar categoría");
+});
