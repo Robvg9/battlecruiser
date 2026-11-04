@@ -60,8 +60,13 @@ test("warehouse channel is checked independently from the selected price type", 
   assert.ok(sales.includes("if(isSellType(t)&&!channelAvailable(p,t))"));
   assert.ok(sales.includes("from('producto_presentaciones')"));
   assert.ok(sales.includes("window.__BC_M275_getProductPresentation"));
+  const saleLines = read("public/js/m27-6-ventas-presentaciones.js");
+  assert.ok(saleLines.includes("function getCartLines()"));
+  assert.ok(saleLines.includes("line.presentacion_id=p.presentacion_id"));
+  assert.ok(saleLines.includes("buildPLineasFromCart(lines)"));
   assert.ok(migration.includes("v_presentacion_producto is null or v_presentacion_id is distinct from v_presentacion_producto"));
   assert.ok(migration.includes("v_presentacion_producto is not null and v_presentacion_id=v_presentacion_producto"));
   assert.ok(migration.includes("v_tipo_almacen='mayorista'"));
   assert.ok(migration.includes("v_tipo_precio_linea:=coalesce"));
+  assert.ok(!migration.includes("La presentación mayorista indicada no coincide con la presentación definida del producto"));
 });
