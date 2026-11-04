@@ -177,30 +177,21 @@
   }
 
   function relocateSmartPermissionsHelp() {
-    var admin = document.getElementById('tab-config');
+    // La ayuda es una explicación estática y única. No se deben mover al modal
+    // matrices generadas por cada rol: eso clonaba visualmente permisos 4-5 veces.
     var host = document.getElementById('bc-roles-help-content');
-    if (!admin || !host) return false;
-    var headings = Array.prototype.slice.call(admin.querySelectorAll('h1,h2,h3,h4,h5,strong,summary'));
-    var heading = headings.find(function (el) {
-      return /permisos inteligentes/i.test((el.textContent || '').replace(/\\s+/g, ' ').trim());
-    });
-    if (!heading) return false;
-    var roleForm = document.getElementById('form-nuevo-rol');
-    var roleList = document.getElementById('lista-roles');
-    var selectors = '.bc-permisos-inteligentes,.permisos-inteligentes,.bc-admin-permissions-help,.bc-admin-subcard,.cc-bloque,.bc-admin-card,.card,section,article';
-    var block = heading.closest(selectors);
-    if (!block || block === admin || block.contains(roleForm) || block.contains(roleList) || block.classList.contains('bc-admin-roles')) {
-      block = heading.parentElement;
-      while (block && block !== admin && (block.contains(roleForm) || block.contains(roleList) || block === document.querySelector('#tab-config .bc-admin-roles'))) {
-        block = block.parentElement;
-      }
-    }
-    if (!block || block === admin || block.contains(roleForm) || block.contains(roleList)) return false;
-    if (!host.contains(block)) {
-      host.appendChild(block);
-      var fallback = document.getElementById('bc-roles-help-default');
-      if (fallback) fallback.remove();
-    }
+    if (!host) return false;
+    var marker = 'data-bc-roles-help-single';
+    if (host.querySelector('[' + marker + '="1"]')) return true;
+    host.innerHTML =
+      '<div ' + marker + '="1" class="bc-roles-help-guide">' +
+        '<p><strong>Ver:</strong> permite consultar la información del módulo.</p>' +
+        '<p><strong>Crear:</strong> permite registrar operaciones o elementos nuevos.</p>' +
+        '<p><strong>Editar:</strong> permite modificar registros existentes.</p>' +
+        '<p><strong>Borrar:</strong> permite eliminar registros cuando las reglas del negocio lo admiten.</p>' +
+        '<p>Los permisos se asignan al rol seleccionado. Los usuarios heredan los permisos del rol que tengan asignado.</p>' +
+        '<p><strong>Perfiles:</strong> Solo lectura consulta; Operación registra operaciones; Inventario gestiona existencias; Administrador operativo administra las funciones operativas habilitadas.</p>' +
+      '</div>';
     return true;
   }
 
