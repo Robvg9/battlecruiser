@@ -70,9 +70,12 @@ test("M27.7: crear almacén ejecuta el RPC con nombre y todos los tipos válidos
   assert.ok(root, "el modal de creación debe existir");
   const cases = [
     { type: "almacenamiento", rpcType: "almacenamiento" },
-    { type: "minorista", rpcType: "venta" },
+    { type: "minorista", rpcType: "minorista" },
     { type: "mayorista", rpcType: "mayorista" }
   ];
+
+  assert.equal(window.__BC_M277_tipoUiARpc("venta"), "minorista",
+    "el alias legado debe normalizarse al tipo minorista aceptado por Supabase");
 
   for (const [index, item] of cases.entries()) {
     window.__BC_M277_openCreateAlmacen();
@@ -95,6 +98,30 @@ test("M27.7: crear almacén ejecuta el RPC con nombre y todos los tipos válidos
       "el almacén creado debe seleccionarse tras refrescar el catálogo");
     assert.equal(selected[index], "warehouse-fixture-" + (index + 1));
   }
+});
+
+
+test("M27.7: editar almacén minorista envía el tipo canónico aceptado por Supabase", async (t) => {
+  const { window, calls } = createContext(t);
+  window._cache.almacenes = [
+    { id: "warehouse-retail-legacy-fixture", nombre: "Cafetería La Cueva", tipo: "venta", activo: true }
+  ];
+  window.editarAlmacen = async (id, payload) => {
+    calls.push({ type: "editar_almacen", payload: { ...payload, p_almacen_id: id } });
+    return { ok: true, offline: false, data: id };
+  };
+
+  window.__BC_M277_openEditAlmacen("warehouse-retail-legacy-fixture");
+  const root = window.document.getElementById("bc-alm-modal");
+  assert.equal(root.querySelector(".bc-alm-tipo.selected").getAttribute("data-tipo"), "minorista",
+    "un registro legacy venta debe presentarse como Minorista");
+  root.querySelector("#bc-m277-modal-nombre").value = "Cafetería La Cueva";
+  root.querySelector("#bc-m277-modal-guardar").click();
+
+  assert.equal(await waitFor(() => calls.length === 1), true, "Guardar debe invocar editar_almacen");
+  assert.equal(calls[0].type, "editar_almacen");
+  assert.equal(calls[0].payload.p_tipo, "minorista",
+    "editar_almacen debe recibir el valor que admite la validación SQL");
 });
 
 test("M27.7: el error de validación se muestra dentro del modal visible", (t) => {
