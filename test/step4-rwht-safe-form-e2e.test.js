@@ -431,6 +431,17 @@ test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden que
   );
   assert.ok(ready, "the unified product form must initialize");
   const d = c.document;
+  const form = d.getElementById("form-producto");
+  const productModal = d.getElementById("bc-product-modal");
+  assert.ok(typeof c.window.__BCM26_openProductModal === "function",
+    "the Add product action must use the native M26 modal");
+  c.window.__BCM26_openProductModal();
+  assert.equal(productModal.classList.contains("hidden"), false,
+    "the test must submit through the real, visible Add product modal");
+  assert.ok(productModal.contains(form),
+    "the original form must be mounted inside the single native modal before submit");
+  assert.equal(d.getElementById("bc-product-commercial-panel").hidden, true,
+    "a product with no optional commercial settings can be saved while the panel remains collapsed");
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto con opciones vacías fixture";
   d.getElementById("prod-categoria").value = "";
