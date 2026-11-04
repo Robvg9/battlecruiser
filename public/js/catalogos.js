@@ -1,8 +1,6 @@
 // ==== Battlecruiser · js/catalogos.js ====
-// Catálogos simples reutilizables (categorías, unidades).
-// (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
+// Catálogos simples reutilizables. La categoría conserva un único formulario/lista dentro de su ventana flotante.
 
-// ---- Formas de presentación. Los 3 catálogos comparten la misma regla de
 function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
   safeInit("catalogo-" + tabla, () => {
     const form = document.getElementById(formId);
@@ -10,19 +8,50 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
     const lista = document.getElementById(listaId);
     if (!form || !input || !lista) return;
 
+    let editandoId = null;
+    let filasActuales = [];
+    const submitBtn = form.querySelector("button[type='submit']");
+    const cancelarBtn = tabla === "categorias" ? document.getElementById("cat-cancelar-edicion") : null;
+
+    function cancelarEdicion() {
+      editandoId = null;
+      form.reset();
+      if (submitBtn) submitBtn.textContent = "Agregar categoría";
+      if (cancelarBtn) cancelarBtn.classList.add("hidden");
+    }
+
     async function refrescar() {
       setLoading(listaId, "Cargando…");
       const data = await withCache(tabla, () => client.from(tabla).select("id, nombre, activo").order("nombre"));
-      if (!data || data.length === 0) {
+      filasActuales = Array.isArray(data) ? data : [];
+      if (filasActuales.length === 0) {
         setEmpty(listaId, mensajeListaVacia(tabla, "Todavía no hay " + tabla + " cargadas."));
         return;
       }
       lista.innerHTML = "";
-      data.forEach((row) => {
+      filasActuales.forEach((row) => {
         const div = document.createElement("div");
         div.className = "lista-item";
-        div.innerHTML = `<span>${escHtml(row.nombre)} ${row.activo ? "" : '<span class="muted">· inactivo</span>'}</span>
-          <button type="button" class="catalogo-toggle-btn" data-id="${row.id}" data-activo="${row.activo}">${row.activo ? "Desactivar" : "Activar"}</button>`;
+        const label = document.createElement("span");
+        label.textContent = row.nombre + (row.activo ? "" : " · inactivo");
+        const actions = document.createElement("span");
+        actions.className = "lista-item-acciones";
+        if (tabla === "categorias") {
+          const edit = document.createElement("button");
+          edit.type = "button";
+          edit.className = "catalogo-edit-btn";
+          edit.dataset.id = row.id;
+          edit.textContent = "Editar";
+          actions.appendChild(edit);
+        }
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "catalogo-toggle-btn";
+        toggle.dataset.id = row.id;
+        toggle.dataset.activo = String(!!row.activo);
+        toggle.textContent = row.activo ? "Desactivar" : "Activar";
+        actions.appendChild(toggle);
+        div.append(label, actions);
         lista.appendChild(div);
       });
     }
@@ -31,27 +60,42 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       e.preventDefault();
       const nombre = input.value.trim();
       if (!nombre) return;
-      const submitBtn = form.querySelector("button[type='submit']");
-      submitBtn.disabled = true;
-      const { error } = await client.from(tabla).insert({ nombre });
-      submitBtn.disabled = false;
-      if (error) {
-        const msg = error.code === "23505" ? "Ya existe un valor con ese nombre." : explicarError(error, "crear " + singular);
-        setMsg("msg-config", "No se pudo crear: " + msg, false);
+      if (submitBtn) submitBtn.disabled = true;
+      const result = editandoId
+        ? await client.from(tabla).update({ nombre }).eq("id", editandoId)
+        : await client.from(tabla).insert({ nombre });
+      if (submitBtn) submitBtn.disabled = false;
+      if (result.error) {
+        const detail = result.error.code === "23505"
+          ? "Ya existe un valor con ese nombre."
+          : explicarError(result.error, (editandoId ? "editar " : "crear ") + singular);
+        setMsg("msg-config", "No se pudo " + (editandoId ? "editar" : "crear") + ": " + detail, false);
         return;
       }
-      setMsg("msg-config", singular.charAt(0).toUpperCase() + singular.slice(1) + " creada.", true);
-      form.reset();
+      const wasEditing = !!editandoId;
+      setMsg("msg-config", singular.charAt(0).toUpperCase() + singular.slice(1) + (wasEditing ? " actualizada." : " creada."), true);
+      cancelarEdicion();
       await refrescar();
     });
 
     lista.addEventListener("click", async (e) => {
+      const editBtn = e.target.closest(".catalogo-edit-btn");
+      if (editBtn && tabla === "categorias") {
+        const row = filasActuales.find((item) => String(item.id) === String(editBtn.dataset.id));
+        if (!row) return;
+        editandoId = row.id;
+        input.value = row.nombre || "";
+        if (submitBtn) submitBtn.textContent = "Guardar cambios";
+        if (cancelarBtn) cancelarBtn.classList.remove("hidden");
+        input.focus();
+        return;
+      }
       const btn = e.target.closest(".catalogo-toggle-btn");
       if (!btn) return;
-      const id = btn.dataset.id;
-      const activoActual = btn.dataset.activo === "true";
       btn.disabled = true;
-      const { error } = await client.from(tabla).update({ activo: !activoActual }).eq("id", id);
+      const { error } = await client.from(tabla)
+        .update({ activo: btn.dataset.activo !== "true" })
+        .eq("id", btn.dataset.id);
       btn.disabled = false;
       if (error) {
         setMsg("msg-config", "No se pudo actualizar: " + explicarError(error, "actualizar " + singular), false);
@@ -60,6 +104,7 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       await refrescar();
     });
 
+    if (cancelarBtn) cancelarBtn.addEventListener("click", cancelarEdicion);
     window["_refrescarCatalogo_" + tabla] = refrescar;
   });
 }
@@ -69,11 +114,5 @@ initCatalogoSimple({ tabla: "categorias", formId: "form-categoria", inputId: "ca
 /* Presentaciones se administra en un único panel dentro de Administración.
    El modal heredado de Productos quedó retirado para evitar rutas duplicadas. */
 
-/* ================================================================
-   M22 — PRODUCTOS: EXPERIENCIA LIMPIA
-   DESACTIVADO en v9.2.22: competía con M26 (botón/form duplicados).
-   La UI de Productos la gestiona exclusivamente m26-ui-integridad.js.
-   ================================================================ */
-(function initProductosUI22(){
-  // no-op: M26 es el único sistema de UI de Productos desde 9.2.22
-})();
+/* La interfaz de Productos la gestiona exclusivamente m26-ui-integridad.js. */
+(function initProductosUI22(){})();
