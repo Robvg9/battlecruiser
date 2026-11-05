@@ -73,7 +73,7 @@ function renderStepTwo(){
  b.querySelector('#bc-m55-back').onclick=function(){state.step=1;state.headers=[];state.rows=[];state.map={};state.validated=null;renderStepOne()};
  b.querySelector('#bc-m55-file').onchange=async function(){
   var f=this.files&&this.files[0];if(!f)return;
-  try{await parseFile(f);renderPreview(f.name||'archivo.csv')}
+  try{await loadCategories();await parseFile(f);renderPreview(f.name||'archivo.csv')}
   catch(e){setStatus(e.message||'No se pudo leer el archivo.',false)}
  };
 }
