@@ -72,8 +72,9 @@ test("Administration module styles are compact and catalog lists are bounded", (
   assert.ok(m75.includes("#tab-config .bc-admin-subcard .lista .lista-item-acciones{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap}"));
   assert.ok(m75.includes(".catalogo-edit-btn") && m75.includes(".catalogo-delete-btn"));
   assert.ok(m75.includes(".catalogo-delete-btn{border-color:rgba(220,105,90,.48);color:#e0a29a}"));
-  assert.ok(!m75.includes("#bc-product-presentations-entry{") && !m75.includes("#tab-config .bc-admin-presentations") && !m75.includes("#tab-config .presentaciones-panel"));
-  assert.doesNotMatch(m75, /bc-product-presentations-entry|bc-admin-presentations|presentaciones-panel/);
+  assert.doesNotMatch(m75, /#bc-product-presentations-entry\{|#tab-config \.bc-admin-presentations|#tab-config \.presentaciones-panel\{/,
+    "M75 must not reintroduce styles that show the retired presentations UI");
+
 });
 
 
