@@ -23,7 +23,6 @@ function setup(t) {
       "<div id='lista-categorias'></div>" +
       "<div id='msg-config'></div>" +
       "<select id='prod-categoria' required><option value=''>Selecciona</option></select>" +
-      "<div id='msg-config'></div>" +
     "</section></body></html>",
     { url: "https://battlecruiser-catalogs.test/", runScripts: "outside-only", pretendToBeVisual: true }
   );
@@ -31,6 +30,7 @@ function setup(t) {
   const tables = {
     categorias: [{ id: "cat-existing", nombre: "General", activo: true }],
     productos: []
+  };
   const inserts = [];
   const updates = [];
   let sequence = 0;
