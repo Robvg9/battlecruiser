@@ -724,9 +724,9 @@ async function main() {
   const rolesHelpClosed = await evaluate("(()=>{const help=document.querySelector('#bc-modal-roles-help');const close=help&&help.querySelector('.bc-roles-close');if(close)close.click();const roles=document.querySelector('#bc-modal-roles-permisos');const rolesClose=roles&&roles.querySelector('[data-bc-roles-close=\"1\"].bc-roles-close');if(rolesClose)rolesClose.click();return {helpClosed:!!(!help||!help.classList.contains('open')),rolesClosed:!!(!roles||!roles.classList.contains('open'))}})()");
   assert(rolesHelpClosed.helpClosed && rolesHelpClosed.rolesClosed,
     "Las ventanas de ayuda o Roles no cerraron correctamente: "+JSON.stringify(rolesHelpClosed));
-  report.evidence.adminPresentationsUi = {
-    initial: adminPresentationsInitial,
-    settled: adminPresentationsStable,
+  report.evidence.adminCatalogsUi = {
+    initial: adminCatalogsInitial,
+    settled: adminCatalogsStable,
     rolesEntry: rolesEntry,
     rolesModal: rolesModalState,
     contextualHelp: rolesHelpState,
