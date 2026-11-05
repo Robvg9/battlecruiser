@@ -236,6 +236,15 @@ function formatoVentaProducto(producto, tipoAlmacen) {
 function cantidadBaseLineaVenta(linea) {
   const value = Number(linea && linea.cantidad_base);
   return Number.isFinite(value) && value >= 0 ? value : Number(linea && linea.cantidad) || 0;
+}
+function payloadLineaVenta(linea) {
+  return {
+    producto_id: linea.producto_id,
+    cantidad: cantidadBaseLineaVenta(linea),
+    presentacion_id: linea.presentacion_id,
+    cantidad_presentacion: Number(linea.cantidad),
+    tipo_precio: linea.tipo_precio,
+  };
 } // lista completa de productos, para el buscador
 let ventaCategoriasLista = []; // Misión 9.3 (Tarea 2): categorías reales, para los filtros del catálogo
 let catalogoCategoriaActiva = ""; // "" = Todos. Estado local de la pestaña, no una segunda cache.
@@ -815,13 +824,7 @@ safeInit("confirmar-venta", () => {
     btn.textContent = "Procesando...";
     setMsg("msg-venta", "Procesando venta…", true);
 
-    const p_lineas = ventaLineas.map((l) => ({
-      producto_id: l.producto_id,
-      cantidad: cantidadBaseLineaVenta(l),
-      presentacion_id: l.presentacion_id,
-      cantidad_presentacion: l.cantidad,
-      tipo_precio: l.tipo_precio,
-    }));
+    const p_lineas = ventaLineas.map(payloadLineaVenta);
     const ventaPayload = { p_almacen_id: almacen_id, p_lineas };
     const tipoOperacionVenta = esJornada ? "venta_jornada" : "venta";
     if (esJornada) {
