@@ -353,6 +353,8 @@ test("Paso 4 UI: un único modal guarda producto, precio mayorista opcional y fa
   assert.equal(d.querySelectorAll("#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado").length, 0);
   assert.equal(d.getElementById("prod-precio-normal").required, true);
   assert.equal(d.getElementById("prod-precio-mayorista").required, false);
+  assert.equal(panel.contains(d.getElementById("prod-categoria")), false,
+    "the required category stays outside the optional commercial panel");
   assert.equal(c.window.__BC172_verify().normalPriceRequired, true);
   assert.equal(c.window.__BC172_verify().wholesalePriceOptional, true);
   assert.equal(c.window.__BC172_verify().legacySubmitHandler, false,
