@@ -6,12 +6,8 @@ window.__bcM55ProductosImport=true;
 const MAX_ROWS=2000,PREVIEW_ROWS=12;
 const FIELDS=[
  {key:'nombre',label:'Nombre',required:true,aliases:['nombre','name','producto','product','descripcion','descripción']},
- {key:'categoria',label:'Categoría',required:true,aliases:['categoria','categoría','category','cat']},
- {key:'unidad',label:'Unidad',required:false,aliases:['unidad','unit','uom','medida']},
  {key:'precio_normal',label:'Precio',required:true,aliases:['precio','precio_normal','precio normal','price','pvp','precio_venta']},
- {key:'precio_mayorista',label:'Precio mayorista',required:false,aliases:['precio_mayorista','precio mayorista','mayorista','wholesale']},
- {key:'formato_venta',label:'Formato de venta',required:false,aliases:['formato_venta','formato de venta','presentacion_mayorista','presentación mayorista','presentacion mayorista','formato mayorista']},
- {key:'factor_venta',label:'Unidades por formato',required:false,aliases:['factor_venta','unidades por formato','factor_mayorista','factor mayorista','factor']}
+ {key:'categoria',label:'Categoría',required:true,aliases:['categoria','categoría','category','cat']}
 ];
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
 function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ')}
@@ -39,7 +35,7 @@ function setStatus(t,ok,kind){
 }
 function csvCell(value){return '"'+String(value==null?'':value).replace(/"/g,'""')+'"'}
 function downloadTemplate(){
- var headers=['nombre','categoria','unidad','precio_normal','precio_mayorista','formato_venta','factor_venta'];
+ var headers=['Nombre','Precio','Categoría'];
  var csv='\uFEFF'+headers.map(csvCell).join(';')+'\r\n';
  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
  var url=URL.createObjectURL(blob),a=document.createElement('a');
@@ -52,13 +48,13 @@ function downloadTemplate(){
 function renderStepOne(){
  var b=document.getElementById('bc-m55-body');if(!b)return;
  b.innerHTML='<div class="bc-m55-step">PASO 1 DE 2 · DESCARGAR Y RELLENAR</div>'+
- '<p>Primero descarga la plantilla, ábrela con Excel y completa una fila por cada producto. Después vuelve aquí para importar el archivo completado.</p>'+
- '<div class="bc-m55-template"><b>Columnas de la plantilla</b><ul>'+
- '<li><b>Obligatorias:</b> nombre, categoria y precio_normal.</li>'+
- '<li><b>Opcionales:</b> unidad y precio_mayorista.</li>'+
- '<li><b>Venta por paquete:</b> completa juntos formato_venta y factor_venta; también requiere precio_mayorista.</li>'+
- '</ul><p class="muted">Usa el nombre de una categoría que ya exista en Administración. No cambies los encabezados. La plantilla se descarga como CSV compatible con Excel: al guardar, conserva el formato CSV.</p></div>'+
- '<div class="bc-m55-actions"><button type="button" id="bc-m55-template-download">Descargar plantilla rellenable</button>'+
+ '<p>Descarga la plantilla, ábrela con Excel o WPS Office y completa una fila por cada producto. Después vuelve aquí para importar el archivo completado.</p>'+
+ '<div class="bc-m55-template"><b>La plantilla tiene únicamente estas tres columnas:</b><ul>'+
+ '<li><b>Nombre:</b> nombre del producto.</li>'+
+ '<li><b>Precio:</b> importe numérico mayor que cero.</li>'+
+ '<li><b>Categoría:</b> debe coincidir con una categoría activa de Administración.</li>'+
+ '</ul><p class="muted">No cambies los encabezados. Conserva el archivo como CSV al guardarlo. La unidad interna se asigna automáticamente.</p></div>'+
+ '<div class="bc-m55-actions"><button type="button" id="bc-m55-template-download">Descargar plantilla para Excel</button>'+
  '<button type="button" id="bc-m55-continue">Ya completé la plantilla · Continuar al paso 2</button></div>';
  b.querySelector('#bc-m55-template-download').onclick=downloadTemplate;
  b.querySelector('#bc-m55-continue').onclick=function(){state.step=2;renderStepTwo()};
@@ -66,8 +62,8 @@ function renderStepOne(){
 function renderStepTwo(){
  var b=document.getElementById('bc-m55-body');if(!b)return;
  b.innerHTML='<div class="bc-m55-step">PASO 2 DE 2 · IMPORTAR EL ARCHIVO COMPLETADO</div>'+
- '<p>Selecciona el CSV que rellenaste en Excel. Primero revisaremos sus filas; ningún producto se procesa hasta que pulses «Procesar importación».</p>'+
- '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar plantilla CSV completada">'+
+ '<p>Selecciona el archivo que completaste en Excel o WPS Office. Revisaremos Nombre, Precio y Categoría; ningún producto se guarda hasta que pulses «Procesar importación».</p>'+
+ '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar plantilla completada">'+
  '<div id="bc-m55-result"></div><div id="bc-m55-preview"></div>'+
  '<div class="bc-m55-actions"><button type="button" id="bc-m55-back">Volver al paso 1</button></div>';
  b.querySelector('#bc-m55-back').onclick=function(){state.step=1;state.headers=[];state.rows=[];state.map={};state.validated=null;renderStepOne()};
@@ -127,6 +123,14 @@ function autoMap(h){
  return m;
 }
 function value(row,k){var h=state.map[k];return h?row[h]:''}
+function parsePrice(value){
+ var raw=String(value==null?'':value).trim().replace(/\s/g,'');
+ if(!raw)return NaN;
+ if(raw.indexOf(',')>=0&&raw.indexOf('.')>=0){
+  raw=raw.lastIndexOf(',')>raw.lastIndexOf('.')?raw.replace(/\./g,'').replace(',','.'):raw.replace(/,/g,'');
+ }else if(raw.indexOf(',')>=0){raw=raw.replace(',','.');}
+ return Number(raw);
+}
 function categoriaId(name){
  var n=norm(name);if(!n)return null;
  var cs=Array.isArray(window._cache?.categorias)?window._cache.categorias:[];
@@ -137,18 +141,11 @@ function validateRows(){
  var errors=[];
  state.rows.forEach(function(r,i){
   var rowNo=i+2,nombre=String(value(r,'nombre')||'').trim(),categoria=String(value(r,'categoria')||'').trim();
-  var unidad=String(value(r,'unidad')||'unidad').trim()||'unidad';
-  var pnRaw=String(value(r,'precio_normal')||'').trim(),pmRaw=String(value(r,'precio_mayorista')||'').trim();
-  var formato=String(value(r,'formato_venta')||'').trim(),factorRaw=String(value(r,'factor_venta')||'').trim();
+  var precioRaw=String(value(r,'precio_normal')||'').trim(),precio=parsePrice(precioRaw);
   if(!nombre)errors.push('Fila '+rowNo+': falta Nombre.');
   if(!categoria)errors.push('Fila '+rowNo+': falta Categoría.');
   else if(!categoriaId(categoria))errors.push('Fila '+rowNo+': la categoría «'+categoria+'» no existe o está inactiva.');
-  if(pnRaw===''||!Number.isFinite(Number(pnRaw))||Number(pnRaw)<=0)errors.push('Fila '+rowNo+': Precio debe ser un número mayor a 0.');
-  if(pmRaw!==''&&(!Number.isFinite(Number(pmRaw))||Number(pmRaw)<=0))errors.push('Fila '+rowNo+': Precio mayorista debe ser un número mayor a 0.');
-  if((formato&&factorRaw==='')||(!formato&&factorRaw!==''))errors.push('Fila '+rowNo+': Formato de venta y Unidades por formato deben completarse juntos.');
-  if(factorRaw!==''&&(!Number.isInteger(Number(factorRaw))||Number(factorRaw)<=0))errors.push('Fila '+rowNo+': Unidades por formato debe ser un entero mayor a 0.');
-  if(formato&&pmRaw==='')errors.push('Fila '+rowNo+': un Formato de venta requiere Precio mayorista.');
-  if(formato&&norm(formato)===norm(unidad))errors.push('Fila '+rowNo+': Formato de venta debe ser distinto de Unidad.');
+  if(precioRaw===''||!Number.isFinite(precio)||precio<=0)errors.push('Fila '+rowNo+': Precio debe ser un número mayor a 0.');
  });
  return errors;
 }
@@ -157,7 +154,7 @@ function renderPreview(fileName){
  var errors=validateRows();state.validated=errors;
  var cols=FIELDS.map(function(f){return f.key});
  b.innerHTML='<p class="muted">'+esc(fileName)+' · '+state.rows.length+' fila(s) · columnas reconocidas: '+esc(Object.keys(state.map).join(', ')||'ninguna')+'</p>'+
- (errors.length?'<p class="bc-m55-err">'+errors.slice(0,12).map(esc).join('<br>')+(errors.length>12?'<br>Y '+(errors.length-12)+' error(es) más.':'')+'</p>':'<p class="bc-m55-ok">✓ Plantilla válida. Categoría, precio y formato mayorista revisados.</p>')+
+ (errors.length?'<p class="bc-m55-err">'+errors.slice(0,12).map(esc).join('<br>')+(errors.length>12?'<br>Y '+(errors.length-12)+' error(es) más.':'')+'</p>':'<p class="bc-m55-ok">✓ Plantilla válida. Nombre, precio y categoría revisados.</p>')+
  '<div style="overflow:auto;max-height:280px"><table><thead><tr>'+cols.map(function(k){return '<th>'+esc(FIELDS.find(function(f){return f.key===k}).label)+'</th>'}).join('')+'</tr></thead><tbody>'+
  state.rows.slice(0,PREVIEW_ROWS).map(function(r){return '<tr>'+cols.map(function(k){return '<td>'+esc(value(r,k))+'</td>'}).join('')+'</tr>'}).join('')+
  '</tbody></table></div><div class="bc-m55-actions"><button type="button" id="bc-m55-run" '+(errors.length?'disabled':'')+'>Procesar importación</button></div>';
@@ -182,37 +179,26 @@ async function run(){
  var ok=0,fail=0,queued=0,rowErrors=[];
  try{
   await loadCategories();
-  var hasWholesale=state.rows.some(function(r){return String(value(r,'formato_venta')||'').trim()});
-  if(typeof navigator!=='undefined'&&navigator.onLine===false&&hasWholesale){
-   setStatus('Conecta internet para importar productos que tengan Formato de venta mayorista. No se ha procesado ningún producto.',false);
-   return;
-  }
   for(var i=0;i<state.rows.length;i++){
    var r=state.rows[i],nombre=String(value(r,'nombre')||'').trim();
    var categoria=categoriaId(value(r,'categoria'));
-   var unidad=String(value(r,'unidad')||'unidad').trim()||'unidad';
-   var pn=Number(String(value(r,'precio_normal')||'').trim());
-   var pmRaw=String(value(r,'precio_mayorista')||'').trim();
-   var pm=pmRaw===''?null:Number(pmRaw);
-   var formato=String(value(r,'formato_venta')||'').trim();
-   var factorRaw=String(value(r,'factor_venta')||'').trim();
-   var factor=factorRaw===''?null:Number(factorRaw);
+   var pn=parsePrice(value(r,'precio_normal'));
    try{
     var res;
     if(typeof navigator==='undefined'||navigator.onLine!==false){
      var catalog=await client.rpc('bc_guardar_producto_catalogo',{
-      p_producto_id:null,p_nombre:nombre,p_categoria_id:categoria,p_unidad:unidad,
-      p_precio_normal:pn,p_precio_mayorista:pm,
-      p_presentacion_normal:unidad,p_factor_normal:1,
-      p_presentacion_mayorista:formato||null,p_factor_mayorista:formato?factor:null,
+      p_producto_id:null,p_nombre:nombre,p_categoria_id:categoria,p_unidad:'unidad',
+      p_precio_normal:pn,p_precio_mayorista:null,
+      p_presentacion_normal:'unidad',p_factor_normal:1,
+      p_presentacion_mayorista:null,p_factor_mayorista:null,
       p_idempotency_key:makeIdempotencyKey()
      });
      if(catalog.error)throw catalog.error;
      res={ok:true,offline:false,data:catalog.data};
     }else{
      res=await ejecutarOperacion('producto',{
-      p_nombre:nombre,p_categoria_id:categoria,p_unidad:unidad,
-      p_precio_normal:pn,p_precio_mayorista:pm
+      p_nombre:nombre,p_categoria_id:categoria,p_unidad:'unidad',
+      p_precio_normal:pn,p_precio_mayorista:null
      });
      if(!res||!res.ok)throw (res&&res.error)||new Error('No se pudo guardar el producto.');
      if(res.offline)queued++;
