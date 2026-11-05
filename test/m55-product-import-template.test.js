@@ -40,7 +40,7 @@ test("importa Nombre, Precio y Categoría; acepta decimal y asigna defaults",asy
  assert.match(d.getElementById("bc-m55-preview").textContent,/Plantilla válida/);
  assert.match(d.getElementById("bc-m55-preview").textContent,/Nombre, precio y categoría revisados/);
  d.getElementById("bc-m55-run").click();assert.ok(await waitFor(()=>c.calls.length===1));
- assert.deepEqual(c.calls[0],{name:"bc_guardar_producto_catalogo",payload:{
+ assert.deepEqual(JSON.parse(JSON.stringify(c.calls[0])),{name:"bc_guardar_producto_catalogo",payload:{
   p_producto_id:null,p_nombre:"Cerveza",p_categoria_id:"cat-bebidas",p_unidad:"unidad",p_precio_normal:650.5,p_precio_mayorista:null,
   p_presentacion_normal:"unidad",p_factor_normal:1,p_presentacion_mayorista:null,p_factor_mayorista:null,p_idempotency_key:"idempotency-test"
  }});
