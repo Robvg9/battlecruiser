@@ -307,7 +307,7 @@ test("Paso 4 UI: precio minorista vacío o cero se rechaza antes de cualquier RP
   const d = c.document;
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto inválido fixture";
-  d.getElementById("prod-categoria").value = "c-step4-fixture";
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
   d.getElementById("prod-precio-mayorista").value = "";
 
   for (const invalidPrice of ["", "0"]) {
@@ -321,7 +321,7 @@ test("Paso 4 UI: precio minorista vacío o cero se rechaza antes de cualquier RP
       "the save button must be restored after validation rejection");
   }
 });
-test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y acepta precio mayorista vacío", async (t) => {
+test("Paso 4 UI: un único modal guarda producto, precio mayorista opcional y factor mayorista válido", async (t) => {
   const c = await contextoListo();
   evaluarModulo(c, "public/js/m26-ui-integridad.js");
   evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
@@ -360,7 +360,7 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
 
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto UI fixture";
-  d.getElementById("prod-categoria").value = "c-step4-fixture";
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
   d.getElementById("prod-unidad").value = "unidad";
   d.getElementById("prod-precio-normal").value = "12.50";
   d.getElementById("prod-precio-mayorista").value = "";
@@ -445,6 +445,7 @@ test("Paso 4 UI: categoría obligatoria y venta minorista base unidad × 1 sin c
     "a product with no optional commercial settings can be saved while the panel remains collapsed");
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto con opciones vacías fixture";
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
   d.getElementById("prod-categoria").value = "";
   d.getElementById("prod-unidad").value = "";
   d.getElementById("prod-precio-normal").value = "1.00";
