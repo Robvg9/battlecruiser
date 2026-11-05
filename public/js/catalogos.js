@@ -53,6 +53,9 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
           edit.dataset.id = row.id;
           edit.textContent = "Editar";
           actions.appendChild(edit);
+          if (tabla === "categorias") {
+            const remove = document.createElement("button"); remove.type = "button"; remove.className = "catalogo-delete-btn"; remove.dataset.id = row.id; remove.textContent = "Eliminar"; actions.appendChild(remove);
+          }
         }
         const toggle = document.createElement("button");
         toggle.type = "button";
@@ -98,6 +101,23 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
         if (submitBtn) submitBtn.textContent = "Guardar cambios";
         if (cancelarBtn) cancelarBtn.classList.remove("hidden");
         input.focus();
+        return;
+      }
+      const del = e.target.closest(".catalogo-delete-btn");
+      if (del && tabla === "categorias") {
+        const row = filasActuales.find((item) => String(item.id) === String(del.dataset.id));
+        if (!row || !window.confirm("¿Eliminar la categoría \\"" + row.nombre + "\\"? Esta acción no se puede deshacer.")) return;
+        del.disabled = true;
+        const refs = await client.from("productos").select("id").eq("categoria_id", row.id);
+        if (refs.error || (Array.isArray(refs.data) && refs.data.length)) {
+          del.disabled = false;
+          setMsg("msg-config", refs.error ? explicarError(refs.error, "consultar productos") : "No se puede eliminar: hay productos asociados. Reasígnalos primero.", false);
+          return;
+        }
+        const removed = await client.from("categorias").delete().eq("id", row.id); del.disabled = false;
+        if (removed.error) { setMsg("msg-config", explicarError(removed.error, "eliminar categoría"), false); return; }
+        setMsg("msg-config", "Categoría eliminada.", true); await refrescar(true);
+        if (typeof window.refrescarSelectorCategoriasProducto === "function") { try { await window.refrescarSelectorCategoriasProducto(); } catch (error) { console.warn(error); } }
         return;
       }
       const btn = e.target.closest(".catalogo-toggle-btn");
