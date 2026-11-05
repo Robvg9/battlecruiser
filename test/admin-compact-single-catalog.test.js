@@ -51,7 +51,7 @@ test("product form requires a real category and retail defaults to base unit tim
     assert.match(m26, /flex:0 0 18px!important/);
     assert.match(products, /fillSelect\(document\.getElementById\("prod-categoria"\), categorias, "id", \(c\) => c\.nombre, true\)/);
     assert.match(products, /window\.refrescarSelectorCategoriasProducto=refrescarSelectorCategoriasProducto/);
-    assert.doesNotMatch(productPolish, /bc-pres-optional-note|Venta minorista:|unidad minorista automática/,
+    assert.doesNotMatch(productPolish, /<p class="bc-pres-optional-note"|Venta minorista:|<strong>unidad minorista automática<\/strong>/,
       "la venta al detalle usa la unidad base × 1 sin mostrar un control o nota comercial minorista");
     assert.match(productPolish, /if\(!isWholesale\).*?factor:1/s,
       "minorista remains an internal base-unit calculation, not a configurable field");

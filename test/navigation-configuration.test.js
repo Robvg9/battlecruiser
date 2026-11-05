@@ -205,7 +205,8 @@ test("Administración solo se abre con permiso de Categorías; roles y Presentac
   window.eval(permissions);
   window.aplicarPermisosAInterfaz();
   assert.equal(document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "0");
-  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="usuarios"]').getAttribute("data-bc-permiso"), "0");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="usuarios"]').getAttribute("data-bc-permiso"), "1",
+    "el permiso de Usuarios sigue habilitando su propia ruta, no Administración");
   assert.equal(window.tienePermiso("presentaciones", "ver"), true);
   assert.equal(window.tienePermiso("usuarios", "ver"), true);
   dom.window.close();
