@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.registrar_venta(p_almacen_id uuid, p_lineas js
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-declare v_venta_id uuid;v_tipo_almacen text;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_turno record;v_almacen_real uuid;v_factor numeric;v_presentacion_producto uuid;v_presentacion_count integer;
+declare v_venta_id uuid;v_tipo_almacen text;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_precio_unitario numeric;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_turno record;v_almacen_real uuid;v_factor numeric;v_presentacion_producto uuid;v_presentacion_count integer;
 begin
  if not public.tiene_permiso('ventas','crear') then raise exception 'Sin permiso para registrar ventas'; end if;
  if p_lineas is null or jsonb_typeof(p_lineas) is distinct from 'array' or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto'; end if;
@@ -58,10 +58,10 @@ begin
 
   if v_tipo_almacen='mayorista' then if v_precio_mayorista is null or v_precio_mayorista<=0 then raise exception 'El producto % no tiene precio mayorista configurado',v_producto_id; end if; v_precio:=v_precio_mayorista; else if v_precio_normal is null or v_precio_normal<=0 then raise exception 'El producto % no tiene precio normal configurado',v_producto_id; end if; v_precio:=v_precio_normal; end if;
   select cantidad into v_stock_actual from public.stock where producto_id=v_producto_id and almacen_id=v_almacen_real for update; if v_stock_actual is null or v_stock_actual<v_cantidad_final then raise exception 'Stock insuficiente para el producto %',v_producto_id; end if;
-  v_subtotal:=v_cantidad_final*v_precio;v_total:=v_total+v_subtotal;v_restante:=v_cantidad_final;v_costo_total_linea:=0;
+  v_subtotal:=v_cantidad_presentacion*v_precio;v_precio_unitario:=v_subtotal/v_cantidad_final;v_total:=v_total+v_subtotal;v_restante:=v_cantidad_final;v_costo_total_linea:=0;
   for v_lote in select id,cantidad_restante,costo_unitario from public.lotes_compra where producto_id=v_producto_id and almacen_id=v_almacen_real and cantidad_restante>0 order by fecha_compra asc for update loop exit when v_restante<=0;v_tomar:=least(v_lote.cantidad_restante,v_restante);update public.lotes_compra set cantidad_restante=cantidad_restante-v_tomar where id=v_lote.id;v_costo_total_linea:=v_costo_total_linea+(v_tomar*v_lote.costo_unitario);v_restante:=v_restante-v_tomar;end loop;
   if v_costo_total_linea>0 then v_costo_unitario_fifo:=v_costo_total_linea/v_cantidad_final; else v_costo_unitario_fifo:=null; end if;
-  insert into public.ventas_lineas(venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo) values(v_venta_id,v_producto_id,v_cantidad_final,v_precio,v_subtotal,v_costo_unitario_fifo);
+  insert into public.ventas_lineas(venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo) values(v_venta_id,v_producto_id,v_cantidad_final,v_precio_unitario,v_subtotal,v_costo_unitario_fifo);
   update public.stock set cantidad=cantidad-v_cantidad_final where producto_id=v_producto_id and almacen_id=v_almacen_real;
  end loop;
  update public.ventas set total=v_total where id=v_venta_id;update private.operaciones_idempotencia set resultado_id=v_venta_id where idempotency_key=p_idempotency_key;return v_venta_id;
@@ -74,7 +74,7 @@ CREATE OR REPLACE FUNCTION public.registrar_venta(p_almacen_id uuid, p_lineas js
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
 AS $function$
-declare v_venta_id uuid;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_tipo_precio_linea text;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_tramo record;v_almacen_real uuid;v_presentacion_producto uuid;v_factor numeric;v_tipo_almacen text;v_presentacion_count integer;
+declare v_venta_id uuid;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_precio_unitario numeric;v_tipo_precio_linea text;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_tramo record;v_almacen_real uuid;v_presentacion_producto uuid;v_factor numeric;v_tipo_almacen text;v_presentacion_count integer;
 begin
  if not public.tiene_permiso('ventas','crear') then raise exception 'Sin permiso para registrar ventas';end if;
  if p_lineas is null or jsonb_typeof(p_lineas) is distinct from 'array' or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto';end if;
@@ -124,19 +124,19 @@ begin
 
   if v_tipo_precio_linea='mayorista' then if v_precio_mayorista is null or v_precio_mayorista<=0 then raise exception 'El producto % no tiene precio mayorista configurado',v_producto_id;end if;v_precio:=v_precio_mayorista;else if v_precio_normal is null or v_precio_normal<=0 then raise exception 'El producto % no tiene precio normal configurado',v_producto_id;end if;v_precio:=v_precio_normal;end if;
   select cantidad into v_stock_actual from public.stock where producto_id=v_producto_id and almacen_id=v_almacen_real for update;if v_stock_actual is null or v_stock_actual<v_cantidad_final then raise exception 'Stock insuficiente para el producto %',v_producto_id;end if;
-  v_subtotal:=v_cantidad_final*v_precio;v_total:=v_total+v_subtotal;v_restante:=v_cantidad_final;v_costo_total_linea:=0;
+  v_subtotal:=v_cantidad_presentacion*v_precio;v_precio_unitario:=v_subtotal/v_cantidad_final;v_total:=v_total+v_subtotal;v_restante:=v_cantidad_final;v_costo_total_linea:=0;
   for v_lote in select id,cantidad_restante,costo_unitario from public.lotes_compra where producto_id=v_producto_id and almacen_id=v_almacen_real and cantidad_restante>0 order by fecha_compra asc for update loop exit when v_restante<=0;v_tomar:=least(v_lote.cantidad_restante,v_restante);update public.lotes_compra set cantidad_restante=cantidad_restante-v_tomar where id=v_lote.id;v_costo_total_linea:=v_costo_total_linea+(v_tomar*v_lote.costo_unitario);v_restante:=v_restante-v_tomar;end loop;
   if v_costo_total_linea>0 then v_costo_unitario_fifo:=v_costo_total_linea/v_cantidad_final;else v_costo_unitario_fifo:=null;end if;
-  insert into public.ventas_lineas(venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo) values(v_venta_id,v_producto_id,v_cantidad_final,v_precio,v_subtotal,v_costo_unitario_fifo);update public.stock set cantidad=cantidad-v_cantidad_final where producto_id=v_producto_id and almacen_id=v_almacen_real;
+  insert into public.ventas_lineas(venta_id,producto_id,cantidad,precio_unitario,subtotal,costo_unitario_fifo) values(v_venta_id,v_producto_id,v_cantidad_final,v_precio_unitario,v_subtotal,v_costo_unitario_fifo);update public.stock set cantidad=cantidad-v_cantidad_final where producto_id=v_producto_id and almacen_id=v_almacen_real;
  end loop;
  update public.ventas set total=v_total where id=v_venta_id;update private.operaciones_idempotencia set resultado_id=v_venta_id where idempotency_key=p_idempotency_key;return v_venta_id;
 end;$function$;
 
 
 COMMENT ON FUNCTION public.registrar_venta(uuid,jsonb,uuid) IS
-  'Registers sales only when the selected product presentation matches the warehouse channel (retail vs wholesale).';
+  'Registers sales using the selected package count for revenue and converted base units for stock/FIFO; presentation must match the warehouse channel.';
 
 COMMENT ON FUNCTION public.registrar_venta(uuid,jsonb,uuid,text) IS
-  'Registers sales only when the selected product presentation matches the warehouse channel; price override remains independent from warehouse channel.';
+  'Registers sales using selected package count for revenue and converted base units for stock/FIFO; price override remains independent from warehouse channel.';
 
 COMMIT;
