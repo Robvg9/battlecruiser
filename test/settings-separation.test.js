@@ -51,11 +51,14 @@ test("Conectividad exposes diagnostic actions; Configuración remains for admin/
   assert.match(index, /id="form-categoria"/);
   assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/,
     "Administración no debe conservar un catálogo paralelo de unidades");
-  assert.equal((index.match(/class="presentaciones-panel"/g) || []).length, 1,
-    "catálogo y asociaciones deben vivir en un solo panel");
+  assert.equal((index.match(/class="presentaciones-panel"/g) || []).length, 0,
+    "el catálogo administrativo de presentaciones debe estar retirado");
   for (const id of ["form-presentacion-nueva", "lista-presentaciones-catalogo", "pp-producto-select", "pp-lista-asociaciones", "form-pp-nueva"]) {
     assert.equal((index.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " debe aparecer una sola vez");
   }
-  assert.match(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/,
-    "la presentación base debe sugerir opciones del catálogo único");
+  assert.doesNotMatch(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/,
+    "la unidad base ya no depende del catálogo de presentaciones");
+  assert.match(index, /<select id="prod-categoria"[^>]*required/,
+    "la categoría es un selector obligatorio en el formulario principal");
+  assert.doesNotMatch(index, /bc-pres-normal-name|bc-pres-normal-factor|prod-pres-min|prod-pres-may/);
 });
