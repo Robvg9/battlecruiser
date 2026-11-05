@@ -60,19 +60,19 @@ test('pulido: minorista siempre es unidad base × 1 y solo mayorista es opcional
   const presentations = read('public/js/presentaciones.js');
   const index = read('public/index.html');
 
-  assert.match(src, /if\\(!isWholesale\\)[\\s\\S]*?factor:1/);
-  assert.match(src, /if\\(wholesale\\.name\\|\\|wholesale\\.factor!==null\\)/);
+  assert.match(src, /if\(!isWholesale\)[\s\S]*?factor:1/);
+  assert.match(src, /if\(wholesale\.name\|\|wholesale\.factor!==null\)/);
   assert.match(src, /bc-pres-wholesale-name/);
   assert.match(src, /bc-pres-wholesale-factor/);
-  assert.match(srcB, /var normal=\\{name:baseUnit,factor:1,id:null\\}/);
-  assert.match(srcB, /p_presentacion_normal:normal\\.name,p_factor_normal:normal\\.factor/);
+  assert.match(srcB, /var normal=\{name:baseUnit,factor:1,id:null\}/);
+  assert.match(srcB, /p_presentacion_normal:normal\.name,p_factor_normal:normal\.factor/);
   assert.match(srcB, /p_presentacion_normal:baseUnit,p_factor_normal:1/);
   assert.doesNotMatch(srcB, /bc-pres-normal-name|bc-pres-normal-factor|presentacion_normal.*factor_normal/i);
 
   assert.doesNotMatch(index, /presentaciones-panel|form-presentacion-nueva|lista-presentaciones-catalogo|pp-producto-select|pp-lista-asociaciones|form-pp-nueva/);
-  assert.match(presentations, /if \\(!document\\.querySelector\\("#tab-config \\.presentaciones-panel"\\)\\) return/);
-  assert.match(presentations, /if \\(!form \\|\\| !input \\|\\| !lista\\) return/);
-  assert.match(presentations, /if \\(!productoSelect \\|\\| !formNueva \\|\\| !listaAsoc\\) return/);
+  assert.match(presentations, /if \(!document\.querySelector\("#tab-config \.presentaciones-panel"\)\) return/);
+  assert.match(presentations, /if \(!form \|\| !input \|\| !lista\) return/);
+  assert.match(presentations, /if \(!productoSelect \|\| !formNueva \|\| !listaAsoc\) return/);
 });
 test('pulido: el submit del producto se captura antes del listener heredado', () => {
   const src = read('public/js/hotfix-pulido-20260903b.js');
