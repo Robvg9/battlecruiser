@@ -67,7 +67,7 @@ test('pulido: minorista siempre es unidad base × 1 y solo mayorista es opcional
   assert.match(srcB, /var normal=\{name:baseUnit,factor:1,id:null\}/);
   assert.match(srcB, /p_presentacion_normal:normal\.name,p_factor_normal:normal\.factor/);
   assert.match(srcB, /p_presentacion_normal:baseUnit,p_factor_normal:1/);
-  assert.doesNotMatch(srcB, /bc-pres-normal-name|bc-pres-normal-factor|presentacion_normal.*factor_normal/i);
+  assert.doesNotMatch(srcB, /bc-pres-normal-name|bc-pres-normal-factor/);
 
   assert.doesNotMatch(index, /presentaciones-panel|form-presentacion-nueva|lista-presentaciones-catalogo|pp-producto-select|pp-lista-asociaciones|form-pp-nueva/);
   assert.match(presentations, /if \(!document\.querySelector\("#tab-config \.presentaciones-panel"\)\) return/);
