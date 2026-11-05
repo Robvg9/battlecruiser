@@ -77,9 +77,7 @@
     if (RUTAS_PERSONALES[tab]) return true;
     if (tab === "operacion") return puedeVerOperaciones();
     if (tab === "config") {
-      return tienePermiso("usuarios", "ver") ||
-        tienePermiso("categorias", "ver") ||
-        tienePermiso("presentaciones", "ver");
+      return tienePermiso("categorias", "ver");
     }
     if (tab === "ventas" && esDependienta()) return false;
     var seccion = TAB_A_SECCION[tab];

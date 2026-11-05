@@ -612,24 +612,12 @@
 
     <section id="tab-config" class="tab-panel">
       <div class="bc-admin-content">
-        <header class="bc-admin-heading">
-          <div><h2>Administración</h2><p class="muted">Accesos y catálogos maestros del negocio, organizados en un solo espacio.</p></div>
-        </header>
         <div class="bc-admin-grid">
-          <section class="cc-bloque bc-admin-card bc-admin-roles">
-            <div class="bc-admin-card-heading"><h3>Roles y permisos</h3><span class="bc-admin-tag">Acceso</span></div>
-            <p class="muted">Define lo que cada rol puede consultar y gestionar.</p>
-            <form id="form-nuevo-rol" class="inline-form">
-              <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
-              <button type="submit">Crear rol</button>
-            </form>
-            <p class="msg" id="msg-roles"></p><div id="lista-roles" class="lista"></div>
-          </section>
-          <section class="cc-bloque bc-admin-card bc-admin-categories">
-            <div class="bc-admin-card-heading"><h3>Categorías</h3><span class="bc-admin-tag">Catálogo</span></div>
-            <p class="muted">Administra las categorías que organizan tus productos.</p>
+          <section class="cc-bloque bc-admin-card bc-admin-categories" aria-label="Categorías">
+            <div class="bc-admin-card-heading"><h3>Categorías</h3></div>
             <button type="button" id="bc-categories-open" class="cc-accion">Administrar categorías</button>
           </section>
+        </div>
           <section id="bc-modal-categorias" class="bc-categories-modal" role="dialog" aria-modal="true" aria-labelledby="bc-categories-title" aria-hidden="true">
             <div class="bc-categories-backdrop" data-bc-categories-close="1"></div>
             <div class="bc-categories-panel">
@@ -648,14 +636,13 @@
               <p class="msg" id="msg-config" role="status" aria-live="polite"></p>
             </div>
           </section>
-        </div>
       </div>
     </section>
     </main>
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.62 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.63 — BattleCruiser</span>
     </footer>
   </div>
 

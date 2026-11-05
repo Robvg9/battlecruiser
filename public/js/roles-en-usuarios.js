@@ -514,9 +514,6 @@
   function boot() {
     unificar();
     wireCategoriesModal();
-    ensureRolesHelpModal();
-    relocateSmartPermissionsHelp();
-    ensureSmartPermissionsObserver();
     wireNav();
     injectHeroButtons();
     wireHeroButtons();
@@ -528,8 +525,6 @@
   }
 
   window.bcOpenRolesModal = openRolesModal;
-  window.bcOpenRolesHelp = openRolesHelp;
-  window.bcCloseRolesHelp = closeRolesHelp;
   window.bcCloseRolesModal = closeRolesModal;
   window.bcOpenNuevoRolModal = openNuevoRolModal;
   window.bcCloseNuevoRolModal = closeNuevoRolModal;
