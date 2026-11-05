@@ -211,7 +211,7 @@
     box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
     box.innerHTML='<div class="bc-pres-section-title">Formato mayorista (opcional)</div>'+
       '<div class="bc-pres-row"><strong class="bc-pres-row-title">Formato mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" list="presentaciones-comunes" placeholder="Etiqueta (ej. Caja)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
-      '<p class="bc-pres-optional-note">Venta minorista: unidad base del producto, factor 1.</p>';
+      '';
     host.appendChild(box);
     loadPresentaciones();
     return true;
@@ -405,7 +405,7 @@
       +'<div class="bc-pulido-help-card"><strong>unidad · opcional</strong><p>Es la unidad base del inventario: botella, lata, libra, kg, etc. No uses “paquete x7” como unidad base.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>precio_normal · opcional</strong><p>Solo número. Ej.: 650. Si no aplica, déjalo vacío.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>precio_mayorista · opcional</strong><p>Solo número. Ej.: 200. Si no aplica, déjalo vacío.</p></div>'
-      +'<div class="bc-pulido-help-card"><strong>unidad minorista automática</strong><p>Ej.: Unidad + 1. El factor es cuántas unidades base representa una venta.</p></div>'
+
       +'<div class="bc-pulido-help-card"><strong>presentacion_mayorista + factor</strong><p>Ej.: Paquete x 7 + 7. Una venta mayorista de 1 paquete descontará 7 unidades base.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>Regla crítica</strong><p>No escribas “7 unidades” dentro del factor. El factor debe ser solo un número positivo.</p></div>'
       +'</div><div class="bc-pulido-dialog-actions"><button type="button" id="bc-pulido-help-close">Cerrar</button></div></div>';

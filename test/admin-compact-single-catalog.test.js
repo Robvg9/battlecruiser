@@ -12,6 +12,7 @@ const catalogos = read("public/js/catalogos.js");
 const m26 = read("public/js/m26-ui-integridad.js");
 const roles = read("public/js/roles-en-usuarios.js");
 const products = read("public/js/productos.js");
+const productPolish = read("public/js/hotfix-pulido-20260903.js");
 
 test("Administration exposes only compact category management", () => {
   const dom = new JSDOM(index);
@@ -50,6 +51,10 @@ test("product form requires a real category and retail defaults to base unit tim
     assert.match(m26, /flex:0 0 18px!important/);
     assert.match(products, /fillSelect\(document\.getElementById\("prod-categoria"\), categorias, "id", \(c\) => c\.nombre, true\)/);
     assert.match(products, /window\.refrescarSelectorCategoriasProducto=refrescarSelectorCategoriasProducto/);
+    assert.doesNotMatch(productPolish, /bc-pres-optional-note|Venta minorista:|unidad minorista automática/,
+      "la venta al detalle usa la unidad base × 1 sin mostrar un control o nota comercial minorista");
+    assert.match(productPolish, /if\(!isWholesale\).*?factor:1/s,
+      "minorista remains an internal base-unit calculation, not a configurable field");
   } finally { dom.window.close(); }
 });
 
