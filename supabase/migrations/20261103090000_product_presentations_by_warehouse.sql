@@ -75,7 +75,7 @@ CREATE OR REPLACE FUNCTION public.registrar_venta(p_almacen_id uuid, p_lineas js
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'pg_temp'
 AS $function$
-declare v_venta_id uuid;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_tipo_precio_linea text;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_tramo record;v_almacen_real uuid;v_presentacion_producto uuid;v_factor numeric;v_tipo_almacen text;v_presentacion_count integer;
+declare v_venta_id uuid;v_linea jsonb;v_producto_id uuid;v_cantidad numeric;v_presentacion_id uuid;v_cantidad_presentacion numeric;v_cantidad_final numeric;v_precio_normal numeric;v_precio_mayorista numeric;v_precio numeric;v_precio_unitario numeric;v_tipo_precio_linea text;v_subtotal numeric;v_total numeric:=0;v_stock_actual numeric;v_restante numeric;v_lote record;v_tomar numeric;v_idempotente uuid;v_costo_total_linea numeric;v_costo_unitario_fifo numeric;v_uid uuid;v_tramo record;v_almacen_real uuid;v_presentacion_producto uuid;v_factor numeric;v_tipo_almacen text;v_presentacion_count integer;
 begin
  if not public.tiene_permiso('ventas','crear') then raise exception 'Sin permiso para registrar ventas';end if;
  if p_lineas is null or jsonb_typeof(p_lineas) is distinct from 'array' or jsonb_array_length(p_lineas)=0 then raise exception 'La venta debe tener al menos un producto';end if;
