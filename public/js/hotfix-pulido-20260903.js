@@ -345,12 +345,12 @@
     }
     try{
       if(!navigator.onLine&&typeof window.ejecutarOperacion==='function'){
-        if(normal.name||normal.factor!==null||wholesale.name||wholesale.factor!==null){
-          msg('Para guardar presentaciones y factores necesitas conexión. No se guardó el producto ni se creó parcialmente.',false);
+        if(wholesale.name||wholesale.factor!==null){
+          msg('Para guardar un formato mayorista necesitas conexión. No se guardó el producto ni se creó parcialmente.',false);
           return true;
         }
         var q=await window.ejecutarOperacion(id?'producto_actualizar':'producto',{...(id?{p_producto_id:id}:{}),p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm});
-        if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
+        if(q?.ok){msg('✓ Producto guardado localmente. El formato mayorista quedó sin configurar; puedes añadirlo al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
         return true;
       }
       if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
