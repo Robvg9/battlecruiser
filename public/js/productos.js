@@ -576,12 +576,15 @@ safeInit("form-producto", () => {
     e.preventDefault();
     const nombre = document.getElementById("prod-nombre").value.trim();
     const categoria_id = document.getElementById("prod-categoria").value || null;
-    const unidad = document.getElementById("prod-unidad").value.trim() || null;
+    const editandoId = document.getElementById("prod-editando-id").value || null;
+    const unidad = editandoId
+      ? (document.getElementById("prod-unidad").value.trim() || "unidad")
+      : "unidad";
     const precio_normal = parseFloat(document.getElementById("prod-precio-normal").value);
-    const precioMayoristaRaw = document.getElementById("prod-precio-mayorista").value.trim();
+    const precioMayoristaRaw = editandoId ? document.getElementById("prod-precio-mayorista").value.trim() : "";
     const precio_mayorista = precioMayoristaRaw === "" ? null : parseFloat(precioMayoristaRaw);
-    const formatoMayorista = document.getElementById("prod-formato-venta").value.trim();
-    const formatoFactorRaw = document.getElementById("prod-formato-factor").value.trim();
+    const formatoMayorista = editandoId ? document.getElementById("prod-formato-venta").value.trim() : "";
+    const formatoFactorRaw = editandoId ? document.getElementById("prod-formato-factor").value.trim() : "";
     const formatoFactor = formatoFactorRaw === "" ? null : Number(formatoFactorRaw);
     const submitBtn = e.target.querySelector("button[type='submit']");
 
@@ -611,9 +614,8 @@ safeInit("form-producto", () => {
       return;
     }
 
-    const editandoId = document.getElementById("prod-editando-id").value || null;
     const mixedToggle = document.getElementById("prod-inventario-mixto");
-    const mixedEnabled = !!(mixedToggle && mixedToggle.checked);
+    const mixedEnabled = !!(editandoId && mixedToggle && mixedToggle.checked);
     const variants = obtenerVariantesFormularioProducto();
     const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
     const previousProduct = editandoId
@@ -635,7 +637,9 @@ safeInit("form-producto", () => {
       return;
     }
     const archivoImagenInput = document.getElementById("prod-imagen-input");
-    const archivoImagen = _productoImagenProcesada || (archivoImagenInput.files && archivoImagenInput.files[0]);
+    const archivoImagen = editandoId
+      ? (_productoImagenProcesada || (archivoImagenInput.files && archivoImagenInput.files[0]))
+      : null;
     if (archivoImagen) {
       const errorArchivo = validarArchivoImagenProducto(archivoImagen);
       if (errorArchivo) {
