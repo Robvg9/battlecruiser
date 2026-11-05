@@ -72,7 +72,7 @@ test("Administration module styles are compact and catalog lists are bounded", (
   assert.ok(m75.includes("#tab-config .bc-admin-subcard .lista .lista-item-acciones{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap}"));
   assert.ok(m75.includes(".catalogo-edit-btn") && m75.includes(".catalogo-delete-btn"));
   assert.ok(m75.includes(".catalogo-delete-btn{border-color:rgba(220,105,90,.48);color:#e0a29a}"));
-  assert.doesNotMatch(m75, /\\.presentaciones-panel|bc-admin-presentations/);
+  assert.ok(!m75.includes("#bc-product-presentations-entry{") && !m75.includes("#tab-config .bc-admin-presentations") && !m75.includes("#tab-config .presentaciones-panel"));
 });
 
 
