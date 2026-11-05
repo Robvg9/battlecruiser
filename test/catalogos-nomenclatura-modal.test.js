@@ -8,9 +8,12 @@ const source = read('public/js/catalogos.js');
 const index = read('public/index.html');
 const m26 = read('public/js/m26-ui-integridad.js');
 
-test('category and unit catalog management has one canonical owner in Administration', () => {
-  for (const id of ['form-categoria','lista-categorias','form-presentacion-nueva','lista-presentaciones-catalogo','pp-producto-select','pp-lista-asociaciones','form-pp-nueva']) {
+test('category catalog is the sole catalog managed from Administration', () => {
+  for (const id of ['form-categoria','lista-categorias']) {
     assert.equal((index.match(new RegExp('id="' + id + '"', 'g')) || []).length, 1, id + ' must exist once');
+  }
+  for (const id of ['form-presentacion-nueva','lista-presentaciones-catalogo','pp-producto-select','pp-lista-asociaciones','form-pp-nueva']) {
+    assert.equal((index.match(new RegExp('id="' + id + '"', 'g')) || []).length, 0, id + ' must be retired');
   }
   assert.match(index, /bc-admin-categories[\s\S]*?bc-categories-open/);
   assert.match(index, /id="bc-modal-categorias"[\s\S]*?id="form-categoria"[\s\S]*?id="lista-categorias"/);
