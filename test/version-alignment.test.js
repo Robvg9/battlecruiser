@@ -143,8 +143,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(app.includes('["m27-6-ventas-presentaciones.js","27.6g"]'));
   assert.ok(sw.includes("./js/m27-5-ventas-precio-politica.js?v=27.5b7"));
   assert.ok(sw.includes("./js/m27-6-ventas-presentaciones.js?v=27.6g"));
-  assert.match(app, /\["m75-productos-ui-compacto\.js","75\.6"\]/, "M75 must load with its refreshed module cache key");
-  assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.6/, "the offline shell must precache the same M75 module version");
+  assert.match(app, /\["m75-productos-ui-compacto\.js","75\.7"\]/, "M75 must load with its refreshed module cache key");
+  assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.7/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
   assert.match(index, /<script src="js\/productos\.js\?v=20261105\.1"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261105\.1/, "the offline shell must precache the existing product module version");
@@ -256,8 +256,8 @@ test('Conectividad compacta: estilos y recursos críticos comparten caché renov
 test('Administration UI modules refresh their cache keys', () => {
   assert.match(app, /\["m26-ui-integridad\.js","26\.38"\]/);
   assert.match(app, /\["roles-en-usuarios\.js","33\.6"\]/);
-  assert.match(app, /\["m75-productos-ui-compacto\.js","75\.6"\]/);
+  assert.match(app, /\["m75-productos-ui-compacto\.js","75\.7"\]/);
   assert.match(sw, /m26-ui-integridad\.js\?v=26\.38/);
-  assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.6/);
+  assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.7/);
   assert.match(sw, /catalogos\.js\?v=20261105\.1/);
 });
