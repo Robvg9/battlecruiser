@@ -871,47 +871,61 @@ async function main() {
 
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
-  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const before=tab.getBoundingClientRect();window.scrollTo(0,Math.max(0,Math.round(before.top+window.scrollY-8)));const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);const modal=document.querySelector('#bc-modal-categorias');const modalState=modal?{ariaHidden:modal.getAttribute('aria-hidden'),open:modal.classList.contains('open'),display:getComputedStyle(modal).display,hidden:modal.getAttribute('aria-hidden')==='true'&&!modal.classList.contains('open')&&getComputedStyle(modal).display==='none'}:null;return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open'),categoriesModal:modalState}})()");
+  // The compact Administration panel may fit entirely in the phone viewport.
+  // If it overflows, verify a real CDP finger swipe; if not, verify no content is clipped.
+  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const before=tab.getBoundingClientRect();window.scrollTo(0,Math.max(0,Math.round(before.top+window.scrollY-8)));const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);const modal=document.querySelector('#bc-modal-categorias');const modalState=modal?{ariaHidden:modal.getAttribute('aria-hidden'),open:modal.classList.contains('open'),display:getComputedStyle(modal).display,hidden:modal.getAttribute('aria-hidden')==='true'&&!modal.classList.contains('open')&&getComputedStyle(modal).display==='none'}:null;return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,viewportHeight:innerHeight,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open'),categoriesModal:modalState}})()");
   report.evidence.androidConfigScrollInitial = mobileConfigScrollInitial;
   assert(mobileConfigScrollInitial && mobileConfigScrollInitial.found &&
          mobileConfigScrollInitial.regionClass &&
          (mobileConfigScrollInitial.overflowY === "auto" || mobileConfigScrollInitial.overflowY === "scroll") &&
-         mobileConfigScrollInitial.scrollHeight > mobileConfigScrollInitial.clientHeight + 80 &&
          !mobileConfigScrollInitial.bodyLock && mobileConfigScrollInitial.categoriesModal && mobileConfigScrollInitial.categoriesModal.hidden,
-    "Configuración no tiene una región táctil desplazable real: " + JSON.stringify(mobileConfigScrollInitial));
+    "Configuración no mantiene una región de contenido accesible y sin bloqueo: " + JSON.stringify(mobileConfigScrollInitial));
 
-  // Start in the panel's outer gutter, away from nested scrollable catalog lists.
-  // Send low-level CDP touch events to exercise Chromium's native finger-scroll path.
-  const configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const candidates=[{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.right-3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.38)}];for(const p of candidates){const hit=document.elementFromPoint(p.x,p.y);let node=hit,nested=false;while(node&&node!==tab){const s=getComputedStyle(node);if((s.overflowY==='auto'||s.overflowY==='scroll')&&node.scrollHeight>node.clientHeight+10)nested=true;node=node.parentElement;}if(hit&&node===tab&&!nested){const startY=Math.min(Math.round(r.bottom-12),p.y+90);const endY=Math.max(Math.round(r.top+12),startY-220);return {x:p.x,startY,endY,distance:startY-endY,targetTag:hit.tagName,targetId:hit.id||null,targetClass:typeof hit.className==='string'?hit.className:null,nestedScrollable:false};}}const x=Math.round(r.left+3),startY=Math.round(r.top+r.height*0.68),endY=Math.max(Math.round(r.top+12),startY-220),hit=document.elementFromPoint(x,startY);return {x,startY,endY,distance:startY-endY,targetTag:hit&&hit.tagName,targetId:hit&&hit.id||null,targetClass:hit&&typeof hit.className==='string'?hit.className:null,nestedScrollable:true};})()");
-  assert(configSwipe && configSwipe.distance >= 100,
-    "No hay una zona segura suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
-  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-  await cdpCommand("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
-  });
-  for (let step = 1; step <= 8; step++) {
-    await delay(45);
-    const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 8);
+  let configSwipe = null;
+  let mobileConfigScrollAfter = null;
+  let mobileConfigScrollMode = "content-fits-viewport";
+  const configNeedsScroll = mobileConfigScrollInitial.scrollHeight > mobileConfigScrollInitial.clientHeight + 10;
+  if (configNeedsScroll) {
+    // Start in the panel's outer gutter, away from nested scrollable catalog lists.
+    // Send low-level CDP touch events to exercise Chromium's native finger-scroll path.
+    configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const candidates=[{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.right-3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.38)}];for(const p of candidates){const hit=document.elementFromPoint(p.x,p.y);let node=hit,nested=false;while(node&&node!==tab){const s=getComputedStyle(node);if((s.overflowY==='auto'||s.overflowY==='scroll')&&node.scrollHeight>node.clientHeight+10)nested=true;node=node.parentElement;}if(hit&&node===tab&&!nested){const startY=Math.min(Math.round(r.bottom-12),p.y+90);const endY=Math.max(Math.round(r.top+12),startY-220);return {x:p.x,startY,endY,distance:startY-endY,targetTag:hit.tagName,targetId:hit.id||null,targetClass:typeof hit.className==='string'?hit.className:null,nestedScrollable:false};}}const x=Math.round(r.left+3),startY=Math.round(r.top+r.height*0.68),endY=Math.max(Math.round(r.top+12),startY-220),hit=document.elementFromPoint(x,startY);return {x,startY,endY,distance:startY-endY,targetTag:hit&&hit.tagName,targetId:hit&&hit.id||null,targetClass:hit&&typeof hit.className==='string'?hit.className:null,nestedScrollable:true};})()");
+    assert(configSwipe && configSwipe.distance >= 100,
+      "No hay una zona segura suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
+    await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     await cdpCommand("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+      type: "touchStart",
+      touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
     });
+    for (let step = 1; step <= 8; step++) {
+      await delay(45);
+      const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 8);
+      await cdpCommand("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+      });
+    }
+    await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await delay(300);
+    mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
+    assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollTop > mobileConfigScrollInitial.scrollTop + 20,
+      "El gesto vertical simulado no desplazó Configuración cuando el contenido excede el viewport. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
+        "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
+    mobileConfigScrollMode = "native-touch-scroll";
+    await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
+  } else {
+    mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const tr=tab.getBoundingClientRect();const selectors=['.bc-admin-content','.bc-admin-grid','.bc-admin-card','.bc-admin-subcard'];const nodes=selectors.flatMap(selector=>Array.from(tab.querySelectorAll(selector)));const clipped=nodes.filter(node=>{const r=node.getBoundingClientRect();return r.height>0&&(r.top<tr.top-1||r.bottom>tr.bottom+1)}).map(node=>({selector:node.className||node.tagName,top:node.getBoundingClientRect().top,bottom:node.getBoundingClientRect().bottom}));return {scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY,tabTop:tr.top,tabBottom:tr.bottom,viewportHeight:innerHeight,clipped}})()");
+    assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollHeight <= mobileConfigScrollAfter.clientHeight + 1 &&
+           mobileConfigScrollAfter.tabTop >= -1 && mobileConfigScrollAfter.tabBottom <= mobileConfigScrollAfter.viewportHeight + 1 &&
+           mobileConfigScrollAfter.clipped.length === 0,
+      "La Administración compacta debería caber completa sin recorte: " + JSON.stringify(mobileConfigScrollAfter));
   }
-  await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await delay(300);
-  const mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
   report.evidence.androidConfigScrollGesture = {
     initial: mobileConfigScrollInitial,
+    mode: mobileConfigScrollMode,
     swipe: configSwipe,
     after: mobileConfigScrollAfter,
-    method: "Chromium CDP touchStart/touchMove/touchEnd in 360x800 mobile emulation; not a physical Android test.",
+    method: "Chromium CDP mobile emulation: native finger swipe only when content overflows; otherwise full-content viewport fit. Not a physical Android test.",
   };
-  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
-  assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollTop > mobileConfigScrollInitial.scrollTop + 20,
-    "El gesto vertical simulado no desplazó Configuración. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
-      "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
-
   const preferencesReopenedForReachability = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=preferencias]');if(!b)return false;b.click();return true})()");
   assert(preferencesReopenedForReachability, "No se pudo volver a Preferencias para verificar el control Wi-Fi.");
   await waitUntil("Preferencias activas después de Configuración", "(()=>{const t=document.querySelector('#tab-preferencias');return !!(t&&t.classList.contains('visible'))})()", 5000);
