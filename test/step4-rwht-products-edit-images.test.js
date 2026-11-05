@@ -117,10 +117,9 @@ function setup() {
     }
   };
 
-  window.eval("(async function __bcInstallProductHandlers(){\\n" + PRODUCTION_HANDLERS + "\\n" +
-    "window.iniciarEdicionProducto = iniciarEdicionProducto;\\n" +
-    "window.cancelarEdicionProducto = cancelarEdicionProducto;\\n" +
-    "})()");
+  window.eval("(async function __bcInstallProductHandlers(){" + PRODUCTION_HANDLERS +
+    ";window.iniciarEdicionProducto = iniciarEdicionProducto;" +
+    "window.cancelarEdicionProducto = cancelarEdicionProducto;})()");
   return {
     dom,
     window,
