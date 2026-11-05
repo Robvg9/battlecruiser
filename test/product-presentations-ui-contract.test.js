@@ -28,23 +28,23 @@ test("product image picker crops, scales, previews and uploads a prepared square
   assert.ok(styles.includes("prod-imagen-preview{width:88px!important;height:88px!important"));
 });
 
-test("minorista and mayorista are independent optional label/factor pairs", () => {
+test("minorista usa siempre unidad base × 1 y solo mayorista ofrece etiqueta/factor opcionales", () => {
   const ui = read("public/js/hotfix-pulido-20260903.js");
   const saver = read("public/js/hotfix-pulido-20260903b.js");
   const salesLines = read("public/js/m27-6-ventas-presentaciones.js");
   const catalogRpcMigration = read("supabase/migrations/20261103090000_product_presentations_by_warehouse.sql");
 
-  for (const id of [
-    "bc-pres-normal-name", "bc-pres-normal-factor",
-    "bc-pres-wholesale-name", "bc-pres-wholesale-factor"
-  ]) assert.ok(ui.includes(id), "missing compact field " + id);
+  assert.ok(ui.includes("if(!isWholesale){var unit=(document.getElementById('prod-unidad')?.value||'').trim()||'unidad';return{name:unit,factor:1,id:null;}"),
+    "retail presentation is always derived from the product base unit with factor one");
+  assert.ok(ui.includes('<strong class="bc-pres-row-title">Formato mayorista</strong>'));
+  assert.ok(ui.includes('id="bc-pres-wholesale-name"'));
+  assert.ok(ui.includes('id="bc-pres-wholesale-factor"'));
+  assert.doesNotMatch(ui, /id="bc-pres-normal-name"|id="bc-pres-normal-factor"/);
 
-  assert.ok(ui.includes("function selectedPres(which)"));
-  assert.ok(ui.includes("return{name:name||null,factor:raw===''?null:Number(raw),id:null};"));
-  assert.ok(ui.includes("normal=rows.find(function(r){return !wholesaleId||String(r.presentacion_id)!==wholesaleId;})"));
-  assert.ok(ui.includes("wholesale=wholesaleId?rows.find(function(r){return String(r.presentacion_id)===wholesaleId;})"));
-  assert.ok(saver.includes("return (!hasName&&!hasFactor)||(hasName&&hasFactor)"));
-  assert.ok(saver.includes("Las etiquetas minorista y mayorista deben ser distintas"));
+  assert.ok(saver.includes("var normal={name:baseUnit,factor:1,id:null},wholesale=readWholesale();"));
+  assert.ok(saver.includes("p_presentacion_normal:normal.name,p_factor_normal:normal.factor"));
+  assert.ok(saver.includes("p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor"));
+
   assert.ok(salesLines.includes("baseQuantity=packageQuantity*factor"));
   assert.ok(salesLines.includes("__bcQuantityIsBase:true"));
   assert.ok(salesLines.includes("line.presentacion_id=p.presentacion_id"));
@@ -56,7 +56,6 @@ test("minorista and mayorista are independent optional label/factor pairs", () =
   assert.ok(catalogRpcMigration.includes("(v_norm_name is null) <> (p_factor_normal is null)"));
   assert.ok(catalogRpcMigration.includes("(v_wh_name is null) <> (p_factor_mayorista is null)"));
 });
-
 test("warehouse channel is checked independently from the selected price type", () => {
   const sales = read("public/js/m27-5-ventas-precio-politica.js");
   const migration = read("supabase/migrations/20261103090000_product_presentations_by_warehouse.sql");
@@ -98,8 +97,8 @@ test("product registration has one commercial-options owner and no legacy duplic
   assert.ok(presentationUi.includes("document.getElementById('bc-product-commercial-panel')"));
   assert.ok(presentationUi.includes("host.appendChild(box)"));
   assert.ok(presentationUi.includes("var legacy=document.getElementById('prod-presentaciones-config');if(legacy)legacy.remove();"));
-  assert.equal((presentationUi.match(/id="bc-pres-normal-name"/g) || []).length, 1);
-  assert.equal((presentationUi.match(/id="bc-pres-normal-factor"/g) || []).length, 1);
+  assert.doesNotMatch(presentationUi, /id="bc-pres-normal-name"|id="bc-pres-normal-factor"/,
+    "retail label/factor inputs no longer exist");
   assert.equal((presentationUi.match(/id="bc-pres-wholesale-name"/g) || []).length, 1);
   assert.equal((presentationUi.match(/id="bc-pres-wholesale-factor"/g) || []).length, 1);
 
