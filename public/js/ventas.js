@@ -220,7 +220,7 @@ safeInit("form-vale", () => {
 let ventaLineas = [];
 let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
 let ventaProductosPrecios = {}; // id -> precios y formatos operativos por canal
-let ventaProductosLista = [];
+let ventaProductosLista = []; // lista completa de productos, para el buscador
 
 function formatoVentaProducto(producto, tipoAlmacen) {
   if (!producto) return null;
@@ -245,7 +245,7 @@ function payloadLineaVenta(linea) {
     cantidad_presentacion: Number(linea.cantidad),
     tipo_precio: linea.tipo_precio,
   };
-} // lista completa de productos, para el buscador
+}
 let ventaCategoriasLista = []; // Misión 9.3 (Tarea 2): categorías reales, para los filtros del catálogo
 let catalogoCategoriaActiva = ""; // "" = Todos. Estado local de la pestaña, no una segunda cache.
 
@@ -530,7 +530,7 @@ function renderVentaLineas() {
       <span class="venta-linea-precios">
         <span class="venta-linea-cant-wrap">
           <button type="button" class="venta-linea-btn venta-linea-menos" data-idx="${idx}" aria-label="Restar">−</button>
-          <input type="number" class="venta-linea-cant-input" data-idx="${idx}" value="${linea.cantidad}" step="${linea.factor_presentacion > 1 ? "1" : "0.01"}" min="${linea.factor_presentacion > 1 ? "1" : "0.01"}">
+          <input type="number" class="venta-linea-cant-input" data-idx="${idx}" value="${linea.cantidad}" step="${linea.tipo_precio === "mayorista" ? "1" : "0.01"}" min="${linea.tipo_precio === "mayorista" ? "1" : "0.01"}">
           <button type="button" class="venta-linea-btn venta-linea-mas" data-idx="${idx}" aria-label="Sumar">+</button>
         </span>
         <span class="muted">$${money(linea.subtotal)}</span>
@@ -557,7 +557,7 @@ function actualizarCantidadLinea(idx, nuevaCantidad) {
   }
 
   const almacen_id = document.getElementById("venta-almacen").value;
-  if (linea.factor_presentacion > 1 && !Number.isInteger(nuevaCantidad)) {
+  if (linea.tipo_precio === "mayorista" && !Number.isInteger(nuevaCantidad)) {
     setMsg("msg-venta-linea", "La cantidad de " + linea.presentacion_nombre + " debe ser un número entero.", false);
     renderVentaLineas();
     return;
