@@ -87,7 +87,13 @@ test("M55: Importar Excel abre primero el paso de descarga, no el selector de ar
     reader.readAsText(c.getDownloadedBlob(), "utf-8");
   });
   assert.ok(csv.replace(/"/g, "").includes("nombre;categoria;unidad;precio_normal;precio_mayorista;formato_venta;factor_venta"));
-  assert.ok(csv.startsWith("\uFEFF"), "el CSV debe llevar BOM UTF-8 para conservar tildes en Excel");
+  const bytes = await new Promise((resolve, reject) => {
+    const reader = new c.window.FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result));
+    reader.onerror = () => reject(reader.error || new Error("No se pudieron leer los bytes del CSV."));
+    reader.readAsArrayBuffer(c.getDownloadedBlob());
+  });
+  assert.deepEqual(Array.from(bytes.slice(0, 3)), [0xef, 0xbb, 0xbf], "el archivo descargado debe conservar el BOM UTF-8 para Excel");
 
   d.getElementById("bc-m55-continue").click();
   assert.match(d.getElementById("bc-m55-body").textContent, /PASO 2 DE 2/);
