@@ -42,12 +42,14 @@ test("account and logout actions remain in appropriate locations", () => {
   assert.match(auth, /if \(formPass\) formPass\.addEventListener\("submit"/, "password form must still submit without the old header button");
 });
 
-test("Conectividad exposes diagnostic actions; Configuración remains for admin/catalogs", () => {
+test("Conectividad exposes diagnostics; Administración remains only for categories", () => {
   assert.match(connectivity, /Conectividad y mantenimiento/);
   assert.match(connectivity, /cfg-refrescar-diag/);
   assert.match(connectivity, /cfg-actualizar-app/);
   assert.match(index, /id="tab-config"/);
-  assert.match(index, /id="form-nuevo-rol"/, "role creation remains available in Configuración");
+  assert.doesNotMatch(index, /id="form-nuevo-rol"|id="lista-roles"|Roles y permisos/,
+    "Administración no debe mostrar gestión de roles ni matrices de permisos");
+  assert.match(index, /id="bc-categories-open"/);
   assert.match(index, /id="form-categoria"/);
   assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/,
     "Administración no debe conservar un catálogo paralelo de unidades");

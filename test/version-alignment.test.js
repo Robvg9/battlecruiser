@@ -56,6 +56,8 @@ test('auth diagnostic stays visible and version updater changes only version lab
   const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
   const htmlVersion = extract(index, /<p class="footnote app-version-label">v(\d+\.\d+\.\d+) — BattleCruiser<\/p>/, 'versión visible del login');
   assert.equal(htmlVersion, appVersion, 'la versión visible del login debe coincidir con app.js');
+  assert.ok(index.includes('<span class="app-footer-version">v' + appVersion + ' — BattleCruiser</span>'),
+    "la versión inicial del pie debe coincidir con app.js");
   assert.match(app, /querySelectorAll\(["']\.app-version-label,\.app-footer-version["']\)/,
     'el actualizador debe seleccionar solo etiquetas explícitas de versión');
   assert.doesNotMatch(app, /querySelectorAll\(["']\.footnote,\.app-footer-version["']\)/,

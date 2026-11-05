@@ -42,9 +42,9 @@ test('the canonical permission engine owns Administración visibility', () => {
   const adminLabel = read('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js');
   const configGate = permissions.match(/if \(tab === "config"\)\s*\{([\s\S]*?)\n\s*\}/);
   assert.ok(configGate, "Administración debe tener una regla de acceso centralizada");
-  assert.match(configGate[1], /tienePermiso\("usuarios", "ver"\)/);
   assert.match(configGate[1], /tienePermiso\("categorias", "ver"\)/);
-  assert.match(configGate[1], /tienePermiso\("presentaciones", "ver"\)/);
+  assert.doesNotMatch(configGate[1], /usuarios|presentaciones/,
+    "legacy role/presentation permissions must not expose category-only Administration");
   assert.doesNotMatch(configGate[1], /unidades/, "el permiso histórico de unidades no debe abrir un catálogo duplicado");
   assert.match(permissions, /RUTAS_PERSONALES = \{ conectividad: true, preferencias: true \}/);
   assert.match(navigation, /getAttribute\("data-bc-permiso"\) !== "1"/);
