@@ -123,8 +123,8 @@
     top.appendChild(left);
     top.appendChild(right);
 
-    // The product modal has one commercial-options owner. Category, wholesale
-    // price and the last approved label/factor pairs all live in this panel.
+    // The required category stays in the primary form. This optional panel owns
+    // only the wholesale price, base inventory unit and optional wholesale format.
     if (legacyPresCfg) legacyPresCfg.remove();
     mayorista.removeAttribute('required');
     mayorista.placeholder = 'Precio mayorista (opcional)';
