@@ -14,7 +14,7 @@ function fixture(){
   "<div id='bc-productos-controles'><div id='bc-productos-orden'><button>A–Z</button><button>Z–A</button></div><div id='bc-productos-vista'><button>Filas</button><button>Cuadros</button></div>",
   "<button type='button' id='bc-productos-agregar'>Registrar nuevo producto</button><button type='button'>Agregar producto</button></div></div>",
   "<div id='lista-productos'><div class='lista-item' data-ctx-tipo='producto' data-ctx-id='p-1'>Cerveza</div><div class='lista-item' data-ctx-tipo='producto' data-ctx-id='p-2'>Arroz</div></div></section>",
-  "<section id='tab-config' class='tab-panel'><div class='presentaciones-panel'><div id='lista-presentaciones-catalogo'></div><div id='pp-lista-asociaciones'></div></div></section>",
+  "<section id='tab-config' class='tab-panel'></section>",
   "<div id='bc-product-modal' class='hidden'><div class='bc-product-modal-head'><h3 id='bc-product-modal-title'>Agregar producto</h3><button id='bc-product-modal-close'>×</button></div><div id='bc-product-form-host'><form id='form-producto'></form></div></div>",
   "</div></body></html>"
  ].join("");
@@ -50,12 +50,12 @@ test("Products has one add action, a live category filter and keeps search",(t)=
  assert.ok(c.document.querySelector("[data-ctx-id='p-1']").classList.contains("bc-category-hidden"));
  assert.ok(!c.document.querySelector("[data-ctx-id='p-2']").classList.contains("bc-category-hidden"));
 });
-// Base presentation remains a product attribute; the commercial formats share one Administration catalogue.
-test("Administration keeps one presentations panel and M75 removes the legacy modal entry",(t)=>{
+// Retail presentation is implicit (base unit × 1); M75 must not recreate the retired Administration catalogue.
+test("Administration remains free of the retired presentations catalogue",(t)=>{
  const c=fixture();t.after(()=>c.dom.window.close());
  const state=c.window.__BCM75_verify();
  assert.equal(state.duplicateCatalogModal,false);
- assert.equal(state.presentationsPanelInAdministration,true);
+ assert.equal(state.presentationsPanelInAdministration,false);
  assert.equal(state.presentationsPanelOutsideProducts,true);
  assert.equal(c.document.querySelectorAll("#productos-nomenclatura-modal,#bc-product-presentations-entry,#productos-tools-nomenclatura").length,0);
  assert.equal(state.duplicateCatalogModal,false);
@@ -150,18 +150,20 @@ async function waitFor(predicate,message,timeoutMs){
  assert.ok(predicate(),message);
 }
 
-test("M26 leaves the canonical presentations panel in Administration without creating another modal",(t)=>{
+test("M26 never recreates the retired Administration presentations catalogue",(t)=>{
  const html=["<!doctype html><html><head></head><body>",
- "<section id='tab-productos' class='tab-panel'><form id='form-producto'><input id='prod-unidad'></form></section>",
- "<section id='tab-config' class='tab-panel'><div class='presentaciones-panel'><div id='lista-presentaciones-catalogo'></div><div id='pp-lista-asociaciones'></div></div></section>",
+ "<section id='tab-productos' class='tab-panel'><form id='form-producto'><select id='prod-categoria' required></select><input id='prod-unidad'></form></section>",
+ "<section id='tab-config' class='tab-panel'></section>",
  "</body></html>"].join("");
  const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
  t.after(()=>dom.window.close());
  const d=dom.window.document;
  dom.window.eval(M26_SOURCE);
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("lista-presentaciones-catalogo")));
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("pp-lista-asociaciones")));
- assert.equal(d.querySelectorAll(".presentaciones-panel").length,1);
+ assert.equal(d.querySelectorAll(".presentaciones-panel").length,0);
+ for(const id of ["form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) assert.equal(d.querySelectorAll("#"+id).length,0);
+ assert.equal(d.getElementById("prod-categoria").tagName,"SELECT");
+ assert.equal(d.getElementById("prod-categoria").required,true);
+ assert.equal(d.getElementById("prod-unidad").getAttribute("list"),null);
  assert.equal(d.querySelectorAll("#productos-nomenclatura-modal,#prod-nom-presentaciones-slot").length,0);
 });
 test("native Add opens the single M26 modal and preserves the existing product creation submit",async(t)=>{
