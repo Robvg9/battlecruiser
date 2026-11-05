@@ -45,7 +45,6 @@
         return (!hasName&&!hasFactor)||(hasName&&hasFactor);
       }
       if(!validPresentation(wholesale))throw Error('La presentación mayorista necesita una etiqueta y un factor numérico mayor que cero, o ambos campos vacíos.');
-      if(!validPresentation(wholesale))throw Error('La presentación mayorista necesita una etiqueta y un factor numérico mayor que cero, o ambos campos vacíos.');
       if(normal.name&&wholesale.name&&norm(normal.name)===norm(wholesale.name))throw Error('La etiqueta mayorista debe ser distinta de la unidad base.');
       if(typeof window.client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
       var r=await client.rpc('bc_guardar_producto_catalogo',{p_producto_id:id||null,p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normal.name,p_factor_normal:normal.factor,p_presentacion_mayorista:wholesale.name,p_factor_mayorista:wholesale.factor,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random())});
