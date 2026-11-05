@@ -17,8 +17,14 @@ function fillSelect(select, rows, valueKey, labelFn, keepFirst) {
 }
 
 async function cargarCategorias() {
-  return withCache("categorias", () => client.from("categorias").select("id, nombre").order("nombre"));
+  return withCache("categorias", () => client.from("categorias").select("id, nombre").eq("activo", true).order("nombre"));
 }
+async function refrescarSelectorCategoriasProducto() {
+  const select=document.getElementById("prod-categoria"); if(!select)return [];
+  const {data,error}=await client.from("categorias").select("id, nombre").eq("activo",true).order("nombre");
+  if(error)throw error; const rows=Array.isArray(data)?data:[]; fillSelect(select,rows,"id",row=>row.nombre,true); return rows;
+}
+window.refrescarSelectorCategoriasProducto=refrescarSelectorCategoriasProducto;
 
 async function cargarAlmacenes() {
   return withCache("almacenes", () => client.from("almacenes").select("id, nombre, tipo, activo").order("nombre"));
@@ -551,6 +557,7 @@ safeInit("form-producto", () => {
     const precio_mayorista = precioMayoristaRaw === "" ? null : parseFloat(precioMayoristaRaw);
     const submitBtn = e.target.querySelector("button[type='submit']");
 
+    if (!categoria_id) { setMsg("msg-productos","Selecciona una categoría para guardar el producto.",false); document.getElementById("prod-categoria").focus(); return; }
     if (!(precio_normal > 0)) {
       setMsg("msg-productos", "El precio normal debe ser mayor a 0.", false);
       return;
