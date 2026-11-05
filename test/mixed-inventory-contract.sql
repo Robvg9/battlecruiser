@@ -171,6 +171,14 @@ BEGIN
     RAISE EXCEPTION 'Flavor SKUs remained active after disabling mixed mode';
   END IF;
 
+  -- Stock writes lock parent before variant, serializing them with mode changes.
+  IF position('WHERE id=v_parent_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))=0
+     OR position('WHERE id=NEW.producto_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))=0
+     OR position('WHERE id=v_parent_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))
+        > position('WHERE id=NEW.producto_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure)) THEN
+    RAISE EXCEPTION 'Mixed stock writes must lock parent before variant to serialize with configuration';
+  END IF;
+
   -- SQL execution permissions are restricted to authenticated users.
   IF has_function_privilege('anon','public.configurar_producto_inventario_mixto(uuid,boolean,jsonb)','EXECUTE') THEN
     RAISE EXCEPTION 'Anonymous role can configure mixed inventory';
