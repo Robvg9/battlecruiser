@@ -95,6 +95,7 @@ function nativeModalFixture(){
  const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
  const w=dom.window;
  const d=w.document;
+ Object.defineProperty(w.navigator,"onLine",{configurable:true,value:true});
  let addClickRegistrations=0;
  let formSubmitRegistrations=0;
  const nativeAddEventListener=w.EventTarget.prototype.addEventListener;
@@ -256,9 +257,10 @@ test("native Add opens the single M26 modal and preserves the existing product c
  );
  d.getElementById("bc-m55-run").click();
  await waitFor(
-  ()=>c.catalogCalls.length===1 && /1 producto\\(s\\) procesado\\(s\\)/.test(d.getElementById("bc-m55-body").textContent),
+  ()=>c.catalogCalls.length===1,
   "M55 must process the CSV row through the canonical product catalog RPC"
  );
+  assert.ok(d.getElementById("bc-m55-body").textContent.includes("1 producto(s) procesado(s)"),"the importer must show a successful completion message");
  assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
   name:"bc_guardar_producto_catalogo",
   payload:{
