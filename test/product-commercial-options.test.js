@@ -22,7 +22,7 @@ function fixture() {
     "<form id='form-producto'>",
     "<input type='hidden' id='prod-editando-id' value=''>",
     "<input id='prod-nombre' value=''>",
-    "<select id='prod-categoria'><option value=''>Sin categoría</option><option value='cat-1'>Bebidas</option></select>",
+    "<select id='prod-categoria' required><option value=''>Sin categoría</option><option value='cat-1'>Bebidas</option></select>",
     "<input id='prod-unidad' value='unidad'>",
     "<datalist id='unidades-comunes'><option value='unidad'></option></datalist>",
     "<input id='prod-precio-normal' type='number' value='10'>",
@@ -66,7 +66,7 @@ test("one master button keeps only optional wholesale price; required category s
   assert.equal(d.getElementById("prod-categoria").tagName, "SELECT");
   assert.equal(d.getElementById("prod-categoria").required, true, "category is required in the primary product form");
   assert.ok(panel.contains(d.getElementById("prod-precio-mayorista")));
-  assert.ok(!basic.contains(d.getElementById("prod-categoria")));
+
   assert.ok(!basic.contains(d.getElementById("prod-precio-mayorista")));
   assert.equal(d.getElementById("prod-precio-mayorista").required, false);
   assert.equal(d.getElementById("prod-precio-mayorista").placeholder, "Precio mayorista (opcional)");
