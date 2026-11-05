@@ -1,5 +1,5 @@
 // BattleCruiser — M26 UI integridad
-// v9.2.44 — Productos: form-producto NUNCA visible en la página (solo modal al pulsar Agregar/Editar)
+// v9.2.45 — Productos: alta simple con tres datos NUNCA visible en la página (solo modal al pulsar Agregar/Editar)
 (function () {
   'use strict';
 
@@ -80,7 +80,7 @@
   function aplicarLayoutFormularioProducto(form) {
     if (!form) return;
     ocultarCampoUnidad(form);
-    if (form.dataset.bcLayoutV925 === '1') return;
+    if (form.dataset.bcLayoutV926 === '1') return;
 
     var nombre = document.getElementById('prod-nombre');
     var categoria = document.getElementById('prod-categoria');
@@ -101,9 +101,6 @@
     top.className = 'bc-product-form-top';
     var left = document.createElement('div');
     left.className = 'bc-product-form-fields';
-    var right = document.createElement('div');
-    right.className = 'bc-product-form-image';
-
     function fieldBlock(el, labelText, className) {
       var box = document.createElement('div');
       box.className = className || 'bc-product-field';
@@ -114,44 +111,32 @@
       box.appendChild(el);
       return box;
     }
-
     categoria.required = true;
-    left.appendChild(fieldBlock(nombre, 'Nombre'));
-    left.appendChild(fieldBlock(categoria, 'Categoría'));
+    nombre.required = true;
+    normal.required = true;
     normal.placeholder = 'Precio';
+    left.appendChild(fieldBlock(nombre, 'Nombre'));
     left.appendChild(fieldBlock(normal, 'Precio'));
-    right.appendChild(imageWrap);
+    left.appendChild(fieldBlock(categoria, 'Categoría'));
     top.appendChild(left);
-    top.appendChild(right);
-
-    // The required category stays in the primary form. Optional owns only
-    // wholesale price and wholesale package-to-base-unit conversion.
+    // Existing advanced data remains editable, but is hidden for new product creation.
     if (legacyPresCfg) legacyPresCfg.remove();
     mayorista.removeAttribute('required');
-    mayorista.placeholder = 'Precio mayorista (opcional)';
-
+    mayorista.placeholder = 'Precio mayorista';
     var commercial = document.createElement('section');
     commercial.id = 'bc-product-commercial-settings';
     commercial.className = 'bc-product-commercial-settings';
-
-    var commercialToggle = document.createElement('button');
-    commercialToggle.type = 'button';
-    commercialToggle.id = 'bc-product-commercial-toggle';
-    commercialToggle.className = 'bc-product-commercial-toggle';
-    commercialToggle.setAttribute('aria-expanded', 'false');
-    commercialToggle.setAttribute('aria-controls', 'bc-product-commercial-panel');
-    commercialToggle.innerHTML =
-      '<span class="bc-product-commercial-toggle-copy"><strong>Opcional</strong><small>Precio mayorista y formato de venta</small></span>' +
-      '<span class="bc-product-commercial-chevron" aria-hidden="true">⌄</span>';
-
     var commercialPanel = document.createElement('div');
     commercialPanel.id = 'bc-product-commercial-panel';
-    commercialPanel.className = 'bc-product-commercial-panel hidden';
+    commercialPanel.className = 'bc-product-commercial-panel bc-product-edit-legacy-settings hidden';
     commercialPanel.hidden = true;
-
+    var legacyHeading = document.createElement('div');
+    legacyHeading.className = 'bc-product-edit-legacy-heading';
+    legacyHeading.textContent = 'Datos adicionales de este producto';
+    commercialPanel.appendChild(legacyHeading);
     var commercialFields = document.createElement('div');
     commercialFields.className = 'bc-product-commercial-fields';
-    commercialFields.appendChild(fieldBlock(mayorista, 'Precio mayorista (opcional)', 'bc-product-commercial-field'));
+    commercialFields.appendChild(fieldBlock(mayorista, 'Precio mayorista', 'bc-product-commercial-field'));
     var wholesaleFormat = document.createElement('div');
     wholesaleFormat.className = 'bc-product-commercial-field bc-product-wholesale-format-field';
     var wholesaleFormatLabel = document.createElement('label');
@@ -160,9 +145,9 @@
     var wholesaleFormatRow = document.createElement('div');
     wholesaleFormatRow.className = 'bc-product-wholesale-format-row';
     formatoVenta.placeholder = 'Ej. Caja';
-    formatoVenta.setAttribute('aria-label', 'Nombre del formato de venta mayorista');
+    formatoVenta.setAttribute('aria-label', 'Nombre del formato de venta');
     formatoFactor.placeholder = 'Ej. 24 unidades';
-    formatoFactor.setAttribute('aria-label', 'Unidades base por formato mayorista');
+    formatoFactor.setAttribute('aria-label', 'Unidades base por formato');
     wholesaleFormatRow.appendChild(formatoVenta);
     wholesaleFormatRow.appendChild(formatoFactor);
     var wholesaleFormatHint = document.createElement('small');
@@ -171,14 +156,10 @@
     wholesaleFormat.appendChild(wholesaleFormatRow);
     wholesaleFormat.appendChild(wholesaleFormatHint);
     commercialFields.appendChild(wholesaleFormat);
+    if (imageWrap) commercialFields.appendChild(imageWrap);
+    if (mixedSettings) commercialFields.appendChild(mixedSettings);
     commercialPanel.appendChild(commercialFields);
-    commercialToggle.addEventListener('click', function () {
-      setCommercialOptionsExpanded(commercialToggle.getAttribute('aria-expanded') !== 'true');
-    });
-    commercial.appendChild(commercialToggle);
     commercial.appendChild(commercialPanel);
-    setCommercialOptionsExpanded(false);
-
     var actions = document.createElement('div');
     actions.className = 'bc-product-form-actions';
     var cancelBtn = document.createElement('button');
@@ -194,9 +175,6 @@
       cancelEdit.classList.add('hidden');
       cancelEdit.style.display = 'none';
     }
-    // El botón final debe seguir siendo el submit real del formulario incluso
-    // después de moverlo al modal; se fuerza visibilidad para evitar que herede
-    // estados/estilos de la antigua presentación inline.
     submitBtn.type = 'submit';
     submitBtn.classList.remove('hidden');
     submitBtn.removeAttribute('hidden');
@@ -204,15 +182,14 @@
     submitBtn.textContent = 'Guardar producto';
     actions.appendChild(cancelBtn);
     actions.appendChild(submitBtn);
-
     var unidad = document.getElementById('prod-unidad');
     var dl = document.getElementById('presentaciones-comunes');
     if (editId) form.appendChild(editId);
     form.appendChild(top);
     form.appendChild(commercial);
-    if (mixedSettings) form.appendChild(mixedSettings);
     if (unidad) {
       unidad.type = 'hidden';
+      unidad.value = unidad.value || 'unidad';
       unidad.style.display = 'none';
       unidad.setAttribute('aria-hidden', 'true');
       form.appendChild(unidad);
@@ -221,7 +198,7 @@
       dl.style.display = 'none';
       form.appendChild(dl);
     }
-    form.appendChild(actions);
+    form.appendChild(actions);    form.appendChild(actions);
 
     var mixedStyle = document.getElementById('bc-product-mixed-stock-css');
     if (!mixedStyle) {
@@ -249,7 +226,7 @@
         '@media(max-width:560px){.prod-inventario-mixto-settings{padding:9px}.prod-variante-row input{font-size:12px}}';
       document.head.appendChild(mixedStyle);
     }
-    form.dataset.bcLayoutV925 = '1';
+    form.dataset.bcLayoutV926 = '1';
     form.classList.add('bc-producto-modal-form');
   }
 
@@ -330,12 +307,8 @@
     var edit = !!(editando && editando.value);
     if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
     if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
-    var hasWholesaleConfig = !!(
-      (document.getElementById('prod-precio-mayorista') && document.getElementById('prod-precio-mayorista').value.trim()) ||
-      (document.getElementById('prod-formato-venta') && document.getElementById('prod-formato-venta').value.trim()) ||
-      (document.getElementById('prod-formato-factor') && document.getElementById('prod-formato-factor').value.trim())
-    );
-    setCommercialOptionsExpanded(edit && hasWholesaleConfig);
+    // Advanced options are surfaced only while editing an existing product.
+    setCommercialOptionsExpanded(edit);
     ocultarCampoUnidad(form);
     form.classList.remove('hidden');
     modal.classList.remove('hidden');
@@ -346,15 +319,11 @@
   }
 
   function setCommercialOptionsExpanded(expanded) {
-    var button = document.getElementById('bc-product-commercial-toggle');
     var panel = document.getElementById('bc-product-commercial-panel');
-    if (!button || !panel) return false;
+    if (!panel) return false;
     var open = !!expanded;
     panel.hidden = !open;
     panel.classList.toggle('hidden', !open);
-    button.setAttribute('aria-expanded', open ? 'true' : 'false');
-    var chevron = button.querySelector('.bc-product-commercial-chevron');
-    if (chevron) chevron.textContent = open ? '⌃' : '⌄';
     return true;
   }
 
@@ -366,7 +335,7 @@
   window.__BCM26_ensureCommercialOptions = function () {
     var form = document.getElementById('form-producto');
     if (!form) return false;
-    if (form.dataset.bcLayoutV925 !== '1') aplicarLayoutFormularioProducto(form);
+    if (form.dataset.bcLayoutV926 !== '1') aplicarLayoutFormularioProducto(form);
     return !!document.getElementById('bc-product-commercial-panel');
   };
 
