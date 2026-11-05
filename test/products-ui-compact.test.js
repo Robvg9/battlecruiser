@@ -95,6 +95,7 @@ function nativeModalFixture(){
  const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
  const w=dom.window;
  const d=w.document;
+ Object.defineProperty(w.navigator,"onLine",{configurable:true,value:true});
  let addClickRegistrations=0;
  let formSubmitRegistrations=0;
  const nativeAddEventListener=w.EventTarget.prototype.addEventListener;
@@ -236,26 +237,37 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.ok(importButton.closest("#bc-product-modal"),"the single import action must stay inside the native M26 modal");
  importButton.click();
  const importOverlay=d.getElementById("bc-m55-overlay");
- const importFile=d.getElementById("bc-m55-file");
+ let importFile=d.getElementById("bc-m55-file");
  assert.ok(importOverlay,"the real M55 import dialog must open");
- assert.ok(importFile.accept.includes(".csv") && importFile.accept.includes(".xlsx"),"the importer must retain CSV and Excel support");
+ assert.match(d.getElementById("bc-m55-body").textContent,/PASO 1 DE 2/);
+ assert.equal(importFile,null,"the file selector must stay hidden until the template has been filled");
+ assert.ok(d.getElementById("bc-m55-template-download"),"the first step must offer the fillable template");
+ d.getElementById("bc-m55-continue").click();
+ importFile=d.getElementById("bc-m55-file");
+ assert.ok(importFile,"the file selector must appear only in step 2");
+ assert.ok(importFile.accept.includes(".csv") && importFile.accept.includes(".xlsx"),"the importer must retain CSV and optional Excel support");
  Object.defineProperty(importFile,"files",{configurable:true,value:[{
   name:"productos.csv",
   text:async function(){return "Nombre,Categoría,Unidad,Precio normal,Precio mayorista\nAvena,Secos,paquete,10,8";}
  }]});
  importFile.dispatchEvent(new w.Event("change",{bubbles:true}));
  await waitFor(
-  ()=>!!d.getElementById("bc-m55-run") && /Estructura válida/.test(d.getElementById("bc-m55-body").textContent),
+  ()=>!!d.getElementById("bc-m55-run") && /Plantilla válida/.test(d.getElementById("bc-m55-body").textContent),
   "M55 must parse the selected CSV and render a validated preview"
  );
  d.getElementById("bc-m55-run").click();
  await waitFor(
-  ()=>c.operationCalls.length===1 && /1 producto\(s\) procesado\(s\)/.test(d.getElementById("bc-m55-body").textContent),
-  "M55 must process the CSV row through the existing product create operation"
+  ()=>c.catalogCalls.length===1,
+  "M55 must process the CSV row through the canonical product catalog RPC"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[0])),{
-  name:"producto",
-  payload:{p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",p_precio_normal:10,p_precio_mayorista:8}
+  assert.ok(d.getElementById("bc-m55-body").textContent.includes("1 producto(s) procesado(s)"),"the importer must show a successful completion message");
+ assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
+  name:"bc_guardar_producto_catalogo",
+  payload:{
+   p_producto_id:null,p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",
+   p_precio_normal:10,p_precio_mayorista:8,p_presentacion_normal:"paquete",p_factor_normal:1,
+   p_presentacion_mayorista:null,p_factor_mayorista:null,p_idempotency_key:"test-idempotency-key"
+  }
  });
  d.getElementById("bc-m55-cancel").click();
  assert.equal(d.getElementById("bc-m55-overlay"),null,"closing import must remove its own overlay");
@@ -269,12 +281,12 @@ test("native Add opens the single M26 modal and preserves the existing product c
  d.getElementById("prod-precio-mayorista").value="10.25";
  form.dispatchEvent(new w.Event("submit",{bubbles:true,cancelable:true}));
  await waitFor(
-  ()=>c.catalogCalls.length===1 &&
+   ()=>c.catalogCalls.length===2 &&
       c.messages.some(function(item){return item.id==="msg-productos" && item.message==="Producto creado.";}) &&
-      c.getRefreshCalls()===1,
+       c.getRefreshCalls()===2,
   "the existing Productos submit handler must call the create operation and refresh the list"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
+  assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[1])),{
   name:"bc_guardar_producto_catalogo",
   payload:{
    p_producto_id:null,
