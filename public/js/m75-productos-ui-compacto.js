@@ -1,10 +1,11 @@
-// BattleCruiser M75 v75.3 — interfaz compacta de Productos y encabezado global.
+// BattleCruiser M75 v75.10 — interfaz compacta de Productos y Administración.
 (function () {
   'use strict';
   if (window.__BCM75_PRODUCTS_UI) return;
   window.__BCM75_PRODUCTS_UI = true;
   var STYLE_ID = 'bc-m75-products-compact-style';
   var listObserver = null;
+  var adminPermissionDesignerObserver = null;
 
   function installStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -220,8 +221,34 @@
     return true;
   }
 
+
+  // Administration has one owner surface: category management. Legacy modules
+  // may still append their old role-permission designer into #tab-config; remove
+  // only that obsolete UI while leaving the permission engine and role data intact.
+  function removeLegacyPermissionDesigner() {
+    var admin = document.getElementById('tab-config');
+    if (!admin) return 0;
+    var obsolete = admin.querySelectorAll('.bc-perm-designer');
+    var removed = obsolete.length;
+    obsolete.forEach(function (node) { node.remove(); });
+    return removed;
+  }
+
+  function observeLegacyPermissionDesigner() {
+    var admin = document.getElementById('tab-config');
+    if (!admin || admin.dataset.bcPermissionDesignerObserver === '1') return;
+    admin.dataset.bcPermissionDesignerObserver = '1';
+    removeLegacyPermissionDesigner();
+    if (typeof MutationObserver !== 'function') return;
+    adminPermissionDesignerObserver = new MutationObserver(function () {
+      removeLegacyPermissionDesigner();
+    });
+    adminPermissionDesignerObserver.observe(admin, { childList: true, subtree: true });
+  }
+
   function apply() {
     installStyles();
+    observeLegacyPermissionDesigner();
     var panel = document.getElementById('tab-productos');
     removeLegacyProductControls(panel);
     var a = ensureToolbar();

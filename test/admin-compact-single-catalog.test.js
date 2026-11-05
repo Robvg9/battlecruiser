@@ -72,6 +72,33 @@ test("the obsolete smart-permissions panel is not initialized", () => {
   assert.doesNotMatch(roles, /Solo lectura|Operación|Inventario|Administrador operativo/);
 });
 
+test("legacy smart-permissions designer is removed from Administration, including reinsertion", async () => {
+  const dom = new JSDOM(index, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  try {
+    const d = dom.window.document;
+    const admin = d.getElementById("tab-config");
+    const legacy = d.createElement("section");
+    legacy.className = "bc-perm-designer";
+    legacy.innerHTML = '<h3>Permisos inteligentes</h3><button>Solo lectura</button>';
+    admin.appendChild(legacy);
+    dom.window.eval(m75);
+    dom.window.__BCM75_apply();
+    assert.equal(admin.querySelector(".bc-perm-designer"), null,
+      "M75 must remove the obsolete permission designer already present in Administration");
+    const reinserted = d.createElement("section");
+    reinserted.className = "bc-perm-designer";
+    reinserted.textContent = "Administrador operativo";
+    admin.appendChild(reinserted);
+    await new Promise(resolve => dom.window.setTimeout(resolve, 25));
+    assert.equal(admin.querySelector(".bc-perm-designer"), null,
+      "the scoped observer must remove late legacy reinsertion too");
+    assert.ok(admin.querySelector("#bc-categories-open"),
+      "category management must remain mounted");
+    assert.ok(admin.querySelector("#bc-modal-categorias #form-categoria"),
+      "the category form must remain intact");
+  } finally { dom.window.close(); }
+});
+
 test("M75 gives Administration a single full-width category control", () => {
   assert.ok(m75.includes("#tab-config .bc-admin-grid{display:block!important;width:100%!important;margin:0!important}"));
   assert.ok(m75.includes("#tab-config .bc-admin-card.bc-admin-categories{display:flex!important;flex-direction:row!important"));
