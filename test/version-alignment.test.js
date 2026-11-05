@@ -150,7 +150,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
   assert.match(index, /<script src="js\/productos\.js\?v=20261105\.2"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261105\.2/, "the offline shell must precache the existing product module version");
-  assert.match(index, /<script src="js\/ventas\.js\?v=20261104\.2"><\/script>/);
+  assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.1"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.24"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
