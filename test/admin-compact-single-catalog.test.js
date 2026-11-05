@@ -12,7 +12,7 @@ const m26 = read("public/js/m26-ui-integridad.js");
 const roles = read("public/js/roles-en-usuarios.js");
 const presentations = read("public/js/presentaciones.js");
 
-test("Administration has one compact home for roles, categories and the single presentations catalogue", () => {
+test("Administration keeps compact roles and categories and removes the presentations catalogue", () => {
   const { JSDOM } = require("jsdom");
   const dom = new JSDOM(index);
   try {
@@ -20,8 +20,11 @@ test("Administration has one compact home for roles, categories and the single p
     assert.ok(admin && admin.querySelector(".bc-admin-grid"));
     assert.ok(admin.querySelector(".bc-admin-roles"));
     assert.ok(admin.querySelector(".bc-admin-categories"));
-    for (const id of ["form-nuevo-rol","form-categoria","lista-categorias","msg-config","form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) {
+    for (const id of ["form-nuevo-rol","form-categoria","lista-categorias","msg-config"]) {
       assert.equal(d.querySelectorAll("#" + id).length, 1, id + " must remain unique");
+    }
+    for (const id of ["form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) {
+      assert.equal(d.querySelectorAll("#" + id).length, 0, id + " belongs to the retired Administration catalogue");
     }
     assert.ok(admin.querySelector("#bc-modal-categorias #form-categoria"));
     assert.ok(admin.querySelector("#bc-modal-categorias #lista-categorias"));
@@ -29,12 +32,15 @@ test("Administration has one compact home for roles, categories and the single p
     assert.ok(admin.querySelector(".bc-admin-roles #bc-btn-config-roles") || admin.querySelector(".bc-admin-roles"));
     assert.ok(admin.querySelector(".bc-admin-categories #bc-categories-open"));
     assert.equal(d.querySelectorAll("#form-unidad,#lista-unidades").length, 0, "units must not be a second catalogue");
-    assert.ok(admin.querySelector(".presentaciones-panel"));
-    assert.equal(d.querySelectorAll("#tab-productos .presentaciones-panel").length, 0);
+    assert.equal(d.querySelectorAll(".presentaciones-panel").length, 0);
+    assert.equal(d.querySelectorAll("#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado,#bc-pres-normal-name,#bc-pres-normal-factor").length, 0);
+    assert.equal(d.getElementById("prod-categoria").tagName, "SELECT");
+    assert.equal(d.getElementById("prod-categoria").required, true);
+    assert.equal(d.getElementById("prod-unidad").getAttribute("list"), null);
   } finally { dom.window.close(); }
 });
 
-test("presentations and role permissions have one Administration entry, not duplicate management actions", () => {
+test("the retired presentations catalogue stays absent and role permissions no longer show the smart-permissions legend", () => {
   assert.match(m75, /function moveNomenclatureToAdmin\(\)/);
   assert.doesNotMatch(m75, /Administrar presentaciones comerciales/);
   assert.match(catalogos, /tabla: "categorias"/);
@@ -51,12 +57,11 @@ test("presentations and role permissions have one Administration entry, not dupl
   assert.match(roles, /function openRolesHelp\(\)/);
   assert.match(roles, /relocateSmartPermissionsHelp\(\)/);
   assert.match(roles, /ensureSmartPermissionsObserver\(\)/);
-  assert.match(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/);
-  assert.match(presentations, /function actualizarDatalistPresentaciones\(\)/);
-  assert.match(presentations, /client\.rpc\("crear_presentacion"/);
-  assert.match(presentations, /client\.rpc\("actualizar_presentacion"/);
-  assert.match(presentations, /client\.rpc\("cambiar_estado_presentacion"/);
-  assert.match(presentations, /pres-eliminar-btn/);
+  assert.doesNotMatch(index, /presentaciones-panel|form-presentacion-nueva|lista-presentaciones-catalogo|pp-producto-select|pp-lista-asociaciones|form-pp-nueva/);
+  assert.doesNotMatch(roles, /Solo lectura|Operación|Inventario|Administrador operativo/);
+  assert.doesNotMatch(index, /bc-pres-normal-name|bc-pres-normal-factor|prod-pres-min|prod-pres-may/);
+  assert.match(catalogos, /catalogo-delete-btn/);
+  assert.match(catalogos, /No se puede eliminar: hay productos asociados/);
   assert.ok(roles.includes("rol-permisos-panel{max-height:240px;overflow:auto"));
 });
 
