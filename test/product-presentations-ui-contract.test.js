@@ -34,7 +34,7 @@ test("minorista usa siempre unidad base × 1 y solo mayorista ofrece etiqueta/fa
   const salesLines = read("public/js/m27-6-ventas-presentaciones.js");
   const catalogRpcMigration = read("supabase/migrations/20261103090000_product_presentations_by_warehouse.sql");
 
-  assert.ok(ui.includes("if(!isWholesale){var unit=(document.getElementById('prod-unidad')?.value||'').trim()||'unidad';return{name:unit,factor:1,id:null;}"),
+  assert.ok(ui.includes("if(!isWholesale){var unit=(document.getElementById('prod-unidad')?.value||'').trim()||'unidad';return{name:unit,factor:1,id:null};"),
     "retail presentation is always derived from the product base unit with factor one");
   assert.ok(ui.includes('<strong class="bc-pres-row-title">Formato mayorista</strong>'));
   assert.ok(ui.includes('id="bc-pres-wholesale-name"'));
