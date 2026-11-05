@@ -54,7 +54,7 @@ test("Conectividad exposes diagnostic actions; Configuración remains for admin/
   assert.equal((index.match(/class="presentaciones-panel"/g) || []).length, 0,
     "el catálogo administrativo de presentaciones debe estar retirado");
   for (const id of ["form-presentacion-nueva", "lista-presentaciones-catalogo", "pp-producto-select", "pp-lista-asociaciones", "form-pp-nueva"]) {
-    assert.equal((index.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " debe aparecer una sola vez");
+    assert.equal((index.match(new RegExp('id="' + id + '"', "g")) || []).length, 0, id + " pertenece al panel retirado");
   }
   assert.doesNotMatch(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/,
     "la unidad base ya no depende del catálogo de presentaciones");
