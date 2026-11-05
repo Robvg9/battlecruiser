@@ -882,24 +882,22 @@ async function main() {
          !mobileConfigScrollInitial.bodyLock,
     "Configuración no tiene una región táctil desplazable real: " + JSON.stringify(mobileConfigScrollInitial));
 
-  const configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const top=Math.max(2,r.top+8);const bottom=Math.min(innerHeight-2,r.bottom-8);const distance=Math.min(220,bottom-top-30);return {x:Math.round(r.left+r.width*0.45),startY:Math.round(bottom-10),endY:Math.round(bottom-10-distance),distance:Math.round(distance)}})()");
+  // Start in the panel's outer gutter, away from nested scrollable catalog lists.
+  // Use CDP's touch-source gesture synthesizer so Chromium applies its native scroll arbitration.
+  const configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const candidates=[{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.right-3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.38)}];for(const p of candidates){const hit=document.elementFromPoint(p.x,p.y);let node=hit,nested=false;while(node&&node!==tab){const s=getComputedStyle(node);if((s.overflowY==='auto'||s.overflowY==='scroll')&&node.scrollHeight>node.clientHeight+10)nested=true;node=node.parentElement;}if(hit&&node===tab&&!nested){const startY=Math.min(Math.round(r.bottom-12),p.y+90);const endY=Math.max(Math.round(r.top+12),startY-220);return {x:p.x,startY,endY,distance:startY-endY,targetTag:hit.tagName,targetId:hit.id||null,targetClass:typeof hit.className==='string'?hit.className:null,nestedScrollable:false};}}const x=Math.round(r.left+3),startY=Math.round(r.top+r.height*0.68),endY=Math.max(Math.round(r.top+12),startY-220),hit=document.elementFromPoint(x,startY);return {x,startY,endY,distance:startY-endY,targetTag:hit&&hit.tagName,targetId:hit&&hit.id||null,targetClass:hit&&typeof hit.className==='string'?hit.className:null,nestedScrollable:true};})()");
   assert(configSwipe && configSwipe.distance >= 100,
-    "No hay una zona visible suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
+    "No hay una zona segura suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
   await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-  await cdpCommand("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+  await cdpCommand("Input.synthesizeScrollGesture", {
+    x: configSwipe.x,
+    y: configSwipe.startY,
+    xDistance: 0,
+    yDistance: -configSwipe.distance,
+    speed: 750,
+    gestureSourceType: "touch",
+    preventFling: true,
   });
-  for (let step = 1; step <= 6; step++) {
-    await delay(35);
-    const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 6);
-    await cdpCommand("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
-    });
-  }
-  await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await delay(250);
+  await delay(300);
   const mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
   report.evidence.androidConfigScrollGesture = {
     initial: mobileConfigScrollInitial,
