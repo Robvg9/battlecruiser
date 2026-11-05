@@ -241,7 +241,7 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
   assert.match(app, /const VERSION=["']9\.5\.65["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.64["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.65["']/);
 });
 
 
