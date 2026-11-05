@@ -888,15 +888,19 @@ async function main() {
   assert(configSwipe && configSwipe.distance >= 100,
     "No hay una zona segura suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
   await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-  await cdpCommand("Input.synthesizeScrollGesture", {
-    x: configSwipe.x,
-    y: configSwipe.startY,
-    xDistance: 0,
-    yDistance: -configSwipe.distance,
-    speed: 750,
-    gestureSourceType: "touch",
-    preventFling: true,
+  await cdpCommand("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
   });
+  for (let step = 1; step <= 8; step++) {
+    await delay(45);
+    const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 8);
+    await cdpCommand("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+    });
+  }
+  await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await delay(300);
   const mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
   report.evidence.androidConfigScrollGesture = {
