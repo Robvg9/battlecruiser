@@ -73,7 +73,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
 });
 
 
-test("Sistema agrupa Conectividad y Preferencias; Administración muestra solo Categorías", () => {
+test("Sistema agrupa Conectividad y Preferencias; Administración muestra Categorías y Roles y Permisos", () => {
   const normalizedIndex = index.replace(/\r\n/g, "\n");
   const groupStart = normalizedIndex.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
   const groupStop = normalizedIndex.indexOf("</div>\n        </div>", groupStart);
@@ -87,10 +87,16 @@ test("Sistema agrupa Conectividad y Preferencias; Administración muestra solo C
   assert.match(groupMarkup, /data-tab="preferencias">Preferencias/);
   assert.match(index, /<button class="tab-btn" data-tab="config">Administración<\/button>/);
   const start = index.indexOf('<section id="tab-config"');
-  const admin = index.slice(start, index.indexOf("</section>", start));
+  const end = index.indexOf("</section>\\n    </main>", start);
+  const admin = index.slice(start, end);
   assert.match(admin, /<h3>Categorías<\/h3>/);
   assert.match(admin, /id="bc-categories-open"/);
-  assert.doesNotMatch(admin, /<h2>Administración|Roles y permisos|Presentaciones comerciales|Permisos inteligentes/);
+  assert.match(admin, /<h3>Roles y Permisos<\/h3>/);
+  assert.match(admin, /class="bc-admin-role-runtime" hidden/);
+  for (const id of ["form-nuevo-rol", "lista-roles", "msg-roles"]) {
+    assert.match(admin, new RegExp('id="' + id + '"'));
+  }
+  assert.doesNotMatch(admin, /Presentaciones comerciales|Permisos inteligentes/);
   assert.doesNotMatch(groupMarkup, /data-tab="config"/);
 });
 
@@ -255,10 +261,10 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
 });
 
 test("app shell, application and Service Worker share 9.5.63 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.63"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.63"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.63"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.63"><\/script>/);
+  assert.match(app, /const VERSION="9\.5\.64"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.64"/);
+  assert.match(index, /href="style\.css\?v=9\.5\.64"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.64"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.7"\]/);
   assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.7/, "Service Worker debe precargar la misma versión de app.js");
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/);

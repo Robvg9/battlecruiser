@@ -40,7 +40,7 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.match(products, /new Set\(names\)\.size !== names\.length/);
   assert.match(products, /async function ejecutarProductoMixtoSinCola\(editandoId, payload\)/);
   assert.match(products, /El producto mixto no se guardó ni se encoló/);
-  assert.match(products, /needsMixedConfig\s*\? await ejecutarProductoMixtoSinCola/);
+  assert.match(products, /if\s*\(needsMixedConfig\)\s*\{\s*resultado = await ejecutarProductoMixtoSinCola/);
   assert.match(products, /String\(v\.producto_padre_id\) === String\(p\.id\) && v\.activo !== false/);
 });
 
@@ -86,9 +86,9 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
-  assert.match(index, /productos\.js\?v=20261105\.1/);
-  assert.match(index, /catalogos\.js\?v=20261105\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.63/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.63"/);
+  assert.match(index, /productos\.js\?v=20261105\.2/);
+  assert.match(index, /catalogos\.js\?v=20261105\.2/);
+  assert.match(index, /app\.js\?v=9\.5\.64/);
+  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.64"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53\.2"\]/);
 });

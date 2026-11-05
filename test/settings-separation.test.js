@@ -42,13 +42,18 @@ test("account and logout actions remain in appropriate locations", () => {
   assert.match(auth, /if \(formPass\) formPass\.addEventListener\("submit"/, "password form must still submit without the old header button");
 });
 
-test("Conectividad exposes diagnostics; Administración remains only for categories", () => {
+test("Conectividad exposes diagnostics; Administración retains Categories and Roles & Permissions", () => {
   assert.match(connectivity, /Conectividad y mantenimiento/);
   assert.match(connectivity, /cfg-refrescar-diag/);
   assert.match(connectivity, /cfg-actualizar-app/);
   assert.match(index, /id="tab-config"/);
-  assert.doesNotMatch(index, /id="form-nuevo-rol"|id="lista-roles"|Roles y permisos/,
-    "Administración no debe mostrar gestión de roles ni matrices de permisos");
+  assert.match(index, /class="cc-bloque bc-admin-card bc-admin-roles" aria-label="Roles y Permisos"/,
+    "Administración debe conservar la tarjeta de Roles y Permisos");
+  assert.match(index, /class="bc-admin-role-runtime" hidden/,
+    "el formulario/lista de roles permanece como punto de montaje del módulo");
+  for (const id of ["form-nuevo-rol", "lista-roles", "msg-roles"]) {
+    assert.match(index, new RegExp('id="' + id + '"'));
+  }
   assert.match(index, /id="bc-categories-open"/);
   assert.match(index, /id="form-categoria"/);
   assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/,
