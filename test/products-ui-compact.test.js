@@ -14,7 +14,7 @@ function fixture(){
   "<div id='bc-productos-controles'><div id='bc-productos-orden'><button>A–Z</button><button>Z–A</button></div><div id='bc-productos-vista'><button>Filas</button><button>Cuadros</button></div>",
   "<button type='button' id='bc-productos-agregar'>Registrar nuevo producto</button><button type='button'>Agregar producto</button></div></div>",
   "<div id='lista-productos'><div class='lista-item' data-ctx-tipo='producto' data-ctx-id='p-1'>Cerveza</div><div class='lista-item' data-ctx-tipo='producto' data-ctx-id='p-2'>Arroz</div></div></section>",
-  "<section id='tab-config' class='tab-panel'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn' data-bc-m26='1'>Nomenclatura y catálogos</button></div></section>",
+  "<section id='tab-config' class='tab-panel'></section>",
   "<div id='bc-product-modal' class='hidden'><div class='bc-product-modal-head'><h3 id='bc-product-modal-title'>Agregar producto</h3><button id='bc-product-modal-close'>×</button></div><div id='bc-product-form-host'><form id='form-producto'></form></div></div>",
   "</div></body></html>"
  ].join("");
@@ -50,16 +50,15 @@ test("Products has one add action, a live category filter and keeps search",(t)=
  assert.ok(c.document.querySelector("[data-ctx-id='p-1']").classList.contains("bc-category-hidden"));
  assert.ok(!c.document.querySelector("[data-ctx-id='p-2']").classList.contains("bc-category-hidden"));
 });
-test("nomenclature moves to Administration and import is a single action inside native product modal",(t)=>{
+// Retail presentation is implicit (base unit × 1); M75 must not recreate the retired Administration catalogue.
+test("Administration remains free of the retired presentations catalogue",(t)=>{
  const c=fixture();t.after(()=>c.dom.window.close());
  const state=c.window.__BCM75_verify();
- assert.ok(state.nomenclatureInAdmin);
- assert.ok(c.document.getElementById("tab-config").contains(c.document.getElementById("productos-tools-nomenclatura")));
- assert.equal(state.importButtonCount,1);
- assert.equal(state.importButtonLabel,"Importar Excel / CSV");
- c.document.getElementById("bc-product-import-open").click();
- assert.equal(c.getImportCalls(),1);
- assert.ok(state.formStillInNativeModal);
+ assert.equal(state.duplicateCatalogModal,false);
+ assert.equal(state.presentationsPanelInAdministration,false);
+ assert.equal(state.presentationsPanelOutsideProducts,true);
+ assert.equal(c.document.querySelectorAll("#productos-nomenclatura-modal,#bc-product-presentations-entry,#productos-tools-nomenclatura").length,0);
+ assert.equal(state.duplicateCatalogModal,false);
 });
 
 
@@ -82,7 +81,7 @@ function nativeModalFixture(){
   "<form id='form-producto' data-bc-layout-v925='1'>",
   "<input id='prod-editando-id' type='hidden' value=''>",
   "<input id='prod-nombre' value=''><select id='prod-categoria'><option value=''>Sin categoría</option><option value='cat-secos'>Secos</option></select>",
-  "<input id='prod-unidad' value='unidad'><input id='prod-precio-normal' value=''><input id='prod-precio-mayorista' value=''>",
+  "<input id='prod-unidad' type='hidden' value='unidad'><input id='prod-precio-normal' placeholder='Precio' value=''><input id='prod-precio-mayorista' value=''><input id='prod-formato-venta' value=''><input id='prod-formato-factor' value=''>",
   "<div class='prod-imagen-campo'><input id='prod-imagen-input' type='file'></div>",
   "<div id='prod-imagen-preview-wrap' class='hidden'><img id='prod-imagen-preview' data-guardada='false'><button type='button' id='prod-imagen-quitar'>Quitar imagen</button></div>",
   "<div id='prod-presentaciones-config'></div>",
@@ -107,6 +106,7 @@ function nativeModalFixture(){
  w._cache={categorias:[{id:"cat-secos",nombre:"Secos"}],productos:[],stock:[]};
  w.safeInit=function(id,init){if(d.getElementById(id)) init();};
  const operationCalls=[];
+ const catalogCalls=[];
  const messages=[];
  let refreshCalls=0;
  let importCalls=0;
@@ -119,6 +119,13 @@ function nativeModalFixture(){
   operationCalls.push({name:name,payload:payload});
   return {ok:true,data:"producto-test-001",offline:false};
  };
+ w.client={
+  rpc:async function(name,payload){
+   catalogCalls.push({name:name,payload:payload});
+   return {data:"producto-test-002",error:null};
+  }
+ };
+ Object.defineProperty(w.crypto,"randomUUID",{configurable:true,value:()=> "test-idempotency-key"});
  w.explicarError=function(){return "error simulado";};
  w.tienePermiso=function(){return true;};
  w.eval(PRODUCTOS_SOURCE);
@@ -133,7 +140,7 @@ function nativeModalFixture(){
  w.eval(SOURCE);
  return {
   dom:dom,window:w,document:d,
-  operationCalls:operationCalls,messages:messages,
+  operationCalls:operationCalls,catalogCalls:catalogCalls,messages:messages,
   getAddClickRegistrations:function(){return addClickRegistrations;},
   getFormSubmitRegistrations:function(){return formSubmitRegistrations;},
   getRefreshCalls:function(){return refreshCalls;},
@@ -151,31 +158,22 @@ async function waitFor(predicate,message,timeoutMs){
  assert.ok(predicate(),message);
 }
 
-test("M26 moves catalog content without detaching M75 Administration nomenclature entry",async(t)=>{
- const html=[
-  "<!doctype html><html><head></head><body>",
-  "<section id='tab-productos' class='tab-panel'><div id='productos-tools-nomenclatura'><button id='productos-nomenclatura-btn'>Nomenclatura y catálogos</button></div></section>",
-  "<section id='tab-config' class='tab-panel'><div class='cc-bloque'><section id='bc-product-catalog-entry'></section><div class='card'><h3>Categorías</h3><div id='lista-categorias'></div></div></div></section>",
-  "<div id='productos-nomenclatura-modal' class='hidden'><button id='productos-nomenclatura-cerrar'>Cerrar</button><div id='prod-nom-categorias-slot'></div><div id='prod-nom-unidades-slot'></div><div id='prod-nom-presentaciones-slot'></div></div>",
-  "</body></html>"
- ].join("");
+test("M26 never recreates the retired Administration presentations catalogue",(t)=>{
+ const html=["<!doctype html><html><head></head><body>",
+ "<section id='tab-productos' class='tab-panel'><form id='form-producto'><select id='prod-categoria' required></select><input id='prod-unidad'></form></section>",
+ "<section id='tab-config' class='tab-panel'></section>",
+ "</body></html>"].join("");
  const dom=new JSDOM(html,{runScripts:"outside-only",url:"https://battlecruiser.test/",pretendToBeVisual:true});
  t.after(()=>dom.window.close());
- const w=dom.window,d=w.document;
- w.eval(M26_SOURCE);
- const button=d.getElementById("productos-nomenclatura-btn");
- await waitFor(()=>button.dataset.bcM26==="1","M26 must bind the native nomenclature handler before M75 relocates its toolbar");
- const entry=d.getElementById("bc-product-catalog-entry");
- const toolbar=d.getElementById("productos-tools-nomenclatura");
- entry.appendChild(toolbar); // reproduce M75's move only after M26 really binds the native handler
- button.click();
- await waitFor(()=>!d.getElementById("productos-nomenclatura-modal").classList.contains("hidden"),"M26 nomenclature modal should open");
- assert.ok(d.getElementById("tab-config").contains(entry),"M26 must not detach M75's Administration entry");
- assert.ok(entry.contains(toolbar),"M26 must preserve the nomenclature toolbar inside the Administration entry");
- assert.ok(d.getElementById("prod-nom-categorias-slot").contains(d.getElementById("lista-categorias")),"the category catalog must still move into its modal slot");
- assert.ok(!d.getElementById("productos-nomenclatura-modal").contains(entry),"the catalog modal must never take ownership of the Administration entry");
+ const d=dom.window.document;
+ dom.window.eval(M26_SOURCE);
+ assert.equal(d.querySelectorAll(".presentaciones-panel").length,0);
+ for(const id of ["form-presentacion-nueva","lista-presentaciones-catalogo","pp-producto-select","pp-lista-asociaciones","form-pp-nueva"]) assert.equal(d.querySelectorAll("#"+id).length,0);
+ assert.equal(d.getElementById("prod-categoria").tagName,"SELECT");
+ assert.equal(d.getElementById("prod-categoria").required,true);
+ assert.equal(d.getElementById("prod-unidad").getAttribute("list"),null);
+ assert.equal(d.querySelectorAll("#productos-nomenclatura-modal,#prod-nom-presentaciones-slot").length,0);
 });
-
 test("native Add opens the single M26 modal and preserves the existing product creation submit",async(t)=>{
  const c=nativeModalFixture();
  t.after(()=>c.dom.window.close());
@@ -193,25 +191,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
   ()=>{const controls=d.getElementById("bc-productos-controles");const tools=d.querySelector(".bc-m44-view-tools");return !!(controls&&tools&&controls.contains(tools)&&tools.querySelectorAll(".bc-m44-view-btn").length===2);},
   "M75 must preserve M44's single functional rows/cards selector"
  );
- await waitFor(
-  ()=>{const admin=d.getElementById("tab-config");const entry=d.getElementById("bc-product-catalog-entry");const tool=d.getElementById("productos-tools-nomenclatura");const button=d.getElementById("productos-nomenclatura-btn");return !!(admin&&entry&&tool&&button&&admin.contains(entry)&&entry.contains(tool)&&tool.contains(button));},
-  "M75 must keep the nomenclature toolbar inside Administration"
- );
- const nomenclatureButton=d.getElementById("productos-nomenclatura-btn");
- const nomenclatureModal=d.getElementById("productos-nomenclatura-modal");
- nomenclatureButton.click();
- await waitFor(
-  ()=>!nomenclatureModal.classList.contains("hidden"),
-  "M26 must open the native nomenclature modal from Administration"
- );
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("bc-product-catalog-entry")),"opening nomenclature must not remove its Administration entry");
- assert.ok(d.getElementById("bc-product-catalog-entry").contains(d.getElementById("productos-tools-nomenclatura")),"M26 must preserve the single toolbar in Administration while opening the modal");
- d.getElementById("productos-nomenclatura-cerrar").click();
- await waitFor(
-  ()=>nomenclatureModal.classList.contains("hidden"),
-  "the nomenclature modal must close normally"
- );
- assert.ok(d.getElementById("tab-config").contains(d.getElementById("productos-tools-nomenclatura")),"closing nomenclature must leave the toolbar in Administration");
+ assert.equal(d.querySelectorAll("#productos-nomenclatura-modal,#bc-product-presentations-entry,#productos-tools-nomenclatura").length,0,"the old presentations shortcut and dialog must be removed");
  const viewState=w.__BCM75_verify();
  assert.equal(viewState.viewButtonCount,2,"the two existing M44 view actions must remain available");
  assert.equal(viewState.viewControlsInToolbar,true,"the view selector must remain inside the compact Products toolbar");
@@ -289,19 +269,25 @@ test("native Add opens the single M26 modal and preserves the existing product c
  d.getElementById("prod-precio-mayorista").value="10.25";
  form.dispatchEvent(new w.Event("submit",{bubbles:true,cancelable:true}));
  await waitFor(
-  ()=>c.operationCalls.length===2 &&
+  ()=>c.catalogCalls.length===1 &&
       c.messages.some(function(item){return item.id==="msg-productos" && item.message==="Producto creado.";}) &&
       c.getRefreshCalls()===1,
   "the existing Productos submit handler must call the create operation and refresh the list"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[1])),{
-  name:"producto",
+ assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
+  name:"bc_guardar_producto_catalogo",
   payload:{
+   p_producto_id:null,
    p_nombre:"Arroz",
    p_categoria_id:"cat-secos",
-   p_unidad:null,
+   p_unidad:"unidad",
    p_precio_normal:12.5,
-   p_precio_mayorista:10.25
+   p_precio_mayorista:10.25,
+   p_presentacion_normal:"unidad",
+   p_factor_normal:1,
+   p_presentacion_mayorista:null,
+   p_factor_mayorista:null,
+   p_idempotency_key:"test-idempotency-key"
   }
  });
  assert.equal(d.querySelectorAll("#bc-product-modal").length,1);

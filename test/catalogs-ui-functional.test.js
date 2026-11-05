@@ -10,6 +10,10 @@ const SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "catalogos.js"),
   "utf8"
 );
+const INDEX_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "index.html"),
+  "utf8"
+);
 
 function setup(t) {
   const dom = new JSDOM(
@@ -17,21 +21,22 @@ function setup(t) {
     "<section>" +
       "<form id='form-categoria'><input id='cat-nombre'><button type='submit'>Agregar categoría</button></form>" +
       "<div id='lista-categorias'></div>" +
-      "<form id='form-unidad'><input id='uni-nombre'><button type='submit'>Agregar unidad</button></form>" +
-      "<div id='lista-unidades'></div>" +
       "<div id='msg-config'></div>" +
+      "<select id='prod-categoria' required><option value=''>Selecciona</option></select>" +
     "</section></body></html>",
     { url: "https://battlecruiser-catalogs.test/", runScripts: "outside-only", pretendToBeVisual: true }
   );
   const { window } = dom;
   const tables = {
     categorias: [{ id: "cat-existing", nombre: "General", activo: true }],
-    unidades: [{ id: "uni-existing", nombre: "unidad", activo: true }]
+    productos: []
   };
   const inserts = [];
   const updates = [];
   let sequence = 0;
   let nextInsertError = null;
+  let selectorRefreshes = 0;
+  window.refrescarSelectorCategoriasProducto = async () => { selectorRefreshes += 1; };
 
   window.safeInit = (_name, fn) => fn();
   window.setLoading = (id, message) => {
@@ -63,7 +68,9 @@ function setup(t) {
     from(table) {
       return {
         select() { return this; },
+        eq: async (column, value) => ({ data: (tables[table] || []).filter((row) => String(row[column]) === String(value)).map((row) => ({ ...row })), error: null }),
         order: async () => ({ data: (tables[table] || []).map((row) => ({ ...row })), error: null }),
+        delete: () => ({ eq: async (column, value) => { tables[table] = (tables[table] || []).filter((row) => String(row[column]) !== String(value)); return { data: [], error: null }; } }),
         insert: async (payload) => {
           inserts.push({ table, payload: { ...payload } });
           if (nextInsertError) {
@@ -96,7 +103,7 @@ function setup(t) {
   window.eval(SOURCE);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   t.after(() => window.close());
-  return { window, dom, tables, inserts, updates };
+  return { window, dom, tables, inserts, updates, getSelectorRefreshes: () => selectorRefreshes };
 }
 
 async function waitFor(predicate, timeout = 1200) {
@@ -125,29 +132,34 @@ test("Paso 4 catálogos: categoría válida inserta una fila fixture, confirma y
   assert.equal(c.window.document.getElementById("cat-nombre").value, "");
   assert.ok(c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas fixture"),
     "lista debe refrescar y mostrar el registro fixture creado");
+  assert.ok(c.getSelectorRefreshes() >= 1, "el selector de Productos se refresca al crear una categoría");
 });
 
-test("Paso 4 catálogos: unidad válida inserta una fila fixture y confirma el resultado", async (t) => {
-  const c = setup(t);
-  c.window.document.getElementById("uni-nombre").value = "paquete fixture";
-  submit(c.window, "form-unidad");
-  assert.ok(await waitFor(() => c.inserts.some((x) => x.table === "unidades" && x.payload.nombre === "paquete fixture")),
-    "unidad válida debe llamar el insert mock");
-  assert.ok(await waitFor(() => /Unidad creada\./i.test(c.window.document.getElementById("msg-config").textContent)),
-    "debe mostrar confirmación de creación");
-  assert.equal(c.window.document.getElementById("uni-nombre").value, "");
-  assert.ok(c.window.document.getElementById("lista-unidades").textContent.includes("paquete fixture"));
+test("Paso 4: Administración no muestra catálogo de presentaciones y retail usa unidad base × 1", () => {
+  const dom = new JSDOM(INDEX_SOURCE);
+  try {
+    const d = dom.window.document;
+    assert.equal(d.getElementById("form-unidad"), null);
+    assert.equal(d.getElementById("lista-unidades"), null);
+    assert.equal(d.querySelectorAll(".presentaciones-panel").length, 0);
+    for (const id of ["form-presentacion-nueva", "lista-presentaciones-catalogo", "pp-producto-select", "pp-lista-asociaciones", "form-pp-nueva"]) {
+      assert.equal(d.querySelectorAll("#" + id).length, 0, id + " debe estar retirado");
+    }
+    const category = d.getElementById("prod-categoria");
+    assert.ok(category && category.tagName === "SELECT" && category.required, "la categoría es un selector obligatorio");
+    const base = d.getElementById("prod-unidad");
+    assert.ok(base && base.getAttribute("list") === null, "la unidad base no depende de un catálogo de presentaciones");
+    assert.doesNotMatch(SOURCE, /initCatalogoSimple\(\{\s*tabla:\s*["']unidades["']/);
+  } finally { dom.window.close(); }
 });
 
-test("Paso 4 catálogos: nombre vacío no crea categoría ni unidad", async (t) => {
+test("Paso 4 catálogos: nombre vacío no crea una categoría", async (t) => {
   const c = setup(t);
   c.window.document.getElementById("cat-nombre").value = "   ";
-  c.window.document.getElementById("uni-nombre").value = "";
   submit(c.window, "form-categoria");
-  submit(c.window, "form-unidad");
   await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(c.inserts.filter((x) => x.table === "categorias" || x.table === "unidades").length, 0,
-    "campos vacíos no llegan al backend mock");
+  assert.equal(c.inserts.filter((x) => x.table === "categorias").length, 0,
+    "los campos vacíos no llegan al backend mock");
 });
 
 test("Paso 4 catálogos: error de duplicado se muestra sin limpiar ni ocultar el motivo", async (t) => {
@@ -175,4 +187,42 @@ test("Paso 4 catálogos: activar/desactivar un elemento actualizado llama update
     "el cambio de estado llama el update mock para el ID correcto");
   const updated = c.tables.categorias.find((row) => row.id === "cat-existing");
   assert.equal(updated.activo, false);
+});
+
+
+test("Paso 4 catálogos: editar categoría actualiza el mismo registro y conserva su identidad", async (t) => {
+  const c = setup(t);
+  await c.window._refrescarCatalogo_categorias();
+  const edit = c.window.document.querySelector("#lista-categorias .catalogo-edit-btn");
+  assert.ok(edit, "cada categoría debe ofrecer edición");
+  edit.click();
+  assert.equal(c.window.document.getElementById("cat-nombre").value, "General");
+  assert.equal(c.window.document.querySelector("#form-categoria button[type=submit]").textContent, "Guardar cambios");
+  c.window.document.getElementById("cat-nombre").value = "Bebidas";
+  submit(c.window, "form-categoria");
+  assert.ok(await waitFor(() => c.updates.some((x) => x.table === "categorias" && x.id === "cat-existing" && x.payload.nombre === "Bebidas")));
+  assert.ok(await waitFor(() => c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas")));
+  assert.equal(c.tables.categorias.find((row) => row.id === "cat-existing").nombre, "Bebidas");
+  assert.ok(c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas"));
+  assert.equal(c.window.document.querySelector("#form-categoria button[type=submit]").textContent, "Agregar categoría");
+});
+
+
+test("Paso 4 categorías: eliminar una categoría sin referencias y conservar las que tienen productos", async (t) => {
+  const c = setup(t);
+  c.tables.productos.push({ id: "product-linked", categoria_id: "cat-existing" });
+  await c.window._refrescarCatalogo_categorias();
+  const linkedDelete = c.window.document.querySelector("#lista-categorias .catalogo-delete-btn");
+  assert.ok(linkedDelete, "las categorías deben mostrar la acción Eliminar");
+  c.window.confirm = () => true;
+  linkedDelete.click();
+  assert.ok(await waitFor(() => /No se puede eliminar: hay productos asociados/.test(c.window.document.getElementById("msg-config").textContent)), "no debe borrar una categoría con productos asociados");
+  assert.ok(c.tables.categorias.some((row) => row.id === "cat-existing"));
+  c.tables.productos.length = 0;
+  await c.window._refrescarCatalogo_categorias();
+  const unlinkedDelete = c.window.document.querySelector("#lista-categorias .catalogo-delete-btn");
+  assert.ok(unlinkedDelete);
+  unlinkedDelete.click();
+  assert.ok(await waitFor(() => !c.tables.categorias.some((row) => row.id === "cat-existing")), "debe borrar una categoría sin referencias");
+  assert.ok(await waitFor(() => /Categoría eliminada\./.test(c.window.document.getElementById("msg-config").textContent)));
 });

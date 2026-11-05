@@ -54,19 +54,26 @@ test('pulido: configuración queda visible y comunicación elimina el estado vac
   assert.match(srcB, /iniciá una nueva conversación|inicia una nueva conversacion/);
 });
 
-test('pulido: la UI de presentaciones incluye Otro y factores comerciales', () => {
+test('pulido: minorista siempre es unidad base × 1 y solo mayorista es opcional', () => {
   const src = read('public/js/hotfix-pulido-20260903.js');
   const srcB = read('public/js/hotfix-pulido-20260903b.js');
-  assert.match(src, /bc-pres-normal-name/);
-  assert.match(src, /bc-pres-normal-factor/);
+  const presentations = read('public/js/presentaciones.js');
+  const index = read('public/index.html');
+
+  assert.match(src, /if\(!isWholesale\)[\s\S]*?factor:1/);
+  assert.match(src, /if\(wholesale\.name\|\|wholesale\.factor!==null\)/);
   assert.match(src, /bc-pres-wholesale-name/);
   assert.match(src, /bc-pres-wholesale-factor/);
-  assert.match(src, /Cada presentación opcional necesita una etiqueta y un factor numérico mayor que cero/);
-  assert.match(srcB, /bc-pres-[^'\"]+-factor/);
-  assert.match(srcB, /actualizar_presentacion/);
-  assert.match(srcB, /cambiar_estado_presentacion/);
-});
+  assert.match(srcB, /var normal=\{name:baseUnit,factor:1,id:null\}/);
+  assert.match(srcB, /p_presentacion_normal:normal\.name,p_factor_normal:normal\.factor/);
+  assert.match(srcB, /p_presentacion_normal:baseUnit,p_factor_normal:1/);
+  assert.doesNotMatch(srcB, /bc-pres-normal-name|bc-pres-normal-factor/);
 
+  assert.doesNotMatch(index, /presentaciones-panel|form-presentacion-nueva|lista-presentaciones-catalogo|pp-producto-select|pp-lista-asociaciones|form-pp-nueva/);
+  assert.match(presentations, /if \(!document\.querySelector\("#tab-config \.presentaciones-panel"\)\) return/);
+  assert.match(presentations, /if \(!form \|\| !input \|\| !lista\) return/);
+  assert.match(presentations, /if \(!productoSelect \|\| !formNueva \|\| !listaAsoc\) return/);
+});
 test('pulido: el submit del producto se captura antes del listener heredado', () => {
   const src = read('public/js/hotfix-pulido-20260903b.js');
   assert.match(src, /document\.addEventListener\('submit',formCapture,true\)/);

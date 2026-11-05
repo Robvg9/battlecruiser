@@ -14,6 +14,10 @@ const M172_SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "js", "hotfix-17-2-productos-save-20260903.js"),
   "utf8"
 );
+const PRODUCTS_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "productos.js"),
+  "utf8"
+);
 
 function fixture() {
   const html = [
@@ -22,11 +26,13 @@ function fixture() {
     "<form id='form-producto'>",
     "<input type='hidden' id='prod-editando-id' value=''>",
     "<input id='prod-nombre' value=''>",
-    "<select id='prod-categoria'><option value=''>Sin categoría</option><option value='cat-1'>Bebidas</option></select>",
-    "<input id='prod-unidad' value='unidad'>",
+    "<select id='prod-categoria' required><option value=''>Sin categoría</option><option value='cat-1'>Bebidas</option></select>",
+    "<input id='prod-unidad' type='hidden' value='unidad'>",
     "<datalist id='unidades-comunes'><option value='unidad'></option></datalist>",
-    "<input id='prod-precio-normal' type='number' value='10'>",
+    "<input id='prod-precio-normal' type='number' value='10' placeholder='Precio'>",
     "<input id='prod-precio-mayorista' type='number' value=''>",
+    "<input id='prod-formato-venta' type='text' value=''>",
+    "<input id='prod-formato-factor' type='number' value=''>",
     "<div class='prod-imagen-campo'><label class='prod-imagen-label'>Imagen</label><input id='prod-imagen-input' type='file'></div>",
     "<fieldset id='prod-presentaciones-config'><select id='prod-pres-min'><option value=''>Selecciona</option></select><select id='prod-pres-may-habilitado'><option value='no'>No</option><option value='si'>Sí</option></select></fieldset>",
     "<button id='prod-cancelar-edicion' type='button'>Cancelar edición</button>",
@@ -48,7 +54,7 @@ function fixture() {
   return { dom, window, document };
 }
 
-test("one master button contains category, optional wholesale price and both approved presentation pairs", (t) => {
+test("one master button keeps only optional wholesale price; required category stays in the primary form", (t) => {
   const c = fixture();
   t.after(() => c.dom.window.close());
   const d = c.document;
@@ -61,9 +67,18 @@ test("one master button contains category, optional wholesale price and both app
   assert.ok(panel, "the commercial options panel must exist");
   assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1);
   assert.equal(d.querySelectorAll("#bc-product-commercial-panel").length, 1);
-  assert.ok(panel.contains(d.getElementById("prod-categoria")));
+  assert.ok(!panel.contains(d.getElementById("prod-categoria")));
+  assert.ok(basic.contains(d.getElementById("prod-categoria")));
+  assert.equal(d.getElementById("prod-categoria").tagName, "SELECT");
+  assert.equal(d.getElementById("prod-categoria").required, true, "category is required in the primary product form");
   assert.ok(panel.contains(d.getElementById("prod-precio-mayorista")));
-  assert.ok(!basic.contains(d.getElementById("prod-categoria")));
+  assert.ok(panel.contains(d.getElementById("prod-formato-venta")));
+  assert.ok(panel.contains(d.getElementById("prod-formato-factor")));
+  assert.equal(d.getElementById("prod-unidad").type, "hidden");
+  assert.equal(panel.contains(d.getElementById("prod-unidad")), false);
+  assert.equal(basic.querySelector('label[for="prod-precio-normal"]').textContent, "Precio");
+  assert.match(toggle.textContent, /Precio mayorista y formato de venta/);
+
   assert.ok(!basic.contains(d.getElementById("prod-precio-mayorista")));
   assert.equal(d.getElementById("prod-precio-mayorista").required, false);
   assert.equal(d.getElementById("prod-precio-mayorista").placeholder, "Precio mayorista (opcional)");
@@ -104,6 +119,8 @@ test("a new product starts collapsed; editing an existing configured product ope
   d.getElementById("prod-editando-id").value = "product-existing";
   d.getElementById("prod-categoria").value = "cat-1";
   d.getElementById("prod-precio-mayorista").value = "8.50";
+  d.getElementById("prod-formato-venta").value = "Caja";
+  d.getElementById("prod-formato-factor").value = "24";
   w.__BCM26_openProductModal();
   assert.equal(panel.hidden, false, "editing a product with commercial settings opens the panel");
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
@@ -112,6 +129,15 @@ test("a new product starts collapsed; editing an existing configured product ope
 
   d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.equal(modal.classList.contains("hidden"), true, "Escape must close the native product modal");
+});
+
+test("product save persists retail factor 1 and wholesale package factor", () => {
+  assert.ok(PRODUCTS_SOURCE.includes('p_presentacion_normal: unidad || "unidad"'));
+  assert.ok(PRODUCTS_SOURCE.includes("p_factor_normal: 1"));
+  assert.ok(PRODUCTS_SOURCE.includes("p_presentacion_mayorista: formatoMayorista || null"));
+  assert.ok(PRODUCTS_SOURCE.includes("p_factor_mayorista: formatoMayorista ? formatoFactor : null"));
+  assert.ok(PRODUCTS_SOURCE.includes("Number.isInteger(formatoFactor)"));
+  assert.ok(PRODUCTS_SOURCE.includes("bc_guardar_producto_catalogo"));
 });
 
 test("the legacy M17.2 module keeps price constraints but never adds a second submit handler", async (t) => {

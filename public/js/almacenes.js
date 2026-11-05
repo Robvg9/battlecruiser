@@ -381,8 +381,11 @@ async function refrescarAlmacenes() {
 async function refrescarStockYSelects() {
   try {
     const { productos } = await refrescarProductos();
-    fillSelect(document.getElementById("trf-producto"), productos, "id", (p) => p.nombre);
-    fillSelect(document.getElementById("vale-producto"), productos, "id", (p) => p.nombre);
+    const productosMovimiento = typeof productosOperativos === "function"
+      ? productosOperativos(productos)
+      : productos.filter((p) => !p.inventario_mixto || !!p.producto_padre_id);
+    fillSelect(document.getElementById("trf-producto"), productosMovimiento, "id", (p) => p.nombre);
+    fillSelect(document.getElementById("vale-producto"), productosMovimiento, "id", (p) => p.nombre);
   } catch (e) {
     console.warn("[BattleCruiser] refrescarStockYSelects productos", e);
   }

@@ -1,0 +1,192 @@
+-- Runtime contract for optional mixed inventory; executes only in disposable PostgreSQL CI.
+DO $$
+DECLARE
+  v_user uuid := '11111111-1111-4111-8111-111111111111';
+  v_warehouse_a uuid := '22222222-2222-4222-8222-222222222222';
+  v_warehouse_b uuid := '33333333-3333-4333-8333-333333333333';
+  v_warehouse_c uuid := '44444444-4444-4444-8444-444444444444';
+  v_parent uuid;
+  v_apple uuid;
+  v_pear uuid;
+  v_child uuid;
+  v_result jsonb;
+  v_qty numeric;
+  v_names text[];
+  v_count integer;
+  v_failed boolean;
+  v_message text;
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub',v_user::text,false);
+  INSERT INTO public.almacenes(id,nombre) VALUES
+    (v_warehouse_a,'Almacén A'),(v_warehouse_b,'Almacén B');
+  INSERT INTO public.presentaciones(nombre) VALUES ('Caja');
+  INSERT INTO public.productos(nombre,unidad,precio_normal,activo,presentacion_id)
+    VALUES ('Refresco de lata','cajas',10,true,(SELECT id FROM public.presentaciones WHERE nombre='Caja'))
+    RETURNING id INTO v_parent;
+  INSERT INTO public.producto_presentaciones(producto_id,presentacion_id,factor)
+    SELECT v_parent,id,24 FROM public.presentaciones WHERE nombre='Caja';
+  INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
+    VALUES(v_parent,v_warehouse_a,0,7);
+
+  v_result:=public.configurar_producto_inventario_mixto(v_parent,true,
+    '[{"nombre":"Manzana"},{"nombre":"Pera"}]'::jsonb);
+  IF NOT (SELECT inventario_mixto FROM public.productos WHERE id=v_parent) THEN
+    RAISE EXCEPTION 'Mixed mode was not enabled on the selected parent';
+  END IF;
+  SELECT id INTO v_apple FROM public.productos WHERE producto_padre_id=v_parent AND variante_nombre='Manzana';
+  SELECT id INTO v_pear FROM public.productos WHERE producto_padre_id=v_parent AND variante_nombre='Pera';
+  IF v_apple IS NULL OR v_pear IS NULL OR v_apple=v_pear THEN
+    RAISE EXCEPTION 'Admin-defined flavors did not receive unique product identities';
+  END IF;
+  IF (SELECT count(*) FROM public.producto_presentaciones WHERE producto_id IN (v_apple,v_pear) AND activo)=0 THEN
+    RAISE EXCEPTION 'Parent presentation conversions were not copied to the variants';
+  END IF;
+  IF (SELECT count(*) FROM public.stock WHERE producto_id IN (v_apple,v_pear))<>4 THEN
+    RAISE EXCEPTION 'Every active flavor must have one stock row per existing warehouse';
+  END IF;
+
+  UPDATE public.stock SET cantidad=20 WHERE producto_id=v_apple AND almacen_id=v_warehouse_a;
+  UPDATE public.stock SET cantidad=10 WHERE producto_id=v_pear AND almacen_id=v_warehouse_a;
+  INSERT INTO public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario)
+    VALUES(v_apple,v_warehouse_a,20,20,1.50),(v_pear,v_warehouse_a,10,10,1.75);
+
+  -- A mixed parent cannot be used as a generic stock SKU by old or new RPC callers.
+  v_failed:=false;
+  BEGIN
+    INSERT INTO public.stock(producto_id,almacen_id,cantidad)
+      VALUES(v_parent,v_warehouse_a,1);
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Mixed parent accepted a generic stock write'; END IF;
+
+  -- An admin may rename an existing flavor without changing its product ID or its stock.
+  PERFORM public.configurar_producto_inventario_mixto(v_parent,true,jsonb_build_array(
+    jsonb_build_object('id',v_apple,'nombre','Manzana Roja'),
+    jsonb_build_object('id',v_pear,'nombre','Pera')
+  ));
+  IF NOT EXISTS(SELECT 1 FROM public.productos WHERE id=v_apple AND variante_nombre='Manzana Roja') THEN
+    RAISE EXCEPTION 'Flavor rename did not preserve the existing variant identity';
+  END IF;
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_apple AND almacen_id=v_warehouse_a)<>20 THEN
+    RAISE EXCEPTION 'Flavor rename changed its stock';
+  END IF;
+
+  -- New warehouses automatically receive rows for every active variant.
+  INSERT INTO public.almacenes(id,nombre) VALUES(v_warehouse_c,'Almacén C');
+  SELECT count(*) INTO v_count FROM public.stock WHERE almacen_id=v_warehouse_c AND producto_id IN (v_apple,v_pear);
+  IF v_count<>2 THEN RAISE EXCEPTION 'New warehouse was not seeded with every active flavor'; END IF;
+
+  -- A parent with open flavor stock cannot be deactivated or have its base unit changed.
+  v_failed:=false;
+  BEGIN
+    UPDATE public.productos SET activo=false WHERE id=v_parent;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Mixed parent was deactivated while flavor stock remained'; END IF;
+
+  v_failed:=false;
+  BEGIN
+    UPDATE public.productos SET unidad='latas' WHERE id=v_parent;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Mixed parent base unit changed while flavor stock remained'; END IF;
+
+  v_failed:=false;
+  BEGIN
+    UPDATE public.productos SET activo=false WHERE id=v_apple;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Variant with stock was deactivated directly'; END IF;
+
+  -- A transfer selects the flavor's own product ID; the other flavor is untouched.
+  UPDATE public.stock SET cantidad=cantidad-5
+   WHERE producto_id=v_apple AND almacen_id=v_warehouse_a;
+  UPDATE public.stock SET cantidad=cantidad+5
+   WHERE producto_id=v_apple AND almacen_id=v_warehouse_b;
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_apple AND almacen_id=v_warehouse_a)<>15
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_apple AND almacen_id=v_warehouse_b)<>5
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_pear AND almacen_id=v_warehouse_a)<>10 THEN
+    RAISE EXCEPTION 'Variant-specific transfer changed a different flavor or the wrong warehouse';
+  END IF;
+  INSERT INTO public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario)
+    VALUES(v_apple,v_warehouse_b,5,5,1.50);
+
+  -- The inventory aggregate must expose one parent total and each independent flavor.
+  SELECT cantidad,ARRAY(
+    SELECT x->>'nombre' FROM jsonb_array_elements(variantes) x ORDER BY x->>'nombre'
+  ) INTO v_qty,v_names
+  FROM public.inventario_mixto_enriquecido(v_warehouse_a)
+  WHERE producto_id=v_parent;
+  IF v_qty<>25 OR v_names<>ARRAY['Manzana Roja','Pera'] THEN
+    RAISE EXCEPTION 'Mixed inventory summary is incorrect: qty %, variants %',v_qty,v_names;
+  END IF;
+
+  -- Removing a flavor that still has stock or open FIFO lots is forbidden.
+  v_failed:=false;
+  BEGIN
+    PERFORM public.configurar_producto_inventario_mixto(v_parent,true,
+      jsonb_build_array(jsonb_build_object('id',v_pear,'nombre','Pera')));
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Variant with stock/lots was removed'; END IF;
+
+  -- Disabling mixed mode is also blocked while any flavor still has stock/FIFO value.
+  v_failed:=false;
+  BEGIN
+    PERFORM public.configurar_producto_inventario_mixto(v_parent,false,'[]'::jsonb);
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Mixed mode disabled while flavor stock remained'; END IF;
+
+  -- Non-admin cannot create or edit variant configuration.
+  PERFORM set_config('test.bc_admin','false',true);
+  v_failed:=false;
+  BEGIN
+    PERFORM public.configurar_producto_inventario_mixto(v_parent,true,
+      jsonb_build_array(jsonb_build_object('id',v_apple,'nombre','Manzana Roja'),jsonb_build_object('id',v_pear,'nombre','Pera')));
+  EXCEPTION WHEN insufficient_privilege THEN v_failed:=true;
+  END;
+  PERFORM set_config('test.bc_admin','true',true);
+  IF NOT v_failed THEN RAISE EXCEPTION 'Non-admin changed mixed product configuration'; END IF;
+
+  -- Clear quantities and open FIFO remnants, then disable; parent minimum is restored.
+  UPDATE public.stock SET cantidad=0 WHERE producto_id IN (v_apple,v_pear);
+  UPDATE public.lotes_compra SET cantidad_restante=0 WHERE producto_id IN (v_apple,v_pear);
+  v_result:=public.configurar_producto_inventario_mixto(v_parent,false,'[]'::jsonb);
+  IF (SELECT inventario_mixto FROM public.productos WHERE id=v_parent) THEN
+    RAISE EXCEPTION 'Mixed mode was not disabled';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.stock WHERE producto_id=v_parent AND almacen_id=v_warehouse_a AND cantidad=0 AND minimo=7
+  ) THEN
+    RAISE EXCEPTION 'Parent minimum threshold was not restored after disabling mixed mode';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.productos WHERE producto_padre_id=v_parent AND activo=true) THEN
+    RAISE EXCEPTION 'Flavor SKUs remained active after disabling mixed mode';
+  END IF;
+
+  -- Stock writes lock parent before variant, serializing them with mode changes.
+  IF position('WHERE id=v_parent_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))=0
+     OR position('WHERE id=NEW.producto_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))=0
+     OR position('WHERE id=v_parent_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))
+        > position('WHERE id=NEW.producto_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure)) THEN
+    RAISE EXCEPTION 'Mixed stock writes must lock parent before variant to serialize with configuration';
+  END IF;
+
+  -- SQL execution permissions are restricted to authenticated users.
+  IF has_function_privilege('anon','public.configurar_producto_inventario_mixto(uuid,boolean,jsonb)','EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can configure mixed inventory';
+  END IF;
+  IF has_table_privilege('authenticated','public.productos_stock_mixto_minimos','INSERT') THEN
+    RAISE EXCEPTION 'Authenticated role can write mixed minimums directly';
+  END IF;
+END
+$$;
+
+SELECT 'PASS: optional mixed inventory, variant identities, stock, FIFO guard, transfer separation, warehouse seeding, aggregation, admin ACL and safe disable' AS result;

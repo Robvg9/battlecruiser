@@ -307,6 +307,7 @@ test("Paso 4 UI: precio minorista vacío o cero se rechaza antes de cualquier RP
   const d = c.document;
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto inválido fixture";
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
   d.getElementById("prod-precio-mayorista").value = "";
 
   for (const invalidPrice of ["", "0"]) {
@@ -320,7 +321,7 @@ test("Paso 4 UI: precio minorista vacío o cero se rechaza antes de cualquier RP
       "the save button must be restored after validation rejection");
   }
 });
-test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y acepta precio mayorista vacío", async (t) => {
+test("Paso 4 UI: un único modal guarda producto, precio mayorista opcional y factor mayorista válido", async (t) => {
   const c = await contextoListo();
   evaluarModulo(c, "public/js/m26-ui-integridad.js");
   evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
@@ -330,8 +331,8 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
     !!c.document.getElementById("bc-product-commercial-toggle") &&
     !!c.document.getElementById("bc-product-commercial-panel") &&
     c.document.getElementById("form-producto").dataset.bc172Prepared === "1" &&
-    !!c.document.getElementById("bc-pres-normal-name") &&
-    !!c.document.getElementById("bc-pres-normal-factor") &&
+    !c.document.getElementById("bc-pres-normal-name") &&
+    !c.document.getElementById("bc-pres-normal-factor") &&
     !!c.document.getElementById("bc-pres-wholesale-name") &&
     !!c.document.getElementById("bc-pres-wholesale-factor") &&
     !!c.document.getElementById("bc-product-modal"),
@@ -352,6 +353,8 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.equal(d.querySelectorAll("#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado").length, 0);
   assert.equal(d.getElementById("prod-precio-normal").required, true);
   assert.equal(d.getElementById("prod-precio-mayorista").required, false);
+  assert.equal(panel.contains(d.getElementById("prod-categoria")), false,
+    "the required category stays outside the optional commercial panel");
   assert.equal(c.window.__BC172_verify().normalPriceRequired, true);
   assert.equal(c.window.__BC172_verify().wholesalePriceOptional, true);
   assert.equal(c.window.__BC172_verify().legacySubmitHandler, false,
@@ -359,20 +362,18 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
 
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto UI fixture";
-  d.getElementById("prod-categoria").value = "c-step4-fixture";
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
   d.getElementById("prod-unidad").value = "unidad";
   d.getElementById("prod-precio-normal").value = "12.50";
   d.getElementById("prod-precio-mayorista").value = "";
-  d.getElementById("bc-pres-normal-name").value = "Unidad fixture";
-  d.getElementById("bc-pres-normal-factor").value = "1";
   d.getElementById("bc-pres-wholesale-name").value = "Paquete x 12";
   d.getElementById("bc-pres-wholesale-factor").value = "12";
 
   if (panel.hidden) toggle.click();
   assert.equal(panel.hidden, false);
 
-  // A factor of zero is present but invalid; do not send any write.
-  d.getElementById("bc-pres-normal-factor").value = "0";
+  // The optional wholesale factor must remain positive; retail is implicit base unit × 1.
+  d.getElementById("bc-pres-wholesale-factor").value = "0";
   enviarSubmit(c, "form-producto");
   assert.ok(await esperarHasta(() => /factor numérico mayor que cero/i.test(d.getElementById("msg-productos").textContent)),
     "a zero presentation factor must be rejected in the form");
@@ -381,7 +382,7 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.equal(d.getElementById("prod-submit-btn").disabled, false,
     "the save button must be restored after validation rejection");
 
-  d.getElementById("bc-pres-normal-factor").value = "1";
+  d.getElementById("bc-pres-wholesale-factor").value = "12";
   enviarSubmit(c, "form-producto");
 
   const reachedSave = await esperarHasta(() =>
@@ -406,7 +407,7 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.equal(call.params.p_precio_normal, 12.5);
   assert.equal(call.params.p_precio_mayorista, null,
     "wholesale price is optional even when a wholesale presentation is configured");
-  assert.equal(call.params.p_presentacion_normal, "Unidad fixture");
+  assert.equal(call.params.p_presentacion_normal, "unidad", "retail must always use the base unit label");
   assert.equal(call.params.p_factor_normal, 1);
   assert.equal(call.params.p_presentacion_mayorista, "Paquete x 12");
   assert.equal(call.params.p_factor_mayorista, 12);
@@ -416,7 +417,7 @@ test("Paso 4 UI: un único modal guarda las opciones comerciales una sola vez y 
   assert.ok(await esperarHasta(() => modal.classList.contains("hidden")),
     "the native modal must close after successful creation");
 });
-test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden quedar vacíos", async (t) => {
+test("Paso 4 UI: categoría obligatoria y venta minorista base unidad × 1 sin campos de formato", async (t) => {
   const c = await contextoListo();
   evaluarModulo(c, "public/js/m26-ui-integridad.js");
   evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
@@ -424,7 +425,8 @@ test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden que
 
   const ready = await esperarHasta(() =>
     !!c.document.getElementById("bc-product-commercial-toggle") &&
-    !!c.document.getElementById("bc-pres-normal-name") &&
+    !c.document.getElementById("bc-pres-normal-name") &&
+    !c.document.getElementById("bc-pres-normal-factor") &&
     c.document.getElementById("form-producto").dataset.bc172Prepared === "1",
     6500,
     25
@@ -445,16 +447,24 @@ test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden que
     "a product with no optional commercial settings can be saved while the panel remains collapsed");
   const base = c.client.__writeCalls.length;
   d.getElementById("prod-nombre").value = "Producto con opciones vacías fixture";
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
   d.getElementById("prod-categoria").value = "";
   d.getElementById("prod-unidad").value = "";
   d.getElementById("prod-precio-normal").value = "1.00";
   d.getElementById("prod-precio-mayorista").value = "";
-  d.getElementById("bc-pres-normal-name").value = "";
-  d.getElementById("bc-pres-normal-factor").value = "";
-  d.getElementById("bc-pres-wholesale-name").value = "";
-  d.getElementById("bc-pres-wholesale-factor").value = "";
+  assert.equal(d.getElementById("prod-categoria").required, true);
+  assert.equal(d.querySelector("#prod-categoria").tagName, "SELECT");
+  assert.equal(d.getElementById("bc-pres-normal-name"), null);
+  assert.equal(d.getElementById("bc-pres-normal-factor"), null);
+  assert.equal(d.getElementById("bc-pres-wholesale-name").value, "");
+  assert.equal(d.getElementById("bc-pres-wholesale-factor").value, "");
   enviarSubmit(c, "form-producto");
+  assert.ok(await esperarHasta(() => /Selecciona una categoría/i.test(d.getElementById("msg-productos").textContent)),
+    "the product must not save without an Administration category");
+  assert.equal(nuevasEscrituras(c, base).length, 0);
 
+  d.getElementById("prod-categoria").value = "c-step4-fixture";
+  enviarSubmit(c, "form-producto");
   assert.ok(await esperarHasta(() =>
     nuevasEscrituras(c, base).some((call) => call.name === "bc_guardar_producto_catalogo"),
     6500,
@@ -466,15 +476,56 @@ test("Paso 4 UI: mayorista, categoría, unidad y ambas presentaciones pueden que
     "; online=" + String(c.window.navigator.onLine) +
     "; modalContainsForm=" + String(d.getElementById("bc-product-modal")?.contains(d.getElementById("form-producto"))));
   const call = nuevasEscrituras(c, base).find((item) => item.name === "bc_guardar_producto_catalogo");
-  assert.equal(call.params.p_categoria_id, null);
+  assert.equal(call.params.p_categoria_id, "c-step4-fixture");
   assert.equal(call.params.p_unidad, null);
   assert.equal(call.params.p_precio_normal, 1);
   assert.equal(call.params.p_precio_mayorista, null);
-  assert.equal(call.params.p_presentacion_normal, null);
-  assert.equal(call.params.p_factor_normal, null);
+  assert.equal(call.params.p_presentacion_normal, "unidad");
+  assert.equal(call.params.p_factor_normal, 1);
   assert.equal(call.params.p_presentacion_mayorista, null);
   assert.equal(call.params.p_factor_mayorista, null);
 });
+test("Paso 4 UI: producto minorista se guarda offline con unidad base × 1", async () => {
+  const c = await contextoListo();
+  evaluarModulo(c, "public/js/m26-ui-integridad.js");
+  evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
+  evaluarModulo(c, "public/js/hotfix-pulido-20260903.js");
+
+  const ready = await esperarHasta(() =>
+    !!c.document.getElementById("bc-product-commercial-toggle") &&
+    c.document.getElementById("form-producto").dataset.bc172Prepared === "1",
+    6500,
+    25
+  );
+  assert.ok(ready, "the offline product saver must initialize");
+  const d = c.document;
+  c.window.__BCM26_openProductModal();
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
+  d.getElementById("prod-nombre").value = "Producto offline fixture";
+  d.getElementById("prod-unidad").value = "unidad";
+  d.getElementById("prod-precio-normal").value = "3.50";
+  d.getElementById("prod-precio-mayorista").value = "";
+
+  const offlineCalls = [];
+  c.window.ejecutarOperacion = async (name, params) => {
+    offlineCalls.push({ name, params });
+    return { ok: true, id: "offline-product-fixture" };
+  };
+  Object.defineProperty(c.window.navigator, "onLine", { value: false, configurable: true });
+  const baseWrites = c.client.__writeCalls.length;
+  enviarSubmit(c, "form-producto");
+
+  assert.ok(await esperarHasta(() => /Producto guardado localmente/i.test(d.getElementById("msg-productos").textContent)),
+    "implicit retail unit × 1 must not block offline product creation");
+  assert.equal(offlineCalls.length, 1, "the offline queue should receive exactly one product operation");
+  assert.equal(offlineCalls[0].name, "producto");
+  assert.equal(offlineCalls[0].params.p_categoria_id, "c-step4-fixture");
+  assert.equal(offlineCalls[0].params.p_unidad, "unidad");
+  assert.equal(offlineCalls[0].params.p_precio_normal, 3.5);
+  assert.equal(offlineCalls[0].params.p_precio_mayorista, null);
+  assert.equal(c.client.__writeCalls.length, baseWrites, "offline product creation must not reach a live write RPC");
+});
+
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
   // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
@@ -771,9 +822,12 @@ function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
     producto_presentaciones: []
   };
   const inserts = [];
+  const rpcCalls = [];
   let sequence = 0;
   window.safeInit = (_selector, callback) => callback();
   window.tienePermiso = () => true;
+  window.explicarError = (error) => error && error.message ? error.message : "error fixture";
+  window._cache = { productos: [{ id: "p-fixture", nombre: "Producto fixture", categoria_id: null, unidad: "unidad", precio_normal: 100, precio_mayorista: 80, presentacion_id: null, activo: true }] };
   window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
   window.setLoading = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
   window.setEmpty = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
@@ -797,7 +851,7 @@ function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
     return result?.data ?? [];
   };
   window.client = {
-    rpc: async () => ({ data: true, error: null }),
+    rpc: async (name, args) => { rpcCalls.push({ name, args }); return { data: true, error: null }; },
     from(table) {
       const query = {
         select() { return query; },
@@ -828,7 +882,7 @@ function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
   };
   const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "presentaciones.js"), "utf8");
   window.eval(source);
-  return { dom, window, database, inserts };
+  return { dom, window, database, inserts, rpcCalls };
 }
 
 test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock", async (t) => {
@@ -844,12 +898,12 @@ test("Paso 4 RWHT: crear presentación valida nombre y envía el payload al mock
 
   input.value = "Caja fixture";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
-  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "presentaciones")),
-    "el formulario válido debe insertar en el cliente fixture");
+  assert.ok(await esperarHasta(() => c.rpcCalls.some((x) => x.name === "crear_presentacion")),
+    "el formulario válido debe llamar al RPC transaccional");
   assert.ok(await esperarHasta(() => /Presentación creada/i.test(
     c.window.document.getElementById("msg-presentaciones").textContent
   )), "la UI debe completar el éxito antes de comprobar el reset");
-  assert.deepEqual(c.inserts.find((x) => x.table === "presentaciones").payload, { nombre: "Caja fixture" });
+  assert.equal(c.rpcCalls.find((x) => x.name === "crear_presentacion").args.p_nombre, "Caja fixture");
   assert.equal(input.value, "", "el formulario se limpia tras el éxito simulado");
 });
 
@@ -876,13 +930,15 @@ test("Paso 4 RWHT: asociar presentación exige producto/presentación/factor vá
 
   factor.value = "12";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
-  assert.ok(await esperarHasta(() => c.inserts.some((x) => x.table === "producto_presentaciones")),
-    "la asociación válida debe llegar al cliente fixture");
-  assert.ok(await esperarHasta(() => /Presentación agregada/i.test(
+  assert.ok(await esperarHasta(() => c.rpcCalls.some((x) => x.name === "bc_guardar_producto_catalogo")),
+    "la asociación válida debe llegar al RPC transaccional del producto");
+  assert.ok(await esperarHasta(() => /Formato minorista actualizado/i.test(
     c.window.document.getElementById("msg-presentaciones").textContent
   )), "la UI debe completar la asociación antes de comprobar el mensaje");
-  assert.deepEqual(c.inserts.find((x) => x.table === "producto_presentaciones").payload,
-    { producto_id: "p-fixture", presentacion_id: "pres-fixture", factor: 12 });
+  const payload = c.rpcCalls.find((x) => x.name === "bc_guardar_producto_catalogo").args;
+  assert.equal(payload.p_producto_id, "p-fixture");
+  assert.equal(payload.p_presentacion_normal, "Caja fixture");
+  assert.equal(payload.p_factor_normal, 12);
 });
 
 

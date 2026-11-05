@@ -73,21 +73,30 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
 });
 
 
-test("Configuración agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
+test("Sistema agrupa Conectividad y Preferencias; Administración muestra Categorías y Roles y Permisos", () => {
   const normalizedIndex = index.replace(/\r\n/g, "\n");
   const groupStart = normalizedIndex.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
   const groupStop = normalizedIndex.indexOf("</div>\n        </div>", groupStart);
-  assert.ok(groupStart >= 0, "debe existir el grupo padre Configuración");
+  assert.ok(groupStart >= 0, "debe existir el grupo padre Sistema");
   assert.ok(groupStop > groupStart, "el grupo y las subsecciones deben estar anidados");
   const groupMarkup = normalizedIndex.slice(groupStart, groupStop);
   assert.match(groupMarkup, /id="nav-config-toggle"[^>]*aria-expanded="true"/);
   assert.match(groupMarkup, /id="nav-config-subtabs"/);
+  assert.ok(groupMarkup.includes('bc-nav-group-label">Sistema</span>'));
   assert.match(groupMarkup, /data-tab="conectividad">Conectividad/);
   assert.match(groupMarkup, /data-tab="preferencias">Preferencias/);
   assert.match(index, /<button class="tab-btn" data-tab="config">Administración<\/button>/);
   const start = index.indexOf('<section id="tab-config"');
-  const admin = index.slice(start, index.indexOf("</section>", start));
-  assert.match(admin, /<h2>Administración<\/h2>/);
+  const end = index.indexOf("</section>\\n    </main>", start);
+  const admin = index.slice(start, end);
+  assert.match(admin, /<h3>Categorías<\/h3>/);
+  assert.match(admin, /id="bc-categories-open"/);
+  assert.match(admin, /<h3>Roles y Permisos<\/h3>/);
+  assert.match(admin, /class="bc-admin-role-runtime" hidden/);
+  for (const id of ["form-nuevo-rol", "lista-roles", "msg-roles"]) {
+    assert.match(admin, new RegExp('id="' + id + '"'));
+  }
+  assert.doesNotMatch(admin, /Presentaciones comerciales|Permisos inteligentes/);
   assert.doesNotMatch(groupMarkup, /data-tab="config"/);
 });
 
@@ -139,7 +148,9 @@ test("al abrirse el shell, todas las rutas y paneles permanecen cerrados hasta c
     assert.equal(panel.classList.contains("visible"), false, "panel visible durante carga: " + panel.id);
   }
   assert.equal(document.getElementById("form-categoria").classList.contains("hidden"), true);
-  assert.equal(document.getElementById("form-unidad").classList.contains("hidden"), true);
+  assert.equal(document.getElementById("form-unidad"), null,
+    "el CRUD separado de unidades fue retirado de Administración");
+  assert.equal(document.getElementById("lista-unidades"), null);
   dom.window.close();
 });
 
@@ -189,21 +200,44 @@ test("la Dependienta ve solo módulos concedidos y conserva las excepciones pers
   dom.window.close();
 });
 
-test("Administración solo aparece por permisos de usuarios o catálogos", async () => {
+test("Administración solo se abre con permiso de Categorías; roles y Presentaciones no habilitan la ruta", async () => {
   const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
   const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
   const { window } = dom;
   const { document } = window;
   window._usuarioActual = { id: "catalog-role", rol: "Catalogador" };
   window._permisosCargaExitosa = true;
-  window._permisosEfectivos = { categorias: { ver: true }, unidades: { ver: false } };
+  window._permisosEfectivos = { presentaciones: { ver: true }, unidades: { ver: false }, usuarios: { ver: true } };
   window.eval(permissions);
   window.aplicarPermisosAInterfaz();
-  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "1");
-  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="usuarios"]').getAttribute("data-bc-permiso"), "0");
-  assert.equal(window.tienePermiso("usuarios", "ver"), false);
-  assert.equal(window.tienePermiso("categorias", "ver"), true);
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "0");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="usuarios"]').getAttribute("data-bc-permiso"), "1",
+    "el permiso de Usuarios sigue habilitando su propia ruta, no Administración");
+  assert.equal(window.tienePermiso("presentaciones", "ver"), true);
+  assert.equal(window.tienePermiso("usuarios", "ver"), true);
   dom.window.close();
+
+  const noCatalogDom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const noCatalogWindow = noCatalogDom.window;
+  noCatalogWindow._usuarioActual = { id: "legacy-units-role", rol: "Catalogador" };
+  noCatalogWindow._permisosCargaExitosa = true;
+  noCatalogWindow._permisosEfectivos = { unidades: { ver: true } };
+  noCatalogWindow.eval(permissions);
+  noCatalogWindow.aplicarPermisosAInterfaz();
+  assert.equal(noCatalogWindow.document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "0",
+    "unidades por sí solo no debe abrir Administración");
+  noCatalogDom.window.close();
+
+  const categoryDom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const categoryWindow = categoryDom.window;
+  categoryWindow._usuarioActual = { id: "category-role", rol: "Catalogador" };
+  categoryWindow._permisosCargaExitosa = true;
+  categoryWindow._permisosEfectivos = { categorias: { ver: true } };
+  categoryWindow.eval(permissions);
+  categoryWindow.aplicarPermisosAInterfaz();
+  assert.equal(categoryWindow.document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "1",
+    "el permiso real de Categorías debe habilitar Administración");
+  categoryDom.window.close();
 });
 
 test("ver y crear son permisos independientes; crear no abre la navegación", async () => {
@@ -226,12 +260,13 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.61 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\.5\.61"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.61"/);
-  assert.match(index, /href="style\.css\?v=9\.5\.61"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.61"><\/script>/);
-  assert.match(app, /\["permisos-navegacion\.js","67\.6"\]/);
+test("app shell, application and Service Worker share 9.5.63 and load refreshed navigation modules", () => {
+  assert.match(app, /const VERSION="9\.5\.64"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.64"/);
+  assert.match(index, /href="style\.css\?v=9\.5\.64"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.64"><\/script>/);
+  assert.match(app, /\["permisos-navegacion\.js","67\.7"\]/);
+  assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.7/, "Service Worker debe precargar la misma versión de app.js");
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261101\.1"\]/);

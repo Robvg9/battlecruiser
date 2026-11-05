@@ -54,6 +54,7 @@ function mount() {
   window.client = {
     rpc: async (name, params) => {
       calls.push({ name, params: params || {} });
+      if (name === "inventario_mixto_enriquecido") return { data: [], error: null };
       if (name !== "inventario_enriquecido") {
         return { data: null, error: { message: "Unexpected RPC: " + name } };
       }
@@ -113,8 +114,9 @@ test("M53 inventory filters: state, search, warehouse Apply and Clear use read-o
   const countBeforeApply = calls.length;
   apply.click();
   await waitFor(() => calls.length > countBeforeApply && names(document).join("|") === "Masareal");
-  assert.equal(calls.at(-1).name, "inventario_enriquecido");
-  assert.equal(calls.at(-1).params.p_almacen_id, "lc", "Apply sends the selected warehouse to the read-only RPC");
+  const lastInventoryRead = calls.filter((call) => call.name === "inventario_enriquecido").at(-1);
+  assert.ok(lastInventoryRead);
+  assert.equal(lastInventoryRead.params.p_almacen_id, "lc", "Apply sends the selected warehouse to the read-only RPC");
   assert.deepEqual(names(document), ["Masareal"], "warehouse and state filters compose");
 
   const countBeforeClear = calls.length;
@@ -132,6 +134,6 @@ test("M53 inventory filters: state, search, warehouse Apply and Clear use read-o
     "Malta Guajira",
     "Cerveza Mayabe",
   ], "Clear restores the complete fixture list");
-  assert.ok(calls.every((call) => call.name === "inventario_enriquecido"), "test issues only read-only inventory RPCs");
+  assert.ok(calls.every((call) => ["inventario_enriquecido","inventario_mixto_enriquecido"].includes(call.name)), "test issues only read-only inventory RPCs");
   assert.equal(window._invFilas.length, FIXTURES.length, "visible inventory cache matches the restored fixture rows");
 });

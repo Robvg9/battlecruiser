@@ -694,34 +694,44 @@ async function main() {
     "Los seis estados no sobrevivieron la recarga de Chromium: " + JSON.stringify(preferenceReload));
   report.evidence.step4PreferencesAfterReload = preferenceReload;
 
-  // M75 reubica la nomenclatura en Administración; Chromium debe validar esa ubicación y su ciclo.
-  const nomenclatureInitial = await waitUntil(
-    "toolbar de nomenclatura dentro de Administración",
-    "(()=>{const p=document.querySelector('#tab-productos');const a=document.querySelector('#tab-config');const e=document.querySelector('#bc-product-catalog-entry');const t=document.querySelector('#productos-tools-nomenclatura');const b=document.querySelector('#productos-nomenclatura-btn');return a&&e&&t&&b&&a.contains(e)&&e.contains(t)&&e.contains(b)&&(!p||!p.contains(e))?{present:true,version:window.__BC_VERSION__||null,toolbarParent:a.id,toolbarOutsideProducts:!p||!p.contains(e)}:null})()",
+  // Step 4/15 — Chromium verifies the simplified Administration layout.
+  // The old presentations catalogue is removed; retail is always base unit × 1.
+  const adminCatalogsInitial = await waitUntil(
+    "Administración sin catálogo de presentaciones",
+    "(()=>{const admin=document.querySelector('#tab-config');const products=document.querySelector('#tab-productos');const base=document.querySelector('#prod-unidad');const category=document.querySelector('#prod-categoria');const categoryForm=admin&&admin.querySelector('#form-categoria');const retired=['.presentaciones-panel','.bc-admin-presentations','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const retiredAbsent=retired.every(selector=>!document.querySelector(selector));const retailFieldsAbsent=!document.querySelector('#bc-pres-normal-name,#bc-pres-normal-factor,#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado');return admin&&products&&base&&category&&category.tagName==='SELECT'&&category.required&&categoryForm&&retiredAbsent&&retailFieldsAbsent?{ready:true,version:window.__BC_VERSION__||null,panelCount:document.querySelectorAll('.presentaciones-panel').length,categoryFormInAdmin:!!categoryForm,categoryRequired:category.required,baseUnitExists:!!base,retiredAbsent,retailFieldsAbsent}:null})()",
     10000
   );
-  report.evidence.productNomenclatureInitial = nomenclatureInitial;
-  await delay(2500);
-  const nomenclatureStable = await evaluate("(()=>{const p=document.querySelector('#tab-productos');const a=document.querySelector('#tab-config');const e=document.querySelector('#bc-product-catalog-entry');const t=document.querySelector('#productos-tools-nomenclatura');const b=document.querySelector('#productos-nomenclatura-btn');return {present:!!b,toolbarInsideAdministration:!!(a&&e&&t&&b&&a.contains(e)&&e.contains(t)&&e.contains(b)),toolbarOutsideProducts:!!(p&&e&&!p.contains(e)),uiReady:window.__BC_UI_READY_RESOLVED__===true,version:window.__BC_VERSION__||null}})()");
-  assert(nomenclatureStable.present && nomenclatureStable.toolbarInsideAdministration && nomenclatureStable.toolbarOutsideProducts,
-    "El toolbar de nomenclatura no permaneció en Administración en Chromium real: "+JSON.stringify(nomenclatureStable));
-  const nomenclatureCycle = await evaluate("(async()=>{const product=document.querySelector('#tab-productos');const button=document.querySelector('#productos-nomenclatura-btn');const modal=document.querySelector('#productos-nomenclatura-modal');const config=document.querySelector('#tab-config');const entry=document.querySelector('#bc-product-catalog-entry');if(!product||!button||!modal||!config||!entry)return {ready:false};const parentBefore=config.parentElement;button.click();await new Promise(r=>setTimeout(r,250));const opened=!modal.classList.contains('hidden');const openState={opened,toolbarInAdmin:config.contains(entry)&&entry.contains(button),toolbarOutsideProducts:!product.contains(entry),configParentKept:config.parentElement===parentBefore,configOutsideModal:!modal.contains(config),categoriesMoved:!!(document.querySelector('#prod-nom-categorias-slot')&&document.querySelector('#lista-categorias')&&document.querySelector('#prod-nom-categorias-slot').contains(document.querySelector('#lista-categorias'))),unitsMoved:!!(document.querySelector('#prod-nom-unidades-slot')&&document.querySelector('#lista-unidades')&&document.querySelector('#prod-nom-unidades-slot').contains(document.querySelector('#lista-unidades')))};const close=document.querySelector('#productos-nomenclatura-cerrar');if(close)close.click();await new Promise(r=>setTimeout(r,200));return {ready:true,open:openState,closed:modal.classList.contains('hidden'),configParentRestored:config.parentElement===parentBefore,configOutsideModal:!modal.contains(config),toolbarInAdmin:config.contains(entry)&&entry.contains(button),toolbarOutsideProducts:!product.contains(entry)}})()");
-  assert(nomenclatureCycle.ready && nomenclatureCycle.open.opened,
-    "No se pudo abrir el modal Nomenclatura desde Administración en Chromium real: "+JSON.stringify(nomenclatureCycle));
-  assert(nomenclatureCycle.open.toolbarInAdmin && nomenclatureCycle.open.toolbarOutsideProducts && nomenclatureCycle.open.configParentKept && nomenclatureCycle.open.configOutsideModal,
-    "Abrir Nomenclatura movió el panel Configuración o sacó el toolbar de Administración: "+JSON.stringify(nomenclatureCycle));
-  assert(nomenclatureCycle.open.categoriesMoved && nomenclatureCycle.open.unitsMoved,
-    "Los catálogos no llegaron a sus slots de modal: "+JSON.stringify(nomenclatureCycle));
-  assert(nomenclatureCycle.closed && nomenclatureCycle.configParentRestored && nomenclatureCycle.configOutsideModal && nomenclatureCycle.toolbarInAdmin && nomenclatureCycle.toolbarOutsideProducts,
-    "Cerrar Nomenclatura no restauró el estado de Administración: "+JSON.stringify(nomenclatureCycle));
-  report.evidence.productNomenclatureUi = {
-    initial: nomenclatureInitial,
-    settled: nomenclatureStable,
-    openClose: nomenclatureCycle,
-    browser: "Chromium CDP",
+  report.evidence.adminCatalogsInitial = adminCatalogsInitial;
+  await delay(1200);
+  const adminCatalogsStable = await evaluate("(()=>{const admin=document.querySelector('#tab-config');const category=document.querySelector('#prod-categoria');const base=document.querySelector('#prod-unidad');const retired=['.presentaciones-panel','.bc-admin-presentations','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const counts=Object.fromEntries(retired.map(selector=>[selector,document.querySelectorAll(selector).length]));return {panelCount:document.querySelectorAll('.presentaciones-panel').length,retiredControlCounts:counts,retiredControlsAbsent:Object.values(counts).every(n=>n===0),retailFieldsAbsent:!document.querySelector('#bc-pres-normal-name,#bc-pres-normal-factor,#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado'),baseUnitExists:!!base,baseUnitHasNoPresentationCatalogue:!!(base&&base.getAttribute('list')!=='presentaciones-comunes'),categoryRequired:!!(category&&category.tagName==='SELECT'&&category.required),categoriesStayInAdmin:!!(admin&&admin.querySelector('#form-categoria'))}})()");
+  assert(adminCatalogsStable.panelCount===0 && adminCatalogsStable.retiredControlsAbsent,
+    "El catálogo de presentaciones de Administración debía estar retirado: "+JSON.stringify(adminCatalogsStable));
+  assert(adminCatalogsStable.retailFieldsAbsent && adminCatalogsStable.baseUnitExists && adminCatalogsStable.baseUnitHasNoPresentationCatalogue && adminCatalogsStable.categoryRequired && adminCatalogsStable.categoriesStayInAdmin,
+    "La venta minorista debe usar unidad base × 1 y la categoría debe seguir siendo obligatoria: "+JSON.stringify(adminCatalogsStable));
+  // Administration retains Categories and Roles & Permissions; only the smart designer stays retired.
+  const adminSurface = await waitUntil(
+    "Administración con Categorías y Roles y Permisos, sin diseñador legado",
+    "(()=>{const admin=document.querySelector('#tab-config');const category=admin&&admin.querySelector('#bc-categories-open');const role=admin&&admin.querySelector('#bc-btn-config-roles');const categoryModal=document.querySelector('#bc-modal-categorias');const roleModal=document.querySelector('#bc-modal-roles-permisos');const newRoleModal=document.querySelector('#bc-modal-nuevo-rol');const roleForm=newRoleModal&&newRoleModal.querySelector('#form-nuevo-rol');const roleList=roleModal&&roleModal.querySelector('#lista-roles');const categoryForm=categoryModal&&categoryModal.querySelector('#form-categoria');const categoryList=categoryModal&&categoryModal.querySelector('#lista-categorias');const forbidden=['.bc-perm-designer','.presentaciones-panel','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const counts=Object.fromEntries(forbidden.map(selector=>[selector,document.querySelectorAll(selector).length]));const forbiddenAbsent=Object.values(counts).every(n=>n===0);const staleLabels=!!(admin&&/Permisos inteligentes|Presentaciones comerciales|Solo lectura|Administrador operativo/.test(admin.textContent||''));return {ready:!!(admin&&category&&role&&categoryModal&&roleModal&&newRoleModal&&roleForm&&roleList&&categoryForm&&categoryList&&forbiddenAbsent&&!staleLabels),categoryButton:!!category,rolesButton:!!role,roleFormMoved:!!roleForm,roleListMoved:!!roleList,categoryForm:!!categoryForm,categoryList:!!categoryList,forbiddenCounts:counts,forbiddenAbsent,staleLabels,adminText:admin?(admin.textContent||'').trim():null}})()",
+    10000
+  );
+  report.evidence.adminSurface = adminSurface;
+  assert(adminSurface.ready,
+    "Administración no muestra ambos accesos o reapareció el diseñador legado: " + JSON.stringify(adminSurface));
+  const rolesModalState = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-btn-config-roles');if(!b)return {ready:false};b.click();const m=document.querySelector('#bc-modal-roles-permisos');return {ready:true,modalOpen:!!(m&&m.classList.contains('open')),roleList:!!(m&&m.querySelector('#lista-roles')),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  assert(rolesModalState.ready&&rolesModalState.modalOpen&&rolesModalState.roleList&&rolesModalState.designerAbsent,
+    "El acceso Roles y Permisos no abrió su modal o reintrodujo el diseñador: "+JSON.stringify(rolesModalState));
+  await evaluate("(()=>{const m=document.querySelector('#bc-modal-roles-permisos');const b=m&&m.querySelector('[data-bc-roles-close=\"1\"]');if(b)b.click();else if(m)m.classList.remove('open');return true})()");
+  await waitUntil("cierre del modal Roles y Permisos","(()=>{const m=document.querySelector('#bc-modal-roles-permisos');return !!(m&&!m.classList.contains('open'))})()",3000);
+  const categoryModalState = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-categories-open');if(!b)return {ready:false};b.click();const m=document.querySelector('#bc-modal-categorias');return {ready:true,modalOpen:!!(m&&m.classList.contains('open')),categoryForm:!!(m&&m.querySelector('#form-categoria')),categoryList:!!(m&&m.querySelector('#lista-categorias')),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  assert(categoryModalState.ready&&categoryModalState.modalOpen&&categoryModalState.categoryForm&&categoryModalState.categoryList&&categoryModalState.designerAbsent,
+    "Administración no abrió Categorías o reintrodujo el diseñador: "+JSON.stringify(categoryModalState));
+  const categoryModalClosed = await evaluate("(()=>{const m=document.querySelector('#bc-modal-categorias');const b=m&&m.querySelector('.bc-categories-close');if(b)b.click();return {closed:!!(!m||!m.classList.contains('open')),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  assert(categoryModalClosed.closed&&categoryModalClosed.designerAbsent,
+    "El modal de Categorías no cerró o reapareció el diseñador: "+JSON.stringify(categoryModalClosed));
+  report.evidence.adminCatalogsUi = {
+    surface: adminSurface, rolesModal: rolesModalState, categoryModal: categoryModalState,
+    close: categoryModalClosed, browser: "Chromium CDP",
   };
-
-
   // Login fits portrait and landscape phone viewports without hiding any form item.
   report.evidence.phase = "login_viewport_fit";
   await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
@@ -844,61 +854,78 @@ async function main() {
 
   const configClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=config]');if(!b)return false;b.click();return true;})()");
   assert(configClicked, "No se encontró la sección Configuración.");
-  const configAdminReady = "(()=>{const t=document.querySelector('#tab-config');const b=document.querySelector('#tabs .tab-btn[data-tab=config]');const state={panelExists:!!t,panelVisible:!!(t&&t.classList.contains('visible')),panelClasses:t?t.className:null,panelDisplay:t?getComputedStyle(t).display:null,buttonExists:!!b,buttonClasses:b?b.className:null,buttonDisplay:b?getComputedStyle(b).display:null,buttonInlineDisplay:b?b.style.display:null,buttonPermit:b?b.getAttribute('data-bc-permiso'):null,roleEntry:!!(t&&t.querySelector('#bc-btn-config-roles')),roleFormMoved:!!document.querySelector('#bc-modal-nuevo-rol #form-nuevo-rol'),roleListMoved:!!document.querySelector('#bc-modal-roles-permisos #lista-roles'),categoryForm:!!(t&&t.querySelector('#form-categoria')),unitForm:!!(t&&t.querySelector('#form-unidad')),legacyPanel:!!(t&&t.querySelector('#bc-aj-panel')),activeTab:document.querySelector('#tabs .tab-btn.active')?.dataset.tab||null};window.__BC_CONFIG_ADMIN_TEST_STATE__=state;return !!(state.panelExists&&state.panelVisible&&state.roleEntry&&state.roleFormMoved&&state.roleListMoved&&state.categoryForm&&state.unitForm&&!state.legacyPanel);})()";
+  const configAdminReady = String.raw`(()=>{const t=document.querySelector('#tab-config');const b=document.querySelector('#tabs .tab-btn[data-tab=config]');const retired=['.presentaciones-panel','.bc-admin-presentations','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const category=t&&t.querySelector('#form-categoria');const base=document.querySelector('#prod-unidad');const categorySelect=document.querySelector('#prod-categoria');const state={panelExists:!!t,panelVisible:!!(t&&t.classList.contains('visible')),panelClasses:t?t.className:null,panelDisplay:t?getComputedStyle(t).display:null,buttonExists:!!b,buttonClasses:b?b.className:null,buttonDisplay:b?getComputedStyle(b).display:null,buttonInlineDisplay:b?b.style.display:null,buttonPermit:b?b.getAttribute('data-bc-permiso'):null,roleEntryPresent:!!(t&&t.querySelector('#bc-btn-config-roles')),roleFormPresent:!!document.querySelector('#bc-modal-nuevo-rol #form-nuevo-rol'),roleListPresent:!!document.querySelector('#bc-modal-roles-permisos #lista-roles'),smartPermissionDesignerAbsent:!(t&&t.querySelector('.bc-perm-designer')),legacyRoleTextAbsent:!(t&&/Permisos inteligentes|Solo lectura|Administrador operativo/.test(t.textContent||'')),categoryForm:!!category,unitsCrudAbsent:!document.querySelector('#form-unidad,#lista-unidades'),presentationsPanel:!!(t&&t.querySelector('.presentaciones-panel')),presentationsPanelCount:document.querySelectorAll('.presentaciones-panel').length,presentationControlsAbsent:retired.every(selector=>document.querySelectorAll(selector).length===0),retailFormatFieldsAbsent:!document.querySelector('#bc-pres-normal-name,#bc-pres-normal-factor,#prod-pres-min,#prod-pres-may,#prod-pres-may-habilitado'),baseUnitExists:!!base,baseUnitHasNoPresentationCatalogue:!!(base&&base.getAttribute('list')!=='presentaciones-comunes'),categoryRequired:!!(categorySelect&&categorySelect.tagName==='SELECT'&&categorySelect.required),legacyPanel:!!(t&&t.querySelector('#bc-aj-panel')),activeTab:document.querySelector('#tabs .tab-btn.active')?.dataset.tab||null};window.__BC_CONFIG_ADMIN_TEST_STATE__=state;return !!(state.panelExists&&state.panelVisible&&state.roleEntryPresent&&state.roleFormPresent&&state.roleListPresent&&state.smartPermissionDesignerAbsent&&state.legacyRoleTextAbsent&&state.categoryForm&&state.unitsCrudAbsent&&!state.presentationsPanel&&state.presentationsPanelCount===0&&state.presentationControlsAbsent&&state.retailFormatFieldsAbsent&&state.baseUnitExists&&state.baseUnitHasNoPresentationCatalogue&&state.categoryRequired&&!state.legacyPanel);})()`;
   try {
     await waitUntil("Configuración de administración y catálogos", configAdminReady, 10000);
   } catch (error) {
     report.evidence.configAdminFailureState = await evaluate("window.__BC_CONFIG_ADMIN_TEST_STATE__||null");
     throw error;
   }
-  const rolesOpened = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-btn-config-roles');if(!b)return {entry:false,opened:false};b.click();const m=document.querySelector('#bc-modal-roles-permisos');return {entry:true,opened:!!(m&&m.classList.contains('open')),listInsideModal:!!(m&&m.querySelector('#lista-roles'))}})()");
-  report.evidence.configRolesModal = rolesOpened;
-  assert(rolesOpened.entry && rolesOpened.opened && rolesOpened.listInsideModal,
-    "Configuración no abre el modal existente de Roles y Permisos: " + JSON.stringify(rolesOpened));
-  await evaluate("(()=>{const b=document.querySelector('#bc-modal-roles-permisos [data-bc-roles-close=\"1\"]');if(b)b.click();return true})()");
-  await waitUntil("cierre del modal Roles y Permisos", "(()=>{const m=document.querySelector('#bc-modal-roles-permisos');return !!(m&&!m.classList.contains('open'))})()", 3000);
+  const categoriesOpened = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-categories-open');if(!b)return {entry:false,opened:false};b.click();const m=document.querySelector('#bc-modal-categorias');return {entry:true,opened:!!(m&&m.classList.contains('open')),categoryForm:!!(m&&m.querySelector('#form-categoria')),categoryList:!!(m&&m.querySelector('#lista-categorias')),roleModalsPresent:!!(document.querySelector('#bc-modal-roles-permisos #lista-roles')&&document.querySelector('#bc-modal-nuevo-rol #form-nuevo-rol')),rolesModalsClosed:!document.querySelector('#bc-modal-roles-permisos.open,#bc-modal-nuevo-rol.open,#bc-modal-roles-help.open'),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  report.evidence.configCategoriesModal = categoriesOpened;
+  assert(categoriesOpened.entry && categoriesOpened.opened && categoriesOpened.categoryForm && categoriesOpened.categoryList &&
+         categoriesOpened.roleModalsPresent && categoriesOpened.rolesModalsClosed && categoriesOpened.designerAbsent,
+    "Configuración no abre Categorías o altera Roles/Permisos: " + JSON.stringify(categoriesOpened));
+  await evaluate("(()=>{const b=document.querySelector('#bc-modal-categorias .bc-categories-close');if(b)b.click();return true})()");
+  await waitUntil("cierre del modal Categorías", "(()=>{const m=document.querySelector('#bc-modal-categorias');return !!(m&&!m.classList.contains('open'))})()", 3000);
 
   // Regression test: do not merely call scrollIntoView; emulate a real vertical finger swipe.
   // The installed Android PWA reported that Configuración remained impossible to scroll.
-  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const before=tab.getBoundingClientRect();window.scrollTo(0,Math.max(0,Math.round(before.top+window.scrollY-8)));const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open')}})()");
+  // The compact Administration panel may fit entirely in the phone viewport.
+  // If it overflows, verify a real CDP finger swipe; if not, verify no content is clipped.
+  const mobileConfigScrollInitial = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;window.scrollTo(0,0);tab.scrollTop=0;const before=tab.getBoundingClientRect();window.scrollTo(0,Math.max(0,Math.round(before.top+window.scrollY-8)));const r=tab.getBoundingClientRect();const s=getComputedStyle(tab);const modal=document.querySelector('#bc-modal-categorias');const modalState=modal?{ariaHidden:modal.getAttribute('aria-hidden'),open:modal.classList.contains('open'),display:getComputedStyle(modal).display,hidden:modal.getAttribute('aria-hidden')==='true'&&!modal.classList.contains('open')&&getComputedStyle(modal).display==='none'}:null;return {found:true,regionClass:tab.classList.contains('bc-config-scroll-region'),overflowY:s.overflowY,top:r.top,bottom:r.bottom,left:r.left,right:r.right,viewportHeight:innerHeight,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,scrollTop:tab.scrollTop,bodyLock:document.body.classList.contains('bc-aj-open'),categoriesModal:modalState}})()");
   report.evidence.androidConfigScrollInitial = mobileConfigScrollInitial;
   assert(mobileConfigScrollInitial && mobileConfigScrollInitial.found &&
          mobileConfigScrollInitial.regionClass &&
          (mobileConfigScrollInitial.overflowY === "auto" || mobileConfigScrollInitial.overflowY === "scroll") &&
-         mobileConfigScrollInitial.scrollHeight > mobileConfigScrollInitial.clientHeight + 80 &&
-         !mobileConfigScrollInitial.bodyLock,
-    "Configuración no tiene una región táctil desplazable real: " + JSON.stringify(mobileConfigScrollInitial));
+         !mobileConfigScrollInitial.bodyLock && mobileConfigScrollInitial.categoriesModal && mobileConfigScrollInitial.categoriesModal.hidden,
+    "Configuración no mantiene una región de contenido accesible y sin bloqueo: " + JSON.stringify(mobileConfigScrollInitial));
 
-  const configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const top=Math.max(2,r.top+8);const bottom=Math.min(innerHeight-2,r.bottom-8);const distance=Math.min(220,bottom-top-30);return {x:Math.round(r.left+r.width*0.45),startY:Math.round(bottom-10),endY:Math.round(bottom-10-distance),distance:Math.round(distance)}})()");
-  assert(configSwipe && configSwipe.distance >= 100,
-    "No hay una zona visible suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
-  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-  await cdpCommand("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
-  });
-  for (let step = 1; step <= 6; step++) {
-    await delay(35);
-    const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 6);
+  let configSwipe = null;
+  let mobileConfigScrollAfter = null;
+  let mobileConfigScrollMode = "content-fits-viewport";
+  const configNeedsScroll = mobileConfigScrollInitial.scrollHeight > mobileConfigScrollInitial.clientHeight + 10;
+  if (configNeedsScroll) {
+    // Start in the panel's outer gutter, away from nested scrollable catalog lists.
+    // Send low-level CDP touch events to exercise Chromium's native finger-scroll path.
+    configSwipe = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const r=tab.getBoundingClientRect();const candidates=[{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.right-3),y:Math.round(r.top+r.height*0.68)},{x:Math.round(r.left+3),y:Math.round(r.top+r.height*0.38)}];for(const p of candidates){const hit=document.elementFromPoint(p.x,p.y);let node=hit,nested=false;while(node&&node!==tab){const s=getComputedStyle(node);if((s.overflowY==='auto'||s.overflowY==='scroll')&&node.scrollHeight>node.clientHeight+10)nested=true;node=node.parentElement;}if(hit&&node===tab&&!nested){const startY=Math.min(Math.round(r.bottom-12),p.y+90);const endY=Math.max(Math.round(r.top+12),startY-220);return {x:p.x,startY,endY,distance:startY-endY,targetTag:hit.tagName,targetId:hit.id||null,targetClass:typeof hit.className==='string'?hit.className:null,nestedScrollable:false};}}const x=Math.round(r.left+3),startY=Math.round(r.top+r.height*0.68),endY=Math.max(Math.round(r.top+12),startY-220),hit=document.elementFromPoint(x,startY);return {x,startY,endY,distance:startY-endY,targetTag:hit&&hit.tagName,targetId:hit&&hit.id||null,targetClass:hit&&typeof hit.className==='string'?hit.className:null,nestedScrollable:true};})()");
+    assert(configSwipe && configSwipe.distance >= 100,
+      "No hay una zona segura suficiente para probar el gesto de scroll táctil: " + JSON.stringify(configSwipe));
+    await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
     await cdpCommand("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+      type: "touchStart",
+      touchPoints: [{ x: configSwipe.x, y: configSwipe.startY, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
     });
+    for (let step = 1; step <= 8; step++) {
+      await delay(45);
+      const y = Math.round(configSwipe.startY + (configSwipe.endY - configSwipe.startY) * step / 8);
+      await cdpCommand("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: configSwipe.x, y, id: 0, radiusX: 3, radiusY: 3, force: 1 }],
+      });
+    }
+    await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await delay(300);
+    mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
+    assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollTop > mobileConfigScrollInitial.scrollTop + 20,
+      "El gesto vertical simulado no desplazó Configuración cuando el contenido excede el viewport. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
+        "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
+    mobileConfigScrollMode = "native-touch-scroll";
+  } else {
+    mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const tr=tab.getBoundingClientRect();const selectors=['.bc-admin-content','.bc-admin-grid','.bc-admin-card','.bc-admin-subcard'];const nodes=selectors.flatMap(selector=>Array.from(tab.querySelectorAll(selector)));const clipped=nodes.filter(node=>{const r=node.getBoundingClientRect();return r.height>0&&(r.top<tr.top-1||r.bottom>tr.bottom+1)}).map(node=>({selector:node.className||node.tagName,top:node.getBoundingClientRect().top,bottom:node.getBoundingClientRect().bottom}));return {scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY,tabTop:tr.top,tabBottom:tr.bottom,viewportHeight:innerHeight,clipped}})()");
+    assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollHeight <= mobileConfigScrollAfter.clientHeight + 1 &&
+           mobileConfigScrollAfter.tabTop >= -1 && mobileConfigScrollAfter.tabBottom <= mobileConfigScrollAfter.viewportHeight + 1 &&
+           mobileConfigScrollAfter.clipped.length === 0,
+      "La Administración compacta debería caber completa sin recorte: " + JSON.stringify(mobileConfigScrollAfter));
   }
-  await cdpCommand("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await delay(250);
-  const mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');return tab?{scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY}:null})()");
+  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
   report.evidence.androidConfigScrollGesture = {
     initial: mobileConfigScrollInitial,
+    mode: mobileConfigScrollMode,
     swipe: configSwipe,
     after: mobileConfigScrollAfter,
-    method: "Chromium CDP touchStart/touchMove/touchEnd in 360x800 mobile emulation; not a physical Android test.",
+    method: "Chromium CDP mobile emulation: native finger swipe only when content overflows; otherwise full-content viewport fit. Not a physical Android test.",
   };
-  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
-  assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollTop > mobileConfigScrollInitial.scrollTop + 20,
-    "El gesto vertical simulado no desplazó Configuración. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
-      "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
-
   const preferencesReopenedForReachability = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=preferencias]');if(!b)return false;b.click();return true})()");
   assert(preferencesReopenedForReachability, "No se pudo volver a Preferencias para verificar el control Wi-Fi.");
   await waitUntil("Preferencias activas después de Configuración", "(()=>{const t=document.querySelector('#tab-preferencias');return !!(t&&t.classList.contains('visible'))})()", 5000);

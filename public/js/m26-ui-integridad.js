@@ -23,75 +23,10 @@
     form.setAttribute('aria-hidden', 'true');
   }
 
-  function fijarNomenclaturaSoloProductos() {
-    var productos = document.getElementById('tab-productos');
-    var modal = document.getElementById('productos-nomenclatura-modal');
-    if (!productos || !modal) return;
-    document.querySelectorAll('#productos-tools-nomenclatura,#productos-nomenclatura-btn').forEach(function (el) {
-      // M75 owns the catalog entry in Administration. Keep its toolbar there
-      // when this routine prepares the native nomenclature modal.
-      if (!el.closest('#tab-productos') && !el.closest('#bc-product-catalog-entry')) el.remove();
-    });
-    var slots = {
-      'lista-categorias': 'prod-nom-categorias-slot',
-      'lista-unidades': 'prod-nom-unidades-slot',
-      'lista-presentaciones-catalogo': 'prod-nom-presentaciones-slot',
-      'pp-lista-asociaciones': 'prod-nom-presentaciones-slot'
-    };
-    Object.keys(slots).forEach(function (id) {
-      var el = document.getElementById(id), slot = document.getElementById(slots[id]);
-      if (!el || !slot) return;
-      var panel = el.closest('.tab-panel');
-      var adminEntry = document.getElementById('bc-product-catalog-entry');
-      var nomenclatureToolbar = document.getElementById('productos-tools-nomenclatura');
-      var candidatos = [
-        el.closest('.cc-bloque'),
-        el.closest('.card'),
-        el.closest('.presentaciones-catalogo'),
-        el.closest('.presentaciones-producto'),
-        el.parentElement
-      ].filter(Boolean);
-      // Never move an ancestor that contains a tab panel or M75's Administration
-      // entry. Catalogs can share a .cc-bloque with that entry; moving the whole
-      // block would silently detach the nomenclature toolbar from Administration.
-      var bloque = candidatos.find(function (candidate) {
-        return (!panel || (
-          panel.contains(candidate) &&
-          candidate !== panel &&
-          !candidate.contains(panel)
-        )) &&
-        !(adminEntry && (candidate === adminEntry || candidate.contains(adminEntry))) &&
-        !(nomenclatureToolbar && (candidate === nomenclatureToolbar || candidate.contains(nomenclatureToolbar)));
-      });
-      if (!bloque) return; // catalogos.js wraps just the related heading/form/list on demand.
-      if (!slot.contains(bloque)) slot.appendChild(bloque);
-    });
-  }
-
-  function prepararNomenclatura() {
-    var modal = document.getElementById('productos-nomenclatura-modal');
-    var btn = document.getElementById('productos-nomenclatura-btn');
-    if (!modal || !btn || !btn.closest('#tab-productos')) return;
-    fijarNomenclaturaSoloProductos();
-    if (btn.dataset.bcM26 === '1') return;
-    btn.dataset.bcM26 = '1';
-    btn.addEventListener('click', function () {
-      fijarNomenclaturaSoloProductos();
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-    });
-    var close = document.getElementById('productos-nomenclatura-cerrar');
-    if (close) close.addEventListener('click', function () {
-      modal.classList.add('hidden');
-      modal.style.display = '';
-    });
-    modal.addEventListener('click', function (e) {
-      if (e.target === modal) {
-        modal.classList.add('hidden');
-        modal.style.display = '';
-      }
-    });
-  }
+  // El catálogo de Presentaciones ya vive directamente en Administración.
+  // No mover DOM ni crear/abrir una segunda ventana desde Productos.
+  function fijarNomenclaturaSoloProductos() { return false; }
+  function prepararNomenclatura() { return false; }
 
   function limpiarInterfazAgregarProducto() {
     var panel = document.getElementById('tab-productos');
@@ -125,20 +60,20 @@
 
   function ocultarCampoUnidad(form) {
     if (!form) return;
+    // productos.unidad stays internal; retail uses the base unit with factor 1.
     var unidad = document.getElementById('prod-unidad');
     if (unidad) {
-      unidad.value = '';
-      unidad.removeAttribute('required');
-      unidad.setAttribute('aria-hidden', 'true');
-      unidad.tabIndex = -1;
+      unidad.type = 'hidden';
       unidad.style.display = 'none';
+      unidad.setAttribute('aria-hidden', 'true');
+      unidad.removeAttribute('required');
       var wrap = unidad.closest('.field');
       if (wrap) {
         wrap.style.display = 'none';
         wrap.setAttribute('aria-hidden', 'true');
       }
     }
-    var dl = document.getElementById('unidades-comunes');
+    var dl = document.getElementById('presentaciones-comunes');
     if (dl) dl.style.display = 'none';
   }
 
@@ -151,13 +86,16 @@
     var categoria = document.getElementById('prod-categoria');
     var normal = document.getElementById('prod-precio-normal');
     var mayorista = document.getElementById('prod-precio-mayorista');
+    var formatoVenta = document.getElementById('prod-formato-venta');
+    var formatoFactor = document.getElementById('prod-formato-factor');
     var imageWrap = form.querySelector('.prod-imagen-campo');
     var legacyPresCfg = document.getElementById('prod-presentaciones-config');
     var submitBtn = document.getElementById('prod-submit-btn');
     var cancelEdit = document.getElementById('prod-cancelar-edicion');
     var editId = document.getElementById('prod-editando-id');
+    var mixedSettings = document.getElementById('prod-inventario-mixto-settings');
 
-    if (!nombre || !categoria || !normal || !mayorista || !imageWrap || !submitBtn) return;
+    if (!nombre || !categoria || !normal || !mayorista || !formatoVenta || !formatoFactor || !imageWrap || !submitBtn) return;
 
     var top = document.createElement('div');
     top.className = 'bc-product-form-top';
@@ -177,14 +115,17 @@
       return box;
     }
 
+    categoria.required = true;
     left.appendChild(fieldBlock(nombre, 'Nombre'));
-    left.appendChild(fieldBlock(normal, 'Precio normal'));
+    left.appendChild(fieldBlock(categoria, 'Categoría'));
+    normal.placeholder = 'Precio';
+    left.appendChild(fieldBlock(normal, 'Precio'));
     right.appendChild(imageWrap);
     top.appendChild(left);
     top.appendChild(right);
 
-    // The product modal has one commercial-options owner. Category, wholesale
-    // price and the last approved label/factor pairs all live in this panel.
+    // The required category stays in the primary form. Optional owns only
+    // wholesale price and wholesale package-to-base-unit conversion.
     if (legacyPresCfg) legacyPresCfg.remove();
     mayorista.removeAttribute('required');
     mayorista.placeholder = 'Precio mayorista (opcional)';
@@ -200,7 +141,7 @@
     commercialToggle.setAttribute('aria-expanded', 'false');
     commercialToggle.setAttribute('aria-controls', 'bc-product-commercial-panel');
     commercialToggle.innerHTML =
-      '<span class="bc-product-commercial-toggle-copy"><strong>Configurar opciones comerciales</strong><small>Categoría, precio mayorista, presentaciones y factores</small></span>' +
+      '<span class="bc-product-commercial-toggle-copy"><strong>Opcional</strong><small>Precio mayorista y formato de venta</small></span>' +
       '<span class="bc-product-commercial-chevron" aria-hidden="true">⌄</span>';
 
     var commercialPanel = document.createElement('div');
@@ -210,8 +151,26 @@
 
     var commercialFields = document.createElement('div');
     commercialFields.className = 'bc-product-commercial-fields';
-    commercialFields.appendChild(fieldBlock(categoria, 'Categoría (opcional)', 'bc-product-commercial-field'));
     commercialFields.appendChild(fieldBlock(mayorista, 'Precio mayorista (opcional)', 'bc-product-commercial-field'));
+    var wholesaleFormat = document.createElement('div');
+    wholesaleFormat.className = 'bc-product-commercial-field bc-product-wholesale-format-field';
+    var wholesaleFormatLabel = document.createElement('label');
+    wholesaleFormatLabel.setAttribute('for', 'prod-formato-venta');
+    wholesaleFormatLabel.textContent = 'Formato de venta';
+    var wholesaleFormatRow = document.createElement('div');
+    wholesaleFormatRow.className = 'bc-product-wholesale-format-row';
+    formatoVenta.placeholder = 'Ej. Caja';
+    formatoVenta.setAttribute('aria-label', 'Nombre del formato de venta mayorista');
+    formatoFactor.placeholder = 'Ej. 24 unidades';
+    formatoFactor.setAttribute('aria-label', 'Unidades base por formato mayorista');
+    wholesaleFormatRow.appendChild(formatoVenta);
+    wholesaleFormatRow.appendChild(formatoFactor);
+    var wholesaleFormatHint = document.createElement('small');
+    wholesaleFormatHint.textContent = 'Unidades de inventario que descuenta cada formato vendido.';
+    wholesaleFormat.appendChild(wholesaleFormatLabel);
+    wholesaleFormat.appendChild(wholesaleFormatRow);
+    wholesaleFormat.appendChild(wholesaleFormatHint);
+    commercialFields.appendChild(wholesaleFormat);
     commercialPanel.appendChild(commercialFields);
     commercialToggle.addEventListener('click', function () {
       setCommercialOptionsExpanded(commercialToggle.getAttribute('aria-expanded') !== 'true');
@@ -235,16 +194,27 @@
       cancelEdit.classList.add('hidden');
       cancelEdit.style.display = 'none';
     }
+    // El botón final debe seguir siendo el submit real del formulario incluso
+    // después de moverlo al modal; se fuerza visibilidad para evitar que herede
+    // estados/estilos de la antigua presentación inline.
+    submitBtn.type = 'submit';
+    submitBtn.classList.remove('hidden');
+    submitBtn.removeAttribute('hidden');
+    submitBtn.style.display = 'inline-flex';
+    submitBtn.textContent = 'Guardar producto';
     actions.appendChild(cancelBtn);
     actions.appendChild(submitBtn);
 
     var unidad = document.getElementById('prod-unidad');
-    var dl = document.getElementById('unidades-comunes');
+    var dl = document.getElementById('presentaciones-comunes');
     if (editId) form.appendChild(editId);
     form.appendChild(top);
     form.appendChild(commercial);
+    if (mixedSettings) form.appendChild(mixedSettings);
     if (unidad) {
+      unidad.type = 'hidden';
       unidad.style.display = 'none';
+      unidad.setAttribute('aria-hidden', 'true');
       form.appendChild(unidad);
     }
     if (dl) {
@@ -253,6 +223,32 @@
     }
     form.appendChild(actions);
 
+    var mixedStyle = document.getElementById('bc-product-mixed-stock-css');
+    if (!mixedStyle) {
+      mixedStyle = document.createElement('style');
+      mixedStyle.id = 'bc-product-mixed-stock-css';
+      mixedStyle.textContent =
+        '.bc-product-wholesale-format-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(105px,.62fr);gap:7px;align-items:center}' +
+        '.bc-product-wholesale-format-row input{width:100%;min-width:0;height:36px;min-height:36px;box-sizing:border-box;padding:7px 9px;font-size:11.5px;border-radius:8px}' +
+        '.bc-product-wholesale-format-field>small{display:block;margin-top:5px;font-size:9.5px;line-height:1.35;color:var(--mist)}' +
+        '@media(max-width:420px){.bc-product-wholesale-format-row{grid-template-columns:minmax(0,1fr) minmax(92px,.62fr);gap:5px}}' +
+        '.prod-inventario-mixto-settings{margin:2px 0 0;padding:11px;border:1px solid rgba(201,162,77,.2);border-radius:10px;background:rgba(8,18,15,.32)}' +
+        '.prod-inventario-mixto-toggle{display:flex;align-items:flex-start;gap:9px;cursor:pointer}' +
+        '.prod-inventario-mixto-toggle input{appearance:auto;width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;max-width:18px!important;max-height:18px!important;box-sizing:border-box;padding:0!important;margin:2px 0 0!important;flex:0 0 18px!important;accent-color:var(--gold,#c9a24d)}' +
+        '.prod-inventario-mixto-toggle span,.prod-variantes-heading{display:flex;flex-direction:column;gap:3px}' +
+        '.prod-inventario-mixto-toggle strong,.prod-variantes-heading strong{font-size:11.5px;color:var(--gold-bright)}' +
+        '.prod-inventario-mixto-toggle small,.prod-variantes-heading small{font-size:10px;line-height:1.35;color:var(--mist)}' +
+        '.prod-variantes-editor{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(201,162,77,.13)}' +
+        '.prod-variantes-editor[hidden]{display:none!important}' +
+        '.prod-variantes-lista{display:flex;flex-direction:column;gap:6px}' +
+        '.prod-variante-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center}' +
+        '.prod-variante-row input{width:100%;min-width:0;height:34px;min-height:34px;padding:6px 9px;font-size:11px}' +
+        '.prod-variante-row button{min-height:32px;margin:0;padding:5px 8px;font-size:10px}' +
+        '#prod-variante-agregar{align-self:flex-start;min-height:32px;margin:0;padding:6px 9px;font-size:10.5px}' +
+        '.producto-mixto-tag{display:inline-block;margin:4px 0 0;padding:3px 6px;border:1px solid rgba(201,162,77,.24);border-radius:6px;color:var(--gold-bright);font-size:9px}' +
+        '@media(max-width:560px){.prod-inventario-mixto-settings{padding:9px}.prod-variante-row input{font-size:12px}}';
+      document.head.appendChild(mixedStyle);
+    }
     form.dataset.bcLayoutV925 = '1';
     form.classList.add('bc-producto-modal-form');
   }
@@ -334,10 +330,12 @@
     var edit = !!(editando && editando.value);
     if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
     if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
-    setCommercialOptionsExpanded(edit && !!(
-      (document.getElementById('prod-categoria') && document.getElementById('prod-categoria').value) ||
-      (document.getElementById('prod-precio-mayorista') && document.getElementById('prod-precio-mayorista').value.trim())
-    ));
+    var hasWholesaleConfig = !!(
+      (document.getElementById('prod-precio-mayorista') && document.getElementById('prod-precio-mayorista').value.trim()) ||
+      (document.getElementById('prod-formato-venta') && document.getElementById('prod-formato-venta').value.trim()) ||
+      (document.getElementById('prod-formato-factor') && document.getElementById('prod-formato-factor').value.trim())
+    );
+    setCommercialOptionsExpanded(edit && hasWholesaleConfig);
     ocultarCampoUnidad(form);
     form.classList.remove('hidden');
     modal.classList.remove('hidden');
@@ -385,6 +383,8 @@
       '#tab-productos #form-producto{display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important}',
       '#form-producto:not(.bc-producto-modal-form){display:none!important}',
       '#bc-product-modal.hidden #form-producto{display:none!important}',
+      '#bc-product-modal .bc-product-form-actions{display:flex!important;justify-content:flex-end;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(201,162,77,.18)}',
+      '#bc-product-modal #prod-submit-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;align-items:center;justify-content:center;min-height:40px;padding:10px 16px;border-radius:10px;font-weight:700}',
       '#bc-productos-barra{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;position:sticky;top:0;z-index:20;background:var(--void);padding:6px 0}',
       '#bc-productos-barra .bc-productos-search{width:100%}',
       '#bc-productos-barra #productos-buscar{display:block!important;width:100%;box-sizing:border-box}',
@@ -411,7 +411,7 @@
       '#bc-product-modal #bc-product-form-host{padding:6px 16px 16px}',
       '#bc-product-modal #form-producto,#bc-product-modal #form-producto.bc-producto-modal-form{display:flex!important;flex-direction:column;gap:12px;visibility:visible!important;height:auto!important;overflow:visible!important}',
       '#bc-product-modal #form-producto.hidden{display:flex!important}',
-      '#bc-product-modal #prod-unidad,#bc-product-modal #unidades-comunes{display:none!important}',
+      '#bc-product-modal #presentaciones-comunes{display:none!important}',
       '#bc-product-modal .bc-product-form-top{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:12px;align-items:start}',
       '#bc-product-modal .bc-product-form-fields{display:flex;flex-direction:column;gap:8px;min-width:0;align-self:start}',
       '#bc-product-modal .bc-product-field{display:block;flex:none!important;height:auto!important;min-height:0!important}',
@@ -634,8 +634,6 @@
   function run() {
     unificarTurnos();
     ocultarCompraEnProductos();
-    prepararNomenclatura();
-    fijarNomenclaturaSoloProductos();
     limpiarInterfazAgregarProducto();
     simplificarProductos();
     arreglarEdicionProducto();

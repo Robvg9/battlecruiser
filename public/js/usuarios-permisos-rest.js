@@ -140,12 +140,12 @@ safeInit("admin-usuarios", () => {
 const SECCIONES_PERMISOS = [
   "productos", "categorias", "almacenes", "stock",
   "transferencias", "ventas", "reportes", "usuarios",
-  "presentaciones", "auditoria", "turnos", "comunicacion", "unidades",
+  "presentaciones", "auditoria", "turnos", "comunicacion",
   "ciclos", "entregas_caja",
   "gastos", "mermas", "reinversiones"
 ];
 const ACCIONES_PERMISOS = ["ver", "crear", "editar", "borrar", "editar_any"];
-const SECCIONES_EXCLUIDAS_FE = { bajas: true, vales_salida: true, vales: true };
+const SECCIONES_EXCLUIDAS_FE = { bajas: true, vales_salida: true, vales: true, unidades: true };
 let _rolExpandidoId = null;
 let _permisosRolActual = [];
 

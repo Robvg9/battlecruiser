@@ -1,10 +1,11 @@
-// BattleCruiser M75 v75.3 — interfaz compacta de Productos y encabezado global.
+// BattleCruiser M75 v75.10 — interfaz compacta de Productos y Administración.
 (function () {
   'use strict';
   if (window.__BCM75_PRODUCTS_UI) return;
   window.__BCM75_PRODUCTS_UI = true;
   var STYLE_ID = 'bc-m75-products-compact-style';
   var listObserver = null;
+  var adminPermissionDesignerObserver = null;
 
   function installStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -45,11 +46,6 @@
       '#tab-productos #bc-productos-controles .bc-m44-view-btn{min-height:32px!important;padding:6px 8px!important;font-size:10.5px!important;line-height:1!important}',
       '#tab-productos .bc-category-hidden{display:none!important}',
       '#tab-productos #productos-tools-nomenclatura{display:none!important}',
-      '#bc-product-catalog-entry{margin:10px 0 14px;padding:12px 14px;border:1px solid rgba(212,176,92,.18);border-radius:10px;background:var(--stone)}',
-      '#bc-product-catalog-entry h3{margin:0 0 5px;font-size:16px}',
-      '#bc-product-catalog-entry p{margin:0 0 9px;font-size:11.5px;line-height:1.4;color:var(--mist)}',
-      '#bc-product-catalog-entry #productos-tools-nomenclatura{display:block!important;margin:0!important}',
-      '#bc-product-catalog-entry #productos-nomenclatura-btn{min-height:34px;padding:7px 11px;font-size:11.5px;border-radius:8px}',
       '#bc-product-modal .bc-product-modal-head{display:flex!important;align-items:center!important;gap:8px!important;padding:9px 12px 5px!important}',
       '#bc-product-modal .bc-product-modal-head h3{font-size:1.1rem!important;line-height:1.15!important;flex:1 1 auto;min-width:0}',
       '#bc-product-modal #bc-product-import-open{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:31px;padding:6px 8px;border:1px solid rgba(212,176,92,.35);border-radius:8px;background:rgba(212,176,92,.1);color:var(--gold-bright);font:600 10.5px/1.1 Inter,sans-serif;white-space:nowrap;cursor:pointer}',
@@ -85,6 +81,22 @@
       '#bc-m55-overlay .bc-m55-modal{width:min(720px,100%)!important;margin:8px auto!important;padding:12px!important;border-radius:11px!important}',
       '@media(max-width:700px){#tab-productos #bc-productos-controles{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"filters add" "views views"!important;gap:7px!important}#tab-productos #bc-productos-filtros{grid-area:filters;min-width:0}#tab-productos #bc-productos-agregar{grid-area:add;min-width:108px!important;padding:7px 9px!important;font-size:11px!important}#tab-productos #bc-productos-controles .bc-m44-view-tools{grid-area:views;justify-self:end!important}#tab-productos #bc-productos-controles .bc-m44-view-btn{padding:6px 8px!important}#bc-product-modal{padding:7px!important}#bc-product-modal .bc-product-modal-dialog{width:100%!important;border-radius:12px!important}#bc-product-modal .bc-product-form-top{grid-template-columns:minmax(0,1fr) 92px!important;gap:7px!important}#bc-product-modal .bc-product-form-image,#bc-product-modal .prod-imagen-campo{width:92px!important;max-width:92px!important}#bc-product-modal .prod-pres-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}}'
     ].join('\n');
+    style.textContent += "\n" + "/* Administration compact layout: styles travel with cache-busted M75. */\n#tab-config .bc-admin-content{display:grid;gap:10px;min-width:0}\n#tab-config .bc-admin-heading{margin:0;display:flex;align-items:flex-end;justify-content:space-between;gap:8px}\n#tab-config .bc-admin-heading h2{margin:0;font-size:clamp(22px,5vw,27px);line-height:1.08}\n#tab-config .bc-admin-heading p{margin:4px 0 0;font-size:11.5px;line-height:1.35}\n#tab-config .bc-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:stretch;min-width:0}\n#tab-config .bc-admin-card{display:flex;flex-direction:column;align-items:stretch;gap:7px;min-width:0;min-height:112px;margin:0;padding:10px 11px;border-radius:10px}\n#tab-config .bc-admin-card h3{margin:0;font-size:15px;line-height:1.2}\n#tab-config .bc-admin-card p{margin:0;font-size:10.5px;line-height:1.35;color:var(--mist)}\n#tab-config .bc-admin-card-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}\n#tab-config .bc-admin-tag{flex:0 0 auto;padding:3px 6px;border:1px solid rgba(212,176,92,.2);border-radius:999px;color:var(--gold-bright);font-size:8.5px;line-height:1.15;text-transform:uppercase;letter-spacing:.04em}\n#tab-config .bc-admin-roles #bc-btn-config-roles{width:100%;min-height:36px;margin:0;padding:7px 9px;border-radius:8px;font-size:10.5px;line-height:1.2;white-space:normal}\n#tab-config .bc-admin-catalogs{grid-column:1/-1;min-height:0}\n#tab-config .bc-admin-catalog-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}\n#tab-config .bc-admin-subcard{display:flex;flex-direction:column;gap:6px;min-width:0;padding:8px;border:1px solid rgba(212,176,92,.15);border-radius:8px;background:rgba(6,16,14,.28)}\n#tab-config .bc-admin-subcard h4{margin:0;font-size:11.5px;line-height:1.2;color:var(--gold-bright)}\n#tab-config .bc-admin-subcard .inline-form{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;margin:0}\n#tab-config .bc-admin-subcard .inline-form input{width:100%;min-width:0;height:34px;min-height:34px;padding:6px 8px;border-radius:7px;font-size:10.5px}\n#tab-config .bc-admin-subcard .inline-form button{min-height:34px;margin:0;padding:6px 8px;border-radius:7px;font-size:10px;line-height:1.15;white-space:normal}\n#tab-config .bc-admin-subcard .lista{display:flex;flex-direction:column;gap:0;max-height:132px;overflow:auto;overscroll-behavior:contain}\n#tab-config .bc-admin-subcard .lista .lista-item{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0;padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.055);font-size:10px;line-height:1.2}\n#tab-config .bc-admin-subcard .lista .lista-item:last-child{border-bottom:0}\n#tab-config .bc-admin-subcard .lista .lista-item-acciones{display:flex;align-items:center;justify-content:flex-end;gap:4px;flex-wrap:wrap}\n#tab-config .bc-admin-subcard .lista .catalogo-edit-btn,#tab-config .bc-admin-subcard .lista .catalogo-delete-btn,#tab-config .bc-admin-subcard .lista .catalogo-toggle-btn{flex:0 0 auto;min-height:27px;margin:0;padding:4px 7px;border-radius:6px;font-size:9px;line-height:1.1}\n#tab-config .bc-admin-subcard .lista .catalogo-delete-btn{border-color:rgba(220,105,90,.48);color:#e0a29a}\n#tab-config #msg-config{min-height:0;margin:0;font-size:10.5px;line-height:1.3}\n@media(max-width:380px){#tab-config .bc-admin-grid{gap:7px}#tab-config .bc-admin-card{padding:9px;gap:6px}#tab-config .bc-admin-card h3{font-size:13px}#tab-config .bc-admin-catalog-grid{grid-template-columns:1fr;gap:7px}}";
+    style.textContent += '';
+    style.textContent += '\n' +
+      '/* Administration now exposes only the required category manager. */' +
+      '#tab-config .bc-admin-content{display:block!important;min-width:0!important}' +
+      '#tab-config .bc-admin-grid{display:block!important;width:100%!important;margin:0!important}' +
+      '#tab-config .bc-admin-card.bc-admin-categories{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;min-height:0!important;margin:0!important;padding:8px 10px!important}' +
+      '#tab-config .bc-admin-categories .bc-admin-card-heading{display:flex;align-items:center;min-width:0;margin:0}' +
+      '#tab-config .bc-admin-categories .bc-admin-card-heading h3{margin:0;font-size:14px;line-height:1.2}' +
+      '#tab-config .bc-admin-categories #bc-categories-open{width:auto!important;min-width:140px;min-height:34px;margin:0;padding:6px 10px;border-radius:8px;font-size:10.5px;line-height:1.2}' +
+      '#tab-config .bc-admin-card.bc-admin-roles{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;min-height:0!important;margin:8px 0 0!important;padding:8px 10px!important}' +
+      '#tab-config .bc-admin-roles .bc-admin-card-heading{display:flex;align-items:center;min-width:0;margin:0}' +
+      '#tab-config .bc-admin-roles .bc-admin-card-heading h3{margin:0;font-size:14px;line-height:1.2}' +
+      '#tab-config .bc-admin-roles #bc-btn-config-roles{width:auto!important;min-width:170px;min-height:34px;margin:0;padding:6px 10px;border-radius:8px;font-size:10.5px;line-height:1.2}' +
+      '#tab-config .bc-admin-role-runtime[hidden]{display:none!important}' +
+      '@media(max-width:420px){#tab-config .bc-admin-categories,#tab-config .bc-admin-roles{flex-wrap:wrap!important}#tab-config .bc-admin-categories #bc-categories-open,#tab-config .bc-admin-roles #bc-btn-config-roles{width:100%!important}}';
     document.head.appendChild(style);
   }
 
@@ -182,27 +194,10 @@
   }
 
   function moveNomenclatureToAdmin() {
-    var tool = document.getElementById('productos-tools-nomenclatura');
-    var button = document.getElementById('productos-nomenclatura-btn');
-    var admin = document.getElementById('tab-config');
-    if (!tool || !button || !admin || button.dataset.bcM26 !== '1') return false;
-    var entry = document.getElementById('bc-product-catalog-entry');
-    if (!entry) {
-      entry = document.createElement('section');
-      entry.id = 'bc-product-catalog-entry';
-      var heading = document.createElement('h3');
-      heading.textContent = 'Catálogos de productos';
-      var note = document.createElement('p');
-      note.textContent = 'Gestiona categorías, unidades de medida y presentaciones comerciales.';
-      entry.appendChild(heading);
-      entry.appendChild(note);
-      var anchor = admin.querySelector('.cc-bloque') || admin.querySelector('h3') || admin.firstChild;
-      admin.insertBefore(entry, anchor);
-    }
-    if (!entry.contains(tool)) entry.appendChild(tool);
-    button.textContent = 'Nomenclatura y catálogos';
-    button.setAttribute('aria-label', 'Abrir nomenclatura y catálogos de productos');
-    return true;
+    ['#bc-product-presentations-entry','#productos-tools-nomenclatura','#productos-nomenclatura-btn','#productos-nomenclatura-modal'].forEach(function (selector) {
+      document.querySelectorAll(selector).forEach(function (node) { node.remove(); });
+    });
+    return false;
   }
 
   function ensureModalImporter() {
@@ -231,8 +226,34 @@
     return true;
   }
 
+
+  // Administration has one owner surface: category management. Legacy modules
+  // may still append their old role-permission designer into #tab-config; remove
+  // only that obsolete UI while leaving the permission engine and role data intact.
+  function removeLegacyPermissionDesigner() {
+    var admin = document.getElementById('tab-config');
+    if (!admin) return 0;
+    var obsolete = admin.querySelectorAll('.bc-perm-designer');
+    var removed = obsolete.length;
+    obsolete.forEach(function (node) { node.remove(); });
+    return removed;
+  }
+
+  function observeLegacyPermissionDesigner() {
+    var admin = document.getElementById('tab-config');
+    if (!admin || admin.dataset.bcPermissionDesignerObserver === '1') return;
+    admin.dataset.bcPermissionDesignerObserver = '1';
+    removeLegacyPermissionDesigner();
+    if (typeof MutationObserver !== 'function') return;
+    adminPermissionDesignerObserver = new MutationObserver(function () {
+      removeLegacyPermissionDesigner();
+    });
+    adminPermissionDesignerObserver.observe(admin, { childList: true, subtree: true });
+  }
+
   function apply() {
     installStyles();
+    observeLegacyPermissionDesigner();
     var panel = document.getElementById('tab-productos');
     removeLegacyProductControls(panel);
     var a = ensureToolbar();
@@ -270,7 +291,10 @@
       categoryFilter: !!document.getElementById('bc-productos-categoria-filter'),
       viewButtonCount: panel ? panel.querySelectorAll('.bc-m44-view-tools .bc-m44-view-btn').length : 0,
       viewControlsInToolbar: !!(controls && controls.querySelector('.bc-m44-view-tools')),
-      nomenclatureInAdmin: !!(tools && document.getElementById('tab-config') && document.getElementById('tab-config').contains(tools)),
+      nomenclatureInAdmin: false,
+      presentationsPanelInAdministration: !!document.querySelector('#tab-config .presentaciones-panel'),
+      presentationsPanelOutsideProducts: !document.querySelector('#tab-productos .presentaciones-panel'),
+      duplicateCatalogModal: !!document.getElementById('productos-nomenclatura-modal'),
       importButtonCount: modal ? modal.querySelectorAll('#bc-product-import-open').length : 0,
       importButtonLabel: importButton ? importButton.textContent : null,
       formStillInNativeModal: !!(modal && modal.contains(document.getElementById('form-producto')))

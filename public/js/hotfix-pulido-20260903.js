@@ -67,7 +67,6 @@
       +'.bc-pulido-dialog-actions button{min-height:38px}'
       +'.bc-pulido-import-error{color:#e88a96!important}.bc-pulido-import-ok{color:var(--sage)!important}.bc-pulido-import-warn{color:var(--gold-bright)!important}'
       +'#bc-pulido-stock-status{font-size:11px;color:var(--mist);margin:5px 0 10px}'
-      +'#tab-productos .presentaciones-panel{display:block!important;visibility:visible!important;max-height:none!important;overflow:visible!important}'
       +'#tab-productos .bc171-native-hidden{display:none!important}'
       +'#tab-productos #prod-cancelar-edicion{display:none!important}'
       +'#tab-productos .bc-pres-grid input,#tab-productos .bc-pres-grid select{width:100%}'
@@ -210,19 +209,18 @@
       return true;
     }
     box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
-    box.innerHTML=
-      '<div class="bc-pres-section-title">Presentaciones y factores</div>'+
-      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Minorista</strong><input id="bc-pres-normal-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Unidad)" aria-label="Etiqueta de presentación minorista"><input id="bc-pres-normal-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 1)" aria-label="Factor numérico minorista"></div>'+
-      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" placeholder="Etiqueta (ej. Bolso)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
-      '<p class="bc-pres-optional-note">Configura únicamente las presentaciones que utilices. Cada una requiere etiqueta y factor positivo; deja ambas vacías si no aplica.</p>';
+    box.innerHTML='<div class="bc-pres-section-title">Formato mayorista (opcional)</div>'+
+      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Formato mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" list="presentaciones-comunes" placeholder="Etiqueta (ej. Caja)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
+      '';
     host.appendChild(box);
     loadPresentaciones();
     return true;
   }
   function selectedPres(which){
     var isWholesale=which==='wholesale';
-    var nameEl=document.getElementById(isWholesale?'bc-pres-wholesale-name':'bc-pres-normal-name');
-    var factorEl=document.getElementById(isWholesale?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+    if(!isWholesale){var unit=(document.getElementById('prod-unidad')?.value||'').trim()||'unidad';return{name:unit,factor:1,id:null};}
+    var nameEl=document.getElementById('bc-pres-wholesale-name');
+    var factorEl=document.getElementById('bc-pres-wholesale-factor');
     var name=nameEl?(nameEl.value||'').trim():'';
     var raw=factorEl?(factorEl.value||'').trim():'';
     if(!name&&!raw)return{name:null,factor:null,id:null};
@@ -246,7 +244,7 @@
     var prod=activeProducts().find(function(p){return String(p.id)===String(productId);});
     var wholesaleId=prod&&prod.presentacion_id?String(prod.presentacion_id):null;
     var wholesale=wholesaleId?rows.find(function(r){return String(r.presentacion_id)===wholesaleId;}):null;
-    var normal=rows.find(function(r){return !wholesaleId||String(r.presentacion_id)!==wholesaleId;})||null;
+    var normal=null;
     function setRow(kind,row){
       var isW=kind==='wholesale';
       var nameEl=document.getElementById(isW?'bc-pres-wholesale-name':'bc-pres-normal-name');
@@ -258,9 +256,9 @@
     setRow('wholesale',wholesale);
     var category=document.getElementById('prod-categoria')?.value||'';
     var wholesalePrice=document.getElementById('prod-precio-mayorista')?.value?.trim()||'';
-    var hasPresentation=!!(normal||wholesale);
+    var hasPresentation=!!wholesale;
     if(typeof window.__BCM26_setCommercialOptionsExpanded==='function'){
-      window.__BCM26_setCommercialOptionsExpanded(!!(category||wholesalePrice||hasPresentation));
+      window.__BCM26_setCommercialOptionsExpanded(!!(wholesalePrice||hasPresentation));
     }
   }
 
@@ -314,6 +312,8 @@
     var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return true;}
+    var categoriaId=document.getElementById('prod-categoria')?.value||'';
+    if(!categoriaId){msg('Selecciona una categoría para guardar el producto.',false);document.getElementById('prod-categoria')?.focus();return true;}
     var save=document.getElementById('prod-submit-btn')||document.getElementById('bc171-save');if(save)save.disabled=true;
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'';var pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
@@ -344,12 +344,12 @@
     }
     try{
       if(!navigator.onLine&&typeof window.ejecutarOperacion==='function'){
-        if(normal.name||normal.factor!==null||wholesale.name||wholesale.factor!==null){
-          msg('Para guardar presentaciones y factores necesitas conexión. No se guardó el producto ni se creó parcialmente.',false);
+        if(wholesale.name||wholesale.factor!==null){
+          msg('Para guardar un formato mayorista necesitas conexión. No se guardó el producto ni se creó parcialmente.',false);
           return true;
         }
         var q=await window.ejecutarOperacion(id?'producto_actualizar':'producto',{...(id?{p_producto_id:id}:{}),p_nombre:nombre,p_categoria_id:document.getElementById('prod-categoria')?.value||null,p_unidad:document.getElementById('prod-unidad')?.value?.trim()||null,p_precio_normal:pn,p_precio_mayorista:pm});
-        if(q?.ok){msg('✓ Producto guardado localmente. Las opciones de presentación quedaron sin configurar; puedes añadirlas al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
+        if(q?.ok){msg('✓ Producto guardado localmente. El formato mayorista quedó sin configurar; puedes añadirlo al recuperar conexión.'+(imageFile?' La imagen requiere conexión: vuelve a seleccionarla al recuperar internet.':''),true);window.__BC_PRODUCT_IMAGE_FILE__=null;closeProductModal();}else msg('No se pudo guardar offline.',false);
         return true;
       }
       if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
@@ -391,8 +391,8 @@
     ensurePresFields();
   }
   function downloadTemplate(){
-    var header=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_normal','factor_normal','presentacion_mayorista','factor_mayorista'];
-    var sample=['Cerveza Bucanero','Bebidas','botella','650','600','Unidad','1','Paquete x 24','24'];
+    var header=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_mayorista','factor_mayorista'];
+    var sample=['Cerveza Bucanero','Bebidas','botella','650','600','Paquete x 24','24'];
     var escCsv=function(x){return '"'+String(x??'').replace(/"/g,'""')+'"';};
     var blob=new Blob([header.map(escCsv).join(',')+'\n'+sample.map(escCsv).join(',')+'\n'],{type:'text/csv;charset=utf-8;'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='plantilla_productos_battlecruiser.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
@@ -401,11 +401,11 @@
     if(document.getElementById('bc-pulido-help'))return;
     var ov=document.createElement('div');ov.id='bc-pulido-help';ov.className='bc-pulido-help-overlay';ov.innerHTML='<div class="bc-pulido-dialog" role="dialog" aria-modal="true"><h3>Cómo llenar la plantilla</h3><p>Usá únicamente la plantilla CSV descargada en el Paso 1. No cambies los encabezados, no agregues columnas y no borres la primera fila.</p><div class="bc-pulido-help-grid">'
       +'<div class="bc-pulido-help-card"><strong>nombre · obligatorio</strong><p>Un producto por fila. Ej.: Cerveza Bucanero. No lo dejes vacío.</p></div>'
-      +'<div class="bc-pulido-help-card"><strong>categoria · opcional</strong><p>Debe coincidir con una categoría existente para asociarse automáticamente.</p></div>'
+      +'<div class="bc-pulido-help-card"><strong>categoria · obligatoria</strong><p>Debe coincidir con una categoría existente para asociarse automáticamente.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>unidad · opcional</strong><p>Es la unidad base del inventario: botella, lata, libra, kg, etc. No uses “paquete x7” como unidad base.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>precio_normal · opcional</strong><p>Solo número. Ej.: 650. Si no aplica, déjalo vacío.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>precio_mayorista · opcional</strong><p>Solo número. Ej.: 200. Si no aplica, déjalo vacío.</p></div>'
-      +'<div class="bc-pulido-help-card"><strong>presentacion_normal + factor</strong><p>Ej.: Unidad + 1. El factor es cuántas unidades base representa una venta.</p></div>'
+
       +'<div class="bc-pulido-help-card"><strong>presentacion_mayorista + factor</strong><p>Ej.: Paquete x 7 + 7. Una venta mayorista de 1 paquete descontará 7 unidades base.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>Regla crítica</strong><p>No escribas “7 unidades” dentro del factor. El factor debe ser solo un número positivo.</p></div>'
       +'</div><div class="bc-pulido-dialog-actions"><button type="button" id="bc-pulido-help-close">Cerrar</button></div></div>';
@@ -420,7 +420,7 @@
   function catId(name){if(!name)return null;var cs=Array.isArray(window._cache&&_cache.categorias)?_cache.categorias:[];var hit=cs.find(function(c){return norm(c.nombre)===norm(name);});return hit?hit.id:null;}
   async function importRows(file,body){
     var text=await file.text(),parsed=parseCsv(text),ok=0,fail=0,errors=[];
-    var headersRequired=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_normal','factor_normal','presentacion_mayorista','factor_mayorista'];
+    var headersRequired=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_mayorista','factor_mayorista'];
     if(parsed.h.indexOf('nombre')<0)throw Error('Falta la columna nombre.');
     for(var i=0;i<parsed.rows.length;i++){
       var r=parsed.rows[i],nombre=val(r,'nombre',['nombre']);
@@ -428,16 +428,14 @@
         if(!nombre)throw Error('Fila '+(i+2)+': falta nombre.');
         var pnRaw=val(r,'precio_normal',['precio_normal','precio normal']),pmRaw=val(r,'precio_mayorista',['precio_mayorista','precio mayorista']);
         var pn=pnRaw===''?null:Number(pnRaw),pm=pmRaw===''?null:Number(pmRaw);if(pn!==null&&!Number.isFinite(pn))throw Error('Fila '+(i+2)+': precio_normal inválido.');if(pm!==null&&!Number.isFinite(pm))throw Error('Fila '+(i+2)+': precio_mayorista inválido.');
-        var normName=val(r,'presentacion_normal',['presentacion_normal','presentación normal','presentacion']),normFacRaw=val(r,'factor_normal',['factor_normal','factor normal']);
+        var baseUnit=val(r,'unidad',['unidad','unit','uom'])||'unidad';
         var whName=val(r,'presentacion_mayorista',['presentacion_mayorista','presentación mayorista']),whFacRaw=val(r,'factor_mayorista',['factor_mayorista','factor mayorista']);
-        var nf=normFacRaw===''?null:Number(normFacRaw),wf=whFacRaw===''?null:Number(whFacRaw);
-        var normalPair=(!normName&&normFacRaw==='')||(!!normName&&Number.isFinite(nf)&&nf>0);
+        var wf=whFacRaw===''?null:Number(whFacRaw);
         var wholesalePair=(!whName&&whFacRaw==='')||(!!whName&&Number.isFinite(wf)&&wf>0);
-        if(!normalPair)throw Error('Fila '+(i+2)+': la presentación minorista requiere etiqueta y factor positivo, o ambos vacíos.');
         if(!wholesalePair)throw Error('Fila '+(i+2)+': la presentación mayorista requiere etiqueta y factor positivo, o ambos vacíos.');
-        if(normName&&whName&&norm(normName)===norm(whName))throw Error('Fila '+(i+2)+': las etiquetas minorista y mayorista deben ser distintas.');
+        if(baseUnit&&whName&&norm(baseUnit)===norm(whName))throw Error('Fila '+(i+2)+': la presentación mayorista debe ser distinta de la unidad base.');
         if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
-        var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:val(r,'unidad',['unidad','unit','uom'])||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normName||null,p_factor_normal:nf,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
+        var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:baseUnit,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:baseUnit,p_factor_normal:1,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
         var rr=await client.rpc('bc_guardar_producto_catalogo',p);if(rr.error)throw rr.error;ok++;
       }catch(err){fail++;if(errors.length<10)errors.push(err.message||String(err));}
     }
@@ -451,22 +449,12 @@
     ov.querySelector('#bc-pulido-import-file').onchange=async function(){var f=this.files&&this.files[0],body=ov.querySelector('#bc-pulido-import-body');if(!f||!body)return;body.innerHTML='<p>Validando archivo…</p>';try{await importRows(f,body);}catch(err){body.innerHTML='<p class="bc-pulido-import-error">'+esc(err.message||String(err))+'</p>';}};
   }
 
-  function buildPresentationCatalog(){
-    var panel=document.querySelector('#tab-productos .presentaciones-panel');if(!panel)return;
-    var catalog=panel.querySelector('.presentaciones-catalogo');if(!catalog)return;
-    var old=catalog.querySelector('.bc-catalog-pres-panel');if(old)old.remove();
-    var wrap=document.createElement('div');wrap.className='bc-catalog-pres-panel';
-    wrap.innerHTML='<div class="bc-catalog-pres-toolbar"><strong>Presentaciones comerciales</strong><button type="button" id="bc-pres-refresh">Actualizar</button></div><div id="bc-pres-catalog-list" class="bc-catalog-pres-list"></div>';
-    catalog.appendChild(wrap);
-    wrap.querySelector('#bc-pres-refresh').onclick=function(){renderPresentationCatalog();};
-  }
-  async function renderPresentationCatalog(){
-    var el=document.getElementById('bc-pres-catalog-list');if(!el)return;await loadPresentaciones();el.innerHTML=PRES_CACHE.map(function(p){return '<div class="bc-catalog-pres-card"><strong>'+esc(p.nombre)+'</strong><span>Activa · disponible para asociar a productos</span></div>';}).join('')||'<div class="lista-estado">No hay presentaciones comerciales creadas.</div>';
-  }
-  function ensurePresentationCreateForm(){
-    var f=document.getElementById('form-presentacion-nueva');if(!f)return;f.classList.remove('hidden');if(f.dataset.bcPulido==='1')return;f.dataset.bcPulido='1';
-    f.addEventListener('submit',async function(e){e.preventDefault();e.stopImmediatePropagation();var input=document.getElementById('pres-nombre-nueva'),n=input?.value?.trim()||'';if(!n)return;try{var r=await client.rpc('crear_presentacion',{p_nombre:n,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now()))});if(r.error)throw r.error;if(input)input.value='';await loadPresentaciones();renderPresentationCatalog();var m=document.getElementById('msg-presentaciones');if(m)m.textContent='✓ Presentación creada.';}catch(err){var m2=document.getElementById('msg-presentaciones');if(m2)m2.textContent=err.message||String(err);}},true);
-  }
+  // El catálogo único lo mantiene presentaciones.js dentro de Administración.
+  // No crear un segundo listado ni un segundo botón de actualización.
+  function buildPresentationCatalog(){ return false; }
+  async function renderPresentationCatalog(){ return false; }
+  // El único submit handler del catálogo vive en presentaciones.js.
+  function ensurePresentationCreateForm(){ return false; }
 
   function cleanCommunicationEmpty(){
     document.querySelectorAll('#tab-comunicacion *').forEach(function(el){var t=norm(el.textContent||'');if((t==='no tenes conversaciones todavia inicia una nueva conversacion'||t==='no tienes conversaciones todavía. iniciá una nueva conversación para comenzar a chatear.')&&el.children.length===0)el.classList.add('bc-pulido-empty-chat');});
@@ -493,11 +481,11 @@
   function boot(){
     css();
     ensureWarehouses();preloadStock();patchStockGetter();bindCatalogClicks();
-    ensurePresFields();patchProductSubmit();patchEditBridge();ensurePresentationCreateForm();buildPresentationCatalog();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
+    ensurePresFields();patchProductSubmit();patchEditBridge();normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();discoverEditButtons();productModalObserver();
     setTimeout(function(){preloadStock(true);ensureWarehouses();patchStockGetter();patchEditBridge();},800);
-    setTimeout(function(){productModalPolish();ensurePresFields();renderPresentationCatalog();discoverEditButtons();repaintStockCards();},1400);
+    setTimeout(function(){productModalPolish();ensurePresFields();discoverEditButtons();repaintStockCards();},1400);
     setTimeout(function(){normalizarEtiquetaConfig();removeTransferSection();cleanCommunicationEmpty();reportsSingleFilter();},2500);
-    window.__BC_PULIDO_20260903_VERIFY=function(){var panel=document.getElementById('bc-product-commercial-panel');var fields=document.getElementById('bc-product-commercial-fields');return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-productos .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-productos .presentaciones-panel')).display!=='none'),commercialPanel:!!panel,commercialPanelExpanded:!!(panel&&!panel.hidden),commercialFields:!!fields,commercialFieldCount:fields?fields.querySelectorAll('input').length:0,legacyPresentationBlock:!!document.getElementById('prod-presentaciones-config')}};
+    window.__BC_PULIDO_20260903_VERIFY=function(){var panel=document.getElementById('bc-product-commercial-panel');var fields=document.getElementById('bc-product-commercial-fields');return{stockReady:STOCK_READY,stockRows:Object.keys(STOCK_MAP).length,warehouseOptions:['trf-origen','trf-destino','compra-almacen'].map(function(id){var e=document.getElementById(id);return [id,e?e.options.length:0]}),transferSidebarPresent:!!document.querySelector('#tabs [data-tab="transferencias"]'),configVisible:!!document.querySelector('#tabs [data-tab="config"]')&&document.querySelector('#tabs [data-tab="config"]').getAttribute('data-bc-permiso')==='1'&&getComputedStyle(document.querySelector('#tabs [data-tab="config"]')).display!=='none',presentationsVisible:!!(document.querySelector('#tab-config .presentaciones-panel')&&getComputedStyle(document.querySelector('#tab-config .presentaciones-panel')).display!=='none'),commercialPanel:!!panel,commercialPanelExpanded:!!(panel&&!panel.hidden),commercialFields:!!fields,commercialFieldCount:fields?fields.querySelectorAll('input').length:0,legacyPresentationBlock:!!document.getElementById('prod-presentaciones-config')}};
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('online',function(){setTimeout(function(){preloadStock(true);ensureWarehouses();},300);});

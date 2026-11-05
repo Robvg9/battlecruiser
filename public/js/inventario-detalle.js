@@ -33,6 +33,14 @@
       ['Valor del inventario', moneySafe(fila.valor_inventario)],
       ['Producto ID', fila.producto_id]
     ].map(([k,v]) => '<div class="bc-inv-detail-row"><span>' + esc(k) + '</span><strong>' + esc(v) + '</strong></div>').join('');
+    const variants = Array.isArray(fila.variantes) ? fila.variantes : [];
+    if (variants.length) {
+      body.innerHTML += '<h3 class="bc-inv-variants-title">Existencias por sabor / variante</h3>' +
+        variants.map(function (v) {
+          return '<div class="bc-inv-detail-row"><span>' + esc(v.nombre || 'Variante') +
+            '</span><strong>' + esc((v.cantidad ?? 0) + ' ' + (v.unidad || 'u')) + '</strong></div>';
+        }).join('');
+    }
     modal.classList.remove('hidden');
     modal.querySelector('.bc-inv-modal-card').focus();
   }
@@ -56,8 +64,26 @@
         row.setAttribute('tabindex', '0');
       });
     };
-    lista.addEventListener('click', e => { const row = e.target.closest('.rep-fila[data-inv-producto]'); if (!row) return; const filas = typeof _invFilas !== 'undefined' ? _invFilas : []; const rows = Array.from(lista.querySelectorAll('.rep-fila[data-inv-producto]')); const f = filas[rows.indexOf(row)]; if (f) abrir(f); });
-    lista.addEventListener('keydown', e => { if (e.key !== 'Enter' && e.key !== ' ') return; const row = e.target.closest('.rep-fila[data-inv-producto]'); if (!row) return; e.preventDefault(); const filas = typeof _invFilas !== 'undefined' ? _invFilas : []; const rows = Array.from(lista.querySelectorAll('.rep-fila[data-inv-producto]')); const f = filas[rows.indexOf(row)]; if (f) abrir(f); });
+    lista.addEventListener('click', e => {
+      if (e.target.closest('.bc-m53-variant-details')) { e.stopPropagation(); return; }
+      const row = e.target.closest('.rep-fila[data-inv-producto]');
+      if (!row) return;
+      const filas = typeof _invFilas !== 'undefined' ? _invFilas : [];
+      const rows = Array.from(lista.querySelectorAll('.rep-fila[data-inv-producto]'));
+      const f = filas[rows.indexOf(row)];
+      if (f) abrir(f);
+    });
+    lista.addEventListener('keydown', e => {
+      if (e.target.closest('.bc-m53-variant-details')) { e.stopPropagation(); return; }
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('.rep-fila[data-inv-producto]');
+      if (!row) return;
+      e.preventDefault();
+      const filas = typeof _invFilas !== 'undefined' ? _invFilas : [];
+      const rows = Array.from(lista.querySelectorAll('.rep-fila[data-inv-producto]'));
+      const f = filas[rows.indexOf(row)];
+      if (f) abrir(f);
+    });
     new MutationObserver(render).observe(lista, { childList: true, subtree: true });
     render();
   }

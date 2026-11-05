@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.61">
+<link rel="stylesheet" href="style.css?v=9.5.64">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 #app-shell.visible:not([data-bc-permisos-cargados="1"]) #tabs .tab-btn[data-tab],
@@ -82,7 +82,7 @@
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
       <a class="login-utility bc-bootstrap-entry" id="bootstrap-first-admin-link" href="bootstrap.html">Inicializar primer administrador</a>
-      <p class="footnote app-version-label">v9.5.61 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.64 — BattleCruiser</p>
     </form>
   </div>
 
@@ -117,7 +117,7 @@
         <div class="bc-nav-group expanded" id="nav-config-group">
           <button class="bc-nav-group-toggle" id="nav-config-toggle" type="button" aria-expanded="true" aria-controls="nav-config-subtabs">
             <span class="bc-nav-group-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
-            <span class="bc-nav-group-label">Configuración</span>
+            <span class="bc-nav-group-label">Sistema</span>
             <span class="bc-nav-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
           </button>
           <div class="bc-nav-group-items" id="nav-config-subtabs">
@@ -210,11 +210,13 @@
       <form id="form-producto" class="inline-form">
         <input type="hidden" id="prod-editando-id" value="">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
-        <select id="prod-categoria"><option value="">Categoría</option></select>
-        <input id="prod-unidad" placeholder="Unidad (ej. unidad, caja)" list="unidades-comunes">
-        <datalist id="unidades-comunes"><option value="unidad"></option><option value="caja"></option><option value="paquete"></option><option value="libra"></option><option value="kg"></option><option value="litro"></option></datalist>
-        <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
+        <select id="prod-categoria" required aria-label="Categoría"><option value="">Selecciona una categoría</option></select>
+        <input id="prod-unidad" type="hidden" value="unidad" aria-label="Unidad base interna del inventario">
+        <datalist id="presentaciones-comunes"></datalist>
+        <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
+        <input id="prod-formato-venta" type="text" maxlength="80" placeholder="Ej. Caja" aria-label="Nombre del formato de venta mayorista">
+        <input id="prod-formato-factor" type="number" inputmode="numeric" step="1" min="1" placeholder="Ej. 24 unidades" aria-label="Unidades base por formato de venta mayorista">
         <div class="prod-imagen-campo">
           <label class="prod-imagen-label">Imagen del producto</label>
           <div class="prod-imagen-selector">
@@ -233,11 +235,22 @@
           </div>
           <div id="msg-prod-imagen" class="msg"></div>
         </div>
+        <section id="prod-inventario-mixto-settings" class="prod-inventario-mixto-settings">
+          <label class="prod-inventario-mixto-toggle" for="prod-inventario-mixto">
+            <input type="checkbox" id="prod-inventario-mixto">
+            <span><strong>Controlar inventario por sabores / variantes</strong><small>Opcional. Solo se activa en este producto. Cada sabor tendrá stock, compras y transferencias independientes.</small></span>
+          </label>
+          <div id="prod-variantes-editor" class="prod-variantes-editor hidden" hidden>
+            <div class="prod-variantes-heading"><strong>Sabores o variantes</strong><small>Escribe tú el nombre de cada uno. Ejemplo: Manzana, Pera, Piña.</small></div>
+            <div id="prod-variantes-lista" class="prod-variantes-lista"></div>
+            <button type="button" id="prod-variante-agregar" class="cc-accion">+ Agregar sabor o variante</button>
+          </div>
+        </section>
         <button type="submit" id="prod-submit-btn">Agregar producto</button>
         <button type="button" id="prod-cancelar-edicion" class="hidden">Cancelar edición</button>
       </form>
       <div class="productos-buscador-controles">
-        <input id="productos-buscar" type="text" placeholder="Buscar por nombre, categoría o unidad..." autocomplete="off">
+        <input id="productos-buscar" type="text" placeholder="Buscar por nombre, categoría o presentación..." autocomplete="off">
         <span id="productos-contador" class="muted mov-contador"></span>
       </div>
       <div id="lista-productos" class="lista"></div>
@@ -260,29 +273,7 @@
       </form>
       </div>
       <p class="msg" id="msg-productos"></p>
-      <div class="rule-orn"><svg width="8" height="8" viewBox="0 0 10 10"><path d="M5 0 L10 5 L5 10 L0 5 Z" fill="#c9a24d"/></svg></div>
-      <h3>Presentaciones comerciales</h3>
-      <div class="presentaciones-panel">
-        <div class="presentaciones-catalogo">
-          <h4>Catálogo de presentaciones</h4>
-          <form id="form-presentacion-nueva" class="inline-form hidden">
-            <input id="pres-nombre-nueva" placeholder="Nombre (ej. Caja)" required>
-            <button type="submit">Crear presentación</button>
-          </form>
-          <div id="lista-presentaciones-catalogo" class="lista"></div>
-        </div>
-        <div class="presentaciones-producto">
-          <h4>Presentaciones por producto</h4>
-          <select id="pp-producto-select"><option value="">Elegí un producto…</option></select>
-          <div id="pp-lista-asociaciones" class="lista"><p class="lista-estado">Elegí un producto para ver sus presentaciones.</p></div>
-          <form id="form-pp-nueva" class="inline-form hidden">
-            <select id="pp-presentacion-select" required><option value="">Presentación</option></select>
-            <input id="pp-factor" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Factor (ej. 24 = 1 caja son 24 unidades base)" required>
-            <button type="submit">Agregar presentación al producto</button>
-          </form>
-        </div>
-      </div>
-      <p class="msg" id="msg-presentaciones"></p>
+
     </section>
 
     <section id="tab-ventas" class="tab-panel">
@@ -622,36 +613,49 @@
     <section id="tab-preferencias" class="tab-panel" aria-label="Preferencias personales"></section>
 
     <section id="tab-config" class="tab-panel">
-      <div class="pendientes-header"><h2>Administración</h2></div>
-      <p class="muted">Gestión de roles, permisos y catálogos maestros del salón.</p>
-      <div class="cc-bloque">
-        <h3>Roles y permisos</h3>
-        <form id="form-nuevo-rol" class="inline-form">
-          <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
-          <button type="submit">Crear rol</button>
-        </form>
-        <p class="msg" id="msg-roles"></p>
-        <div id="lista-roles" class="lista"></div>
+      <div class="bc-admin-content">
+        <div class="bc-admin-grid">
+          <section class="cc-bloque bc-admin-card bc-admin-categories" aria-label="Categorías">
+            <div class="bc-admin-card-heading"><h3>Categorías</h3></div>
+            <button type="button" id="bc-categories-open" class="cc-accion">Administrar categorías</button>
+          </section>
+          <section class="cc-bloque bc-admin-card bc-admin-roles" aria-label="Roles y Permisos">
+            <div class="bc-admin-card-heading"><h3>Roles y Permisos</h3></div>
+            <div class="bc-admin-role-runtime" hidden aria-hidden="true">
+              <form id="form-nuevo-rol" class="inline-form">
+                <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
+                <button type="submit">Crear rol</button>
+              </form>
+              <p class="msg" id="msg-roles"></p>
+              <div id="lista-roles" class="lista"></div>
+            </div>
+          </section>
+        </div>
+          <section id="bc-modal-categorias" class="bc-categories-modal" role="dialog" aria-modal="true" aria-labelledby="bc-categories-title" aria-hidden="true">
+            <div class="bc-categories-backdrop" data-bc-categories-close="1"></div>
+            <div class="bc-categories-panel">
+              <header class="bc-categories-head">
+                <div><h3 id="bc-categories-title">Categorías</h3><p class="muted">Añade categorías o cambia sus nombres sin alterar los productos asociados.</p></div>
+                <button type="button" class="bc-categories-close" data-bc-categories-close="1" aria-label="Cerrar categorías">×</button>
+              </header>
+              <section class="bc-admin-subcard">
+                <form id="form-categoria" class="inline-form">
+                  <input id="cat-nombre" placeholder="Nombre de la categoría" maxlength="80" required>
+                  <button type="submit">Agregar categoría</button>
+                  <button type="button" id="cat-cancelar-edicion" class="cc-accion hidden">Cancelar</button>
+                </form>
+                <div id="lista-categorias" class="lista"></div>
+              </section>
+              <p class="msg" id="msg-config" role="status" aria-live="polite"></p>
+            </div>
+          </section>
       </div>
-      <h3>Categorías</h3>
-      <form id="form-categoria" class="inline-form">
-        <input id="cat-nombre" placeholder="Nombre de la categoría" required>
-        <button type="submit">Agregar categoría</button>
-      </form>
-      <div id="lista-categorias" class="lista"></div>
-      <h3>Unidades de medida</h3>
-      <form id="form-unidad" class="inline-form">
-        <input id="uni-nombre" placeholder="Nombre de la unidad" required>
-        <button type="submit">Agregar unidad</button>
-      </form>
-      <div id="lista-unidades" class="lista"></div>
-      <p class="msg" id="msg-config"></p>
     </section>
     </main>
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.61 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.64 — BattleCruiser</span>
     </footer>
   </div>
 
@@ -661,27 +665,27 @@
 <script src="js/offline.js"></script>
 <script src="js/network-core.js?v=20261020.4"></script>
 <script src="js/loading-guard.js"></script>
-<script src="js/centro-control.js?v=9.5.61"></script>
-<script src="js/navegacion.js?v=9.5.61"></script>
-<script src="js/productos.js?v=20261103.2"></script>
-<script src="js/presentaciones.js"></script>
-<script src="js/almacenes.js"></script>
+<script src="js/centro-control.js?v=9.5.64"></script>
+<script src="js/navegacion.js?v=9.5.64"></script>
+<script src="js/productos.js?v=20261105.2"></script>
+<script src="js/presentaciones.js?v=20261105.2"></script>
+<script src="js/almacenes.js?v=20261104.2"></script>
 <script src="js/transferencias.js"></script>
 <script src="js/vales.js"></script>
-<script src="js/ventas.js?v=20261102.1"></script>
-<script src="js/catalogos.js?v=20261103.2"></script>
+<script src="js/ventas.js?v=20261105.1"></script>
+<script src="js/catalogos.js?v=20261105.2"></script>
 <script src="js/usuarios-permisos.js"></script>
-<script src="js/mando.js?v=9.5.61"></script>
+<script src="js/mando.js?v=9.5.64"></script>
 <script src="js/reportes.js?v=20261022.2"></script>
 <script src="js/historial-detalle.js?v=h1.1"></script>
 <script src="js/nucleo-operativo.js"></script>
-<script src="js/operacion-humana.js?v=9.5.61"></script>
+<script src="js/operacion-humana.js?v=9.5.64"></script>
 <script src="js/ciclos.js"></script>
 <script src="js/m18-ciclos-ux.js"></script>
 <script src="js/venta-turno-ui.js?v=9.4.46"></script>
-<script src="js/comunicacion.js?v=9.5.61"></script>
+<script src="js/comunicacion.js?v=9.5.64"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.61"></script>
+<script src="app.js?v=9.5.64"></script>
 </body>
 </html>

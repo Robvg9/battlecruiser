@@ -494,7 +494,6 @@ function aplicarPermisosAInterfaz() {
   const formVale = document.getElementById("form-vale");
   if (formVale) formVale.classList.add("hidden");
   togglePorPermiso("form-categoria", "categorias", "crear");
-  togglePorPermiso("form-unidad", "unidades", "crear");
   togglePorPermiso("form-nuevo-usuario", "usuarios", "crear");
 }
 

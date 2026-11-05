@@ -17,19 +17,86 @@ function fillSelect(select, rows, valueKey, labelFn, keepFirst) {
 }
 
 async function cargarCategorias() {
-  return withCache("categorias", () => client.from("categorias").select("id, nombre").order("nombre"));
+  return withCache("categorias", () => client.from("categorias").select("id, nombre").eq("activo", true).order("nombre"));
 }
+async function refrescarSelectorCategoriasProducto() {
+  const select=document.getElementById("prod-categoria"); if(!select)return [];
+  const {data,error}=await client.from("categorias").select("id, nombre").eq("activo",true).order("nombre");
+  if(error)throw error; const rows=Array.isArray(data)?data:[]; fillSelect(select,rows,"id",row=>row.nombre,true); return rows;
+}
+window.refrescarSelectorCategoriasProducto=refrescarSelectorCategoriasProducto;
 
 async function cargarAlmacenes() {
   return withCache("almacenes", () => client.from("almacenes").select("id, nombre, tipo, activo").order("nombre"));
 }
 
 async function cargarProductos() {
-  return withCache("productos", () => client
-    .from("productos")
-    .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, categorias(nombre), presentaciones(nombre)")
-    .order("nombre"));
+  return withCache("productos", async () => {
+    const extended = await client.from("productos")
+      .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, inventario_mixto, producto_padre_id, variante_nombre, categorias(nombre), presentaciones(nombre)")
+      .order("nombre");
+    if (!extended.error) return extended;
+    const errorText = String(extended.error.message || extended.error.code || extended.error).toLowerCase();
+    // PR preview and pre-migration deployments keep the original catalog usable.
+    if (!/inventario_mixto|producto_padre_id|variante_nombre|column .* does not exist|schema cache/i.test(errorText)) return extended;
+    return client.from("productos")
+      .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, categorias(nombre), presentaciones(nombre)")
+      .order("nombre");
+  });
 }
+
+// A mixed parent is catalog-only; operational pickers select one of its child variants.
+function productosPrincipales(rows) {
+  return (Array.isArray(rows) ? rows : (_cache.productos || [])).filter((p) => !p.producto_padre_id);
+}
+
+function productosOperativos(rows) {
+  const all = Array.isArray(rows) ? rows : (_cache.productos || []);
+  const byId = new Map(all.map((p) => [String(p.id), p]));
+  return all.filter((p) => {
+    if (!p || p.activo === false) return false;
+    if (!p.producto_padre_id) return !p.inventario_mixto;
+    const parent = byId.get(String(p.producto_padre_id));
+    return !!(parent && parent.activo !== false && parent.inventario_mixto);
+  });
+}
+
+function productoEsVariante(p) {
+  return !!(p && p.producto_padre_id);
+}
+
+function productosEnCacheActual() {
+  return typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
+}
+
+async function ejecutarProductoMixtoSinCola(editandoId, payload) {
+  if (typeof usuarioPuedeOperar === "function" && !(await usuarioPuedeOperar())) {
+    return { ok: false, error: { message: "Tu usuario está inactivo. Contacta al administrador." } };
+  }
+  if (typeof sincronizarUsuarioIdParaOperaciones === "function") sincronizarUsuarioIdParaOperaciones();
+  const rpc = editandoId ? "actualizar_producto" : "crear_producto";
+  const args = Object.assign({}, payload, { p_idempotency_key: crypto.randomUUID() });
+  try {
+    const run = () => client.rpc(rpc, args);
+    const result = typeof withNetworkTimeout === "function"
+      ? await withNetworkTimeout(run, 15000, "guardar producto con inventario mixto")
+      : await run();
+    if (result.error) {
+      if (typeof esErrorDeRed === "function" && esErrorDeRed(result.error)) {
+        if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+        return { ok: false, error: { message: "No se pudo confirmar la conexión con Supabase. El producto mixto no se guardó ni se encoló." } };
+      }
+      if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+      return { ok: false, error: result.error };
+    }
+    if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+    return { ok: true, offline: false, data: result.data };
+  } catch (error) {
+    if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
+    return { ok: false, error: { message: "No se pudo confirmar el guardado con el servidor. El producto mixto no se guardó ni se encoló." } };
+  }
+}
+
 
 const PROD_IMAGEN_TIPOS_VALIDOS = ["image/jpeg", "image/png", "image/jpg"];
 const PROD_IMAGEN_TAMANO_ORIGINAL_MAX = 15 * 1024 * 1024;
@@ -209,15 +276,19 @@ safeInit("prod-imagen-input", () => {
 let _productosBusqueda = "";
 
 function stockTotalProducto(productoId) {
+  const product = (_cache.productos || []).find((p) => String(p.id) === String(productoId));
+  const ids = product && product.inventario_mixto
+    ? (_cache.productos || []).filter((p) => String(p.producto_padre_id) === String(productoId)).map((p) => String(p.id))
+    : [String(productoId)];
   return (_cache.stock || [])
-    .filter((s) => s.producto_id === productoId)
+    .filter((s) => ids.includes(String(s.producto_id)))
     .reduce((acc, s) => acc + (Number(s.cantidad) || 0), 0);
 }
 
 function renderProductosLista() {
   const lista = document.getElementById("lista-productos");
   if (!lista) return;
-  const todas = _cache.productos || [];
+  const todas = productosPrincipales(_cache.productos || []);
   if (todas.length === 0) {
     setEmpty("lista-productos", mensajeListaVacia("productos", "Todavía no hay productos cargados."));
     actualizarContador("productos-contador", 0, 0);
@@ -260,9 +331,10 @@ function renderProductosLista() {
       : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
     const unidadTxt = p.unidad ? escHtml(p.unidad) : "—";
     const stockTot = stockTotalProducto(p.id);
-    div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""}${p.presentaciones ? " · " + escHtml(p.presentaciones.nombre) : ""} · ${unidadTxt}</span> ${estadoTxt}</span>
+    div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""} · Base: ${unidadTxt}${p.presentacion_id && p.presentaciones ? " · Mayorista: " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
         <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)} · Stock ${money(stockTot)}</span>
         ${botones}`;
+    if (p.inventario_mixto) div.innerHTML += '<small class="producto-mixto-tag">Inventario por sabores</small>';
     lista.appendChild(div);
   });
   actualizarContador("productos-contador", filtradas.length, todas.length);
@@ -277,7 +349,7 @@ async function refrescarProductos() {
   renderResumen();
 
   fillSelect(document.getElementById("prod-categoria"), categorias, "id", (c) => c.nombre, true);
-  fillSelect(document.getElementById("compra-producto"), productos, "id", (p) => p.nombre);
+  fillSelect(document.getElementById("compra-producto"), productosOperativos(productos), "id", (p) => p.nombre);
   fillSelect(document.getElementById("compra-almacen"), almacenes, "id", (a) => a.nombre);
 
   const compraProductoSelect = document.getElementById("compra-producto");
@@ -286,8 +358,9 @@ async function refrescarProductos() {
   const ppProductoSelect = document.getElementById("pp-producto-select");
   if (ppProductoSelect) {
     const seleccionPPActual = ppProductoSelect.value;
-    fillSelect(ppProductoSelect, productos, "id", (p) => p.nombre, true);
-    if (seleccionPPActual && productos.some((p) => p.id === seleccionPPActual)) {
+    const productosConfigurables = productosPrincipales(productos);
+    fillSelect(ppProductoSelect, productosConfigurables, "id", (p) => p.nombre, true);
+    if (seleccionPPActual && productosConfigurables.some((p) => p.id === seleccionPPActual)) {
       ppProductoSelect.value = seleccionPPActual;
     }
   }
@@ -344,12 +417,103 @@ safeInit("productos-buscar", () => {
   });
 });
 
-function iniciarEdicionProducto(p) {
+function renderEditorVariantesProducto(variantes) {
+  const list = document.getElementById("prod-variantes-lista");
+  if (!list) return;
+  list.innerHTML = "";
+  (Array.isArray(variantes) ? variantes : []).forEach((variant) => agregarFilaVarianteProducto(variant.id || "", variant.variante_nombre || variant.nombre || ""));
+}
+
+function agregarFilaVarianteProducto(id, nombre) {
+  const list = document.getElementById("prod-variantes-lista");
+  if (!list) return;
+  const row = document.createElement("div");
+  row.className = "prod-variante-row";
+  if (id) row.dataset.varianteId = id;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "prod-variante-nombre";
+  input.maxLength = 80;
+  input.required = true;
+  input.placeholder = "Nombre del sabor (ej. Manzana)";
+  input.value = nombre || "";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "cc-accion prod-variante-quitar";
+  remove.textContent = "Quitar";
+  remove.setAttribute("aria-label", "Quitar esta variante");
+  row.append(input, remove);
+  list.appendChild(row);
+}
+
+function sincronizarEditorVariantesProducto() {
+  const toggle = document.getElementById("prod-inventario-mixto");
+  const editor = document.getElementById("prod-variantes-editor");
+  if (!toggle || !editor) return;
+  editor.hidden = !toggle.checked;
+  editor.classList.toggle("hidden", !toggle.checked);
+}
+
+safeInit("prod-inventario-mixto", () => {
+  const toggle = document.getElementById("prod-inventario-mixto");
+  const add = document.getElementById("prod-variante-agregar");
+  const list = document.getElementById("prod-variantes-lista");
+  if (!toggle || !add || !list) return;
+  toggle.addEventListener("change", sincronizarEditorVariantesProducto);
+  add.addEventListener("click", () => {
+    agregarFilaVarianteProducto("", "");
+    const inputs = list.querySelectorAll(".prod-variante-nombre");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+  list.addEventListener("click", (e) => {
+    const remove = e.target.closest(".prod-variante-quitar");
+    if (remove) remove.closest(".prod-variante-row").remove();
+  });
+  sincronizarEditorVariantesProducto();
+});
+
+function obtenerVariantesFormularioProducto() {
+  const list = document.getElementById("prod-variantes-lista");
+  if (!list) return [];
+  return Array.from(list.querySelectorAll(".prod-variante-row")).map((row) => ({
+    id: row.dataset.varianteId || null,
+    nombre: (row.querySelector(".prod-variante-nombre")?.value || "").trim()
+  }));
+}
+
+async function iniciarEdicionProducto(p) {
   document.getElementById("prod-editando-id").value = p.id;
   document.getElementById("prod-nombre").value = p.nombre || "";
-  document.getElementById("prod-unidad").value = p.unidad || "";
+  const mixedToggle = document.getElementById("prod-inventario-mixto");
+  if (mixedToggle) mixedToggle.checked = !!p.inventario_mixto;
+  const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
+  const currentVariants = cachedProducts.filter((v) =>
+    String(v.producto_padre_id) === String(p.id) && v.activo !== false
+  );
+  renderEditorVariantesProducto(currentVariants);
+  sincronizarEditorVariantesProducto();
+  document.getElementById("prod-unidad").value = p.unidad || "unidad";
   document.getElementById("prod-precio-normal").value = p.precio_normal != null ? p.precio_normal : "";
   document.getElementById("prod-precio-mayorista").value = p.precio_mayorista != null ? p.precio_mayorista : "";
+  const formatoNameInput = document.getElementById("prod-formato-venta");
+  const formatoFactorInput = document.getElementById("prod-formato-factor");
+  const joinedPresentation = Array.isArray(p.presentaciones) ? p.presentaciones[0] : p.presentaciones;
+  if (formatoNameInput) formatoNameInput.value = joinedPresentation && joinedPresentation.nombre ? joinedPresentation.nombre : "";
+  if (formatoFactorInput) formatoFactorInput.value = "";
+  if (p.presentacion_id && typeof cargarAsociacionesProducto === "function") {
+    try {
+      const associations = await cargarAsociacionesProducto(p.id);
+      const wholesale = (Array.isArray(associations) ? associations : []).find((row) =>
+        String(row.presentacion_id) === String(p.presentacion_id) && row.activo !== false
+      );
+      if (wholesale) {
+        if (formatoNameInput && wholesale.presentaciones && wholesale.presentaciones.nombre) formatoNameInput.value = wholesale.presentaciones.nombre;
+        if (formatoFactorInput && Number(wholesale.factor) > 0) formatoFactorInput.value = String(wholesale.factor);
+      }
+    } catch (error) {
+      console.warn("[BattleCruiser] No se pudo cargar el formato mayorista del producto:", error);
+    }
+  }
   const categoriaSelect = document.getElementById("prod-categoria");
   if (categoriaSelect) {
     if (p.categorias) {
@@ -383,6 +547,16 @@ function iniciarEdicionProducto(p) {
 function cancelarEdicionProducto() {
   document.getElementById("form-producto").reset();
   document.getElementById("prod-editando-id").value = "";
+  const unidadInput = document.getElementById("prod-unidad");
+  const formatoNameInput = document.getElementById("prod-formato-venta");
+  const formatoFactorInput = document.getElementById("prod-formato-factor");
+  if (unidadInput) unidadInput.value = "unidad";
+  if (formatoNameInput) formatoNameInput.value = "";
+  if (formatoFactorInput) formatoFactorInput.value = "";
+  const mixedToggle = document.getElementById("prod-inventario-mixto");
+  if (mixedToggle) mixedToggle.checked = false;
+  renderEditorVariantesProducto([]);
+  sincronizarEditorVariantesProducto();
   const submitBtn = document.getElementById("prod-submit-btn");
   if (submitBtn) submitBtn.textContent = "Agregar producto";
   const cancelarBtn = document.getElementById("prod-cancelar-edicion");
@@ -406,8 +580,12 @@ safeInit("form-producto", () => {
     const precio_normal = parseFloat(document.getElementById("prod-precio-normal").value);
     const precioMayoristaRaw = document.getElementById("prod-precio-mayorista").value.trim();
     const precio_mayorista = precioMayoristaRaw === "" ? null : parseFloat(precioMayoristaRaw);
+    const formatoMayorista = document.getElementById("prod-formato-venta").value.trim();
+    const formatoFactorRaw = document.getElementById("prod-formato-factor").value.trim();
+    const formatoFactor = formatoFactorRaw === "" ? null : Number(formatoFactorRaw);
     const submitBtn = e.target.querySelector("button[type='submit']");
 
+    if (!categoria_id) { setMsg("msg-productos","Selecciona una categoría para guardar el producto.",false); document.getElementById("prod-categoria").focus(); return; }
     if (!(precio_normal > 0)) {
       setMsg("msg-productos", "El precio normal debe ser mayor a 0.", false);
       return;
@@ -416,8 +594,46 @@ safeInit("form-producto", () => {
       setMsg("msg-productos", "El precio mayorista debe ser mayor a 0.", false);
       return;
     }
+    if ((formatoMayorista && formatoFactorRaw === "") || (!formatoMayorista && formatoFactorRaw !== "")) {
+      setMsg("msg-productos", "El formato de venta necesita nombre y unidades equivalentes.", false);
+      return;
+    }
+    if (formatoMayorista && (!Number.isInteger(formatoFactor) || formatoFactor <= 0)) {
+      setMsg("msg-productos", "Las unidades por formato deben ser un entero mayor a cero (ej. 24).", false);
+      return;
+    }
+    if (formatoMayorista && precio_mayorista === null) {
+      setMsg("msg-productos", "Para vender por ese formato, indica también el precio mayorista.", false);
+      return;
+    }
+    if (formatoMayorista && unidad && formatoMayorista.toLocaleLowerCase() === unidad.toLocaleLowerCase()) {
+      setMsg("msg-productos", "El formato debe tener un nombre distinto de la unidad base.", false);
+      return;
+    }
 
     const editandoId = document.getElementById("prod-editando-id").value || null;
+    const mixedToggle = document.getElementById("prod-inventario-mixto");
+    const mixedEnabled = !!(mixedToggle && mixedToggle.checked);
+    const variants = obtenerVariantesFormularioProducto();
+    const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
+    const previousProduct = editandoId
+      ? cachedProducts.find((p) => String(p.id) === String(editandoId))
+      : null;
+    const needsMixedConfig = mixedEnabled || !!(previousProduct && previousProduct.inventario_mixto);
+    if (mixedEnabled) {
+      const names = variants.map((v) => v.nombre.toLocaleLowerCase());
+      if (!variants.length || variants.some((v) => !v.nombre || v.nombre.length > 80)
+          || new Set(names).size !== names.length) {
+        setMsg("msg-productos", "Añade al menos un sabor y utiliza nombres únicos (máximo 80 caracteres).", false);
+        return;
+      }
+    }
+    if ((needsMixedConfig || formatoMayorista || (previousProduct && previousProduct.presentacion_id)) && !navigator.onLine) {
+      setMsg("msg-productos", needsMixedConfig
+        ? "Necesitas conexión para configurar el inventario por sabores. El producto no se ha guardado."
+        : "Necesitas conexión para configurar el formato mayorista. El producto no se ha guardado.", false);
+      return;
+    }
     const archivoImagenInput = document.getElementById("prod-imagen-input");
     const archivoImagen = _productoImagenProcesada || (archivoImagenInput.files && archivoImagenInput.files[0]);
     if (archivoImagen) {
@@ -428,22 +644,41 @@ safeInit("form-producto", () => {
       }
     }
     submitBtn.disabled = true;
-    const resultado = editandoId
-      ? await ejecutarOperacion("producto_actualizar", {
-          p_producto_id: editandoId,
-          p_nombre: nombre,
-          p_categoria_id: categoria_id,
-          p_unidad: unidad,
-          p_precio_normal: precio_normal,
-          p_precio_mayorista: precio_mayorista,
-        })
-      : await ejecutarOperacion("producto", {
-          p_nombre: nombre,
-          p_categoria_id: categoria_id,
-          p_unidad: unidad,
-          p_precio_normal: precio_normal,
-          p_precio_mayorista: precio_mayorista,
-        });
+    const payload = editandoId ? {
+      p_producto_id: editandoId,
+      p_nombre: nombre,
+      p_categoria_id: categoria_id,
+      p_unidad: unidad,
+      p_precio_normal: precio_normal,
+      p_precio_mayorista: precio_mayorista,
+    } : {
+      p_nombre: nombre,
+      p_categoria_id: categoria_id,
+      p_unidad: unidad,
+      p_precio_normal: precio_normal,
+      p_precio_mayorista: precio_mayorista,
+    };
+    let resultado;
+    if (needsMixedConfig) {
+      resultado = await ejecutarProductoMixtoSinCola(editandoId, payload);
+    } else if (navigator.onLine) {
+      const catalog = await client.rpc("bc_guardar_producto_catalogo", {
+        p_producto_id: editandoId,
+        p_nombre: nombre,
+        p_categoria_id: categoria_id,
+        p_unidad: unidad || "unidad",
+        p_precio_normal: precio_normal,
+        p_precio_mayorista: precio_mayorista,
+        p_presentacion_normal: unidad || "unidad",
+        p_factor_normal: 1,
+        p_presentacion_mayorista: formatoMayorista || null,
+        p_factor_mayorista: formatoMayorista ? formatoFactor : null,
+        p_idempotency_key: crypto.randomUUID()
+      }).catch(error => ({ error }));
+      resultado = catalog.error ? { ok: false, error: catalog.error } : { ok: true, offline: false, data: catalog.data };
+    } else {
+      resultado = await ejecutarOperacion(editandoId ? "producto_actualizar" : "producto", payload);
+    }
     submitBtn.disabled = false;
 
     if (!resultado.ok) {
@@ -451,13 +686,45 @@ safeInit("form-producto", () => {
       return;
     }
     const estabaEditando = !!editandoId;
-    cancelarEdicionProducto();
     if (resultado.offline) {
       setMsg("msg-productos", "✓ Guardado localmente — se sincronizará al recuperar conexión."
         + (archivoImagen ? " La imagen no se pudo subir sin conexión: agrégala editando el producto una vez sincronizado." : ""), true);
       return;
     }
     const productoIdReal = editandoId || resultado.data;
+    if (needsMixedConfig && productoIdReal) {
+      const config = await client.rpc("configurar_producto_inventario_mixto", {
+        p_producto_id: productoIdReal,
+        p_habilitar: mixedEnabled,
+        p_variantes: mixedEnabled ? variants : []
+      });
+      if (config.error) {
+        setMsg("msg-productos", "Los datos básicos del producto se guardaron, pero no se pudo aplicar la configuración de sabores: " + explicarError(config.error, "configurar inventario mixto"), false);
+        await refrescarProductos();
+        return;
+      }
+    }
+    if (needsMixedConfig && productoIdReal) {
+      const formatConfig = await client.rpc("bc_guardar_producto_catalogo", {
+        p_producto_id: productoIdReal,
+        p_nombre: nombre,
+        p_categoria_id: categoria_id,
+        p_unidad: unidad || "unidad",
+        p_precio_normal: precio_normal,
+        p_precio_mayorista: precio_mayorista,
+        p_presentacion_normal: unidad || "unidad",
+        p_factor_normal: 1,
+        p_presentacion_mayorista: formatoMayorista || null,
+        p_factor_mayorista: formatoMayorista ? formatoFactor : null,
+        p_idempotency_key: crypto.randomUUID()
+      }).catch(error => ({ error }));
+      if (formatConfig.error) {
+        setMsg("msg-productos", "El producto se guardó, pero no se pudo aplicar el formato de venta: " + explicarError(formatConfig.error, "guardar formato mayorista"), false);
+        await refrescarProductos();
+        return;
+      }
+    }
+    cancelarEdicionProducto();
     if (archivoImagen && productoIdReal) {
       const resultadoImagen = await subirImagenProducto(productoIdReal, archivoImagen);
       if (!resultadoImagen.ok) {
