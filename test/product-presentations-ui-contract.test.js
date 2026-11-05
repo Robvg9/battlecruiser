@@ -89,7 +89,7 @@ test("product registration has one commercial-options owner and no legacy duplic
   );
   assert.match(productModal, /bc-product-commercial-toggle/);
   assert.match(productModal, /bc-product-commercial-panel/);
-  assert.match(productModal, /fieldBlock\(categoria, 'Categoría \(opcional\)'/);
+  assert.match(productModal, /fieldBlock\(categoria, 'Categoría'/);
   assert.match(productModal, /fieldBlock\(mayorista, 'Precio mayorista \(opcional\)'/);
   assert.match(productModal, /window\.__BCM26_setCommercialOptionsExpanded/);
 
