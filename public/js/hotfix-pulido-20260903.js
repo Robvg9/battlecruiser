@@ -437,8 +437,6 @@
         if(baseUnit&&whName&&norm(baseUnit)===norm(whName))throw Error('Fila '+(i+2)+': la presentación mayorista debe ser distinta de la unidad base.');
         if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
         var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:baseUnit,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:baseUnit,p_factor_normal:1,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
-        if(typeof client==='undefined'||!client||!client.rpc)throw Error('No hay conexión con el backend.');
-        var p={p_producto_id:null,p_nombre:nombre,p_categoria_id:catId(val(r,'categoria',['categoria','category'])),p_unidad:val(r,'unidad',['unidad','unit','uom'])||null,p_precio_normal:pn,p_precio_mayorista:pm,p_presentacion_normal:normName||null,p_factor_normal:nf,p_presentacion_mayorista:whName||null,p_factor_mayorista:wf,p_idempotency_key:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+i)};
         var rr=await client.rpc('bc_guardar_producto_catalogo',p);if(rr.error)throw rr.error;ok++;
       }catch(err){fail++;if(errors.length<10)errors.push(err.message||String(err));}
     }
