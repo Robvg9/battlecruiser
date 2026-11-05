@@ -47,6 +47,8 @@ DECLARE
   v_sale uuid;
   v_qty numeric;
   v_price numeric;
+  v_subtotal numeric;
+  v_stock numeric;
   v_failed boolean;
   v_created_product uuid;
   v_catalog_wholesale uuid;
@@ -69,7 +71,7 @@ BEGIN
     VALUES(v_product,'Producto fixture',10,80,v_wholesale_presentation);
   INSERT INTO public.producto_presentaciones(producto_id,presentacion_id,factor,activo) VALUES
     (v_product,v_retail_presentation,1,true),
-    (v_product,v_wholesale_presentation,6,true);
+    (v_product,v_wholesale_presentation,24,true);
   INSERT INTO public.stock(producto_id,almacen_id,cantidad) VALUES
     (v_product,v_retail_warehouse,100),
     (v_product,v_wholesale_warehouse,100);
@@ -109,10 +111,15 @@ BEGIN
     'producto_id',v_product,'cantidad',1,
     'presentacion_id',v_wholesale_presentation,'cantidad_presentacion',1
   )),'99999999-9999-4999-8999-999999999992');
-  SELECT vl.cantidad,vl.precio_unitario INTO v_qty,v_price
+  SELECT vl.cantidad,vl.precio_unitario,vl.subtotal INTO v_qty,v_price,v_subtotal
     FROM public.ventas_lineas vl WHERE vl.venta_id=v_sale;
-  IF v_qty<>6 OR v_price<>80 THEN
-    RAISE EXCEPTION 'Wholesale sale did not preserve its case presentation and wholesale warehouse price';
+  IF v_qty<>24 OR abs(v_price-(80::numeric/24))>0.000001 OR v_subtotal<>80 THEN
+    RAISE EXCEPTION 'One wholesale case must total its case price while recording 24 base units';
+  END IF;
+  SELECT cantidad INTO v_stock FROM public.stock
+   WHERE producto_id=v_product AND almacen_id=v_wholesale_warehouse;
+  IF v_stock<>76 THEN
+    RAISE EXCEPTION 'Selling one 24-unit case must deduct exactly 24 base units (remaining: %)',v_stock;
   END IF;
 
   -- A wholesale warehouse must reject the product's retail unit presentation.
