@@ -89,6 +89,9 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       setMsg("msg-config", singular.charAt(0).toUpperCase() + singular.slice(1) + (wasEditing ? " actualizada." : " creada."), true);
       cancelarEdicion();
       await refrescar(true);
+      if (tabla === "categorias" && typeof window.refrescarSelectorCategoriasProducto === "function") {
+        try { await window.refrescarSelectorCategoriasProducto(); } catch (error) { console.warn(error); }
+      }
     });
 
     lista.addEventListener("click", async (e) => {
@@ -132,6 +135,9 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
         return;
       }
       await refrescar();
+      if (tabla === "categorias" && typeof window.refrescarSelectorCategoriasProducto === "function") {
+        try { await window.refrescarSelectorCategoriasProducto(); } catch (error) { console.warn(error); }
+      }
     });
 
     if (cancelarBtn) cancelarBtn.addEventListener("click", cancelarEdicion);
