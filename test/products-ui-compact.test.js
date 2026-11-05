@@ -256,12 +256,16 @@ test("native Add opens the single M26 modal and preserves the existing product c
  );
  d.getElementById("bc-m55-run").click();
  await waitFor(
-  ()=>c.operationCalls.length===1 && /1 producto\(s\) procesado\(s\)/.test(d.getElementById("bc-m55-body").textContent),
-  "M55 must process the CSV row through the existing product create operation"
+  ()=>c.catalogCalls.length===1 && /1 producto\\(s\\) procesado\\(s\\)/.test(d.getElementById("bc-m55-body").textContent),
+  "M55 must process the CSV row through the canonical product catalog RPC"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[0])),{
-  name:"producto",
-  payload:{p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",p_precio_normal:10,p_precio_mayorista:8}
+ assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
+  name:"bc_guardar_producto_catalogo",
+  payload:{
+   p_producto_id:null,p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",
+   p_precio_normal:10,p_precio_mayorista:8,p_presentacion_normal:"paquete",p_factor_normal:1,
+   p_presentacion_mayorista:null,p_factor_mayorista:null,p_idempotency_key:"test-idempotency-key"
+  }
  });
  d.getElementById("bc-m55-cancel").click();
  assert.equal(d.getElementById("bc-m55-overlay"),null,"closing import must remove its own overlay");
