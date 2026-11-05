@@ -93,8 +93,8 @@ test("Productos: alta usa el modal M26 existente y no crea un segundo overlay", 
   assert.equal(save.closest("form"), form);
   assert.equal(save.style.display, "inline-flex");
   assert.equal(save.type, "submit");
-  assert.equal(c.document.getElementById("prod-inventario-mixto-settings").parentElement, form,
-    "M26 debe reubicar el editor opcional junto al resto de campos del formulario");
+  assert.ok(c.document.getElementById("prod-inventario-mixto-settings").closest("#bc-product-commercial-panel"),
+    "los ajustes heredados permanecen ocultos durante las altas nuevas");
   assert.equal(c.document.getElementById("bc171-overlay"), null);
   assert.equal(c.document.getElementById("form-producto"), form, "el mismo formulario debe conservarse");
 
