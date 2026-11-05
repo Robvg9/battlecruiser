@@ -117,7 +117,10 @@ function setup() {
     }
   };
 
-  window.eval(PRODUCTION_HANDLERS);
+  window.eval("(async function __bcInstallProductHandlers(){\\n" + PRODUCTION_HANDLERS + "\\n" +
+    "window.iniciarEdicionProducto = iniciarEdicionProducto;\\n" +
+    "window.cancelarEdicionProducto = cancelarEdicionProducto;\\n" +
+    "})()");
   return {
     dom,
     window,

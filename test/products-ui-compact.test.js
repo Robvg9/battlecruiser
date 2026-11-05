@@ -106,6 +106,7 @@ function nativeModalFixture(){
  w._cache={categorias:[{id:"cat-secos",nombre:"Secos"}],productos:[],stock:[]};
  w.safeInit=function(id,init){if(d.getElementById(id)) init();};
  const operationCalls=[];
+ const catalogCalls=[];
  const messages=[];
  let refreshCalls=0;
  let importCalls=0;
@@ -118,6 +119,13 @@ function nativeModalFixture(){
   operationCalls.push({name:name,payload:payload});
   return {ok:true,data:"producto-test-001",offline:false};
  };
+ w.client={
+  rpc:async function(name,payload){
+   catalogCalls.push({name:name,payload:payload});
+   return {data:"producto-test-002",error:null};
+  }
+ };
+ Object.defineProperty(w.crypto,"randomUUID",{configurable:true,value:()=> "test-idempotency-key"});
  w.explicarError=function(){return "error simulado";};
  w.tienePermiso=function(){return true;};
  w.eval(PRODUCTOS_SOURCE);
@@ -132,7 +140,7 @@ function nativeModalFixture(){
  w.eval(SOURCE);
  return {
   dom:dom,window:w,document:d,
-  operationCalls:operationCalls,messages:messages,
+  operationCalls:operationCalls,catalogCalls:catalogCalls,messages:messages,
   getAddClickRegistrations:function(){return addClickRegistrations;},
   getFormSubmitRegistrations:function(){return formSubmitRegistrations;},
   getRefreshCalls:function(){return refreshCalls;},
@@ -261,19 +269,25 @@ test("native Add opens the single M26 modal and preserves the existing product c
  d.getElementById("prod-precio-mayorista").value="10.25";
  form.dispatchEvent(new w.Event("submit",{bubbles:true,cancelable:true}));
  await waitFor(
-  ()=>c.operationCalls.length===2 &&
+  ()=>c.catalogCalls.length===1 &&
       c.messages.some(function(item){return item.id==="msg-productos" && item.message==="Producto creado.";}) &&
       c.getRefreshCalls()===1,
   "the existing Productos submit handler must call the create operation and refresh the list"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.operationCalls[1])),{
-  name:"producto",
+ assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
+  name:"bc_guardar_producto_catalogo",
   payload:{
+   p_producto_id:null,
    p_nombre:"Arroz",
    p_categoria_id:"cat-secos",
    p_unidad:"unidad",
    p_precio_normal:12.5,
-   p_precio_mayorista:10.25
+   p_precio_mayorista:10.25,
+   p_presentacion_normal:"unidad",
+   p_factor_normal:1,
+   p_presentacion_mayorista:null,
+   p_factor_mayorista:null,
+   p_idempotency_key:"test-idempotency-key"
   }
  });
  assert.equal(d.querySelectorAll("#bc-product-modal").length,1);
