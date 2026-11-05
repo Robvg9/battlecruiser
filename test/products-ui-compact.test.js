@@ -281,12 +281,12 @@ test("native Add opens the single M26 modal and preserves the existing product c
  d.getElementById("prod-precio-mayorista").value="10.25";
  form.dispatchEvent(new w.Event("submit",{bubbles:true,cancelable:true}));
  await waitFor(
-  ()=>c.catalogCalls.length===1 &&
+   ()=>c.catalogCalls.length===2 &&
       c.messages.some(function(item){return item.id==="msg-productos" && item.message==="Producto creado.";}) &&
-      c.getRefreshCalls()===1,
+       c.getRefreshCalls()===2,
   "the existing Productos submit handler must call the create operation and refresh the list"
  );
- assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
+  assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[1])),{
   name:"bc_guardar_producto_catalogo",
   payload:{
    p_producto_id:null,
