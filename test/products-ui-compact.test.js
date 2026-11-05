@@ -236,16 +236,22 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.ok(importButton.closest("#bc-product-modal"),"the single import action must stay inside the native M26 modal");
  importButton.click();
  const importOverlay=d.getElementById("bc-m55-overlay");
- const importFile=d.getElementById("bc-m55-file");
+ let importFile=d.getElementById("bc-m55-file");
  assert.ok(importOverlay,"the real M55 import dialog must open");
- assert.ok(importFile.accept.includes(".csv") && importFile.accept.includes(".xlsx"),"the importer must retain CSV and Excel support");
+ assert.match(d.getElementById("bc-m55-body").textContent,/PASO 1 DE 2/);
+ assert.equal(importFile,null,"the file selector must stay hidden until the template has been filled");
+ assert.ok(d.getElementById("bc-m55-template-download"),"the first step must offer the fillable template");
+ d.getElementById("bc-m55-continue").click();
+ importFile=d.getElementById("bc-m55-file");
+ assert.ok(importFile,"the file selector must appear only in step 2");
+ assert.ok(importFile.accept.includes(".csv") && importFile.accept.includes(".xlsx"),"the importer must retain CSV and optional Excel support");
  Object.defineProperty(importFile,"files",{configurable:true,value:[{
   name:"productos.csv",
   text:async function(){return "Nombre,Categoría,Unidad,Precio normal,Precio mayorista\nAvena,Secos,paquete,10,8";}
  }]});
  importFile.dispatchEvent(new w.Event("change",{bubbles:true}));
  await waitFor(
-  ()=>!!d.getElementById("bc-m55-run") && /Estructura válida/.test(d.getElementById("bc-m55-body").textContent),
+  ()=>!!d.getElementById("bc-m55-run") && /Plantilla válida/.test(d.getElementById("bc-m55-body").textContent),
   "M55 must parse the selected CSV and render a validated preview"
  );
  d.getElementById("bc-m55-run").click();
