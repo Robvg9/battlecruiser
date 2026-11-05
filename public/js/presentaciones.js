@@ -1,6 +1,6 @@
 // ==== Battlecruiser · js/presentaciones.js ====
-// Presentaciones comerciales: catálogo único y formatos por producto dentro de Administración.
-// Los factores se guardan mediante bc_guardar_producto_catalogo para conservar el contrato minorista/mayorista.
+// Compatibilidad de factores y datos de presentaciones para el POS.
+// El panel administrativo de presentaciones fue retirado; la venta minorista usa unidad base × 1.
 
 // ---- Presentaciones comerciales — catálogo maestro y conversiones por canal.
 let _permisosPresentaciones = { ver: true, crear: false, editar: false, borrar: false };
@@ -195,6 +195,7 @@ safeInit("presentaciones-catalogo", () => {
   const form = document.getElementById("form-presentacion-nueva");
   const input = document.getElementById("pres-nombre-nueva");
   const lista = document.getElementById("lista-presentaciones-catalogo");
+  if (!form || !input || !lista) return; // Administración ya no monta este panel.
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -322,6 +323,7 @@ safeInit("presentaciones-por-producto", () => {
   const productoSelect = document.getElementById("pp-producto-select");
   const formNueva = document.getElementById("form-pp-nueva");
   const listaAsoc = document.getElementById("pp-lista-asociaciones");
+  if (!productoSelect || !formNueva || !listaAsoc) return; // La asociación se administra fuera del panel retirado.
 
   productoSelect.addEventListener("change", async () => {
     const producto_id = productoSelect.value;
