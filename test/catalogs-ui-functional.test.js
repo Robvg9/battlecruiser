@@ -22,16 +22,21 @@ function setup(t) {
       "<form id='form-categoria'><input id='cat-nombre'><button type='submit'>Agregar categoría</button></form>" +
       "<div id='lista-categorias'></div>" +
       "<div id='msg-config'></div>" +
+      "<select id='prod-categoria' required><option value=''>Selecciona</option></select>" +
+      "<div id='msg-config'></div>" +
     "</section></body></html>",
     { url: "https://battlecruiser-catalogs.test/", runScripts: "outside-only", pretendToBeVisual: true }
   );
   const { window } = dom;
   const tables = {
-    categorias: [{ id: "cat-existing", nombre: "General", activo: true }]  };
+    categorias: [{ id: "cat-existing", nombre: "General", activo: true }],
+    productos: []
   const inserts = [];
   const updates = [];
   let sequence = 0;
   let nextInsertError = null;
+  let selectorRefreshes = 0;
+  window.refrescarSelectorCategoriasProducto = async () => { selectorRefreshes += 1; };
 
   window.safeInit = (_name, fn) => fn();
   window.setLoading = (id, message) => {
@@ -63,7 +68,9 @@ function setup(t) {
     from(table) {
       return {
         select() { return this; },
+        eq: async (column, value) => ({ data: (tables[table] || []).filter((row) => String(row[column]) === String(value)).map((row) => ({ ...row })), error: null }),
         order: async () => ({ data: (tables[table] || []).map((row) => ({ ...row })), error: null }),
+        delete: () => ({ eq: async (column, value) => { tables[table] = (tables[table] || []).filter((row) => String(row[column]) !== String(value)); return { data: [], error: null }; } }),
         insert: async (payload) => {
           inserts.push({ table, payload: { ...payload } });
           if (nextInsertError) {
@@ -96,7 +103,7 @@ function setup(t) {
   window.eval(SOURCE);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   t.after(() => window.close());
-  return { window, dom, tables, inserts, updates };
+  return { window, dom, tables, inserts, updates, getSelectorRefreshes: () => selectorRefreshes };
 }
 
 async function waitFor(predicate, timeout = 1200) {
@@ -125,24 +132,24 @@ test("Paso 4 catálogos: categoría válida inserta una fila fixture, confirma y
   assert.equal(c.window.document.getElementById("cat-nombre").value, "");
   assert.ok(c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas fixture"),
     "lista debe refrescar y mostrar el registro fixture creado");
+  assert.ok(c.getSelectorRefreshes() >= 1, "el selector de Productos se refresca al crear una categoría");
 });
 
-test("Paso 4: no existe CRUD separado de unidades; presentación base y formatos comparten el catálogo maestro", () => {
+test("Paso 4: Administración no muestra catálogo de presentaciones y retail usa unidad base × 1", () => {
   const dom = new JSDOM(INDEX_SOURCE);
   try {
     const d = dom.window.document;
     assert.equal(d.getElementById("form-unidad"), null);
     assert.equal(d.getElementById("lista-unidades"), null);
-    assert.equal(d.querySelectorAll(".presentaciones-panel").length, 1);
+    assert.equal(d.querySelectorAll(".presentaciones-panel").length, 0);
     for (const id of ["form-presentacion-nueva", "lista-presentaciones-catalogo", "pp-producto-select", "pp-lista-asociaciones", "form-pp-nueva"]) {
-      assert.equal(d.querySelectorAll("#" + id).length, 1, id + " debe existir una sola vez");
+      assert.equal(d.querySelectorAll("#" + id).length, 0, id + " debe estar retirado");
     }
+    const category = d.getElementById("prod-categoria");
+    assert.ok(category && category.tagName === "SELECT" && category.required, "la categoría es un selector obligatorio");
     const base = d.getElementById("prod-unidad");
-    assert.ok(base && base.getAttribute("list") === "presentaciones-comunes",
-      "la presentación base debe sugerir opciones del catálogo único");
-    assert.ok(d.getElementById("presentaciones-comunes"));
-    assert.doesNotMatch(SOURCE, /initCatalogoSimple\(\{\s*tabla:\s*["']unidades["']/,
-      "catalogos.js no debe iniciar otro CRUD de unidades");
+    assert.ok(base && base.getAttribute("list") === null, "la unidad base no depende de un catálogo de presentaciones");
+    assert.doesNotMatch(SOURCE, /initCatalogoSimple\(\{\s*tabla:\s*["']unidades["']/);
   } finally { dom.window.close(); }
 });
 
@@ -198,4 +205,24 @@ test("Paso 4 catálogos: editar categoría actualiza el mismo registro y conserv
   assert.equal(c.tables.categorias.find((row) => row.id === "cat-existing").nombre, "Bebidas");
   assert.ok(c.window.document.getElementById("lista-categorias").textContent.includes("Bebidas"));
   assert.equal(c.window.document.querySelector("#form-categoria button[type=submit]").textContent, "Agregar categoría");
+});
+
+
+test("Paso 4 categorías: eliminar una categoría sin referencias y conservar las que tienen productos", async (t) => {
+  const c = setup(t);
+  c.tables.productos.push({ id: "product-linked", categoria_id: "cat-existing" });
+  await c.window._refrescarCatalogo_categorias();
+  const linkedDelete = c.window.document.querySelector("#lista-categorias .catalogo-delete-btn");
+  assert.ok(linkedDelete, "las categorías deben mostrar la acción Eliminar");
+  c.window.confirm = () => true;
+  linkedDelete.click();
+  assert.ok(await waitFor(() => /No se puede eliminar: hay productos asociados/.test(c.window.document.getElementById("msg-config").textContent)), "no debe borrar una categoría con productos asociados");
+  assert.ok(c.tables.categorias.some((row) => row.id === "cat-existing"));
+  c.tables.productos.length = 0;
+  await c.window._refrescarCatalogo_categorias();
+  const unlinkedDelete = c.window.document.querySelector("#lista-categorias .catalogo-delete-btn");
+  assert.ok(unlinkedDelete);
+  unlinkedDelete.click();
+  assert.ok(await waitFor(() => !c.tables.categorias.some((row) => row.id === "cat-existing")), "debe borrar una categoría sin referencias");
+  assert.ok(await waitFor(() => /Categoría eliminada\./.test(c.window.document.getElementById("msg-config").textContent)));
 });
