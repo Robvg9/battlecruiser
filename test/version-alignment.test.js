@@ -103,7 +103,7 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 });
 
 
-// PWA 9.5.62 rotates the shell cache and keeps the M68 fallback aligned.
+// PWA 9.5.63 rotates the shell cache and keeps the M68 fallback aligned.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.5\.62["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.62["']/);
@@ -129,7 +129,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261104\.1"\]/, "connectivity panel must bypass stale cached layout");
-  assert.ok(index.includes('<script src="js/navegacion.js?v=9.5.62"></script>'), "new navigation sections need a cache-busted script");
+  assert.ok(index.includes('<script src="js/navegacion.js?v=9.5.63"></script>'), "new navigation sections need a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.62"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.62/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
@@ -159,19 +159,19 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /v9\.5\.62 — Dashboard único y Auditoría separada/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.62"><\/script>/);
   for (const asset of [
-    'style.css?v=9.5.62',
-    'js/centro-control.js?v=9.5.62',
-    'js/navegacion.js?v=9.5.62',
-    'js/mando.js?v=9.5.62',
-    'js/operacion-humana.js?v=9.5.62',
-    'js/comunicacion.js?v=9.5.62',
+    'style.css?v=9.5.63',
+    'js/centro-control.js?v=9.5.63',
+    'js/navegacion.js?v=9.5.63',
+    'js/mando.js?v=9.5.63',
+    'js/operacion-humana.js?v=9.5.63',
+    'js/comunicacion.js?v=9.5.63',
   ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
   for (const asset of [
-    './js/centro-control.js?v=9.5.62',
-    './js/navegacion.js?v=9.5.62',
-    './js/mando.js?v=9.5.62',
-    './js/operacion-humana.js?v=9.5.62',
-    './js/comunicacion.js?v=9.5.62',
+    './js/centro-control.js?v=9.5.63',
+    './js/navegacion.js?v=9.5.63',
+    './js/mando.js?v=9.5.63',
+    './js/operacion-humana.js?v=9.5.63',
+    './js/comunicacion.js?v=9.5.63',
   ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261022\.2"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
@@ -198,7 +198,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261104.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.62"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.63"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -244,10 +244,10 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.62'));
-  assert.ok(index.includes('app.js?v=9.5.62'));
-  assert.ok(sw.includes('./style.css?v=9.5.62'));
-  assert.ok(sw.includes('./app.js?v=9.5.62'));
+  assert.ok(index.includes('style.css?v=9.5.63'));
+  assert.ok(index.includes('app.js?v=9.5.63'));
+  assert.ok(sw.includes('./style.css?v=9.5.63'));
+  assert.ok(sw.includes('./app.js?v=9.5.63'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
