@@ -20,9 +20,11 @@ function createContext() {
         "<option value='cat-drinks'>Bebidas</option>" +
         "<option value='cat-food'>Alimentos</option>" +
       "</select>" +
-      "<input id='prod-unidad' value=''>" +
+      "<input id='prod-unidad' type='hidden' value=''>" +
       "<input id='prod-precio-normal' type='number' value=''>" +
       "<input id='prod-precio-mayorista' type='number' value=''>" +
+      "<input id='prod-formato-venta' type='text' value=''>" +
+      "<input id='prod-formato-factor' type='number' value=''>" +
       "<input id='prod-imagen-input' type='file' accept='image/jpeg,image/png,image/jpg'>" +
       "<div id='prod-imagen-preview-wrap' class='hidden'>" +
         "<img id='prod-imagen-preview' alt='Vista previa'>" +
@@ -105,6 +107,8 @@ test("Paso 4 RWHT 019/021: editar producto carga ID y categoría existentes en e
     assert.equal(window.document.getElementById("prod-unidad").value, "botella");
     assert.equal(window.document.getElementById("prod-precio-normal").value, "12.5");
     assert.equal(window.document.getElementById("prod-precio-mayorista").value, "10.25");
+    assert.equal(window.document.getElementById("prod-formato-venta").value, "");
+    assert.equal(window.document.getElementById("prod-formato-factor").value, "");
     assert.equal(window.document.getElementById("prod-categoria").value, "cat-drinks");
     assert.equal(window.document.getElementById("prod-submit-btn").textContent, "Guardar cambios");
     assert.equal(window.document.getElementById("prod-cancelar-edicion").classList.contains("hidden"), false);
@@ -125,6 +129,9 @@ test("Paso 4 RWHT 019/028: cancelar edición limpia el ID y restaura el formular
     assert.equal(window.document.getElementById("prod-categoria").value, "");
     assert.equal(window.document.getElementById("prod-precio-normal").value, "");
     assert.equal(window.document.getElementById("prod-precio-mayorista").value, "");
+    assert.equal(window.document.getElementById("prod-unidad").value, "unidad");
+    assert.equal(window.document.getElementById("prod-formato-venta").value, "");
+    assert.equal(window.document.getElementById("prod-formato-factor").value, "");
     assert.equal(window.document.getElementById("prod-submit-btn").textContent, "Agregar producto");
     assert.equal(window.document.getElementById("prod-cancelar-edicion").classList.contains("hidden"), true);
     assert.equal(window.document.getElementById("prod-imagen-preview-wrap").classList.contains("hidden"), true);

@@ -547,9 +547,12 @@ async function iniciarEdicionProducto(p) {
 function cancelarEdicionProducto() {
   document.getElementById("form-producto").reset();
   document.getElementById("prod-editando-id").value = "";
-  document.getElementById("prod-unidad").value = "unidad";
-  document.getElementById("prod-formato-venta").value = "";
-  document.getElementById("prod-formato-factor").value = "";
+  const unidadInput = document.getElementById("prod-unidad");
+  const formatoNameInput = document.getElementById("prod-formato-venta");
+  const formatoFactorInput = document.getElementById("prod-formato-factor");
+  if (unidadInput) unidadInput.value = "unidad";
+  if (formatoNameInput) formatoNameInput.value = "";
+  if (formatoFactorInput) formatoFactorInput.value = "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
   if (mixedToggle) mixedToggle.checked = false;
   renderEditorVariantesProducto([]);
@@ -599,8 +602,8 @@ safeInit("form-producto", () => {
       setMsg("msg-productos", "Las unidades por formato deben ser un entero mayor a cero (ej. 24).", false);
       return;
     }
-    if ((formatoMayorista && precio_mayorista === null) || (!formatoMayorista && precio_mayorista !== null)) {
-      setMsg("msg-productos", "Configura juntos el precio mayorista y el formato de venta.", false);
+    if (formatoMayorista && precio_mayorista === null) {
+      setMsg("msg-productos", "Para vender por ese formato, indica también el precio mayorista.", false);
       return;
     }
     if (formatoMayorista && unidad && formatoMayorista.toLocaleLowerCase() === unidad.toLocaleLowerCase()) {
