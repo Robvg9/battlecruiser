@@ -210,7 +210,6 @@
         '<p><strong>Editar:</strong> permite modificar registros existentes.</p>' +
         '<p><strong>Borrar:</strong> permite eliminar registros cuando las reglas del negocio lo admiten.</p>' +
         '<p>Los permisos se asignan al rol seleccionado. Los usuarios heredan los permisos del rol que tengan asignado.</p>' +
-        '<p><strong>Perfiles:</strong> Solo lectura consulta; Operación registra operaciones; Inventario gestiona existencias; Administrador operativo administra las funciones operativas habilitadas.</p>' +
       '</div>';
     return true;
   }
