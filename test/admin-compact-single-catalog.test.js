@@ -14,25 +14,25 @@ const roles = read("public/js/roles-en-usuarios.js");
 const products = read("public/js/productos.js");
 const productPolish = read("public/js/hotfix-pulido-20260903.js");
 
-test("Administration exposes only compact category management", () => {
+test("Administration exposes compact Categories and Roles & Permissions entry points", () => {
   const dom = new JSDOM(index);
   try {
     const d = dom.window.document;
     const admin = d.getElementById("tab-config");
     assert.ok(admin);
     assert.ok(admin.querySelector(".bc-admin-categories #bc-categories-open"));
-    assert.equal(admin.querySelector(".bc-admin-roles"), null);
-    assert.equal(admin.querySelector(".bc-admin-heading"), null);
+    assert.ok(admin.querySelector(".bc-admin-roles h3"));
     for (const id of ["form-nuevo-rol", "lista-roles", "msg-roles"]) {
-      assert.equal(d.getElementById(id), null, id + " must not be rendered in Administration");
+      assert.ok(admin.querySelector(".bc-admin-role-runtime #" + id), id + " must expose the role-module mount point");
     }
+    assert.ok(admin.querySelector(".bc-admin-role-runtime[hidden]"));
     for (const id of ["form-categoria", "lista-categorias", "msg-config"]) {
       assert.equal(d.querySelectorAll("#" + id).length, 1, id + " must remain unique");
     }
     assert.ok(admin.querySelector("#bc-modal-categorias #form-categoria"));
     assert.ok(admin.querySelector("#bc-modal-categorias #lista-categorias"));
     assert.ok(admin.querySelector("#bc-modal-categorias[role=dialog]"));
-    assert.doesNotMatch(admin.innerHTML, /Roles y permisos|Permisos inteligentes|Presentaciones comerciales/);
+    assert.doesNotMatch(admin.innerHTML, /Permisos inteligentes|Presentaciones comerciales|Solo lectura|Administrador operativo/);
   } finally { dom.window.close(); }
 });
 
@@ -94,13 +94,19 @@ test("legacy smart-permissions designer is removed from Administration, includin
       "the scoped observer must remove late legacy reinsertion too");
     assert.ok(admin.querySelector("#bc-categories-open"),
       "category management must remain mounted");
+    assert.ok(admin.querySelector(".bc-admin-roles h3"),
+      "Roles y Permisos remains available after the smart designer is removed");
+    assert.ok(admin.querySelector(".bc-admin-role-runtime[hidden] #form-nuevo-rol"),
+      "the role module mount point must remain available");
     assert.ok(admin.querySelector("#bc-modal-categorias #form-categoria"),
       "the category form must remain intact");
   } finally { dom.window.close(); }
 });
 
-test("M75 gives Administration a single full-width category control", () => {
+test("M75 keeps compact Categories and Roles controls", () => {
   assert.ok(m75.includes("#tab-config .bc-admin-grid{display:block!important;width:100%!important;margin:0!important}"));
   assert.ok(m75.includes("#tab-config .bc-admin-card.bc-admin-categories{display:flex!important;flex-direction:row!important"));
   assert.ok(m75.includes("#tab-config .bc-admin-categories #bc-categories-open{width:auto!important"));
+  assert.ok(m75.includes("#tab-config .bc-admin-card.bc-admin-roles{display:flex!important;flex-direction:row!important"));
+  assert.ok(m75.includes("#tab-config .bc-admin-roles #bc-btn-config-roles{width:auto!important"));
 });

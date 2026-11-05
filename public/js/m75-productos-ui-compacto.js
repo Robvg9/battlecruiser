@@ -91,7 +91,12 @@
       '#tab-config .bc-admin-categories .bc-admin-card-heading{display:flex;align-items:center;min-width:0;margin:0}' +
       '#tab-config .bc-admin-categories .bc-admin-card-heading h3{margin:0;font-size:14px;line-height:1.2}' +
       '#tab-config .bc-admin-categories #bc-categories-open{width:auto!important;min-width:140px;min-height:34px;margin:0;padding:6px 10px;border-radius:8px;font-size:10.5px;line-height:1.2}' +
-      '@media(max-width:420px){#tab-config .bc-admin-categories{flex-wrap:wrap!important}#tab-config .bc-admin-categories #bc-categories-open{width:100%!important}}';
+      '#tab-config .bc-admin-card.bc-admin-roles{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;min-height:0!important;margin:8px 0 0!important;padding:8px 10px!important}' +
+      '#tab-config .bc-admin-roles .bc-admin-card-heading{display:flex;align-items:center;min-width:0;margin:0}' +
+      '#tab-config .bc-admin-roles .bc-admin-card-heading h3{margin:0;font-size:14px;line-height:1.2}' +
+      '#tab-config .bc-admin-roles #bc-btn-config-roles{width:auto!important;min-width:170px;min-height:34px;margin:0;padding:6px 10px;border-radius:8px;font-size:10.5px;line-height:1.2}' +
+      '#tab-config .bc-admin-role-runtime[hidden]{display:none!important}' +
+      '@media(max-width:420px){#tab-config .bc-admin-categories,#tab-config .bc-admin-roles{flex-wrap:wrap!important}#tab-config .bc-admin-categories #bc-categories-open,#tab-config .bc-admin-roles #bc-btn-config-roles{width:100%!important}}';
     document.head.appendChild(style);
   }
 

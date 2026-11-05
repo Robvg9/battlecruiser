@@ -211,10 +211,12 @@
         <input type="hidden" id="prod-editando-id" value="">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
         <select id="prod-categoria" required aria-label="Categoría"><option value="">Selecciona una categoría</option></select>
-        <input id="prod-unidad" aria-label="Unidad base del inventario" placeholder="Unidad base (ej. unidad, botella, kg)">
+        <input id="prod-unidad" type="hidden" value="unidad" aria-label="Unidad base interna del inventario">
         <datalist id="presentaciones-comunes"></datalist>
-        <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
+        <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
+        <input id="prod-formato-venta" type="text" maxlength="80" placeholder="Ej. Caja" aria-label="Nombre del formato de venta mayorista">
+        <input id="prod-formato-factor" type="number" inputmode="numeric" step="1" min="1" placeholder="Ej. 24 unidades" aria-label="Unidades base por formato de venta mayorista">
         <div class="prod-imagen-campo">
           <label class="prod-imagen-label">Imagen del producto</label>
           <div class="prod-imagen-selector">
@@ -616,6 +618,17 @@
           <section class="cc-bloque bc-admin-card bc-admin-categories" aria-label="Categorías">
             <div class="bc-admin-card-heading"><h3>Categorías</h3></div>
             <button type="button" id="bc-categories-open" class="cc-accion">Administrar categorías</button>
+          </section>
+          <section class="cc-bloque bc-admin-card bc-admin-roles" aria-label="Roles y Permisos">
+            <div class="bc-admin-card-heading"><h3>Roles y Permisos</h3></div>
+            <div class="bc-admin-role-runtime" hidden aria-hidden="true">
+              <form id="form-nuevo-rol" class="inline-form">
+                <input id="rol-nombre" type="text" placeholder="Nombre del rol nuevo" required>
+                <button type="submit">Crear rol</button>
+              </form>
+              <p class="msg" id="msg-roles"></p>
+              <div id="lista-roles" class="lista"></div>
+            </div>
           </section>
         </div>
           <section id="bc-modal-categorias" class="bc-categories-modal" role="dialog" aria-modal="true" aria-labelledby="bc-categories-title" aria-hidden="true">

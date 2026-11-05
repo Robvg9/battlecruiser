@@ -481,7 +481,7 @@ function obtenerVariantesFormularioProducto() {
   }));
 }
 
-function iniciarEdicionProducto(p) {
+async function iniciarEdicionProducto(p) {
   document.getElementById("prod-editando-id").value = p.id;
   document.getElementById("prod-nombre").value = p.nombre || "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
@@ -492,9 +492,28 @@ function iniciarEdicionProducto(p) {
   );
   renderEditorVariantesProducto(currentVariants);
   sincronizarEditorVariantesProducto();
-  document.getElementById("prod-unidad").value = p.unidad || "";
+  document.getElementById("prod-unidad").value = p.unidad || "unidad";
   document.getElementById("prod-precio-normal").value = p.precio_normal != null ? p.precio_normal : "";
   document.getElementById("prod-precio-mayorista").value = p.precio_mayorista != null ? p.precio_mayorista : "";
+  const formatoNameInput = document.getElementById("prod-formato-venta");
+  const formatoFactorInput = document.getElementById("prod-formato-factor");
+  const joinedPresentation = Array.isArray(p.presentaciones) ? p.presentaciones[0] : p.presentaciones;
+  if (formatoNameInput) formatoNameInput.value = joinedPresentation && joinedPresentation.nombre ? joinedPresentation.nombre : "";
+  if (formatoFactorInput) formatoFactorInput.value = "";
+  if (p.presentacion_id && typeof cargarAsociacionesProducto === "function") {
+    try {
+      const associations = await cargarAsociacionesProducto(p.id);
+      const wholesale = (Array.isArray(associations) ? associations : []).find((row) =>
+        String(row.presentacion_id) === String(p.presentacion_id) && row.activo !== false
+      );
+      if (wholesale) {
+        if (formatoNameInput && wholesale.presentaciones && wholesale.presentaciones.nombre) formatoNameInput.value = wholesale.presentaciones.nombre;
+        if (formatoFactorInput && Number(wholesale.factor) > 0) formatoFactorInput.value = String(wholesale.factor);
+      }
+    } catch (error) {
+      console.warn("[BattleCruiser] No se pudo cargar el formato mayorista del producto:", error);
+    }
+  }
   const categoriaSelect = document.getElementById("prod-categoria");
   if (categoriaSelect) {
     if (p.categorias) {
@@ -528,6 +547,9 @@ function iniciarEdicionProducto(p) {
 function cancelarEdicionProducto() {
   document.getElementById("form-producto").reset();
   document.getElementById("prod-editando-id").value = "";
+  document.getElementById("prod-unidad").value = "unidad";
+  document.getElementById("prod-formato-venta").value = "";
+  document.getElementById("prod-formato-factor").value = "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
   if (mixedToggle) mixedToggle.checked = false;
   renderEditorVariantesProducto([]);
@@ -555,6 +577,9 @@ safeInit("form-producto", () => {
     const precio_normal = parseFloat(document.getElementById("prod-precio-normal").value);
     const precioMayoristaRaw = document.getElementById("prod-precio-mayorista").value.trim();
     const precio_mayorista = precioMayoristaRaw === "" ? null : parseFloat(precioMayoristaRaw);
+    const formatoMayorista = document.getElementById("prod-formato-venta").value.trim();
+    const formatoFactorRaw = document.getElementById("prod-formato-factor").value.trim();
+    const formatoFactor = formatoFactorRaw === "" ? null : Number(formatoFactorRaw);
     const submitBtn = e.target.querySelector("button[type='submit']");
 
     if (!categoria_id) { setMsg("msg-productos","Selecciona una categoría para guardar el producto.",false); document.getElementById("prod-categoria").focus(); return; }
@@ -564,6 +589,22 @@ safeInit("form-producto", () => {
     }
     if (precio_mayorista !== null && !(precio_mayorista > 0)) {
       setMsg("msg-productos", "El precio mayorista debe ser mayor a 0.", false);
+      return;
+    }
+    if ((formatoMayorista && formatoFactorRaw === "") || (!formatoMayorista && formatoFactorRaw !== "")) {
+      setMsg("msg-productos", "El formato de venta necesita nombre y unidades equivalentes.", false);
+      return;
+    }
+    if (formatoMayorista && (!Number.isInteger(formatoFactor) || formatoFactor <= 0)) {
+      setMsg("msg-productos", "Las unidades por formato deben ser un entero mayor a cero (ej. 24).", false);
+      return;
+    }
+    if ((formatoMayorista && precio_mayorista === null) || (!formatoMayorista && precio_mayorista !== null)) {
+      setMsg("msg-productos", "Configura juntos el precio mayorista y el formato de venta.", false);
+      return;
+    }
+    if (formatoMayorista && unidad && formatoMayorista.toLocaleLowerCase() === unidad.toLocaleLowerCase()) {
+      setMsg("msg-productos", "El formato debe tener un nombre distinto de la unidad base.", false);
       return;
     }
 
@@ -584,8 +625,10 @@ safeInit("form-producto", () => {
         return;
       }
     }
-    if (needsMixedConfig && !navigator.onLine) {
-      setMsg("msg-productos", "Necesitas conexión para configurar el inventario por sabores. El producto no se ha guardado.", false);
+    if ((needsMixedConfig || formatoMayorista || (previousProduct && previousProduct.presentacion_id)) && !navigator.onLine) {
+      setMsg("msg-productos", needsMixedConfig
+        ? "Necesitas conexión para configurar el inventario por sabores. El producto no se ha guardado."
+        : "Necesitas conexión para configurar el formato mayorista. El producto no se ha guardado.", false);
       return;
     }
     const archivoImagenInput = document.getElementById("prod-imagen-input");
@@ -612,9 +655,27 @@ safeInit("form-producto", () => {
       p_precio_normal: precio_normal,
       p_precio_mayorista: precio_mayorista,
     };
-    const resultado = needsMixedConfig
-      ? await ejecutarProductoMixtoSinCola(editandoId, payload)
-      : await ejecutarOperacion(editandoId ? "producto_actualizar" : "producto", payload);
+    let resultado;
+    if (needsMixedConfig) {
+      resultado = await ejecutarProductoMixtoSinCola(editandoId, payload);
+    } else if (navigator.onLine) {
+      const catalog = await client.rpc("bc_guardar_producto_catalogo", {
+        p_producto_id: editandoId,
+        p_nombre: nombre,
+        p_categoria_id: categoria_id,
+        p_unidad: unidad || "unidad",
+        p_precio_normal: precio_normal,
+        p_precio_mayorista: precio_mayorista,
+        p_presentacion_normal: unidad || "unidad",
+        p_factor_normal: 1,
+        p_presentacion_mayorista: formatoMayorista || null,
+        p_factor_mayorista: formatoMayorista ? formatoFactor : null,
+        p_idempotency_key: crypto.randomUUID()
+      }).catch(error => ({ error }));
+      resultado = catalog.error ? { ok: false, error: catalog.error } : { ok: true, offline: false, data: catalog.data };
+    } else {
+      resultado = await ejecutarOperacion(editandoId ? "producto_actualizar" : "producto", payload);
+    }
     submitBtn.disabled = false;
 
     if (!resultado.ok) {
@@ -636,6 +697,26 @@ safeInit("form-producto", () => {
       });
       if (config.error) {
         setMsg("msg-productos", "Los datos básicos del producto se guardaron, pero no se pudo aplicar la configuración de sabores: " + explicarError(config.error, "configurar inventario mixto"), false);
+        await refrescarProductos();
+        return;
+      }
+    }
+    if (needsMixedConfig && productoIdReal) {
+      const formatConfig = await client.rpc("bc_guardar_producto_catalogo", {
+        p_producto_id: productoIdReal,
+        p_nombre: nombre,
+        p_categoria_id: categoria_id,
+        p_unidad: unidad || "unidad",
+        p_precio_normal: precio_normal,
+        p_precio_mayorista: precio_mayorista,
+        p_presentacion_normal: unidad || "unidad",
+        p_factor_normal: 1,
+        p_presentacion_mayorista: formatoMayorista || null,
+        p_factor_mayorista: formatoMayorista ? formatoFactor : null,
+        p_idempotency_key: crypto.randomUUID()
+      }).catch(error => ({ error }));
+      if (formatConfig.error) {
+        setMsg("msg-productos", "El producto se guardó, pero no se pudo aplicar el formato de venta: " + explicarError(formatConfig.error, "guardar formato mayorista"), false);
         await refrescarProductos();
         return;
       }

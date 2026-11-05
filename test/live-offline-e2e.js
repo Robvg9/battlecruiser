@@ -708,27 +708,29 @@ async function main() {
     "El catálogo de presentaciones de Administración debía estar retirado: "+JSON.stringify(adminCatalogsStable));
   assert(adminCatalogsStable.retailFieldsAbsent && adminCatalogsStable.baseUnitExists && adminCatalogsStable.baseUnitHasNoPresentationCatalogue && adminCatalogsStable.categoryRequired && adminCatalogsStable.categoriesStayInAdmin,
     "La venta minorista debe usar unidad base × 1 y la categoría debe seguir siendo obligatoria: "+JSON.stringify(adminCatalogsStable));
-  // Administration now exposes category management only. Legacy roles and
-  // presentations surfaces must remain absent; category controls stay usable.
+  // Administration retains Categories and Roles & Permissions; only the smart designer stays retired.
   const adminSurface = await waitUntil(
-    "Administración con categorías y sin roles/permisos/presentaciones",
-    "(()=>{const admin=document.querySelector('#tab-config');const open=admin&&admin.querySelector('#bc-categories-open');const modal=document.querySelector('#bc-modal-categorias');const form=modal&&modal.querySelector('#form-categoria');const list=modal&&modal.querySelector('#lista-categorias');const obsolete=['.bc-perm-designer','.bc-admin-roles','#bc-btn-config-roles','#bc-modal-roles-permisos','#bc-modal-roles-help','#form-nuevo-rol','#lista-roles','.presentaciones-panel','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const obsoleteCounts=Object.fromEntries(obsolete.map(selector=>[selector,document.querySelectorAll(selector).length]));const obsoleteAbsent=Object.values(obsoleteCounts).every(n=>n===0);const staleLabels=!!(admin&&/Roles y permisos|Permisos inteligentes|Presentaciones comerciales|Solo lectura|Administrador operativo/.test(admin.textContent||''));return {ready:!!(admin&&open&&modal&&form&&list&&obsoleteAbsent&&!staleLabels),adminExists:!!admin,adminHTML:admin?(admin.innerHTML||'').slice(0,5000):null,categoryButton:!!open,categoryModal:!!modal,categoryForm:!!form,categoryList:!!list,modalInitiallyClosed:!!(modal&&(modal.getAttribute('aria-hidden')==='true'||!modal.classList.contains('open'))),obsoleteCounts,obsoleteAbsent,adminText:admin?(admin.textContent||'').trim():null,staleLabels,bodyTextIncludesLegacyRoles:/Roles y Permisos|Permisos inteligentes/.test(document.body.textContent||'')}})()",
+    "Administración con Categorías y Roles y Permisos, sin diseñador legado",
+    "(()=>{const admin=document.querySelector('#tab-config');const category=admin&&admin.querySelector('#bc-categories-open');const role=admin&&admin.querySelector('#bc-btn-config-roles');const categoryModal=document.querySelector('#bc-modal-categorias');const roleModal=document.querySelector('#bc-modal-roles-permisos');const newRoleModal=document.querySelector('#bc-modal-nuevo-rol');const roleForm=newRoleModal&&newRoleModal.querySelector('#form-nuevo-rol');const roleList=roleModal&&roleModal.querySelector('#lista-roles');const categoryForm=categoryModal&&categoryModal.querySelector('#form-categoria');const categoryList=categoryModal&&categoryModal.querySelector('#lista-categorias');const forbidden=['.bc-perm-designer','.presentaciones-panel','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const counts=Object.fromEntries(forbidden.map(selector=>[selector,document.querySelectorAll(selector).length]));const forbiddenAbsent=Object.values(counts).every(n=>n===0);const staleLabels=!!(admin&&/Permisos inteligentes|Presentaciones comerciales|Solo lectura|Administrador operativo/.test(admin.textContent||''));return {ready:!!(admin&&category&&role&&categoryModal&&roleModal&&newRoleModal&&roleForm&&roleList&&categoryForm&&categoryList&&forbiddenAbsent&&!staleLabels),categoryButton:!!category,rolesButton:!!role,roleFormMoved:!!roleForm,roleListMoved:!!roleList,categoryForm:!!categoryForm,categoryList:!!categoryList,forbiddenCounts:counts,forbiddenAbsent,staleLabels,adminText:admin?(admin.textContent||'').trim():null}})()",
     10000
   );
   report.evidence.adminSurface = adminSurface;
   assert(adminSurface.ready,
-    "La Administración no coincide con la superficie de Categorías esperada: " + JSON.stringify(adminSurface));
-  const categoryModalState = await evaluate("(()=>{const button=document.querySelector('#tab-config #bc-categories-open');if(!button)return {ready:false,reason:'falta acceso a Categorías'};button.click();const modal=document.querySelector('#bc-modal-categorias');return {ready:true,modalOpen:!!(modal&&modal.classList.contains('open')),categoryForm:!!(modal&&modal.querySelector('#form-categoria')),categoryList:!!(modal&&modal.querySelector('#lista-categorias')),rolesModalAbsent:!document.querySelector('#bc-modal-roles-permisos,#bc-modal-roles-help')}})()");
-  assert(categoryModalState.ready && categoryModalState.modalOpen && categoryModalState.categoryForm && categoryModalState.categoryList && categoryModalState.rolesModalAbsent,
-    "Administración no abrió correctamente el único modal de Categorías o reintrodujo Roles: " + JSON.stringify(categoryModalState));
-  const categoryModalClosed = await evaluate("(()=>{const modal=document.querySelector('#bc-modal-categorias');const close=modal&&modal.querySelector('.bc-categories-close');if(close)close.click();return {closed:!!(!modal||!modal.classList.contains('open')),rolesModalAbsent:!document.querySelector('#bc-modal-roles-permisos,#bc-modal-roles-help')}})()");
-  assert(categoryModalClosed.closed && categoryModalClosed.rolesModalAbsent,
-    "El modal de Categorías no cerró correctamente o apareció una ventana de Roles: " + JSON.stringify(categoryModalClosed));
+    "Administración no muestra ambos accesos o reapareció el diseñador legado: " + JSON.stringify(adminSurface));
+  const rolesModalState = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-btn-config-roles');if(!b)return {ready:false};b.click();const m=document.querySelector('#bc-modal-roles-permisos');return {ready:true,modalOpen:!!(m&&m.classList.contains('open')),roleList:!!(m&&m.querySelector('#lista-roles')),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  assert(rolesModalState.ready&&rolesModalState.modalOpen&&rolesModalState.roleList&&rolesModalState.designerAbsent,
+    "El acceso Roles y Permisos no abrió su modal o reintrodujo el diseñador: "+JSON.stringify(rolesModalState));
+  await evaluate("(()=>{const m=document.querySelector('#bc-modal-roles-permisos');const b=m&&m.querySelector('[data-bc-roles-close=\"1\"]');if(b)b.click();else if(m)m.classList.remove('open');return true})()");
+  await waitUntil("cierre del modal Roles y Permisos","(()=>{const m=document.querySelector('#bc-modal-roles-permisos');return !!(m&&!m.classList.contains('open'))})()",3000);
+  const categoryModalState = await evaluate("(()=>{const b=document.querySelector('#tab-config #bc-categories-open');if(!b)return {ready:false};b.click();const m=document.querySelector('#bc-modal-categorias');return {ready:true,modalOpen:!!(m&&m.classList.contains('open')),categoryForm:!!(m&&m.querySelector('#form-categoria')),categoryList:!!(m&&m.querySelector('#lista-categorias')),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  assert(categoryModalState.ready&&categoryModalState.modalOpen&&categoryModalState.categoryForm&&categoryModalState.categoryList&&categoryModalState.designerAbsent,
+    "Administración no abrió Categorías o reintrodujo el diseñador: "+JSON.stringify(categoryModalState));
+  const categoryModalClosed = await evaluate("(()=>{const m=document.querySelector('#bc-modal-categorias');const b=m&&m.querySelector('.bc-categories-close');if(b)b.click();return {closed:!!(!m||!m.classList.contains('open')),designerAbsent:!document.querySelector('#tab-config .bc-perm-designer')}})()");
+  assert(categoryModalClosed.closed&&categoryModalClosed.designerAbsent,
+    "El modal de Categorías no cerró o reapareció el diseñador: "+JSON.stringify(categoryModalClosed));
   report.evidence.adminCatalogsUi = {
-    surface: adminSurface,
-    categoryModal: categoryModalState,
-    close: categoryModalClosed,
-    browser: "Chromium CDP",
+    surface: adminSurface, rolesModal: rolesModalState, categoryModal: categoryModalState,
+    close: categoryModalClosed, browser: "Chromium CDP",
   };
   // Login fits portrait and landscape phone viewports without hiding any form item.
   report.evidence.phase = "login_viewport_fit";

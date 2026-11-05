@@ -22,9 +22,11 @@ function fixture() {
         <input type="hidden" id="prod-editando-id" value="">
         <input id="prod-nombre" value="">
         <select id="prod-categoria"><option value="">Categoría</option><option value="cat-1">Bebidas</option></select>
-        <input id="prod-unidad" value="unidad">
-        <input id="prod-precio-normal" type="number" value="">
+        <input id="prod-unidad" type="hidden" value="unidad">
+        <input id="prod-precio-normal" type="number" placeholder="Precio" value="">
         <input id="prod-precio-mayorista" type="number" value="">
+        <input id="prod-formato-venta" type="text" value="">
+        <input id="prod-formato-factor" type="number" value="">
         <div class="prod-imagen-campo"><input id="prod-imagen-input" type="file"></div>
         <fieldset id="prod-presentaciones-config"></fieldset>
         <section id="prod-inventario-mixto-settings"><input type="checkbox" id="prod-inventario-mixto"><div id="prod-variantes-editor" hidden><div id="prod-variantes-lista"></div><button type="button" id="prod-variante-agregar">Agregar sabor</button></div></section>
