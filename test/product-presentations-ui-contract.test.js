@@ -90,7 +90,13 @@ test("product registration has one commercial-options owner and no legacy duplic
   assert.match(productModal, /bc-product-commercial-toggle/);
   assert.match(productModal, /bc-product-commercial-panel/);
   assert.match(productModal, /fieldBlock\(categoria, 'Categoría'/);
-  assert.match(productModal, /fieldBlock\(mayorista, 'Precio mayorista \(opcional\)'/);
+  assert.match(productModal, /left\.appendChild\(fieldBlock\(nombre, 'Nombre'\)\)/);
+  assert.match(productModal, /left\.appendChild\(fieldBlock\(normal, 'Precio'\)\)/);
+  assert.match(productModal, /left\.appendChild\(fieldBlock\(categoria, 'Categoría'\)\)/);
+  assert.doesNotMatch(productModal, /left\.appendChild\(fieldBlock\(mayorista/);
+  assert.match(productModal, /commercialToggle\.hidden = !edit/);
+  assert.match(productModal, /commercialToggle\.style\.display = edit \? 'flex' : 'none'/);
+  assert.match(productModal, /setCommercialOptionsExpanded\(edit\)/);
   assert.match(productModal, /window\.__BCM26_setCommercialOptionsExpanded/);
 
   assert.ok(presentationUi.includes("window.__BCM26_ensureCommercialOptions()"));
