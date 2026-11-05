@@ -158,8 +158,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.64 — Dashboard único y Auditoría separada/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.64"><\/script>/);
+  assert.match(app, /v9\.5\.65 — Importación de productos en dos pasos/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.65"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.64',
     'js/centro-control.js?v=9.5.64',
@@ -190,7 +190,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.64['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.65['"]\);/);
 });
 
 
@@ -200,7 +200,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.1"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.64"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.65"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
