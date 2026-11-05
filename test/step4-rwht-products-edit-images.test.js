@@ -51,6 +51,10 @@ function setup() {
         "<input id='prod-unidad' value=''>" +
         "<input id='prod-precio-normal' type='number' value=''>" +
         "<input id='prod-precio-mayorista' type='number' value=''>" +
+        "<input id='prod-formato-venta' value=''>" +
+        "<input id='prod-formato-factor' value=''>" +
+        "<input type='checkbox' id='prod-inventario-mixto'>" +
+        "<div id='prod-variantes-lista'></div>" +
         "<input id='prod-imagen-input' type='file' accept='image/jpeg,image/png'>" +
         "<div id='prod-imagen-preview-wrap' class='hidden'>" +
           "<img id='prod-imagen-preview' data-guardada='false' alt='Vista previa'>" +
@@ -116,6 +120,10 @@ function setup() {
       return { data: null, error: null };
     }
   };
+  Object.defineProperty(window.crypto, "randomUUID", {
+    configurable: true,
+    value: () => "test-idempotency-key"
+  });
 
   window.eval("(async function __bcInstallProductHandlers(){" + PRODUCTION_HANDLERS +
     ";window.iniciarEdicionProducto = iniciarEdicionProducto;" +
@@ -172,7 +180,7 @@ test("Paso 4 RWHT 019/021: iniciar edición carga el ID oculto y la categoría d
   assert.equal(c.document.getElementById("prod-imagen-preview-wrap").classList.contains("hidden"), false);
 });
 
-test("Paso 4 RWHT 019/021: guardar edición envía el ID y la categoría exactos por la operación mock", async (t) => {
+test("Paso 4 RWHT 019/021: guardar edición envía el ID y la categoría exactos por el RPC de catálogo", async (t) => {
   const c = setup();
   t.after(() => c.dom.window.close());
 
@@ -192,18 +200,25 @@ test("Paso 4 RWHT 019/021: guardar edición envía el ID y la categoría exactos
     new c.window.Event("submit", { bubbles: true, cancelable: true })
   );
 
-  assert.ok(await waitFor(() => c.calls.length === 1), "el formulario debe ejecutar la actualización mock");
-  assert.deepEqual(c.calls[0], {
-    name: "producto_actualizar",
+  assert.ok(await waitFor(() => c.rpcCalls.length === 1 && c.refreshCount === 1),
+    "el formulario debe guardar por el RPC canónico y refrescar la lista");
+  assert.deepEqual(c.rpcCalls[0], {
+    name: "bc_guardar_producto_catalogo",
     params: {
       p_producto_id: "producto-edit-fixture",
       p_nombre: "Cerveza actualizada",
       p_categoria_id: "cat-bebidas",
       p_unidad: "botella",
       p_precio_normal: 130.5,
-      p_precio_mayorista: null
+      p_precio_mayorista: null,
+      p_presentacion_normal: "botella",
+      p_factor_normal: 1,
+      p_presentacion_mayorista: null,
+      p_factor_mayorista: null,
+      p_idempotency_key: "test-idempotency-key"
     }
   });
+  assert.equal(c.calls.length, 0, "una edición online no debe saltar al antiguo dispatcher de cola");
   assert.ok(await waitFor(() => /Producto actualizado/i.test(c.document.getElementById("msg-productos").textContent)),
     "la UI debe terminar la actualización, comunicar el éxito y limpiar el estado");
   assert.equal(c.document.getElementById("prod-editando-id").value, "");
