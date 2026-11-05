@@ -106,7 +106,7 @@ function initCatalogoSimple({ tabla, formId, inputId, listaId, singular }) {
       const del = e.target.closest(".catalogo-delete-btn");
       if (del && tabla === "categorias") {
         const row = filasActuales.find((item) => String(item.id) === String(del.dataset.id));
-        if (!row || !window.confirm("¿Eliminar la categoría \\"" + row.nombre + "\\"? Esta acción no se puede deshacer.")) return;
+        if (!row || !window.confirm('¿Eliminar la categoría "' + row.nombre + '"? Esta acción no se puede deshacer.')) return;
         del.disabled = true;
         const refs = await client.from("productos").select("id").eq("categoria_id", row.id);
         if (refs.error || (Array.isArray(refs.data) && refs.data.length)) {
