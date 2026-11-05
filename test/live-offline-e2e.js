@@ -911,7 +911,6 @@ async function main() {
       "El gesto vertical simulado no desplazó Configuración cuando el contenido excede el viewport. Antes=" + JSON.stringify(mobileConfigScrollInitial) +
         "; gesto=" + JSON.stringify(configSwipe) + "; después=" + JSON.stringify(mobileConfigScrollAfter));
     mobileConfigScrollMode = "native-touch-scroll";
-    await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
   } else {
     mobileConfigScrollAfter = await evaluate("(()=>{const tab=document.querySelector('#tab-config');if(!tab)return null;const tr=tab.getBoundingClientRect();const selectors=['.bc-admin-content','.bc-admin-grid','.bc-admin-card','.bc-admin-subcard'];const nodes=selectors.flatMap(selector=>Array.from(tab.querySelectorAll(selector)));const clipped=nodes.filter(node=>{const r=node.getBoundingClientRect();return r.height>0&&(r.top<tr.top-1||r.bottom>tr.bottom+1)}).map(node=>({selector:node.className||node.tagName,top:node.getBoundingClientRect().top,bottom:node.getBoundingClientRect().bottom}));return {scrollTop:tab.scrollTop,scrollHeight:tab.scrollHeight,clientHeight:tab.clientHeight,windowScrollY:window.scrollY,tabTop:tr.top,tabBottom:tr.bottom,viewportHeight:innerHeight,clipped}})()");
     assert(mobileConfigScrollAfter && mobileConfigScrollAfter.scrollHeight <= mobileConfigScrollAfter.clientHeight + 1 &&
@@ -919,6 +918,7 @@ async function main() {
            mobileConfigScrollAfter.clipped.length === 0,
       "La Administración compacta debería caber completa sin recorte: " + JSON.stringify(mobileConfigScrollAfter));
   }
+  await cdpCommand("Emulation.setTouchEmulationEnabled", { enabled: false });
   report.evidence.androidConfigScrollGesture = {
     initial: mobileConfigScrollInitial,
     mode: mobileConfigScrollMode,
