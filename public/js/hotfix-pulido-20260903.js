@@ -67,7 +67,6 @@
       +'.bc-pulido-dialog-actions button{min-height:38px}'
       +'.bc-pulido-import-error{color:#e88a96!important}.bc-pulido-import-ok{color:var(--sage)!important}.bc-pulido-import-warn{color:var(--gold-bright)!important}'
       +'#bc-pulido-stock-status{font-size:11px;color:var(--mist);margin:5px 0 10px}'
-      +'#tab-config .presentaciones-panel{display:block!important;visibility:visible!important;max-height:none!important;overflow:visible!important}'
       +'#tab-productos .bc171-native-hidden{display:none!important}'
       +'#tab-productos #prod-cancelar-edicion{display:none!important}'
       +'#tab-productos .bc-pres-grid input,#tab-productos .bc-pres-grid select{width:100%}'
