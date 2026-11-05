@@ -19,7 +19,10 @@ test('category catalog is the sole catalog managed from Administration', () => {
   assert.match(index, /id="bc-modal-categorias"[\s\S]*?id="form-categoria"[\s\S]*?id="lista-categorias"/);
   assert.equal((index.match(/id="bc-modal-categorias"/g)||[]).length,1);
   assert.doesNotMatch(index, /id="form-unidad"|id="lista-unidades"/);
-  assert.match(index, /presentaciones-panel[\s\S]*?lista-presentaciones-catalogo[\s\S]*?pp-lista-asociaciones/);
+  assert.doesNotMatch(index, /presentaciones-panel|form-presentacion-nueva|lista-presentaciones-catalogo|pp-producto-select|pp-lista-asociaciones|form-pp-nueva/);
+  assert.match(index, /<select id="prod-categoria"[^>]*required/);
+  assert.doesNotMatch(index, /id="prod-unidad"[^>]*list="presentaciones-comunes"/);
+  assert.doesNotMatch(index, /bc-pres-normal-name|bc-pres-normal-factor|prod-pres-min|prod-pres-may/);
   assert.doesNotMatch(source, /prod-nom-categorias-slot|prod-nom-unidades-slot|nomenclaturaOrigenes|prepararNomenclatura/);
   assert.doesNotMatch(m26, /'lista-categorias'\s*:\s*'prod-nom-|\s*'lista-unidades'\s*:\s*'prod-nom-/);
 });
