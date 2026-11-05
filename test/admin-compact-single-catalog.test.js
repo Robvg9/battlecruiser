@@ -48,7 +48,7 @@ test("product form requires a real category and retail defaults to base unit tim
     }
     assert.match(m26, /prod-inventario-mixto-toggle input\{appearance:auto;width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;max-width:18px!important;max-height:18px!important/);
     assert.match(m26, /flex:0 0 18px!important/);
-    assert.match(products, /fillSelect\(document\.getElementById\("prod-categoria"\), categorias, "id", c=>c\.nombre, true\)/);
+    assert.match(products, /fillSelect\(document\.getElementById\("prod-categoria"\), categorias, "id", \(c\) => c\.nombre, true\)/);
     assert.match(products, /window\.refrescarSelectorCategoriasProducto=refrescarSelectorCategoriasProducto/);
   } finally { dom.window.close(); }
 });

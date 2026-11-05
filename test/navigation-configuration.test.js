@@ -73,7 +73,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
 });
 
 
-test("Sistema agrupa Conectividad y Preferencias; Administración conserva su panel", () => {
+test("Sistema agrupa Conectividad y Preferencias; Administración muestra solo Categorías", () => {
   const normalizedIndex = index.replace(/\r\n/g, "\n");
   const groupStart = normalizedIndex.indexOf('<div class="bc-nav-group expanded" id="nav-config-group">');
   const groupStop = normalizedIndex.indexOf("</div>\n        </div>", groupStart);
@@ -88,7 +88,9 @@ test("Sistema agrupa Conectividad y Preferencias; Administración conserva su pa
   assert.match(index, /<button class="tab-btn" data-tab="config">Administración<\/button>/);
   const start = index.indexOf('<section id="tab-config"');
   const admin = index.slice(start, index.indexOf("</section>", start));
-  assert.match(admin, /<h2>Administración<\/h2>/);
+  assert.match(admin, /<h3>Categorías<\/h3>/);
+  assert.match(admin, /id="bc-categories-open"/);
+  assert.doesNotMatch(admin, /<h2>Administración|Roles y permisos|Presentaciones comerciales|Permisos inteligentes/);
   assert.doesNotMatch(groupMarkup, /data-tab="config"/);
 });
 
@@ -192,19 +194,20 @@ test("la Dependienta ve solo módulos concedidos y conserva las excepciones pers
   dom.window.close();
 });
 
-test("Administración admite Presentaciones y nunca se abre solo por el permiso histórico de unidades", async () => {
+test("Administración solo se abre con permiso de Categorías; roles y Presentaciones no habilitan la ruta", async () => {
   const html = index.replace('<div class="app-shell" id="app-shell">', '<div class="app-shell visible" id="app-shell">');
   const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
   const { window } = dom;
   const { document } = window;
   window._usuarioActual = { id: "catalog-role", rol: "Catalogador" };
   window._permisosCargaExitosa = true;
-  window._permisosEfectivos = { presentaciones: { ver: true }, unidades: { ver: false } };
+  window._permisosEfectivos = { presentaciones: { ver: true }, unidades: { ver: false }, usuarios: { ver: true } };
   window.eval(permissions);
   window.aplicarPermisosAInterfaz();
-  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "1");
+  assert.equal(document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "0");
   assert.equal(document.querySelector('#tabs .tab-btn[data-tab="usuarios"]').getAttribute("data-bc-permiso"), "0");
   assert.equal(window.tienePermiso("presentaciones", "ver"), true);
+  assert.equal(window.tienePermiso("usuarios", "ver"), true);
   dom.window.close();
 
   const noCatalogDom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
@@ -217,6 +220,17 @@ test("Administración admite Presentaciones y nunca se abre solo por el permiso 
   assert.equal(noCatalogWindow.document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "0",
     "unidades por sí solo no debe abrir Administración");
   noCatalogDom.window.close();
+
+  const categoryDom = new JSDOM(html, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const categoryWindow = categoryDom.window;
+  categoryWindow._usuarioActual = { id: "category-role", rol: "Catalogador" };
+  categoryWindow._permisosCargaExitosa = true;
+  categoryWindow._permisosEfectivos = { categorias: { ver: true } };
+  categoryWindow.eval(permissions);
+  categoryWindow.aplicarPermisosAInterfaz();
+  assert.equal(categoryWindow.document.querySelector('#tabs .tab-btn[data-tab="config"]').getAttribute("data-bc-permiso"), "1",
+    "el permiso real de Categorías debe habilitar Administración");
+  categoryDom.window.close();
 });
 
 test("ver y crear son permisos independientes; crear no abre la navegación", async () => {
