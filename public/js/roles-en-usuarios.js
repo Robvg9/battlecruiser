@@ -80,7 +80,7 @@
       '#bc-roles-help-content{font-size:12px;line-height:1.5}' +
       '#bc-roles-help-content p{margin:6px 0}' +
       '@media(max-width:650px){#bc-modal-roles-help{align-items:flex-end;padding:8px}#bc-modal-roles-help .bc-roles-help-panel{max-height:78dvh;border-radius:12px}}';
-    s.textContent += '\\n' +
+    s.textContent += '\n' +
       '#bc-modal-categorias{position:fixed;inset:0;z-index:1380;display:none;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}' +
       '#bc-modal-categorias.open{display:flex}' +
       '#bc-modal-categorias .bc-categories-backdrop{position:absolute;inset:0;background:rgba(4,10,8,.78);backdrop-filter:blur(3px)}' +
