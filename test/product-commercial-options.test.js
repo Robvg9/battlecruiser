@@ -26,7 +26,9 @@ test("alta nueva muestra solo Nombre, Precio y Categoría",t=>{
  const c=fixture();t.after(()=>c.w.close());const fields=c.d.querySelectorAll(".bc-product-form-fields .bc-product-field");
  assert.equal(fields.length,3);assert.deepEqual(Array.from(fields).map(x=>x.querySelector("label").textContent),["Nombre","Precio","Categoría"]);
  assert.equal(c.d.getElementById("prod-categoria").required,true);assert.equal(c.d.getElementById("prod-precio-normal").required,true);
- assert.equal(c.d.getElementById("bc-product-commercial-toggle"),null);assert.doesNotMatch(c.d.getElementById("form-producto").textContent,/Opcional/);
+ const toggle=c.d.getElementById("bc-product-commercial-toggle");assert.ok(toggle,"M17.2/Pulido require a stable compatibility anchor");
+ assert.equal(toggle.hidden,true,"the anchor is hidden during new-product creation");assert.equal(toggle.style.display,"none");
+ assert.doesNotMatch(c.d.getElementById("form-producto").textContent,/Opcional/);
  const panel=c.d.getElementById("bc-product-commercial-panel");assert.ok(panel);assert.equal(panel.hidden,true);
  for(const id of ["prod-precio-mayorista","prod-formato-venta","prod-formato-factor","prod-imagen-input"])assert.ok(panel.contains(c.d.getElementById(id)));
  assert.equal(c.d.getElementById("prod-unidad").type,"hidden");
