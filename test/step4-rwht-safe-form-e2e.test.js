@@ -483,6 +483,47 @@ test("Paso 4 UI: categoría obligatoria y venta minorista base unidad × 1 sin c
   assert.equal(call.params.p_presentacion_mayorista, null);
   assert.equal(call.params.p_factor_mayorista, null);
 });
+test("Paso 4 UI: producto minorista se guarda offline con unidad base × 1", async () => {
+  const c = await contextoListo();
+  evaluarModulo(c, "public/js/m26-ui-integridad.js");
+  evaluarModulo(c, "public/js/hotfix-17-2-productos-save-20260903.js");
+  evaluarModulo(c, "public/js/hotfix-pulido-20260903.js");
+
+  const ready = await esperarHasta(() =>
+    !!c.document.getElementById("bc-product-commercial-toggle") &&
+    c.document.getElementById("form-producto").dataset.bc172Prepared === "1",
+    6500,
+    25
+  );
+  assert.ok(ready, "the offline product saver must initialize");
+  const d = c.document;
+  c.window.__BCM26_openProductModal();
+  addOption(d.getElementById("prod-categoria"), "c-step4-fixture", "General");
+  d.getElementById("prod-nombre").value = "Producto offline fixture";
+  d.getElementById("prod-unidad").value = "unidad";
+  d.getElementById("prod-precio-normal").value = "3.50";
+  d.getElementById("prod-precio-mayorista").value = "";
+
+  const offlineCalls = [];
+  c.window.ejecutarOperacion = async (name, params) => {
+    offlineCalls.push({ name, params });
+    return { ok: true, id: "offline-product-fixture" };
+  };
+  Object.defineProperty(c.window.navigator, "onLine", { value: false, configurable: true });
+  const baseWrites = c.client.__writeCalls.length;
+  enviarSubmit(c, "form-producto");
+
+  assert.ok(await esperarHasta(() => /Producto guardado localmente/i.test(d.getElementById("msg-productos").textContent)),
+    "implicit retail unit × 1 must not block offline product creation");
+  assert.equal(offlineCalls.length, 1, "the offline queue should receive exactly one product operation");
+  assert.equal(offlineCalls[0].name, "producto");
+  assert.equal(offlineCalls[0].params.p_categoria_id, "c-step4-fixture");
+  assert.equal(offlineCalls[0].params.p_unidad, "unidad");
+  assert.equal(offlineCalls[0].params.p_precio_normal, 3.5);
+  assert.equal(offlineCalls[0].params.p_precio_mayorista, null);
+  assert.equal(c.client.__writeCalls.length, baseWrites, "offline product creation must not reach a live write RPC");
+});
+
 test("Paso 4 UI: compra rechaza costo cero sin registrar una compra", async (t) => {
   const c = await contextoListo();
   // Keep the booted JSDOM alive: unrelated startup refreshes may still resolve after this assertion.
