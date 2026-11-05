@@ -115,7 +115,9 @@
       return box;
     }
 
+    categoria.required = true;
     left.appendChild(fieldBlock(nombre, 'Nombre'));
+    left.appendChild(fieldBlock(categoria, 'Categoría'));
     left.appendChild(fieldBlock(normal, 'Precio normal'));
     right.appendChild(imageWrap);
     top.appendChild(left);
@@ -138,7 +140,7 @@
     commercialToggle.setAttribute('aria-expanded', 'false');
     commercialToggle.setAttribute('aria-controls', 'bc-product-commercial-panel');
     commercialToggle.innerHTML =
-      '<span class="bc-product-commercial-toggle-copy"><strong>Configurar opciones comerciales</strong><small>Categoría, precio mayorista, presentaciones y factores</small></span>' +
+      '<span class="bc-product-commercial-toggle-copy"><strong>Opcional</strong><small>Precio mayorista y unidad base del inventario</small></span>' +
       '<span class="bc-product-commercial-chevron" aria-hidden="true">⌄</span>';
 
     var commercialPanel = document.createElement('div');
@@ -148,7 +150,6 @@
 
     var commercialFields = document.createElement('div');
     commercialFields.className = 'bc-product-commercial-fields';
-    commercialFields.appendChild(fieldBlock(categoria, 'Categoría (opcional)', 'bc-product-commercial-field'));
     commercialFields.appendChild(fieldBlock(mayorista, 'Precio mayorista (opcional)', 'bc-product-commercial-field'));
     commercialPanel.appendChild(commercialFields);
     commercialToggle.addEventListener('click', function () {
@@ -208,7 +209,7 @@
       mixedStyle.textContent =
         '.prod-inventario-mixto-settings{margin:2px 0 0;padding:11px;border:1px solid rgba(201,162,77,.2);border-radius:10px;background:rgba(8,18,15,.32)}' +
         '.prod-inventario-mixto-toggle{display:flex;align-items:flex-start;gap:9px;cursor:pointer}' +
-        '.prod-inventario-mixto-toggle input{flex:0 0 auto;margin:2px 0 0;accent-color:var(--gold,#c9a24d)}' +
+        '.prod-inventario-mixto-toggle input{appearance:auto;width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;max-width:18px!important;max-height:18px!important;box-sizing:border-box;padding:0!important;margin:2px 0 0!important;flex:0 0 18px!important;accent-color:var(--gold,#c9a24d)}' +
         '.prod-inventario-mixto-toggle span,.prod-variantes-heading{display:flex;flex-direction:column;gap:3px}' +
         '.prod-inventario-mixto-toggle strong,.prod-variantes-heading strong{font-size:11.5px;color:var(--gold-bright)}' +
         '.prod-inventario-mixto-toggle small,.prod-variantes-heading small{font-size:10px;line-height:1.35;color:var(--mist)}' +
@@ -304,10 +305,7 @@
     var edit = !!(editando && editando.value);
     if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
     if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
-    setCommercialOptionsExpanded(edit && !!(
-      (document.getElementById('prod-categoria') && document.getElementById('prod-categoria').value) ||
-      (document.getElementById('prod-precio-mayorista') && document.getElementById('prod-precio-mayorista').value.trim())
-    ));
+    setCommercialOptionsExpanded(edit && !!(document.getElementById('prod-precio-mayorista') && document.getElementById('prod-precio-mayorista').value.trim()));
     ocultarCampoUnidad(form);
     form.classList.remove('hidden');
     modal.classList.remove('hidden');
