@@ -99,16 +99,30 @@ SET search_path TO 'public','pg_temp'
 AS $$
 DECLARE v_product public.productos%ROWTYPE;
 DECLARE v_parent public.productos%ROWTYPE;
+DECLARE v_parent_id uuid;
 BEGIN
-  SELECT * INTO v_product FROM public.productos WHERE id=NEW.producto_id;
+  -- Read the relationship first, then lock parent before child. Configuration
+  -- locks in the same order, so stock writes cannot race mode changes or deadlock
+  -- by acquiring a variant before its parent.
+  SELECT producto_padre_id INTO v_parent_id
+  FROM public.productos WHERE id=NEW.producto_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Producto no encontrado.' USING ERRCODE='23503'; END IF;
-  IF v_product.inventario_mixto AND v_product.producto_padre_id IS NULL THEN
-    RAISE EXCEPTION 'Este producto controla existencias por sabor. Selecciona una variante.' USING ERRCODE='23514';
-  END IF;
-  IF v_product.producto_padre_id IS NOT NULL THEN
-    SELECT * INTO v_parent FROM public.productos WHERE id=v_product.producto_padre_id;
-    IF NOT FOUND OR NOT v_parent.inventario_mixto OR NOT v_parent.activo OR NOT v_product.activo THEN
+
+  IF v_parent_id IS NOT NULL THEN
+    SELECT * INTO v_parent FROM public.productos WHERE id=v_parent_id FOR SHARE;
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'La variante ya no está disponible para movimientos de inventario.' USING ERRCODE='23514';
+    END IF;
+    SELECT * INTO v_product FROM public.productos WHERE id=NEW.producto_id FOR SHARE;
+    IF NOT FOUND OR v_product.producto_padre_id IS DISTINCT FROM v_parent.id
+       OR NOT v_parent.inventario_mixto OR NOT v_parent.activo OR NOT v_product.activo THEN
+      RAISE EXCEPTION 'La variante ya no está disponible para movimientos de inventario.' USING ERRCODE='23514';
+    END IF;
+  ELSE
+    SELECT * INTO v_product FROM public.productos WHERE id=NEW.producto_id FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Producto no encontrado.' USING ERRCODE='23503'; END IF;
+    IF v_product.inventario_mixto THEN
+      RAISE EXCEPTION 'Este producto controla existencias por sabor. Selecciona una variante.' USING ERRCODE='23514';
     END IF;
   END IF;
   RETURN NEW;
