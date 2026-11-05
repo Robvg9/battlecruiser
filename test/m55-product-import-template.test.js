@@ -11,6 +11,10 @@ const SOURCE = fs.readFileSync(
   "utf8"
 );
 
+const APP_SOURCE = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
+const INDEX_SOURCE = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+const SW_SOURCE = fs.readFileSync(path.join(__dirname, "..", "public", "service-worker.js"), "utf8");
+
 function setup(t) {
   const dom = new JSDOM(
     "<!doctype html><html><head></head><body><p id='msg-productos'></p></body></html>",
@@ -134,7 +138,7 @@ test("M55: rechaza categoría inexistente y no envía registros al servidor", as
     name: "productos.csv",
     text: async () => [
       "nombre;categoria;unidad;precio_normal;precio_mayorista;formato_venta;factor_venta",
-      "Cerveza;Categoría inventada;botella;650;;;;"
+      "Cerveza;Categoría inventada;botella;650;;;"
     ].join("\r\n")
   };
   Object.defineProperty(input, "files", { value: [file], configurable: true });
@@ -143,4 +147,13 @@ test("M55: rechaza categoría inexistente y no envía registros al servidor", as
   assert.match(d.getElementById("bc-m55-preview").textContent, /no existe o está inactiva/);
   assert.equal(d.getElementById("bc-m55-run").disabled, true);
   assert.equal(c.rpcCalls.length, 0);
+});
+
+test("M55: app shell y Service Worker publican la versión y caché nuevas del importador", () => {
+  assert.match(APP_SOURCE, /const VERSION="9\.5\.65"/);
+  assert.match(APP_SOURCE, /m55-productos-import\.js","55\.2"/);
+  assert.match(INDEX_SOURCE, /app\.js\?v=9\.5\.65/);
+  assert.match(SW_SOURCE, /BC_SW_VERSION = "9\.5\.65"/);
+  assert.match(SW_SOURCE, /app\.js\?v=9\.5\.65/);
+  assert.match(SW_SOURCE, /m55-productos-import\.js\?v=55\.2/);
 });
