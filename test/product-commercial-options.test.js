@@ -48,7 +48,7 @@ function fixture() {
   return { dom, window, document };
 }
 
-test("one master button contains category, optional wholesale price and both approved presentation pairs", (t) => {
+test("one master button keeps only optional wholesale price; required category stays in the primary form", (t) => {
   const c = fixture();
   t.after(() => c.dom.window.close());
   const d = c.document;
@@ -61,7 +61,10 @@ test("one master button contains category, optional wholesale price and both app
   assert.ok(panel, "the commercial options panel must exist");
   assert.equal(d.querySelectorAll("#bc-product-commercial-toggle").length, 1);
   assert.equal(d.querySelectorAll("#bc-product-commercial-panel").length, 1);
-  assert.ok(panel.contains(d.getElementById("prod-categoria")));
+  assert.ok(!panel.contains(d.getElementById("prod-categoria")));
+  assert.ok(basic.contains(d.getElementById("prod-categoria")));
+  assert.equal(d.getElementById("prod-categoria").tagName, "SELECT");
+  assert.equal(d.getElementById("prod-categoria").required, true, "category is required in the primary product form");
   assert.ok(panel.contains(d.getElementById("prod-precio-mayorista")));
   assert.ok(!basic.contains(d.getElementById("prod-categoria")));
   assert.ok(!basic.contains(d.getElementById("prod-precio-mayorista")));
