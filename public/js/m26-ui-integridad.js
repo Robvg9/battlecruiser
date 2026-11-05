@@ -126,6 +126,19 @@
     var commercial = document.createElement('section');
     commercial.id = 'bc-product-commercial-settings';
     commercial.className = 'bc-product-commercial-settings';
+    var commercialToggle = document.createElement('button');
+    commercialToggle.type = 'button';
+    commercialToggle.id = 'bc-product-commercial-toggle';
+    commercialToggle.className = 'bc-product-commercial-toggle';
+    commercialToggle.textContent = 'Datos adicionales de este producto';
+    commercialToggle.setAttribute('aria-expanded', 'false');
+    commercialToggle.setAttribute('aria-controls', 'bc-product-commercial-panel');
+    commercialToggle.hidden = true;
+    commercialToggle.style.display = 'none';
+    commercialToggle.addEventListener('click', function () {
+      setCommercialOptionsExpanded(commercialToggle.getAttribute('aria-expanded') !== 'true');
+    });
+
     var commercialPanel = document.createElement('div');
     commercialPanel.id = 'bc-product-commercial-panel';
     commercialPanel.className = 'bc-product-commercial-panel bc-product-edit-legacy-settings hidden';
@@ -159,6 +172,7 @@
     if (imageWrap) commercialFields.appendChild(imageWrap);
     if (mixedSettings) commercialFields.appendChild(mixedSettings);
     commercialPanel.appendChild(commercialFields);
+    commercial.appendChild(commercialToggle);
     commercial.appendChild(commercialPanel);
     var actions = document.createElement('div');
     actions.className = 'bc-product-form-actions';
@@ -304,10 +318,15 @@
     var editando = document.getElementById('prod-editando-id');
     var title = modal.querySelector('#bc-product-modal-title');
     var submitBtn = document.getElementById('prod-submit-btn');
+    var commercialToggle = document.getElementById('bc-product-commercial-toggle');
     var edit = !!(editando && editando.value);
     if (title) title.textContent = edit ? 'Editar producto' : 'Agregar producto';
     if (submitBtn) submitBtn.textContent = edit ? 'Guardar cambios' : 'Guardar producto';
-    // Advanced options are surfaced only while editing an existing product.
+    // Keep compatibility for M17.2/Pulido while hiding the control on new product creation.
+    if (commercialToggle) {
+      commercialToggle.hidden = !edit;
+      commercialToggle.style.display = edit ? 'flex' : 'none';
+    }
     setCommercialOptionsExpanded(edit);
     ocultarCampoUnidad(form);
     form.classList.remove('hidden');
@@ -320,10 +339,12 @@
 
   function setCommercialOptionsExpanded(expanded) {
     var panel = document.getElementById('bc-product-commercial-panel');
-    if (!panel) return false;
+    var button = document.getElementById('bc-product-commercial-toggle');
+    if (!panel || !button) return false;
     var open = !!expanded;
     panel.hidden = !open;
     panel.classList.toggle('hidden', !open);
+    button.setAttribute('aria-expanded', open ? 'true' : 'false');
     return true;
   }
 
