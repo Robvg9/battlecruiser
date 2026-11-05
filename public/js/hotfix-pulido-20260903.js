@@ -210,19 +210,18 @@
       return true;
     }
     box=document.createElement('div');box.id='bc-product-commercial-fields';box.className='bc-pres-grid bc-pres-grid-compact';
-    box.innerHTML=
-      '<div class="bc-pres-section-title">Presentaciones y factores</div>'+
-      '<div class="bc-pres-row"><strong class="bc-pres-row-title">Formato minorista</strong><input id="bc-pres-normal-name" type="text" maxlength="60" list="presentaciones-comunes" placeholder="Etiqueta (ej. Botella)" aria-label="Etiqueta de presentación minorista"><input id="bc-pres-normal-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 1)" aria-label="Factor numérico minorista"></div>'+
+    box.innerHTML='<div class="bc-pres-section-title">Formato mayorista (opcional)</div>'+
       '<div class="bc-pres-row"><strong class="bc-pres-row-title">Formato mayorista</strong><input id="bc-pres-wholesale-name" type="text" maxlength="60" list="presentaciones-comunes" placeholder="Etiqueta (ej. Caja)" aria-label="Etiqueta de presentación mayorista"><input id="bc-pres-wholesale-factor" type="number" step="any" min="0.0001" inputmode="decimal" placeholder="Factor (ej. 50)" aria-label="Factor numérico mayorista"></div>'+
-      '<p class="bc-pres-optional-note">Configura únicamente las presentaciones que utilices. Cada una requiere etiqueta y factor positivo; deja ambas vacías si no aplica.</p>';
+      '<p class="bc-pres-optional-note">Venta minorista: unidad base del producto, factor 1.</p>';
     host.appendChild(box);
     loadPresentaciones();
     return true;
   }
   function selectedPres(which){
     var isWholesale=which==='wholesale';
-    var nameEl=document.getElementById(isWholesale?'bc-pres-wholesale-name':'bc-pres-normal-name');
-    var factorEl=document.getElementById(isWholesale?'bc-pres-wholesale-factor':'bc-pres-normal-factor');
+    if(!isWholesale){var unit=(document.getElementById('prod-unidad')?.value||'').trim()||'unidad';return{name:unit,factor:1,id:null};}
+    var nameEl=document.getElementById('bc-pres-wholesale-name');
+    var factorEl=document.getElementById('bc-pres-wholesale-factor');
     var name=nameEl?(nameEl.value||'').trim():'';
     var raw=factorEl?(factorEl.value||'').trim():'';
     if(!name&&!raw)return{name:null,factor:null,id:null};
@@ -246,7 +245,7 @@
     var prod=activeProducts().find(function(p){return String(p.id)===String(productId);});
     var wholesaleId=prod&&prod.presentacion_id?String(prod.presentacion_id):null;
     var wholesale=wholesaleId?rows.find(function(r){return String(r.presentacion_id)===wholesaleId;}):null;
-    var normal=rows.find(function(r){return !wholesaleId||String(r.presentacion_id)!==wholesaleId;})||null;
+    var normal=null;
     function setRow(kind,row){
       var isW=kind==='wholesale';
       var nameEl=document.getElementById(isW?'bc-pres-wholesale-name':'bc-pres-normal-name');
@@ -258,9 +257,9 @@
     setRow('wholesale',wholesale);
     var category=document.getElementById('prod-categoria')?.value||'';
     var wholesalePrice=document.getElementById('prod-precio-mayorista')?.value?.trim()||'';
-    var hasPresentation=!!(normal||wholesale);
+    var hasPresentation=!!wholesale;
     if(typeof window.__BCM26_setCommercialOptionsExpanded==='function'){
-      window.__BCM26_setCommercialOptionsExpanded(!!(category||wholesalePrice||hasPresentation));
+      window.__BCM26_setCommercialOptionsExpanded(!!(wholesalePrice||hasPresentation));
     }
   }
 
@@ -314,6 +313,8 @@
     var imageFile=window.__BC_PRODUCT_IMAGE_FILE__||null;
     var nombre=document.getElementById('prod-nombre')?.value?.trim()||'';
     if(!nombre){msg('El nombre del producto es requerido.',false);return true;}
+    var categoriaId=document.getElementById('prod-categoria')?.value||'';
+    if(!categoriaId){msg('Selecciona una categoría para guardar el producto.',false);document.getElementById('prod-categoria')?.focus();return true;}
     var save=document.getElementById('prod-submit-btn')||document.getElementById('bc171-save');if(save)save.disabled=true;
     var pnRaw=document.getElementById('prod-precio-normal')?.value??'';var pmRaw=document.getElementById('prod-precio-mayorista')?.value??'';
     var pn=String(pnRaw).trim()===''?null:Number(pnRaw);var pm=String(pmRaw).trim()===''?null:Number(pmRaw);
@@ -391,8 +392,8 @@
     ensurePresFields();
   }
   function downloadTemplate(){
-    var header=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_normal','factor_normal','presentacion_mayorista','factor_mayorista'];
-    var sample=['Cerveza Bucanero','Bebidas','botella','650','600','Unidad','1','Paquete x 24','24'];
+    var header=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_mayorista','factor_mayorista'];
+    var sample=['Cerveza Bucanero','Bebidas','botella','650','600','Paquete x 24','24'];
     var escCsv=function(x){return '"'+String(x??'').replace(/"/g,'""')+'"';};
     var blob=new Blob([header.map(escCsv).join(',')+'\n'+sample.map(escCsv).join(',')+'\n'],{type:'text/csv;charset=utf-8;'});
     var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='plantilla_productos_battlecruiser.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
@@ -401,11 +402,11 @@
     if(document.getElementById('bc-pulido-help'))return;
     var ov=document.createElement('div');ov.id='bc-pulido-help';ov.className='bc-pulido-help-overlay';ov.innerHTML='<div class="bc-pulido-dialog" role="dialog" aria-modal="true"><h3>Cómo llenar la plantilla</h3><p>Usá únicamente la plantilla CSV descargada en el Paso 1. No cambies los encabezados, no agregues columnas y no borres la primera fila.</p><div class="bc-pulido-help-grid">'
       +'<div class="bc-pulido-help-card"><strong>nombre · obligatorio</strong><p>Un producto por fila. Ej.: Cerveza Bucanero. No lo dejes vacío.</p></div>'
-      +'<div class="bc-pulido-help-card"><strong>categoria · opcional</strong><p>Debe coincidir con una categoría existente para asociarse automáticamente.</p></div>'
+      +'<div class="bc-pulido-help-card"><strong>categoria · obligatoria</strong><p>Debe coincidir con una categoría existente para asociarse automáticamente.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>unidad · opcional</strong><p>Es la unidad base del inventario: botella, lata, libra, kg, etc. No uses “paquete x7” como unidad base.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>precio_normal · opcional</strong><p>Solo número. Ej.: 650. Si no aplica, déjalo vacío.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>precio_mayorista · opcional</strong><p>Solo número. Ej.: 200. Si no aplica, déjalo vacío.</p></div>'
-      +'<div class="bc-pulido-help-card"><strong>presentacion_normal + factor</strong><p>Ej.: Unidad + 1. El factor es cuántas unidades base representa una venta.</p></div>'
+      +'<div class="bc-pulido-help-card"><strong>unidad minorista automática</strong><p>Ej.: Unidad + 1. El factor es cuántas unidades base representa una venta.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>presentacion_mayorista + factor</strong><p>Ej.: Paquete x 7 + 7. Una venta mayorista de 1 paquete descontará 7 unidades base.</p></div>'
       +'<div class="bc-pulido-help-card"><strong>Regla crítica</strong><p>No escribas “7 unidades” dentro del factor. El factor debe ser solo un número positivo.</p></div>'
       +'</div><div class="bc-pulido-dialog-actions"><button type="button" id="bc-pulido-help-close">Cerrar</button></div></div>';
@@ -420,7 +421,7 @@
   function catId(name){if(!name)return null;var cs=Array.isArray(window._cache&&_cache.categorias)?_cache.categorias:[];var hit=cs.find(function(c){return norm(c.nombre)===norm(name);});return hit?hit.id:null;}
   async function importRows(file,body){
     var text=await file.text(),parsed=parseCsv(text),ok=0,fail=0,errors=[];
-    var headersRequired=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_normal','factor_normal','presentacion_mayorista','factor_mayorista'];
+    var headersRequired=['nombre','categoria','unidad','precio_normal','precio_mayorista','presentacion_mayorista','factor_mayorista'];
     if(parsed.h.indexOf('nombre')<0)throw Error('Falta la columna nombre.');
     for(var i=0;i<parsed.rows.length;i++){
       var r=parsed.rows[i],nombre=val(r,'nombre',['nombre']);
