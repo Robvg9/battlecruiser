@@ -248,7 +248,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.ok(importFile.accept.includes(".csv") && importFile.accept.includes(".xlsx"),"the importer must retain CSV and optional Excel support");
  Object.defineProperty(importFile,"files",{configurable:true,value:[{
   name:"productos.csv",
-  text:async function(){return "Nombre,Categoría,Unidad,Precio normal,Precio mayorista\nAvena,Secos,paquete,10,8";}
+  text:async function(){return "Nombre;Precio;Categoría\nAvena;10,00;Secos";}
  }]});
  importFile.dispatchEvent(new w.Event("change",{bubbles:true}));
  await waitFor(
@@ -264,8 +264,8 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.deepEqual(JSON.parse(JSON.stringify(c.catalogCalls[0])),{
   name:"bc_guardar_producto_catalogo",
   payload:{
-   p_producto_id:null,p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"paquete",
-   p_precio_normal:10,p_precio_mayorista:8,p_presentacion_normal:"paquete",p_factor_normal:1,
+   p_producto_id:null,p_nombre:"Avena",p_categoria_id:"cat-secos",p_unidad:"unidad",
+   p_precio_normal:10,p_precio_mayorista:null,p_presentacion_normal:"unidad",p_factor_normal:1,
    p_presentacion_mayorista:null,p_factor_mayorista:null,p_idempotency_key:"test-idempotency-key"
   }
  });
@@ -278,7 +278,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
  d.getElementById("prod-nombre").value="Arroz";
  d.getElementById("prod-categoria").value="cat-secos";
  d.getElementById("prod-precio-normal").value="12.5";
- d.getElementById("prod-precio-mayorista").value="10.25";
+ d.getElementById("prod-precio-mayorista").value="";
  form.dispatchEvent(new w.Event("submit",{bubbles:true,cancelable:true}));
  await waitFor(
    ()=>c.catalogCalls.length===2 &&
@@ -294,7 +294,7 @@ test("native Add opens the single M26 modal and preserves the existing product c
    p_categoria_id:"cat-secos",
    p_unidad:"unidad",
    p_precio_normal:12.5,
-   p_precio_mayorista:10.25,
+   p_precio_mayorista:null,
    p_presentacion_normal:"unidad",
    p_factor_normal:1,
    p_presentacion_mayorista:null,
