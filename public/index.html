@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0c1c18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.62">
+<link rel="stylesheet" href="style.css?v=9.5.63">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 #app-shell.visible:not([data-bc-permisos-cargados="1"]) #tabs .tab-btn[data-tab],
@@ -210,8 +210,8 @@
       <form id="form-producto" class="inline-form">
         <input type="hidden" id="prod-editando-id" value="">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
-        <select id="prod-categoria"><option value="">Categoría</option></select>
-        <input id="prod-unidad" aria-label="Presentación base del inventario" placeholder="Presentación base (ej. botella, kg)" list="presentaciones-comunes">
+        <select id="prod-categoria" required aria-label="Categoría"><option value="">Selecciona una categoría</option></select>
+        <input id="prod-unidad" aria-label="Unidad base del inventario" placeholder="Unidad base (ej. unidad, botella, kg)">
         <datalist id="presentaciones-comunes"></datalist>
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio normal" required>
         <input id="prod-precio-mayorista" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio mayorista">
@@ -630,38 +630,6 @@
             <p class="muted">Administra las categorías que organizan tus productos.</p>
             <button type="button" id="bc-categories-open" class="cc-accion">Administrar categorías</button>
           </section>
-          <!-- One canonical commercial-presentation catalogue; no separate units CRUD or product-side copy. -->
-          <section class="cc-bloque bc-admin-card bc-admin-presentations">
-            <div class="bc-admin-card-heading"><h3>Presentaciones</h3><span class="bc-admin-tag">Catálogo único</span></div>
-            <p class="muted">Define los formatos disponibles y cómo cada producto convierte sus cantidades a la presentación base.</p>
-            <div class="presentaciones-panel">
-              <div class="presentaciones-catalogo">
-                <h4>Catálogo de presentaciones</h4>
-                <p class="muted">Crea, edita, activa, desactiva o elimina formatos que no estén vinculados a productos.</p>
-                <form id="form-presentacion-nueva" class="inline-form hidden">
-                  <input id="pres-nombre-nueva" placeholder="Nombre (ej. Unidad, Caja, Paquete)" required maxlength="80">
-                  <button type="submit">Crear presentación</button>
-                </form>
-                <div id="lista-presentaciones-catalogo" class="lista"></div>
-              </div>
-              <div class="presentaciones-producto">
-                <h4>Formatos por producto</h4>
-                <p class="muted">Asigna un formato minorista o mayorista y su equivalencia en la presentación base.</p>
-                <select id="pp-producto-select" aria-label="Producto"><option value="">Elegí un producto…</option></select>
-                <div id="pp-lista-asociaciones" class="lista"><p class="lista-estado">Elegí un producto para ver sus formatos.</p></div>
-                <form id="form-pp-nueva" class="inline-form hidden">
-                  <select id="pp-canal-select" aria-label="Tipo de venta">
-                    <option value="normal">Minorista</option>
-                    <option value="mayorista">Mayorista</option>
-                  </select>
-                  <select id="pp-presentacion-select" required aria-label="Presentación"></select>
-                  <input id="pp-factor" type="number" inputmode="decimal" step="0.0001" min="0.0001" placeholder="Equivalencia (ej. 24)" required aria-label="Unidades base por presentación">
-                  <button type="submit">Guardar formato</button>
-                </form>
-              </div>
-            </div>
-            <p class="msg" id="msg-presentaciones" role="status" aria-live="polite"></p>
-          </section>
           <section id="bc-modal-categorias" class="bc-categories-modal" role="dialog" aria-modal="true" aria-labelledby="bc-categories-title" aria-hidden="true">
             <div class="bc-categories-backdrop" data-bc-categories-close="1"></div>
             <div class="bc-categories-panel">
@@ -699,13 +667,13 @@
 <script src="js/loading-guard.js"></script>
 <script src="js/centro-control.js?v=9.5.62"></script>
 <script src="js/navegacion.js?v=9.5.62"></script>
-<script src="js/productos.js?v=20261104.2"></script>
+<script src="js/productos.js?v=20261105.1"></script>
 <script src="js/presentaciones.js?v=20261104.2"></script>
 <script src="js/almacenes.js?v=20261104.2"></script>
 <script src="js/transferencias.js"></script>
 <script src="js/vales.js"></script>
 <script src="js/ventas.js?v=20261104.2"></script>
-<script src="js/catalogos.js?v=20261104.4"></script>
+<script src="js/catalogos.js?v=20261105.1"></script>
 <script src="js/usuarios-permisos.js"></script>
 <script src="js/mando.js?v=9.5.62"></script>
 <script src="js/reportes.js?v=20261022.2"></script>
@@ -718,6 +686,6 @@
 <script src="js/comunicacion.js?v=9.5.62"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.62"></script>
+<script src="app.js?v=9.5.63"></script>
 </body>
 </html>
