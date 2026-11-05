@@ -11,7 +11,7 @@ const SOURCE = fs.readFileSync(
   "utf8"
 );
 
-const EDIT_START = SOURCE.indexOf("function iniciarEdicionProducto(p) {");
+const EDIT_START = SOURCE.indexOf("async function iniciarEdicionProducto(p) {");
 const EDIT_END = SOURCE.indexOf('safeInit("form-producto"', EDIT_START);
 const VARIANT_HELPERS_START = SOURCE.indexOf("function renderEditorVariantesProducto(variantes) {");
 const VARIANT_HELPERS_END = SOURCE.indexOf("function iniciarEdicionProducto(p) {", VARIANT_HELPERS_START);
