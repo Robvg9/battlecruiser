@@ -708,29 +708,24 @@ async function main() {
     "El catálogo de presentaciones de Administración debía estar retirado: "+JSON.stringify(adminCatalogsStable));
   assert(adminCatalogsStable.retailFieldsAbsent && adminCatalogsStable.baseUnitExists && adminCatalogsStable.baseUnitHasNoPresentationCatalogue && adminCatalogsStable.categoryRequired && adminCatalogsStable.categoriesStayInAdmin,
     "La venta minorista debe usar unidad base × 1 y la categoría debe seguir siendo obligatoria: "+JSON.stringify(adminCatalogsStable));
-  // Roles y permisos: the explanatory help is opened only from its ⓘ icon.
-  const rolesEntry = await waitUntil(
-    "acceso único a Roles y Permisos en Administración",
-    "(()=>{const admin=document.querySelector('#tab-config');const card=admin&&admin.querySelector('.bc-admin-roles');const button=admin&&admin.querySelector('#bc-btn-config-roles');return card&&button&&card.contains(button)?{ready:true,entry:button.id}:null})()",
+  // Administration now exposes category management only. Legacy roles and
+  // presentations surfaces must remain absent; category controls stay usable.
+  const adminSurface = await waitUntil(
+    "Administración con categorías y sin roles/permisos/presentaciones",
+    "(()=>{const admin=document.querySelector('#tab-config');const open=admin&&admin.querySelector('#bc-categories-open');const modal=document.querySelector('#bc-modal-categorias');const form=modal&&modal.querySelector('#form-categoria');const list=modal&&modal.querySelector('#lista-categorias');const obsolete=['.bc-admin-roles','#bc-btn-config-roles','#bc-modal-roles-permisos','#bc-modal-roles-help','#form-nuevo-rol','#lista-roles','.presentaciones-panel','#form-presentacion-nueva','#lista-presentaciones-catalogo','#pp-producto-select','#pp-lista-asociaciones','#form-pp-nueva'];const obsoleteCounts=Object.fromEntries(obsolete.map(selector=>[selector,document.querySelectorAll(selector).length]));const obsoleteAbsent=Object.values(obsoleteCounts).every(n=>n===0);const staleLabels=!!(admin&&/Roles y permisos|Permisos inteligentes|Presentaciones comerciales|Solo lectura|Administrador operativo/.test(admin.textContent||''));return admin&&open&&modal&&form&&list&&obsoleteAbsent&&!staleLabels?{ready:true,categoryButton:open.id,categoryForm:!!form,categoryList:!!list,modalInitiallyClosed:modal.getAttribute('aria-hidden')==='true'||!modal.classList.contains('open'),obsoleteCounts,staleLabels}:null})()",
     10000
   );
-  report.evidence.rolesEntry = rolesEntry;
-  const rolesModalState = await evaluate("(()=>{const button=document.querySelector('#tab-config #bc-btn-config-roles');if(!button)return {ready:false,reason:'falta acceso de Roles'};button.click();const modal=document.querySelector('#bc-modal-roles-permisos');const info=modal&&modal.querySelector('#bc-btn-roles-help');return {ready:true,modalOpen:!!(modal&&modal.classList.contains('open')),infoInsideRolesModal:!!info,infoCount:document.querySelectorAll('#bc-btn-roles-help').length}})()");
-  assert(rolesModalState.ready && rolesModalState.modalOpen && rolesModalState.infoInsideRolesModal && rolesModalState.infoCount===1,
-    "Roles y Permisos no abrió una sola ventana con el icono ⓘ contextual: "+JSON.stringify(rolesModalState));
-  const rolesHelpState = await evaluate("(()=>{const modal=document.querySelector('#bc-modal-roles-permisos');const info=modal&&modal.querySelector('#bc-btn-roles-help');if(info)info.click();const help=document.querySelector('#bc-modal-roles-help');const content=document.querySelector('#bc-roles-help-content');return {helpOpen:!!(help&&help.classList.contains('open')),helpHasExplanation:!!(content&&(content.textContent||'').trim().length>20),helpContentLength:content?(content.textContent||'').trim().length:0,permanentMatrixInAdmin:!!(document.querySelector('#tab-config')&&/Permisos inteligentes/i.test(document.querySelector('#tab-config').textContent))}})()");
-  assert(rolesHelpState.helpOpen && rolesHelpState.helpHasExplanation,
-    "El icono ⓘ no abrió la explicación contextual de permisos: "+JSON.stringify(rolesHelpState));
-  const rolesHelpClosed = await evaluate("(()=>{const help=document.querySelector('#bc-modal-roles-help');const close=help&&help.querySelector('.bc-roles-close');if(close)close.click();const roles=document.querySelector('#bc-modal-roles-permisos');const rolesClose=roles&&roles.querySelector('[data-bc-roles-close=\"1\"].bc-roles-close');if(rolesClose)rolesClose.click();return {helpClosed:!!(!help||!help.classList.contains('open')),rolesClosed:!!(!roles||!roles.classList.contains('open'))}})()");
-  assert(rolesHelpClosed.helpClosed && rolesHelpClosed.rolesClosed,
-    "Las ventanas de ayuda o Roles no cerraron correctamente: "+JSON.stringify(rolesHelpClosed));
+  report.evidence.adminSurface = adminSurface;
+  const categoryModalState = await evaluate("(()=>{const button=document.querySelector('#tab-config #bc-categories-open');if(!button)return {ready:false,reason:'falta acceso a Categorías'};button.click();const modal=document.querySelector('#bc-modal-categorias');return {ready:true,modalOpen:!!(modal&&modal.classList.contains('open')),categoryForm:!!(modal&&modal.querySelector('#form-categoria')),categoryList:!!(modal&&modal.querySelector('#lista-categorias')),rolesModalAbsent:!document.querySelector('#bc-modal-roles-permisos,#bc-modal-roles-help')}})()");
+  assert(categoryModalState.ready && categoryModalState.modalOpen && categoryModalState.categoryForm && categoryModalState.categoryList && categoryModalState.rolesModalAbsent,
+    "Administración no abrió correctamente el único modal de Categorías o reintrodujo Roles: " + JSON.stringify(categoryModalState));
+  const categoryModalClosed = await evaluate("(()=>{const modal=document.querySelector('#bc-modal-categorias');const close=modal&&modal.querySelector('.bc-categories-close');if(close)close.click();return {closed:!!(!modal||!modal.classList.contains('open')),rolesModalAbsent:!document.querySelector('#bc-modal-roles-permisos,#bc-modal-roles-help')}})()");
+  assert(categoryModalClosed.closed && categoryModalClosed.rolesModalAbsent,
+    "El modal de Categorías no cerró correctamente o apareció una ventana de Roles: " + JSON.stringify(categoryModalClosed));
   report.evidence.adminCatalogsUi = {
-    initial: adminCatalogsInitial,
-    settled: adminCatalogsStable,
-    rolesEntry: rolesEntry,
-    rolesModal: rolesModalState,
-    contextualHelp: rolesHelpState,
-    close: rolesHelpClosed,
+    surface: adminSurface,
+    categoryModal: categoryModalState,
+    close: categoryModalClosed,
     browser: "Chromium CDP",
   };
   // Login fits portrait and landscape phone viewports without hiding any form item.
