@@ -22,6 +22,12 @@ BEGIN
      OR position('v_presentacion_producto is not null and v_presentacion_id<>v_presentacion_producto' IN typed_definition)>0 THEN
     RAISE EXCEPTION 'Price selection must remain independent from the warehouse presentation';
   END IF;
+  IF position('v_subtotal:=v_cantidad_presentacion*v_precio' IN legacy_definition)=0
+     OR position('v_precio_unitario:=v_subtotal/v_cantidad_final' IN legacy_definition)=0
+     OR position('v_subtotal:=v_cantidad_presentacion*v_precio' IN typed_definition)=0
+     OR position('v_precio_unitario:=v_subtotal/v_cantidad_final' IN typed_definition)=0 THEN
+    RAISE EXCEPTION 'Wholesale price must apply once per package while stock/line quantity remains in base units';
+  END IF;
 
   SELECT lower(pg_get_functiondef('public.bc_guardar_producto_catalogo(uuid,text,uuid,text,numeric,numeric,text,numeric,text,numeric,uuid)'::regprocedure))
     INTO catalog_definition;
