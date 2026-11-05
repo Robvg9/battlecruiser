@@ -219,8 +219,24 @@ safeInit("form-vale", () => {
 // ---- El precio se decide SOLO en el servidor (RPC registrar_venta) según el
 let ventaLineas = [];
 let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
-let ventaProductosPrecios = {}; // id -> { nombre, precio_normal, precio_mayorista }
-let ventaProductosLista = []; // lista completa de productos, para el buscador
+let ventaProductosPrecios = {}; // id -> precios y formatos operativos por canal
+let ventaProductosLista = [];
+
+function formatoVentaProducto(producto, tipoAlmacen) {
+  if (!producto) return null;
+  const formato = tipoAlmacen === "mayorista"
+    ? producto.formato_mayorista
+    : producto.formato_minorista;
+  if (!formato || !formato.presentacion_id) return null;
+  const factor = Number(formato.factor);
+  if (!Number.isFinite(factor) || factor <= 0) return null;
+  return { presentacion_id: formato.presentacion_id, factor, nombre: formato.nombre || (tipoAlmacen === "mayorista" ? "formato mayorista" : "unidad") };
+}
+
+function cantidadBaseLineaVenta(linea) {
+  const value = Number(linea && linea.cantidad_base);
+  return Number.isFinite(value) && value >= 0 ? value : Number(linea && linea.cantidad) || 0;
+} // lista completa de productos, para el buscador
 let ventaCategoriasLista = []; // Misión 9.3 (Tarea 2): categorías reales, para los filtros del catálogo
 let catalogoCategoriaActiva = ""; // "" = Todos. Estado local de la pestaña, no una segunda cache.
 
@@ -236,7 +252,7 @@ function obtenerStockDisponible(producto_id, almacen_id) {
 function cantidadEnCarrito(producto_id, exceptoIdx) {
   return ventaLineas.reduce((s, l, i) => {
     if (i === exceptoIdx) return s;
-    return l.producto_id === producto_id ? s + l.cantidad : s;
+    return l.producto_id === producto_id ? s + cantidadBaseLineaVenta(l) : s;
   }, 0);
 }
 
@@ -268,21 +284,42 @@ function actualizarStockDisponibleUI() {
     return;
   }
 
-  const { valor: stockTotal, ajuste, noCalculable } = obtenerStockDisponible(producto_id, almacen_id); // ya incluye ajuste por pendientes
-  const enCarrito = cantidadEnCarrito(producto_id, -1);
-  const disponible = Math.max(stockTotal - enCarrito, 0);
+  const producto = ventaProductosPrecios[producto_id];
+  const tipo = ventaAlmacenesTipo[almacen_id];
+  const formato = formatoVentaProducto(producto, tipo);
+  if (!formato) {
+    infoEl.textContent = tipo === "mayorista"
+      ? "Este producto no tiene Formato de venta mayorista configurado."
+      : "Este producto no tiene su unidad minorista configurada.";
+    infoEl.className = "msg error";
+    cantidadInput.removeAttribute("max");
+    return;
+  }
 
+  const { valor: stockTotal, ajuste, noCalculable } = obtenerStockDisponible(producto_id, almacen_id);
+  const enCarrito = cantidadEnCarrito(producto_id, -1);
+  const disponibleBase = Math.max(stockTotal - enCarrito, 0);
+  const disponibleFormato = tipo === "mayorista"
+    ? Math.floor(disponibleBase / formato.factor)
+    : disponibleBase;
+
+  cantidadInput.step = tipo === "mayorista" ? "1" : "0.01";
+  cantidadInput.min = tipo === "mayorista" ? "1" : "0.01";
+  cantidadInput.placeholder = tipo === "mayorista" ? "Cantidad de " + formato.nombre.toLowerCase() : "Cantidad";
   if (noCalculable) {
-    infoEl.textContent = "Stock disponible: " + money(disponible) + " (proyección no calculable — hay una compra pendiente con presentación sin confirmar en este dispositivo)";
+    infoEl.textContent = "Stock disponible: " + money(disponibleFormato) + " " + formato.nombre + " (proyección offline incompleta)";
     infoEl.className = "msg";
     cantidadInput.removeAttribute("max");
     return;
   }
 
   const tienePendientes = ajuste !== 0;
-  infoEl.textContent = "Stock disponible: " + money(disponible) + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
-  infoEl.className = "msg" + (disponible <= 0 ? " error" : "");
-  cantidadInput.setAttribute("max", disponible);
+  const stockLabel = tipo === "mayorista"
+    ? money(disponibleFormato) + " " + formato.nombre + " (" + money(disponibleBase) + " unidades base)"
+    : money(disponibleBase) + " unidades";
+  infoEl.textContent = "Stock disponible: " + stockLabel + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
+  infoEl.className = "msg" + (disponibleBase <= 0 ? " error" : "");
+  cantidadInput.setAttribute("max", disponibleFormato);
 }
 
 function agregarLineaVenta(producto_id, cantidad, almacen_id) {
@@ -290,31 +327,53 @@ function agregarLineaVenta(producto_id, cantidad, almacen_id) {
   const producto = ventaProductosPrecios[producto_id];
   if (!producto) { setMsg("msg-venta-linea", "Producto no encontrado.", false); return false; }
 
+  const formato = formatoVentaProducto(producto, tipo);
+  if (!formato) {
+    setMsg("msg-venta-linea", tipo === "mayorista"
+      ? "Configura Precio mayorista y Formato de venta para este producto antes de venderlo."
+      : "El producto no tiene una única unidad minorista válida.", false);
+    return false;
+  }
   const precio = tipo === "mayorista" ? producto.precio_mayorista : producto.precio_normal;
-  if (precio === null || precio === undefined) {
-    setMsg("msg-venta-linea", "Este producto no tiene precio mayorista configurado.", false);
+  if (precio === null || precio === undefined || !(Number(precio) > 0)) {
+    setMsg("msg-venta-linea", tipo === "mayorista"
+      ? "Este producto no tiene Precio mayorista configurado."
+      : "Este producto no tiene Precio configurado.", false);
+    return false;
+  }
+  if (tipo === "mayorista" && !Number.isInteger(cantidad)) {
+    setMsg("msg-venta-linea", "La cantidad de " + formato.nombre.toLowerCase() + " debe ser un número entero.", false);
     return false;
   }
 
-  // Impedir superar el stock disponible: se compara lo que ya está en el
-  // carrito para ese producto + lo que se está por agregar, contra el
-  // stock real de ese producto en el almacén elegido.
+  const cantidadBase = cantidad * formato.factor;
   const existente = ventaLineas.find((l) => l.producto_id === producto_id);
   const { valor: stockTotal } = obtenerStockDisponible(producto_id, almacen_id);
-  const yaEnCarrito = existente ? existente.cantidad : 0;
-  if (yaEnCarrito + cantidad > stockTotal) {
-    const disponible = Math.max(stockTotal - yaEnCarrito, 0);
-    setMsg("msg-venta-linea", "No hay suficiente stock de " + producto.nombre + " (disponible: " + money(disponible) + ").", false);
+  const yaEnCarritoBase = existente ? cantidadBaseLineaVenta(existente) : 0;
+  if (yaEnCarritoBase + cantidadBase > stockTotal) {
+    const disponibleBase = Math.max(stockTotal - yaEnCarritoBase, 0);
+    const disponibleFormato = tipo === "mayorista" ? Math.floor(disponibleBase / formato.factor) : disponibleBase;
+    setMsg("msg-venta-linea", "Stock insuficiente de " + producto.nombre + " (disponible: "
+      + money(disponibleFormato) + " " + formato.nombre + ").", false);
     return false;
   }
 
   if (existente) {
     existente.cantidad += cantidad;
+    existente.cantidad_base += cantidadBase;
     existente.subtotal = existente.cantidad * existente.precio_unitario;
   } else {
     ventaLineas.push({
-      producto_id, nombre: producto.nombre, cantidad,
-      precio_unitario: precio, subtotal: cantidad * precio,
+      producto_id,
+      nombre: producto.nombre,
+      cantidad,
+      cantidad_base: cantidadBase,
+      presentacion_id: formato.presentacion_id,
+      presentacion_nombre: formato.nombre,
+      factor_presentacion: formato.factor,
+      tipo_precio: tipo === "mayorista" ? "mayorista" : "normal",
+      precio_unitario: Number(precio),
+      subtotal: cantidad * Number(precio),
     });
   }
 
@@ -358,9 +417,16 @@ function renderCatalogoGrid() {
   const tipo = almacen_id ? ventaAlmacenesTipo[almacen_id] : null;
   grid.innerHTML = "";
   disponibles.forEach((p) => {
-    const precio = tipo === "mayorista" ? p.precio_mayorista : p.precio_normal;
+    const productoVenta = ventaProductosPrecios[p.id] || p;
+    const precio = tipo === "mayorista" ? productoVenta.precio_mayorista : productoVenta.precio_normal;
+    const formato = formatoVentaProducto(productoVenta, tipo);
     const precioTxt = precio === null || precio === undefined ? "Sin precio" : "$" + money(precio);
-    const stockTxt = almacen_id ? money(obtenerStockDisponible(p.id, almacen_id).valor) : null;
+    const stockBase = almacen_id ? obtenerStockDisponible(p.id, almacen_id).valor : null;
+    const stockTxt = stockBase === null ? null : (formato
+      ? (tipo === "mayorista"
+        ? money(Math.floor(stockBase / formato.factor)) + " " + formato.nombre + " · " + money(stockBase) + " u"
+        : money(stockBase) + " u")
+      : money(stockBase) + " u");
 
     const card = document.createElement("button");
     card.type = "button";
@@ -449,13 +515,13 @@ function renderVentaLineas() {
     div.className = "lista-item";
     div.innerHTML = `
       <span class="venta-linea-info">
-        <span>${escHtml(linea.nombre)}</span>
-        <span class="muted">$${money(linea.precio_unitario)} c/u</span>
+        <span>${escHtml(linea.nombre)} · ${money(linea.cantidad)} ${escHtml(linea.presentacion_nombre || "unidades")}</span>
+        <span class="muted">$${money(linea.precio_unitario)} por ${escHtml(linea.presentacion_nombre || "unidad")}</span>
       </span>
       <span class="venta-linea-precios">
         <span class="venta-linea-cant-wrap">
           <button type="button" class="venta-linea-btn venta-linea-menos" data-idx="${idx}" aria-label="Restar">−</button>
-          <input type="number" class="venta-linea-cant-input" data-idx="${idx}" value="${linea.cantidad}" step="0.01" min="0.01">
+          <input type="number" class="venta-linea-cant-input" data-idx="${idx}" value="${linea.cantidad}" step="${linea.factor_presentacion > 1 ? "1" : "0.01"}" min="${linea.factor_presentacion > 1 ? "1" : "0.01"}">
           <button type="button" class="venta-linea-btn venta-linea-mas" data-idx="${idx}" aria-label="Sumar">+</button>
         </span>
         <span class="muted">$${money(linea.subtotal)}</span>
@@ -482,17 +548,28 @@ function actualizarCantidadLinea(idx, nuevaCantidad) {
   }
 
   const almacen_id = document.getElementById("venta-almacen").value;
+  if (linea.factor_presentacion > 1 && !Number.isInteger(nuevaCantidad)) {
+    setMsg("msg-venta-linea", "La cantidad de " + linea.presentacion_nombre + " debe ser un número entero.", false);
+    renderVentaLineas();
+    return;
+  }
   const { valor: stockTotal } = obtenerStockDisponible(linea.producto_id, almacen_id);
-  const enOtrasLineas = cantidadEnCarrito(linea.producto_id, idx);
-  const disponible = stockTotal - enOtrasLineas;
+  const enOtrasLineasBase = cantidadEnCarrito(linea.producto_id, idx);
+  const nuevaCantidadBase = nuevaCantidad * (Number(linea.factor_presentacion) || 1);
+  const disponibleBase = stockTotal - enOtrasLineasBase;
 
-  if (nuevaCantidad > disponible) {
-    setMsg("msg-venta-linea", "No hay suficiente stock de " + linea.nombre + " (disponible: " + money(Math.max(disponible, 0)) + ").", false);
-    renderVentaLineas(); // vuelve a mostrar el valor anterior, sin aplicar el cambio
+  if (nuevaCantidadBase > disponibleBase) {
+    const disponibleFormato = linea.factor_presentacion > 1
+      ? Math.floor(Math.max(disponibleBase, 0) / linea.factor_presentacion)
+      : Math.max(disponibleBase, 0);
+    setMsg("msg-venta-linea", "No hay suficiente stock de " + linea.nombre + " (disponible: "
+      + money(disponibleFormato) + " " + linea.presentacion_nombre + ").", false);
+    renderVentaLineas();
     return;
   }
 
   linea.cantidad = nuevaCantidad;
+  linea.cantidad_base = nuevaCantidadBase;
   linea.subtotal = nuevaCantidad * linea.precio_unitario;
   setMsg("msg-venta-linea", "", true);
   renderVentaLineas();
@@ -738,7 +815,13 @@ safeInit("confirmar-venta", () => {
     btn.textContent = "Procesando...";
     setMsg("msg-venta", "Procesando venta…", true);
 
-    const p_lineas = ventaLineas.map((l) => ({ producto_id: l.producto_id, cantidad: l.cantidad }));
+    const p_lineas = ventaLineas.map((l) => ({
+      producto_id: l.producto_id,
+      cantidad: cantidadBaseLineaVenta(l),
+      presentacion_id: l.presentacion_id,
+      cantidad_presentacion: l.cantidad,
+      tipo_precio: l.tipo_precio,
+    }));
     const ventaPayload = { p_almacen_id: almacen_id, p_lineas };
     const tipoOperacionVenta = esJornada ? "venta_jornada" : "venta";
     if (esJornada) {
@@ -787,11 +870,41 @@ async function refrescarVentas() {
     ? productosOperativos(productos)
     : productos.filter((p) => !p.inventario_mixto || !!p.producto_padre_id);
   ventaProductosPrecios = {};
-  productosVenta.forEach((p) => {
+  await Promise.all(productosVenta.map(async (p) => {
+    let asociaciones = [];
+    try {
+      if (typeof cargarAsociacionesProducto === "function") {
+        asociaciones = await cargarAsociacionesProducto(p.id);
+      }
+    } catch (error) {
+      console.warn("[BattleCruiser] No se pudieron cargar los formatos de venta de " + p.nombre + ":", error);
+    }
+    const activas = (asociaciones || []).filter((row) => row && row.activo !== false && row.presentacion_id);
+    const mayorista = p.presentacion_id
+      ? activas.find((row) => String(row.presentacion_id) === String(p.presentacion_id))
+      : null;
+    const minoristas = activas.filter((row) => !p.presentacion_id || String(row.presentacion_id) !== String(p.presentacion_id));
+    const minorista = minoristas.length === 1 ? minoristas[0] : null;
+    const nombreFormato = (row) => row && row.presentaciones && row.presentaciones.nombre
+      ? row.presentaciones.nombre
+      : (row && row.presentacion_id ? "Formato" : "");
     ventaProductosPrecios[p.id] = {
-      nombre: p.nombre, precio_normal: p.precio_normal, precio_mayorista: p.precio_mayorista,
+      nombre: p.nombre,
+      precio_normal: p.precio_normal,
+      precio_mayorista: p.precio_mayorista,
+      presentacion_id: p.presentacion_id || null,
+      formato_mayorista: mayorista ? {
+        presentacion_id: mayorista.presentacion_id,
+        factor: Number(mayorista.factor),
+        nombre: nombreFormato(mayorista),
+      } : null,
+      formato_minorista: minorista ? {
+        presentacion_id: minorista.presentacion_id,
+        factor: Number(minorista.factor),
+        nombre: nombreFormato(minorista) || p.unidad || "unidad",
+      } : null,
     };
-  });
+  }));
 
   ventaProductosLista = productosVenta;
   ventaCategoriasLista = categorias;
