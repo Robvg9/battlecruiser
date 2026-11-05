@@ -67,7 +67,7 @@ function renderStepTwo(){
  var b=document.getElementById('bc-m55-body');if(!b)return;
  b.innerHTML='<div class="bc-m55-step">PASO 2 DE 2 · IMPORTAR EL ARCHIVO COMPLETADO</div>'+
  '<p>Selecciona el CSV que rellenaste en Excel. Primero revisaremos sus filas; ningún producto se procesa hasta que pulses «Procesar importación».</p>'+
- '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,text/csv" aria-label="Seleccionar plantilla CSV completada">'+
+ '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar plantilla CSV completada">'+
  '<div id="bc-m55-result"></div><div id="bc-m55-preview"></div>'+
  '<div class="bc-m55-actions"><button type="button" id="bc-m55-back">Volver al paso 1</button></div>';
  b.querySelector('#bc-m55-back').onclick=function(){state.step=1;state.headers=[];state.rows=[];state.map={};state.validated=null;renderStepOne()};
@@ -96,10 +96,27 @@ function parseCsv(text){
  var rows=lines.slice(1).map(function(line){var v=split(line),o={};h.forEach(function(k,i){o[k]=v[i]||''});return o});
  return{headers:h,rows:rows};
 }
+async function loadXLSX(){
+ if(window.XLSX)return window.XLSX;
+ if(typeof window.loadSheetJS==='function')return await window.loadSheetJS();
+ throw Error('No está disponible el lector XLSX en este dispositivo. Abre la plantilla CSV con Excel y guárdala como CSV UTF-8 para importarla.');
+}
 async function parseFile(file){
- var name=(file.name||'').toLowerCase();
- if(!name.endsWith('.csv'))throw Error('Usa el archivo CSV de la plantilla. En Excel selecciona «Guardar como CSV», no «Libro de Excel».');
- var p=parseCsv(await file.text());
+ var name=(file.name||'').toLowerCase(),p;
+ if(name.endsWith('.csv')){
+  p=parseCsv(await file.text());
+ }else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
+  var X=await loadXLSX(),wb=X.read(await file.arrayBuffer(),{type:'array',raw:false}),sheet=wb.Sheets[wb.SheetNames[0]];
+  if(!sheet)throw Error('El libro de Excel no contiene hojas.');
+  var aoa=X.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+  var headers=(aoa[0]||[]).map(function(x){return String(x==null?'':x).trim()});
+  var rows=aoa.slice(1).filter(function(row){return row.some(function(x){return String(x==null?'':x).trim()!==''})}).map(function(row){
+   var obj={};headers.forEach(function(key,i){obj[key]=row[i]==null?'':String(row[i]).trim()});return obj;
+  });
+  p={headers:headers,rows:rows};
+ }else{
+  throw Error('Selecciona la plantilla CSV o un libro Excel XLSX/XLS.');
+ }
  if(!p.headers.length||!p.rows.length)throw Error('El archivo debe conservar los encabezados y contener al menos un producto desde la fila 2.');
  if(p.rows.length>MAX_ROWS)throw Error('Máximo '+MAX_ROWS+' filas por importación.');
  state.headers=p.headers;state.rows=p.rows;state.map=autoMap(p.headers);
