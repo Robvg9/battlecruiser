@@ -16,12 +16,12 @@
     });
   }
   function num(v){const n=Number(v);return Number.isFinite(n)?n:0}
-  function fmtNumM42(v){return typeof window.numberFmt==='function'?window.numberFmt(v):String(v==null?0:v)}
-function money(v){
+  function fmtNumM42(v,options){return typeof window.numberFmt==='function'?window.numberFmt(v,options):num(v).toLocaleString('es-ES',Object.assign({useGrouping:true,maximumFractionDigits:2},options||{}))}
+  function money(v){
     if(typeof window.money==='function')return window.money(v);
     return num(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
   }
-  function pct(v){return (typeof window.numberFmt==='function'?window.numberFmt(v,{minimumFractionDigits:1,maximumFractionDigits:1}):num(v).toLocaleString('es-ES',{minimumFractionDigits:1,maximumFractionDigits:1}))+'%'}
+  function pct(v){return num(v).toLocaleString('es-ES',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'}
 
   function injectCss(){
     if(document.getElementById(STYLE_ID))return;
@@ -178,7 +178,7 @@ function money(v){
     if(!metrics||!lastExecutive)return;
     const v=lastExecutive.ventas||{},inv=lastExecutive.inventario||{},comp=lastExecutive.compras||{},mar=lastExecutive.margen||{},t=lastExecutive.transferencias||{};
     metrics.innerHTML=
-      metric('↗','Ingresos totales','+
+      metric('↗','Ingresos totales','$'+money(v.ingresos||0),fmtNumM42(v.cantidad||0)+' ventas')+
       metric('▣','Ventas',fmtNumM42(v.cantidad||0),fmtNumM42(v.unidades||0)+' unidades')+
       metric('◌','Gastos / compras',comp.disponible===false?'—':'$'+money(comp.valor_compras||0),comp.disponible===false?(comp.nota||'No disponible'):fmtNumM42(comp.lotes||0)+' lote(s)')+
       metric('◇','Margen',mar.disponible===false?'—':(mar.margen_pct_conocido!=null?money(mar.margen_pct_conocido)+'%':'—'),mar.disponible===false?(mar.nota||'No disponible'):'Margen con costo conocido')+
@@ -186,57 +186,6 @@ function money(v){
     // Keep transferencias available as compact secondary text when useful.
     const last=metrics.querySelector('.bc-m42-metric:last-child .bc-m42-metric-sub');
     if(last && t.cantidad!=null)last.textContent=fmtNumM42(t.cantidad||0)+' transferencias · '+fmtNumM42(inv.stock_bajo||0)+' bajo';
-  }
-
-  function drawSalesChart(){
-    const canvas=document.getElementById('bc-m42-sales-chart');
-    if(!canvas)return;
-    const ctx=canvas.getContext('2d');if(!ctx)return;
-    const rows=(lastVentas||[]).slice().sort((a,b)=>new Date(a.fecha||0)-new Date(b.fecha||0));
-    const points=[];const byDay={};
-    rows.forEach(function(r){const d=r.fecha?String(r.fecha).slice(0,10):'Sin fecha';byDay[d]=(byDay[d]||0)+num(r.total)});
-    Object.keys(byDay).sort().forEach(function(d){points.push({label:d,total:byDay[d]})});
-    const w=canvas.clientWidth||640,h=canvas.clientHeight||270;const ratio=window.devicePixelRatio||1;
-    canvas.width=Math.max(1,Math.round(w*ratio));canvas.height=Math.max(1,Math.round(h*ratio));ctx.setTransform(ratio,0,0,ratio,0,0);
-    ctx.clearRect(0,0,w,h);
-    if(!points.length){ctx.fillStyle='rgba(201,192,168,.8)';ctx.font='13px Inter, sans-serif';ctx.textAlign='center';ctx.fillText('No hay ventas para los filtros seleccionados.',w/2,h/2);return;}
-    const pad={l:46,r:14,t:18,b:34};const pw=w-pad.l-pad.r,ph=h-pad.t-pad.b;const max=Math.max(...points.map(p=>p.total),1);const step=points.length===1?pw:pw/(points.length-1);
-    ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=1;ctx.font='10px Inter, sans-serif';ctx.fillStyle='rgba(201,192,168,.65)';ctx.textAlign='right';
-    for(let i=0;i<4;i++){const y=pad.t+ph*i/3;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText('$'+money(max*(1-i/3)),pad.l-7,y+3)}
-    const coords=points.map(function(p,i){return {x:pad.l+step*i,y:pad.t+ph-(p.total/max)*ph}});
-    ctx.beginPath();coords.forEach(function(c,i){if(i===0)ctx.moveTo(c.x,c.y);else ctx.lineTo(c.x,c.y)});ctx.strokeStyle='#d4b05c';ctx.lineWidth=2;ctx.stroke();
-    ctx.fillStyle='#efd48a';coords.forEach(function(c){ctx.beginPath();ctx.arc(c.x,c.y,3,0,Math.PI*2);ctx.fill()});
-    ctx.fillStyle='rgba(201,192,168,.72)';ctx.textAlign='center';
-    const labelEvery=Math.max(1,Math.ceil(points.length/6));points.forEach(function(p,i){if(i%labelEvery!==0&&i!==points.length-1)return;const x=pad.l+step*i;ctx.fillText(p.label==='Sin fecha'?'—':p.label.slice(5),x,h-12)});
-  }
-
-  function renderTopProducts(){
-    const el=document.getElementById('bc-m42-top-products');const note=document.getElementById('bc-m42-top-note');if(!el)return;
-    const totals={};
-    (lastVentas||[]).forEach(function(v){if(!Array.isArray(v.lineas))return;v.lineas.forEach(function(l){const name=l.producto||'—';if(!totals[name])totals[name]={units:0,total:0};totals[name].units+=num(l.cantidad);totals[name].total+=num(l.subtotal)})});
-    const list=Object.entries(totals).sort(function(a,b){return b[1].total-a[1].total}).slice(0,5);
-    if(!list.length){el.innerHTML='<div class="bc-m42-empty">No hay líneas de productos disponibles en las ventas cargadas.</div>';if(note)note.textContent='';return;}
-    el.innerHTML=list.map(function(entry,i){const name=entry[0],v=entry[1];return `<div class="bc-m42-top-item"><span class="bc-m42-rank">${i+1}</span><div><div class="bc-m42-top-name">${esc(name)}</div><div class="bc-m42-top-meta">${money(v.units)} u.</div></div><div class="bc-m42-top-total">$${money(v.total)}</div></div>`}).join('');
-    if(note)note.textContent=list.length<5?'Mostrando todos los disponibles.':'Top 5 por importe.';
-  }
-
-  function renderAnalysis(){ensureShell();renderTopProducts();drawSalesChart()}
-
-  function boot(){
-    ensureShell();captureExecutive();captureVentas();
-    setTimeout(function(){ensureShell();renderMetricCards();renderAnalysis()},50);
-    setTimeout(function(){ensureShell();renderMetricCards();renderAnalysis()},600);
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-})();
-+money(v.ingresos||0),(fmtNumM42(v.cantidad||0)+' ventas'))+
-      metric('▣','Ventas',String(v.cantidad||0),(v.unidades||0)+' unidades')+
-      metric('◌','Gastos / compras',comp.disponible===false?'—':'$'+money(comp.valor_compras||0),comp.disponible===false?(comp.nota||'No disponible'):(comp.lotes||0)+' lote(s)')+
-      metric('◇','Margen',mar.disponible===false?'—':(mar.margen_pct_conocido!=null?money(mar.margen_pct_conocido)+'%':'—'),mar.disponible===false?(mar.nota||'No disponible'):'Margen con costo conocido')+
-      metric('□','Stock',String(inv.productos||0),(inv.stock_bajo||0)+' bajo · '+(inv.stock_agotado||0)+' agotado');
-    // Keep transferencias available as compact secondary text when useful.
-    const last=metrics.querySelector('.bc-m42-metric:last-child .bc-m42-metric-sub');
-    if(last && t.cantidad!=null)last.textContent=(t.cantidad||0)+' transferencias · '+(inv.stock_bajo||0)+' bajo';
   }
 
   function drawSalesChart(){
