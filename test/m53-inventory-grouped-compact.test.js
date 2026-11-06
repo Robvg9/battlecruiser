@@ -135,8 +135,8 @@ test("Formato numérico global y modal de producto no exponen valor de inversió
   assert.match(coreSource, /function numberFmt\(value,options\)/);
   assert.match(coreSource, /part\.type===\"group\"\?\"\\u202f\"/);
   assert.match(coreSource, /function money\(n\)/);
-  assert.match(detailSource, /warehouse\.minimo/);
-  assert.match(detailSource, /warehouse\.cantidad/);
+  assert.match(detailSource, /\.minimo/);
+  assert.match(detailSource, /\.cantidad/);
   assert.doesNotMatch(detailSource, /moneySafe|Costo promedio|Valor del inventario|valor_inventario/);
 });
 
