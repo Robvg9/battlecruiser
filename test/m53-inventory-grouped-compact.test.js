@@ -28,7 +28,9 @@ async function waitFor(predicate, timeout = 2500) {
   return Boolean(predicate());
 }
 
-async function boot(t) {
+async function boot(t, options = {}) {
+  const fixtureRows = rows.map((row) => ({ ...row }));
+  const rpcCalls = [];
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
       "<section id='tab-inventario' class='tab-panel visible'>" +
@@ -44,7 +46,7 @@ async function boot(t) {
   );
   const { window } = dom;
   Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
-  window.tienePermiso = () => true;
+  window.tienePermiso = () => options.canEdit !== false;
   window.poblarSelectAlmacenes = () => {};
   window.escHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -56,20 +58,35 @@ async function boot(t) {
     minimumFractionDigits: 2, maximumFractionDigits: 2
   }).format(value);
   window.client = {
-    rpc: async (name) => {
-      if (name === "inventario_enriquecido") return { data: rows.map((row) => ({ ...row })), error: null };
+    rpc: async (name, args = {}) => {
+      rpcCalls.push({ name, args });
+      if (name === "inventario_enriquecido") return { data: fixtureRows.map((row) => ({ ...row })), error: null };
       if (name === "inventario_mixto_enriquecido") return { data: [], error: null };
+      if (name === "bc_actualizar_stock_minimo") {
+        const target = fixtureRows.find((row) =>
+          String(row.producto_id) === String(args.p_producto_id) &&
+          String(row.almacen_id) === String(args.p_almacen_id)
+        );
+        if (!target) return { data: null, error: { message: "Fila no encontrada" } };
+        target.minimo = Number(args.p_minimo);
+        target.estado = Number(target.cantidad) <= 0 ? "agotado"
+          : Number(target.cantidad) <= target.minimo && target.minimo > 0 ? "bajo" : "normal";
+        return { data: { ...target }, error: null };
+      }
       throw new Error("RPC inesperado en prueba: " + name);
     }
   };
+  window.__rpcCalls = rpcCalls;
+  window.__fixtureRows = fixtureRows;
   window.eval(m53Source);
+  window.eval(detailSource);
   window.document.dispatchEvent(new window.Event("DOMContentLoaded"));
   assert.ok(await waitFor(() => typeof window.refrescarInventario === "function"), "M53 debe instalar su API");
   await window.refrescarInventario();
   assert.ok(await waitFor(() => window.document.querySelectorAll("#inv-detalle [data-inv-producto]").length === 3),
     "deben mostrarse tres productos agrupados");
   t.after(() => window.close());
-  return { window, dom };
+  return { window, dom, fixtureRows, rpcCalls };
 }
 
 test("Inventario: un solo producto agrupa almacenes, cantidades, mínimos y estados", async (t) => {
@@ -121,4 +138,68 @@ test("Formato numérico global y modal de producto no exponen valor de inversió
   assert.match(detailSource, /warehouse\.minimo/);
   assert.match(detailSource, /warehouse\.cantidad/);
   assert.doesNotMatch(detailSource, /moneySafe|Costo promedio|Valor del inventario|valor_inventario/);
+});
+
+
+test("Inventario: tocar producto abre modal con resumen y mínimo independiente por almacén", async (t) => {
+  const { window } = await boot(t);
+  const card = window.document.querySelector('#inv-detalle [data-inv-producto="biz"]');
+  assert.ok(card, "el producto debe poder seleccionarse");
+  card.click();
+  const modal = window.document.getElementById("bc-inv-producto-modal");
+  assert.ok(modal && !modal.classList.contains("hidden"), "debe abrirse la ventana flotante");
+  assert.match(modal.textContent, /270 u/);
+  assert.match(modal.textContent, /2 almacenes/);
+  assert.match(modal.textContent, /Stock actual/);
+  assert.match(modal.textContent, /Almacén Casa/);
+  assert.match(modal.textContent, /La Cueva/);
+  assert.equal(modal.querySelectorAll("[data-bc-save-minimum]").length, 2);
+  assert.equal(modal.querySelectorAll("[data-bc-minimum-input]").length, 2);
+});
+
+test("Inventario: guardar cambia solo el mínimo del almacén elegido y conserva la cantidad", async (t) => {
+  const { window, fixtureRows, rpcCalls } = await boot(t);
+  window.document.querySelector('#inv-detalle [data-inv-producto="biz"]').click();
+  const modal = window.document.getElementById("bc-inv-producto-modal");
+  const target = modal.querySelector('.bc-inv-warehouse-detail[data-warehouse-id="a2"]');
+  const input = target.querySelector("[data-bc-minimum-input]");
+  const button = target.querySelector("[data-bc-save-minimum]");
+  assert.ok(input && button);
+  input.value = "220";
+  button.click();
+  assert.ok(await waitFor(() => rpcCalls.some((call) => call.name === "bc_actualizar_stock_minimo")));
+  assert.ok(await waitFor(() => modal.textContent.includes("Stock mínimo guardado.")));
+
+  const call = rpcCalls.find((item) => item.name === "bc_actualizar_stock_minimo");
+  assert.deepEqual(call.args, { p_producto_id: "biz", p_almacen_id: "a2", p_minimo: 220 });
+  const casa = fixtureRows.find((row) => row.almacen_id === "a1");
+  const cueva = fixtureRows.find((row) => row.almacen_id === "a2");
+  assert.equal(casa.minimo, 5, "el otro almacén no cambia");
+  assert.equal(cueva.minimo, 220, "el mínimo del almacén elegido se actualiza");
+  assert.equal(cueva.cantidad, 200, "la cantidad real queda intacta");
+  const refreshed = modal.querySelector('.bc-inv-warehouse-detail[data-warehouse-id="a2"]');
+  assert.match(refreshed.textContent, /Bajo mínimo/);
+  assert.match(refreshed.textContent, /200 u/);
+});
+
+test("Inventario: no se ofrece editar el mínimo a un rol sin permiso", async (t) => {
+  const { window } = await boot(t, { canEdit: false });
+  window.document.querySelector('#inv-detalle [data-inv-producto="biz"]').click();
+  const modal = window.document.getElementById("bc-inv-producto-modal");
+  assert.ok(modal && !modal.classList.contains("hidden"));
+  assert.equal(modal.querySelectorAll("[data-bc-save-minimum]").length, 0);
+  assert.equal(modal.querySelectorAll("[data-bc-minimum-input]").length, 0);
+  assert.match(modal.textContent, /no tiene permiso para editar/i);
+});
+
+test("Inventario: un mínimo negativo no llega al RPC", async (t) => {
+  const { window, rpcCalls } = await boot(t);
+  window.document.querySelector('#inv-detalle [data-inv-producto="biz"]').click();
+  const modal = window.document.getElementById("bc-inv-producto-modal");
+  const target = modal.querySelector('.bc-inv-warehouse-detail[data-warehouse-id="a1"]');
+  target.querySelector("[data-bc-minimum-input]").value = "-1";
+  target.querySelector("[data-bc-save-minimum]").click();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(rpcCalls.filter((call) => call.name === "bc_actualizar_stock_minimo").length, 0);
+  assert.match(target.textContent, /mínimo válido/i);
 });
