@@ -411,7 +411,7 @@ function renderResumen() {
       alertasEl.innerHTML = "";
       const cab = document.createElement("div");
       cab.className = "lista-item alerta-cabecera";
-      cab.innerHTML = '<span class="cc-asunto-tipo">' + bajoMinimo.length + ' producto(s) bajo mínimo</span>'
+      cab.innerHTML = '<span class="cc-asunto-tipo">' + fmtNumCC(bajoMinimo.length) + ' producto(s) bajo mínimo</span>'
         + '<button type="button" class="cc-accion alerta-ir-btn" data-ir-tab="inventario">Ver inventario</button>';
       alertasEl.appendChild(cab);
       bajoMinimo.forEach((s) => {
