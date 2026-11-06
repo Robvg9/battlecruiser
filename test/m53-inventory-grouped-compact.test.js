@@ -46,7 +46,7 @@ async function boot(t, options = {}) {
   );
   const { window } = dom;
   Object.defineProperty(window.navigator, "onLine", { value: true, configurable: true });
-  window.tienePermiso = () => options.canEdit !== false;
+  window.tienePermiso = (section, action) => !(options.canEdit === false && section === 'stock' && action === 'editar');
   window.poblarSelectAlmacenes = () => {};
   window.escHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
