@@ -213,14 +213,13 @@ function validateRows(){
  });
  return errors;
 }
-function fmtRows(v){return typeof window.numberFmt==='function'?window.numberFmt(v):String(v==null?0:v);}
 function fmtRows(v){return typeof window.numberFmt==='function'?window.numberFmt(v):String(v==null?0:v)}
 function renderPreview(fileName){
  var b=document.getElementById('bc-m55-preview');if(!b)return;
  var errors=validateRows();state.validated=errors;
  var cols=FIELDS.map(function(f){return f.key});
  b.innerHTML='<p class="muted">'+esc(fileName)+' · '+state.rows.length+' fila(s) · columnas reconocidas: '+esc(Object.keys(state.map).join(', ')||'ninguna')+'</p>'+
- (errors.length?'<p class="bc-m55-err">'+errors.slice(0,12).map(esc).join('<br>')+(errors.length>12?'<br>Y '+fmtRowsfmtRows(errors.length-12)+' error(es) más.':'')+'</p>':'<p class="bc-m55-ok">✓ Plantilla válida. Nombre, precio y categoría revisados.</p>')+
+ (errors.length?'<p class="bc-m55-err">'+errors.slice(0,12).map(esc).join('<br>')+(errors.length>12?'<br>Y '+fmtRows(errors.length-12)+' error(es) más.':'')+'</p>':'<p class="bc-m55-ok">✓ Plantilla válida. Nombre, precio y categoría revisados.</p>')+
  '<div style="overflow:auto;max-height:280px"><table><thead><tr>'+cols.map(function(k){return '<th>'+esc(FIELDS.find(function(f){return f.key===k}).label)+'</th>'}).join('')+'</tr></thead><tbody>'+
  state.rows.slice(0,PREVIEW_ROWS).map(function(r){return '<tr>'+cols.map(function(k){return '<td>'+esc(value(r,k))+'</td>'}).join('')+'</tr>'}).join('')+
  '</tbody></table></div><div class="bc-m55-actions"><button type="button" id="bc-m55-run" '+(errors.length?'disabled':'')+'>Procesar importación</button></div>';
