@@ -162,7 +162,7 @@
 
     rememberAndMove(form, 'transferForm', formHost);
     const stockInfo = document.getElementById('trf-stock-disponible');
-    if (stockInfo && !form.contains(stockInfo)) rememberAndMove(stockInfo, 'transferStockInfo', supportHost);
+    if (stockInfo) rememberAndMove(stockInfo, 'transferStockInfo', supportHost);
     const message = document.getElementById('msg-transferencias');
     if (message) rememberAndMove(message, 'transferMessage', supportHost);
 
