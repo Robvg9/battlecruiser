@@ -60,7 +60,7 @@ test("Inventory centre replaces variant rows with parent total and a non-navigat
   assert.match(m53, /ordinaryRows\.filter\(function \(row\)/);
   assert.match(m53, /<details class="bc-m53-variant-details">/);
   assert.match(m53, /Ver stock detallado/);
-  assert.match(m53, /qtyFmt\(v\.cantidad\)/);
+  assert.match(m53, /qtyFmt\(variant\.cantidad\)/);
   assert.match(detail, /bc-m53-variant-details/);
   assert.match(detail, /e\.stopPropagation\(\)/);
 });
