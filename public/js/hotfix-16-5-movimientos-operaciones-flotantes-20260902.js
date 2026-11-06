@@ -199,8 +199,9 @@
     const sheet = document.createElement('style');
     sheet.id = 'bc165-css';
     sheet.textContent =
-      '.bc165-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;gap:8px;margin:12px 0 0}' +
-      '.bc165-action{display:block;height:auto;min-height:38px;min-width:0;width:100%;box-sizing:border-box;padding:9px 12px;white-space:normal;overflow-wrap:anywhere;line-height:1.3;background:var(--stone-2);color:var(--text);border:1px solid var(--gold-dim);border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600}' +
+      '.bc165-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;gap:8px;margin:8px 0 0}' +
+      '.bc165-action{display:inline-flex;align-items:center;justify-content:center;height:48px;min-height:48px;min-width:48px;width:48px;box-sizing:border-box;padding:0;white-space:nowrap;line-height:1.3;background:var(--stone-2);color:var(--gold-bright);border:1px solid var(--gold-dim);border-radius:50%;cursor:pointer;font-size:12.5px;font-weight:600}' +
+      '.bc165-action svg{width:21px;height:21px;display:block}.bc165-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}' +
       '.bc165-action:hover{border-color:var(--gold);color:var(--gold-bright)}' +
       '.bc165-overlay{position:fixed;inset:0;z-index:9400;background:rgba(6,14,11,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}' +
       '.bc165-modal{width:min(760px,100%);max-height:calc(100dvh - 32px);overflow:auto;margin:16px auto;background:var(--stone);border:1px solid rgba(212,176,92,.32);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:16px}' +
@@ -219,7 +220,7 @@
       '.bc165-overlay #tab-transferencias input,.bc165-overlay #tab-transferencias select,.bc165-overlay #tab-transferencias button,.bc165-overlay #tab-compras input,.bc165-overlay #tab-compras select,.bc165-overlay #tab-compras button{pointer-events:auto!important;position:relative;z-index:2}' +
       '#tab-movimientos.bc-m51 .bc-m51-hero{display:flex;flex-wrap:wrap;align-items:flex-start;min-width:0;max-width:100%;box-sizing:border-box}' +
       '#tab-movimientos.bc-m51 .bc-m51-hero>*{min-width:0;max-width:100%;box-sizing:border-box}#tab-movimientos.bc-m51 .bc165-actions{flex:1 0 100%;width:100%;min-width:0}' +
-      '@media(max-width:640px){#tab-movimientos.bc-m51 .bc165-actions{grid-template-columns:1fr}.bc165-overlay{padding:8px}.bc165-modal{width:100%;max-width:100%;box-sizing:border-box;padding:12px;margin:8px auto}#bc165-overlay #form-transferencia.bc165-transfer-form{grid-template-columns:minmax(0,1fr);gap:10px}}' +
+      '@media(max-width:640px){#tab-movimientos.bc-m51 .bc165-actions{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:start}.bc165-overlay{padding:8px}.bc165-modal{width:100%;max-width:100%;box-sizing:border-box;padding:12px;margin:8px auto}#bc165-overlay #form-transferencia.bc165-transfer-form{grid-template-columns:minmax(0,1fr);gap:10px}}' +
       '.bc165-modal .bc-m51,.bc165-modal .bc-m51 *{max-width:none}.bc165-placeholder{display:none!important}';
     document.head.appendChild(sheet);
   }
@@ -313,7 +314,12 @@
       button.type = 'button';
       button.className = 'bc165-action';
       button.dataset.bc165 = key;
-      button.textContent = label;
+      button.setAttribute('aria-label', label);
+      button.title = label;
+      const icon = key === 'transferencias'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h17l-4-4M21 17H4l4 4"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.2 11h10.9L21 7H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="18" cy="20" r="1.2"/></svg>';
+      button.innerHTML = icon + '<span class="bc165-sr-only">' + label + '</span>';
       button.onclick = () => {
         if (typeof window.__BC165_open === 'function') window.__BC165_open(key);
       };
