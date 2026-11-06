@@ -16,6 +16,7 @@
   let _estado = 'todos';
   let _loading = false;
   let _lastError = null;
+  let _view = 'grid';
 
   function esc(v) {
     if (typeof window.escHtml === 'function') return window.escHtml(String(v == null ? '' : v));
@@ -33,7 +34,9 @@
   }
   function qtyFmt(v) {
     const n = num(v);
-    return Number.isInteger(n) ? String(n) : n.toLocaleString('es-ES', { maximumFractionDigits: 2 });
+    if (typeof window.numberFmt === 'function') return window.numberFmt(n);
+    return new Intl.NumberFormat('es-ES', { useGrouping: true, maximumFractionDigits: 2 }).formatToParts(n)
+      .map(function (part) { return part.type === 'group' ? '\u202f' : part.value; }).join('');
   }
 
   function injectCss() {
@@ -100,10 +103,69 @@
     document.head.appendChild(s);
   }
 
+  function injectCompactStyles() {
+    if (document.getElementById('bc-m53-inventory-compact-css')) return;
+    const style = document.createElement('style');
+    style.id = 'bc-m53-inventory-compact-css';
+    style.textContent = `
+      #tab-inventario.bc-m53 .bc-m53-metrics{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important;margin-bottom:8px!important}
+      #tab-inventario.bc-m53 .bc-m53-metric{padding:8px 9px!important}
+      #tab-inventario.bc-m53 .bc-m53-metric-value{font-size:1.02rem!important;margin-top:2px!important}
+      #tab-inventario.bc-m53 .bc-m53-filters{grid-template-columns:minmax(120px,.85fr) minmax(120px,.85fr) minmax(180px,1.5fr) auto auto!important;gap:6px!important;padding:8px!important;margin-bottom:7px!important}
+      #tab-inventario.bc-m53 .bc-m53-filter label{font-size:.6rem!important;margin-bottom:2px!important}
+      #tab-inventario.bc-m53 .bc-m53-filter input,#tab-inventario.bc-m53 .bc-m53-filter select{height:34px!important;padding:0 8px!important;font-size:12px!important}
+      #tab-inventario.bc-m53 .bc-m53-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px!important;margin-bottom:7px!important}
+      #tab-inventario.bc-m53 .bc-m53-view-tools{display:flex;align-items:center;gap:4px;margin-left:auto}
+      #tab-inventario.bc-m53 .bc-m53-view-btn{height:30px;padding:0 9px;border:1px solid rgba(212,176,92,.2);border-radius:7px;background:rgba(8,20,17,.65);color:var(--mist);font-size:.67rem;white-space:nowrap}
+      #tab-inventario.bc-m53 .bc-m53-view-btn[aria-pressed=true]{border-color:rgba(212,176,92,.48);background:rgba(212,176,92,.1);color:var(--gold-bright)}
+      #tab-inventario.bc-m53 #bc-stock-bajo-btn{width:auto!important}
+      #tab-inventario.bc-m53 .bc-m53-grid{gap:8px!important}
+      #tab-inventario.bc-m53 .bc-m53-card{padding:8px!important;border-radius:10px!important}
+      #tab-inventario.bc-m53 .bc-m53-thumb{aspect-ratio:1.5!important;margin-bottom:6px!important}
+      #tab-inventario.bc-m53 .bc-m53-card-content{min-width:0}
+      #tab-inventario.bc-m53 .bc-m53-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:5px;margin-bottom:4px}
+      #tab-inventario.bc-m53 .bc-m53-card-name{font-size:.82rem!important;line-height:1.2!important;margin:0!important;min-width:0;overflow-wrap:anywhere}
+      #tab-inventario.bc-m53 .bc-m53-badge{flex:0 0 auto;margin:0!important;padding:2px 6px!important;font-size:.55rem!important}
+      #tab-inventario.bc-m53 .bc-m53-stores{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-row{padding:4px 0;border-top:1px solid rgba(212,176,92,.1)}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-main{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;font-size:.69rem}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-name{color:var(--mist);min-width:0;overflow-wrap:anywhere}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-qty{font-size:.73rem;color:var(--text);white-space:nowrap}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-meta{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:2px;font-size:.61rem;color:var(--mist)}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-status{padding:1px 5px;border-radius:999px;font-size:.55rem;font-weight:600;white-space:nowrap}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-status-normal{background:rgba(159,196,173,.12);color:var(--sage)}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-status-bajo{background:rgba(232,197,106,.12);color:#e8c56a}
+      #tab-inventario.bc-m53 .bc-m53-warehouse-status-agotado{background:rgba(196,74,90,.12);color:#e88a96}
+      #tab-inventario.bc-m53 .bc-m53-variant-details{margin-top:4px;padding-top:4px;border-top:1px solid rgba(212,176,92,.1);font-size:.62rem}
+      #tab-inventario.bc-m53 .bc-m53-variant-details summary{cursor:pointer;color:var(--gold-bright);font-size:.62rem}
+      #tab-inventario.bc-m53 .bc-m53-variant-list{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+      #tab-inventario.bc-m53 .bc-m53-variant-row{display:flex;justify-content:space-between;gap:6px;padding:2px 0;color:var(--mist)}
+      #tab-inventario.bc-m53 .bc-m53-variant-row strong{color:var(--text);font-weight:600}
+      #tab-inventario.bc-m53 .bc-m53-list{display:flex;flex-direction:column;gap:5px}
+      #tab-inventario.bc-m53 .bc-m53-list .bc-m53-card{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:start;gap:8px;padding:7px!important}
+      #tab-inventario.bc-m53 .bc-m53-list .bc-m53-thumb{width:52px;height:52px;aspect-ratio:1;margin:0!important;border-radius:6px}
+      #tab-inventario.bc-m53 .bc-m53-list .bc-m53-card-name{font-size:.77rem!important}
+      #tab-inventario.bc-m53 .bc-m53-list .bc-m53-warehouse-row{padding:3px 0}
+      @media(max-width:980px){#tab-inventario.bc-m53 .bc-m53-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+      @media(max-width:640px){
+        #tab-inventario.bc-m53 .bc-m53-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}
+        #tab-inventario.bc-m53 .bc-m53-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important;padding:7px!important}
+        #tab-inventario.bc-m53 .bc-m53-filter:nth-child(3){grid-column:1/-1}
+        #tab-inventario.bc-m53 .bc-m53-filters>.bc-m53-btn{width:auto!important;height:34px!important;padding:0 8px!important}
+        #tab-inventario.bc-m53 .bc-m53-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+        #tab-inventario.bc-m53 .bc-m53-card{padding:7px!important}
+        #tab-inventario.bc-m53 .bc-m53-thumb{aspect-ratio:1.4!important}
+        #tab-inventario.bc-m53 .bc-m53-view-btn{padding:0 7px;font-size:.63rem}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function ensureShell() {
     const tab = document.getElementById('tab-inventario');
     if (!tab) return null;
     injectCss();
+    injectCompactStyles();
     tab.classList.add('bc-m53');
 
     let hero = tab.querySelector('.bc-m53-hero');
@@ -214,6 +276,13 @@
       toolbar.id = 'inv-toolbar-m53';
       filters.after(toolbar);
     }
+    if (!toolbar.querySelector('.bc-m53-view-tools')) {
+      const tools = document.createElement('div');
+      tools.className = 'bc-m53-view-tools';
+      tools.innerHTML = '<button type="button" class="bc-m53-view-btn" data-m53-view="grid" aria-pressed="true">▦ Cuadros</button>' +
+        '<button type="button" class="bc-m53-view-btn" data-m53-view="list" aria-pressed="false">☷ Filas</button>';
+      toolbar.appendChild(tools);
+    }
 
     if (!tab.querySelector('.bc-m53-chips')) {
       const chips = document.createElement('div');
@@ -223,7 +292,7 @@
     }
 
     let list = tab.querySelector('#inv-detalle');
-    if (list && !list.classList.contains('bc-m53-grid')) {
+    if (list && !list.classList.contains('bc-m53-grid') && !list.classList.contains('bc-m53-list')) {
       // Convertir contenedor lista a grid host
       list.className = 'bc-m53-grid';
       list.id = 'inv-detalle';
@@ -271,7 +340,8 @@
     const btn = document.getElementById('bc-stock-bajo-btn');
     const toolbar = document.getElementById('inv-toolbar-m53');
     if (btn && toolbar && btn.parentNode !== toolbar) {
-      toolbar.appendChild(btn);
+      const viewTools = toolbar.querySelector('.bc-m53-view-tools');
+      toolbar.insertBefore(btn, viewTools || null);
       btn.classList.add('bc-m53-btn');
     }
   }
@@ -288,31 +358,64 @@
     return { label: 'Disponible', cls: 'normal' };
   }
 
-  function totalsFrom(rows) {
-    let totalValor = 0, totalUnidades = 0, agotados = 0, bajos = 0;
-    const productos = new Set();
-    (rows || []).forEach(function (s) {
-      totalValor += num(s.valor_inventario);
-      totalUnidades += num(s.cantidad);
-      if (s.estado === 'agotado') agotados++;
-      else if (s.estado === 'bajo') bajos++;
-      if (s.producto_id) productos.add(String(s.producto_id));
+  function estadoAlmacen(row) {
+    if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
+    if (row && row.estado === 'bajo') return 'bajo';
+    if (row && row.minimo != null && num(row.cantidad) <= num(row.minimo)) return 'bajo';
+    return 'normal';
+  }
+
+  function agruparProductos(rows) {
+    const groups = new Map();
+    (rows || []).forEach(function (row) {
+      const name = String(row.producto || '').trim();
+      const key = row.producto_id != null && String(row.producto_id) !== ''
+        ? 'id:' + String(row.producto_id)
+        : 'name:' + name.toLowerCase() + '|' + String(row.unidad || '');
+      let group = groups.get(key);
+      if (!group) {
+        group = { producto_id: row.producto_id || '', producto: row.producto || '—', unidad: row.unidad || 'u', cantidad: 0, valor_inventario: 0, almacenes: [] };
+        groups.set(key, group);
+      }
+      group.cantidad += num(row.cantidad);
+      group.valor_inventario += num(row.valor_inventario);
+      group.almacenes.push({
+        almacen_id: row.almacen_id || null, almacen: row.almacen || '—', cantidad: num(row.cantidad),
+        minimo: row.minimo == null ? null : num(row.minimo), estado: estadoAlmacen(row), unidad: row.unidad || group.unidad,
+        variantes: Array.isArray(row.variantes) ? row.variantes : []
+      });
     });
-    return { totalValor: totalValor, totalUnidades: totalUnidades, agotados: agotados, bajos: bajos, productos: productos.size };
+    return Array.from(groups.values()).map(function (group) {
+      group.almacenes.sort(function (a, b) { return String(a.almacen).localeCompare(String(b.almacen), 'es'); });
+      group.estado = group.cantidad <= 0 ? 'agotado' :
+        (group.almacenes.some(function (a) { return a.estado === 'bajo'; }) ? 'bajo' : 'normal');
+      group.almacen = group.almacenes.map(function (a) { return a.almacen; }).join(' ');
+      return group;
+    }).sort(function (a, b) { return String(a.producto).localeCompare(String(b.producto), 'es'); });
+  }
+
+  function totalsFrom(rows) {
+    const products = agruparProductos(rows);
+    return {
+      totalValor: (rows || []).reduce(function (sum, row) { return sum + num(row.valor_inventario); }, 0),
+      agotados: products.filter(function (p) { return p.estado === 'agotado'; }).length,
+      bajos: products.filter(function (p) { return p.estado === 'bajo'; }).length,
+      productos: products.length
+    };
   }
 
   function applyFilters() {
-    let rows = _allRows.slice();
-    if (_estado === 'agotado') rows = rows.filter(function (s) { return s.estado === 'agotado'; });
-    else if (_estado === 'bajo') rows = rows.filter(function (s) { return s.estado === 'bajo'; });
-    else if (_estado === 'normal') rows = rows.filter(function (s) { return s.estado !== 'agotado' && s.estado !== 'bajo'; });
-
+    let rows = agruparProductos(_allRows);
+    if (_estado === 'agotado') rows = rows.filter(function (p) { return p.estado === 'agotado'; });
+    else if (_estado === 'bajo') rows = rows.filter(function (p) { return p.estado === 'bajo'; });
+    else if (_estado === 'normal') rows = rows.filter(function (p) { return p.estado === 'normal'; });
     const q = (_search || '').toLowerCase().trim();
     if (q) {
-      rows = rows.filter(function (s) {
-        const hay = [s.producto, s.almacen, s.producto_id, s.estado]
-          .map(function (x) { return String(x == null ? '' : x).toLowerCase(); }).join(' ');
-        return hay.indexOf(q) !== -1;
+      rows = rows.filter(function (p) {
+        const stores = p.almacenes.map(function (a) {
+          return [a.almacen].concat(a.variantes.map(function (v) { return v.nombre || ''; })).join(' ');
+        }).join(' ');
+        return [p.producto, p.producto_id, stores].join(' ').toLowerCase().indexOf(q) !== -1;
       });
     }
     _filtered = rows;
@@ -334,11 +437,445 @@
         esc(label) + '</div><div class="bc-m53-metric-value">' + esc(String(value)) + '</div></div>';
     }
     el.innerHTML =
-      card('Valor inventario', '$' + moneyFmt(t.totalValor)) +
-      card('Unidades', qtyFmt(t.totalUnidades)) +
-      card('Productos', t.productos) +
-      card('Agotados', t.agotados, t.agotados > 0 ? 'is-crit' : '') +
-      card('Bajo mínimo', t.bajos, t.bajos > 0 ? 'is-warn' : '');
+      card('Valor inventario', '
+  }
+
+  function renderAlerts() {
+    const el = document.getElementById('inv-alertas-m53');
+    if (!el) return;
+    const t = totalsFrom(_allRows);
+    let html = '';
+    if (t.agotados > 0) {
+      html += '<div class="bc-m53-alert bc-m53-alert-crit" data-m53-filter="agotado" role="button" tabindex="0">' +
+        '<strong>🔴 Agotados</strong><span>' + t.agotados + ' producto' + (t.agotados === 1 ? '' : 's') +
+        '</span><button type="button" class="bc-m53-alert-action" data-m53-filter="agotado">Ver</button></div>';
+    }
+    if (t.bajos > 0) {
+      html += '<div class="bc-m53-alert bc-m53-alert-warn" data-m53-filter="bajo" role="button" tabindex="0">' +
+        '<strong>🟠 Bajo mínimo</strong><span>' + t.bajos + ' producto' + (t.bajos === 1 ? '' : 's') +
+        '</span><button type="button" class="bc-m53-alert-action" data-m53-filter="bajo">Ver</button>' +
+        '<button type="button" class="bc-m53-alert-action" data-m53-open-stock-bajo="1">Reposición</button></div>';
+    }
+    if (!html && !_loading && _allRows.length) {
+      html = '<div class="bc-m53-alert" style="cursor:default"><strong>🟢 Inventario en rango</strong><span>Sin alertas de stock bajo ni agotados.</span></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function renderChips() {
+    const el = document.getElementById('inv-chips-m53');
+    if (!el) return;
+    const chips = [];
+    const sel = document.getElementById('inv-filtro-almacen');
+    if (sel && sel.value) {
+      const opt = sel.selectedOptions[0];
+      chips.push({ key: 'almacen', label: opt ? opt.textContent : sel.value });
+    }
+    if (_estado && _estado !== 'todos') {
+      const labels = { bajo: 'Bajo mínimo', agotado: 'Agotados', normal: 'Normales' };
+      chips.push({ key: 'estado', label: labels[_estado] || _estado });
+    }
+    if (_search) chips.push({ key: 'search', label: '“' + _search + '”' });
+    if (!chips.length) { el.innerHTML = ''; return; }
+    el.innerHTML = chips.map(function (c) {
+      return '<span class="bc-m53-chip" data-chip="' + esc(c.key) + '">' + esc(c.label) +
+        ' <button type="button" aria-label="Quitar filtro">×</button></span>';
+    }).join('') +
+      '<button type="button" class="bc-m53-btn" id="inv-chips-clear" style="height:28px;padding:0 10px;font-size:11px">Limpiar filtros</button>';
+  }
+
+  function syncViewControls() {
+    const tools = document.querySelector('#tab-inventario .bc-m53-view-tools');
+    if (!tools) return;
+    tools.querySelectorAll('[data-m53-view]').forEach(function (button) {
+      const active = button.getAttribute('data-m53-view') === _view;
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      button.classList.toggle('active', active);
+    });
+  }
+
+  function renderGrid() {
+    const el = document.getElementById('inv-detalle');
+    const pag = document.getElementById('inv-paginacion-m53');
+    if (!el) return;
+    syncViewControls();
+    if (_loading) {
+      el.className = '';
+      el.innerHTML = '<div class="bc-m53-loading">Cargando inventario…</div>';
+      if (pag) pag.innerHTML = '';
+      return;
+    }
+    if (_lastError) {
+      el.className = '';
+      el.innerHTML = '<div class="bc-m53-error">No pudimos cargar el inventario.<br><button type="button" class="bc-m53-btn" id="inv-retry-btn" style="margin-top:10px">Reintentar</button></div>';
+      if (pag) pag.innerHTML = '';
+      return;
+    }
+    if (!_filtered.length) {
+      el.className = '';
+      const hasF = !!(document.getElementById('inv-filtro-almacen') && document.getElementById('inv-filtro-almacen').value) || (_estado !== 'todos') || !!_search;
+      const msg = _allRows.length === 0 ? 'No hay productos con stock registrado.' : 'No hay productos que coincidan con los filtros.';
+      el.innerHTML = '<div class="bc-m53-empty"><strong>' + esc(msg) + '</strong>' +
+        (hasF ? '<br><button type="button" class="bc-m53-btn" id="inv-empty-clear" style="margin-top:10px">Limpiar filtros</button>' : '') + '</div>';
+      if (pag) pag.innerHTML = '';
+      window._invFilas = [];
+      return;
+    }
+    el.className = _view === 'list' ? 'bc-m53-list' : 'bc-m53-grid';
+    const start = _page * PAGE_SIZE;
+    const visibleRows = _filtered.slice(start, start + PAGE_SIZE);
+    window._invFilas = visibleRows;
+    el.innerHTML = visibleRows.map(function (product, i) {
+      const meta = estadoMeta(product.estado);
+      const img = imagenProducto(product.producto_id);
+      const thumb = img
+        ? '<img class="bc-m53-thumb" src="' + esc(img) + '" alt="" loading="lazy">'
+        : '<div class="bc-m53-thumb bc-m53-thumb-empty" aria-hidden="true">Sin imagen</div>';
+      const unit = product.unidad || 'u';
+      const storesHtml = product.almacenes.map(function (warehouse) {
+        const status = estadoMeta(warehouse.estado);
+        return '<div class="bc-m53-warehouse-row">' +
+          '<div class="bc-m53-warehouse-main"><span class="bc-m53-warehouse-name">' + esc(warehouse.almacen) + '</span>' +
+          '<strong class="bc-m53-warehouse-qty">' + qtyFmt(warehouse.cantidad) + ' ' + esc(warehouse.unidad || unit) + '</strong></div>' +
+          '<div class="bc-m53-warehouse-meta">' +
+          (warehouse.minimo != null ? '<span>mín ' + qtyFmt(warehouse.minimo) + '</span>' : '') +
+          '<span class="bc-m53-warehouse-status bc-m53-warehouse-status-' + status.cls + '">' + esc(status.label) + '</span>' +
+          '</div></div>';
+      }).join('');
+      const variantWarehouses = product.almacenes.filter(function (warehouse) { return warehouse.variantes.length > 0; });
+      const variantDetails = variantWarehouses.length
+        ? '<details class="bc-m53-variant-details"><summary>Ver sabores por almacén</summary><div class="bc-m53-variant-list">' +
+          variantWarehouses.map(function (warehouse) {
+            return '<div class="bc-m53-variant-row"><strong>' + esc(warehouse.almacen) + '</strong><span></span></div>' +
+              warehouse.variantes.map(function (variant) {
+                return '<div class="bc-m53-variant-row"><span>' + esc(variant.nombre || 'Variante') + '</span><strong>' +
+                  qtyFmt(variant.cantidad) + ' ' + esc(variant.unidad || unit) + '</strong></div>';
+              }).join('');
+          }).join('') + '</div></details>'
+        : '';
+      return '<article class="bc-m53-card rep-fila" data-idx="' + i + '" data-inv-producto="' +
+        esc(product.producto_id || '') + '" role="button" tabindex="0">' + thumb +
+        '<div class="bc-m53-card-content"><div class="bc-m53-card-head">' +
+        '<h4 class="bc-m53-card-name">' + esc(product.producto || '—') + '</h4>' +
+        '<span class="bc-m53-badge bc-m53-badge-' + meta.cls + '">' + esc(meta.label) + '</span></div>' +
+        '<div class="bc-m53-stores">' + storesHtml + '</div>' + variantDetails + '</div></article>';
+    }).join('');
+    if (pag) {
+      pag.innerHTML = '';
+      const totalPages = Math.max(1, Math.ceil(_filtered.length / PAGE_SIZE));
+      if (_page > 0) {
+        const ant = document.createElement('button');
+        ant.type = 'button'; ant.className = 'bc-m53-btn'; ant.textContent = '← Anterior';
+        ant.addEventListener('click', function () { _page--; paintListOnly(); });
+        pag.appendChild(ant);
+      }
+      const span = document.createElement('span');
+      span.className = 'muted';
+      span.textContent = 'Página ' + qtyFmt(_page + 1) + ' de ' + qtyFmt(totalPages) + ' · ' + qtyFmt(_filtered.length) + ' productos';
+      pag.appendChild(span);
+      if (_page < totalPages - 1) {
+        const sig = document.createElement('button');
+        sig.type = 'button'; sig.className = 'bc-m53-btn'; sig.textContent = 'Siguiente →';
+        sig.addEventListener('click', function () { _page++; paintListOnly(); });
+        pag.appendChild(sig);
+      }
+    }
+  }
+
+  function paintListOnly() {
+    applyFilters();
+    renderChips();
+    renderGrid();
+  }
+
+  function paint() {
+    ensureShell();
+    relocateStockBajoBtn();
+    applyFilters();
+    renderMetrics();
+    renderAlerts();
+    renderChips();
+    renderGrid();
+  }
+
+  function syncEstadoSelect() {
+    const sel = document.getElementById('inv-filtro-estado-select');
+    if (sel && sel.value !== _estado) sel.value = _estado;
+    // Compat con variable global usada por nucleo-operativo
+    if (typeof window._invFiltroEstado !== 'undefined') window._invFiltroEstado = _estado;
+  }
+
+  function limpiarFiltrosUI() {
+    const alm = document.getElementById('inv-filtro-almacen');
+    if (alm) alm.value = '';
+    const bus = document.getElementById('inv-buscar');
+    if (bus) bus.value = '';
+    _search = '';
+    _estado = 'todos';
+    _page = 0;
+    syncEstadoSelect();
+  }
+
+  async function cargarInventario() {
+    ensureShell();
+    relocateStockBajoBtn();
+    const conn = document.getElementById('inv-conn-info');
+
+    if (typeof window.tienePermiso === 'function' && !window.tienePermiso('reportes', 'ver')) {
+      _allRows = [];
+      _filtered = [];
+      _lastError = null;
+      _loading = false;
+      window._invFilas = [];
+      const el = document.getElementById('inv-detalle');
+      if (el) {
+        el.className = '';
+        el.innerHTML = '<div class="bc-m53-empty">No tenés permiso para ver inventario.</div>';
+      }
+      const metrics = document.getElementById('inv-resumen');
+      if (metrics) metrics.innerHTML = '';
+      const alerts = document.getElementById('inv-alertas-m53');
+      if (alerts) alerts.innerHTML = '';
+      return;
+    }
+
+    if (!navigator.onLine) {
+      if (conn) conn.textContent = '⚪ Sin conexión — datos no disponibles';
+      _allRows = [];
+      _filtered = [];
+      _lastError = null;
+      _loading = false;
+      window._invFilas = [];
+      const el = document.getElementById('inv-detalle');
+      if (el) {
+        el.className = '';
+        el.innerHTML = '<div class="bc-m53-empty">⚪ Sin conexión — el inventario enriquecido requiere datos de Supabase.</div>';
+      }
+      const metrics = document.getElementById('inv-resumen');
+      if (metrics) metrics.innerHTML = '<div class="bc-m53-empty" style="padding:12px">Sin conexión.</div>';
+      return;
+    }
+
+    if (conn) conn.textContent = '🟢 Datos de Supabase';
+    if (typeof window.poblarSelectAlmacenes === 'function') {
+      window.poblarSelectAlmacenes(document.getElementById('inv-filtro-almacen'));
+    }
+
+    _loading = true;
+    _lastError = null;
+    paint();
+
+    const sel = document.getElementById('inv-filtro-almacen');
+    const almacen = sel ? (sel.value || null) : null;
+
+    try {
+      const client = window.client;
+      if (!client) throw new Error('Cliente Supabase no disponible');
+      const [res, mixedRes] = await Promise.all([
+        client.rpc('inventario_enriquecido', { p_almacen_id: almacen }),
+        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen })
+      ]);
+      if (res.error) {
+        if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
+          _lastError = 'rpc_missing';
+        } else {
+          _lastError = String(res.error.message || res.error.code || res.error);
+        }
+        _allRows = [];
+        _filtered = [];
+        window._invFilas = [];
+        _loading = false;
+        paint();
+        return;
+      }
+      const ordinaryRows = Array.isArray(res.data) ? res.data : [];
+      let mixedRows = [];
+      if (!mixedRes.error) {
+        mixedRows = Array.isArray(mixedRes.data) ? mixedRes.data : [];
+      } else if (!(typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(mixedRes.error))) {
+        throw new Error(String(mixedRes.error.message || mixedRes.error.code || mixedRes.error));
+      }
+      const mixedVariantIds = new Set();
+      mixedRows.forEach(function (row) {
+        (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
+          if (variant && variant.producto_id) mixedVariantIds.add(String(variant.producto_id));
+        });
+      });
+      // Replace child SKU rows with one parent summary; their real product IDs
+      // remain in the expandable details and in every transactional table.
+      _allRows = ordinaryRows.filter(function (row) {
+        return !mixedVariantIds.has(String(row.producto_id));
+      }).concat(mixedRows);
+      window._invFilas = _allRows;
+      _page = 0;
+      _loading = false;
+      _lastError = null;
+      paint();
+    } catch (e) {
+      console.warn('[BattleCruiser] M53 inventario_enriquecido:', e);
+      _lastError = String(e && e.message ? e.message : e);
+      _allRows = [];
+      _filtered = [];
+      window._invFilas = [];
+      _loading = false;
+      paint();
+    }
+  }
+
+  function installHooks() {
+    window.refrescarInventario = function () { return cargarInventario(); };
+    window.refrescarInventario.__m53 = true;
+    window.renderInventario = function (filas) {
+      _allRows = Array.isArray(filas) ? filas : [];
+      window._invFilas = _allRows;
+      _page = 0;
+      _loading = false;
+      _lastError = null;
+      paint();
+    };
+  }
+
+  function bindEvents() {
+    const tab = document.getElementById('tab-inventario');
+    if (!tab || tab.dataset.m53Bound) return;
+    tab.dataset.m53Bound = '1';
+
+    tab.addEventListener('click', function (e) {
+      const viewButton = e.target.closest('[data-m53-view]');
+      if (viewButton) {
+        _view = viewButton.getAttribute('data-m53-view') === 'list' ? 'list' : 'grid';
+        try { window.localStorage.setItem('bc_inventario_vista', _view); } catch (_) {}
+        renderGrid();
+        return;
+      }
+      if (e.target.closest('#inv-retry-btn, #inv-empty-clear')) {
+        if (e.target.closest('#inv-empty-clear')) {
+          limpiarFiltrosUI();
+          cargarInventario();
+        } else {
+          cargarInventario();
+        }
+        return;
+      }
+      if (e.target.closest('#inv-chips-clear')) {
+        limpiarFiltrosUI();
+        cargarInventario();
+        return;
+      }
+      const chipBtn = e.target.closest('.bc-m53-chip button');
+      if (chipBtn) {
+        const chip = chipBtn.closest('.bc-m53-chip');
+        const key = chip && chip.getAttribute('data-chip');
+        if (key === 'almacen') {
+          const a = document.getElementById('inv-filtro-almacen');
+          if (a) a.value = '';
+          cargarInventario();
+        } else if (key === 'estado') {
+          _estado = 'todos';
+          _page = 0;
+          syncEstadoSelect();
+          paintListOnly();
+        } else if (key === 'search') {
+          const b = document.getElementById('inv-buscar');
+          if (b) b.value = '';
+          _search = '';
+          _page = 0;
+          paintListOnly();
+        }
+        return;
+      }
+
+      const openSb = e.target.closest('[data-m53-open-stock-bajo]');
+      if (openSb) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.__BC_openStockBajo === 'function') window.__BC_openStockBajo();
+        else {
+          const btn = document.getElementById('bc-stock-bajo-btn');
+          if (btn) btn.click();
+        }
+        return;
+      }
+
+      const filterBtn = e.target.closest('[data-m53-filter]');
+      if (filterBtn) {
+        const f = filterBtn.getAttribute('data-m53-filter');
+        if (f) {
+          _estado = f;
+          _page = 0;
+          syncEstadoSelect();
+          paintListOnly();
+        }
+        return;
+      }
+
+      if (e.target.closest('#inv-refrescar-btn')) {
+        const b = document.getElementById('inv-buscar');
+        _search = b ? b.value.trim() : '';
+        const est = document.getElementById('inv-filtro-estado-select');
+        if (est) _estado = est.value || 'todos';
+        _page = 0;
+        syncEstadoSelect();
+        cargarInventario();
+        return;
+      }
+      if (e.target.closest('#inv-limpiar-btn')) {
+        limpiarFiltrosUI();
+        cargarInventario();
+        return;
+      }
+
+      // Click en card: inventario-detalle.js también escucha .rep-fila[data-inv-producto]
+      // No interceptamos para no romper el modal existente.
+    });
+
+    tab.addEventListener('change', function (e) {
+      if (e.target && e.target.id === 'inv-filtro-estado-select') {
+        _estado = e.target.value || 'todos';
+        _page = 0;
+        if (typeof window._invFiltroEstado !== 'undefined') window._invFiltroEstado = _estado;
+        paintListOnly();
+      }
+      if (e.target && e.target.id === 'inv-filtro-almacen') {
+        _page = 0;
+        cargarInventario();
+      }
+    });
+
+    tab.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'inv-buscar') {
+        _search = e.target.value.trim();
+        _page = 0;
+        paintListOnly();
+      }
+    });
+  }
+
+  function boot() {
+    try { _view = window.localStorage.getItem('bc_inventario_vista') === 'list' ? 'list' : 'grid'; } catch (_) { _view = 'grid'; }
+    ensureShell();
+    installHooks();
+    bindEvents();
+    relocateStockBajoBtn();
+    const tab = document.getElementById('tab-inventario');
+    if (tab && tab.classList.contains('visible')) cargarInventario();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  // Reubicar botón stock bajo cuando mision-d lo inyecte (una sola pasada diferida mínima)
+  requestAnimationFrame(function () {
+    ensureShell();
+    installHooks();
+    bindEvents();
+    relocateStockBajoBtn();
+  });
+})();
+ + moneyFmt(t.totalValor)) +
+      card('Productos', qtyFmt(t.productos)) +
+      card('Bajo mínimo', qtyFmt(t.bajos), t.bajos > 0 ? 'is-warn' : '') +
+      card('Agotados', qtyFmt(t.agotados), t.agotados > 0 ? 'is-crit' : '');
   }
 
   function renderAlerts() {
