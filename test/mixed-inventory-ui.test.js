@@ -90,5 +90,5 @@ test("Cache versions are bumped for the updated PWA inventory and admin assets",
   assert.match(index, /catalogos\.js\?v=20261105\.2/);
   assert.match(index, /app\.js\?v=9\.5\.68/);
   assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.68"/);
-  assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53\.2"\]/);
+  assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53\.3"\]/);
 });
