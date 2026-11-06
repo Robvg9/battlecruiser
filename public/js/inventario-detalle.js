@@ -308,7 +308,7 @@
       }
 
       if (typeof window.bcNotificarCambioDatos === 'function') {
-        window.bcNotificarCambioDatos(['stock', 'inventory', 'movements'], false);
+        window.bcNotificarCambioDatos('stock_minimum', false);
       }
       let refreshed = null;
       if (typeof window.refrescarInventario === 'function') {
