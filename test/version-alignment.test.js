@@ -162,14 +162,14 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="app\.js\?v=9\.5\.70"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.64',
-    'js/centro-control.js?v=9.5.70',
+    'js/centro-control.js?v=9.5.69',
     'js/navegacion.js?v=9.5.64',
     'js/mando.js?v=9.5.64',
     'js/operacion-humana.js?v=9.5.64',
     'js/comunicacion.js?v=9.5.64',
   ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
   for (const asset of [
-    './js/centro-control.js?v=9.5.70',
+    './js/centro-control.js?v=9.5.69',
     './js/navegacion.js?v=9.5.64',
     './js/mando.js?v=9.5.64',
     './js/operacion-humana.js?v=9.5.64',
