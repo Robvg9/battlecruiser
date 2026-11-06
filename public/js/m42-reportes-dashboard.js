@@ -179,13 +179,13 @@ function money(v){
     const v=lastExecutive.ventas||{},inv=lastExecutive.inventario||{},comp=lastExecutive.compras||{},mar=lastExecutive.margen||{},t=lastExecutive.transferencias||{};
     metrics.innerHTML=
       metric('↗','Ingresos totales','+
-      metric('▣','Ventas',fmtNumM42(v.cantidad||0),fmtNumM42(v.unidades||0)+' unidades')+
+      metric('▣','Ventas',fmtNumM42(v.cantidad||0),fmtNumM42fmtNumM42(v.unidades||0)+' unidades')+
       metric('◌','Gastos / compras',comp.disponible===false?'—':'$'+money(comp.valor_compras||0),comp.disponible===false?(comp.nota||'No disponible'):fmtNumM42(comp.lotes||0)+' lote(s)')+
       metric('◇','Margen',mar.disponible===false?'—':(mar.margen_pct_conocido!=null?money(mar.margen_pct_conocido)+'%':'—'),mar.disponible===false?(mar.nota||'No disponible'):'Margen con costo conocido')+
-      metric('□','Stock',String(inv.productos||0),(inv.stock_bajo||0)+' bajo · '+(inv.stock_agotado||0)+' agotado');
+      metric('□','Stock',String(fmtNumM42(inv.productos||0)),(fmtNumM42(inv.stock_bajo||0))+' bajo · '+(fmtNumM42(inv.stock_agotado||0))+' agotado');
     // Keep transferencias available as compact secondary text when useful.
     const last=metrics.querySelector('.bc-m42-metric:last-child .bc-m42-metric-sub');
-    if(last && t.cantidad!=null)last.textContent=(t.cantidad||0)+' transferencias · '+(inv.stock_bajo||0)+' bajo';
+    if(last && t.cantidad!=null)last.textContent=(fmtNumM42(t.cantidad||0))+' transferencias · '+(inv.stock_bajo||0)+' bajo';
   }
 
   function drawSalesChart(){
