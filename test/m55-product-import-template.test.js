@@ -34,6 +34,10 @@ test("paso 1 descarga un XLSX real con tres encabezados en celdas independientes
  const binary=new TextDecoder().decode(bytes);assert.match(binary,/xl\/worksheets\/sheet1.xml/);assert.match(binary,/Productos/);assert.match(binary,/Precios/);assert.match(binary,/Categorias/);
  d.getElementById("bc-m55-continue").click();assert.match(d.getElementById("bc-m55-body").textContent,/PASO 2 DE 2/);
  assert.ok(d.getElementById("bc-m55-file"));assert.equal(c.calls.length,0);
+ const c2=setup(t),d2=c2.w.document;d2.getElementById("bc-m55-continue").click();
+ const binaryFile={name:"renombrado.csv",arrayBuffer:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)};
+ attachFile(c2.w,d2.getElementById("bc-m55-file"),binaryFile);
+ assert.ok(await waitFor(()=>d2.getElementById("bc-m55-result").textContent.includes("al menos un producto")));
 });
 test("importa CSV de WPS con tabulaciones, fila de título, columna vacía y encabezados plurales",async t=>{
  const c=setup(t),d=c.w.document;d.getElementById("bc-m55-continue").click();
