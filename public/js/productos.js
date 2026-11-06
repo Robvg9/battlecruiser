@@ -2,6 +2,8 @@
 // Categorías, almacenes (carga básica), productos (CRUD, imagen), y formulario de compra.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
+function fmtQtyProducto(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
 function fillSelect(select, rows, valueKey, labelFn, keepFirst) {
   // Several legacy/offscreen modules share this helper; their optional controls may not exist in the active DOM.
   if (!select) return;
@@ -330,9 +332,10 @@ function renderProductosLista() {
       ? `<img src="${escHtml(p.imagen_url)}" alt="" class="producto-thumb" loading="lazy">`
       : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
     const unidadTxt = p.unidad ? escHtml(p.unidad) : "—";
+
     const stockTot = stockTotalProducto(p.id);
     div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""} · Base: ${unidadTxt}${p.presentacion_id && p.presentaciones ? " · Mayorista: " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
-        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)} · Stock ${money(stockTot)}</span>
+        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)} · Stock ${fmtQtyProducto(stockTot)}</span>
         ${botones}`;
     if (p.inventario_mixto) div.innerHTML += '<small class="producto-mixto-tag">Inventario por sabores</small>';
     lista.appendChild(div);
@@ -807,10 +810,10 @@ function actualizarResumenCompra() {
   const costoValido = costo > 0;
 
   document.getElementById("compra-resumen-cantidad").textContent = cantidadValida
-    ? cantidad + " × " + pp.presentaciones.nombre + " (1 " + pp.presentaciones.nombre + " = " + formatFactor(pp.factor) + " unidades)"
+    ? fmtQtyProducto(cantidad) + " × " + pp.presentaciones.nombre + " (1 " + pp.presentaciones.nombre + " = " + formatFactor(pp.factor) + " unidades)"
     : "—";
   document.getElementById("compra-resumen-equivalente").textContent = cantidadValida
-    ? money(cantidad * pp.factor) + " unidades base"
+    ? fmtQtyProducto(cantidad * pp.factor) + " unidades base"
     : "—";
   document.getElementById("compra-resumen-costo").textContent = costoValido
     ? "$" + money(costo) + " por " + pp.presentaciones.nombre

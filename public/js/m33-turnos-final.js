@@ -3,6 +3,7 @@
 // v33.20 — libro de jornada adaptable, sin desplazamiento horizontal
 (function () {
   'use strict';
+  const fmtNumM33 = v => typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v);
   if (window.__bcM33TurnosFinal) return;
   window.__bcM33TurnosFinal = true;
 
@@ -1781,7 +1782,7 @@
           const timestamp = String(row.fecha || '').replace('T', ' ').slice(0, 19);
           return '<tr><td>' + esc(timestamp || '—') + '</td><td>' + esc(row.__sessionLabel || '—') +
             '</td><td>' + esc(archiveTypeLabel(row.tipo)) + '</td><td>' + esc(row.producto || '—') +
-            '</td><td>' + esc(row.almacen || '—') + '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
+            '</td><td>' + esc(row.almacen || '—') + '</td><td>' + esc(row.cantidad == null ? '—' : fmtNumM33(row.cantidad)) +
             '</td><td>' + esc(row.usuario || '—') + '</td><td>' + esc(shortRef) + '</td></tr>';
         }).join('');
         host.innerHTML = title + '<div class="m33-archive-scroll"><table class="m33-archive-table"><thead><tr><th>Fecha/hora</th><th>' + 'Jornada' + '</th><th>Tipo</th><th>Producto</th><th>Almacén</th><th>Cantidad</th><th>Responsable</th><th>Ref.</th></tr></thead><tbody>' + body + '</tbody></table></div>' +

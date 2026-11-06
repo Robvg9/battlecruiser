@@ -21,6 +21,7 @@
   `; document.head.appendChild(style);
 
   const esc=v=>typeof escHtml==='function'?escHtml(String(v??'—')):String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtNumHist=v=>typeof window.numberFmt==='function'?window.numberFmt(v):String(v??'—');
   const moneySafe=v=>typeof money==='function'?'$'+money(v):String(v??'—');
   const labels={fecha:'Fecha y hora',fecha_compra:'Fecha de compra',almacen:'Almacén',origen:'Almacén origen',destino:'Almacén destino',estado:'Estado',tipo:'Tipo',producto:'Producto',categoria:'Categoría',cantidad:'Cantidad',cantidad_inicial:'Cantidad inicial',cantidad_restante:'Cantidad restante',minimo:'Mínimo',unidades:'Unidades',total:'Total',ingreso:'Ingreso',costo_total:'Costo de productos',costo_unitario:'Costo unitario',margen:'Ganancia',margen_porcentaje:'Margen %',direccion:'Dirección',proveedor:'Proveedor',nota:'Nota',costo_disponible:'Costo histórico disponible',lineas_sin_costo:'Líneas sin costo histórico'};
   const tituloMap={ventas:'Venta',transferencias:'Transferencia',vales:'Vale de salida',stock:'Stock',movimiento:'Movimiento de inventario',compras:'Compra',rentabilidad:'Rentabilidad'};
@@ -30,6 +31,7 @@
     if((key==='fecha'||key==='fecha_compra')&&typeof fechaHoraCompleta==='function') return fechaHoraCompleta(v);
     if(['total','ingreso','costo_total','costo_unitario','margen'].includes(key)) return moneySafe(v);
     if(key==='margen_porcentaje') return (typeof money==='function'?money(v):v)+'%';
+    if(['cantidad','cantidad_inicial','cantidad_restante','minimo','unidades','lineas_sin_costo'].includes(key)) return fmtNumHist(v);
     if(typeof v==='boolean') return v?'Sí':'No';
     return String(v);
   }
@@ -61,8 +63,8 @@
       parts.push('<div class="historial-detalle-section">Detalle de productos</div>');
       row.lineas.forEach((l,i)=>{
         const nombre=l.producto||l.nombre||l.producto_nombre||l.productos?.nombre||'Producto';
-        const vals=[]; if(l.cantidad!=null) vals.push(l.cantidad+' u'); if(l.precio_unitario!=null) vals.push(moneySafe(l.precio_unitario)); if(l.subtotal!=null) vals.push(moneySafe(l.subtotal));
-        parts.push('<div class="historial-detalle-fila"><span>'+esc((i+1)+'. '+nombre)+'</span><strong>'+esc(vals.join(' · '))+'</strong></div>');
+        const vals=[]; if(l.cantidad!=null) vals.push(fmtNumHist(l.cantidad)+' u'); if(l.precio_unitario!=null) vals.push(moneySafe(l.precio_unitario)); if(l.subtotal!=null) vals.push(moneySafe(l.subtotal));
+        parts.push('<div class="historial-detalle-fila"><span>'+esc(fmtNumHist(i+1)+'. '+nombre)+'</span><strong>'+esc(vals.join(' · '))+'</strong></div>');
       });
     }
     return parts.join('')||'<p class="lista-estado">Sin detalles disponibles.</p>';

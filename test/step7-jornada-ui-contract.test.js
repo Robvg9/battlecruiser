@@ -56,7 +56,7 @@ test("Jornada POS UI separates payment methods and cash declaration from gross s
   assert.match(ui,/NO_DECLARADO/);
   assert.match(ui,/no se calcula un efectivo esperado/);
   assert.match(ui,/ventas nuevas vinculadas de forma verificable/);
-  assert.ok(sw.includes("./js/ventas.js?v=20261105.1"));
+  assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
 });

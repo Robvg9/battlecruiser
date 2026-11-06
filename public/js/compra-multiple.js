@@ -23,6 +23,7 @@
     el.textContent = text || '';
     el.className = ok ? 'msg success' : 'msg error';
   }
+  function fmtNumCompra(v){ return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   function moneyLocal(v){
     return typeof money === 'function' ? money(v) : Number(v || 0).toFixed(2);
   }
@@ -196,8 +197,8 @@
       lista.innerHTML = lineas.length
         ? lineas.map(function(l, i){
             var etiqueta = l.presentacion_nombre
-              ? (l.cantidad_presentacion + ' × ' + esc(l.presentacion_nombre))
-              : (l.cantidad + ' unidades');
+              ? (fmtNumCompra(l.cantidad_presentacion) + ' × ' + esc(l.presentacion_nombre))
+              : (fmtNumCompra(l.cantidad) + ' unidades');
             var subtotal = (l.cantidad_documento * l.costo).toFixed(2);
             return '<div class="lista-item"><span><strong>' + esc(l.nombre) + '</strong>' +
               '<span class="muted"> · ' + etiqueta + ' · costo $' + moneyLocal(l.costo) + ' · $' + subtotal + '</span></span>' +
@@ -206,7 +207,7 @@
         : '<p class="lista-estado">Todavía no hay productos en esta compra.</p>';
       var tot = lineas.reduce(function(s, l){ return s + l.cantidad_documento * l.costo; }, 0);
       total.textContent = '$' + moneyLocal(tot);
-      if (nLineas) nLineas.textContent = lineas.length + (lineas.length === 1 ? ' línea' : ' líneas');
+      if (nLineas) nLineas.textContent = fmtNumCompra(lineas.length) + (lineas.length === 1 ? ' línea' : ' líneas');
     }
 
     function add(){

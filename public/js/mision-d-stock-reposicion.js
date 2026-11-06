@@ -22,7 +22,7 @@
   }
   function n(v) { return Number(v) || 0; }
   function moneyLocal(v) {
-    return typeof money === 'function' ? money(v) : n(v).toLocaleString('es-ES');
+    return typeof window.numberFmt === 'function' ? window.numberFmt(v) : n(v).toLocaleString('es-ES');
   }
   function labelTipo(t) {
     var s = String(t || '').toLowerCase();

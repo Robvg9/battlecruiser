@@ -69,9 +69,9 @@ async function _cargarLineasVenta(ventaId, fechaVenta, totalRegistrado) {
       el.innerHTML = '<div class="venta-lineas-lista">' + lineas.map((l) =>
         '<div class="venta-linea">'
         + '<span class="venta-linea-producto">' + escHtml(l.producto || "—") + '</span>'
-        + '<span class="venta-linea-cant">' + (l.cantidad || 0) + ' u</span>'
+        + '<span class="venta-linea-cant">' + fmtNumVenta(l.cantidad || 0) + ' u</span>'
         + '<span class="venta-linea-precio">$' + money(l.precio_unitario || 0) + '</span>'
-        + '<span class="venta-linea-subtotal">' + (l.subtotal || 0) + '</span>'
+        + '<span class="venta-linea-subtotal">' + money(l.subtotal || 0) + '</span>'
         + '</div>'
       ).join("") + '</div>';
     }
@@ -190,7 +190,7 @@ safeInit("form-vale", () => {
       setMsg("msg-vales", "La cantidad debe ser mayor a 0.", false);
       return;
     }
-    if (!window.confirm("¿Confirmar vale de salida (" + tipo + ") por " + cantidad + " unidades? Esto descuenta stock real.")) {
+    if (!window.confirm("¿Confirmar vale de salida (" + tipo + ") por " + fmtNumVenta(cantidad) + " unidades? Esto descuenta stock real.")) {
       return;
     }
 
@@ -218,6 +218,7 @@ safeInit("form-vale", () => {
 
 // ---- El precio se decide SOLO en el servidor (RPC registrar_venta) según el
 let ventaLineas = [];
+function fmtNumVenta(v) { return typeof numberFmt === 'function' ? numberFmt(v) : (typeof money === 'function' ? money(v) : String(v == null ? 0 : v)); }
 let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
 let ventaProductosPrecios = {}; // id -> precios y formatos operativos por canal
 let ventaProductosLista = []; // lista completa de productos, para el buscador
@@ -316,7 +317,7 @@ function actualizarStockDisponibleUI() {
   cantidadInput.min = tipo === "mayorista" ? "1" : "0.01";
   cantidadInput.placeholder = tipo === "mayorista" ? "Cantidad de " + formato.nombre.toLowerCase() : "Cantidad";
   if (noCalculable) {
-    infoEl.textContent = "Stock disponible: " + money(disponibleFormato) + " " + formato.nombre + " (proyección offline incompleta)";
+    infoEl.textContent = "Stock disponible: " + fmtNumVenta(disponibleFormato) + " " + formato.nombre + " (proyección offline incompleta)";
     infoEl.className = "msg";
     cantidadInput.removeAttribute("max");
     return;
@@ -324,8 +325,8 @@ function actualizarStockDisponibleUI() {
 
   const tienePendientes = ajuste !== 0;
   const stockLabel = tipo === "mayorista"
-    ? money(disponibleFormato) + " " + formato.nombre + " (" + money(disponibleBase) + " unidades base)"
-    : money(disponibleBase) + " unidades";
+    ? fmtNumVenta(disponibleFormato) + " " + formato.nombre + " (" + fmtNumVenta(disponibleBase) + " unidades base)"
+    : fmtNumVenta(disponibleBase) + " unidades";
   infoEl.textContent = "Stock disponible: " + stockLabel + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
   infoEl.className = "msg" + (disponibleBase <= 0 ? " error" : "");
   cantidadInput.setAttribute("max", disponibleFormato);
@@ -363,7 +364,7 @@ function agregarLineaVenta(producto_id, cantidad, almacen_id) {
     const disponibleBase = Math.max(stockTotal - yaEnCarritoBase, 0);
     const disponibleFormato = tipo === "mayorista" ? Math.floor(disponibleBase / formato.factor) : disponibleBase;
     setMsg("msg-venta-linea", "Stock insuficiente de " + producto.nombre + " (disponible: "
-      + money(disponibleFormato) + " " + formato.nombre + ").", false);
+      + fmtNumVenta(disponibleFormato) + " " + formato.nombre + ").", false);
     return false;
   }
 
@@ -433,9 +434,9 @@ function renderCatalogoGrid() {
     const stockBase = almacen_id ? obtenerStockDisponible(p.id, almacen_id).valor : null;
     const stockTxt = stockBase === null ? null : (formato
       ? (tipo === "mayorista"
-        ? money(Math.floor(stockBase / formato.factor)) + " " + formato.nombre + " · " + money(stockBase) + " u"
-        : money(stockBase) + " u")
-      : money(stockBase) + " u");
+        ? fmtNumVenta(Math.floor(stockBase / formato.factor)) + " " + formato.nombre + " · " + fmtNumVenta(stockBase) + " u"
+        : fmtNumVenta(stockBase) + " u")
+      : fmtNumVenta(stockBase) + " u");
 
     const card = document.createElement("button");
     card.type = "button";
@@ -524,7 +525,7 @@ function renderVentaLineas() {
     div.className = "lista-item";
     div.innerHTML = `
       <span class="venta-linea-info">
-        <span>${escHtml(linea.nombre)} · ${money(linea.cantidad)} ${escHtml(linea.presentacion_nombre || "unidades")}</span>
+        <span>${escHtml(linea.nombre)} · ${fmtNumVenta(linea.cantidad)} ${escHtml(linea.presentacion_nombre || "unidades")}</span>
         <span class="muted">$${money(linea.precio_unitario)} por ${escHtml(linea.presentacion_nombre || "unidad")}</span>
       </span>
       <span class="venta-linea-precios">
@@ -572,7 +573,7 @@ function actualizarCantidadLinea(idx, nuevaCantidad) {
       ? Math.floor(Math.max(disponibleBase, 0) / linea.factor_presentacion)
       : Math.max(disponibleBase, 0);
     setMsg("msg-venta-linea", "No hay suficiente stock de " + linea.nombre + " (disponible: "
-      + money(disponibleFormato) + " " + linea.presentacion_nombre + ").", false);
+      + fmtNumVenta(disponibleFormato) + " " + linea.presentacion_nombre + ").", false);
     renderVentaLineas();
     return;
   }
@@ -668,7 +669,7 @@ safeInit("form-venta-linea", () => {
     const max = cantidadInput.getAttribute("max");
     const val = parseFloat(cantidadInput.value);
     if (max !== null && val > parseFloat(max)) {
-      setMsg("msg-venta-linea", "Esa cantidad supera el stock disponible (" + money(parseFloat(max)) + ").", false);
+      setMsg("msg-venta-linea", "Esa cantidad supera el stock disponible (" + fmtNumVenta(parseFloat(max)) + ").", false);
     } else {
       setMsg("msg-venta-linea", "", true);
     }

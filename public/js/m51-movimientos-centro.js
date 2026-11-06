@@ -40,6 +40,7 @@
       return { '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[c];
     });
   }
+  function fmtNumM51(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   function num(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
@@ -490,10 +491,10 @@
       if (_viewMode === 'history') {
         const openAttr = _expandedHistoryDays.has(g.key) ? ' open' : '';
         html += '<details class="bc-m51-group bc-m51-group-collapsible" data-day="' + esc(g.key) + '"' + openAttr + '><summary class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
-          '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></summary>';
+          '</span><span class="bc-m51-group-count">' + fmtNumM51(g.items.length) + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></summary>';
       } else {
         html += '<div class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
-          '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
+          '</span><span class="bc-m51-group-count">' + fmtNumM51(g.items.length) + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
       }
       const warehouseMap = Object.create(null);
       const warehouseGroups = [];
@@ -509,16 +510,16 @@
       warehouseGroups.forEach(function (warehouse) {
         html += '<section class="bc-m51-warehouse-group" data-warehouse="' + esc(warehouse.key) + '">' +
           '<div class="bc-m51-warehouse-head"><span>' + esc(warehouse.name) + '</span><span>' +
-          warehouse.items.length + ' movimiento' + (warehouse.items.length === 1 ? '' : 's') + '</span></div>';
+          fmtNumM51(warehouse.items.length) + ' movimiento' + (warehouse.items.length === 1 ? '' : 's') + '</span></div>';
         warehouse.items.forEach(function (entry) {
-          const m = entry.m; const meta = metaTipo(m.tipo); const cant = absCant(m.cantidad);
+          const m = entry.m; const meta = metaTipo(m.tipo); const cant = absCant(m.cantidad); const cantTxt = fmtNumM51(cant);
           const sel = _selected && _selected.operacion_id === m.operacion_id && _selected.tipo === m.tipo &&
             String(_selected.fecha) === String(m.fecha) && _selected.producto === m.producto;
           html += '<article class="bc-m51-card' + (sel ? ' is-selected' : '') + '" data-idx="' + entry.globalIdx +
             '" role="button" tabindex="0"><div><h4 class="bc-m51-card-title">' + esc(m.producto || '—') +
             '</h4><div class="bc-m51-card-tipo"><span class="bc-m51-badge bc-m51-badge-' + esc(meta.badge) + '">' + esc(meta.short) +
             '</span></div><div class="bc-m51-card-meta">' + esc(m.almacen || '—') + ' · ' + fechaHoraFmt(m.fecha) +
-            '</div></div><div class="bc-m51-card-side"><div class="bc-m51-card-qty">' + cant +
+            '</div></div><div class="bc-m51-card-side"><div class="bc-m51-card-qty">' + fmtNumM51(cant) +
             ' u</div><div class="bc-m51-card-user">' + esc(m.usuario || '—') +
             ' <span class="bc-m51-card-chev">›</span></div></div></article>';
         });
@@ -540,7 +541,7 @@
       }
       const span = document.createElement('span');
       span.className = 'muted';
-      span.textContent = 'Página ' + (_page + 1) + ' de ' + totalPages + ' · ' + _filtered.length + ' registros';
+      span.textContent = 'Página ' + fmtNumM51(_page + 1) + ' de ' + fmtNumM51(totalPages) + ' · ' + fmtNumM51(_filtered.length) + ' registros';
       pag.appendChild(span);
       if (_page < totalPages - 1) {
         const sig = document.createElement('button');
@@ -572,7 +573,7 @@
     }
     body.innerHTML = '<div class="bc-m51-section"><h5>Información general</h5>' +
       field('Producto', m.producto || '—') + field('Tipo', meta.label) + field('Dirección', dir) +
-      field('Cantidad', cant + ' unidades') + field('Fecha/hora', fechaHoraFmt(m.fecha)) +
+      field('Cantidad', fmtNumM51(cant) + ' unidades') + field('Fecha/hora', fechaHoraFmt(m.fecha)) +
       field('Usuario', m.usuario || '—') + '</div>' +
       '<div class="bc-m51-section"><h5>Ubicación</h5>' + field('Almacén', m.almacen || '—') + '</div>' +
       costos +

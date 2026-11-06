@@ -4,6 +4,7 @@
 // v9.2.45: formulario "Crear nuevo usuario" solo como modal; sin scrollbar de página en app-shell.
 (function () {
   'use strict';
+  function fmtNumUsers(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
 
   function css() {
     if (document.getElementById('bc-usuarios-dash-css')) return;
@@ -291,7 +292,7 @@
     set('ud-res-r', roles.length);
     set('ud-res-p', permsApprox || '—');
     var sub = document.getElementById('ud-kpi-activos-sub');
-    if (sub) sub.innerHTML = users.length ? ('<span class="ok">' + activos + ' de ' + users.length + '</span> en total') : 'Sin datos aún';
+    if (sub) sub.innerHTML = users.length ? ('<span class="ok">' + fmtNumUsers(activos) + ' de ' + fmtNumUsers(users.length) + '</span> en total') : 'Sin datos aún';
   }
 
   function softRoleLabels() {

@@ -179,7 +179,7 @@ test("B5.5: el resumen ejecutivo se carga con datos reales del RPC", async () =>
     await esperarHasta(() => resumen.innerHTML.includes("15")),
     "debe mostrar cantidad de ventas dentro de 2 s"
   );
-  assert.ok(resumen.innerHTML.includes("50000"), "debe mostrar ingresos");
+  assert.ok(resumen.innerHTML.includes("50\u202f000.00"), "debe mostrar ingresos");
   assert.ok(resumen.innerHTML.includes("No existe tabla histórica"), "debe mostrar nota de compras no disponible");
   assert.ok(resumen.innerHTML.includes("No existe costo histórico"), "debe mostrar nota de margen no disponible");
 });
@@ -411,7 +411,7 @@ test("B5.3 R1: venta con costo real muestra CMV, ganancia y margen", async () =>
   await esperar(30);
   const detalle = document.getElementById("rep-detalle");
   assert.ok(detalle.innerHTML.includes("Caja 1"), "muestra el almacén");
-  assert.ok(detalle.innerHTML.includes("1000.00"), "muestra ingresos");
+  assert.ok(detalle.innerHTML.includes("1\u202f000.00"), "muestra ingresos");
   assert.ok(detalle.innerHTML.includes("$600.00"), "muestra CMV real");
   assert.ok(detalle.innerHTML.includes("$400.00"), "muestra ganancia real");
   assert.ok(detalle.innerHTML.includes("40.00%"), "muestra margen real");
@@ -487,7 +487,7 @@ test("B5.3 R1: mixto — ventas con y sin costo; totales solo suman las que tien
   // La venta sin costo marca no disponible.
   assert.ok(/costo no disponible/.test(detalle.innerHTML), "venta sin costo marcada");
   // Totales: ingresos suman ambas (1500), pero CMV solo la que tiene costo (600).
-  assert.ok(detalle.innerHTML.includes("1500.00"), "total ingresos suma ambas ventas");
+  assert.ok(detalle.innerHTML.includes("1\u202f500.00"), "total ingresos suma ambas ventas");
   assert.ok(/TOTALES[\s\S]*\$600\.00/.test(detalle.innerHTML), "total CMV solo suma la venta con costo");
   assert.ok(!/100\.00%/.test(detalle.innerHTML), "ningún margen 100% falso");
 });

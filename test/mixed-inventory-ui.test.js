@@ -60,7 +60,7 @@ test("Inventory centre replaces variant rows with parent total and a non-navigat
   assert.match(m53, /ordinaryRows\.filter\(function \(row\)/);
   assert.match(m53, /<details class="bc-m53-variant-details">/);
   assert.match(m53, /Ver stock detallado/);
-  assert.match(m53, /qtyFmt\(v\.cantidad\)/);
+  assert.match(m53, /qtyFmt\(variant\.cantidad\)/);
   assert.match(detail, /bc-m53-variant-details/);
   assert.match(detail, /e\.stopPropagation\(\)/);
 });
@@ -86,9 +86,9 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
-  assert.match(index, /productos\.js\?v=20261105\.2/);
+  assert.match(index, /productos\.js\?v=20261105\.3/);
   assert.match(index, /catalogos\.js\?v=20261105\.2/);
-  assert.match(index, /app\.js\?v=9\.5\.68/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.68"/);
-  assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53\.2"\]/);
+  assert.match(index, /app\.js\?v=9\.5\.69/);
+  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.69"/);
+  assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53\.3"\]/);
 });
