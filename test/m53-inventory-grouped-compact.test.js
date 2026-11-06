@@ -86,7 +86,7 @@ test("Inventario: un solo producto agrupa almacenes, cantidades, mínimos y esta
   assert.match(bizcocho[0].textContent, /Disponible/);
   assert.doesNotMatch(bizcocho[0].textContent, /123456|345678|469135|Inversión|Valor inventario/i);
   assert.equal(window.document.querySelectorAll("#inv-detalle [data-inv-producto]").length, 3);
-  assert.deepEqual(window._invFilas.find((row) => row.producto_id === "biz").almacenes.map((x) => x.almacen),
+  assert.deepEqual(Array.from(window._invFilas.find((row) => row.producto_id === "biz").almacenes, (x) => x.almacen),
     ["Almacén Casa", "La Cueva"]);
 });
 
