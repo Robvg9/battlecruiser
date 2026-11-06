@@ -158,18 +158,24 @@ async function loadXLSX(){
  throw Error('Este archivo XLS antiguo no es compatible. Ábrelo con WPS/Excel y guárdalo como XLSX o CSV UTF-8.');
 }
 async function parseFile(file){
- var name=(file.name||'').toLowerCase(),buffer=await file.arrayBuffer(),magic=new Uint8Array(buffer.slice(0,8)),p;
- var isZip=magic[0]===0x50&&magic[1]===0x4b;
- var isOle=magic[0]===0xd0&&magic[1]===0xcf&&magic[2]===0x11&&magic[3]===0xe0;
- if(isZip||name.endsWith('.xlsx')){
-  p=await parseXlsx(buffer);
- }else if(isOle||name.endsWith('.xls')){
-  var X=await loadXLSX(),wb=X.read(buffer,{type:'array',raw:false}),sheet=wb.Sheets[wb.SheetNames[0]];
-  if(!sheet)throw Error('El libro de Excel no contiene hojas.');
-  var aoa=X.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});p=matrixToRows(aoa,headerIndex(aoa));
+ var name=(file.name||'').toLowerCase(),buffer=null,p;
+ if(typeof file.arrayBuffer!=='function'){
+  if(typeof file.text!=='function')throw Error('No se pudo leer el archivo seleccionado.');
+  p=parseCsv(await file.text());
  }else{
-  var raw=buffer.byteLength>=2&&new Uint8Array(buffer)[0]===0xff&&new Uint8Array(buffer)[1]===0xfe?new TextDecoder('utf-16le').decode(buffer):new TextDecoder('utf-8').decode(buffer);
-  p=parseCsv(raw);
+  buffer=await file.arrayBuffer();
+  var magic=new Uint8Array(buffer.slice(0,8)),isZip=magic[0]===0x50&&magic[1]===0x4b;
+  var isOle=magic[0]===0xd0&&magic[1]===0xcf&&magic[2]===0x11&&magic[3]===0xe0;
+  if(isZip||name.endsWith('.xlsx')){
+   p=await parseXlsx(buffer);
+  }else if(isOle||name.endsWith('.xls')){
+   var X=await loadXLSX(),wb=X.read(buffer,{type:'array',raw:false}),sheet=wb.Sheets[wb.SheetNames[0]];
+   if(!sheet)throw Error('El libro de Excel no contiene hojas.');
+   var aoa=X.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});p=matrixToRows(aoa,headerIndex(aoa));
+  }else{
+   var bytes=new Uint8Array(buffer),raw=buffer.byteLength>=2&&bytes[0]===0xff&&bytes[1]===0xfe?new TextDecoder('utf-16le').decode(buffer):new TextDecoder('utf-8').decode(buffer);
+   p=parseCsv(raw);
+  }
  }
  if(!p.headers.length||!p.rows.length)throw Error('El archivo debe conservar los encabezados y contener al menos un producto debajo de ellos.');
  if(p.rows.length>MAX_ROWS)throw Error('Máximo '+MAX_ROWS+' filas por importación.');
