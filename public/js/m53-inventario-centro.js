@@ -638,9 +638,13 @@
     try {
       const client = window.client;
       if (!client) throw new Error('Cliente Supabase no disponible');
-      const [res, mixedRes] = await Promise.all([
+      const [res, mixedRes, warehousesRes] = await Promise.all([
         client.rpc('inventario_enriquecido', { p_almacen_id: almacen }),
-        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen })
+        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen }),
+        // inventario_enriquecido returns the warehouse name but not its UUID.
+        // Resolve the identifier here because stock-minimum updates are keyed by
+        // product_id + almacen_id, never by a display name.
+        client.from('almacenes').select('id, nombre').order('nombre')
       ]);
       if (res.error) {
         if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
@@ -662,6 +666,27 @@
       } else if (!(typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(mixedRes.error))) {
         throw new Error(String(mixedRes.error.message || mixedRes.error.code || mixedRes.error));
       }
+
+      // The standard inventory RPC intentionally exposes only the warehouse
+      // label. Build a name→UUID index from the warehouse catalog so the
+      // product detail editor can address the exact stock row.
+      const warehouseIdByName = new Map();
+      if (!warehousesRes.error && Array.isArray(warehousesRes.data)) {
+        warehousesRes.data.forEach(function (warehouse) {
+          const key = String(warehouse && warehouse.nombre || '').trim().toLocaleLowerCase('es');
+          if (!key || !warehouse.id) return;
+          if (warehouseIdByName.has(key)) warehouseIdByName.set(key, null);
+          else warehouseIdByName.set(key, warehouse.id);
+        });
+      } else {
+        console.warn('[BattleCruiser] M53 no pudo resolver IDs de almacén:', warehousesRes.error);
+      }
+      const ordinaryRowsWithWarehouseIds = ordinaryRows.map(function (row) {
+        if (row.almacen_id) return row;
+        const key = String(row.almacen || '').trim().toLocaleLowerCase('es');
+        const resolvedId = warehouseIdByName.get(key) || (almacen || null);
+        return Object.assign({}, row, { almacen_id: resolvedId });
+      });
       const mixedVariantIds = new Set();
       mixedRows.forEach(function (row) {
         (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
@@ -670,7 +695,7 @@
       });
       // Replace child SKU rows with one parent summary; their real product IDs
       // remain in the expandable details and in every transactional table.
-      _allRows = ordinaryRows.filter(function (row) {
+      _allRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
         return !mixedVariantIds.has(String(row.producto_id));
       }).concat(mixedRows);
       window._invFilas = _allRows;
