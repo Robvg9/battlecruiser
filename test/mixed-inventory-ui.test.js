@@ -57,7 +57,7 @@ test("Every operational product picker selects child flavor IDs, not the mixed p
 test("Inventory centre replaces variant rows with parent total and a non-navigating expandable breakdown", () => {
   assert.match(m53, /client\.rpc\('inventario_mixto_enriquecido'/);
   assert.match(m53, /mixedVariantIds\.add\(String\(variant\.producto_id\)\)/);
-  assert.match(m53, /ordinaryRows\.filter\(function \(row\)/);
+  assert.match(m53, /ordinaryRowsWithWarehouseIds\.filter\(function \(row\)/);
   assert.match(m53, /<details class="bc-m53-variant-details">/);
   assert.match(m53, /Ver stock detallado/);
   assert.match(m53, /qtyFmt\(variant\.cantidad\)/);
