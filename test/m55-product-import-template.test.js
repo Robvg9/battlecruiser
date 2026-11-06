@@ -42,7 +42,7 @@ test("importa CSV de WPS con tabulaciones, fila de título, columna vacía y enc
  assert.ok(await waitFor(()=>d.getElementById("bc-m55-run")));
  assert.match(d.getElementById("bc-m55-preview").textContent,/Plantilla válida/);
  assert.match(d.getElementById("bc-m55-preview").textContent,/2 fila\(s\)/);
- assert.match(d.getElementById("bc-m55-preview").textContent,/Productos, Precios, Categorias/);
+ assert.match(d.getElementById("bc-m55-preview").textContent,/columnas reconocidas: nombre, precio_normal, categoria/);
  d.getElementById("bc-m55-run").click();assert.ok(await waitFor(()=>c.calls.length===2));
  assert.equal(c.calls[0].payload.p_nombre,"Cerveza Mayabe");assert.equal(c.calls[0].payload.p_precio_normal,1000);
  assert.equal(c.calls[1].payload.p_nombre,"Cerveza Cristal");assert.equal(c.calls[1].payload.p_precio_normal,900);
