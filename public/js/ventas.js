@@ -69,9 +69,9 @@ async function _cargarLineasVenta(ventaId, fechaVenta, totalRegistrado) {
       el.innerHTML = '<div class="venta-lineas-lista">' + lineas.map((l) =>
         '<div class="venta-linea">'
         + '<span class="venta-linea-producto">' + escHtml(l.producto || "—") + '</span>'
-        + '<span class="venta-linea-cant">' + (l.cantidad || 0) + ' u</span>'
+        + '<span class="venta-linea-cant">' + fmtNumVenta(l.cantidad || 0) + ' u</span>'
         + '<span class="venta-linea-precio">$' + money(l.precio_unitario || 0) + '</span>'
-        + '<span class="venta-linea-subtotal">' + (l.subtotal || 0) + '</span>'
+        + '<span class="venta-linea-subtotal">' + money(l.subtotal || 0) + '</span>'
         + '</div>'
       ).join("") + '</div>';
     }
@@ -316,7 +316,7 @@ function actualizarStockDisponibleUI() {
   cantidadInput.min = tipo === "mayorista" ? "1" : "0.01";
   cantidadInput.placeholder = tipo === "mayorista" ? "Cantidad de " + formato.nombre.toLowerCase() : "Cantidad";
   if (noCalculable) {
-    infoEl.textContent = "Stock disponible: " + money(disponibleFormato) + " " + formato.nombre + " (proyección offline incompleta)";
+    infoEl.textContent = "Stock disponible: " + fmtNumVenta(disponibleFormato) + " " + formato.nombre + " (proyección offline incompleta)";
     infoEl.className = "msg";
     cantidadInput.removeAttribute("max");
     return;
@@ -324,7 +324,7 @@ function actualizarStockDisponibleUI() {
 
   const tienePendientes = ajuste !== 0;
   const stockLabel = tipo === "mayorista"
-    ? money(disponibleFormato) + " " + formato.nombre + " (" + money(disponibleBase) + " unidades base)"
+    ? money(disponibleFormato) + " " + formato.nombre + " (" + fmtNumVenta(disponibleBase) + " unidades base)"
     : money(disponibleBase) + " unidades";
   infoEl.textContent = "Stock disponible: " + stockLabel + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
   infoEl.className = "msg" + (disponibleBase <= 0 ? " error" : "");
@@ -433,7 +433,7 @@ function renderCatalogoGrid() {
     const stockBase = almacen_id ? obtenerStockDisponible(p.id, almacen_id).valor : null;
     const stockTxt = stockBase === null ? null : (formato
       ? (tipo === "mayorista"
-        ? money(Math.floor(stockBase / formato.factor)) + " " + formato.nombre + " · " + money(stockBase) + " u"
+        ? fmtNumVenta(Math.floor(stockBase / formato.factor)) + " " + formato.nombre + " · " + fmtNumVenta(stockBase) + " u"
         : money(stockBase) + " u")
       : money(stockBase) + " u");
 
@@ -524,7 +524,7 @@ function renderVentaLineas() {
     div.className = "lista-item";
     div.innerHTML = `
       <span class="venta-linea-info">
-        <span>${escHtml(linea.nombre)} · ${money(linea.cantidad)} ${escHtml(linea.presentacion_nombre || "unidades")}</span>
+        <span>${escHtml(linea.nombre)} · ${fmtNumVenta(linea.cantidad)} ${escHtml(linea.presentacion_nombre || "unidades")}</span>
         <span class="muted">$${money(linea.precio_unitario)} por ${escHtml(linea.presentacion_nombre || "unidad")}</span>
       </span>
       <span class="venta-linea-precios">
@@ -668,7 +668,7 @@ safeInit("form-venta-linea", () => {
     const max = cantidadInput.getAttribute("max");
     const val = parseFloat(cantidadInput.value);
     if (max !== null && val > parseFloat(max)) {
-      setMsg("msg-venta-linea", "Esa cantidad supera el stock disponible (" + money(parseFloat(max)) + ").", false);
+      setMsg("msg-venta-linea", "Esa cantidad supera el stock disponible (" + fmtNumVenta(parseFloat(max)) + ").", false);
     } else {
       setMsg("msg-venta-linea", "", true);
     }
