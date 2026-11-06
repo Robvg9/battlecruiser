@@ -393,9 +393,9 @@ function renderResumen() {
   const totalVendido = ventasRecientes.reduce((s, v) => s + (Number(v.total) || 0), 0);
 
   grid.innerHTML = `
-    <div class="resumen-card"><div class="valor">${(_cache.productos || []).length}</div><div class="etiqueta">Productos</div></div>
-    <div class="resumen-card"><div class="valor">${(_cache.almacenes || []).length}</div><div class="etiqueta">Almacenes</div></div>
-    <div class="resumen-card ${bajoMinimo.length ? "alerta resumen-card-accion" : ""}" ${bajoMinimo.length ? 'data-ir-tab="inventario" role="button" tabindex="0"' : ""}><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div>${bajoMinimo.length ? '<div class="muted">Tocá para ver inventario</div>' : ""}</div>
+    <div class="resumen-card"><div class="valor">${fmtNumCC((_cache.productos || []).length)}</div><div class="etiqueta">Productos</div></div>
+    <div class="resumen-card"><div class="valor">${fmtNumCC((_cache.almacenes || []).length)}</div><div class="etiqueta">Almacenes</div></div>
+    <div class="resumen-card ${bajoMinimo.length ? "alerta resumen-card-accion" : ""}" ${bajoMinimo.length ? 'data-ir-tab="inventario" role="button" tabindex="0"' : ""}><div class="valor">${fmtNumCC(bajoMinimo.length)}</div><div class="etiqueta">Bajo mínimo</div>${bajoMinimo.length ? '<div class="muted">Tocá para ver inventario</div>' : ""}</div>
     <div class="resumen-card"><div class="valor">$${money(totalVendido)}</div><div class="etiqueta">Ventas recientes</div><div class="muted">${fmtNumCC(ventasRecientes.length)} venta(s)</div></div>
     <div class="resumen-card"><div class="valor">${fmtNumCC((_cache.transferencias || []).length + (_cache.vales || []).length)}</div><div class="etiqueta">Otros movimientos</div></div>
   `;
