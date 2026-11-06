@@ -511,7 +511,7 @@
       }).join('');
       const variantWarehouses = product.almacenes.filter(function (warehouse) { return warehouse.variantes.length > 0; });
       const variantDetails = variantWarehouses.length
-        ? '<details class="bc-m53-variant-details"><summary>Ver sabores por almacén</summary><div class="bc-m53-variant-list">' +
+        ? '<details class="bc-m53-variant-details"><summary>Ver stock detallado por almacén</summary><div class="bc-m53-variant-list">' +
           variantWarehouses.map(function (warehouse) {
             return '<div class="bc-m53-variant-row"><strong>' + esc(warehouse.almacen) + '</strong><span></span></div>' +
               warehouse.variantes.map(function (variant) {
