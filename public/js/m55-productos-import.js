@@ -104,8 +104,7 @@ function renderStepTwo(){
  };
 }
 function delimiterFor(text){
- var sample=String(text||'').split(/\r?\n/).slice(0,12),candidates=['\t','; ',','];
- candidates=['\t',';',','];var best=';',score=-1;
+ var sample=String(text||'').split(/\r?\n/).slice(0,12),candidates=['\t',';',','];var best=';',score=-1;
  candidates.forEach(function(d){var n=0;sample.forEach(function(line){var q=false;for(var i=0;i<line.length;i++){if(line[i]==='"'){if(q&&line[i+1]==='"')i++;else q=!q}else if(line[i]===d&&!q)n++}});if(n>score){score=n;best=d}});
  return best;
 }
@@ -156,7 +155,7 @@ async function parseXlsx(buffer){
 async function loadXLSX(){
  if(window.XLSX)return window.XLSX;
  if(typeof window.loadSheetJS==='function')return await window.loadSheetJS();
- throw Error('No está disponible el lector XLSX en este dispositivo. Abre la plantilla CSV con Excel y guárdala como CSV UTF-8 para importarla.');
+ throw Error('Este archivo XLS antiguo no es compatible. Ábrelo con WPS/Excel y guárdalo como XLSX o CSV UTF-8.');
 }
 async function parseFile(file){
  var name=(file.name||'').toLowerCase(),buffer=await file.arrayBuffer(),magic=new Uint8Array(buffer.slice(0,8)),p;
