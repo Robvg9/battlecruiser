@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.70 — Editor de stock mínimo por almacén
+// v9.5.70 — Inventario agrupado por almacén y números legibles · mínimos por almacén
 (function hotfixV9475(){
   const VERSION="9.5.70";
   window.__BC_VERSION__=VERSION;
