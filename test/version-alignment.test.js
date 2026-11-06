@@ -105,11 +105,11 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 
 test('movement operations load multi-product transfer before the compact modal', () => {
   const multiAt = app.indexOf('["movimiento-multiple.js","20261106.1"]');
-  const modalAt = app.indexOf('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.11"]');
+  const modalAt = app.indexOf('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.12"]');
   assert.notEqual(multiAt, -1, 'the multi-transfer module must load dynamically');
   assert.ok(multiAt < modalAt, 'the multi-transfer module must load before the modal');
   assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261106.1'));
-  assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.11'));
+  assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.12'));
   assert.ok(app.includes('["m51-movimientos-centro.js","51.7"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.7"), 'the offline shell must precache the refreshed movement listener');
   assert.ok(app.includes('["inventario-detalle.js","65"]'), 'the minimum editor must refresh');
@@ -131,7 +131,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(sw.includes('./js/transferencias.js?v=20261106.1'), "transfer history must be cached with its reactive subscriber");
 });
 
-// PWA 9.5.72 rotates the shell cache and keeps the M68 fallback aligned.
+// PWA 9.5.73 groups movement history by operation and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.5\.72["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.72["']/);
@@ -172,6 +172,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(sw.includes("./js/m27-5-ventas-precio-politica.js?v=27.5b7"));
   assert.ok(sw.includes("./js/m27-6-ventas-presentaciones.js?v=27.6g"));
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.12"\]/, "M75 must load with its refreshed module cache key");
+  assert.ok(app.includes('["m76-movimientos-operaciones.js","76.1"]'), "M76 must group the movement history by operation");
+  assert.ok(sw.includes("./js/m76-movimientos-operaciones.js?v=76.1"), "M76 must be precached for offline use");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.12/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
   assert.match(index, /<script src="js\/productos\.js\?v=20261106\.1"><\/script>/);
@@ -226,7 +228,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.72"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.73"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -263,8 +265,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
 
 
 test('Step 4 modal and Turnos layout invalidate their production cache keys', () => {
-  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.11"\]/);
-  assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.11/);
+  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.12"\]/);
+  assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.12/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
   assert.match(app, /const VERSION=["']9\.5\.72["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.72["']/);
@@ -273,9 +275,9 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
   assert.ok(index.includes('style.css?v=9.5.64'));
-  assert.ok(index.includes('app.js?v=9.5.72'));
+  assert.ok(index.includes('app.js?v=9.5.73'));
   assert.ok(sw.includes('./style.css?v=9.5.64'));
-  assert.ok(sw.includes('./app.js?v=9.5.72'));
+  assert.ok(sw.includes('./app.js?v=9.5.73'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
