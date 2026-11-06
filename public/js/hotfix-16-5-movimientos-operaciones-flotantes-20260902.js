@@ -99,6 +99,7 @@
     const placeholder = current && current[key + 'Placeholder'];
     if (!placeholder || !placeholder.parentNode) return;
     const node = document.getElementById(
+      key === 'multiPanel' ? 'movimiento-multiple-panel' :
       key === 'transferForm' ? 'form-transferencia' :
       key === 'transferMessage' ? 'msg-transferencias' : 'trf-stock-disponible'
     );
@@ -143,41 +144,22 @@
   }
 
   function prepareTransferForm(current, overlay) {
-    const panel = current && current.panel;
-    const form = panel && panel.querySelector('#form-transferencia');
+    const sourcePanel = current && current.panel;
+    const multiPanel = sourcePanel && sourcePanel.querySelector('#movimiento-multiple-panel');
     const host = overlay && overlay.querySelector('.bc165-panel-host');
-    if (!form || !host) {
-      setModalStatus(overlay, 'No se encontró el formulario de transferencia. Cierra la ventana y vuelve a abrirla.');
+    if (!multiPanel || !host) {
+      setModalStatus(overlay, 'No se cargó el formulario de transferencia múltiple. Actualiza la PWA y vuelve a abrirla.');
       return null;
     }
-
     host.innerHTML =
-      '<section class="bc165-transfer-shell" aria-label="Formulario de nueva transferencia">' +
-        '<p class="bc165-transfer-intro">Selecciona los dos almacenes, el producto y la cantidad que vas a mover.</p>' +
-        '<div class="bc165-transfer-form-host"></div>' +
-        '<div class="bc165-transfer-support"></div>' +
+      '<section class="bc165-transfer-shell" aria-label="Transferencia de varios productos">' +
+        '<div class="bc165-transfer-multi-host"></div>' +
       '</section>';
-    const formHost = host.querySelector('.bc165-transfer-form-host');
-    const supportHost = host.querySelector('.bc165-transfer-support');
-
-    rememberAndMove(form, 'transferForm', formHost);
-    const stockInfo = document.getElementById('trf-stock-disponible');
-    if (stockInfo) rememberAndMove(stockInfo, 'transferStockInfo', supportHost);
-    const message = document.getElementById('msg-transferencias');
-    if (message) rememberAndMove(message, 'transferMessage', supportHost);
-
-    form.classList.add('bc165-transfer-form');
-    form.setAttribute('aria-label', 'Nueva transferencia entre almacenes');
-    ensureTransferField(form, 'trf-origen', 'Almacén de origen', 'Selecciona el almacén de origen…');
-    ensureTransferField(form, 'trf-destino', 'Almacén de destino', 'Selecciona el almacén de destino…');
-    ensureTransferField(form, 'trf-producto', 'Producto', 'Selecciona el producto…');
-    ensureTransferField(form, 'trf-cantidad', 'Cantidad a transferir', 'Escribe la cantidad…');
-    const submit = form.querySelector('button[type="submit"]');
-    if (submit) {
-      submit.classList.add('bc165-transfer-submit');
-      submit.textContent = 'Confirmar transferencia';
-    }
-    return form;
+    rememberAndMove(multiPanel, 'multiPanel', host.querySelector('.bc165-transfer-multi-host'));
+    multiPanel.classList.add('bc165-transfer-multiple');
+    const legacyForm = sourcePanel.querySelector('#form-transferencia');
+    if (legacyForm) { legacyForm.style.display = 'none'; legacyForm.setAttribute('aria-hidden', 'true'); }
+    return multiPanel;
   }
 
   function ensureTransferFormPlaceholders() {
@@ -190,8 +172,8 @@
   }
 
   function activateTransferCatalogs(overlay) {
-    const needsWarehouses = !hasSelectableOption('trf-origen') || !hasSelectableOption('trf-destino');
-    const needsProducts = !hasSelectableOption('trf-producto');
+    const needsWarehouses = !hasSelectableOption('mov-multiple-origen') || !hasSelectableOption('mov-multiple-destino');
+    const needsProducts = !hasSelectableOption('mov-multiple-producto');
     const tasks = [];
     if (needsWarehouses && typeof window.refrescarAlmacenes === 'function') {
       tasks.push(Promise.resolve().then(() => window.refrescarAlmacenes()));
@@ -200,10 +182,12 @@
       tasks.push(Promise.resolve().then(() => window.refrescarStockYSelects()));
     }
     return Promise.allSettled(tasks).then(() => {
-      ensureTransferFormPlaceholders();
+      if (typeof window.__BC_MOVIMIENTO_MULTIPLE_REFRESH__ === 'function') {
+        try { window.__BC_MOVIMIENTO_MULTIPLE_REFRESH__(); } catch (error) { console.warn(error); }
+      }
       const missing = [];
-      if (!hasSelectableOption('trf-origen') || !hasSelectableOption('trf-destino')) missing.push('almacenes');
-      if (!hasSelectableOption('trf-producto')) missing.push('productos');
+      if (!hasSelectableOption('mov-multiple-origen') || !hasSelectableOption('mov-multiple-destino')) missing.push('almacenes');
+      if (!hasSelectableOption('mov-multiple-producto')) missing.push('productos');
       setModalStatus(overlay, missing.length
         ? 'No se pudieron cargar ' + missing.join(' y ') + '. Comprueba la conexión e inténtalo de nuevo. No se ha registrado ninguna transferencia.'
         : '');
@@ -219,11 +203,11 @@
       '.bc165-action{display:block;height:auto;min-height:38px;min-width:0;width:100%;box-sizing:border-box;padding:9px 12px;white-space:normal;overflow-wrap:anywhere;line-height:1.3;background:var(--stone-2);color:var(--text);border:1px solid var(--gold-dim);border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600}' +
       '.bc165-action:hover{border-color:var(--gold);color:var(--gold-bright)}' +
       '.bc165-overlay{position:fixed;inset:0;z-index:9400;background:rgba(6,14,11,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}' +
-      '.bc165-modal{width:min(760px,100%);margin:20px auto;background:var(--stone);border:1px solid rgba(212,176,92,.32);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:16px}' +
+      '.bc165-modal{width:min(760px,100%);max-height:calc(100dvh - 32px);overflow:auto;margin:16px auto;background:var(--stone);border:1px solid rgba(212,176,92,.32);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:16px}' +
       '.bc165-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.bc165-head h3{margin:0;color:var(--gold)}' +
       '.bc165-close{background:none;border:1px solid rgba(212,176,92,.2);border-radius:7px;color:var(--mist);width:34px;height:34px;cursor:pointer;font-size:18px}' +
       '.bc165-panel-host{min-height:40px}.bc165-feedback{margin:0 0 12px;padding:10px 12px;border:1px solid rgba(212,176,92,.22);border-radius:8px;background:rgba(212,176,92,.07);color:var(--mist);font-size:12px;line-height:1.4}' +
-      '.bc165-transfer-shell{display:flex;flex-direction:column;gap:10px}.bc165-transfer-intro{margin:0;color:var(--mist);font-size:.8rem;line-height:1.45}' +
+      '.bc165-transfer-shell{display:flex;flex-direction:column;gap:10px}.bc165-transfer-multi-host{min-width:0}.bc165-transfer-multi-host>#movimiento-multiple-panel{max-width:none}.bc165-transfer-multi-host .mov-transfer-lines{max-height:160px}.bc165-transfer-intro{margin:0;color:var(--mist);font-size:.8rem;line-height:1.45}' +
       '#bc165-overlay #form-transferencia.bc165-transfer-form{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;margin:0;padding:4px 0;visibility:visible!important;opacity:1!important}' +
       '#bc165-overlay .bc165-transfer-field{display:flex;flex-direction:column;gap:5px;min-width:0}' +
       '#bc165-overlay .bc165-transfer-field label{display:block;color:var(--mist);font-size:.72rem;font-weight:600}' +
@@ -245,7 +229,7 @@
     if (!current || !current.panel) return;
     const existing = document.getElementById('bc165-overlay');
     if (existing && existing.dataset.type === type &&
-        (type === 'transferencias' ? !!existing.querySelector('#form-transferencia') : existing.contains(current.panel))) return;
+        (type === 'transferencias' ? !!existing.querySelector('#movimiento-multiple-panel') : existing.contains(current.panel))) return;
     if (existing) close(existing.dataset.type, existing);
 
     const overlay = document.createElement('div');
@@ -284,20 +268,11 @@
 
   function restoreTransferForm(current) {
     if (!current || !current.panel) return;
-    const form = current.panel.querySelector('#form-transferencia') ||
-      document.getElementById('form-transferencia');
-    const stockInfo = document.getElementById('trf-stock-disponible');
-    // The stock hint can be created lazily after the modal opens. If it had
-    // no original placeholder, put it inside the real form before removing
-    // the overlay so the next open/submit still has the same live node.
-    if (form && stockInfo && !current.transferStockInfoPlaceholder && !form.contains(stockInfo)) {
-      form.appendChild(stockInfo);
-    }
-    restoreMovedNode(current, 'transferForm', current.panel);
-    restoreMovedNode(current, 'transferStockInfo', current.panel);
-    restoreMovedNode(current, 'transferMessage', current.panel);
-    const restoredForm = current.panel.querySelector('#form-transferencia');
-    if (restoredForm) restoredForm.classList.remove('bc165-transfer-form');
+    restoreMovedNode(current, 'multiPanel', current.panel);
+    const multiPanel = current.panel.querySelector('#movimiento-multiple-panel');
+    if (multiPanel) multiPanel.classList.remove('bc165-transfer-multiple');
+    const legacyForm = current.panel.querySelector('#form-transferencia');
+    if (legacyForm) { legacyForm.style.display = 'none'; legacyForm.setAttribute('aria-hidden', 'true'); }
   }
 
   function close(type, overlay) {
@@ -366,7 +341,10 @@
       newTransfer: !!document.querySelector('[data-bc165="transferencias"]'),
       newPurchase: !!document.querySelector('[data-bc165="compras"]'),
       transferPanelPresent: !!(refs.transferencias && refs.transferencias.panel),
-      transferFormPresent: !!document.querySelector('#bc165-overlay #form-transferencia'),
+      transferFormPresent: !!document.querySelector('#bc165-overlay #movimiento-multiple-panel'),
+      transferLegacyFormHidden: !!(refs.transferencias && refs.transferencias.panel &&
+        refs.transferencias.panel.querySelector('#form-transferencia') &&
+        refs.transferencias.panel.querySelector('#form-transferencia').style.display === 'none'),
       purchasePanelPresent: !!(refs.compras && refs.compras.panel)
     };
   };
