@@ -6,6 +6,7 @@ const app = fs.readFileSync('public/app.js', 'utf8');
 const sw = fs.readFileSync('public/service-worker.js', 'utf8');
 const m68 = fs.readFileSync('public/js/m68-ventas-pos-definitivo.js', 'utf8');
 const almacenes = fs.readFileSync('public/js/almacenes.js', 'utf8');
+const transferencias = fs.readFileSync('public/js/transferencias.js', 'utf8');
 const m74 = fs.readFileSync('public/js/m74-pos-archive-retail.js', 'utf8');
 const visibilityNormalizer = fs.readFileSync('public/js/hotfix-secciones-visibles-20260903.js', 'utf8');
 const adminVisibilityNormalizer = fs.readFileSync('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js', 'utf8');
@@ -118,6 +119,9 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
   assert.ok(almacenes.includes("bc:data-changed"), "the warehouse screen must subscribe to data changes");
+  assert.ok(app.includes('["compra-multiple.js","27.13"]'), "the purchase module must load its reactive catalog listener");
+  assert.ok(sw.includes("./js/compra-multiple.js?v=27.13"), "the purchase module's reactive listener must be available offline");
+  assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
 });
 
 // PWA 9.5.72 rotates the shell cache and keeps the M68 fallback aligned.
