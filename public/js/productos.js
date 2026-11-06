@@ -418,13 +418,19 @@ if (!window.__BC_PRODUCT_CATEGORY_EVENTS__) {
   window.addEventListener("bc:data-changed", (event) => {
     const domains = event.detail && event.detail.domains || [];
     if (event.detail && event.detail.offline) return;
-    if (!domains.includes("categories")) return;
+    const categoryChanged = domains.includes("categories");
+    const productOrStockChanged = domains.includes("products") || domains.includes("stock");
+    const productTab = document.getElementById("tab-productos");
+    const productViewVisible = !!(productTab && productTab.classList.contains("visible"));
+    if (!categoryChanged && !(event.detail && event.detail.remote && productViewVisible && productOrStockChanged)) return;
     clearTimeout(categoryRefreshTimer);
     categoryRefreshTimer = setTimeout(async () => {
       try {
-        if (typeof refrescarProductos === "function") await refrescarProductos();
+        if (domains.includes("stock") && productViewVisible && typeof window.refrescarStockYSelects === "function") {
+          await window.refrescarStockYSelects();
+        } else if (typeof refrescarProductos === "function") await refrescarProductos();
         else if (typeof refrescarSelectorCategoriasProducto === "function") await refrescarSelectorCategoriasProducto();
-      } catch (error) { console.warn("[BattleCruiser] No se pudo actualizar el catálogo de categorías:", error); }
+      } catch (error) { console.warn("[BattleCruiser] No se pudo actualizar el catálogo de productos/categorías:", error); }
     }, 100);
   });
 }
