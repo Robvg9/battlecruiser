@@ -3,7 +3,7 @@
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
 // ---- B6 — NÚCLEO OPERATIVO + INVENTARIO INTELIGENTE
-function fmtNumNucleo(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : Number(v || 0).toLocaleString('es-ES', { useGrouping: true, maximumFractionDigits: 2 }); }
+function fmtNumNucleo(v) { return typeof numberFmt === 'function' ? numberFmt(v) : Number(v || 0).toLocaleString('es-ES', { useGrouping: true, maximumFractionDigits: 2 }); }
 let _invFiltroEstado = "todos"; // todos | bajo | agotado | normal
 let _invFilas = []; // filas del ultimo inventario cargado (en memoria)
 
@@ -61,9 +61,10 @@ function renderInventario(filas) {
     return;
   }
   // Totales/valoracion sobre TODAS las filas (estables, no dependen del filtro).
-  let totalValor = 0, agotados = 0, bajos = 0;
+  let totalValor = 0, totalUnidades = 0, agotados = 0, bajos = 0;
   filas.forEach((s) => {
     totalValor += Number(s.valor_inventario || 0);
+    totalUnidades += Number(s.cantidad || 0);
     if (s.estado === "agotado") agotados++;
     else if (s.estado === "bajo") bajos++;
   });
@@ -82,11 +83,14 @@ function renderInventario(filas) {
     el.innerHTML = '<p class="lista-estado">No hay productos ' + escHtml(etiqueta) + ' con el filtro actual.</p>';
   } else {
     filtradas.forEach((s) => {
+      const valor = Number(s.valor_inventario || 0);
       const div = document.createElement("div");
       div.className = "rep-fila rep-estado-" + (s.estado || "normal");
       const icono = s.estado === "agotado" ? "\ud83d\udd34" : s.estado === "bajo" ? "\ud83d\udfe1" : "\ud83d\udfe2";
       // inventario_enriquecido usa COALESCE(..., 0) en el backend:
-      div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + fmtNumNucleo(s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? fmtNumNucleo(s.minimo) : "\u2014") + ")</span></span>";
+      const costoTxt = valor > 0 ? "$" + money(s.costo_promedio || 0) : "\u2014";
+      const valorTxt = valor > 0 ? "$" + money(valor) : "\u2014";
+      div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom ' + costoTxt + " \u00b7 valor " + valorTxt + "</span></span>";
       el.appendChild(div);
     });
   }
@@ -96,6 +100,7 @@ function renderInventario(filas) {
     }
     resumen.innerHTML =
       card("Valor inventario", "$" + money(totalValor)) +
+      card("Unidades", totalUnidades) +
       card("Agotados", agotados, "\ud83d\udd34") +
       card("Stock bajo", bajos, "\ud83d\udfe1");
   }
