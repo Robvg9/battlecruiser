@@ -73,10 +73,11 @@
     const raw=String(input.value||'').trim(), value=raw===''?NaN:Number(raw);
     if(!Number.isFinite(value)||value<0){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='Introduce un mínimo válido igual o mayor que 0.';input.focus();return;}
     if(!puedeEditar()){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='Tu rol no tiene permiso para editar el stock mínimo.';return;}
-    if(!window.client||typeof window.client.rpc!=='function'){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='No está disponible la conexión con el inventario.';return;}
+    const supabaseClient=typeof client!=='undefined'?client:window.client;
+    if(!supabaseClient||typeof supabaseClient.rpc!=='function'){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='No está disponible la conexión con el inventario.';return;}
     const label=button.textContent;button.disabled=true;input.disabled=true;button.textContent='Guardando…';feedback.textContent='Guardando mínimo…';feedback.className='bc-inv-minimum-feedback';
     try{
-      const result=await window.client.rpc('bc_actualizar_stock_minimo',{p_producto_id:productId,p_almacen_id:warehouseId,p_minimo:value});
+      const result=await supabaseClient.rpc('bc_actualizar_stock_minimo',{p_producto_id:productId,p_almacen_id:warehouseId,p_minimo:value});
       if(!result||result.error)throw new Error(result&&result.error&&(result.error.message||result.error.details)||'No se pudo guardar el mínimo.');
       let updated=null;
       if(typeof window.refrescarInventario==='function'){
