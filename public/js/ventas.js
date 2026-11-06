@@ -2,6 +2,8 @@
 // Ventas: detalle/auditoría de venta, catálogo de productos para vender, carrito, confirmación de venta e historial.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
+function fmtNumVenta(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
 function mostrarDetalleVenta(ventaId) {
   const cont = document.getElementById("venta-detalle");
   if (!cont) return;
@@ -324,8 +326,8 @@ function actualizarStockDisponibleUI() {
 
   const tienePendientes = ajuste !== 0;
   const stockLabel = tipo === "mayorista"
-    ? money(disponibleFormato) + " " + formato.nombre + " (" + fmtNumVenta(disponibleBase) + " unidades base)"
-    : money(disponibleBase) + " unidades";
+    ? fmtNumVenta(disponibleFormato) + " " + formato.nombre + " (" + fmtNumVenta(disponibleBase) + " unidades base)"
+    : fmtNumVenta(disponibleBase) + " unidades";
   infoEl.textContent = "Stock disponible: " + stockLabel + (tienePendientes ? " (aprox., con operaciones pendientes)" : "");
   infoEl.className = "msg" + (disponibleBase <= 0 ? " error" : "");
   cantidadInput.setAttribute("max", disponibleFormato);
@@ -363,7 +365,7 @@ function agregarLineaVenta(producto_id, cantidad, almacen_id) {
     const disponibleBase = Math.max(stockTotal - yaEnCarritoBase, 0);
     const disponibleFormato = tipo === "mayorista" ? Math.floor(disponibleBase / formato.factor) : disponibleBase;
     setMsg("msg-venta-linea", "Stock insuficiente de " + producto.nombre + " (disponible: "
-      + money(disponibleFormato) + " " + formato.nombre + ").", false);
+      + fmtNumVenta(disponibleFormato) + " " + formato.nombre + ").", false);
     return false;
   }
 
@@ -434,8 +436,8 @@ function renderCatalogoGrid() {
     const stockTxt = stockBase === null ? null : (formato
       ? (tipo === "mayorista"
         ? fmtNumVenta(Math.floor(stockBase / formato.factor)) + " " + formato.nombre + " · " + fmtNumVenta(stockBase) + " u"
-        : money(stockBase) + " u")
-      : money(stockBase) + " u");
+        : fmtNumVenta(stockBase) + " u")
+      : fmtNumVenta(stockBase) + " u");
 
     const card = document.createElement("button");
     card.type = "button";
@@ -572,7 +574,7 @@ function actualizarCantidadLinea(idx, nuevaCantidad) {
       ? Math.floor(Math.max(disponibleBase, 0) / linea.factor_presentacion)
       : Math.max(disponibleBase, 0);
     setMsg("msg-venta-linea", "No hay suficiente stock de " + linea.nombre + " (disponible: "
-      + money(disponibleFormato) + " " + linea.presentacion_nombre + ").", false);
+      + fmtNumVenta(disponibleFormato) + " " + linea.presentacion_nombre + ").", false);
     renderVentaLineas();
     return;
   }
