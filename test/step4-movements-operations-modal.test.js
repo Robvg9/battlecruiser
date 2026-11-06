@@ -169,7 +169,10 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
   assert.equal(window.__transferCalls.length, 1, "la lista completa debe usar un solo RPC");
   assert.equal(window.__transferCalls[0].type, "transferencia");
-  assert.deepEqual(window.__transferCalls[0].payload.p_lineas.map((x) => [x.producto_id, x.cantidad]), [["p1", 2], ["p2", 3]]);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(window.__transferCalls[0].payload.p_lineas.map((x) => [x.producto_id, x.cantidad]))),
+    [["p1", 2], ["p2", 3]]
+  );
   assert.equal(window.__transferCalls[0].payload.p_origen_id, "a");
   assert.equal(window.__transferCalls[0].payload.p_destino_id, "b");
   assert.match(panel.querySelector("#mov-multiple-msg").textContent, /una sola operación/);
