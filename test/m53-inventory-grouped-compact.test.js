@@ -58,11 +58,41 @@ async function boot(t, options = {}) {
     minimumFractionDigits: 2, maximumFractionDigits: 2
   }).format(value);
   window.client = {
+    from(table) {
+      const query = {
+        select() { return query; },
+        order: async () => table === "almacenes"
+          ? { data: [{ id: "a1", nombre: "Almacén Casa" }, { id: "a2", nombre: "La Cueva" }], error: null }
+          : { data: [], error: null },
+        eq() { return query; },
+        maybeSingle: async () => ({
+          data: {
+            id: "biz", nombre: "Bizcocho", unidad: "u",
+            categorias: { nombre: "Repostería" },
+            presentaciones: { nombre: "Caja" },
+            inventario_mixto: false
+          }, error: null
+        })
+      };
+      return query;
+    },
     rpc: async (name, args = {}) => {
       rpcCalls.push({ name, args });
-      if (name === "inventario_enriquecido") return { data: fixtureRows.map((row) => ({ ...row })), error: null };
+      if (name === "inventario_enriquecido") {
+        // The real RPC returns warehouse names but not almacen_id.
+        return { data: fixtureRows.map(({ almacen_id, ...row }) => ({ ...row })), error: null };
+      }
       if (name === "inventario_mixto_enriquecido") return { data: [], error: null };
+      if (name === "movimientos_producto") return {
+        data: [
+          { fecha: "2026-11-05T14:30:00Z", tipo: "compra", producto: "Bizcocho", almacen: "Almacén Casa", cantidad: 30, usuario: "Prueba" },
+          { fecha: "2026-11-04T10:00:00Z", tipo: "transferencia_entrada", producto: "Bizcocho", almacen: "La Cueva", cantidad: 20, usuario: "Prueba" }
+        ], error: null
+      };
       if (name === "bc_actualizar_stock_minimo") {
+        if (options.canEdit === false) {
+          return { data: null, error: { code: "42501", message: "No tenés permiso para editar el stock mínimo." } };
+        }
         const target = fixtureRows.find((row) =>
           String(row.producto_id) === String(args.p_producto_id) &&
           String(row.almacen_id) === String(args.p_almacen_id)
@@ -89,7 +119,7 @@ async function boot(t, options = {}) {
   return { window, dom, fixtureRows, rpcCalls };
 }
 
-test("Inventario: un solo producto agrupa almacenes, cantidades, mínimos y estados", async (t) => {
+test("Inventario: un solo producto agrupa almacenes, cantidades, mínimos e IDs reales aunque el RPC no devuelve almacen_id", async (t) => {
   const { window } = await boot(t);
   const cards = Array.from(window.document.querySelectorAll("#inv-detalle [data-inv-producto]"));
   const bizcocho = cards.filter((card) => card.getAttribute("data-inv-producto") === "biz");
@@ -103,8 +133,10 @@ test("Inventario: un solo producto agrupa almacenes, cantidades, mínimos y esta
   assert.match(bizcocho[0].textContent, /Disponible/);
   assert.doesNotMatch(bizcocho[0].textContent, /123456|345678|469135|Inversión|Valor inventario/i);
   assert.equal(window.document.querySelectorAll("#inv-detalle [data-inv-producto]").length, 3);
-  assert.deepEqual(Array.from(window._invFilas.find((row) => row.producto_id === "biz").almacenes, (x) => x.almacen),
-    ["Almacén Casa", "La Cueva"]);
+  const grouped = window._invFilas.find((row) => row.producto_id === "biz");
+  assert.deepEqual(Array.from(grouped.almacenes, (x) => x.almacen), ["Almacén Casa", "La Cueva"]);
+  assert.deepEqual(Array.from(grouped.almacenes, (x) => x.almacen_id), ["a1", "a2"],
+    "M53 debe resolver los UUID de almacén que faltan en la respuesta estándar");
 });
 
 test("Inventario: contadores no duplican productos y elimina el indicador Unidades", async (t) => {
@@ -141,20 +173,32 @@ test("Formato numérico global y modal de producto no exponen valor de inversió
 });
 
 
-test("Inventario: tocar producto abre modal con resumen y mínimo independiente por almacén", async (t) => {
+test("Inventario: el modal muestra contexto del producto, historial y editor mínimo en cada almacén", async (t) => {
   const { window } = await boot(t);
   const card = window.document.querySelector('#inv-detalle [data-inv-producto="biz"]');
   assert.ok(card, "el producto debe poder seleccionarse");
   card.click();
   const modal = window.document.getElementById("bc-inv-producto-modal");
   assert.ok(modal && !modal.classList.contains("hidden"), "debe abrirse la ventana flotante");
+  assert.ok(await waitFor(() => modal.textContent.includes("Repostería")), "debe cargar la categoría");
   assert.match(modal.textContent, /270 u/);
   assert.match(modal.textContent, /2 almacenes/);
+  assert.match(modal.textContent, /Datos del producto/);
+  assert.match(modal.textContent, /Categoría/);
+  assert.match(modal.textContent, /Repostería/);
+  assert.match(modal.textContent, /Unidad/);
   assert.match(modal.textContent, /Stock actual/);
   assert.match(modal.textContent, /Almacén Casa/);
   assert.match(modal.textContent, /La Cueva/);
-  assert.equal(modal.querySelectorAll("[data-bc-save-minimum]").length, 2);
-  assert.equal(modal.querySelectorAll("[data-bc-minimum-input]").length, 2);
+  assert.match(modal.textContent, /Movimientos recientes/);
+  assert.match(modal.textContent, /Compra/);
+  assert.match(modal.textContent, /Transferencia · entrada/);
+  assert.equal(modal.querySelectorAll("[data-bc-save-minimum]").length, 2,
+    "cada almacén debe ofrecer su botón Guardar");
+  assert.equal(modal.querySelectorAll("[data-bc-minimum-input]").length, 2,
+    "cada almacén debe tener un campo de mínimo editable");
+  assert.equal(modal.querySelector('.bc-inv-warehouse-detail[data-warehouse-id="a1"] [data-bc-save-minimum]').dataset.productId, "biz");
+  assert.equal(modal.querySelector('.bc-inv-warehouse-detail[data-warehouse-id="a2"] [data-bc-save-minimum]').dataset.warehouseId, "a2");
 });
 
 test("Inventario: guardar cambia solo el mínimo del almacén elegido y conserva la cantidad", async (t) => {
@@ -184,14 +228,19 @@ test("Inventario: guardar cambia solo el mínimo del almacén elegido y conserva
   assert.match(refreshed.textContent, /200 u/);
 });
 
-test("Inventario: no se ofrece editar el mínimo a un rol sin permiso", async (t) => {
-  const { window } = await boot(t, { canEdit: false });
+test("Inventario: el permiso de stock es aplicado por el RPC y un rechazo no confirma el cambio", async (t) => {
+  const { window, fixtureRows, rpcCalls } = await boot(t, { canEdit: false });
   window.document.querySelector('#inv-detalle [data-inv-producto="biz"]').click();
   const modal = window.document.getElementById("bc-inv-producto-modal");
-  assert.ok(modal && !modal.classList.contains("hidden"));
-  assert.equal(modal.querySelectorAll("[data-bc-save-minimum]").length, 0);
-  assert.equal(modal.querySelectorAll("[data-bc-minimum-input]").length, 0);
-  assert.match(modal.textContent, /no tiene permiso para editar/i);
+  assert.ok(await waitFor(() => modal.querySelectorAll("[data-bc-save-minimum]").length === 2));
+  const section = modal.querySelector('.bc-inv-warehouse-detail[data-warehouse-id="a1"]');
+  section.querySelector("[data-bc-minimum-input]").value = "25";
+  section.querySelector("[data-bc-save-minimum]").click();
+  assert.ok(await waitFor(() => section.textContent.includes("No tenés permiso")),
+    "el error del RPC debe mostrarse al usuario");
+  assert.equal(rpcCalls.filter(call => call.name === "bc_actualizar_stock_minimo").length, 1);
+  assert.equal(fixtureRows.find(row => row.almacen_id === "a1").minimo, 5,
+    "un rechazo por permiso no modifica el mínimo");
 });
 
 test("Inventario: un mínimo negativo no llega al RPC", async (t) => {
