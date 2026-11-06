@@ -638,9 +638,20 @@
     try {
       const client = window.client;
       if (!client) throw new Error('Cliente Supabase no disponible');
-      const [res, mixedRes] = await Promise.all([
+      // The warehouse catalogue is only an optional enrichment for the
+      // minimum editor. Legacy/offline fixtures may expose RPC only; never let
+      // the missing .from() method block the inventory RPC and its filters.
+      const warehouseCatalogRequest = typeof client.from === 'function'
+        ? Promise.resolve().then(function () {
+            return client.from('almacenes').select('id, nombre').order('nombre');
+          }).catch(function (error) {
+            return { data: [], error: error };
+          })
+        : Promise.resolve({ data: [], error: null });
+      const [res, mixedRes, warehousesRes] = await Promise.all([
         client.rpc('inventario_enriquecido', { p_almacen_id: almacen }),
-        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen })
+        client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen }),
+        warehouseCatalogRequest
       ]);
       if (res.error) {
         if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
@@ -662,6 +673,35 @@
       } else if (!(typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(mixedRes.error))) {
         throw new Error(String(mixedRes.error.message || mixedRes.error.code || mixedRes.error));
       }
+
+      // The standard inventory RPC intentionally exposes only the warehouse
+      // label. Build a name→UUID index from the warehouse catalog so the
+      // product detail editor can address the exact stock row.
+      const warehouseIdByName = new Map();
+      let warehouseCatalog = !warehousesRes.error && Array.isArray(warehousesRes.data)
+        ? warehousesRes.data : [];
+      if (!warehouseCatalog.length) {
+        try {
+          const cached = typeof _cache !== 'undefined' && _cache && Array.isArray(_cache.almacenes)
+            ? _cache.almacenes : (Array.isArray(window._almacenes) ? window._almacenes : []);
+          if (cached.length) warehouseCatalog = cached;
+        } catch (_) {}
+      }
+      if (!warehouseCatalog.length && warehousesRes.error) {
+        console.warn('[BattleCruiser] M53 no pudo resolver IDs de almacén desde catálogo:', warehousesRes.error);
+      }
+      warehouseCatalog.forEach(function (warehouse) {
+        const key = String(warehouse && warehouse.nombre || '').trim().toLocaleLowerCase('es');
+        if (!key || !warehouse.id) return;
+        if (warehouseIdByName.has(key)) warehouseIdByName.set(key, null);
+        else warehouseIdByName.set(key, warehouse.id);
+      });
+      const ordinaryRowsWithWarehouseIds = ordinaryRows.map(function (row) {
+        if (row.almacen_id) return row;
+        const key = String(row.almacen || '').trim().toLocaleLowerCase('es');
+        const resolvedId = warehouseIdByName.get(key) || (almacen || null);
+        return Object.assign({}, row, { almacen_id: resolvedId });
+      });
       const mixedVariantIds = new Set();
       mixedRows.forEach(function (row) {
         (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
@@ -670,7 +710,7 @@
       });
       // Replace child SKU rows with one parent summary; their real product IDs
       // remain in the expandable details and in every transactional table.
-      _allRows = ordinaryRows.filter(function (row) {
+      _allRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
         return !mixedVariantIds.has(String(row.producto_id));
       }).concat(mixedRows);
       window._invFilas = _allRows;

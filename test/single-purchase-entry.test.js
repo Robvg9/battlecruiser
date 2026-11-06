@@ -18,10 +18,10 @@ test("purchase registration has one user-facing route through Movimientos", () =
   assert.equal(purchase.includes("tab.dataset.tab = 'compras'"), false);
   assert.ok(purchase.includes("section.id = 'tab-compras'"));
   assert.ok(purchase.includes("compra-multiple-confirmar"));
-  assert.ok(movementModal.includes("ensure('compras','Nueva Compra')"));
-  assert.ok(movementModal.includes("window.__BC165_open=open"));
+  assert.ok(movementModal.includes("ensure('compras', 'Nueva Compra')"));
+  assert.ok(movementModal.includes("window.__BC165_open = open"));
   assert.ok(purchase.includes("window.__BC_COMPRAS_ACTIVAR = cargarDatosYRender;"));
-  assert.ok(movementModal.includes("window.__BC_COMPRAS_ACTIVAR==='function'"));
+  assert.ok(movementModal.includes("window.__BC_COMPRAS_ACTIVAR === 'function'"));
 });
 
 test("Productos hides the duplicate legacy purchase form and points to the single route", () => {
@@ -34,12 +34,12 @@ test("Productos hides the duplicate legacy purchase form and points to the singl
 
 test("purchase and movement modal cache keys match the active release", () => {
   assert.ok(app.includes('["compra-multiple.js","27.12"]'));
-  assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.9"]'));
+  assert.ok(app.includes('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.10"]'));
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/);
   const workerVersion = serviceWorker.match(/BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion && workerVersion);
   assert.equal(workerVersion[1], appVersion[1]);
-  assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.9"));
+  assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.10"));
   assert.ok(serviceWorker.includes("./js/compra-multiple.js?v=27.12"));
   assert.ok(index.includes('app.js?v=' + appVersion[1]));
 });

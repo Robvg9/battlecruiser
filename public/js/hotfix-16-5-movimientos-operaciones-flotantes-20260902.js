@@ -1,129 +1,373 @@
-// BattleCruiser — 16.5: Transferencias + Compras viven como operaciones de Movimientos.
-(function(){
-'use strict';
-if(window.__BC165)return;window.__BC165=true;
-var refs={transferencias:null,compras:null};
-function visibilitySnapshot(panel){
- var styles={};
- ['display','visibility','opacity'].forEach(function(prop){styles[prop]={value:panel.style.getPropertyValue(prop),priority:panel.style.getPropertyPriority(prop)};});
- return {styles:styles,hidden:panel.hasAttribute('hidden'),ariaHidden:panel.getAttribute('aria-hidden')};
-}
-function revealPanel(panel){
- panel.removeAttribute('hidden');panel.removeAttribute('aria-hidden');
- panel.style.setProperty('display','block','important');
- panel.style.setProperty('visibility','visible','important');
- panel.style.setProperty('opacity','1','important');
-}
-function restorePanel(panel,snapshot){
- if(!snapshot)return;
- ['display','visibility','opacity'].forEach(function(prop){
-  var entry=snapshot.styles[prop];
-  if(entry&&entry.value)panel.style.setProperty(prop,entry.value,entry.priority);else panel.style.removeProperty(prop);
- });
- if(snapshot.hidden)panel.setAttribute('hidden','');else panel.removeAttribute('hidden');
- if(snapshot.ariaHidden===null)panel.removeAttribute('aria-hidden');else panel.setAttribute('aria-hidden',snapshot.ariaHidden);
-}
-function hasSelectableOption(id){
- var el=document.getElementById(id);
- return !!el&&Array.prototype.some.call(el.options,function(option){return option.value!=='';});
-}
-function setModalStatus(overlay,message){
- var host=overlay&&overlay.querySelector('.bc165-panel-host');if(!host)return;
- var p=host.querySelector('.bc165-feedback');
- if(!p){p=document.createElement('p');p.className='bc165-feedback';p.setAttribute('role','status');host.insertBefore(p,host.firstChild);}
- p.textContent=message||'';p.hidden=!message;
-}
-function activateTransferCatalogs(panel,overlay){
- var needsWarehouses=!hasSelectableOption('trf-origen')||!hasSelectableOption('trf-destino');
- var needsProducts=!hasSelectableOption('trf-producto');var tasks=[];
- if(needsWarehouses&&typeof window.refrescarAlmacenes==='function')tasks.push(Promise.resolve().then(function(){return window.refrescarAlmacenes();}));
- if(needsProducts&&typeof window.refrescarStockYSelects==='function')tasks.push(Promise.resolve().then(function(){return window.refrescarStockYSelects();}));
- return Promise.allSettled(tasks).then(function(){
-  revealPanel(panel);var missing=[];
-  if(!hasSelectableOption('trf-origen')||!hasSelectableOption('trf-destino'))missing.push('almacenes');
-  if(!hasSelectableOption('trf-producto'))missing.push('productos');
-  setModalStatus(overlay,missing.length?'No se pudieron cargar '+missing.join(' y ')+'. Comprueba la conexión y vuelve a abrir esta ventana. No se ha creado ninguna operación.':'');
- });
-}
-function style(){if(document.getElementById('bc165-css'))return;var s=document.createElement('style');s.id='bc165-css';s.textContent='.bc165-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;gap:8px;margin:12px 0 0}.bc165-action{display:block;height:auto;min-height:38px;min-width:0;width:100%;box-sizing:border-box;padding:9px 12px;white-space:normal;overflow-wrap:anywhere;line-height:1.3;background:var(--stone-2);color:var(--text);border:1px solid var(--gold-dim);border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600}.bc165-action:hover{border-color:var(--gold);color:var(--gold-bright)}.bc165-overlay{position:fixed;inset:0;z-index:9400;background:rgba(6,14,11,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}.bc165-modal{width:min(1050px,100%);margin:20px auto;background:var(--stone);border:1px solid rgba(212,176,92,.32);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:16px}.bc165-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.bc165-head h3{margin:0;color:var(--gold)}.bc165-close{background:none;border:1px solid rgba(212,176,92,.2);border-radius:7px;color:var(--mist);width:34px;height:34px;cursor:pointer;font-size:18px}.bc165-panel-host{min-height:40px}.bc165-feedback{margin:0 0 12px;padding:10px 12px;border:1px solid rgba(212,176,92,.22);border-radius:8px;background:rgba(212,176,92,.07);color:var(--mist);font-size:12px;line-height:1.4}.bc165-panel-host>.tab-panel{display:block!important;visibility:visible!important;position:static!important;margin:0!important;max-width:none!important}.bc165-overlay #tab-transferencias,.bc165-overlay #tab-compras{display:block!important;visibility:visible!important;opacity:1!important;position:static!important;margin:0!important;max-width:none!important;min-width:0!important;width:100%!important;box-sizing:border-box!important}.bc165-overlay #tab-transferencias input,.bc165-overlay #tab-transferencias select,.bc165-overlay #tab-transferencias button,.bc165-overlay #tab-compras input,.bc165-overlay #tab-compras select,.bc165-overlay #tab-compras button{pointer-events:auto!important;position:relative;z-index:2}#tab-movimientos.bc-m51 .bc-m51-hero{display:flex;flex-wrap:wrap;align-items:flex-start;min-width:0;max-width:100%;box-sizing:border-box}#tab-movimientos.bc-m51 .bc-m51-hero>*{min-width:0;max-width:100%;box-sizing:border-box}#tab-movimientos.bc-m51 .bc165-actions{flex:1 0 100%;width:100%;min-width:0}@media(max-width:640px){#tab-movimientos.bc-m51 .bc165-actions{grid-template-columns:1fr}.bc165-overlay{padding:8px}.bc165-modal{width:100%;max-width:100%;box-sizing:border-box;padding:12px;margin:8px auto}}.bc165-modal .bc-m51,.bc165-modal .bc-m51 *{max-width:none}.bc165-placeholder{display:none!important}';document.head.appendChild(s)}
-function captureTab(key){
- var current=refs[key];
- if(current&&current.panel&&current.placeholder&&current.originalParent){
-   if(current.button)current.button.classList.add('hidden');
-   var activeOverlay=document.getElementById('bc165-overlay');
-   if(!(activeOverlay&&activeOverlay.contains(current.panel))){
-     current.panel.classList.remove('visible');
-     current.panel.classList.add('bc165-placeholder');
-   }
-   return current;
- }
- var button=document.querySelector('.tab-btn[data-tab="'+key+'"]');
- var panel=document.getElementById('tab-'+key);
- if(!panel||!panel.parentNode)return null;
- var originalParent=panel.parentNode;
- var placeholder=document.createComment('bc165-'+key);
- originalParent.insertBefore(placeholder,panel);
- current={button:button,panel:panel,placeholder:placeholder,originalParent:originalParent};
- refs[key]=current;
- panel.dataset.bc165='1';
- if(button)button.classList.add('hidden');
- var overlay=document.getElementById('bc165-overlay');
- if(!(overlay&&overlay.contains(panel))){
-   panel.classList.remove('visible');
-   panel.classList.add('bc165-placeholder');
- }
- return current;
-}
-function open(type){
- var r=captureTab(type);
- if(!r||!r.panel)return;
- var existing=document.getElementById('bc165-overlay');
- if(existing&&existing.dataset.type===type&&existing.contains(r.panel))return;
- if(existing)close(existing.dataset.type,existing);
- var ov=document.createElement('div');
- ov.className='bc165-overlay';ov.id='bc165-overlay';ov.dataset.type=type;
- var title=type==='transferencias'?'Nueva Transferencia':'Nueva Compra';
- r.modalVisibility=visibilitySnapshot(r.panel);
- ov.innerHTML='<div class="bc165-modal" role="dialog" aria-modal="true" aria-label="'+title+'"><div class="bc165-head"><h3>'+title+'</h3><button type="button" class="bc165-close" aria-label="Cerrar">×</button></div><div class="bc165-panel-host"></div></div>';
- document.body.appendChild(ov);
- ov.querySelector('.bc165-panel-host').appendChild(r.panel);
- r.panel.classList.remove('bc165-placeholder');
- r.panel.classList.add('visible');
- revealPanel(r.panel);
- if(type==='transferencias')activateTransferCatalogs(r.panel,ov);
- if(type==='compras'&&typeof window.__BC_COMPRAS_ACTIVAR==='function'){
-   Promise.resolve().then(function(){return window.__BC_COMPRAS_ACTIVAR();}).catch(function(err){console.error('[BattleCruiser] No se pudo cargar el catálogo de compra',err);});
- }
- ov.querySelector('.bc165-close').onclick=function(){close(type,ov);};
- ov.addEventListener('click',function(e){if(e.target===ov)close(type,ov);});
-}
-function close(type,ov){
- var r=refs[type];
- if(r&&r.panel&&r.modalVisibility){restorePanel(r.panel,r.modalVisibility);r.modalVisibility=null;}
- if(r&&r.panel&&r.placeholder&&r.placeholder.parentNode===r.originalParent){
-   r.originalParent.insertBefore(r.panel,r.placeholder.nextSibling);
- }
- if(r&&r.panel){r.panel.classList.remove('visible');r.panel.classList.add('bc165-placeholder');}
- if(ov)ov.remove();
-}
-function install(){
- var mov=document.getElementById('tab-movimientos');if(!mov)return false;
- style();
- captureTab('transferencias');captureTab('compras');
- var host=mov.querySelector('.bc-m51-hero')||mov.firstElementChild;if(!host)return false;
- var actions=host.querySelector('.bc165-actions');
- if(!actions){actions=document.createElement('div');actions.className='bc165-actions';host.appendChild(actions);}
- function ensure(key,label){
-   var ref=refs[key];if(!ref||!ref.panel)return;
-   if(actions.querySelector('[data-bc165="'+key+'"]'))return;
-   var b=document.createElement('button');b.type='button';b.className='bc165-action';b.dataset.bc165=key;b.textContent=label;
-   b.onclick=function(){if(typeof window.__BC165_open==='function')window.__BC165_open(key);};
-   actions.appendChild(b);
- }
- ensure('transferencias','Nueva Transferencia');ensure('compras','Nueva Compra');return true;
-}
-function boot(){[0,300,900,1800,3000,5000].forEach(function(ms){setTimeout(install,ms)});}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-window.__BC165_open=open;window.__BC165_close=close;
-window.__BC165_verify=function(){return{transferTabHidden:!!document.querySelector('.tab-btn[data-tab="transferencias"].hidden')||!!document.querySelector('.tab-btn[data-tab="transferencias"].hidden'),purchaseTabHidden:!document.querySelector('.tab-btn[data-tab="compras"]')||!!document.querySelector('.tab-btn[data-tab="compras"].hidden'),newTransfer:!!document.querySelector('[data-bc165="transferencias"]'),newPurchase:!!document.querySelector('[data-bc165="compras"]'),transferPanelPresent:!!(refs.transferencias&&refs.transferencias.panel),purchasePanelPresent:!!(refs.compras&&refs.compras.panel)}};
+// BattleCruiser — 16.5: formularios de Transferencias y Compras en Movimientos.
+(function () {
+  'use strict';
+  if (window.__BC165) return;
+  window.__BC165 = true;
+
+  const refs = { transferencias: null, compras: null };
+
+  function visibilitySnapshot(panel) {
+    const styles = {};
+    ['display', 'visibility', 'opacity'].forEach(property => {
+      styles[property] = {
+        value: panel.style.getPropertyValue(property),
+        priority: panel.style.getPropertyPriority(property)
+      };
+    });
+    return { styles, hidden: panel.hasAttribute('hidden'), ariaHidden: panel.getAttribute('aria-hidden') };
+  }
+
+  function revealPanel(panel) {
+    panel.removeAttribute('hidden');
+    panel.removeAttribute('aria-hidden');
+    panel.style.setProperty('display', 'block', 'important');
+    panel.style.setProperty('visibility', 'visible', 'important');
+    panel.style.setProperty('opacity', '1', 'important');
+  }
+
+  function restorePanel(panel, snapshot) {
+    if (!snapshot) return;
+    ['display', 'visibility', 'opacity'].forEach(property => {
+      const entry = snapshot.styles[property];
+      if (entry && entry.value) panel.style.setProperty(property, entry.value, entry.priority);
+      else panel.style.removeProperty(property);
+    });
+    if (snapshot.hidden) panel.setAttribute('hidden', '');
+    else panel.removeAttribute('hidden');
+    if (snapshot.ariaHidden === null) panel.removeAttribute('aria-hidden');
+    else panel.setAttribute('aria-hidden', snapshot.ariaHidden);
+  }
+
+  function captureTab(key) {
+    let current = refs[key];
+    if (current && current.panel && current.placeholder && current.originalParent) {
+      if (current.button) current.button.classList.add('hidden');
+      const activeOverlay = document.getElementById('bc165-overlay');
+      // Transferencia uses a detached, dedicated form host; its source tab
+      // stays parked outside the overlay while the form itself remains active.
+      if (!(activeOverlay && (activeOverlay.contains(current.panel) ||
+          (key === 'transferencias' && activeOverlay.querySelector('#form-transferencia'))))) {
+        current.panel.classList.remove('visible');
+        current.panel.classList.add('bc165-placeholder');
+      }
+      return current;
+    }
+    const button = document.querySelector('.tab-btn[data-tab="' + key + '"]');
+    const panel = document.getElementById('tab-' + key);
+    if (!panel || !panel.parentNode) return null;
+    const originalParent = panel.parentNode;
+    const placeholder = document.createComment('bc165-' + key);
+    originalParent.insertBefore(placeholder, panel);
+    current = { button, panel, placeholder, originalParent };
+    refs[key] = current;
+    panel.dataset.bc165 = '1';
+    if (button) button.classList.add('hidden');
+    panel.classList.remove('visible');
+    panel.classList.add('bc165-placeholder');
+    return current;
+  }
+
+  function setModalStatus(overlay, message) {
+    const host = overlay && overlay.querySelector('.bc165-panel-host');
+    if (!host) return;
+    let status = host.querySelector('.bc165-feedback');
+    if (!status) {
+      status = document.createElement('p');
+      status.className = 'bc165-feedback';
+      status.setAttribute('role', 'status');
+      host.insertBefore(status, host.firstChild);
+    }
+    status.textContent = message || '';
+    status.hidden = !message;
+  }
+
+  function hasSelectableOption(id) {
+    const select = document.getElementById(id);
+    return !!select && Array.prototype.some.call(select.options, option => option.value !== '');
+  }
+
+  function rememberAndMove(node, key, destination, reference) {
+    if (!node || !node.parentNode || node.parentNode === destination) return;
+    const current = refs.transferencias;
+    const placeholder = document.createComment('bc165-' + key);
+    node.parentNode.insertBefore(placeholder, node);
+    current[key + 'Placeholder'] = placeholder;
+    destination.insertBefore(node, reference || null);
+  }
+
+  function restoreMovedNode(current, key, fallbackParent) {
+    const placeholder = current && current[key + 'Placeholder'];
+    if (!placeholder || !placeholder.parentNode) return;
+    const node = document.getElementById(
+      key === 'transferForm' ? 'form-transferencia' :
+      key === 'transferMessage' ? 'msg-transferencias' : 'trf-stock-disponible'
+    );
+    if (node) placeholder.parentNode.insertBefore(node, placeholder.nextSibling);
+    placeholder.remove();
+  }
+
+  function ensureTransferField(form, id, labelText, placeholderText) {
+    const control = form.querySelector('#' + id);
+    if (!control) return;
+    let wrapper = form.querySelector('[data-bc165-field="' + id + '"]');
+    if (!wrapper) {
+      const existingLabel = form.querySelector('label[for="' + id + '"]');
+      wrapper = document.createElement('div');
+      wrapper.className = 'bc165-transfer-field';
+      wrapper.dataset.bc165Field = id;
+      const anchor = existingLabel || control;
+      form.insertBefore(wrapper, anchor);
+      const label = existingLabel || document.createElement('label');
+      label.setAttribute('for', id);
+      label.textContent = labelText;
+      wrapper.appendChild(label);
+      wrapper.appendChild(control);
+    } else {
+      const label = wrapper.querySelector('label');
+      if (label) label.textContent = labelText;
+    }
+    control.setAttribute('aria-label', labelText);
+    if (control.tagName === 'SELECT') {
+      let empty = Array.prototype.find.call(control.options, option => option.value === '');
+      if (!empty) {
+        empty = document.createElement('option');
+        empty.value = '';
+        control.insertBefore(empty, control.firstChild);
+      }
+      empty.textContent = placeholderText;
+      empty.disabled = false;
+      if (!control.value) control.value = '';
+    } else if (placeholderText) {
+      control.setAttribute('placeholder', placeholderText);
+    }
+  }
+
+  function prepareTransferForm(current, overlay) {
+    const panel = current && current.panel;
+    const form = panel && panel.querySelector('#form-transferencia');
+    const host = overlay && overlay.querySelector('.bc165-panel-host');
+    if (!form || !host) {
+      setModalStatus(overlay, 'No se encontró el formulario de transferencia. Cierra la ventana y vuelve a abrirla.');
+      return null;
+    }
+
+    host.innerHTML =
+      '<section class="bc165-transfer-shell" aria-label="Formulario de nueva transferencia">' +
+        '<p class="bc165-transfer-intro">Selecciona los dos almacenes, el producto y la cantidad que vas a mover.</p>' +
+        '<div class="bc165-transfer-form-host"></div>' +
+        '<div class="bc165-transfer-support"></div>' +
+      '</section>';
+    const formHost = host.querySelector('.bc165-transfer-form-host');
+    const supportHost = host.querySelector('.bc165-transfer-support');
+
+    rememberAndMove(form, 'transferForm', formHost);
+    const stockInfo = document.getElementById('trf-stock-disponible');
+    if (stockInfo) rememberAndMove(stockInfo, 'transferStockInfo', supportHost);
+    const message = document.getElementById('msg-transferencias');
+    if (message) rememberAndMove(message, 'transferMessage', supportHost);
+
+    form.classList.add('bc165-transfer-form');
+    form.setAttribute('aria-label', 'Nueva transferencia entre almacenes');
+    ensureTransferField(form, 'trf-origen', 'Almacén de origen', 'Selecciona el almacén de origen…');
+    ensureTransferField(form, 'trf-destino', 'Almacén de destino', 'Selecciona el almacén de destino…');
+    ensureTransferField(form, 'trf-producto', 'Producto', 'Selecciona el producto…');
+    ensureTransferField(form, 'trf-cantidad', 'Cantidad a transferir', 'Escribe la cantidad…');
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) {
+      submit.classList.add('bc165-transfer-submit');
+      submit.textContent = 'Confirmar transferencia';
+    }
+    return form;
+  }
+
+  function ensureTransferFormPlaceholders() {
+    const form = document.getElementById('form-transferencia');
+    if (!form) return;
+    ensureTransferField(form, 'trf-origen', 'Almacén de origen', 'Selecciona el almacén de origen…');
+    ensureTransferField(form, 'trf-destino', 'Almacén de destino', 'Selecciona el almacén de destino…');
+    ensureTransferField(form, 'trf-producto', 'Producto', 'Selecciona el producto…');
+    ensureTransferField(form, 'trf-cantidad', 'Cantidad a transferir', 'Escribe la cantidad…');
+  }
+
+  function activateTransferCatalogs(overlay) {
+    const needsWarehouses = !hasSelectableOption('trf-origen') || !hasSelectableOption('trf-destino');
+    const needsProducts = !hasSelectableOption('trf-producto');
+    const tasks = [];
+    if (needsWarehouses && typeof window.refrescarAlmacenes === 'function') {
+      tasks.push(Promise.resolve().then(() => window.refrescarAlmacenes()));
+    }
+    if (needsProducts && typeof window.refrescarStockYSelects === 'function') {
+      tasks.push(Promise.resolve().then(() => window.refrescarStockYSelects()));
+    }
+    return Promise.allSettled(tasks).then(() => {
+      ensureTransferFormPlaceholders();
+      const missing = [];
+      if (!hasSelectableOption('trf-origen') || !hasSelectableOption('trf-destino')) missing.push('almacenes');
+      if (!hasSelectableOption('trf-producto')) missing.push('productos');
+      setModalStatus(overlay, missing.length
+        ? 'No se pudieron cargar ' + missing.join(' y ') + '. Comprueba la conexión e inténtalo de nuevo. No se ha registrado ninguna transferencia.'
+        : '');
+    });
+  }
+
+  function style() {
+    if (document.getElementById('bc165-css')) return;
+    const sheet = document.createElement('style');
+    sheet.id = 'bc165-css';
+    sheet.textContent =
+      '.bc165-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;gap:8px;margin:12px 0 0}' +
+      '.bc165-action{display:block;height:auto;min-height:38px;min-width:0;width:100%;box-sizing:border-box;padding:9px 12px;white-space:normal;overflow-wrap:anywhere;line-height:1.3;background:var(--stone-2);color:var(--text);border:1px solid var(--gold-dim);border-radius:7px;cursor:pointer;font-size:12.5px;font-weight:600}' +
+      '.bc165-action:hover{border-color:var(--gold);color:var(--gold-bright)}' +
+      '.bc165-overlay{position:fixed;inset:0;z-index:9400;background:rgba(6,14,11,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}' +
+      '.bc165-modal{width:min(760px,100%);margin:20px auto;background:var(--stone);border:1px solid rgba(212,176,92,.32);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);padding:16px}' +
+      '.bc165-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.bc165-head h3{margin:0;color:var(--gold)}' +
+      '.bc165-close{background:none;border:1px solid rgba(212,176,92,.2);border-radius:7px;color:var(--mist);width:34px;height:34px;cursor:pointer;font-size:18px}' +
+      '.bc165-panel-host{min-height:40px}.bc165-feedback{margin:0 0 12px;padding:10px 12px;border:1px solid rgba(212,176,92,.22);border-radius:8px;background:rgba(212,176,92,.07);color:var(--mist);font-size:12px;line-height:1.4}' +
+      '.bc165-transfer-shell{display:flex;flex-direction:column;gap:10px}.bc165-transfer-intro{margin:0;color:var(--mist);font-size:.8rem;line-height:1.45}' +
+      '#bc165-overlay #form-transferencia.bc165-transfer-form{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;margin:0;padding:4px 0;visibility:visible!important;opacity:1!important}' +
+      '#bc165-overlay .bc165-transfer-field{display:flex;flex-direction:column;gap:5px;min-width:0}' +
+      '#bc165-overlay .bc165-transfer-field label{display:block;color:var(--mist);font-size:.72rem;font-weight:600}' +
+      '#bc165-overlay .bc165-transfer-field select,#bc165-overlay .bc165-transfer-field input{display:block!important;width:100%;height:44px;min-width:0;box-sizing:border-box;padding:0 11px;border:1px solid rgba(212,176,92,.32);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font-size:.85rem;visibility:visible!important;opacity:1!important}' +
+      '#bc165-overlay #form-transferencia .bc165-transfer-submit{grid-column:1/-1;min-height:44px;width:100%;padding:10px 14px;border:0;border-radius:7px;background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;font-weight:700;font-size:.85rem;cursor:pointer}' +
+      '.bc165-transfer-support{display:flex;flex-direction:column;gap:6px}.bc165-transfer-support .msg{margin:0}.bc165-transfer-support #trf-stock-disponible{margin:0;font-size:.76rem}' +
+      '.bc165-panel-host>.tab-panel{display:block!important;visibility:visible!important;position:static!important;margin:0!important;max-width:none!important}' +
+      '.bc165-overlay #tab-transferencias,.bc165-overlay #tab-compras{display:block!important;visibility:visible!important;opacity:1!important;position:static!important;margin:0!important;max-width:none!important;min-width:0!important;width:100%!important;box-sizing:border-box!important}' +
+      '.bc165-overlay #tab-transferencias input,.bc165-overlay #tab-transferencias select,.bc165-overlay #tab-transferencias button,.bc165-overlay #tab-compras input,.bc165-overlay #tab-compras select,.bc165-overlay #tab-compras button{pointer-events:auto!important;position:relative;z-index:2}' +
+      '#tab-movimientos.bc-m51 .bc-m51-hero{display:flex;flex-wrap:wrap;align-items:flex-start;min-width:0;max-width:100%;box-sizing:border-box}' +
+      '#tab-movimientos.bc-m51 .bc-m51-hero>*{min-width:0;max-width:100%;box-sizing:border-box}#tab-movimientos.bc-m51 .bc165-actions{flex:1 0 100%;width:100%;min-width:0}' +
+      '@media(max-width:640px){#tab-movimientos.bc-m51 .bc165-actions{grid-template-columns:1fr}.bc165-overlay{padding:8px}.bc165-modal{width:100%;max-width:100%;box-sizing:border-box;padding:12px;margin:8px auto}#bc165-overlay #form-transferencia.bc165-transfer-form{grid-template-columns:minmax(0,1fr);gap:10px}}' +
+      '.bc165-modal .bc-m51,.bc165-modal .bc-m51 *{max-width:none}.bc165-placeholder{display:none!important}';
+    document.head.appendChild(sheet);
+  }
+
+  function open(type) {
+    const current = captureTab(type);
+    if (!current || !current.panel) return;
+    const existing = document.getElementById('bc165-overlay');
+    if (existing && existing.dataset.type === type &&
+        (type === 'transferencias' ? !!existing.querySelector('#form-transferencia') : existing.contains(current.panel))) return;
+    if (existing) close(existing.dataset.type, existing);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'bc165-overlay';
+    overlay.id = 'bc165-overlay';
+    overlay.dataset.type = type;
+    const title = type === 'transferencias' ? 'Nueva Transferencia' : 'Nueva Compra';
+    current.modalVisibility = visibilitySnapshot(current.panel);
+    overlay.innerHTML =
+      '<div class="bc165-modal" role="dialog" aria-modal="true" aria-label="' + title + '">' +
+        '<div class="bc165-head"><h3>' + title + '</h3><button type="button" class="bc165-close" aria-label="Cerrar">×</button></div>' +
+        '<div class="bc165-panel-host"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    if (type === 'transferencias') {
+      prepareTransferForm(current, overlay);
+      activateTransferCatalogs(overlay);
+    } else {
+      overlay.querySelector('.bc165-panel-host').appendChild(current.panel);
+      current.panel.classList.remove('bc165-placeholder');
+      current.panel.classList.add('visible');
+      revealPanel(current.panel);
+      if (typeof window.__BC_COMPRAS_ACTIVAR === 'function') {
+        Promise.resolve().then(() => window.__BC_COMPRAS_ACTIVAR()).catch(error => {
+          console.error('[BattleCruiser] No se pudo cargar el catálogo de compra', error);
+        });
+      }
+    }
+
+    overlay.querySelector('.bc165-close').onclick = () => close(type, overlay);
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) close(type, overlay);
+    });
+  }
+
+  function restoreTransferForm(current) {
+    if (!current || !current.panel) return;
+    const form = current.panel.querySelector('#form-transferencia') ||
+      document.getElementById('form-transferencia');
+    const stockInfo = document.getElementById('trf-stock-disponible');
+    // The stock hint can be created lazily after the modal opens. If it had
+    // no original placeholder, put it inside the real form before removing
+    // the overlay so the next open/submit still has the same live node.
+    if (form && stockInfo && !current.transferStockInfoPlaceholder && !form.contains(stockInfo)) {
+      form.appendChild(stockInfo);
+    }
+    restoreMovedNode(current, 'transferForm', current.panel);
+    restoreMovedNode(current, 'transferStockInfo', current.panel);
+    restoreMovedNode(current, 'transferMessage', current.panel);
+    const restoredForm = current.panel.querySelector('#form-transferencia');
+    if (restoredForm) restoredForm.classList.remove('bc165-transfer-form');
+  }
+
+  function close(type, overlay) {
+    const current = refs[type];
+    if (type === 'transferencias') restoreTransferForm(current);
+    if (current && current.panel && current.modalVisibility) {
+      restorePanel(current.panel, current.modalVisibility);
+      current.modalVisibility = null;
+    }
+    if (current && current.panel && current.placeholder && current.placeholder.parentNode === current.originalParent) {
+      current.originalParent.insertBefore(current.panel, current.placeholder.nextSibling);
+    }
+    if (current && current.panel) {
+      current.panel.classList.remove('visible');
+      current.panel.classList.add('bc165-placeholder');
+    }
+    if (overlay) overlay.remove();
+  }
+
+  function install() {
+    const movements = document.getElementById('tab-movimientos');
+    if (!movements) return false;
+    style();
+    captureTab('transferencias');
+    captureTab('compras');
+    const host = movements.querySelector('.bc-m51-hero') || movements.firstElementChild;
+    if (!host) return false;
+    let actions = host.querySelector('.bc165-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'bc165-actions';
+      host.appendChild(actions);
+    }
+    function ensure(key, label) {
+      const current = refs[key];
+      if (!current || !current.panel || actions.querySelector('[data-bc165="' + key + '"]')) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'bc165-action';
+      button.dataset.bc165 = key;
+      button.textContent = label;
+      button.onclick = () => {
+        if (typeof window.__BC165_open === 'function') window.__BC165_open(key);
+      };
+      actions.appendChild(button);
+    }
+    ensure('transferencias', 'Nueva Transferencia');
+    ensure('compras', 'Nueva Compra');
+    return true;
+  }
+
+  function boot() {
+    [0, 300, 900, 1800, 3000, 5000].forEach(delay => setTimeout(install, delay));
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
+
+  window.__BC165_open = open;
+  window.__BC165_close = close;
+  window.__BC165_verify = function () {
+    return {
+      transferTabHidden: !!document.querySelector('.tab-btn[data-tab="transferencias"].hidden') ||
+        !!document.querySelector('.tab-btn[data-tab="transferencias"].hidden'),
+      purchaseTabHidden: !document.querySelector('.tab-btn[data-tab="compras"]') ||
+        !!document.querySelector('.tab-btn[data-tab="compras"].hidden'),
+      newTransfer: !!document.querySelector('[data-bc165="transferencias"]'),
+      newPurchase: !!document.querySelector('[data-bc165="compras"]'),
+      transferPanelPresent: !!(refs.transferencias && refs.transferencias.panel),
+      transferFormPresent: !!document.querySelector('#bc165-overlay #form-transferencia'),
+      purchasePanelPresent: !!(refs.compras && refs.compras.panel)
+    };
+  };
 })();

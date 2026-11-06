@@ -57,12 +57,12 @@ test("Every operational product picker selects child flavor IDs, not the mixed p
 test("Inventory centre replaces variant rows with parent total and a non-navigating expandable breakdown", () => {
   assert.match(m53, /client\.rpc\('inventario_mixto_enriquecido'/);
   assert.match(m53, /mixedVariantIds\.add\(String\(variant\.producto_id\)\)/);
-  assert.match(m53, /ordinaryRows\.filter\(function \(row\)/);
+  assert.match(m53, /ordinaryRowsWithWarehouseIds\.filter\(function \(row\)/);
   assert.match(m53, /<details class="bc-m53-variant-details">/);
   assert.match(m53, /Ver stock detallado/);
   assert.match(m53, /qtyFmt\(variant\.cantidad\)/);
   assert.match(detail, /bc-m53-variant-details/);
-  assert.match(detail, /e\.stopPropagation\(\)/);
+  assert.match(detail, /event\.stopPropagation\(\)/);
 });
 
 test("Mixed inventory migration keeps existing product IDs as the transaction and FIFO key", () => {
@@ -88,7 +88,7 @@ test("Product catalog query falls back until the optional migration is deployed"
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
   assert.match(index, /productos\.js\?v=20261105\.3/);
   assert.match(index, /catalogos\.js\?v=20261105\.2/);
-  assert.match(index, /app\.js\?v=9\.5\.70/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.70"/);
+  assert.match(index, /app\.js\?v=9\.5\.71/);
+  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9\.5\.71"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53\.3"\]/);
 });

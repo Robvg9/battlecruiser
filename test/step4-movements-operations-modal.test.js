@@ -54,21 +54,40 @@ test("Paso 4: los botones Nueva Transferencia y Nueva Compra se montan en Movimi
   assert.match(css, /#tab-compras/);
 });
 
-test("Paso 4: abrir Nueva Transferencia muestra el formulario dentro del modal y permite cerrarlo", (t) => {
+test("Paso 4: abrir Nueva Transferencia muestra los cuatro campos y conserva el formulario real", (t) => {
   const { window } = setup(t);
+  const originalPanel = window.document.getElementById("tab-transferencias");
+  const originalForm = window.document.getElementById("form-transferencia");
+  let submitListenerCalls = 0;
+  originalForm.addEventListener("submit", (event) => { event.preventDefault(); submitListenerCalls += 1; });
+
   window.document.querySelector('[data-bc165="transferencias"]').click();
   const modal = window.document.getElementById("bc165-overlay");
   assert.ok(modal, "el modal debe usar el ID que consumen los controles de reparación");
-  assert.ok(modal.querySelector("#tab-transferencias"));
-  assert.ok(modal.querySelector("#trf-origen"));
-  assert.equal(modal.querySelector("#tab-transferencias").style.getPropertyValue("display"), "block");
-  assert.equal(modal.querySelector("#tab-transferencias").style.getPropertyPriority("display"), "important");
-  assert.equal(modal.querySelector("#tab-transferencias").classList.contains("visible"), true);
+  const form = modal.querySelector("#form-transferencia");
+  assert.equal(form, originalForm, "debe moverse el formulario real, no duplicarlo");
+  assert.equal(form.parentElement.classList.contains("bc165-transfer-form-host"), true);
+  assert.ok(form.querySelector("#trf-origen"));
+  assert.ok(form.querySelector("#trf-destino"));
+  assert.ok(form.querySelector("#trf-producto"));
+  assert.ok(form.querySelector("#trf-cantidad"));
+  assert.equal(form.querySelectorAll("label").length, 4, "los cuatro campos deben tener una etiqueta visible");
+  assert.match(form.textContent, /Almacén de origen/);
+  assert.match(form.textContent, /Almacén de destino/);
+  assert.match(form.textContent, /Producto/);
+  assert.match(form.textContent, /Cantidad a transferir/);
+  assert.match(form.querySelector("button[type='submit']").textContent, /Confirmar transferencia/);
+  assert.equal(modal.querySelector("#tab-transferencias"), null, "el panel antiguo permanece aparcado fuera del modal");
+  assert.equal(originalPanel.parentElement.id, "panel-root");
+  form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.equal(submitListenerCalls, 1, "mover el nodo debe conservar sus listeners");
   modal.querySelector(".bc165-close").click();
   assert.equal(window.document.getElementById("bc165-overlay"), null);
-  assert.equal(window.document.getElementById("tab-transferencias").parentElement.id, "panel-root");
-  assert.equal(window.document.getElementById("tab-transferencias").style.getPropertyValue("display"), "none");
-  assert.equal(window.document.getElementById("tab-transferencias").style.getPropertyPriority("display"), "important");
+  assert.equal(window.document.getElementById("tab-transferencias"), originalPanel);
+  assert.equal(originalPanel.parentElement.id, "panel-root");
+  assert.equal(originalPanel.querySelector("#form-transferencia"), originalForm);
+  assert.equal(originalPanel.style.getPropertyValue("display"), "none");
+  assert.equal(originalPanel.style.getPropertyPriority("display"), "important");
 });
 
 test("Paso 4: abrir Nueva Compra dispara la carga de catálogo e historial", async (t) => {
@@ -107,24 +126,35 @@ test("Paso 4: el cargador de la PWA incluye el módulo de operaciones flotantes 
 });
 
 
-test("Paso 4 regresión: reintentos de inicialización no vacían un modal de transferencia abierto", (t) => {
+test("Paso 4 regresión: reintentos de inicialización no ocultan ni duplican el formulario de transferencia", (t) => {
   const { window } = setup(t);
-  const trigger = window.document.querySelector('[data-bc165="transferencias"]');
-  trigger.click();
+  const originalPanel = window.document.getElementById("tab-transferencias");
+  const originalForm = window.document.getElementById("form-transferencia");
+  window.document.querySelector('[data-bc165="transferencias"]').click();
   let modal = window.document.getElementById("bc165-overlay");
-  assert.ok(modal.querySelector("#trf-origen"), "el formulario de transferencia debe estar en el modal antes del reintento");
+  assert.equal(modal.querySelector("#form-transferencia"), originalForm);
 
   const delays = window.__BC165_runPendingTimers();
   assert.ok(delays.includes(300), "la prueba debe reproducir el segundo intento de inicialización");
   modal = window.document.getElementById("bc165-overlay");
   assert.ok(modal, "el modal debe permanecer abierto");
-  assert.ok(modal.querySelector("#trf-origen"), "la inicialización repetida no debe ocultar ni sacar el formulario");
-  assert.equal(modal.querySelector("#tab-transferencias").classList.contains("bc165-placeholder"), false,
-    "un panel dentro del modal activo nunca debe volver al estado placeholder");
+  assert.equal(modal.querySelector("#form-transferencia"), originalForm,
+    "la inicialización repetida no debe sacar ni duplicar el formulario");
+  assert.equal(modal.querySelectorAll("#form-transferencia").length, 1);
+  assert.equal(originalPanel.classList.contains("bc165-placeholder"), true,
+    "el panel fuente sigue aparcado mientras el formulario real está en el modal");
 
+  const stockInfo = window.document.createElement("p");
+  stockInfo.id = "trf-stock-disponible";
+  stockInfo.textContent = "Stock disponible en origen: 40";
+  modal.querySelector(".bc165-transfer-support").appendChild(stockInfo);
   modal.querySelector(".bc165-close").click();
-  assert.equal(window.document.getElementById("tab-transferencias").parentElement.id, "panel-root",
-    "el panel debe volver a su padre original al cerrar");
+  assert.equal(originalPanel.querySelector("#form-transferencia"), originalForm,
+    "al cerrar, el formulario debe volver a su panel");
+  assert.equal(originalForm.contains(stockInfo), true,
+    "el aviso de stock creado mientras el modal estaba abierto debe restaurarse y no perderse");
+  assert.equal(originalPanel.parentElement.id, "panel-root",
+    "el panel debe permanecer en su padre original al cerrar");
 });
 
 test("Paso 4 regresión: reintentos de inicialización no vacían un modal de compra abierto", (t) => {
@@ -174,7 +204,7 @@ test("Paso 4: Transferencia recupera almacenes y productos al abrirse si los sel
   assert.ok(!feedback || feedback.hidden || !feedback.textContent, "successful loading leaves no error text");
 });
 
-test("Paso 4: una transferencia sin catálogo visible informa del problema en vez de mostrar un modal vacío", async (t) => {
+test("Paso 4: sin catálogo visible el formulario sigue presentado y explica el bloqueo", async (t) => {
   const { window } = setup(t);
   ["trf-origen", "trf-destino", "trf-producto"].forEach((id) => {
     window.document.getElementById(id).innerHTML = '<option value="">Selecciona…</option>';
@@ -182,7 +212,12 @@ test("Paso 4: una transferencia sin catálogo visible informa del problema en ve
   window.document.querySelector('[data-bc165="transferencias"]').click();
   await new Promise((resolve) => setTimeout(resolve, 0));
   const modal = window.document.getElementById("bc165-overlay");
-  assert.ok(modal.querySelector("#form-transferencia"), "the form itself remains visible");
+  const form = modal.querySelector("#form-transferencia");
+  assert.ok(form, "el formulario debe mostrarse aunque los catálogos todavía no estén cargados");
+  assert.equal(form.querySelectorAll("label").length, 4);
+  assert.ok(form.querySelector("#trf-origen"));
+  assert.ok(form.querySelector("#trf-destino"));
+  assert.ok(form.querySelector("#trf-producto"));
   assert.match(modal.querySelector(".bc165-feedback").textContent, /No se pudieron cargar almacenes y productos/);
 });
 
