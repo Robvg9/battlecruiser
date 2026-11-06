@@ -122,6 +122,8 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["compra-multiple.js","27.13"]'), "the purchase module must load its reactive catalog listener");
   assert.ok(sw.includes("./js/compra-multiple.js?v=27.13"), "the purchase module's reactive listener must be available offline");
   assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
+  assert.ok(index.includes('js/transferencias.js?v=20261106.1'), "transfer history must load its reactive subscriber");
+  assert.ok(sw.includes('./js/transferencias.js?v=20261106.1'), "transfer history must be cached with its reactive subscriber");
 });
 
 // PWA 9.5.72 rotates the shell cache and keeps the M68 fallback aligned.
