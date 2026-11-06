@@ -4,6 +4,7 @@
 // v29.11 — CREAR TURNO solo ADMIN real (no ciclos.crear de dependienta)
 (function () {
   'use strict';
+  function fmtNumM29(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   if (window.__bcM29TurnosOrg) return;
   window.__bcM29TurnosOrg = true;
   window.__BC_TURNOS_HOME_OWNER = 'm29';
@@ -606,7 +607,7 @@
       // Offline creation may continue from the last locally verified catalog.
       var people = await ensureEligibleStaff(!offlineNow());
       var status = document.getElementById('m29-staff-status');
-      if (status) { status.textContent = people.length + ' responsables activos disponibles.'; status.className = 'm29-msg ok'; }
+      if (status) { status.textContent = fmtNumM29(people.length) + ' responsables activos disponibles.'; status.className = 'm29-msg ok'; }
       buildCreateRows();
       var confirm = document.getElementById('m29-confirm-crear');
       if (confirm) confirm.disabled = false;
