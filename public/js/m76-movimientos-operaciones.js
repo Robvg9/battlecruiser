@@ -156,6 +156,37 @@
         button.innerHTML = iconSvg(item.path) + '<span class="bc-m76-sr-only">' + item.label + '</span>';
       });
     });
+    // Iconify only exact, universally recognizable one-word actions. Contextual
+    // or destructive multi-word actions keep their visible text.
+    const exact = {
+      'guardar': ['Guardar', 'M5 3h12l4 4v14H3V3h2 M7 3v6h10V3 M7 21v-8h10v8'],
+      'editar': ['Editar', 'M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z'],
+      'eliminar': ['Eliminar', 'M3 6h18 M8 6V4h8v2 M19 6l-1 15H6L5 6 M10 11v6 M14 11v6'],
+      'buscar': ['Buscar', 'M20 20l-4.5-4.5 M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z'],
+      'refrescar': ['Actualizar', 'M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.8-2L20 12 M4 12l2.6 5a7 7 0 0 0 11.8-2'],
+      'actualizar': ['Actualizar', 'M20 7v5h-5 M4 17v-5h5 M5.6 9a7 7 0 0 1 11.8-2L20 12 M4 12l2.6 5a7 7 0 0 0 11.8-2'],
+      'limpiar': ['Limpiar', 'M5 5l14 14 M19 5L5 19'],
+      'cancelar': ['Cancelar', 'M5 5l14 14 M19 5L5 19'],
+      'cerrar': ['Cerrar', 'M5 5l14 14 M19 5L5 19'],
+      'volver': ['Volver', 'M19 12H5 M12 19l-7-7 7-7'],
+      'anterior': ['Anterior', 'M19 12H5 M12 19l-7-7 7-7'],
+      'siguiente': ['Siguiente', 'M5 12h14 M12 5l7 7-7 7'],
+      'agregar': ['Agregar', 'M12 5v14 M5 12h14'],
+      'añadir': ['Añadir', 'M12 5v14 M5 12h14'],
+      'descargar': ['Descargar', 'M12 3v12 M7 10l5 5 5-5 M4 20h16'],
+      'subir': ['Subir', 'M12 21V9 M7 14l5-5 5 5 M4 4h16']
+    };
+    root.querySelectorAll('button').forEach(function (button) {
+      if (button.dataset.bcIconified === '1') return;
+      const visible = text(button.innerText || button.textContent).replace(/[↻⌕×✓✔✕←→‹›]/g, '').trim().toLowerCase();
+      const item = exact[visible];
+      if (!item) return;
+      button.dataset.bcIconified = '1';
+      button.setAttribute('aria-label', item[0]);
+      button.setAttribute('title', item[0]);
+      button.classList.add('bc-m76-icon-only');
+      button.innerHTML = iconSvg(item[1]) + '<span class="bc-m76-sr-only">' + esc(item[0]) + '</span>';
+    });
   }
 
   function injectStyles() {
@@ -187,7 +218,7 @@
       '#tab-movimientos #mov-paginacion{display:none!important}',
       '#tab-movimientos .bc-m76-pagination{display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 0}',
       '#tab-movimientos .bc-m76-pagination button{width:36px;height:34px;border-radius:7px;border:1px solid var(--gold-dim);background:var(--stone-2);color:var(--text)}',
-      '#tab-movimientos .bc-m76-op-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:9px 11px;margin:0 0 6px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.018);cursor:pointer}',
+      '#tab-movimientos .bc-m76-op-card{display:grid;width:100%;font:inherit;text-align:left;color:inherit;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;padding:9px 11px;margin:0 0 6px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.018);cursor:pointer}',
       '#tab-movimientos .bc-m76-op-card:hover,#tab-movimientos .bc-m76-op-card:focus{outline:none;border-color:rgba(212,176,92,.5);background:rgba(212,176,92,.055)}',
       '#tab-movimientos .bc-m76-op-name{font-size:.84rem;font-weight:700;color:var(--text)}',
       '#tab-movimientos .bc-m76-op-meta{margin-top:4px;font-size:.72rem;color:var(--mist);line-height:1.35}',
@@ -428,7 +459,15 @@
     ensureCategoryTabs(tab);
     ensurePagination(tab);
     const legacyDrawer = tab.querySelector('#mov-drawer-m51');
-    if (legacyDrawer) legacyDrawer.setAttribute('aria-hidden', 'true');
+    if (legacyDrawer) { legacyDrawer.setAttribute('aria-hidden', 'true'); legacyDrawer.style.setProperty('display', 'none', 'important'); }
+    const sectionTitle = tab.querySelector('.bc-m51-hero h3');
+    if (sectionTitle) sectionTitle.textContent = 'Actividad de inventario';
+    const viewTitle = tab.querySelector('#mov-view-title');
+    if (viewTitle) viewTitle.textContent = tab.querySelector('#mov-view-history[aria-pressed="true"]') ? 'Historial de operaciones' : 'Operaciones de hoy';
+    const todayButton = tab.querySelector('#mov-view-today');
+    const historyButton = tab.querySelector('#mov-view-history');
+    if (todayButton) todayButton.textContent = 'Hoy';
+    if (historyButton) historyButton.textContent = 'Historial';
     if (!tab.dataset.bcM76Events) {
       tab.dataset.bcM76Events = '1';
       tab.addEventListener('click', function (event) {
@@ -520,6 +559,7 @@
   function boot() {
     injectStyles();
     setupGlobalIcons(document);
+    if (Array.isArray(window.__BC_M52_LAST_ROWS)) state.rows = window.__BC_M52_LAST_ROWS.slice();
     hookData();
     installUi();
     // M51/M52 initialize during the same dynamic module sequence; retry a few times
