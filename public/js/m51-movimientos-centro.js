@@ -715,9 +715,11 @@
         const domains = event.detail && event.detail.domains || [];
         if (event.detail && event.detail.offline) return;
         if (!['stock', 'movements', 'transfers', 'vales'].some(function (domain) { return domains.indexOf(domain) >= 0; })) return;
+        const movementsTab = document.getElementById('tab-movimientos');
+        if (!movementsTab || !movementsTab.classList.contains('visible')) return;
         window.clearTimeout(movementRefreshTimer);
         movementRefreshTimer = window.setTimeout(function () {
-          cargarMovimientos().catch(function (error) {
+          Promise.resolve(cargarMovimientos()).catch(function (error) {
             console.warn('[BattleCruiser] No se pudo actualizar Movimientos tras un cambio:', error);
           });
         }, 180);
