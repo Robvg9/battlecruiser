@@ -122,7 +122,7 @@
       '#tab-inventario.bc-m53 .bc-m53-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}',
       '#tab-inventario.bc-m53 #bc-stock-bajo-btn{font-weight:600}',
       '@media(max-width:980px){#tab-inventario.bc-m53 .bc-m53-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}#tab-inventario.bc-m53 .bc-m53-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}',
-      '@media(max-width:640px){#tab-inventario.bc-m53 .bc-m53-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-inventario.bc-m53 .bc-m53-filters{grid-template-columns:1fr}#tab-inventario.bc-m53 .bc-m53-btn{width:100%}#tab-inventario.bc-m53 .bc-m53-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}}'
+      '@media(max-width:640px){#tab-inventario.bc-m53 .bc-m53-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#tab-inventario.bc-m53 .bc-m53-metric{padding:8px 9px}#tab-inventario.bc-m53 .bc-m53-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:7px}#tab-inventario.bc-m53 .bc-m53-filter:nth-child(3){grid-column:1/-1}#tab-inventario.bc-m53 .bc-m53-filters>.bc-m53-btn{width:auto;height:34px;padding:0 8px}#tab-inventario.bc-m53 .bc-m53-btn{width:auto}#tab-inventario.bc-m53 .bc-m53-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}#tab-inventario.bc-m53 .bc-m53-view-btn{padding:0 7px;font-size:.63rem}}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -414,12 +414,12 @@
     let html = '';
     if (t.agotados > 0) {
       html += '<div class="bc-m53-alert bc-m53-alert-crit" data-m53-filter="agotado" role="button" tabindex="0">' +
-        '<strong>🔴 Agotados</strong><span>' + t.agotados + ' producto' + (t.agotados === 1 ? '' : 's') +
+        '<strong>🔴 Agotados</strong><span>' + qtyFmt(t.agotados) + ' producto' + (t.agotados === 1 ? '' : 's') +
         '</span><button type="button" class="bc-m53-alert-action" data-m53-filter="agotado">Ver</button></div>';
     }
     if (t.bajos > 0) {
       html += '<div class="bc-m53-alert bc-m53-alert-warn" data-m53-filter="bajo" role="button" tabindex="0">' +
-        '<strong>🟠 Bajo mínimo</strong><span>' + t.bajos + ' producto' + (t.bajos === 1 ? '' : 's') +
+        '<strong>🟠 Bajo mínimo</strong><span>' + qtyFmt(t.bajos) + ' producto' + (t.bajos === 1 ? '' : 's') +
         '</span><button type="button" class="bc-m53-alert-action" data-m53-filter="bajo">Ver</button>' +
         '<button type="button" class="bc-m53-alert-action" data-m53-open-stock-bajo="1">Reposición</button></div>';
     }
