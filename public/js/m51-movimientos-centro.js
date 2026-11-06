@@ -494,7 +494,7 @@
           '</span><span class="bc-m51-group-count">' + fmtNumM51(g.items.length) + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></summary>';
       } else {
         html += '<div class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(fechaGrupoLabel(g.key)) +
-          '</span><span class="bc-m51-group-count">' + g.items.length + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
+          '</span><span class="bc-m51-group-count">' + fmtNumM51(g.items.length) + ' movimiento' + (g.items.length === 1 ? '' : 's') + '</span></div>';
       }
       const warehouseMap = Object.create(null);
       const warehouseGroups = [];
