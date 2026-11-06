@@ -105,7 +105,7 @@ test('movement operation modal cache key is refreshed for the race fix', () => {
 });
 
 
-// PWA 9.5.68 rotates the shell cache and keeps the M68 fallback aligned.
+// PWA 9.5.69 rotates the shell cache and keeps the M68 fallback aligned.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.5\.68["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.68["']/);
@@ -200,7 +200,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.1"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.68"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.69"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -247,9 +247,9 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
   assert.ok(index.includes('style.css?v=9.5.64'));
-  assert.ok(index.includes('app.js?v=9.5.68'));
+  assert.ok(index.includes('app.js?v=9.5.69'));
   assert.ok(sw.includes('./style.css?v=9.5.64'));
-  assert.ok(sw.includes('./app.js?v=9.5.68'));
+  assert.ok(sw.includes('./app.js?v=9.5.69'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
