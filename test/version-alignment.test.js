@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const app = fs.readFileSync('public/app.js', 'utf8');
 const sw = fs.readFileSync('public/service-worker.js', 'utf8');
 const m68 = fs.readFileSync('public/js/m68-ventas-pos-definitivo.js', 'utf8');
+const almacenes = fs.readFileSync('public/js/almacenes.js', 'utf8');
 const m74 = fs.readFileSync('public/js/m74-pos-archive-retail.js', 'utf8');
 const visibilityNormalizer = fs.readFileSync('public/js/hotfix-secciones-visibles-20260903.js', 'utf8');
 const adminVisibilityNormalizer = fs.readFileSync('public/js/hotfix-17-13-configuracion-admin-visible-20260903.js', 'utf8');
@@ -114,6 +115,9 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(index.includes('js/almacenes.js?v=20261106.1'), 'the warehouse view must refresh its tab subscriber');
   assert.ok(sw.includes("./js/productos.js?v=20261106.1"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
+  assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
+  assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
+  assert.ok(almacenes.includes("bc:data-changed"), "the warehouse screen must subscribe to data changes");
 });
 
 // PWA 9.5.72 rotates the shell cache and keeps the M68 fallback aligned.
