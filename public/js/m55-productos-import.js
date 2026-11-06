@@ -5,9 +5,9 @@ if(window.__bcM55ProductosImport)return;
 window.__bcM55ProductosImport=true;
 const MAX_ROWS=2000,PREVIEW_ROWS=12;
 const FIELDS=[
- {key:'nombre',label:'Nombre',required:true,aliases:['nombre','name','producto','product','descripcion','descripción']},
- {key:'precio_normal',label:'Precio',required:true,aliases:['precio','precio_normal','precio normal','price','pvp','precio_venta']},
- {key:'categoria',label:'Categoría',required:true,aliases:['categoria','categoría','category','cat']}
+ {key:'nombre',label:'Producto',required:true,aliases:['nombre','name','producto','productos','product','products','descripcion','descripción']},
+ {key:'precio_normal',label:'Precio',required:true,aliases:['precio','precios','precio_normal','precio normal','price','prices','pvp','precio_venta']},
+ {key:'categoria',label:'Categoría',required:true,aliases:['categoria','categoría','categorias','categorías','category','categories','cat']}
 ];
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
 function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ')}
@@ -22,7 +22,7 @@ var state=null;
 function close(){document.getElementById('bc-m55-overlay')?.remove();state=null}
 function openModal(){
  if(!can()){if(typeof setMsg==='function')setMsg('msg-productos','Sin permiso para importar productos.',false);return}
- injectCss();close();state={step:1,headers:[],rows:[],map:{},validated:null,processing:false};
+ injectCss();close();state={step:1,headers:[],rows:[],rowNumbers:[],map:{},validated:null,processing:false};
  var ov=document.createElement('div');ov.id='bc-m55-overlay';ov.className='bc-m55-overlay';
  ov.innerHTML='<div class="bc-m55-modal" role="dialog" aria-modal="true" aria-labelledby="bc-m55-title"><h3 id="bc-m55-title">Importar productos</h3><div id="bc-m55-body"></div><div class="bc-m55-actions"><button type="button" id="bc-m55-cancel">Cancelar</button></div></div>';
  document.body.appendChild(ov);
@@ -34,12 +34,42 @@ function setStatus(t,ok,kind){
  b.innerHTML='<p class="'+(ok?'bc-m55-ok':kind==='warn'?'bc-m55-warn':'bc-m55-err')+'" role="status">'+esc(t)+'</p>';
 }
 function csvCell(value){return '"'+String(value==null?'':value).replace(/"/g,'""')+'"'}
+function u8(s){return new TextEncoder().encode(String(s))}
+function crc32(bytes){var c=-1;for(var i=0;i<bytes.length;i++){c^=bytes[i];for(var j=0;j<8;j++)c=(c>>>1)^((c&1)?0xedb88320:0)}return(c^-1)>>>0}
+function zipStored(files){
+ var locals=[],centrals=[],offset=0;
+ files.forEach(function(file){
+  var name=u8(file.name),data=u8(file.data),crc=crc32(data),lh=new Uint8Array(30+name.length),lv=new DataView(lh.buffer);
+  lv.setUint32(0,0x04034b50,true);lv.setUint16(4,20,true);lv.setUint16(6,0x0800,true);lv.setUint16(8,0,true);
+  lv.setUint32(14,crc,true);lv.setUint32(18,data.length,true);lv.setUint32(22,data.length,true);lv.setUint16(26,name.length,true);lh.set(name,30);
+  locals.push(lh,data);
+  var ch=new Uint8Array(46+name.length),cv=new DataView(ch.buffer);
+  cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,0x0800,true);cv.setUint16(10,0,true);
+  cv.setUint32(16,crc,true);cv.setUint32(20,data.length,true);cv.setUint32(24,data.length,true);cv.setUint16(28,name.length,true);cv.setUint32(42,offset,true);ch.set(name,46);
+  centrals.push(ch);offset+=lh.length+data.length;
+ });
+ var centralSize=centrals.reduce(function(n,x){return n+x.length},0),end=new Uint8Array(22),ev=new DataView(end.buffer);
+ ev.setUint32(0,0x06054b50,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,centralSize,true);ev.setUint32(16,offset,true);
+ return new Blob(locals.concat(centrals,[end]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function xmlEsc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
+function makeTemplateXlsx(){
+ var headers=['Productos','Precios','Categorias'];
+ var sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+ '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="34" customWidth="1"/><col min="2" max="2" width="16" customWidth="1"/><col min="3" max="3" width="25" customWidth="1"/></cols><sheetData><row r="1">'+
+ headers.map(function(v,i){var ref=String.fromCharCode(65+i)+'1';return '<c r="'+ref+'" t="inlineStr"><is><t>'+xmlEsc(v)+'</t></is></c>'}).join('')+
+ '</row></sheetData><autoFilter ref="A1:C1"/></worksheet>';
+ return zipStored([
+  {name:'[Content_Types].xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'},
+  {name:'_rels/.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+  {name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Productos" sheetId="1" r:id="rId1"/></sheets></workbook>'},
+  {name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'},
+  {name:'xl/worksheets/sheet1.xml',data:sheet}
+ ]);
+}
 function downloadTemplate(){
- var headers=['Nombre','Precio','Categoría'];
- var csv='\uFEFF'+headers.map(csvCell).join(';')+'\r\n';
- var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
- var url=URL.createObjectURL(blob),a=document.createElement('a');
- a.href=url;a.download='plantilla_productos_battlecruiser.csv';
+ var blob=makeTemplateXlsx(),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='plantilla_productos_battlecruiser.xlsx';
  document.body.appendChild(a);a.click();a.remove();
  if(typeof URL.revokeObjectURL==='function')setTimeout(function(){URL.revokeObjectURL(url)},1500);
  var btn=document.getElementById('bc-m55-template-download');
@@ -50,11 +80,11 @@ function renderStepOne(){
  b.innerHTML='<div class="bc-m55-step">PASO 1 DE 2 · DESCARGAR Y RELLENAR</div>'+
  '<p>Descarga la plantilla, ábrela con Excel o WPS Office y completa una fila por cada producto. Después vuelve aquí para importar el archivo completado.</p>'+
  '<div class="bc-m55-template"><b>La plantilla tiene únicamente estas tres columnas:</b><ul>'+
- '<li><b>Nombre:</b> nombre del producto.</li>'+
- '<li><b>Precio:</b> importe numérico mayor que cero.</li>'+
- '<li><b>Categoría:</b> debe coincidir con una categoría activa de Administración.</li>'+
- '</ul><p class="muted">No cambies los encabezados. Conserva el archivo como CSV al guardarlo. La unidad interna se asigna automáticamente.</p></div>'+
- '<div class="bc-m55-actions"><button type="button" id="bc-m55-template-download">Descargar plantilla para Excel</button>'+
+ '<li><b>Productos:</b> nombre del producto.</li>'+
+ '<li><b>Precios:</b> importe numérico mayor que cero.</li>'+
+ '<li><b>Categorias:</b> debe coincidir con una categoría activa de Administración.</li>'+
+ '</ul><p class="muted">Cada encabezado está en su propia columna. Completa las filas debajo y conserva el archivo como XLSX. También puedes importar CSV.</p></div>'+
+ '<div class="bc-m55-actions"><button type="button" id="bc-m55-template-download">Descargar plantilla Excel (.xlsx)</button>'+
  '<button type="button" id="bc-m55-continue">Ya completé la plantilla · Continuar al paso 2</button></div>';
  b.querySelector('#bc-m55-template-download').onclick=downloadTemplate;
  b.querySelector('#bc-m55-continue').onclick=function(){state.step=2;renderStepTwo()};
@@ -66,31 +96,62 @@ function renderStepTwo(){
  '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar plantilla completada">'+
  '<div id="bc-m55-result"></div><div id="bc-m55-preview"></div>'+
  '<div class="bc-m55-actions"><button type="button" id="bc-m55-back">Volver al paso 1</button></div>';
- b.querySelector('#bc-m55-back').onclick=function(){state.step=1;state.headers=[];state.rows=[];state.map={};state.validated=null;renderStepOne()};
+ b.querySelector('#bc-m55-back').onclick=function(){state.step=1;state.headers=[];state.rows=[];state.rowNumbers=[];state.map={};state.validated=null;renderStepOne()};
  b.querySelector('#bc-m55-file').onchange=async function(){
   var f=this.files&&this.files[0];if(!f)return;
   try{await loadCategories();await parseFile(f);renderPreview(f.name||'archivo.csv')}
   catch(e){setStatus(e.message||'No se pudo leer el archivo.',false)}
  };
 }
-function parseCsv(text){
- var t=String(text||'').replace(/^\uFEFF/,'').trim();if(!t)throw Error('Archivo vacío.');
- var lines=t.split(/\r?\n/).filter(function(line){return line.trim()!==''});
- if(!lines.length)throw Error('El archivo está vacío.');
- var delim=(lines[0].match(/;/g)||[]).length>(lines[0].match(/,/g)||[]).length?';':',';
- var split=function(line){
-  var a=[],c='',q=false;
-  for(var i=0;i<line.length;i++){
-   var ch=line[i];
-   if(ch==='"'){if(q&&line[i+1]==='"'){c+='"';i++}else q=!q}
-   else if(ch===delim&&!q){a.push(c);c=''}
-   else c+=ch;
-  }
-  a.push(c);return a.map(function(x){return x.trim()});
- };
- var h=split(lines[0]);
- var rows=lines.slice(1).map(function(line){var v=split(line),o={};h.forEach(function(k,i){o[k]=v[i]||''});return o});
- return{headers:h,rows:rows};
+function delimiterFor(text){
+ var sample=String(text||'').split(/\r?\n/).slice(0,12),candidates=['\t','; ',','];
+ candidates=['\t',';',','];var best=';',score=-1;
+ candidates.forEach(function(d){var n=0;sample.forEach(function(line){var q=false;for(var i=0;i<line.length;i++){if(line[i]==='"'){if(q&&line[i+1]==='"')i++;else q=!q}else if(line[i]===d&&!q)n++}});if(n>score){score=n;best=d}});
+ return best;
+}
+function csvMatrix(text){
+ var d=delimiterFor(text),out=[],row=[],cell='',quoted=false,t=String(text||'').replace(/^\uFEFF/,'');
+ for(var i=0;i<t.length;i++){var ch=t[i];
+  if(ch==='"'){if(quoted&&t[i+1]==='"'){cell+='"';i++}else quoted=!quoted}
+  else if(ch===d&&!quoted){row.push(cell);cell=''}
+  else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&t[i+1]==='\n')i++;row.push(cell);if(row.some(function(v){return String(v).trim()!==''}))out.push(row);row=[];cell=''}
+  else cell+=ch;
+ }
+ row.push(cell);if(row.some(function(v){return String(v).trim()!==''}))out.push(row);
+ return out;
+}
+function headerIndex(matrix){
+ var best=-1,bestScore=0;
+ matrix.slice(0,15).forEach(function(row,i){var score=0;row.forEach(function(v){var n=norm(v);if(FIELDS.some(function(f){return f.aliases.some(function(a){return norm(a)===n})}))score++});if(score>bestScore){bestScore=score;best=i}});
+ if(bestScore<2)throw Error('No se encontraron encabezados reconocibles. Usa Productos, Precios y Categorias, cada uno en su propia columna.');
+ return best;
+}
+function matrixToRows(matrix,start){
+ var headers=(matrix[start]||[]).map(function(v){return String(v==null?'':v).trim()}),rows=[],rowNumbers=[];
+ matrix.slice(start+1).forEach(function(values,index){if(!values.some(function(v){return String(v==null?'':v).trim()!==''}))return;var obj={};headers.forEach(function(k,i){if(k)obj[k]=values[i]==null?'':String(values[i]).trim()});rows.push(obj);rowNumbers.push(start+index+2)});
+ return{headers:headers,rows:rows,rowNumbers:rowNumbers};
+}
+function parseCsv(text){var matrix=csvMatrix(text);if(!matrix.length)throw Error('Archivo vacío.');return matrixToRows(matrix,headerIndex(matrix))}
+async function unzipEntry(buffer,name){
+ var bytes=new Uint8Array(buffer),view=new DataView(buffer),eocd=-1;
+ for(var p=bytes.length-22;p>=Math.max(0,bytes.length-65557);p--){if(view.getUint32(p,true)===0x06054b50){eocd=p;break}}
+ if(eocd<0)throw Error('El archivo parece Excel, pero su estructura XLSX está dañada.');
+ var count=view.getUint16(eocd+10,true),offset=view.getUint32(eocd+16,true),found=null;
+ for(var i=0;i<count;i++){if(view.getUint32(offset,true)!==0x02014b50)break;var method=view.getUint16(offset+10,true),size=view.getUint32(offset+20,true),nl=view.getUint16(offset+28,true),el=view.getUint16(offset+30,true),cl=view.getUint16(offset+32,true),local=view.getUint32(offset+42,true),fname=new TextDecoder().decode(bytes.slice(offset+46,offset+46+nl));if(fname===name){var lnl=view.getUint16(local+26,true),lel=view.getUint16(local+28,true),start=local+30+lnl+lel;found={method,data:bytes.slice(start,start+size)};break}offset+=46+nl+el+cl}
+ if(!found)return null;if(found.method===0)return new TextDecoder().decode(found.data);
+ if(found.method!==8)throw Error('El XLSX utiliza una compresión no compatible.');
+ if(typeof DecompressionStream!=='function')throw Error('Este navegador no puede descomprimir XLSX. Guarda una copia como CSV UTF-8.');
+ var stream=new Blob([found.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+ return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+}
+function colIndex(ref){var m=String(ref||'').match(/^([A-Z]+)/i);if(!m)return 0;var n=0;for(var i=0;i<m[1].length;i++)n=n*26+m[1].toUpperCase().charCodeAt(i)-64;return n-1}
+async function parseXlsx(buffer){
+ var [sheetXml,sharedXml]=await Promise.all([unzipEntry(buffer,'xl/worksheets/sheet1.xml'),unzipEntry(buffer,'xl/sharedStrings.xml')]);
+ if(!sheetXml)throw Error('No se encontró la primera hoja del libro Excel.');
+ var parser=new DOMParser(),doc=parser.parseFromString(sheetXml,'application/xml'),shared=[];
+ if(sharedXml){var sd=parser.parseFromString(sharedXml,'application/xml');shared=Array.from(sd.getElementsByTagName('si')).map(function(si){return Array.from(si.getElementsByTagName('t')).map(function(t){return t.textContent}).join('')})}
+ var matrix=Array.from(doc.getElementsByTagName('row')).map(function(row){var vals=[];Array.from(row.getElementsByTagName('c')).forEach(function(c){var i=colIndex(c.getAttribute('r'));var v=c.getElementsByTagName('v')[0],inline=c.getElementsByTagName('is')[0],value='';if(c.getAttribute('t')==='s'&&v)value=shared[Number(v.textContent)]||'';else if(inline)value=Array.from(inline.getElementsByTagName('t')).map(function(t){return t.textContent}).join('');else if(v)value=v.textContent;vals[i]=value});return vals});
+ return matrixToRows(matrix,headerIndex(matrix));
 }
 async function loadXLSX(){
  if(window.XLSX)return window.XLSX;
@@ -98,24 +159,22 @@ async function loadXLSX(){
  throw Error('No está disponible el lector XLSX en este dispositivo. Abre la plantilla CSV con Excel y guárdala como CSV UTF-8 para importarla.');
 }
 async function parseFile(file){
- var name=(file.name||'').toLowerCase(),p;
- if(name.endsWith('.csv')){
-  p=parseCsv(await file.text());
- }else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
-  var X=await loadXLSX(),wb=X.read(await file.arrayBuffer(),{type:'array',raw:false}),sheet=wb.Sheets[wb.SheetNames[0]];
+ var name=(file.name||'').toLowerCase(),buffer=await file.arrayBuffer(),magic=new Uint8Array(buffer.slice(0,8)),p;
+ var isZip=magic[0]===0x50&&magic[1]===0x4b;
+ var isOle=magic[0]===0xd0&&magic[1]===0xcf&&magic[2]===0x11&&magic[3]===0xe0;
+ if(isZip||name.endsWith('.xlsx')){
+  p=await parseXlsx(buffer);
+ }else if(isOle||name.endsWith('.xls')){
+  var X=await loadXLSX(),wb=X.read(buffer,{type:'array',raw:false}),sheet=wb.Sheets[wb.SheetNames[0]];
   if(!sheet)throw Error('El libro de Excel no contiene hojas.');
-  var aoa=X.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
-  var headers=(aoa[0]||[]).map(function(x){return String(x==null?'':x).trim()});
-  var rows=aoa.slice(1).filter(function(row){return row.some(function(x){return String(x==null?'':x).trim()!==''})}).map(function(row){
-   var obj={};headers.forEach(function(key,i){obj[key]=row[i]==null?'':String(row[i]).trim()});return obj;
-  });
-  p={headers:headers,rows:rows};
+  var aoa=X.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});p=matrixToRows(aoa,headerIndex(aoa));
  }else{
-  throw Error('Selecciona la plantilla CSV o un libro Excel XLSX/XLS.');
+  var raw=buffer.byteLength>=2&&new Uint8Array(buffer)[0]===0xff&&new Uint8Array(buffer)[1]===0xfe?new TextDecoder('utf-16le').decode(buffer):new TextDecoder('utf-8').decode(buffer);
+  p=parseCsv(raw);
  }
- if(!p.headers.length||!p.rows.length)throw Error('El archivo debe conservar los encabezados y contener al menos un producto desde la fila 2.');
+ if(!p.headers.length||!p.rows.length)throw Error('El archivo debe conservar los encabezados y contener al menos un producto debajo de ellos.');
  if(p.rows.length>MAX_ROWS)throw Error('Máximo '+MAX_ROWS+' filas por importación.');
- state.headers=p.headers;state.rows=p.rows;state.map=autoMap(p.headers);
+ state.headers=p.headers;state.rows=p.rows;state.rowNumbers=p.rowNumbers||[];state.map=autoMap(p.headers);
 }
 function autoMap(h){
  var m={};
@@ -140,7 +199,7 @@ function categoriaId(name){
 function validateRows(){
  var errors=[];
  state.rows.forEach(function(r,i){
-  var rowNo=i+2,nombre=String(value(r,'nombre')||'').trim(),categoria=String(value(r,'categoria')||'').trim();
+  var rowNo=state.rowNumbers[i]||i+2,nombre=String(value(r,'nombre')||'').trim(),categoria=String(value(r,'categoria')||'').trim();
   var precioRaw=String(value(r,'precio_normal')||'').trim(),precio=parsePrice(precioRaw);
   if(!nombre)errors.push('Fila '+rowNo+': falta Nombre.');
   if(!categoria)errors.push('Fila '+rowNo+': falta Categoría.');
@@ -205,7 +264,7 @@ async function run(){
     }
     if(!res||!res.ok)throw (res&&res.error)||new Error('No se pudo guardar el producto.');
     ok++;
-   }catch(error){fail++;rowErrors.push('Fila '+(i+2)+': '+(error&&error.message?error.message:'no se pudo guardar.'))}
+   }catch(error){fail++;rowErrors.push('Fila '+(state.rowNumbers[i]||i+2)+': '+(error&&error.message?error.message:'no se pudo guardar.'))}
   }
   var msg=ok+' producto(s) procesado(s) · '+fail+' con error'+(queued?' · '+queued+' guardado(s) en cola offline':'')+'.';
   if(rowErrors.length)msg+=' '+rowErrors.slice(0,5).join(' ');
