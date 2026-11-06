@@ -2,6 +2,8 @@
 // Vales de salida: detalle accionable y utilidades de redondeo monetario.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
+function fmtNumVale(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
 function mostrarDetalleVale(valeId) {
   const cont = document.getElementById("vale-detalle");
   if (!cont) return;
@@ -25,7 +27,7 @@ function mostrarDetalleVale(valeId) {
     + '<div class="detalle-fila"><span class="detalle-etiqueta">Tipo</span><span class="detalle-valor">' + escHtml(tipoEtiqueta) + '</span></div>'
     + '<div class="detalle-fila"><span class="detalle-etiqueta">Producto</span><span class="detalle-valor">' + escHtml(vale.productos ? vale.productos.nombre : "—") + '</span></div>'
     + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén</span><span class="detalle-valor">' + escHtml(vale.almacenes ? vale.almacenes.nombre : "—") + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Cantidad</span><span class="detalle-valor">' + money(vale.cantidad || 0) + ' u</span></div>'
+    + '<div class="detalle-fila"><span class="detalle-etiqueta">Cantidad</span><span class="detalle-valor">' + fmtNumVale(vale.cantidad || 0) + ' u</span></div>'
     + '</div>';
   cont.classList.remove("hidden");
   _enlazarCerrarValeDetalle();
