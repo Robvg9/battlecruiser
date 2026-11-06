@@ -355,7 +355,7 @@
         (group.almacenes.some(function (x) { return x.estado === 'bajo'; }) ? 'bajo' : 'normal');
       group.almacen = group.almacenes.map(function (x) { return x.almacen; }).join(' ');
       return group;
-    }).sort(function (x, y) { return String(x.producto).localeCompare(String(y.producto), 'es'); });
+    });
   }
 
   function totalsFrom(rows) {
