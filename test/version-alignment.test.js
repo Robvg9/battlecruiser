@@ -110,8 +110,8 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(multiAt < modalAt, 'the multi-transfer module must load before the modal');
   assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261106.1'));
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.12'));
-  assert.ok(app.includes('["m51-movimientos-centro.js","51.7"]'), 'M51 must load the refreshed data-change listener');
-  assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.7"), 'the offline shell must precache the refreshed movement listener');
+  assert.ok(app.includes('["m51-movimientos-centro.js","51.8"]'), 'M51 must load the refreshed data-change listener');
+  assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.8"), 'the offline shell must precache the refreshed movement listener');
   assert.ok(app.includes('["inventario-detalle.js","65"]'), 'the minimum editor must refresh');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=65"), 'the offline shell must precache the updated minimum editor');
   assert.ok(index.includes('js/productos.js?v=20261106.1'), 'the product view must refresh its category subscriber');
@@ -244,7 +244,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     "./js/hotfix-regresiones-20260902.js?v=20261101.1",
     "./js/hotfix-17-4-turnos-tarde-visible-20260903.js?v=17.5",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
-    "./js/m51-movimientos-centro.js?v=51.7",
+    "./js/m51-movimientos-centro.js?v=51.8",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
   ];
   for (const asset of assets) assert.ok(sw.includes(asset), "faltó el precache offline de " + asset);
@@ -258,7 +258,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
     '["hotfix-regresiones-20260902.js","20261101.1"]',
     '["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
-    '["m51-movimientos-centro.js","51.7"]',
+    '["m51-movimientos-centro.js","51.8"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
   ]) assert.ok(app.includes(key), "el cargador debe conservar la versión " + key);
 });
