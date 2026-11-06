@@ -152,7 +152,7 @@ test("M76 recibe el snapshot completo de M51 después de paginar el historial", 
   const state = window.__BC_M76_TEST__.getState();
   assert.equal(state.rows.length, 1200);
   assert.equal(state.operations.length, 1200);
-  assert.equal(window.document.querySelector(".bc-m76-pagination").textContent.includes("1.200 operaciones"), true);
+  assert.equal(window.document.querySelector(".bc-m76-pagination").textContent.includes("1200 operaciones"), true);
 });
 
 test("M76 no fusiona registros sin ID de operación por compartir hora y usuario", (t) => {
