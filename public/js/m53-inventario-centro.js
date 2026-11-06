@@ -638,13 +638,20 @@
     try {
       const client = window.client;
       if (!client) throw new Error('Cliente Supabase no disponible');
+      // The warehouse catalogue is only an optional enrichment for the
+      // minimum editor. Legacy/offline fixtures may expose RPC only; never let
+      // the missing .from() method block the inventory RPC and its filters.
+      const warehouseCatalogRequest = typeof client.from === 'function'
+        ? Promise.resolve().then(function () {
+            return client.from('almacenes').select('id, nombre').order('nombre');
+          }).catch(function (error) {
+            return { data: [], error: error };
+          })
+        : Promise.resolve({ data: [], error: null });
       const [res, mixedRes, warehousesRes] = await Promise.all([
         client.rpc('inventario_enriquecido', { p_almacen_id: almacen }),
         client.rpc('inventario_mixto_enriquecido', { p_almacen_id: almacen }),
-        // inventario_enriquecido returns the warehouse name but not its UUID.
-        // Resolve the identifier here because stock-minimum updates are keyed by
-        // product_id + almacen_id, never by a display name.
-        client.from('almacenes').select('id, nombre').order('nombre')
+        warehouseCatalogRequest
       ]);
       if (res.error) {
         if (typeof window.esRpcFaltante === 'function' && window.esRpcFaltante(res.error)) {
