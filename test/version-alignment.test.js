@@ -81,9 +81,9 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"), 'the recovery control must be available in the offline shell');
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.8"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
-  assert.ok(app.includes('["m33-turnos-final.js","33.20"]'), 'the turn detail modal cache key must load the audited recovery action');
-  assert.ok(app.includes('["m29-turnos-organizacion.js","29.20"]'), 'M29 full-day default flow must be loaded dynamically');
-  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.20"), 'M29 full-day default flow must be available offline');
+  assert.ok(app.includes('["m33-turnos-final.js","33.21"]'), 'the turn detail modal cache key must load the audited recovery action');
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.21"]'), 'M29 full-day default flow must be loaded dynamically');
+  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.21"), 'M29 full-day default flow must be available offline');
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
@@ -140,7 +140,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
   assert.match(sw, /\.\/js\/m26-ui-integridad\.js\?v=26\.40/, "the unified commercial-options panel must be available offline");
-  assert.match(sw, /\.\/js\/catalogos\.js\?v=20261105\.3/, "the updated master catalog loader must be available offline");
+  assert.match(sw, /\.\/js\/catalogos\.js\?v=20261105\.2/, "the updated master catalog loader must be available offline");
   assert.ok(app.includes('["m27-5-ventas-precio-politica.js","27.5b7"]'));
   assert.ok(app.includes('["m27-6-ventas-presentaciones.js","27.6g"]'));
   assert.ok(sw.includes("./js/m27-5-ventas-precio-politica.js?v=27.5b7"));
@@ -152,7 +152,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(sw, /\.\/js\/productos\.js\?v=20261105\.3/, "the offline shell must precache the existing product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.24"><\/script>/);
-  assert.match(index, /<script src="js\/catalogos\.js\?v=20261105\.3"><\/script>/);
+  assert.match(index, /<script src="js\/catalogos\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
@@ -162,14 +162,14 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="app\.js\?v=9\.5\.69"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.64',
-    'js/centro-control.js?v=9.5.64',
+    'js/centro-control.js?v=9.5.69',
     'js/navegacion.js?v=9.5.64',
     'js/mando.js?v=9.5.64',
     'js/operacion-humana.js?v=9.5.64',
     'js/comunicacion.js?v=9.5.64',
   ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
   for (const asset of [
-    './js/centro-control.js?v=9.5.64',
+    './js/centro-control.js?v=9.5.69',
     './js/navegacion.js?v=9.5.64',
     './js/mando.js?v=9.5.64',
     './js/operacion-humana.js?v=9.5.64',
@@ -199,7 +199,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(app.includes('["m27-6b-venta-payload-pres.js","27.6b2"]'));
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
-  assert.ok(sw.includes("./js/ventas.js?v=20261105.1"));
+  assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
   assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.69"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
@@ -208,29 +208,29 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
 test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precache offline", () => {
   const assets = [
     "./js/turno-api.js?v=9.4.8",
-    "./js/turnos-maestro.js?v=9.4.7",
-    "./js/m29-turnos-organizacion.js?v=29.20",
-    "./js/m33-turnos-final.js?v=33.20",
+    "./js/turnos-maestro.js?v=9.4.8",
+    "./js/m29-turnos-organizacion.js?v=29.21",
+    "./js/m33-turnos-final.js?v=33.21",
     "./js/m22-sesiones-en-m21.js?v=25.5",
     "./js/m49-turnos-layout-definitivo.js?v=49.6",
     "./js/hotfix-regresiones-20260902.js?v=20261101.1",
     "./js/hotfix-17-4-turnos-tarde-visible-20260903.js?v=17.5",
     "./js/m54-movimientos-client-bridge.js?v=54.1",
-    "./js/m51-movimientos-centro.js?v=51.5",
+    "./js/m51-movimientos-centro.js?v=51.6",
     "./js/m52-movimientos-auth-retry.js?v=52.2"
   ];
   for (const asset of assets) assert.ok(sw.includes(asset), "faltó el precache offline de " + asset);
   for (const key of [
     '["turno-api.js","9.4.8"]',
-    '["turnos-maestro.js","9.4.7"]',
-    '["m29-turnos-organizacion.js","29.20"]',
-    '["m33-turnos-final.js","33.20"]',
+    '["turnos-maestro.js","9.4.8"]',
+    '["m29-turnos-organizacion.js","29.21"]',
+    '["m33-turnos-final.js","33.21"]',
     '["m22-sesiones-en-m21.js","25.5"]',
     '["m49-turnos-layout-definitivo.js","49.6"]',
     '["hotfix-regresiones-20260902.js","20261101.1"]',
     '["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"]',
     '["m54-movimientos-client-bridge.js","54.1"]',
-    '["m51-movimientos-centro.js","51.5"]',
+    '["m51-movimientos-centro.js","51.6"]',
     '["m52-movimientos-auth-retry.js","52.2"]'
   ]) assert.ok(app.includes(key), "el cargador debe conservar la versión " + key);
 });
@@ -261,5 +261,5 @@ test('Administration UI modules refresh their cache keys', () => {
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.12"\]/);
   assert.match(sw, /m26-ui-integridad\.js\?v=26\.40/);
   assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.12/);
-  assert.match(sw, /catalogos\.js\?v=20261105\.3/);
+  assert.match(sw, /catalogos\.js\?v=20261105\.2/);
 });
