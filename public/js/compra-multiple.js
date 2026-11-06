@@ -289,6 +289,7 @@
             msg('✓ Compra guardada localmente — se sincronizará al recuperar conexión.', true);
           } else {
             msg('✓ Compra registrada. Stock actualizado.', true);
+            if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
             if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
           }
           return;
