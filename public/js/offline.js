@@ -1093,7 +1093,8 @@ const BC_DATA_DOMAINS_BY_OPERATION = {
   vale: ['stock', 'inventory', 'movements', 'vales'],
   almacen: ['warehouses', 'stock', 'inventory'],
   almacen_actualizar: ['warehouses', 'stock', 'inventory'],
-  almacen_estado: ['warehouses', 'stock', 'inventory']
+  almacen_estado: ['warehouses', 'stock', 'inventory'],
+  stock_minimum: ['stock', 'inventory', 'movements']
 };
 let _bcDataChannel = null;
 function emitirCambioDatos(detail, remote) {
