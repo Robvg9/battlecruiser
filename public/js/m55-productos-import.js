@@ -93,7 +93,7 @@ function renderStepTwo(){
  var b=document.getElementById('bc-m55-body');if(!b)return;
  b.innerHTML='<div class="bc-m55-step">PASO 2 DE 2 · IMPORTAR EL ARCHIVO COMPLETADO</div>'+
  '<p>Selecciona el archivo que completaste en Excel o WPS Office. Revisaremos Nombre, Precio y Categoría; ningún producto se guarda hasta que pulses «Procesar importación».</p>'+
- '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar plantilla completada">'+
+ '<input class="bc-m55-file" type="file" id="bc-m55-file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-label="Seleccionar plantilla completada">'+
  '<div id="bc-m55-result"></div><div id="bc-m55-preview"></div>'+
  '<div class="bc-m55-actions"><button type="button" id="bc-m55-back">Volver al paso 1</button></div>';
  b.querySelector('#bc-m55-back').onclick=function(){state.step=1;state.headers=[];state.rows=[];state.rowNumbers=[];state.map={};state.validated=null;renderStepOne()};
