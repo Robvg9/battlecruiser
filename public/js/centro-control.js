@@ -394,8 +394,8 @@ function renderResumen() {
     <div class="resumen-card"><div class="valor">${(_cache.productos || []).length}</div><div class="etiqueta">Productos</div></div>
     <div class="resumen-card"><div class="valor">${(_cache.almacenes || []).length}</div><div class="etiqueta">Almacenes</div></div>
     <div class="resumen-card ${bajoMinimo.length ? "alerta resumen-card-accion" : ""}" ${bajoMinimo.length ? 'data-ir-tab="inventario" role="button" tabindex="0"' : ""}><div class="valor">${bajoMinimo.length}</div><div class="etiqueta">Bajo mínimo</div>${bajoMinimo.length ? '<div class="muted">Tocá para ver inventario</div>' : ""}</div>
-    <div class="resumen-card"><div class="valor">$${money(totalVendido)}</div><div class="etiqueta">Ventas recientes</div><div class="muted">${ventasRecientes.length} venta(s)</div></div>
-    <div class="resumen-card"><div class="valor">${(_cache.transferencias || []).length + (_cache.vales || []).length}</div><div class="etiqueta">Otros movimientos</div></div>
+    <div class="resumen-card"><div class="valor">$${money(totalVendido)}</div><div class="etiqueta">Ventas recientes</div><div class="muted">${fmtNumCC(ventasRecientes.length)} venta(s)</div></div>
+    <div class="resumen-card"><div class="valor">${fmtNumCC((_cache.transferencias || []).length + (_cache.vales || []).length)}</div><div class="etiqueta">Otros movimientos</div></div>
   `;
 
   const alertasEl = document.getElementById("resumen-alertas-lista");
@@ -422,7 +422,7 @@ function renderResumen() {
         const almNombre = s.almacenes && s.almacenes.nombre ? s.almacenes.nombre : "?";
         const nivelStock = Number(s.cantidad) <= 0 ? "Agotado" : "Bajo mínimo";
         div.innerHTML = `<span>${escHtml(prodNombre)} <span class="muted">· ${escHtml(almNombre)}</span></span>
-          <span class="muted" style="color:var(--wine)">${escHtml(nivelStock)} · ${money(s.cantidad)} ⚠</span>`;
+          <span class="muted" style="color:var(--wine)">${escHtml(nivelStock)} · ${fmtNumCC(s.cantidad)} ⚠</span>`;
         alertasEl.appendChild(div);
       });
     }
@@ -445,7 +445,7 @@ function renderResumen() {
       })),
       ...(_cache.vales || []).map((v) => ({
         tipo: "vale", id: v.id, fecha: v.fecha,
-        texto: `Vale (${v.tipo || "?"}): ${v.productos && v.productos.nombre ? v.productos.nombre : "?"} · ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"}`, estado: money(v.cantidad),
+        texto: `Vale (${v.tipo || "?"}): ${v.productos && v.productos.nombre ? v.productos.nombre : "?"} · ${v.almacenes && v.almacenes.nombre ? v.almacenes.nombre : "?"}`, estado: fmtNumCC(v.cantidad),
       })),
     ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 8);
 
