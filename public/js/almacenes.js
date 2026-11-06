@@ -529,3 +529,28 @@ async function activarDesactivarAlmacen(almacen_id, activo) {
   }
   return resultado;
 }
+
+
+// Actualiza el panel de almacenes cuando otra pestaña de la misma PWA confirma
+// una operación de inventario. La navegación conserva su refresco habitual.
+if (!window.__BC_ALMACENES_DATA_EVENTS__) {
+  window.__BC_ALMACENES_DATA_EVENTS__ = true;
+  let warehouseRefreshTimer = null;
+  window.addEventListener("bc:data-changed", function (event) {
+    const detail = event.detail || {};
+    if (detail.offline || !detail.remote) return;
+    const domains = detail.domains || [];
+    if (!domains.includes("warehouses") && !domains.includes("stock")) return;
+    const tab = document.getElementById("tab-almacenes");
+    if (!tab || !tab.classList.contains("visible")) return;
+    clearTimeout(warehouseRefreshTimer);
+    warehouseRefreshTimer = setTimeout(async function () {
+      try {
+        if (domains.includes("warehouses") && typeof refrescarAlmacenes === "function") await refrescarAlmacenes();
+        if (typeof cargarStockAlmacenes === "function") await cargarStockAlmacenes(true);
+      } catch (error) {
+        console.warn("[BattleCruiser] No se pudo actualizar el panel de almacenes tras un cambio:", error);
+      }
+    }, 160);
+  });
+}
