@@ -411,6 +411,23 @@ safeInit("lista-productos", () => {
   });
 });
 
+// Mantener el selector y las etiquetas de categoría sincronizados entre módulos.
+if (!window.__BC_PRODUCT_CATEGORY_EVENTS__) {
+  window.__BC_PRODUCT_CATEGORY_EVENTS__ = true;
+  let categoryRefreshTimer = null;
+  window.addEventListener("bc:data-changed", (event) => {
+    const domains = event.detail && event.detail.domains || [];
+    if (event.detail && event.detail.offline) return;
+    if (!domains.includes("categories")) return;
+    clearTimeout(categoryRefreshTimer);
+    categoryRefreshTimer = setTimeout(async () => {
+      try {
+        if (typeof refrescarProductos === "function") await refrescarProductos();
+        else if (typeof refrescarSelectorCategoriasProducto === "function") await refrescarSelectorCategoriasProducto();
+      } catch (error) { console.warn("[BattleCruiser] No se pudo actualizar el catálogo de categorías:", error); }
+    }, 100);
+  });
+}
 safeInit("productos-buscar", () => {
   const input = document.getElementById("productos-buscar");
   if (!input) return;
