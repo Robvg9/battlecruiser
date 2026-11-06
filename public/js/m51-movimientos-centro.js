@@ -519,7 +519,7 @@
             '" role="button" tabindex="0"><div><h4 class="bc-m51-card-title">' + esc(m.producto || '—') +
             '</h4><div class="bc-m51-card-tipo"><span class="bc-m51-badge bc-m51-badge-' + esc(meta.badge) + '">' + esc(meta.short) +
             '</span></div><div class="bc-m51-card-meta">' + esc(m.almacen || '—') + ' · ' + fechaHoraFmt(m.fecha) +
-            '</div></div><div class="bc-m51-card-side"><div class="bc-m51-card-qty">' + cant +
+            '</div></div><div class="bc-m51-card-side"><div class="bc-m51-card-qty">' + fmtNumM51(cant) +
             ' u</div><div class="bc-m51-card-user">' + esc(m.usuario || '—') +
             ' <span class="bc-m51-card-chev">›</span></div></div></article>';
         });
