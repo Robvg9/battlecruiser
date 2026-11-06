@@ -75,6 +75,8 @@ function stockDisponibleOrigen(producto_id, origen_id) {
   return { cantidad: base, aproximado: false };
 }
 
+function fmtNumTransfer(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
 function actualizarStockTransferenciaUI() {
   let el = document.getElementById("trf-stock-disponible");
   const form = document.getElementById("form-transferencia");
@@ -101,7 +103,7 @@ function actualizarStockTransferenciaUI() {
   const disp = info.cantidad;
   el.textContent =
     "Stock disponible en origen: " +
-    (typeof money === "function" ? money(disp) : disp) +
+    fmtNumTransfer(disp) +
     (info.aproximado ? " (estimado con operaciones pendientes)" : "");
   el.className = "msg" + (disp <= 0 ? " error" : "");
   if (cantInput) {
@@ -131,7 +133,7 @@ safeInit("form-transferencia", () => {
       const val = parseFloat(cantEl.value);
       if (max != null && Number.isFinite(val) && val > parseFloat(max)) {
         setMsg("msg-transferencias", "Esa cantidad supera el stock disponible en origen (" +
-          (typeof money === "function" ? money(parseFloat(max)) : max) + ").", false);
+          fmtNumTransfer(parseFloat(max)) + ").", false);
       } else if (val < 0 || (cantEl.value !== "" && !Number.isFinite(val))) {
         setMsg("msg-transferencias", "La cantidad debe ser un número mayor a 0.", false);
       } else {
@@ -170,7 +172,7 @@ safeInit("form-transferencia", () => {
 
     const stockInfo = stockDisponibleOrigen(producto_id, origen);
     if (stockInfo && stockInfo.cantidad < cantidad) {
-      const disp = typeof money === "function" ? money(stockInfo.cantidad) : stockInfo.cantidad;
+      const disp = fmtNumTransfer(stockInfo.cantidad);
       setMsg("msg-transferencias", "Stock insuficiente en el almacén origen (disponible: " + disp +
         (stockInfo.aproximado ? " · estimado con pendientes" : "") + ").", false);
       return;
@@ -245,7 +247,7 @@ async function mostrarDetalleTransferencia(trfId) {
           const nombre = (l.productos && l.productos.nombre)
             || (typeof resolverNombreProducto === "function" ? resolverNombreProducto(l.producto_id) : idCorto(l.producto_id));
           lineasHtml += '<div class="detalle-fila"><span class="detalle-etiqueta">  ' + (i + 1) + '. ' + escHtml(nombre) +
-            '</span><span class="detalle-valor">' + money(l.cantidad || 0) + ' u</span></div>';
+            '</span><span class="detalle-valor">' + fmtNumTransfer(l.cantidad || 0) + ' u</span></div>';
         });
       }
     }
@@ -330,7 +332,7 @@ function renderValesLista() {
     div.setAttribute("role", "button");
     div.setAttribute("tabindex", "0");
     div.innerHTML = `<span>${v.productos ? escHtml(v.productos.nombre) : "—"} <span class="muted">· ${v.almacenes ? escHtml(v.almacenes.nombre) : "—"} · #${v.id ? idCorto(v.id) : "—"}</span></span>
-      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${money(v.cantidad)}</span>`;
+      <span class="muted">${fechaCorta(v.fecha)} · ${escHtml(v.tipo || "")} · ${fmtNumTransfer(v.cantidad)}</span>`;
     lista.appendChild(div);
   });
   actualizarContador("vales-contador", filtradas.length, todas.length);
