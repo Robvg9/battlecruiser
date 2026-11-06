@@ -254,3 +254,19 @@ test("Inventario: un mínimo negativo no llega al RPC", async (t) => {
   assert.equal(rpcCalls.filter((call) => call.name === "bc_actualizar_stock_minimo").length, 0);
   assert.match(target.textContent, /mínimo válido/i);
 });
+
+test("Inventario: stock cambiado en otro módulo refresca la vista visible sin recargar la PWA", async (t) => {
+  const { window, fixtureRows, rpcCalls } = await boot(t);
+  const before = rpcCalls.filter((call) => call.name === "inventario_enriquecido").length;
+  const cafe = fixtureRows.find((row) => row.producto_id === "cafe" && row.almacen_id === "a1");
+  cafe.cantidad = 8;
+  cafe.estado = "normal";
+  window.dispatchEvent(new window.CustomEvent("bc:data-changed", {
+    detail: { domains: ["stock", "inventory"], offline: false, remote: true }
+  }));
+  assert.ok(await waitFor(() => rpcCalls.filter((call) => call.name === "inventario_enriquecido").length > before),
+    "the event must re-query the authoritative inventory RPC");
+  const cafeCard = window.document.querySelector('#inv-detalle [data-inv-producto="cafe"]');
+  assert.ok(await waitFor(() => cafeCard && cafeCard.textContent.includes("8 kg")),
+    "the visible inventory card must show the changed stock without an app reload");
+});
