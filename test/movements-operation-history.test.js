@@ -132,6 +132,39 @@ test("M76 abre el detalle flotante con todas las líneas y el recorrido de almac
   assert.equal(modal.hidden, true);
 });
 
+test("M76 recibe el snapshot completo de M51 después de paginar el historial", async (t) => {
+  const window = fixture(t);
+  const rows = Array.from({ length: 1200 }, (_, index) => ({
+    operacion_id: "OP-" + index,
+    tipo: index % 4 === 0 ? "compra" : index % 4 === 1 ? "reinversion" : index % 4 === 2 ? "baja" : "transferencia_salida",
+    producto_id: "P-" + index,
+    producto: "Producto " + index,
+    cantidad: 1,
+    fecha: "2026-11-06T10:00:00",
+    usuario: "Operador",
+    almacen: "Almacén Casa"
+  }));
+  window.__BC_M51_ROWS__ = rows;
+  window.dispatchEvent(new window.CustomEvent("bc:m51-rows", {
+    detail: { rows, historyTruncated: false }
+  }));
+  await new Promise(resolve => window.setTimeout(resolve, 10));
+  const state = window.__BC_M76_TEST__.getState();
+  assert.equal(state.rows.length, 1200);
+  assert.equal(state.operations.length, 1200);
+  assert.equal(window.document.querySelector(".bc-m76-pagination").textContent.includes("1.200 operaciones"), true);
+});
+
+test("M76 no fusiona registros sin ID de operación por compartir hora y usuario", (t) => {
+  const window = fixture(t);
+  const sameMoment = [
+    { tipo: "compra", producto_id: "P1", producto: "Producto A", cantidad: 2, fecha: "2026-11-06T10:00:00", usuario: "Operador", almacen: "Almacén Casa" },
+    { tipo: "compra", producto_id: "P2", producto: "Producto B", cantidad: 3, fecha: "2026-11-06T10:00:00", usuario: "Operador", almacen: "Almacén Casa" }
+  ];
+  const operations = window.__BC_M76_TEST__.groupOperations(sameMoment);
+  assert.equal(operations.length, 2);
+});
+
 test("M76 compacta filtros y conserva etiquetas accesibles en botones con iconos", (t) => {
   const window = fixture(t);
   const tab = window.document.getElementById("tab-movimientos");
