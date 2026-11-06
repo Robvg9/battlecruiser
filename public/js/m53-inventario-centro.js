@@ -671,16 +671,24 @@
       // label. Build a name→UUID index from the warehouse catalog so the
       // product detail editor can address the exact stock row.
       const warehouseIdByName = new Map();
-      if (!warehousesRes.error && Array.isArray(warehousesRes.data)) {
-        warehousesRes.data.forEach(function (warehouse) {
-          const key = String(warehouse && warehouse.nombre || '').trim().toLocaleLowerCase('es');
-          if (!key || !warehouse.id) return;
-          if (warehouseIdByName.has(key)) warehouseIdByName.set(key, null);
-          else warehouseIdByName.set(key, warehouse.id);
-        });
-      } else {
-        console.warn('[BattleCruiser] M53 no pudo resolver IDs de almacén:', warehousesRes.error);
+      let warehouseCatalog = !warehousesRes.error && Array.isArray(warehousesRes.data)
+        ? warehousesRes.data : [];
+      if (!warehouseCatalog.length) {
+        try {
+          const cached = typeof _cache !== 'undefined' && _cache && Array.isArray(_cache.almacenes)
+            ? _cache.almacenes : (Array.isArray(window._almacenes) ? window._almacenes : []);
+          if (cached.length) warehouseCatalog = cached;
+        } catch (_) {}
       }
+      if (!warehouseCatalog.length && warehousesRes.error) {
+        console.warn('[BattleCruiser] M53 no pudo resolver IDs de almacén desde catálogo:', warehousesRes.error);
+      }
+      warehouseCatalog.forEach(function (warehouse) {
+        const key = String(warehouse && warehouse.nombre || '').trim().toLocaleLowerCase('es');
+        if (!key || !warehouse.id) return;
+        if (warehouseIdByName.has(key)) warehouseIdByName.set(key, null);
+        else warehouseIdByName.set(key, warehouse.id);
+      });
       const ordinaryRowsWithWarehouseIds = ordinaryRows.map(function (row) {
         if (row.almacen_id) return row;
         const key = String(row.almacen || '').trim().toLocaleLowerCase('es');
