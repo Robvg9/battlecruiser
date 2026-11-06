@@ -49,7 +49,7 @@ function safeInit(nombre,fn){try{fn();}catch(e){console.error("[Battlecruiser] N
 function esperar(ms){return new Promise(r=>setTimeout(r,ms));}
 function numberFmt(value,options){const v=Number(value);if(!Number.isFinite(v))return "0";const config=Object.assign({useGrouping:true,maximumFractionDigits:2},options||{});return new Intl.NumberFormat("es-ES",config).formatToParts(v).map(function(part){return part.type==="group"?"\u202f":part.value;}).join("");}
 window.numberFmt=numberFmt;
-function money(n){const v=Number(n);return Number.isFinite(v)?numberFmt(v,{minimumFractionDigits:2,maximumFractionDigits:2}):"0,00";}
+function money(n){const v=Number(n);return Number.isFinite(v)?v.toFixed(2).replace(/\\B(?=(\\d{3})+\\.)/g,"\\u202f"):"0.00";}
 function fechaCorta(fecha){return new Date(fecha).toLocaleDateString("es",{day:"2-digit",month:"2-digit",year:"numeric"});}
 function fechaHora(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
 function fechaHoraCompleta(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
