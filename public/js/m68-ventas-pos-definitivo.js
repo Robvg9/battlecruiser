@@ -1125,12 +1125,37 @@ html.${POS_CLASS} .main-content > .rule-orn {
 
 
   // El catálogo de venta depende de stock, productos, categorías y almacenes.
-  // Releer fuentes reales cuando cualquiera de ellos cambie en este dispositivo
-  // o en otra pestaña; renderVentaLineas conserva el carrito ya armado.
+  // Releer fuentes reales cuando cualquiera de ellos cambie en esta pestaña
+  // o en otra. El carrito y el texto de búsqueda se conservan.
   if (!window.__BC_M68_DATA_CHANGE_BOUND__) {
     window.__BC_M68_DATA_CHANGE_BOUND__ = true;
     var salesRefreshTimer = null;
     var salesRefreshRunning = false;
+    var salesRefreshPending = false;
+    async function refreshSalesAfterDataChange() {
+      if (salesRefreshRunning) { salesRefreshPending = true; return; }
+      salesRefreshRunning = true;
+      try {
+        do {
+          salesRefreshPending = false;
+          var searchInput = document.getElementById('venta-producto-buscar');
+          var previousSearch = searchInput ? searchInput.value : '';
+          if (typeof window.refrescarStockYSelects === 'function') {
+            await window.refrescarStockYSelects();
+          }
+          if (typeof window.refrescarVentas === 'function') await window.refrescarVentas();
+          var currentSearchInput = document.getElementById('venta-producto-buscar');
+          if (currentSearchInput && previousSearch) {
+            currentSearchInput.value = previousSearch;
+            applySearchFilter();
+          }
+        } while (salesRefreshPending);
+      } catch (error) {
+        console.warn('[BattleCruiser] No se pudo actualizar el catálogo de Ventas tras un cambio:', error);
+      } finally {
+        salesRefreshRunning = false;
+      }
+    }
     window.addEventListener('bc:data-changed', function (event) {
       var detail = event.detail || {};
       var domains = detail.domains || [];
@@ -1139,24 +1164,9 @@ html.${POS_CLASS} .main-content > .rule-orn {
       })) return;
       var salesTab = document.getElementById('tab-ventas');
       if (!salesTab || !salesTab.classList.contains('visible')) return;
-      // El formulario de venta ya refresca sus propios datos tras su RPC.
       if (!detail.remote && (detail.operation === 'venta' || detail.operation === 'venta_jornada')) return;
       window.clearTimeout(salesRefreshTimer);
-      salesRefreshTimer = window.setTimeout(async function () {
-        if (salesRefreshRunning) return;
-        salesRefreshRunning = true;
-        try {
-          if (typeof window.refrescarStockYSelects === 'function' &&
-              domains.some(function (domain) { return domain === 'stock' || domain === 'inventory' || domain === 'products' || domain === 'warehouses'; })) {
-            await window.refrescarStockYSelects();
-          }
-          if (typeof window.refrescarVentas === 'function') await window.refrescarVentas();
-        } catch (error) {
-          console.warn('[BattleCruiser] No se pudo actualizar el catálogo de Ventas tras un cambio:', error);
-        } finally {
-          salesRefreshRunning = false;
-        }
-      }, 200);
+      salesRefreshTimer = window.setTimeout(refreshSalesAfterDataChange, 200);
     });
   }
 
