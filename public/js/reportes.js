@@ -105,6 +105,8 @@ async function refrescarResumenEjecutivo() {
   }
 }
 
+function fmtNumReporte(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
 function renderResumenEjecutivo(d) {
   const el = document.getElementById("rep-resumen");
   if (!el || !d) return;
@@ -113,22 +115,22 @@ function renderResumenEjecutivo(d) {
   }
   const v = d.ventas || {}, t = d.transferencias || {}, va = d.vales || {}, inv = d.inventario || {}, comp = d.compras || {}, mar = d.margen || {};
   el.innerHTML =
-    card("Ventas", v.cantidad || 0, "$" + money(v.ingresos || 0) + " · ticket $" + money(v.ticket_promedio || 0)) +
-    card("Unidades vendidas", v.unidades || 0) +
-    card("Transferencias", t.cantidad || 0, (t.unidades || 0) + " unidades") +
-    card("Vales", va.cantidad || 0, (va.unidades || 0) + " unidades") +
-    card("Productos en stock", inv.productos || 0, (inv.unidades || 0) + " unidades") +
-    card("Stock bajo", inv.stock_bajo || 0) +
-    card("Stock agotado", inv.stock_agotado || 0) +
+    card("Ventas", fmtNumReporte(v.cantidad || 0), "$" + money(v.ingresos || 0) + " · ticket $" + money(v.ticket_promedio || 0)) +
+    card("Unidades vendidas", fmtNumReporte(v.unidades || 0)) +
+    card("Transferencias", fmtNumReporte(t.cantidad || 0), fmtNumReporte(t.unidades || 0) + " unidades") +
+    card("Vales", fmtNumReporte(va.cantidad || 0), fmtNumReporte(va.unidades || 0) + " unidades") +
+    card("Productos en stock", fmtNumReporte(inv.productos || 0), fmtNumReporte(inv.unidades || 0) + " unidades") +
+    card("Stock bajo", fmtNumReporte(inv.stock_bajo || 0)) +
+    card("Stock agotado", fmtNumReporte(inv.stock_agotado || 0)) +
     (comp.disponible === false
       ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Compras</div><div class="muted">' + escHtml(comp.nota || "No disponible") + '</div></div>'
-      : card("Compras", comp.lotes || 0, (comp.unidades_compradas || 0) + " u · $" + money(comp.valor_compras || 0))) +
+      : card("Compras", fmtNumReporte(comp.lotes || 0), fmtNumReporte(comp.unidades_compradas || 0) + " u · $" + money(comp.valor_compras || 0))) +
     // Ídem para margen: ahora llega disponible=true con margen_conocido /
     // margen_pct_conocido (calculado solo sobre líneas con costo FIFO real;
     // nunca se asume costo 0 para las que no lo tienen).
     (mar.disponible === false
       ? '<div class="resumen-card"><div class="valor muted">—</div><div class="etiqueta">Margen</div><div class="muted">' + escHtml(mar.nota || "No disponible") + '</div></div>'
-      : card("Margen", (mar.margen_pct_conocido != null ? money(mar.margen_pct_conocido) + "%" : "—"), "$" + money(mar.margen_conocido || 0) + (mar.lineas_sin_costo ? " · " + mar.lineas_sin_costo + " línea(s) sin costo excluidas" : "")));
+      : card("Margen", (mar.margen_pct_conocido != null ? money(mar.margen_pct_conocido) + "%" : "—"), "$" + money(mar.margen_conocido || 0) + (mar.lineas_sin_costo ? " · " + fmtNumReporte(mar.lineas_sin_costo) + " línea(s) sin costo excluidas" : "")));
 }
 
 // ---- Sub-reportes detallados ----
@@ -217,7 +219,7 @@ function renderVentas(filas) {
     const fecha = v.fecha ? fechaHoraReporte(v.fecha) : "—";
     let lineasHtml = "";
     if (Array.isArray(v.lineas)) {
-      lineasHtml = v.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + (l.cantidad || 0) + " u · $" + money(l.precio_unitario || 0) + " = $" + money(l.subtotal || 0) + "</div>").join("");
+      lineasHtml = v.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + fmtNumReporte(l.cantidad || 0) + " u · $" + money(l.precio_unitario || 0) + " = $" + money(l.subtotal || 0) + "</div>").join("");
     }
     div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(v.almacen || "—") + '</span><span class="muted">' + fecha + ' · Total $' + money(v.total || 0) + '</span>' + lineasHtml + '</span>';
     el.appendChild(div);
@@ -237,7 +239,7 @@ function renderTransferencias(filas) {
     if (Array.isArray(t.lineas)) {
       lineasHtml = t.lineas.map((l) => '<div class="muted rep-linea">' + escHtml(l.producto || "—") + " · " + (l.cantidad || 0) + " u</div>").join("");
     }
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(t.origen || "—") + ' → ' + escHtml(t.destino || "—") + '</span><span class="muted">' + fecha + ' · ' + escHtml(t.estado || "") + ' · ' + (t.unidades || 0) + ' u</span>' + lineasHtml + '</span>';
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(t.origen || "—") + ' → ' + escHtml(t.destino || "—") + '</span><span class="muted">' + fecha + ' · ' + escHtml(t.estado || "") + ' · ' + fmtNumReporte(t.unidades || 0) + ' u</span>' + lineasHtml + '</span>';
     el.appendChild(div);
   });
 }
@@ -251,7 +253,7 @@ function renderVales(filas) {
     const div = document.createElement("div");
     div.className = "rep-fila";
     const fecha = va.fecha ? fechaHoraReporte(va.fecha) : "—";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(va.tipo || "—") + '</span><span class="muted">' + escHtml(va.producto || "—") + ' · ' + escHtml(va.almacen || "—") + ' · ' + (va.cantidad || 0) + ' u · ' + fecha + '</span></span>';
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(va.tipo || "—") + '</span><span class="muted">' + escHtml(va.producto || "—") + ' · ' + escHtml(va.almacen || "—") + ' · ' + fmtNumReporte(va.cantidad || 0) + ' u · ' + fecha + '</span></span>';
     el.appendChild(div);
   });
 }
@@ -265,7 +267,7 @@ function renderStockReporte(filas) {
     const div = document.createElement("div");
     div.className = "rep-fila rep-estado-" + (s.estado || "normal");
     const icono = s.estado === "agotado" ? "🔴" : s.estado === "bajo" ? "🟡" : "🟢";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(s.producto || "—") + '</span><span class="muted">' + escHtml(s.almacen || "—") + ' · ' + escHtml(s.categoria || "") + ' · ' + (s.cantidad || 0) + ' u (mín: ' + (s.minimo != null ? s.minimo : "—") + ')</span></span>';
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(s.producto || "—") + '</span><span class="muted">' + escHtml(s.almacen || "—") + ' · ' + escHtml(s.categoria || "") + ' · ' + fmtNumReporte(s.cantidad || 0) + ' u (mín: ' + (s.minimo != null ? fmtNumReporte(s.minimo) : "—") + ')</span></span>';
     el.appendChild(div);
   });
 }
@@ -280,7 +282,7 @@ function renderMovimiento(filas) {
     div.className = "rep-fila rep-dir-" + (m.direccion || "");
     const fecha = m.fecha ? fechaHoraReporte(m.fecha) : "—";
     const icono = m.direccion === "entrada" ? "⬆️" : "⬇️";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(m.tipo || "—") + '</span><span class="muted">' + escHtml(m.producto || "—") + ' · ' + escHtml(m.almacen || "—") + ' · ' + (m.cantidad || 0) + ' u · ' + fecha + '</span></span>';
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + ' ' + escHtml(m.tipo || "—") + '</span><span class="muted">' + escHtml(m.producto || "—") + ' · ' + escHtml(m.almacen || "—") + ' · ' + fmtNumReporte(m.cantidad || 0) + ' u · ' + fecha + '</span></span>';
     el.appendChild(div);
   });
 }
@@ -301,7 +303,7 @@ function renderCompras(filas) {
     div.className = "rep-fila";
     const fecha = c.fecha_compra ? fechaHoraReporte(c.fecha_compra) : "—";
     const estadoTxt = ESTADO_TXT[c.estado] || c.estado || "—";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(c.producto || "—") + '</span><span class="muted">' + escHtml(c.almacen || "—") + ' · ' + fecha + ' · ' + (c.cantidad_restante ?? 0) + '/' + (c.cantidad_inicial ?? 0) + ' u (' + escHtml(estadoTxt) + ') · Costo unit. $' + money(c.costo_unitario || 0) + ' · Total $' + money(c.costo_total || 0) + '</span></span>';
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + escHtml(c.producto || "—") + '</span><span class="muted">' + escHtml(c.almacen || "—") + ' · ' + fecha + ' · ' + fmtNumReporte(c.cantidad_restante ?? 0) + '/' + fmtNumReporte(c.cantidad_inicial ?? 0) + ' u (' + escHtml(estadoTxt) + ') · Costo unit. $' + money(c.costo_unitario || 0) + ' · Total $' + money(c.costo_total || 0) + '</span></span>';
     el.appendChild(div);
   });
 }
