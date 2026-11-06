@@ -1080,6 +1080,57 @@ function tipoAuditableFrontend(tipo) {
   }
 }
 
+// Aviso común de cambios de datos entre módulos y pestañas de esta PWA.
+// No almacena datos ni crea una segunda caché/cola: solo comunica qué vistas deben releer.
+const BC_DATA_DOMAINS_BY_OPERATION = {
+  producto: ['products', 'inventory'],
+  producto_actualizar: ['products', 'inventory'],
+  producto_estado: ['products', 'inventory'],
+  compra: ['stock', 'inventory', 'movements'],
+  venta: ['stock', 'inventory', 'movements', 'sales'],
+  venta_jornada: ['stock', 'inventory', 'movements', 'sales'],
+  transferencia: ['stock', 'inventory', 'movements', 'transfers'],
+  vale: ['stock', 'inventory', 'movements', 'vales'],
+  almacen: ['warehouses', 'stock', 'inventory'],
+  almacen_actualizar: ['warehouses', 'stock', 'inventory'],
+  almacen_estado: ['warehouses', 'stock', 'inventory']
+};
+let _bcDataChannel = null;
+function emitirCambioDatos(detail, remote) {
+  if (!detail || !Array.isArray(detail.domains) || !detail.domains.length) return;
+  const payload = {
+    domains: Array.from(new Set(detail.domains.filter(Boolean))),
+    operation: detail.operation || null,
+    offline: !!detail.offline,
+    timestamp: Number(detail.timestamp) || Date.now(),
+    remote: !!remote
+  };
+  window.dispatchEvent(new CustomEvent('bc:data-changed', { detail: payload }));
+  if (!remote && _bcDataChannel) {
+    try { _bcDataChannel.postMessage(payload); } catch (error) {
+      console.warn('[BattleCruiser] No se pudo compartir el aviso entre pestañas:', error);
+    }
+  }
+}
+function bcNotificarCambioDatos(operationOrDomains, offline) {
+  const operation = typeof operationOrDomains === 'string' ? operationOrDomains : null;
+  const domains = Array.isArray(operationOrDomains)
+    ? operationOrDomains
+    : (BC_DATA_DOMAINS_BY_OPERATION[operation] || []);
+  emitirCambioDatos({ domains, operation, offline: !!offline, timestamp: Date.now() }, false);
+}
+window.bcNotificarCambioDatos = bcNotificarCambioDatos;
+window.__BC_DATA_EVENTS_READY__ = true;
+try {
+  if (typeof BroadcastChannel === 'function') {
+    _bcDataChannel = new BroadcastChannel('battlecruiser:data-changed');
+    _bcDataChannel.onmessage = event => emitirCambioDatos(event && event.data, true);
+  }
+} catch (error) {
+  _bcDataChannel = null;
+  console.warn('[BattleCruiser] BroadcastChannel no disponible; se mantienen los eventos de esta pestaña.', error);
+}
+
 async function ejecutarOperacion(tipo, payload) {
   // frontend lo refleja devolviendo un error claro. Reutiliza
   // usuarioPuedeOperar() (que consulta el contexto, no hace RPC nuevo).
@@ -1098,6 +1149,7 @@ async function ejecutarOperacion(tipo, payload) {
       crearOperacionPendiente(tipo, payload, idempotency_key)
     );
     await refrescarOperacionesPendientesCache();
+    bcNotificarCambioDatos(tipo, true);
     return { ok: true, offline: true, operacion };
   }
 
@@ -1119,6 +1171,7 @@ async function ejecutarOperacion(tipo, payload) {
         registrarAuditoria(tipo, "Operación " + (ETIQUETA_TIPO_OP[tipo] || tipo) + " ejecutada online.", "exito", entidadId, idempotency_key, null);
       }
       marcarConectividadReal("online");
+      bcNotificarCambioDatos(tipo, false);
       return { ok: true, offline: false, data };
     }
 
@@ -1169,6 +1222,7 @@ function marcarRefrescoPendiente(categoria) {
 
 // Anota que refrescos hacen falta segun el tipo/resultado de la operacion
 function reconciliarTrasOperacion(tipo, resultado) {
+  if (resultado === "exito" && typeof bcNotificarCambioDatos === "function") bcNotificarCambioDatos(tipo, false);
   switch (tipo) {
     case "producto":
       // Producto nuevo: tras exito hay que traer los productos reales. No
