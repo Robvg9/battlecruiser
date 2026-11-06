@@ -1,144 +1,420 @@
-/* BattleCruiser — detalle de inventario y mínimo por almacén */
+/* BattleCruiser — detalle accionable de inventario por producto y almacén */
 (function () {
   'use strict';
-  const esc = v => typeof window.escHtml === 'function'
-    ? window.escHtml(String(v ?? '—'))
-    : String(v ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const num = v => Number.isFinite(Number(v)) ? Number(v) : 0;
-  const qtyFmt = v => typeof window.numberFmt === 'function'
-    ? window.numberFmt(v)
-    : new Intl.NumberFormat('es-ES',{useGrouping:true,maximumFractionDigits:2})
-      .formatToParts(num(v)).map(p=>p.type==='group'?'\u202f':p.value).join('');
-  const estadoLabel = s => s==='agotado'?'🔴 Agotado':s==='bajo'?'🟡 Bajo mínimo':'🟢 Disponible';
-  const puedeEditar = () => typeof window.tienePermiso==='function' && window.tienePermiso('stock','editar')===true;
-  let filaActual = null;
 
-  function estadoAlmacen(w) {
-    if (num(w.cantidad)<=0) return 'agotado';
-    if (w.minimo!=null && num(w.cantidad)<=num(w.minimo)) return 'bajo';
+  const esc = value => typeof window.escHtml === 'function'
+    ? window.escHtml(String(value ?? '—'))
+    : String(value ?? '—').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const num = value => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const qtyFmt = value => typeof window.numberFmt === 'function'
+    ? window.numberFmt(value)
+    : new Intl.NumberFormat('es-ES', { useGrouping: true, maximumFractionDigits: 2 })
+      .formatToParts(num(value)).map(part => part.type === 'group' ? '\u202f' : part.value).join('');
+  const estadoLabel = state => state === 'agotado' ? '🔴 Agotado'
+    : state === 'bajo' ? '🟡 Bajo mínimo' : '🟢 Disponible';
+  const MOVEMENT_LABELS = {
+    compra: 'Compra',
+    reinversion: 'Reinversión',
+    venta: 'Venta',
+    transferencia_salida: 'Transferencia · salida',
+    transferencia_entrada: 'Transferencia · entrada',
+    movimiento_interno: 'Movimiento interno',
+    vale: 'Vale de salida',
+    merma: 'Merma',
+    baja: 'Baja',
+    ajuste: 'Ajuste'
+  };
+
+  let filaActual = null;
+  let modalSequence = 0;
+
+  function getClient() {
+    try {
+      if (typeof client !== 'undefined' && client) return client;
+    } catch (_) {}
+    return window.client || null;
+  }
+
+  function estadoAlmacen(warehouse) {
+    if (num(warehouse.cantidad) <= 0) return 'agotado';
+    if (warehouse.minimo != null && num(warehouse.cantidad) <= num(warehouse.minimo)) return 'bajo';
     return 'normal';
   }
-  function recalcular(f) {
-    f.almacenes.forEach(w=>w.estado=estadoAlmacen(w));
-    f.cantidad=f.almacenes.reduce((s,w)=>s+num(w.cantidad),0);
-    f.estado=f.cantidad<=0?'agotado':f.almacenes.some(w=>w.estado==='bajo')?'bajo':'normal';
-  }
-  function ensureModal() {
-    let m=document.getElementById('bc-inv-producto-modal');
-    if(m)return m;
-    m=document.createElement('div');m.id='bc-inv-producto-modal';m.className='hidden';
-    m.innerHTML='<div class="bc-inv-modal-backdrop" data-bc-inv-close="1"></div><section class="bc-inv-modal-card" role="dialog" aria-modal="true" aria-labelledby="bc-inv-modal-title" tabindex="-1"><button type="button" class="bc-inv-modal-close" data-bc-inv-close="1" aria-label="Cerrar">×</button><h2 id="bc-inv-modal-title"></h2><div class="bc-inv-modal-body"></div></section>';
-    document.body.appendChild(m);
-    m.addEventListener('click',e=>{
-      if(e.target.closest('[data-bc-inv-close]')){m.classList.add('hidden');return;}
-      const b=e.target.closest('[data-bc-save-minimum]');
-      if(b){e.preventDefault();guardarMinimo(b);}
-    });
-    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!m.classList.contains('hidden'))m.classList.add('hidden');});
-    return m;
+
+  function recalcular(fila) {
+    if (!fila || !Array.isArray(fila.almacenes)) return;
+    fila.almacenes.forEach(warehouse => { warehouse.estado = estadoAlmacen(warehouse); });
+    fila.cantidad = fila.almacenes.reduce((sum, warehouse) => sum + num(warehouse.cantidad), 0);
+    fila.estado = fila.cantidad <= 0 ? 'agotado'
+      : fila.almacenes.some(warehouse => warehouse.estado === 'bajo') ? 'bajo' : 'normal';
   }
 
-  function abrir(fila, aviso) {
-    filaActual=fila;
-    const m=ensureModal(), body=m.querySelector('.bc-inv-modal-body');
-    const stores=Array.isArray(fila.almacenes)&&fila.almacenes.length?fila.almacenes:
-      [{almacen:fila.almacen,almacen_id:fila.almacen_id,cantidad:fila.cantidad,minimo:fila.minimo,estado:fila.estado,unidad:fila.unidad,variantes:fila.variantes}];
-    const total=stores.reduce((s,w)=>s+num(w.cantidad),0), canEdit=puedeEditar();
-    m.querySelector('h2').textContent=fila.producto||'Producto';
-    body.innerHTML='<div class="bc-inv-product-summary"><span>'+esc(estadoLabel(fila.estado))+'</span><strong>'+esc(qtyFmt(total)+' '+(fila.unidad||'u'))+'</strong><span>existencias totales · '+esc(qtyFmt(stores.length))+' almacenes</span></div>'+
-      stores.map(w=>{
-        const variants=Array.isArray(w.variantes)?w.variantes:[], status=estadoAlmacen(w);
-        const editable=canEdit&&fila.producto_id&&w.almacen_id&&variants.length===0;
-        const minimum=w.minimo==null?0:num(w.minimo);
-        const saved=aviso&&String(aviso.almacenId)===String(w.almacen_id)?'<div class="bc-inv-minimum-feedback is-success" role="status">'+esc(aviso.message)+'</div>':'';
-        return '<section class="bc-inv-warehouse-detail" data-warehouse-id="'+esc(w.almacen_id||'')+'">'+
-          '<div class="bc-inv-warehouse-heading"><strong>'+esc(w.almacen||'Almacén')+'</strong><span>'+esc(estadoLabel(status))+'</span></div>'+
-          '<div class="bc-inv-detail-row"><span>Stock actual</span><strong>'+esc(qtyFmt(w.cantidad)+' '+(w.unidad||fila.unidad||'u'))+'</strong></div>'+
-          '<div class="bc-inv-minimum-editor"><label>Stock mínimo</label>'+
-          (editable?'<div class="bc-inv-minimum-controls"><input data-bc-minimum-input type="number" min="0" step="any" inputmode="decimal" value="'+esc(String(minimum))+'" aria-label="Stock mínimo de '+esc(w.almacen||'almacén')+'"><button type="button" class="bc-inv-minimum-save" data-bc-save-minimum data-product-id="'+esc(fila.producto_id)+'" data-warehouse-id="'+esc(w.almacen_id)+'">Guardar</button></div>':'<strong class="bc-inv-minimum-readonly">'+esc(qtyFmt(minimum))+'</strong>')+
-          saved+(variants.length?'<p class="bc-inv-minimum-hint">El mínimo de inventario por variantes está en modo de solo lectura.</p>':(!canEdit?'<p class="bc-inv-minimum-hint">Tu rol no tiene permiso para editar el stock mínimo.</p>':''))+'</div>'+
-          (variants.length?'<div class="bc-inv-variants-title">Existencias por sabor / variante</div>'+variants.map(v=>'<div class="bc-inv-variant-row"><span>'+esc(v.nombre||'Variante')+'</span><strong>'+esc(qtyFmt(v.cantidad)+' '+(v.unidad||w.unidad||'u'))+'</strong></div>').join(''):'')+
-          '</section>';
-      }).join('');
-    m.classList.remove('hidden');m.querySelector('.bc-inv-modal-card').focus();
+  function ensureModal() {
+    let modal = document.getElementById('bc-inv-producto-modal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'bc-inv-producto-modal';
+    modal.className = 'hidden';
+    modal.innerHTML =
+      '<div class="bc-inv-modal-backdrop" data-bc-inv-close="1"></div>' +
+      '<section class="bc-inv-modal-card" role="dialog" aria-modal="true" aria-labelledby="bc-inv-modal-title" tabindex="-1">' +
+        '<button type="button" class="bc-inv-modal-close" data-bc-inv-close="1" aria-label="Cerrar">×</button>' +
+        '<h2 id="bc-inv-modal-title"></h2><div class="bc-inv-modal-body"></div>' +
+      '</section>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => {
+      if (event.target.closest('[data-bc-inv-close]')) {
+        modal.classList.add('hidden');
+        return;
+      }
+      const button = event.target.closest('[data-bc-save-minimum]');
+      if (button) {
+        event.preventDefault();
+        guardarMinimo(button);
+      }
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !modal.classList.contains('hidden')) modal.classList.add('hidden');
+    });
+    return modal;
+  }
+
+  async function cargarDatosProducto(productId) {
+    if (!productId) return null;
+    const cache = (() => { try { return typeof _cache !== 'undefined' && _cache ? _cache : null; } catch (_) { return null; } })();
+    const cached = cache && Array.isArray(cache.productos)
+      ? cache.productos.find(product => String(product.id) === String(productId))
+      : null;
+    if (cached && (cached.unidad || cached.categorias || cached.presentaciones)) return cached;
+    const supabaseClient = getClient();
+    if (!supabaseClient) return cached || null;
+    try {
+      const result = await supabaseClient.from('productos')
+        .select('id, nombre, unidad, categorias(nombre), presentaciones(nombre), inventario_mixto, producto_padre_id, variante_nombre')
+        .eq('id', productId)
+        .maybeSingle();
+      if (result.error) throw result.error;
+      return result.data || cached || null;
+    } catch (error) {
+      console.warn('[BattleCruiser] No se pudieron cargar los datos descriptivos del producto:', error);
+      return cached || null;
+    }
+  }
+
+  async function cargarMovimientosRecientes(productId) {
+    if (!productId) return { rows: [], error: null };
+    const supabaseClient = getClient();
+    if (!supabaseClient || typeof supabaseClient.rpc !== 'function') {
+      return { rows: [], error: 'Conexión no disponible.' };
+    }
+    try {
+      const result = await supabaseClient.rpc('movimientos_producto', {
+        p_producto_id: productId,
+        p_almacen_id: null,
+        p_desde: null,
+        p_hasta: null,
+        p_tipo: null,
+        p_limite: 5,
+        p_offset: 0
+      });
+      if (result.error) throw result.error;
+      return { rows: Array.isArray(result.data) ? result.data : [], error: null };
+    } catch (error) {
+      return { rows: [], error: String(error && (error.message || error.details) || error) };
+    }
+  }
+
+  function fechaMovimiento(value) {
+    if (!value) return 'Fecha no disponible';
+    try {
+      if (typeof window.fechaHora === 'function') return window.fechaHora(value);
+      return new Date(value).toLocaleString('es-ES', {
+        timeZone: 'America/Havana', day: '2-digit', month: 'short',
+        year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    } catch (_) {
+      return String(value);
+    }
+  }
+
+  function renderMovimientos(movements, movementError, unit) {
+    if (movementError) {
+      return '<p class="bc-inv-history-empty">El historial reciente no está disponible ahora.</p>';
+    }
+    if (!movements || !movements.length) {
+      return '<p class="bc-inv-history-empty">Todavía no hay movimientos registrados para este producto.</p>';
+    }
+    return '<div class="bc-inv-history-list">' + movements.map(movement => {
+      const type = String(movement.tipo || '').toLowerCase();
+      const label = MOVEMENT_LABELS[type] || movement.tipo || 'Movimiento';
+      const amount = num(movement.cantidad);
+      const signed = amount > 0 ? '+' + qtyFmt(amount) : qtyFmt(amount);
+      return '<article class="bc-inv-history-row">' +
+        '<div class="bc-inv-history-main"><strong>' + esc(label) + '</strong>' +
+        '<span>' + esc(movement.almacen || 'Almacén no disponible') + '</span>' +
+        '<small>' + esc(fechaMovimiento(movement.fecha)) + '</small></div>' +
+        '<strong class="bc-inv-history-amount">' + esc(signed + ' ' + (unit || 'u')) + '</strong>' +
+      '</article>';
+    }).join('') + '</div>';
+  }
+
+  function render(fila, meta, movements, movementError, feedback, loadingExtra) {
+    const modal = ensureModal();
+    const body = modal.querySelector('.bc-inv-modal-body');
+    const stores = Array.isArray(fila.almacenes) && fila.almacenes.length
+      ? fila.almacenes
+      : [{ almacen: fila.almacen, almacen_id: fila.almacen_id, cantidad: fila.cantidad,
+          minimo: fila.minimo, estado: fila.estado, unidad: fila.unidad, variantes: fila.variantes }];
+    const total = stores.reduce((sum, warehouse) => sum + num(warehouse.cantidad), 0);
+    const unit = (meta && meta.unidad) || fila.unidad ||
+      (stores[0] && stores[0].unidad) || 'u';
+    const category = meta && meta.categorias && meta.categorias.nombre
+      ? meta.categorias.nombre : 'Sin categoría';
+    const presentation = meta && meta.presentaciones && meta.presentaciones.nombre
+      ? meta.presentaciones.nombre : '';
+    const mixed = !!(meta && meta.inventario_mixto) ||
+      stores.some(warehouse => Array.isArray(warehouse.variantes) && warehouse.variantes.length > 0);
+
+    modal.querySelector('h2').textContent = fila.producto || (meta && meta.nombre) || 'Producto';
+    body.innerHTML =
+      '<div class="bc-inv-product-summary">' +
+        '<span class="bc-inv-product-status">' + esc(estadoLabel(fila.estado)) + '</span>' +
+        '<strong>' + esc(qtyFmt(total) + ' ' + unit) + '</strong>' +
+        '<span>existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes</span>' +
+      '</div>' +
+      '<section class="bc-inv-product-meta" aria-label="Datos del producto">' +
+        '<div class="bc-inv-meta-title">Datos del producto</div>' +
+        '<div class="bc-inv-meta-grid">' +
+          '<div><span>Categoría</span><strong>' + esc(category) + '</strong></div>' +
+          '<div><span>Unidad</span><strong>' + esc(unit) + '</strong></div>' +
+          (presentation ? '<div><span>Presentación</span><strong>' + esc(presentation) + '</strong></div>' : '') +
+          (mixed ? '<div><span>Inventario</span><strong>Por variantes</strong></div>' : '') +
+        '</div>' +
+      '</section>' +
+      stores.map(function (warehouse, index) {
+        const variants = Array.isArray(warehouse.variantes) ? warehouse.variantes : [];
+        const status = estadoAlmacen(warehouse);
+        const productId = fila.producto_id || fila.id || '';
+        const warehouseId = warehouse.almacen_id || warehouse.id || '';
+        const hasIdentity = !!productId && !!warehouseId;
+        const editable = hasIdentity && variants.length === 0 && !!getClient();
+        const minimum = warehouse.minimo == null ? 0 : num(warehouse.minimo);
+        const inputId = 'bc-inv-minimum-' + index;
+        const savedFeedback = feedback && String(feedback.almacenId) === String(warehouseId)
+          ? '<div class="bc-inv-minimum-feedback is-success" role="status">' + esc(feedback.message) + '</div>'
+          : '';
+        const editor = editable
+          ? '<div class="bc-inv-minimum-controls">' +
+              '<input id="' + inputId + '" data-bc-minimum-input type="number" min="0" step="any" inputmode="decimal" value="' + esc(String(minimum)) + '" aria-label="Stock mínimo de ' + esc(warehouse.almacen || 'almacén') + '">' +
+              '<button type="button" class="bc-inv-minimum-save" data-bc-save-minimum data-product-id="' + esc(productId) + '" data-warehouse-id="' + esc(warehouseId) + '">Guardar</button>' +
+            '</div>'
+          : '<strong class="bc-inv-minimum-readonly">' + esc(qtyFmt(minimum)) + '</strong>';
+        const hint = variants.length
+          ? '<p class="bc-inv-minimum-hint">Este producto controla stock por variantes; su mínimo todavía no se edita desde este formulario.</p>'
+          : (!hasIdentity
+            ? '<p class="bc-inv-minimum-hint is-warning">No se pudo identificar este almacén para habilitar el guardado. Actualiza Inventario y vuelve a abrir el producto.</p>'
+            : (!getClient() ? '<p class="bc-inv-minimum-hint is-warning">La conexión no está disponible para guardar el mínimo.</p>' : ''));
+        return '<section class="bc-inv-warehouse-detail" data-warehouse-id="' + esc(warehouseId) + '">' +
+          '<div class="bc-inv-warehouse-heading"><strong>' + esc(warehouse.almacen || 'Almacén') + '</strong>' +
+            '<span class="bc-inv-warehouse-status">' + esc(estadoLabel(status)) + '</span></div>' +
+          '<div class="bc-inv-detail-row"><span>Stock actual</span><strong>' +
+            esc(qtyFmt(warehouse.cantidad) + ' ' + (warehouse.unidad || unit)) + '</strong></div>' +
+          '<div class="bc-inv-minimum-editor"><label for="' + (editable ? inputId : '') + '">Stock mínimo</label>' +
+            editor + savedFeedback + hint +
+          '</div>' +
+          (variants.length
+            ? '<div class="bc-inv-variants-title">Existencias por sabor / variante</div>' +
+              variants.map(function (variant) {
+                return '<div class="bc-inv-variant-row"><span>' + esc(variant.nombre || 'Variante') +
+                  '</span><strong>' + esc(qtyFmt(variant.cantidad) + ' ' + (variant.unidad || unit)) + '</strong></div>';
+              }).join('')
+            : '') +
+        '</section>';
+      }).join('') +
+      '<section class="bc-inv-history" aria-label="Movimientos recientes">' +
+        '<div class="bc-inv-history-heading"><strong>Movimientos recientes</strong><span>Últimos 5</span></div>' +
+        (loadingExtra
+          ? '<p class="bc-inv-history-empty">Cargando historial…</p>'
+          : renderMovimientos(movements, movementError, unit)) +
+      '</section>';
+    modal.classList.remove('hidden');
+    modal.querySelector('.bc-inv-modal-card').focus();
+  }
+
+  async function abrirProducto(fila, feedback) {
+    filaActual = fila;
+    const sequence = ++modalSequence;
+    render(fila, null, [], null, feedback || null, true);
+    const productId = fila.producto_id || fila.id || '';
+    const [meta, history] = await Promise.all([
+      cargarDatosProducto(productId),
+      cargarMovimientosRecientes(productId)
+    ]);
+    if (sequence !== modalSequence || !filaActual || String(filaActual.producto_id || filaActual.id) !== String(productId)) return;
+    render(filaActual, meta, history.rows, history.error, feedback || null, false);
   }
 
   async function guardarMinimo(button) {
-    if(button.disabled)return;
-    const section=button.closest('.bc-inv-warehouse-detail'), input=section&&section.querySelector('[data-bc-minimum-input]');
-    const productId=button.dataset.productId, warehouseId=button.dataset.warehouseId;
-    if(!section||!input)return;
-    let feedback=section.querySelector('.bc-inv-minimum-feedback');
-    if(!feedback){feedback=document.createElement('div');feedback.className='bc-inv-minimum-feedback';feedback.setAttribute('role','status');section.querySelector('.bc-inv-minimum-editor').appendChild(feedback);}
-    const raw=String(input.value||'').trim(), value=raw===''?NaN:Number(raw);
-    if(!Number.isFinite(value)||value<0){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='Introduce un mínimo válido igual o mayor que 0.';input.focus();return;}
-    if(!puedeEditar()){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='Tu rol no tiene permiso para editar el stock mínimo.';return;}
-    const supabaseClient=typeof client!=='undefined'?client:window.client;
-    if(!supabaseClient||typeof supabaseClient.rpc!=='function'){feedback.className='bc-inv-minimum-feedback is-error';feedback.textContent='No está disponible la conexión con el inventario.';return;}
-    const label=button.textContent;button.disabled=true;input.disabled=true;button.textContent='Guardando…';feedback.textContent='Guardando mínimo…';feedback.className='bc-inv-minimum-feedback';
-    try{
-      const result=await supabaseClient.rpc('bc_actualizar_stock_minimo',{p_producto_id:productId,p_almacen_id:warehouseId,p_minimo:value});
-      if(!result||result.error)throw new Error(result&&result.error&&(result.error.message||result.error.details)||'No se pudo guardar el mínimo.');
-      let updated=null;
-      if(typeof window.refrescarInventario==='function'){
-        try{await window.refrescarInventario();const current=Array.isArray(window._invFilas)?window._invFilas:[];updated=current.find(r=>String(r.producto_id)===String(productId))||null;}catch(_){}
+    if (button.disabled) return;
+    const modal = document.getElementById('bc-inv-producto-modal');
+    const warehouseSection = button.closest('.bc-inv-warehouse-detail');
+    const input = warehouseSection && warehouseSection.querySelector('[data-bc-minimum-input]');
+    const productId = button.getAttribute('data-product-id');
+    const warehouseId = button.getAttribute('data-warehouse-id');
+    if (!modal || !warehouseSection || !input || !productId || !warehouseId) return;
+
+    let feedback = warehouseSection.querySelector('.bc-inv-minimum-feedback');
+    if (!feedback) {
+      feedback = document.createElement('div');
+      feedback.className = 'bc-inv-minimum-feedback';
+      feedback.setAttribute('role', 'status');
+      warehouseSection.querySelector('.bc-inv-minimum-editor').appendChild(feedback);
+    }
+    const raw = String(input.value || '').trim();
+    const minimum = raw === '' ? NaN : Number(raw);
+    if (!Number.isFinite(minimum) || minimum < 0) {
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'Introduce un mínimo válido igual o mayor que 0.';
+      input.focus();
+      return;
+    }
+
+    const supabaseClient = getClient();
+    if (!supabaseClient || typeof supabaseClient.rpc !== 'function') {
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'No está disponible la conexión con el inventario.';
+      return;
+    }
+
+    const originalText = button.textContent;
+    button.disabled = true;
+    input.disabled = true;
+    button.textContent = 'Guardando…';
+    feedback.className = 'bc-inv-minimum-feedback';
+    feedback.textContent = 'Guardando mínimo…';
+    try {
+      // The RPC is the authority for stock.edit permission; the UI must not
+      // hide the editor because a client-side permission cache is still stale.
+      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo', {
+        p_producto_id: productId,
+        p_almacen_id: warehouseId,
+        p_minimo: minimum
+      });
+      if (!result || result.error) {
+        throw new Error(result && result.error && (result.error.message || result.error.details) || 'No se pudo guardar el mínimo.');
       }
-      const target=updated||filaActual;
-      if(target&&Array.isArray(target.almacenes)){
-        const wh=target.almacenes.find(w=>String(w.almacen_id)===String(warehouseId));
-        if(wh){wh.minimo=value;recalcular(target);}
+
+      let refreshed = null;
+      if (typeof window.refrescarInventario === 'function') {
+        try {
+          await window.refrescarInventario();
+          const currentRows = Array.isArray(window._invFilas) ? window._invFilas : [];
+          refreshed = currentRows.find(row => String(row.producto_id || row.id) === String(productId)) || null;
+        } catch (_) {
+          refreshed = null;
+        }
       }
-      abrir(target||filaActual,{almacenId:warehouseId,message:'✓ Stock mínimo guardado.'});
-    }catch(error){
-      button.disabled=false;input.disabled=false;button.textContent=label;
-      feedback.className='bc-inv-minimum-feedback is-error';
-      feedback.textContent='No se pudo guardar: '+String(error&&error.message||error);
+      const target = refreshed || filaActual;
+      if (target && Array.isArray(target.almacenes)) {
+        const targetWarehouse = target.almacenes.find(row => String(row.almacen_id || row.id) === String(warehouseId));
+        if (targetWarehouse) {
+          targetWarehouse.minimo = minimum;
+          recalcular(target);
+        }
+      }
+      await abrirProducto(target || filaActual, {
+        almacenId: warehouseId,
+        message: '✓ Stock mínimo guardado.'
+      });
+    } catch (error) {
+      button.disabled = false;
+      input.disabled = false;
+      button.textContent = originalText;
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'No se pudo guardar: ' + String(error && error.message || error);
     }
   }
 
   function bind() {
-    const list=document.getElementById('inv-detalle');
-    if(!list){setTimeout(bind,500);return;}
-    if(list.dataset.bcInvDetailBound==='1')return;
-    list.dataset.bcInvDetailBound='1';
-    const style=document.createElement('style');
-    style.textContent=
-      '#bc-inv-producto-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:10px}'+
-      '#bc-inv-producto-modal.hidden{display:none}.bc-inv-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72)}'+
-      '.bc-inv-modal-card{position:relative;width:min(600px,100%);max-height:88vh;overflow:auto;background:var(--void,#0c1c18);border:1px solid var(--gold,#c9a24d);border-radius:10px;padding:14px;color:var(--text,#eee);box-shadow:0 18px 60px rgba(0,0,0,.5)}'+
-      '.bc-inv-modal-card h2{margin:0 38px 9px 0;color:var(--gold,#c9a24d);font-size:1.2rem}.bc-inv-modal-close{position:absolute;right:9px;top:5px;border:0;background:none;color:var(--mist,#aaa);font-size:26px;cursor:pointer}'+
-      '.bc-inv-product-summary{display:flex;align-items:center;flex-wrap:wrap;gap:5px 10px;margin-bottom:8px;font-size:.75rem;color:var(--mist,#aaa)}.bc-inv-product-summary strong{color:var(--text,#eee);font-size:.95rem}'+
-      '.bc-inv-warehouse-detail{padding:9px 0;border-top:1px solid rgba(201,162,77,.16)}.bc-inv-warehouse-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}.bc-inv-warehouse-heading strong{font-size:.88rem}.bc-inv-warehouse-heading span{font-size:.68rem;color:var(--mist,#aaa);white-space:nowrap}'+
-      '.bc-inv-detail-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:.8rem}.bc-inv-detail-row span{color:var(--mist,#aaa)}'+
-      '.bc-inv-minimum-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 12px;padding-top:3px;font-size:.8rem}.bc-inv-minimum-editor>label{color:var(--mist,#aaa)}.bc-inv-minimum-controls{display:flex;align-items:center;gap:6px;min-width:0}'+
-      '.bc-inv-minimum-controls input{width:105px;min-width:0;height:34px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(201,162,77,.35);border-radius:6px;background:var(--void,#0c1c18);color:var(--text,#eee);font:inherit}'+
-      '.bc-inv-minimum-save{height:34px;padding:0 11px;border:0;border-radius:6px;background:linear-gradient(180deg,var(--gold-bright,#e0bd69),var(--gold,#c9a24d));color:#211605;font-weight:600;font-size:.75rem;cursor:pointer;white-space:nowrap}.bc-inv-minimum-save:disabled{opacity:.55;cursor:wait}'+
-      '.bc-inv-minimum-readonly{color:var(--text,#eee);justify-self:end}.bc-inv-minimum-feedback{grid-column:1/-1;min-height:1em;font-size:.7rem;color:var(--mist,#aaa)}.bc-inv-minimum-feedback.is-success{color:#9fc4ad}.bc-inv-minimum-feedback.is-error{color:#e88a96}.bc-inv-minimum-hint{grid-column:1/-1;margin:0;font-size:.67rem;color:var(--mist,#aaa)}'+
-      '.bc-inv-variants-title{padding-top:6px;font-size:.69rem;color:var(--gold,#c9a24d)}.bc-inv-variant-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:.75rem;color:var(--mist,#aaa)}.bc-inv-variant-row strong{color:var(--text,#eee)}'+
-      '.rep-fila[data-inv-producto]{cursor:pointer}.rep-fila[data-inv-producto]:focus{outline:1px solid var(--gold,#c9a24d);outline-offset:2px}@media(max-width:480px){.bc-inv-modal-card{padding:12px}.bc-inv-minimum-controls input{width:82px}.bc-inv-minimum-editor{gap:5px}}';
+    const list = document.getElementById('inv-detalle');
+    if (!list) { setTimeout(bind, 500); return; }
+    if (list.dataset.bcInvDetailBound === '1') return;
+    list.dataset.bcInvDetailBound = '1';
+
+    const style = document.createElement('style');
+    style.textContent =
+      '#bc-inv-producto-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:10px}' +
+      '#bc-inv-producto-modal.hidden{display:none}' +
+      '.bc-inv-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72)}' +
+      '.bc-inv-modal-card{position:relative;width:min(620px,100%);max-height:88vh;overflow:auto;background:var(--void,#0c1c18);border:1px solid var(--gold,#c9a24d);border-radius:10px;padding:14px;color:var(--text,#eee);box-shadow:0 18px 60px rgba(0,0,0,.5)}' +
+      '.bc-inv-modal-card h2{margin:0 38px 9px 0;color:var(--gold,#c9a24d);font-size:1.2rem}' +
+      '.bc-inv-modal-close{position:absolute;right:9px;top:5px;border:0;background:none;color:var(--mist,#aaa);font-size:26px;cursor:pointer}' +
+      '.bc-inv-product-summary{display:flex;align-items:center;flex-wrap:wrap;gap:5px 10px;margin-bottom:8px;font-size:.75rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-product-summary strong{color:var(--text,#eee);font-size:.95rem}.bc-inv-product-status{font-size:.72rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-product-meta{padding:8px 0 9px;border-top:1px solid rgba(201,162,77,.16)}' +
+      '.bc-inv-meta-title{margin-bottom:6px;color:var(--gold,#c9a24d);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}' +
+      '.bc-inv-meta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}' +
+      '.bc-inv-meta-grid>div{display:flex;flex-direction:column;gap:2px;min-width:0}.bc-inv-meta-grid span{font-size:.68rem;color:var(--mist,#aaa)}.bc-inv-meta-grid strong{font-size:.8rem;overflow-wrap:anywhere}' +
+      '.bc-inv-warehouse-detail{padding:9px 0;border-top:1px solid rgba(201,162,77,.16)}' +
+      '.bc-inv-warehouse-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}' +
+      '.bc-inv-warehouse-heading strong{font-size:.88rem}.bc-inv-warehouse-status{font-size:.68rem;color:var(--mist,#aaa);white-space:nowrap}' +
+      '.bc-inv-detail-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:.8rem}.bc-inv-detail-row span{color:var(--mist,#aaa)}' +
+      '.bc-inv-minimum-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 12px;padding-top:3px;font-size:.8rem}' +
+      '.bc-inv-minimum-editor>label{color:var(--mist,#aaa)}.bc-inv-minimum-controls{display:flex;align-items:center;gap:6px;min-width:0}' +
+      '.bc-inv-minimum-controls input{width:105px;min-width:0;height:36px;box-sizing:border-box;padding:0 8px;border:1px solid rgba(201,162,77,.45);border-radius:6px;background:var(--void,#0c1c18);color:var(--text,#eee);font:inherit}' +
+      '.bc-inv-minimum-save{height:36px;padding:0 12px;border:0;border-radius:6px;background:linear-gradient(180deg,var(--gold-bright,#e0bd69),var(--gold,#c9a24d));color:#211605;font-weight:700;font-size:.75rem;cursor:pointer;white-space:nowrap}' +
+      '.bc-inv-minimum-save:disabled{opacity:.55;cursor:wait}.bc-inv-minimum-readonly{color:var(--text,#eee);justify-self:end}' +
+      '.bc-inv-minimum-feedback{grid-column:1/-1;min-height:1em;font-size:.7rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-minimum-feedback.is-success{color:#9fc4ad}.bc-inv-minimum-feedback.is-error{color:#e88a96}' +
+      '.bc-inv-minimum-hint{grid-column:1/-1;margin:0;font-size:.67rem;color:var(--mist,#aaa)}.bc-inv-minimum-hint.is-warning{color:#e8c56a}' +
+      '.bc-inv-variants-title{padding-top:6px;font-size:.69rem;color:var(--gold,#c9a24d)}' +
+      '.bc-inv-variant-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:.75rem;color:var(--mist,#aaa)}.bc-inv-variant-row strong{color:var(--text,#eee)}' +
+      '.bc-inv-history{margin-top:7px;padding-top:9px;border-top:1px solid rgba(201,162,77,.2)}' +
+      '.bc-inv-history-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}.bc-inv-history-heading strong{font-size:.8rem}.bc-inv-history-heading span{font-size:.66rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-history-list{display:flex;flex-direction:column;gap:5px}.bc-inv-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid rgba(201,162,77,.1);border-radius:7px;background:rgba(255,255,255,.015)}' +
+      '.bc-inv-history-main{display:flex;flex-direction:column;gap:2px;min-width:0}.bc-inv-history-main strong{font-size:.74rem}.bc-inv-history-main span,.bc-inv-history-main small{font-size:.66rem;color:var(--mist,#aaa);overflow-wrap:anywhere}' +
+      '.bc-inv-history-amount{font-size:.76rem;white-space:nowrap}.bc-inv-history-empty{margin:0;padding:5px 0;font-size:.7rem;color:var(--mist,#aaa)}' +
+      '.rep-fila[data-inv-producto]{cursor:pointer}.rep-fila[data-inv-producto]:focus{outline:1px solid var(--gold,#c9a24d);outline-offset:2px}' +
+      '@media(max-width:480px){.bc-inv-modal-card{padding:12px}.bc-inv-minimum-controls input{width:82px}.bc-inv-minimum-editor{gap:5px}.bc-inv-meta-grid{grid-template-columns:1fr 1fr}}';
     document.head.appendChild(style);
 
-    const render=()=>{
-      const filas=Array.isArray(window._invFilas)?window._invFilas:[];
-      const rows=Array.from(list.querySelectorAll('.rep-fila')).filter(x=>!x.classList.contains('rep-totales'));
-      rows.forEach((row,i)=>{if(!filas[i])return;row.dataset.invProducto=filas[i].producto_id||'';row.setAttribute('role','button');row.setAttribute('tabindex','0');});
+    const tagRows = () => {
+      const rows = Array.from(list.querySelectorAll('.rep-fila')).filter(row => !row.classList.contains('rep-totales'));
+      rows.forEach((row, index) => {
+        const data = Array.isArray(window._invFilas) ? window._invFilas[index] : null;
+        if (!data) return;
+        row.dataset.invProducto = data.producto_id || data.id || '';
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
+      });
     };
-    const openFromRow=row=>{
-      const filas=Array.isArray(window._invFilas)?window._invFilas:[];
-      const rows=Array.from(list.querySelectorAll('.rep-fila[data-inv-producto]'));
-      const f=filas[rows.indexOf(row)];if(f)abrir(f);
+    const openFromRow = row => {
+      const filas = Array.isArray(window._invFilas) ? window._invFilas : [];
+      const rows = Array.from(list.querySelectorAll('.rep-fila[data-inv-producto]'));
+      const fila = filas[rows.indexOf(row)];
+      if (fila) abrirProducto(fila);
     };
-    list.addEventListener('click',e=>{
-      if(e.target.closest('.bc-m53-variant-details')){e.stopPropagation();return;}
-      const row=e.target.closest('.rep-fila[data-inv-producto]');if(row)openFromRow(row);
+
+    list.addEventListener('click', event => {
+      if (event.target.closest('.bc-m53-variant-details')) { event.stopPropagation(); return; }
+      const row = event.target.closest('.rep-fila[data-inv-producto]');
+      if (row) openFromRow(row);
     });
-    list.addEventListener('keydown',e=>{
-      if(e.target.closest('.bc-m53-variant-details')){e.stopPropagation();return;}
-      if(e.key!=='Enter'&&e.key!==' ')return;
-      const row=e.target.closest('.rep-fila[data-inv-producto]');if(!row)return;
-      e.preventDefault();openFromRow(row);
+    list.addEventListener('keydown', event => {
+      if (event.target.closest('.bc-m53-variant-details')) { event.stopPropagation(); return; }
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const row = event.target.closest('.rep-fila[data-inv-producto]');
+      if (!row) return;
+      event.preventDefault();
+      openFromRow(row);
     });
-    new MutationObserver(render).observe(list,{childList:true,subtree:true});render();
+    new MutationObserver(tagRows).observe(list, { childList: true, subtree: true });
+    tagRows();
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, { once: true });
+  else bind();
 })();
