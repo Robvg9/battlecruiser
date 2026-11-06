@@ -47,7 +47,9 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 (function programarLoadingGuard(){function cargar(){try{if(document.querySelector('script[data-battlecruiser-loading-guard="1"]'))return;const s=document.createElement('script');s.src='js/loading-guard.js';s.async=false;s.dataset.battlecruiserLoadingGuard='1';document.head.appendChild(s);}catch(e){console.warn('[BattleCruiser] No se pudo cargar loading-guard.js:',e);}}if(document.readyState==='complete')cargar();else window.addEventListener('load',cargar,{once:true});})();
 function safeInit(nombre,fn){try{fn();}catch(e){console.error("[Battlecruiser] No se pudo iniciar '"+nombre+"':",e);}}
 function esperar(ms){return new Promise(r=>setTimeout(r,ms));}
-function money(n){const v=Number(n);return Number.isFinite(v)?v.toFixed(2):"0.00";}
+function numberFmt(value,options){const v=Number(value);if(!Number.isFinite(v))return "0";const config=Object.assign({useGrouping:true,maximumFractionDigits:2},options||{});return new Intl.NumberFormat("es-ES",config).formatToParts(v).map(function(part){return part.type==="group"?"\u202f":part.value;}).join("");}
+window.numberFmt=numberFmt;
+function money(n){const v=Number(n);return Number.isFinite(v)?numberFmt(v,{minimumFractionDigits:2,maximumFractionDigits:2}):"0,00";}
 function fechaCorta(fecha){return new Date(fecha).toLocaleDateString("es",{day:"2-digit",month:"2-digit",year:"numeric"});}
 function fechaHora(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
 function fechaHoraCompleta(fecha){return new Date(fecha).toLocaleString("es",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
