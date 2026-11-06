@@ -138,16 +138,17 @@ function renderPanelAlmacenSeleccionado() {
     else if (s.minimo != null && cant <= Number(s.minimo)) bajoMin++;
   });
   const activo = a.activo !== false;
+  const fmtQty = (v) => typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v);
   panel.innerHTML =
     '<div class="alm-info-grid">' +
       '<div class="alm-info-item"><span class="alm-info-label">Nombre</span><span class="alm-info-valor">' + escHtml(a.nombre) + "</span></div>" +
       '<div class="alm-info-item"><span class="alm-info-label">Tipo</span><span class="alm-info-valor">' + escHtml(etiquetaTipoAlmacen(a.tipo)) + "</span></div>" +
       '<div class="alm-info-item"><span class="alm-info-label">Estado</span><span class="alm-info-valor ' + (activo ? "alm-estado-activo" : "alm-estado-inactivo") + '">' + (activo ? "Activo" : "Inactivo") + "</span></div>" +
       '<div class="alm-info-item"><span class="alm-info-label">Productos</span><span class="alm-info-valor">' + productosCount + "</span></div>" +
-      '<div class="alm-info-item"><span class="alm-info-label">Unidades</span><span class="alm-info-valor">' + money(unidades) + "</span></div>" +
+      '<div class="alm-info-item"><span class="alm-info-label">Unidades</span><span class="alm-info-valor">' + fmtQty(unidades) + "</span></div>" +
       '<div class="alm-info-item"><span class="alm-info-label">Alertas</span><span class="alm-info-valor">' +
         (bajoMin + agotados > 0
-          ? (agotados ? agotados + " agotado(s)" : "") + (agotados && bajoMin ? " · " : "") + (bajoMin ? bajoMin + " bajo mínimo" : "")
+          ? (agotados ? fmtQty(agotados) + " agotado(s)" : "") + (agotados && bajoMin ? " · " : "") + (bajoMin ? fmtQty(bajoMin) + " bajo mínimo" : "")
           : "Sin alertas") +
       "</span></div>" +
     "</div>";
