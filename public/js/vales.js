@@ -2,7 +2,12 @@
 // Vales de salida: detalle accionable y utilidades de redondeo monetario.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
-function fmtNumVale(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+function fmtNumVale(v) {
+  const value = Number(v);
+  if (!Number.isFinite(value)) return '0.00';
+  return new Intl.NumberFormat('en-US', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .formatToParts(value).map(function (part) { return part.type === 'group' ? '\u202f' : part.value; }).join('');
+}
 
 function mostrarDetalleVale(valeId) {
   const cont = document.getElementById("vale-detalle");
