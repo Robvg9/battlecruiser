@@ -62,7 +62,7 @@ test("Inventory centre replaces variant rows with parent total and a non-navigat
   assert.match(m53, /Ver stock detallado/);
   assert.match(m53, /qtyFmt\(variant\.cantidad\)/);
   assert.match(detail, /bc-m53-variant-details/);
-  assert.match(detail, /e\.stopPropagation\(\)/);
+  assert.match(detail, /event\.stopPropagation\(\)/);
 });
 
 test("Mixed inventory migration keeps existing product IDs as the transaction and FIFO key", () => {
