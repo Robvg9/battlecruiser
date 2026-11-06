@@ -731,6 +731,26 @@
 
   function installHooks() {
     window.refrescarInventario = function () { return cargarInventario(); };
+    if (!window.__BC_M53_DATA_CHANGE_BOUND__) {
+      window.__BC_M53_DATA_CHANGE_BOUND__ = true;
+      let refreshTimer = null;
+      window.addEventListener('bc:data-changed', function (event) {
+        const detail = event.detail || {};
+        const domains = detail.domains || [];
+        if (!['stock', 'inventory', 'products', 'categories', 'warehouses'].some(function (domain) {
+          return domains.indexOf(domain) >= 0;
+        })) return;
+        const inventoryTab = document.getElementById('tab-inventario');
+        if (!inventoryTab || !inventoryTab.classList.contains('visible')) return;
+        if (detail.offline || !navigator.onLine) { paint(); return; }
+        window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(function () {
+          cargarInventario().catch(function (error) {
+            console.warn('[BattleCruiser] No se pudo sincronizar la vista de inventario tras un cambio:', error);
+          });
+        }, 140);
+      });
+    }
     window.refrescarInventario.__m53 = true;
     window.renderInventario = function (filas) {
       _allRows = Array.isArray(filas) ? filas : [];

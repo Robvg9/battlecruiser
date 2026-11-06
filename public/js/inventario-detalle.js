@@ -307,6 +307,9 @@
         throw new Error(result && result.error && (result.error.message || result.error.details) || 'No se pudo guardar el mínimo.');
       }
 
+      if (typeof window.bcNotificarCambioDatos === 'function') {
+        window.bcNotificarCambioDatos('stock_minimum', false);
+      }
       let refreshed = null;
       if (typeof window.refrescarInventario === 'function') {
         try {

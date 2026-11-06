@@ -82,17 +82,17 @@ test("Shared inventory foreign-key index migration covers all six new references
   ]) assert.ok(indexes.includes(column),"missing covering index: "+column);
 });
 
-test("PWA and service worker cache are aligned at 9.5.71 / Jornada module 7.13",()=>{
+test("PWA and service worker cache are aligned at 9.5.72 / Jornada module 7.13",()=>{
   const version=app.match(/const VERSION="([^"]+)"/);
   const swVersion=sw.match(/BC_SW_VERSION = "([^"]+)"/);
   assert.ok(version&&swVersion,"app/service worker version declaration missing");
-  assert.equal(version[1],"9.5.71");
+  assert.equal(version[1],"9.5.72");
   assert.equal(swVersion[1],version[1]);
-  for(const marker of ['["bc7-jornada-ui.js","7.13"]','["m68-ventas-pos-definitivo.js","9.5.71"]']){
+  for(const marker of ['["bc7-jornada-ui.js","7.13"]','["m68-ventas-pos-definitivo.js","9.5.72"]']){
     assert.ok(app.includes(marker),"dynamic module cache missing "+marker);
   }
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.13"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.71"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.72"));
   assert.ok(ui.includes("v7.13"));
 });
 

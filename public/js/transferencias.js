@@ -337,3 +337,34 @@ function renderValesLista() {
   });
   actualizarContador("vales-contador", filtradas.length, todas.length);
 }
+
+
+// Actualiza las listas de historial si otra vista o pestaña registra una
+// transferencia o un vale. Los formularios de alta ya refrescan su propio listado.
+if (!window.__BC_TRANSFER_HISTORY_EVENTS__) {
+  window.__BC_TRANSFER_HISTORY_EVENTS__ = true;
+  let transferHistoryTimer = null;
+  window.addEventListener('bc:data-changed', function (event) {
+    const detail = event.detail || {};
+    const domains = detail.domains || [];
+    if (detail.offline) return;
+    const refreshTransfers = domains.includes('transfers');
+    const refreshVales = domains.includes('vales');
+    if (!refreshTransfers && !refreshVales) return;
+    if (!detail.remote && ['transferencia', 'vale'].includes(detail.operation)) return;
+    const transferTab = document.getElementById('tab-transferencias');
+    const valesTab = document.getElementById('tab-vales');
+    const showTransfers = refreshTransfers && transferTab && transferTab.classList.contains('visible');
+    const showVales = refreshVales && valesTab && valesTab.classList.contains('visible');
+    if (!showTransfers && !showVales) return;
+    window.clearTimeout(transferHistoryTimer);
+    transferHistoryTimer = window.setTimeout(async function () {
+      try {
+        if (showTransfers) await refrescarTransferencias();
+        if (showVales) await refrescarVales();
+      } catch (error) {
+        console.warn('[BattleCruiser] No se pudo actualizar el historial de movimientos:', error);
+      }
+    }, 180);
+  });
+}

@@ -708,6 +708,23 @@
     const tab = document.getElementById('tab-movimientos');
     if (!tab || tab.dataset.m51Bound) return;
     tab.dataset.m51Bound = '1';
+    if (!window.__BC_M51_DATA_CHANGE_BOUND__) {
+      window.__BC_M51_DATA_CHANGE_BOUND__ = true;
+      let movementRefreshTimer = null;
+      window.addEventListener('bc:data-changed', function (event) {
+        const domains = event.detail && event.detail.domains || [];
+        if (event.detail && event.detail.offline) return;
+        if (!['stock', 'movements', 'transfers', 'vales'].some(function (domain) { return domains.indexOf(domain) >= 0; })) return;
+        const movementsTab = document.getElementById('tab-movimientos');
+        if (!movementsTab || !movementsTab.classList.contains('visible')) return;
+        window.clearTimeout(movementRefreshTimer);
+        movementRefreshTimer = window.setTimeout(function () {
+          Promise.resolve(cargarMovimientos()).catch(function (error) {
+            console.warn('[BattleCruiser] No se pudo actualizar Movimientos tras un cambio:', error);
+          });
+        }, 180);
+      });
+    }
     tab.addEventListener('toggle', function (e) {
       const group = e.target;
       if (!group || !group.matches || !group.matches('.bc-m51-group-collapsible')) return;

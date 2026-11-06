@@ -289,6 +289,7 @@
             msg('✓ Compra guardada localmente — se sincronizará al recuperar conexión.', true);
           } else {
             msg('✓ Compra registrada. Stock actualizado.', true);
+            if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
             if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
           }
           return;
@@ -402,6 +403,29 @@
     }
     // La única entrada visible es Movimientos → Nueva compra.
     // El modal llama este hook al abrir para cargar solo los catálogos del formulario.
+    if (!window.__BC_COMPRA_DATA_EVENTS__) {
+      window.__BC_COMPRA_DATA_EVENTS__ = true;
+      var compraRefreshTimer = null;
+      window.addEventListener('bc:data-changed', function (event) {
+        var detail = event.detail || {};
+        var domains = detail.domains || [];
+        if (detail.offline || !['stock', 'inventory', 'products', 'categories', 'warehouses'].some(function (domain) {
+          return domains.indexOf(domain) >= 0;
+        })) return;
+        var openPanel = document.querySelector('#bc165-overlay #tab-compras.bc175-active');
+        if (!openPanel) return;
+        if (!detail.remote && detail.operation === 'compra') return;
+        window.clearTimeout(compraRefreshTimer);
+        compraRefreshTimer = window.setTimeout(async function () {
+          try {
+            if (typeof window.refrescarStockYSelects === 'function') await window.refrescarStockYSelects();
+            await cargarDatosYRender();
+          } catch (error) {
+            console.warn('[BattleCruiser] No se pudo actualizar el catálogo de Nueva Compra:', error);
+          }
+        }, 180);
+      });
+    }
     window.__BC_COMPRAS_ACTIVAR = cargarDatosYRender;
 
     poblar();

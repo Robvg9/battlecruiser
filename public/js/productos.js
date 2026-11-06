@@ -92,6 +92,9 @@ async function ejecutarProductoMixtoSinCola(editandoId, payload) {
       return { ok: false, error: result.error };
     }
     if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+    if (typeof window.bcNotificarCambioDatos === "function") {
+      window.bcNotificarCambioDatos(editandoId ? "producto_actualizar" : "producto", false);
+    }
     return { ok: true, offline: false, data: result.data };
   } catch (error) {
     if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
@@ -411,6 +414,29 @@ safeInit("lista-productos", () => {
   });
 });
 
+// Mantener el selector y las etiquetas de categoría sincronizados entre módulos.
+if (!window.__BC_PRODUCT_CATEGORY_EVENTS__) {
+  window.__BC_PRODUCT_CATEGORY_EVENTS__ = true;
+  let categoryRefreshTimer = null;
+  window.addEventListener("bc:data-changed", (event) => {
+    const domains = event.detail && event.detail.domains || [];
+    if (event.detail && event.detail.offline) return;
+    const categoryChanged = domains.includes("categories");
+    const productOrStockChanged = domains.includes("products") || domains.includes("stock");
+    const productTab = document.getElementById("tab-productos");
+    const productViewVisible = !!(productTab && productTab.classList.contains("visible"));
+    if (!categoryChanged && !(event.detail && event.detail.remote && productViewVisible && productOrStockChanged)) return;
+    clearTimeout(categoryRefreshTimer);
+    categoryRefreshTimer = setTimeout(async () => {
+      try {
+        if (domains.includes("stock") && productViewVisible && typeof window.refrescarStockYSelects === "function") {
+          await window.refrescarStockYSelects();
+        } else if (typeof refrescarProductos === "function") await refrescarProductos();
+        else if (typeof refrescarSelectorCategoriasProducto === "function") await refrescarSelectorCategoriasProducto();
+      } catch (error) { console.warn("[BattleCruiser] No se pudo actualizar el catálogo de productos/categorías:", error); }
+    }, 100);
+  });
+}
 safeInit("productos-buscar", () => {
   const input = document.getElementById("productos-buscar");
   if (!input) return;
@@ -743,6 +769,9 @@ safeInit("form-producto", () => {
     }
     setMsg("msg-productos", estabaEditando ? "Producto actualizado." : "Producto creado.", true);
     await refrescarProductos();
+    if (typeof window.bcNotificarCambioDatos === "function") {
+      window.bcNotificarCambioDatos(estabaEditando ? "producto_actualizar" : "producto", false);
+    }
   });
 });
 
