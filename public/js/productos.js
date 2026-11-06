@@ -92,6 +92,9 @@ async function ejecutarProductoMixtoSinCola(editandoId, payload) {
       return { ok: false, error: result.error };
     }
     if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
+    if (typeof window.bcNotificarCambioDatos === "function") {
+      window.bcNotificarCambioDatos(editandoId ? "producto_actualizar" : "producto", false);
+    }
     return { ok: true, offline: false, data: result.data };
   } catch (error) {
     if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
