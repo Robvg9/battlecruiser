@@ -2,8 +2,6 @@
 // Ventas: detalle/auditoría de venta, catálogo de productos para vender, carrito, confirmación de venta e historial.
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
-function fmtNumVenta(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
-
 function mostrarDetalleVenta(ventaId) {
   const cont = document.getElementById("venta-detalle");
   if (!cont) return;
@@ -220,6 +218,7 @@ safeInit("form-vale", () => {
 
 // ---- El precio se decide SOLO en el servidor (RPC registrar_venta) según el
 let ventaLineas = [];
+function fmtNumVenta(v) { return typeof numberFmt === 'function' ? numberFmt(v) : (typeof money === 'function' ? money(v) : String(v == null ? 0 : v)); }
 let ventaAlmacenesTipo = {}; // id -> 'venta' | 'mayorista'
 let ventaProductosPrecios = {}; // id -> precios y formatos operativos por canal
 let ventaProductosLista = []; // lista completa de productos, para el buscador
