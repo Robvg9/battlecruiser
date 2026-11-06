@@ -117,7 +117,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(sw, /\.\/js\/hotfix-secciones-visibles-20260903\.js\?v=20261030\.1/, "the sidebar visibility policy must be available in the offline shell");
   assert.match(app, /\["section-scope-fix\.js","20261030\.1"\]/);
   assert.match(app, /\["hotfix-pulido-20260903\.js","20261105\.4"\]/);
-  assert.match(app, /\["hotfix-pulido-20260903b\.js","20261105\.3"\]/);
+  assert.match(app, /\["hotfix-pulido-20260903b\.js","20261105\.2"\]/);
   assert.match(app, /\["hotfix-17-final-loader-20260903\.js","20261030\.2"\]/);
   assert.doesNotMatch(app, /\["hotfix-17-13-configuracion-admin-visible-20260903\.js"/, "the legacy config label helper must not participate in route visibility");
   assert.match(sw, /\.\/js\/hotfix-17-13-configuracion-admin-visible-20260903\.js\?v=20261030\.3/, "the label-only helper remains available to the offline shell");
@@ -126,7 +126,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.69["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261105\.4/);
-  assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.3/);
+  assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.2/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
   assert.doesNotMatch(app, /\["ui-ajustes-panel\.js","96\.2"\]/, "legacy settings drawer must not load with the Preferences tab");
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
