@@ -284,11 +284,20 @@
 
   function restoreTransferForm(current) {
     if (!current || !current.panel) return;
+    const form = current.panel.querySelector('#form-transferencia') ||
+      document.getElementById('form-transferencia');
+    const stockInfo = document.getElementById('trf-stock-disponible');
+    // The stock hint can be created lazily after the modal opens. If it had
+    // no original placeholder, put it inside the real form before removing
+    // the overlay so the next open/submit still has the same live node.
+    if (form && stockInfo && !current.transferStockInfoPlaceholder && !form.contains(stockInfo)) {
+      form.appendChild(stockInfo);
+    }
     restoreMovedNode(current, 'transferForm', current.panel);
     restoreMovedNode(current, 'transferStockInfo', current.panel);
     restoreMovedNode(current, 'transferMessage', current.panel);
-    const form = current.panel.querySelector('#form-transferencia');
-    if (form) form.classList.remove('bc165-transfer-form');
+    const restoredForm = current.panel.querySelector('#form-transferencia');
+    if (restoredForm) restoredForm.classList.remove('bc165-transfer-form');
   }
 
   function close(type, overlay) {
