@@ -61,7 +61,7 @@ function renderInventario(filas) {
     return;
   }
   // Totales/valoracion sobre TODAS las filas (estables, no dependen del filtro).
-  let totalValor = 0, totalUnidades = 0, agotados = 0, bajos = 0;
+  let totalValor = 0, agotados = 0, bajos = 0;
   filas.forEach((s) => {
     totalValor += Number(s.valor_inventario || 0);
     totalUnidades += Number(s.cantidad || 0);
@@ -88,9 +88,7 @@ function renderInventario(filas) {
       div.className = "rep-fila rep-estado-" + (s.estado || "normal");
       const icono = s.estado === "agotado" ? "\ud83d\udd34" : s.estado === "bajo" ? "\ud83d\udfe1" : "\ud83d\udfe2";
       // inventario_enriquecido usa COALESCE(..., 0) en el backend:
-      const costoTxt = valor > 0 ? "$" + money(s.costo_promedio || 0) : "\u2014";
-      const valorTxt = valor > 0 ? "$" + money(valor) : "\u2014";
-      div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (s.cantidad || 0) + " u (m\u00edn: " + (s.minimo != null ? s.minimo : "\u2014") + ') \u00b7 costo prom ' + costoTxt + " \u00b7 valor " + valorTxt + "</span></span>";
+                  div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(s.producto || "\u2014") + '</span><span class="muted">' + escHtml(s.almacen || "\u2014") + " \u00b7 " + (fmtNumNucleo(s.cantidad || 0)) + " u (m\u00edn: " + (s.minimo != null ? fmtNumNucleo(s.minimo) : "\u2014") + ")</span></span>";
       el.appendChild(div);
     });
   }
@@ -100,7 +98,6 @@ function renderInventario(filas) {
     }
     resumen.innerHTML =
       card("Valor inventario", "$" + money(totalValor)) +
-      card("Unidades", totalUnidades) +
       card("Agotados", agotados, "\ud83d\udd34") +
       card("Stock bajo", bajos, "\ud83d\udfe1");
   }
@@ -174,7 +171,7 @@ function renderMovimientos(filas) {
     const entrada = Number(m.cantidad) > 0;
     const icono = entrada ? "\u2b06\ufe0f" : "\u2b07\ufe0f";
     const costo = m.costo_unitario != null ? " \u00b7 $" + money(m.costo_unitario) + " c/u" : "";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(m.tipo || "\u2014") + '</span><span class="muted">' + escHtml(m.producto || "\u2014") + " \u00b7 " + escHtml(m.almacen || "\u2014") + " \u00b7 " + fmtNumNucleo(m.cantidad || 0) + " u" + costo + " \u00b7 " + escHtml(m.usuario || "\u2014") + " \u00b7 " + fecha + "</span></span>";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(m.tipo || "\u2014") + '</span><span class="muted">' + escHtml(m.producto || "\u2014") + " \u00b7 " + escHtml(m.almacen || "\u2014") + " \u00b7 " + fmtNumNucleofmtNumNucleo(m.cantidad || 0) + " u" + costo + " \u00b7 " + escHtml(m.usuario || "\u2014") + " \u00b7 " + fecha + "</span></span>";
     el.appendChild(div);
   });
   // Paginación simple.
@@ -212,7 +209,7 @@ function construirAlertasInventarioB6() {
       alertas.push({
         nivel: "atencion",
         tipo: "Stock bajo",
-        texto: escHtml((prod && prod.nombre) || "Producto") + " \u00b7 " + escHtml((alm && alm.nombre) || "\u2014") + " \u00b7 " + cant + " u (m\u00edn " + s.minimo + ")",
+        texto: escHtml((prod && prod.nombre) || "Producto") + " \u00b7 " + escHtml((alm && alm.nombre) || "\u2014") + " \u00b7 " + fmtNumNucleo(cant) + " u (m\u00edn " + fmtNumNucleo(s.minimo) + ")",
         op: null,
       });
     } else if (cant <= 0) {
