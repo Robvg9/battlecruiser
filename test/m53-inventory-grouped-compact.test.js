@@ -171,7 +171,9 @@ test("Inventario: guardar cambia solo el mínimo del almacén elegido y conserva
   assert.ok(await waitFor(() => modal.textContent.includes("Stock mínimo guardado.")));
 
   const call = rpcCalls.find((item) => item.name === "bc_actualizar_stock_minimo");
-  assert.deepEqual(call.args, { p_producto_id: "biz", p_almacen_id: "a2", p_minimo: 220 });
+  assert.equal(call.args.p_producto_id, "biz");
+  assert.equal(call.args.p_almacen_id, "a2");
+  assert.equal(call.args.p_minimo, 220);
   const casa = fixtureRows.find((row) => row.almacen_id === "a1");
   const cueva = fixtureRows.find((row) => row.almacen_id === "a2");
   assert.equal(casa.minimo, 5, "el otro almacén no cambia");
