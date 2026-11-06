@@ -3,6 +3,8 @@
 // (Módulo extraído de app.js — Misión de modularización. Mismo scope global, se carga como <script> clásico.)
 
 
+function fmtNumCC(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
 // ---- Lecturas: consultas directas a las tablas (protegidas por RLS/tiene_permiso).
 function setMsg(id, text, ok) {
   const el = document.getElementById(id);
@@ -213,7 +215,7 @@ function construirAvisosAdicionalesControl(ops) {
     avisos.push({
       nivel: "atencion",
       tipo: "Pendientes prolongados",
-      texto: prolongados.length + (prolongados.length === 1 ? " operación lleva más de 24 horas pendiente." : " operaciones llevan más de 24 horas pendientes."),
+      texto: fmtNumCC(prolongados.length) + (prolongados.length === 1 ? " operación lleva más de 24 horas pendiente." : " operaciones llevan más de 24 horas pendientes."),
       op: prolongados[0],
       tab: "pendientes",
     });
@@ -223,7 +225,7 @@ function construirAvisosAdicionalesControl(ops) {
     avisos.push({
       nivel: "atencion",
       tipo: "Transferencias pendientes",
-      texto: transferencias.length + (transferencias.length === 1 ? " transferencia en cola de sincronización." : " transferencias en cola de sincronización."),
+      texto: fmtNumCC(transferencias.length) + (transferencias.length === 1 ? " transferencia en cola de sincronización." : " transferencias en cola de sincronización."),
       op: transferencias[0],
       tab: "pendientes",
     });
