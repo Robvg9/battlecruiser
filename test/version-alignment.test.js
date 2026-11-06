@@ -100,8 +100,8 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 
 
 test('movement operation modal cache key is refreshed for the race fix', () => {
-  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.9"\]/);
-  assert.match(sw, /\.\/js\/hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
+  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.10"\]/);
+  assert.match(sw, /\.\/js\/hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.10/);
 });
 
 
@@ -237,8 +237,8 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
 
 
 test('Step 4 modal and Turnos layout invalidate their production cache keys', () => {
-  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.9"\]/);
-  assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.9/);
+  assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.10"\]/);
+  assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.10/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
   assert.match(app, /const VERSION=["']9\.5\.71["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.71["']/);
