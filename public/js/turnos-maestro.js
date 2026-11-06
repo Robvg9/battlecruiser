@@ -26,7 +26,9 @@
         });
   }
 
-  function money(v) {
+  function fmtNumTurno(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
+
+function money(v) {
     return typeof window.money === 'function' ? window.money(Number(v || 0)) : Number(v || 0).toFixed(2);
   }
 
@@ -348,7 +350,7 @@
       }).join('');
     }
     if (state.isAdmin && cancelledSessions.length) {
-      sesHtml += '<p class="muted">Bloques antiguos no trabajados cancelados: ' + cancelledSessions.length +
+      sesHtml += '<p class="muted">Bloques antiguos no trabajados cancelados: ' + fmtNumTurno(cancelledSessions.length) +
         '. Sus asignaciones y eventos se conservan en el expediente; no requieren declaración de efectivo.</p>';
     }
 
@@ -761,7 +763,7 @@
             '</td><td>' + esc(row.__sessionLabel || '—') +
             '</td><td>' + esc(label(row.tipo)) +
             '</td><td>' + esc(row.producto || '—') +
-            '</td><td>' + esc(row.cantidad == null ? '—' : row.cantidad) +
+            '</td><td>' + esc(row.cantidad == null ? '—' : fmtNumTurno(row.cantidad)) +
             '</td><td>' + esc(row.usuario || '—') +
             '</td><td>' + esc(shortRef) + '</td></tr>';
         }).join('');
