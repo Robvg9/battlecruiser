@@ -138,7 +138,6 @@ function renderPanelAlmacenSeleccionado() {
     else if (s.minimo != null && cant <= Number(s.minimo)) bajoMin++;
   });
   const activo = a.activo !== false;
-  const fmtQtyAlmacen = (v) => typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v);
   const fmtQty = (v) => typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v);
   panel.innerHTML =
     '<div class="alm-info-grid">' +
