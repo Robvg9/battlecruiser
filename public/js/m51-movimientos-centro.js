@@ -583,6 +583,15 @@
 
   function paint() {
     ensureShell(); renderChips(); renderResumen(); renderLista(); renderDrawer();
+    // Publish the complete, paginated result assembled by movimientos_producto.
+    // M76 renders operation-level cards from this snapshot, never from one RPC page.
+    window.__BC_M51_ROWS__ = _allRows.slice();
+    window.__BC_M51_HISTORY_TRUNCATED__ = !!_historyTruncated;
+    try {
+      window.dispatchEvent(new CustomEvent('bc:m51-rows', {
+        detail: { rows: window.__BC_M51_ROWS__, historyTruncated: window.__BC_M51_HISTORY_TRUNCATED__ }
+      }));
+    } catch (_) {}
   }
 
   function prepararNavegacionDesdeResumen() {
