@@ -740,6 +740,8 @@
         if (!['stock', 'inventory', 'products', 'categories', 'warehouses'].some(function (domain) {
           return domains.indexOf(domain) >= 0;
         })) return;
+        const inventoryTab = document.getElementById('tab-inventario');
+        if (!inventoryTab || !inventoryTab.classList.contains('visible')) return;
         if (detail.offline || !navigator.onLine) { paint(); return; }
         window.clearTimeout(refreshTimer);
         refreshTimer = window.setTimeout(function () {
