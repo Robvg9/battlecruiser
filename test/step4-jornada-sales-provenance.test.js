@@ -112,7 +112,7 @@ test("Jornada finance shows actual cash declaration/count separately from paymen
   assert.match(APP, /\["venta-turno-ui\.js","9\.4\.46"\]/);
   assert.match(APP, /\["m27-6b-venta-payload-pres\.js","27\.6b2"\]/);
   assert.match(SW, /BC_SW_VERSION = "9.5.69"/);
-  assert.match(SW, /ventas\.js\?v=20261105\.1/);
+  assert.match(SW, /ventas\.js\?v=20261105\.2/);
   assert.match(SW, /m68-ventas-pos-definitivo\.js\?v=9.5.69/);
   assert.match(SW, /venta-turno-ui\.js\?v=9\.4\.46/);
   assert.match(SW, /m27-6b-venta-payload-pres\.js\?v=27\.6b2/);
