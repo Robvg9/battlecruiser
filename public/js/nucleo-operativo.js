@@ -169,7 +169,7 @@ function renderMovimientos(filas) {
     const entrada = Number(m.cantidad) > 0;
     const icono = entrada ? "\u2b06\ufe0f" : "\u2b07\ufe0f";
     const costo = m.costo_unitario != null ? " \u00b7 $" + money(m.costo_unitario) + " c/u" : "";
-    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(m.tipo || "\u2014") + '</span><span class="muted">' + escHtml(m.producto || "\u2014") + " \u00b7 " + escHtml(m.almacen || "\u2014") + " \u00b7 " + fmtNumNucleofmtNumNucleo(m.cantidad || 0) + " u" + costo + " \u00b7 " + escHtml(m.usuario || "\u2014") + " \u00b7 " + fecha + "</span></span>";
+    div.innerHTML = '<span class="rep-fila-principal"><span class="cc-asunto-tipo">' + icono + " " + escHtml(m.tipo || "\u2014") + '</span><span class="muted">' + escHtml(m.producto || "\u2014") + " \u00b7 " + escHtml(m.almacen || "\u2014") + " \u00b7 " + fmtNumNucleo(m.cantidad || 0) + " u" + costo + " \u00b7 " + escHtml(m.usuario || "\u2014") + " \u00b7 " + fecha + "</span></span>";
     el.appendChild(div);
   });
   // Paginación simple.
