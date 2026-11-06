@@ -192,7 +192,7 @@ safeInit("form-vale", () => {
       setMsg("msg-vales", "La cantidad debe ser mayor a 0.", false);
       return;
     }
-    if (!window.confirm("¿Confirmar vale de salida (" + tipo + ") por " + cantidad + " unidades? Esto descuenta stock real.")) {
+    if (!window.confirm("¿Confirmar vale de salida (" + tipo + ") por " + fmtNumVenta(cantidad) + " unidades? Esto descuenta stock real.")) {
       return;
     }
 
