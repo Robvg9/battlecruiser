@@ -769,6 +769,9 @@ safeInit("form-producto", () => {
     }
     setMsg("msg-productos", estabaEditando ? "Producto actualizado." : "Producto creado.", true);
     await refrescarProductos();
+    if (typeof window.bcNotificarCambioDatos === "function") {
+      window.bcNotificarCambioDatos(estabaEditando ? "producto_actualizar" : "producto", false);
+    }
   });
 });
 
