@@ -51,14 +51,35 @@
     var s = document.createElement('style');
     s.id = 'bc-compras-flow-style';
     s.textContent = [
-      '#tab-compras .compra-flow-banner{margin:0 0 14px;padding:12px 14px;border-radius:10px;border:1px solid rgba(201,162,77,.28);background:rgba(12,28,24,.55)}',
-      '#tab-compras .compra-flow-banner strong{color:var(--gold,#c9a24d)}',
-      '#tab-compras .compra-flow-banner p{margin:4px 0 0;font-size:12.5px;color:var(--mist);line-height:1.4}',
-      '#tab-compras .compra-cabecera{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}',
-      '@media(max-width:800px){#tab-compras .compra-cabecera{grid-template-columns:1fr}}',
-      '#tab-compras .compra-linea-editor{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}',
-      '#tab-compras .compra-resumen-box{margin:12px 0;padding:12px;border:1px solid var(--gold-dim,#c9a24d33);border-radius:10px;background:var(--stone)}',
-      '#tab-compras .compra-resumen-box .row{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin:4px 0}',
+      '#bc165-overlay .bc165-modal{width:min(760px,100%);max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box;padding:12px}',
+      '#bc165-overlay .bc165-head{position:sticky;top:-12px;z-index:5;margin:0 0 8px;padding:0 0 8px;background:var(--stone);border-bottom:1px solid var(--gold-dim)}',
+      '#bc165-overlay .bc165-head h3{font-size:16px;line-height:1.2}',
+      '#bc165-overlay #tab-compras{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}',
+      '#tab-compras .compra-multiple-panel,#tab-compras .seccion-principal{width:100%;max-width:none;margin:0!important;padding:0!important;min-width:0;box-sizing:border-box}',
+      '#tab-compras .compra-cabecera{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:7px 8px;margin:0 0 8px}',
+      '#tab-compras .compra-cabecera>div{min-width:0;margin:0}',
+      '#tab-compras .compra-cabecera>div:nth-child(1){grid-column:1;grid-row:1}',
+      '#tab-compras .compra-cabecera>div:nth-child(3){grid-column:2;grid-row:1}',
+      '#tab-compras .compra-cabecera>div:nth-child(2){grid-column:1/-1;grid-row:2}',
+      '#tab-compras .compra-cabecera label{display:block;margin:0 0 3px;font-size:11px;line-height:1.2}',
+      '#tab-compras .compra-cabecera input,#tab-compras .compra-cabecera select{width:100%;min-width:0;min-height:36px;height:36px;margin:0;padding:7px 9px;font-size:13px;box-sizing:border-box}',
+      '#tab-compras .compra-subtitulo{margin:8px 0 5px;font-size:14px;line-height:1.2}',
+      '#tab-compras .compra-linea-editor{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(82px,.7fr) minmax(96px,.8fr) auto;gap:6px;align-items:center;margin:0 0 4px}',
+      '#tab-compras .compra-linea-editor select,#tab-compras .compra-linea-editor input{width:100%;min-width:0;height:38px;min-height:38px;margin:0;padding:7px 8px;font-size:12px;box-sizing:border-box}',
+      '#tab-compras #compra-multiple-add{height:38px;min-height:38px;margin:0;padding:7px 10px;white-space:nowrap;font-size:12px}',
+      '#tab-compras #compra-multiple-pres-ayuda{margin:4px 0 6px;font-size:10.5px;line-height:1.25}',
+      '#tab-compras #compra-multiple-lineas{margin:6px 0 0;padding:0;border:0}',
+      '#tab-compras #compra-multiple-lineas .lista-estado{margin:5px 0;font-size:11px}',
+      '#tab-compras #compra-multiple-lineas .lista-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center;margin:0!important;padding:7px 9px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--void);font-size:12px}',
+      '#tab-compras #compra-multiple-lineas .lista-item .muted{font-size:10.5px;line-height:1.25}',
+      '#tab-compras #compra-multiple-lineas .lista-item button{min-height:30px;padding:5px 8px;font-size:11px}',
+      '#tab-compras .compra-resumen-box{margin:7px 0 5px;padding:8px 10px;border:1px solid var(--gold-dim,#c9a24d33);border-radius:8px;background:var(--stone)}',
+      '#tab-compras .compra-resumen-box .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0;font-size:12px;line-height:1.25}',
+      '#tab-compras .compra-footer{position:sticky;bottom:-12px;z-index:4;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.6fr);gap:8px;margin:7px 0 0;padding:8px 0 0;background:var(--stone);border-top:1px solid var(--gold-dim)}',
+      '#tab-compras .compra-footer button{width:100%;min-height:38px;margin:0;padding:8px 10px;font-size:12px}',
+      '#tab-compras #compra-multiple-msg{margin:6px 0 0;font-size:11px;line-height:1.3}',
+      '@media(max-width:720px){#bc165-overlay .bc165-modal{width:100%;max-width:100%;padding:10px}#bc165-overlay .bc165-head{top:-10px}#tab-compras .compra-linea-editor{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:6px}#tab-compras .compra-linea-editor #compra-multiple-add{grid-column:1/-1}}',
+      '@media(max-width:380px){#tab-compras .compra-cabecera{grid-template-columns:minmax(0,1fr)}#tab-compras .compra-cabecera>div:nth-child(1),#tab-compras .compra-cabecera>div:nth-child(2),#tab-compras .compra-cabecera>div:nth-child(3){grid-column:1;grid-row:auto}#tab-compras .compra-linea-editor{grid-template-columns:minmax(0,1fr)}#tab-compras .compra-linea-editor>*{grid-column:1!important}}'
     ].join('');
     document.head.appendChild(s);
   }
@@ -77,45 +98,34 @@
     section.id = 'tab-compras';
     section.className = 'tab-panel';
     section.innerHTML =
-      '<div class="compra-flow-banner">' +
-        '<strong>Compra de proveedor</strong>' +
-        '<p>Mercancía que entra desde un proveedor al stock de un almacén. ' +
-        'No es una transferencia entre almacenes (eso está en <em>Transferencias</em>).</p>' +
-      '</div>' +
       '<div class="seccion-cuerpo compra-multiple-panel">' +
         '<div class="seccion-principal">' +
-          '<h2>Registrar compra</h2>' +
-          '<p class="muted">Proveedor → BattleCruiser → almacén destino. Podés agregar varias líneas y confirmar una sola vez.</p>' +
           '<div class="inline-form compra-cabecera">' +
             '<div><label class="muted" for="compra-multiple-almacen">Almacén destino</label>' +
-            '<select id="compra-multiple-almacen" required><option value="">Almacén de destino</option></select></div>' +
-            '<div><label class="muted" for="compra-multiple-proveedor">Proveedor</label>' +
-            '<input id="compra-multiple-proveedor" placeholder="Nombre del proveedor (opcional)"></div>' +
+            '<select id="compra-multiple-almacen" required><option value="">Seleccionar almacén</option></select></div>' +
+            '<div><label class="muted" for="compra-multiple-proveedor">Proveedor <span class="muted">(opcional)</span></label>' +
+            '<input id="compra-multiple-proveedor" placeholder="Nombre del proveedor"></div>' +
             '<div><label class="muted" for="compra-multiple-fecha">Fecha</label>' +
             '<input id="compra-multiple-fecha" type="datetime-local"></div>' +
           '</div>' +
-          '<h3>Líneas de la compra</h3>' +
+          '<h3 class="compra-subtitulo">Agregar productos</h3>' +
           '<div class="inline-form compra-linea-editor">' +
-            '<select id="compra-multiple-producto"><option value="">Producto</option></select>' +
-            '<select id="compra-multiple-presentacion"><option value="">Unidad / presentación</option></select>' +
-            '<input id="compra-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad">' +
-            '<input id="compra-multiple-costo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Costo">' +
-            '<button type="button" id="compra-multiple-add">+ Agregar</button>' +
+            '<select id="compra-multiple-producto" aria-label="Producto"><option value="">Producto</option></select>' +
+            '<select id="compra-multiple-presentacion" aria-label="Unidad o presentación"><option value="">Unidad base</option></select>' +
+            '<input id="compra-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad">' +
+            '<input id="compra-multiple-costo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Costo" aria-label="Costo por unidad o presentación">' +
+            '<button type="button" id="compra-multiple-add">+ Añadir</button>' +
           '</div>' +
-          '<p id="compra-multiple-pres-ayuda" class="muted">Elegí presentación (caja, paquete…) o unidad base. El costo es por la unidad elegida.</p>' +
+          '<p id="compra-multiple-pres-ayuda" class="muted">El costo corresponde a la unidad o presentación seleccionada.</p>' +
           '<div id="compra-multiple-lineas" class="lista"></div>' +
           '<div class="compra-resumen-box" id="compra-multiple-resumen">' +
-            '<div class="row"><span>Líneas</span><strong id="compra-multiple-n-lineas">0</strong></div>' +
-            '<div class="row"><span>Total compra</span><strong id="compra-multiple-total">$0.00</strong></div>' +
+            '<div class="row"><span id="compra-multiple-n-lineas">0 líneas</span><strong>Total · <span id="compra-multiple-total">$0.00</span></strong></div>' +
           '</div>' +
-          '<div class="btn-row">' +
-            '<button type="button" id="compra-multiple-confirmar">Confirmar compra</button>' +
+          '<div class="btn-row compra-footer">' +
+            '<button type="button" id="compra-multiple-confirmar">Registrar compra</button>' +
             '<button type="button" id="compra-multiple-limpiar" class="cc-accion">Limpiar</button>' +
           '</div>' +
-          '<p id="compra-multiple-msg" class="msg"></p>' +
-          '<div class="rule-orn" style="margin:18px 0"></div>' +
-          '<h3>Últimas compras</h3>' +
-          '<div id="compra-multiple-historial" class="lista"><p class="lista-estado muted">Se actualiza al abrir esta pestaña.</p></div>' +
+          '<p id="compra-multiple-msg" class="msg" role="status" aria-live="polite"></p>' +
         '</div>' +
       '</div>';
     main.appendChild(section);
@@ -133,7 +143,6 @@
     var nLineas = document.getElementById('compra-multiple-n-lineas');
     var confirmar = document.getElementById('compra-multiple-confirmar');
     var limpiar = document.getElementById('compra-multiple-limpiar');
-    var historialEl = document.getElementById('compra-multiple-historial');
     var lineas = [];
     var presActual = [];
 
@@ -197,7 +206,7 @@
         : '<p class="lista-estado">Todavía no hay productos en esta compra.</p>';
       var tot = lineas.reduce(function(s, l){ return s + l.cantidad_documento * l.costo; }, 0);
       total.textContent = '$' + moneyLocal(tot);
-      if (nLineas) nLineas.textContent = String(lineas.length);
+      if (nLineas) nLineas.textContent = lineas.length + (lineas.length === 1 ? ' línea' : ' líneas');
     }
 
     function add(){
@@ -237,44 +246,6 @@
       costo.value = '';
       msg('', true);
       render();
-    }
-
-    async function cargarHistorial(){
-      if (!historialEl) return;
-      historialEl.innerHTML = '<p class="lista-estado">Cargando historial…</p>';
-      try {
-        if (!navigator.onLine) {
-          historialEl.innerHTML = '<p class="lista-estado">Sin conexión: el historial de compras requiere red.</p>';
-          return;
-        }
-        var res = await client.from('compras')
-          .select('id, fecha, total, proveedor, almacenes(nombre)')
-          .order('fecha', { ascending: false })
-          .limit(15);
-        if (res.error) {
-          // Tabla puede no estar expuesta por RLS: degradar sin romper
-          historialEl.innerHTML = '<p class="lista-estado muted">Historial no disponible en este dispositivo.</p>';
-          return;
-        }
-        var rows = res.data || [];
-        if (!rows.length) {
-          historialEl.innerHTML = '<p class="lista-estado">Todavía no hay compras registradas.</p>';
-          return;
-        }
-        historialEl.innerHTML = '';
-        rows.forEach(function(c){
-          var div = document.createElement('div');
-          div.className = 'lista-item';
-          var alm = c.almacenes && c.almacenes.nombre ? c.almacenes.nombre : '—';
-          var prov = c.proveedor || 'Sin proveedor';
-          var fec = c.fecha && typeof fechaCorta === 'function' ? fechaCorta(c.fecha) : (c.fecha || '');
-          div.innerHTML = '<span>' + esc(prov) + ' <span class="muted">· ' + esc(alm) + '</span></span>' +
-            '<span class="muted">' + esc(fec) + ' · $' + moneyLocal(c.total) + '</span>';
-          historialEl.appendChild(div);
-        });
-      } catch (e) {
-        historialEl.innerHTML = '<p class="lista-estado muted">No se pudo cargar el historial.</p>';
-      }
     }
 
     function mapLineasPayload(){
@@ -318,7 +289,6 @@
           } else {
             msg('✓ Compra registrada. Stock actualizado.', true);
             if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
-            await cargarHistorial();
           }
           return;
         }
@@ -345,7 +315,6 @@
           render();
           msg('✓ Compra registrada. Stock actualizado.', true);
           if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
-          await cargarHistorial();
           return;
         }
 
@@ -391,7 +360,6 @@
         render();
         msg('✓ Compra registrada (línea a línea). Stock actualizado.', true);
         if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
-        await cargarHistorial();
       }
     }
 
@@ -430,10 +398,9 @@
       poblar();
       render();
       if (producto.value) await cargarPresentaciones();
-      await cargarHistorial();
     }
     // La única entrada visible es Movimientos → Nueva compra.
-    // El modal llama este hook cada vez que abre el panel para cargar catálogos e historial.
+    // El modal llama este hook al abrir para cargar solo los catálogos del formulario.
     window.__BC_COMPRAS_ACTIVAR = cargarDatosYRender;
 
     poblar();
