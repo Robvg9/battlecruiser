@@ -538,7 +538,7 @@ if (!window.__BC_ALMACENES_DATA_EVENTS__) {
   let warehouseRefreshTimer = null;
   window.addEventListener("bc:data-changed", function (event) {
     const detail = event.detail || {};
-    if (detail.offline || !detail.remote) return;
+    if (detail.offline) return;
     const domains = detail.domains || [];
     if (!domains.includes("warehouses") && !domains.includes("stock")) return;
     const tab = document.getElementById("tab-almacenes");
