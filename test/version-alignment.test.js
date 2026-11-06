@@ -106,8 +106,15 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(multiAt < modalAt, 'the multi-transfer module must load before the modal');
   assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261106.1'));
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.11'));
+  assert.ok(app.includes('["m51-movimientos-centro.js","51.7"]'), 'M51 must load the refreshed data-change listener');
+  assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.7"), 'the offline shell must precache the refreshed movement listener');
+  assert.ok(app.includes('["inventario-detalle.js","65"]'), 'the minimum editor must refresh');
+  assert.ok(sw.includes("./js/inventario-detalle.js?v=65"), 'the offline shell must precache the updated minimum editor');
+  assert.ok(index.includes('js/productos.js?v=20261106.1'), 'the product view must refresh its category subscriber');
+  assert.ok(index.includes('js/almacenes.js?v=20261106.1'), 'the warehouse view must refresh its tab subscriber');
+  assert.ok(sw.includes("./js/productos.js?v=20261106.1"), 'the product view must refresh offline');
+  assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
 });
-
 
 // PWA 9.5.72 rotates the shell cache and keeps the M68 fallback aligned.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
