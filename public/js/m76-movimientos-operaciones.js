@@ -6,7 +6,7 @@
 
   const PAGE_SIZE = 40;
   const TZ = 'America/Havana';
-  const state = { rows: [], operations: [], page: 0, selected: null, trigger: null, installed: false };
+  const state = { rows: [], operations: [], page: 0, selected: null, trigger: null, installed: false, historyTruncated: false };
 
   function text(value) { return String(value == null ? '' : value); }
   function esc(value) {
@@ -76,9 +76,10 @@
       const actor = text(row && (row.usuario_id || row.usuario || row.usuario_nombre)).trim();
       const place = kind === 'transferencia' ? 'transferencia' : text(row && (row.almacen_id || warehouseOf(row))).trim();
       // Prefer the real transaction identifier. Fallback groups only equal timestamp/actor/location.
-      const key = ref ? kind + '|ref|' + ref
-        : timestamp && (actor || place) ? kind + '|fallback|' + timestamp + '|' + actor + '|' + place
-        : kind + '|row|' + index;
+      // Only merge rows when the backend supplies the same transaction ID.
+      // Never infer a transaction from matching timestamps/users: distinct operations
+      // can happen at the same time and must remain separate in the history.
+      const key = ref ? kind + '|ref|' + ref : kind + '|row|' + index;
       if (!grouped.has(key)) {
         grouped.set(key, { key, reference: ref, kind, rows: [], fecha: row && row.fecha || '', usuario: text(row && (row.usuario || row.usuario_nombre)) || '—' });
       }
@@ -352,6 +353,9 @@
       });
       list.innerHTML = html;
     }
+    if (state.historyTruncated) {
+      list.insertAdjacentHTML('beforeend', '<div class="bc-m51-empty" role="status">Se alcanzó el límite de seguridad de 5.000 registros. Reduce el rango de fechas para consultar todo el historial.</div>');
+    }
     const totalPages = Math.max(1, Math.ceil(state.operations.length / PAGE_SIZE));
     pagination.innerHTML = '<button type="button" data-bc-m76-page="-1" aria-label="Página anterior" title="Anterior"' +
       (state.page <= 0 ? ' disabled' : '') + '>‹</button><span class="muted">Página ' + (state.page + 1) + ' / ' + totalPages +
@@ -540,26 +544,25 @@
       wrapped.__bcM76Wrapped = true;
       window.renderMovimientos = wrapped;
     }
-    const client = window.client;
-    if (client && typeof client.rpc === 'function' && !client.rpc.__bcM76Wrapped) {
-      const originalRpc = client.rpc;
-      const wrappedRpc = function (name) {
-        const result = originalRpc.apply(this, arguments);
-        if (name !== 'movimientos_producto' || !result || typeof result.then !== 'function') return result;
-        return result.then(function (response) {
-          if (response && !response.error && Array.isArray(response.data)) scheduleRender(response.data);
-          return response;
-        });
-      };
-      wrappedRpc.__bcM76Wrapped = true;
-      try { client.rpc = wrappedRpc; } catch (_) {}
+    if (!window.__BC_M76_M51_ROWS_BOUND__) {
+      window.__BC_M76_M51_ROWS_BOUND__ = true;
+      window.addEventListener('bc:m51-rows', function (event) {
+        const detail = event && event.detail || {};
+        if (Array.isArray(detail.rows)) {
+          state.rows = detail.rows.slice();
+          state.historyTruncated = !!detail.historyTruncated;
+          state.page = 0;
+          if (installUi()) renderOperations();
+        }
+      });
     }
   }
 
   function boot() {
     injectStyles();
     setupGlobalIcons(document);
-    if (Array.isArray(window.__BC_M52_LAST_ROWS)) state.rows = window.__BC_M52_LAST_ROWS.slice();
+    if (Array.isArray(window.__BC_M51_ROWS__)) state.rows = window.__BC_M51_ROWS__.slice();
+    state.historyTruncated = !!window.__BC_M51_HISTORY_TRUNCATED__;
     hookData();
     installUi();
     // M51/M52 initialize during the same dynamic module sequence; retry a few times
