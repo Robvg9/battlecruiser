@@ -40,6 +40,28 @@ CREATE TRIGGER bc_seed_mixed_variant_minimum
 AFTER INSERT OR UPDATE OF producto_id,almacen_id,minimo ON public.stock
 FOR EACH ROW EXECUTE FUNCTION public.bc_seed_mixed_variant_minimum();
 
+CREATE OR REPLACE FUNCTION public.bc_require_positive_stock_minimum()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $minimum_guard$
+BEGIN
+  IF NEW.cantidad > 0 AND coalesce(NEW.minimo,0) <= 0 THEN
+    RAISE EXCEPTION 'Antes de mover existencias, configura un stock mínimo mayor que cero para este producto y almacén.'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END;
+$minimum_guard$;
+
+DROP TRIGGER IF EXISTS bc_require_positive_stock_minimum ON public.stock;
+CREATE TRIGGER bc_require_positive_stock_minimum
+BEFORE INSERT OR UPDATE OF cantidad ON public.stock
+FOR EACH ROW EXECUTE FUNCTION public.bc_require_positive_stock_minimum();
+
+REVOKE ALL ON FUNCTION public.bc_require_positive_stock_minimum() FROM PUBLIC,anon;
+
 CREATE OR REPLACE FUNCTION public.bc_actualizar_stock_minimo_obligatorio(
   p_producto_id uuid,
   p_almacen_id uuid,
