@@ -173,8 +173,8 @@
     });
   }
 
-  async function openMerma() {
-    if (!requireCrear('mermas')) return;
+  async function openBaja() {
+    if (!requireCrear('bajas')) return;
     await ensureOperationCatalogs();
     openModal({
       icon: '📦', title: 'Registrar baja', submitText: 'Enviar a revisión',
@@ -205,7 +205,7 @@
         syncOther();
       },
       onSubmit: async function (setMsg) {
-        if (!requireCrear('mermas')) { setMsg('Sin permiso para registrar mermas.', false); throw new Error('permiso'); }
+        if (!requireCrear('bajas')) { setMsg('Sin permiso para registrar bajas.', false); throw new Error('permiso'); }
         var alm = document.getElementById('op-m-alm').value;
         var prod = document.getElementById('op-m-prod').value;
         var cant = Number(document.getElementById('op-m-cant').value);
@@ -213,7 +213,7 @@
         var otro = document.getElementById('op-m-otro');
         var motivo = motivoSeleccionado === 'Otro' ? ('Otro: ' + String(otro && otro.value || '').trim()) : motivoSeleccionado;
         if (!alm || !prod || !(cant > 0) || !motivo || (motivoSeleccionado === 'Otro' && !(otro && otro.value.trim()))) { setMsg('Completa almacén, producto, cantidad y motivo.', false); throw new Error('validación'); }
-        await rpc('crear_merma', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
+        await rpc('crear_baja', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
         setMsg('✓ Solicitud enviada a revisión.', true);
         if (typeof refrescarAprobacionesAdmin === 'function') refrescarAprobacionesAdmin();
         if (typeof refrescarFinanzas === 'function') refrescarFinanzas();
@@ -415,8 +415,8 @@
     if (can('gastos', 'ver') && can('gastos', 'crear')) {
       cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
     }
-    if (can('mermas', 'ver') && can('mermas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Productos que salen del inventario por pérdida, daño o consumo interno.', go: 'Registrar baja', fn: openMerma });
+    if (can('bajas', 'ver') && can('bajas', 'crear')) {
+      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Productos que salen del inventario por pérdida, daño o consumo interno.', go: 'Registrar baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
@@ -428,8 +428,8 @@
     if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
       cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
     }
-    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
-      cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, merma y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
+    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
+      cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, baja y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
     }
     return cards;
   }
