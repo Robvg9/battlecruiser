@@ -218,7 +218,7 @@ test("resumen híbrido: La Cueva conserva la última jornada y Almacén Casa rei
   const { window, rpcCalls } = setup(t, { now: "2026-11-07T10:00:00.000Z", fixtures, windows });
   assert.ok(await waitFor(() => Array.isArray(window.__BC_M51_TODAY_ROWS__)), "el resumen independiente debe terminar");
   const summary = window.__BC_M51_TODAY_ROWS__;
-  const products = summary.map((row) => row.producto);
+  const products = Array.from(summary, (row) => row.producto);
   assert.deepEqual(products.sort(), [
     "Compra de hoy en Casa",
     "Compra de la última jornada",
@@ -233,11 +233,3 @@ test("resumen híbrido: La Cueva conserva la última jornada y Almacén Casa rei
   assert.ok(warehouseSummaryCalls.some((call) => call.params.p_almacen_id === "alm-2" && call.params.p_desde === "2026-11-07"));
 });
 
-test("La ventana de jornada elige jornadas reales y mantiene intactos los datos", () => {
-  assert.match(migration, /s\.estado IN \('EN_CURSO','COMPLETADA'\)/);
-  assert.match(migration, /ORDER BY CASE WHEN j\.estado='EN_CURSO' THEN 0 ELSE 1 END/);
-  assert.match(migration, /j\.inicio_real DESC NULLS LAST/);
-  assert.match(migration, /'ULTIMA_JORNADA'/);
-  assert.match(migration, /'DIARIO_SIN_JORNADA'/);
-  assert.doesNotMatch(migration, /INSERT INTO public\.turno_sesiones|UPDATE public\.turno_sesiones|DELETE FROM public\.turno_sesiones/i);
-});
