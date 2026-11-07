@@ -32,6 +32,9 @@ test("approval UI renders Bajas and updates the control-center badge from the sa
   assert.match(ui, /listar_aprobaciones_admin/);
   assert.match(ui, /p_tipo:x\.tipo/);
   assert.match(ui, /Baja pendiente/);
+  assert.match(ui, /Registrar y aprobar Baja/);
+  assert.match(ui, /Baja autoaprobada\. El stock y FIFO ya fueron actualizados/);
+  assert.match(ui, /Las bajas se aprueban automáticamente/);
   assert.match(ui, /bcActualizarBadgeAprobacionesAdmin/);
   assert.match(center, /_bcAprobacionesAdminPendientes/);
   assert.match(center, /criticosNoVistos \+ _bcAprobacionesAdminPendientes/);
