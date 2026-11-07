@@ -79,8 +79,9 @@ test("Paso 4: los botones Nueva Transferencia y Nueva Compra se montan en Movimi
   assert.equal(window.__BC165_verify().purchaseTabHidden, true, "Compras debe abrirse desde Movimientos y no como pestaña independiente");
   assert.equal(window.document.querySelector('.tab-btn[data-tab="compras"]'), null);
   const css = window.document.getElementById("bc165-css").textContent;
-  assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(css, /flex-wrap:wrap/);
+  assert.match(css, /\.bc165-actions\{display:flex/);
+  assert.match(css, /flex:0 0 auto/);
+  assert.doesNotMatch(css, /\.bc165-actions\{[^}]*flex:1 0 100%/);
   assert.match(css, /#tab-transferencias/);
   assert.match(css, /#tab-compras/);
 });

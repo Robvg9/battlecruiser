@@ -199,8 +199,8 @@
     const sheet = document.createElement('style');
     sheet.id = 'bc165-css';
     sheet.textContent =
-      '.bc165-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;width:100%;min-width:0;box-sizing:border-box;gap:8px;margin:8px 0 0}' +
-      '.bc165-action{display:inline-flex;align-items:center;justify-content:center;height:48px;min-height:48px;min-width:48px;width:48px;box-sizing:border-box;padding:0;white-space:nowrap;line-height:1.3;background:var(--stone-2);color:var(--gold-bright);border:1px solid var(--gold-dim);border-radius:50%;cursor:pointer;font-size:12.5px;font-weight:600}' +
+      '.bc165-actions{display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto;width:auto;min-width:0;box-sizing:border-box;gap:6px;margin:0 0 0 auto}' +
+      '.bc165-action{display:inline-flex;align-items:center;justify-content:center;height:42px;min-height:42px;min-width:42px;width:42px;box-sizing:border-box;padding:0;white-space:nowrap;line-height:1.3;background:var(--stone-2);color:var(--gold-bright);border:1px solid var(--gold-dim);border-radius:50%;cursor:pointer;font-size:12.5px;font-weight:600}' +
       '.bc165-action svg{width:21px;height:21px;display:block}.bc165-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}' +
       '.bc165-action:hover{border-color:var(--gold);color:var(--gold-bright)}' +
       '.bc165-overlay{position:fixed;inset:0;z-index:9400;background:rgba(6,14,11,.82);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}' +
@@ -218,9 +218,9 @@
       '.bc165-panel-host>.tab-panel{display:block!important;visibility:visible!important;position:static!important;margin:0!important;max-width:none!important}' +
       '.bc165-overlay #tab-transferencias,.bc165-overlay #tab-compras{display:block!important;visibility:visible!important;opacity:1!important;position:static!important;margin:0!important;max-width:none!important;min-width:0!important;width:100%!important;box-sizing:border-box!important}' +
       '.bc165-overlay #tab-transferencias input,.bc165-overlay #tab-transferencias select,.bc165-overlay #tab-transferencias button,.bc165-overlay #tab-compras input,.bc165-overlay #tab-compras select,.bc165-overlay #tab-compras button{pointer-events:auto!important;position:relative;z-index:2}' +
-      '#tab-movimientos.bc-m51 .bc-m51-hero{display:flex;flex-wrap:wrap;align-items:flex-start;min-width:0;max-width:100%;box-sizing:border-box}' +
-      '#tab-movimientos.bc-m51 .bc-m51-hero>*{min-width:0;max-width:100%;box-sizing:border-box}#tab-movimientos.bc-m51 .bc165-actions{flex:1 0 100%;width:100%;min-width:0}' +
-      '@media(max-width:640px){#tab-movimientos.bc-m51 .bc165-actions{grid-template-columns:repeat(2,minmax(0,1fr));justify-items:start}.bc165-overlay{padding:8px}.bc165-modal{width:100%;max-width:100%;box-sizing:border-box;padding:12px;margin:8px auto}#bc165-overlay #form-transferencia.bc165-transfer-form{grid-template-columns:minmax(0,1fr);gap:10px}}' +
+      '#tab-movimientos.bc-m51 .bc-m51-hero{display:flex;flex-wrap:nowrap;align-items:center;gap:9px;min-width:0;max-width:100%;box-sizing:border-box}' +
+      '#tab-movimientos.bc-m51 .bc-m51-hero>*{min-width:0;max-width:100%;box-sizing:border-box}#tab-movimientos.bc-m51 .bc-m51-hero>div:first-child{flex:1 1 auto}#tab-movimientos.bc-m51 .bc-m51-hero h3{font-size:clamp(1.05rem,4vw,1.55rem);line-height:1.05}#tab-movimientos.bc-m51 .bc165-actions{flex:0 0 auto;width:auto;min-width:0}' +
+      '@media(max-width:640px){#tab-movimientos.bc-m51 .bc165-actions{gap:5px}.bc165-overlay{padding:8px}.bc165-modal{width:100%;max-width:100%;box-sizing:border-box;padding:12px;margin:8px auto}#bc165-overlay #form-transferencia.bc165-transfer-form{grid-template-columns:minmax(0,1fr);gap:10px}}' +
       '.bc165-modal .bc-m51,.bc165-modal .bc-m51 *{max-width:none}.bc165-placeholder{display:none!important}';
     document.head.appendChild(sheet);
   }

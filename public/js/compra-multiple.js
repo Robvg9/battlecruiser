@@ -300,16 +300,12 @@
           var key = crypto.randomUUID();
           var res = await client.rpc('registrar_compra_multiple', Object.assign({}, payloadMultiple, { p_idempotency_key: key }));
           if (res.error) {
-            // Fallback: líneas con registrar_compra (ejecutarOperacion)
-            if (typeof esErrorDeRed === 'function' && esErrorDeRed(res.error) && typeof ejecutarOperacion === 'function') {
-              await confirmarLineaALinea();
-              return;
+            var em = String((res.error && res.error.message) || res.error.code || 'error');
+            if (typeof esErrorDeRed === 'function' && esErrorDeRed(res.error)) {
+              throw new Error('No se pudo guardar la lista completa. No se registró ningún producto; revisa la conexión y vuelve a intentar.');
             }
-            // Si el RPC múltiple no existe, línea a línea
-            var em = String((res.error && res.error.message) || '');
-            if (/could not find|42883|does not exist/i.test(em) && typeof ejecutarOperacion === 'function') {
-              await confirmarLineaALinea();
-              return;
+            if (/could not find|42883|does not exist/i.test(em)) {
+              throw new Error('No está disponible el registro de compras por lista. No se registró ningún producto.');
             }
             throw res.error;
           }
@@ -320,48 +316,12 @@
           return;
         }
 
-        // Offline sin mapping múltiple: línea a línea en cola
-        if (typeof ejecutarOperacion === 'function') {
-          await confirmarLineaALinea();
-          return;
-        }
-        throw new Error('Sin conexión y sin cola offline disponible.');
+        throw new Error('Sin conexión y sin cola para guardar la lista completa. No se registró ningún producto.');
       } catch (e) {
         msg('No se pudo registrar la compra: ' +
           (typeof explicarError === 'function' ? explicarError(e, 'registrar compra') : (e && e.message) || 'error'), false);
       } finally {
         confirmar.disabled = false;
-      }
-    }
-
-    async function confirmarLineaALinea(){
-      var fallos = 0;
-      var offlineAlguno = false;
-      for (var i = 0; i < lineas.length; i++) {
-        var l = lineas[i];
-        var r = await ejecutarOperacion('compra', {
-          p_producto_id: l.producto_id,
-          p_almacen_id: almacen.value,
-          p_cantidad: l.presentacion_id ? (Number(l.cantidad_presentacion) * Number(l.factor || 1)) : l.cantidad,
-          p_costo_unitario: l.costo,
-          p_presentacion_id: l.presentacion_id,
-          p_cantidad_presentacion: l.cantidad_presentacion
-        });
-        // Nota: registrar_compra espera cantidad base o presentacion; el payload de productos.js usa ambos.
-        if (!r.ok) fallos++;
-        if (r.offline) offlineAlguno = true;
-      }
-      if (fallos) {
-        msg('Algunas líneas no se registraron (' + fallos + '). Revisá pendientes.', false);
-      } else if (offlineAlguno) {
-        lineas = [];
-        render();
-        msg('✓ Compra encolada offline — se sincronizará al recuperar conexión.', true);
-      } else {
-        lineas = [];
-        render();
-        msg('✓ Compra registrada (línea a línea). Stock actualizado.', true);
-        if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
       }
     }
 

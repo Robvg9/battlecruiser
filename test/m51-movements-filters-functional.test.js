@@ -97,7 +97,8 @@ test("Paso 4 movimientos: filtrar por tipo y almacén envía los parámetros cor
   window.document.getElementById("mov-refrescar-btn").click();
   assert.ok(await waitFor(() => visibleRows(window).length === 1),
     "tipo=venta y almacén Principal deben mostrar una sola fila");
-  const latest = c.rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
+  const latest = c.rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_tipo === "compra" && call.params.p_almacen_id === "alm-1").at(-1);
+  assert.ok(latest);
   assert.equal(latest.params.p_tipo, "compra");
   assert.equal(latest.params.p_almacen_id, "alm-1");
   assert.match(visibleRows(window)[0], /Agua/);
@@ -145,7 +146,8 @@ test("Paso 4 movimientos: rango Desde/Hasta filtra días frontera y envía ambos
   window.document.getElementById("mov-refrescar-btn").click();
   assert.ok(await waitFor(() => visibleRows(window).length === 2),
     "el intervalo de un solo día debe incluir todos los movimientos de ese día y excluir los posteriores");
-  const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
+  const latest = rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_desde === "2026-10-20" && call.params.p_hasta === "2026-10-20").at(-1);
+  assert.ok(latest);
   assert.equal(latest.params.p_desde, "2026-10-20");
   assert.equal(latest.params.p_hasta, "2026-10-20");
   assert.match(visibleRows(window)[0], /Agua/);

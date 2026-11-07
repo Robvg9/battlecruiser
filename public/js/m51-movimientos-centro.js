@@ -15,6 +15,9 @@
   let _expandedHistoryDays = new Set();
   let _historyTruncated = false;
   let _allRows = [];
+  let _todayRows = null;
+  let _todaySummaryError = false;
+  let _todaySummaryTruncated = false;
   let _filtered = [];
   let _page = 0;
   let _search = '';
@@ -429,26 +432,22 @@
   function renderResumen() {
     const el = document.getElementById('mov-resumen-m51');
     if (!el) return;
-    const rows = _filtered;
-    const counts = { total: rows.length, compras: 0, reinversiones: 0, bajas: 0 };
-    const internalOperations = new Set();
-    rows.forEach(function (m) {
+    const counts = { compras: new Set(), reinversiones: new Set(), bajas: new Set(), internos: new Set() };
+    _filtered.forEach(function (m, index) {
       const t = normalizarTipo(m.tipo);
-      if (t === 'compra') counts.compras++;
-      else if (t === 'reinversion') counts.reinversiones++;
-      else if (t === 'merma' || t === 'baja') counts.bajas++;
-      else if (t === 'transferencia_salida' || t === 'transferencia_entrada') {
-        internalOperations.add(String(m.operacion_id || m.id || (m.fecha + ':' + m.producto)));
-      }
+      const id = String(m.operacion_id || m.id || ('row-' + index));
+      if (t === 'compra') counts.compras.add(id);
+      else if (t === 'reinversion') counts.reinversiones.add(id);
+      else if (t === 'merma' || t === 'baja') counts.bajas.add(id);
+      else if (t === 'transferencia_salida' || t === 'transferencia_entrada') counts.internos.add(id);
     });
     function card(label, value) {
       return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(String(value)) + '</div></div>';
     }
-    el.innerHTML = card('Movimientos', counts.total) +
-      card('Compras', counts.compras) +
-      card('Reinversiones', counts.reinversiones) +
-      card('Bajas', counts.bajas) +
-      card('Movimientos internos', internalOperations.size);
+    el.innerHTML = card('Compras', counts.compras.size) +
+      card('Mov. internos', counts.internos.size) +
+      card('Bajas', counts.bajas.size) +
+      card('Reinversiones', counts.reinversiones.size);
   }
 
   function appendHistoryLimitNotice(host) {
@@ -586,10 +585,13 @@
     // Publish the complete, paginated result assembled by movimientos_producto.
     // M76 renders operation-level cards from this snapshot, never from one RPC page.
     window.__BC_M51_ROWS__ = _allRows.slice();
+    window.__BC_M51_TODAY_ROWS__ = Array.isArray(_todayRows) ? _todayRows.slice() : null;
+    window.__BC_M51_TODAY_SUMMARY_ERROR__ = !!_todaySummaryError;
+    window.__BC_M51_TODAY_SUMMARY_TRUNCATED__ = !!_todaySummaryTruncated;
     window.__BC_M51_HISTORY_TRUNCATED__ = !!_historyTruncated;
     try {
       window.dispatchEvent(new CustomEvent('bc:m51-rows', {
-        detail: { rows: window.__BC_M51_ROWS__, historyTruncated: window.__BC_M51_HISTORY_TRUNCATED__ }
+        detail: { rows: window.__BC_M51_ROWS__, todayRows: window.__BC_M51_TODAY_ROWS__, todaySummaryError: window.__BC_M51_TODAY_SUMMARY_ERROR__, todaySummaryTruncated: window.__BC_M51_TODAY_SUMMARY_TRUNCATED__, historyTruncated: window.__BC_M51_HISTORY_TRUNCATED__ }
       }));
     } catch (_) {}
   }
@@ -640,12 +642,31 @@
     _pendingSummaryMove = null;
   }
 
+  async function cargarResumenDiario(client, today) {
+    const rows = [];
+    let offset = 0;
+    let truncated = false;
+    while (true) {
+      const res = await client.rpc('movimientos_producto', {
+        p_producto_id: null, p_almacen_id: null, p_desde: today, p_hasta: today,
+        p_tipo: null, p_limite: FETCH_LIMIT, p_offset: offset
+      });
+      if (res.error) throw res.error;
+      const pageRows = Array.isArray(res.data) ? res.data : [];
+      rows.push.apply(rows, pageRows);
+      if (pageRows.length < FETCH_LIMIT) break;
+      if (rows.length >= HISTORY_MAX_ROWS) { truncated = true; break; }
+      offset += pageRows.length;
+    }
+    return { rows: rows.slice(0, HISTORY_MAX_ROWS), truncated };
+  }
+
   async function cargarMovimientos() {
     ensureShell();
     prepararNavegacionDesdeResumen();
     const conn = document.getElementById('mov-conn-info');
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('reportes', 'ver')) {
-      _allRows = []; _filtered = []; _lastError = null; _loading = false;
+      _allRows = []; _todayRows = []; _todaySummaryError = true; _filtered = []; _lastError = null; _loading = false;
       const el = document.getElementById('mov-detalle');
       if (el) el.innerHTML = '<div class="bc-m51-empty">No tenés permiso para ver movimientos.</div>';
       const metrics = document.getElementById('mov-resumen-m51');
@@ -668,6 +689,7 @@
     try {
       const client = window.client;
       if (!client) throw new Error('Cliente Supabase no disponible');
+      const today = fechaHoyNegocio();
       const collected = [];
       let offset = 0;
       const maxRows = HISTORY_MAX_ROWS;
@@ -684,7 +706,7 @@
           } else {
             _lastError = String(res.error.message || res.error.code || res.error);
           }
-          _allRows = []; _filtered = []; _loading = false; paint(); return;
+          _allRows = []; _todayRows = null; _todaySummaryError = true; _filtered = []; _loading = false; paint(); return;
         }
         const pageRows = Array.isArray(res.data) ? res.data : [];
         collected.push.apply(collected, pageRows);
@@ -696,11 +718,23 @@
         offset += pageRows.length;
       }
       _allRows = collected.slice(0, maxRows);
+      const primaryIsDailyUnfiltered = f.desde === today && f.hasta === today && !f.almacen && !f.tipo;
+      if (primaryIsDailyUnfiltered) {
+        _todayRows = _allRows.slice(); _todaySummaryTruncated = !!_historyTruncated; _todaySummaryError = false;
+      } else {
+        try {
+          const summary = await cargarResumenDiario(client, today);
+          _todayRows = summary.rows; _todaySummaryTruncated = summary.truncated; _todaySummaryError = false;
+        } catch (summaryError) {
+          console.warn('[BattleCruiser] No se pudo cargar el resumen diario:', summaryError);
+          _todayRows = null; _todaySummaryTruncated = false; _todaySummaryError = true;
+        }
+      }
       _page = 0; applySearchAndPage(); seleccionarNavegacionDesdeResumen(); _loading = false; _lastError = null; paint();
     } catch (e) {
       console.warn('[BattleCruiser] M51 movimientos_producto:', e);
       _lastError = String(e && e.message ? e.message : e);
-      _allRows = []; _filtered = []; _loading = false; paint();
+      _allRows = []; _todayRows = null; _todaySummaryError = true; _filtered = []; _loading = false; paint();
     }
   }
 

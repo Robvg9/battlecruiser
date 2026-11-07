@@ -101,3 +101,28 @@ test("confirmar compra conserva el RPC de alta y no consulta compras anteriores"
   assert.equal(ctx.readCalls, 0);
   assert.match(d.getElementById("compra-multiple-msg").textContent, /Compra registrada/);
 });
+
+test("una compra con varias líneas nunca se fragmenta si falla el RPC de lista", async (t) => {
+  const ctx = createPurchaseWindow(t);
+  const { w, rpcCalls } = ctx;
+  await w.__BC_COMPRAS_ACTIVAR();
+  const d = w.document;
+  d.getElementById("compra-multiple-almacen").value = "warehouse-1";
+  const product = d.getElementById("compra-multiple-producto");
+  product.value = "product-1";
+  product.dispatchEvent(new w.Event("change"));
+  await tick(w);
+  d.getElementById("compra-multiple-cantidad").value = "12";
+  d.getElementById("compra-multiple-costo").value = "3.5";
+  d.getElementById("compra-multiple-add").click();
+  w.client.rpc = async (name, payload) => {
+    rpcCalls.push({ name, payload });
+    return { data: null, error: { code: "42883", message: "registrar_compra_multiple does not exist" } };
+  };
+  d.getElementById("compra-multiple-confirmar").click();
+  await tick(w);
+  assert.equal(rpcCalls.length, 1);
+  assert.equal(rpcCalls[0].name, "registrar_compra_multiple");
+  assert.match(d.getElementById("compra-multiple-msg").textContent, /No está disponible el registro de compras por lista/);
+  assert.doesNotMatch(PURCHASE, /confirmarLineaALinea|ejecutarOperacion\('compra',/);
+});
