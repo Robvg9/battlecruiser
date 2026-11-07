@@ -16,6 +16,7 @@ const finance = read("public/js/operaciones-financieras.js");
 const m53 = read("public/js/m53-inventario-centro.js");
 const detail = read("public/js/inventario-detalle.js");
 const migration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
+const conversionMigration = read("supabase/migrations/20261107230000_mixed_inventory_conversion_composite_minimum.sql");
 
 test("Mixed inventory stays opt-in and flavor names are entered by the administrator in the product form", () => {
   const { JSDOM } = require("jsdom");
@@ -26,6 +27,7 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
     assert.equal(d.querySelectorAll("#prod-variantes-editor").length, 1);
     assert.equal(d.querySelectorAll("#prod-variantes-lista").length, 1);
     assert.equal(d.querySelectorAll("#prod-variante-agregar").length, 1);
+    assert.equal(d.querySelectorAll("#prod-variantes-asignacion").length, 1);
     assert.equal(d.getElementById("prod-inventario-mixto").checked, false,
       "mixed inventory is disabled unless the owner opts in");
     assert.ok(d.getElementById("prod-variantes-lista").closest("#form-producto"));
@@ -36,6 +38,11 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.match(products, /function productosOperativos\(rows\)/);
   assert.match(products, /function obtenerVariantesFormularioProducto\(\)/);
   assert.match(products, /p_variantes:\s*mixedEnabled \? variants : \[\]/);
+  assert.match(products, /configurar_producto_inventario_mixto_con_asignaciones/);
+  assert.match(products, /bc_obtener_snapshot_conversion_mixta/);
+  assert.match(products, /prepararAsignacionesMixtasProducto/);
+  assert.match(products, /data-confirm-mixed-conversion/);
+  assert.match(products, /minimum <= 0/);
   assert.match(products, /nombre: \(row\.querySelector\("\.prod-variante-nombre"\)/);
   assert.match(products, /new Set\(names\)\.size !== names\.length/);
   assert.match(products, /async function ejecutarProductoMixtoSinCola\(editandoId, payload\)/);
@@ -77,6 +84,14 @@ test("Mixed inventory migration keeps existing product IDs as the transaction an
   assert.match(migration, /no se repartirá automáticamente/);
   assert.match(migration, /No puedes quitar una variante que todavía conserva stock o lotes pendientes/);
   assert.match(migration, /CREATE TRIGGER bc_seed_mixed_stock_for_warehouse/);
+  assert.match(conversionMigration, /CREATE TABLE IF NOT EXISTS public\.lotes_compra_conversion_mixta/);
+  assert.match(conversionMigration, /configurar_producto_inventario_mixto_con_asignaciones/);
+  assert.match(conversionMigration, /bc_obtener_snapshot_conversion_mixta/);
+  assert.match(conversionMigration, /historial_compras/);
+  assert.match(conversionMigration, /historial_premium_detalle/);
+  assert.match(conversionMigration, /sum\(coalesce\(vm\.minimo,0\)\)/);
+  assert.match(conversionMigration, /DELETE FROM public\.productos_stock_mixto_minimos WHERE producto_id=p_producto_id/);
+  assert.match(conversionMigration, /conversion_mixta/);
 });
 
 test("Product catalog query falls back until the optional migration is deployed", () => {
@@ -89,6 +104,6 @@ test("Cache versions are bumped for the updated PWA inventory and admin assets",
   assert.match(index, /productos\.js\?v=20261107\.1/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
   assert.match(index, /app\.js\?v=9\.5\.78/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.78"/);
+  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.79"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.6"\]/);
 });

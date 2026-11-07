@@ -1016,3 +1016,35 @@ textarea:focus-visible {
   #tab-conectividad #cfg-diag-grid .cfg-metric { min-height:62px; padding:7px; }
   #tab-conectividad #cfg-mantenimiento .cfg-actions .cc-accion { font-size:10px; }
 }
+
+
+/* Mixed inventory conversion: manual flavor allocation and per-warehouse minima. */
+.prod-variantes-asignacion { display:grid; gap:12px; margin:12px 0 4px; padding:12px; border:1px solid rgba(212,176,92,.28); border-radius:12px; background:rgba(16,28,40,.72); }
+.bc-mixed-assignment-heading strong { display:block; color:var(--gold,var(--mist)); font-size:14px; }
+.bc-mixed-assignment-heading p,.bc-mixed-assignment-note p,.bc-mixed-assignment-footnote { margin:5px 0 0; color:var(--mist); font-size:12px; line-height:1.45; }
+.bc-mixed-assignment-note { padding:10px; border-radius:8px; background:rgba(212,176,92,.08); }
+.bc-mixed-assignment-note strong { color:var(--gold,var(--mist)); font-size:12px; }
+.bc-mixed-assignment-warehouse { min-width:0; padding:11px; border:1px solid rgba(255,255,255,.12); border-radius:9px; background:rgba(255,255,255,.025); }
+.bc-mixed-assignment-warehouse-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.bc-mixed-assignment-warehouse-heading strong { min-width:0; color:var(--mist); font-size:13px; }
+.bc-mixed-assignment-warehouse-heading span { color:var(--muted,var(--mist)); font-size:10px; }
+.bc-mixed-assignment-meta { margin:4px 0 9px; color:var(--mist); font-size:11px; line-height:1.4; }
+.bc-mixed-assignment-flavors { display:grid; gap:8px; }
+.bc-mixed-assignment-flavor { display:grid; grid-template-columns:minmax(0,1fr) repeat(2,minmax(90px,.8fr)); align-items:end; gap:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.1); }
+.bc-mixed-assignment-flavor > strong { align-self:center; color:var(--mist); font-size:12px; }
+.bc-mixed-assignment-flavor label { display:grid; gap:4px; color:var(--mist); font-size:10px; }
+.bc-mixed-assignment-flavor input { width:100%; min-width:0; min-height:38px; padding:7px; border:1px solid rgba(212,176,92,.28); border-radius:7px; background:rgba(0,0,0,.18); color:var(--mist); font:inherit; font-size:12px; }
+.bc-mixed-assignment-flavor input[readonly] { opacity:.7; }
+.bc-mixed-assignment-total { margin-top:9px; color:var(--mist); font-size:11px; font-weight:600; }
+.bc-mixed-assignment-total.is-valid { color:#5bd39b; }
+.bc-mixed-assignment-total.is-invalid { color:#f0b66c; }
+.bc-mixed-assignment-confirm { display:flex; align-items:flex-start; gap:9px; padding:10px; border:1px solid rgba(212,176,92,.32); border-radius:8px; color:var(--mist); font-size:11px; line-height:1.45; }
+.bc-mixed-assignment-confirm input { flex:0 0 auto; margin-top:2px; }
+.bc-mixed-assignment-error { margin:6px 0; padding:8px; border-left:3px solid #e2a65f; background:rgba(226,166,95,.09); color:var(--mist); font-size:11px; line-height:1.4; }
+.bc-mixed-assignment-loading { color:var(--mist); font-size:12px; }
+.bc-mixed-assignment-footnote { font-size:10px; opacity:.86; }
+@media (max-width:520px) {
+  .prod-variantes-asignacion { padding:9px; }
+  .bc-mixed-assignment-flavor { grid-template-columns:1fr 1fr; }
+  .bc-mixed-assignment-flavor > strong { grid-column:1 / -1; }
+}

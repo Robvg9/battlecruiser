@@ -527,7 +527,7 @@
           '<div class="bc-m53-warehouse-main"><span class="bc-m53-warehouse-name">' + esc(warehouse.almacen) + '</span>' +
           '<strong class="bc-m53-warehouse-qty">' + qtyFmt(warehouse.cantidad) + ' ' + esc(warehouse.unidad || unit) + '</strong></div>' +
           '<div class="bc-m53-warehouse-meta">' +
-          (warehouse.minimo != null ? '<span>mín ' + qtyFmt(warehouse.minimo) + '</span>' : '') +
+          (warehouse.variantes.length ? (warehouse.minimo != null ? '<span>mín. compuesto ' + qtyFmt(warehouse.minimo) + '</span>' : '<span>mín. compuesto pendiente</span>') : (warehouse.minimo != null ? '<span>mín ' + qtyFmt(warehouse.minimo) + '</span>' : '')) +
           '<span class="bc-m53-warehouse-status bc-m53-warehouse-status-' + status.cls + '">' + esc(status.label) + '</span>' +
           '</div></div>';
       }).join('');

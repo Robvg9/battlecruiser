@@ -8,6 +8,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
 const baseMigration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
 const migration = read("supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql");
+const conversionMigration = read("supabase/migrations/20261107230000_mixed_inventory_conversion_composite_minimum.sql");
 const detail = read("public/js/inventario-detalle.js");
 const inventory = read("public/js/m53-inventario-centro.js");
 const operations = read("public/js/ui-operaciones-hub.js");
@@ -48,6 +49,8 @@ test("Each mixed-inventory flavor has an independent minimum for each warehouse"
   assert.match(migration, /LEFT JOIN public\.productos_stock_mixto_minimos vm ON vm\.producto_id=v\.id AND vm\.almacen_id=a\.id/);
   assert.match(migration, /'minimo',coalesce\(vm\.minimo,0\)/);
   assert.match(migration, /'estado',CASE WHEN coalesce\(vm\.minimo,0\)<=0 THEN 'sin_minimo'/);
+  assert.match(conversionMigration, /sum\(coalesce\(vm\.minimo,0\)\)/);
+  assert.match(conversionMigration, /THEN 'bajo'/);
 });
 
 test("Inventory detail edits and saves a separate threshold for each flavor", () => {
@@ -65,7 +68,7 @@ test("Inventory detail edits and saves a separate threshold for each flavor", ()
   assert.match(inventory, /__bc_sin_asignacion/);
   assert.match(inventory, /window\.refrescarProductos/);
   assert.match(detail, /variant\.minimo/);
-  assert.match(detail, /Mínimos individuales por sabor/);
+  assert.match(detail, /Mínimo compuesto/);
   assert.match(detail, /data-bc-assign-warehouse/);
   assert.match(detail, /bc_actualizar_stock_minimo_obligatorio/);
   assert.match(detail, /Sin almacenes asignados/);
@@ -117,28 +120,29 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
 });
 
 test("Release cache keys and Service Worker precache match the modified inventory and Operations modules", () => {
-  assert.match(app, /const VERSION="9\.5\.78"/);
-  assert.match(app, /m53-inventario-centro\.js","53\.6/);
+  assert.match(app, /const VERSION="9\.5\.79"/);
+  assert.match(app, /m53-inventario-centro\.js","53\.7/);
   assert.match(app, /ui-operaciones-hub\.js","43\.1/);
   assert.match(app, /operaciones-financieras\.js","20261107\.3/);
   assert.match(app, /aprobaciones-admin\.js","20261107\.2/);
-  assert.match(app, /inventario-detalle\.js","68"/);
+  assert.match(app, /inventario-detalle\.js","69"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.match(app, /movimiento-multiple\.js","20261107\.1/);
-  assert.match(index, /productos\.js\?v=20261107\.1/);
+  assert.match(index, /productos\.js\?v=20261107\.2/);
+  assert.match(index, /style\.css\?v=9\.5\.79/);
   assert.match(index, /almacenes\.js\?v=20261107\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.78/);
-  assert.match(index, /v9\.5\.78 — BattleCruiser/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.78"/);
+  assert.match(index, /app\.js\?v=9\.5\.79/);
+  assert.match(index, /v9\.5\.79 — BattleCruiser/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.79"/);
   for (const asset of [
-    "inventario-detalle.js?v=68",
+    "inventario-detalle.js?v=69",
     "operaciones-financieras.js?v=20261107.3",
     "aprobaciones-admin.js?v=20261107.2",
     "ui-operaciones-hub.js?v=43.1",
     "almacenes.js?v=20261107.1",
-    "m53-inventario-centro.js?v=53.6",
+    "m53-inventario-centro.js?v=53.7",
     "movimiento-multiple.js?v=20261107.1",
-    "productos.js?v=20261107.1",
+    "productos.js?v=20261107.2",
     "compra-multiple.js?v=27.15"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
