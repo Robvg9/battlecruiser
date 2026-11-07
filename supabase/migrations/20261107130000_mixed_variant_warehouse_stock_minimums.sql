@@ -40,6 +40,54 @@ CREATE TRIGGER bc_seed_mixed_variant_minimum
 AFTER INSERT OR UPDATE OF producto_id,almacen_id,minimo ON public.stock
 FOR EACH ROW EXECUTE FUNCTION public.bc_seed_mixed_variant_minimum();
 
+CREATE OR REPLACE FUNCTION public.bc_actualizar_stock_minimo_obligatorio(
+  p_producto_id uuid,
+  p_almacen_id uuid,
+  p_minimo numeric
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $
+DECLARE
+  v_producto public.productos%ROWTYPE;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'No hay una sesión autenticada.' USING ERRCODE='42501';
+  END IF;
+  IF NOT public.tiene_permiso('stock','editar') THEN
+    RAISE EXCEPTION 'No tienes permiso para editar el stock mínimo.' USING ERRCODE='42501';
+  END IF;
+  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 THEN
+    RAISE EXCEPTION 'El stock mínimo es obligatorio y debe ser mayor que cero.' USING ERRCODE='22023';
+  END IF;
+
+  SELECT * INTO v_producto
+  FROM public.productos
+  WHERE id=p_producto_id AND activo=true
+  FOR SHARE;
+  IF NOT FOUND OR v_producto.producto_padre_id IS NOT NULL OR v_producto.inventario_mixto THEN
+    RAISE EXCEPTION 'Selecciona un producto normal para configurar su mínimo; los sabores llevan mínimos independientes.' USING ERRCODE='23514';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.almacenes WHERE id=p_almacen_id AND activo=true) THEN
+    RAISE EXCEPTION 'El almacén no existe o está inactivo.' USING ERRCODE='23503';
+  END IF;
+
+  UPDATE public.stock
+  SET minimo=p_minimo
+  WHERE producto_id=p_producto_id AND almacen_id=p_almacen_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El producto no está asignado a este almacén.' USING ERRCODE='23514';
+  END IF;
+
+  RETURN jsonb_build_object('producto_id',p_producto_id,'almacen_id',p_almacen_id,'minimo',p_minimo);
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.bc_actualizar_stock_minimo_variante(
   p_producto_id uuid,
   p_almacen_id uuid,
@@ -58,7 +106,7 @@ BEGIN
   IF NOT public.tiene_permiso('stock','editar') THEN
     RAISE EXCEPTION 'No tienes permiso para editar el stock mínimo.' USING ERRCODE='42501';
   END IF;
-  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<0 THEN
+  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 THEN
     RAISE EXCEPTION 'Producto, almacén y mínimo válido son obligatorios.' USING ERRCODE='22023';
   END IF;
 
@@ -74,7 +122,9 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.almacenes WHERE id=p_almacen_id AND activo=true) THEN
     RAISE EXCEPTION 'El almacén no existe o está inactivo.' USING ERRCODE='23503';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.stock WHERE producto_id=p_producto_id AND almacen_id=p_almacen_id) THEN
+  UPDATE public.stock SET minimo=p_minimo
+  WHERE producto_id=p_producto_id AND almacen_id=p_almacen_id;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'La variante todavía no tiene una asignación de inventario en este almacén.' USING ERRCODE='23514';
   END IF;
 
@@ -111,6 +161,7 @@ BEGIN
     coalesce(sum(coalesce(s.cantidad,0)),0)::numeric,
     coalesce(mm.minimo,0)::numeric,
     CASE
+      WHEN bool_or(coalesce(vm.minimo,0)<=0) THEN 'sin_minimo'
       WHEN coalesce(sum(coalesce(s.cantidad,0)),0)<=0 THEN 'agotado'
       WHEN coalesce(mm.minimo,0)>0 AND sum(coalesce(s.cantidad,0))<=mm.minimo THEN 'bajo'
       ELSE 'normal'
@@ -126,7 +177,8 @@ BEGIN
         'nombre',v.variante_nombre,
         'cantidad',coalesce(s.cantidad,0),
         'minimo',coalesce(vm.minimo,0),
-        'estado',CASE WHEN coalesce(s.cantidad,0)<=0 THEN 'agotado'
+        'estado',CASE WHEN coalesce(vm.minimo,0)<=0 THEN 'sin_minimo'
+          WHEN coalesce(s.cantidad,0)<=0 THEN 'agotado'
           WHEN coalesce(vm.minimo,0)>0 AND coalesce(s.cantidad,0)<=vm.minimo THEN 'bajo'
           ELSE 'normal' END,
         'unidad',v.unidad,
