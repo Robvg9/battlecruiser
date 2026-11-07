@@ -75,7 +75,9 @@ test("The financial operations panel loads catalogs before building inventory fo
   assert.doesNotMatch(finance, /crear_merma/);
   assert.match(finance, /Motivo de la baja/);
   assert.match(finance, /Otro/);
-  assert.match(finance, /for \(const reason of/);
+  for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
+    assert.ok(finance.includes('value="' + reason + '"') || finance.includes(">" + reason + "<"), "missing financial Baja reason " + reason);
+  }
 });
 
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
