@@ -106,9 +106,10 @@
   }
 
   async function ensureCatalogs(){
+    let catalogReady=true;
     try {
       if(typeof window.bcRefrescarCatalogosOperativos==='function') {
-        await window.bcRefrescarCatalogosOperativos(false);
+        catalogReady=await window.bcRefrescarCatalogosOperativos(true);
       } else {
         const api=window.client || (typeof client!=='undefined'?client:null);
         if(api && typeof api.from==='function') {
@@ -131,9 +132,12 @@
         }
       }
     } catch(error) {
+      catalogReady=false;
       console.warn('[BattleCruiser] No se pudieron actualizar desde Supabase los catálogos de Operaciones financieras:',error);
     }
-    return {products:productos().filter(p=>p&&p.activo!==false),warehouses:almacenes()};
+    return catalogReady
+      ? {products:productos().filter(p=>p&&p.activo!==false),warehouses:almacenes()}
+      : {products:[],warehouses:[]};
   }
 
   function refreshSelectors(){
@@ -141,7 +145,7 @@
     ['rein-almacen','sal-almacen','fin-g-almacen'].forEach(id=>{
       const select=document.getElementById(id);if(!select)return;
       const value=select.value;const optional=id==='fin-g-almacen';
-      select.innerHTML='<option value="">'+(optional?'Almacén (opcional)':'Almacén')+'</option>'+stores.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nombre)+'</option>').join('');
+      select.innerHTML='<option value="" disabled selected hidden>'+(optional?'Almacén (opcional)':'Almacén')+'</option>'+stores.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nombre)+'</option>').join('');
       if(stores.some(a=>String(a.id)===String(value)))select.value=value;
     });
     document.querySelectorAll('#rein-lineas .rein-prod, #sal-prod').forEach(select=>{
