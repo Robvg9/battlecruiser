@@ -69,6 +69,7 @@ BEFORE INSERT OR UPDATE OF cantidad,producto_id,almacen_id,minimo ON public.stoc
 FOR EACH ROW EXECUTE FUNCTION public.bc_require_positive_stock_minimum();
 
 REVOKE ALL ON FUNCTION public.bc_require_positive_stock_minimum() FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION public.bc_seed_mixed_variant_minimum() FROM PUBLIC,anon;
 
 CREATE OR REPLACE FUNCTION public.bc_actualizar_stock_minimo_obligatorio(
   p_producto_id uuid,
@@ -104,12 +105,12 @@ BEGIN
     RAISE EXCEPTION 'El almacén no existe o está inactivo.' USING ERRCODE='23503';
   END IF;
 
-  UPDATE public.stock
-  SET minimo=p_minimo
-  WHERE producto_id=p_producto_id AND almacen_id=p_almacen_id;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'El producto no está asignado a este almacén.' USING ERRCODE='23514';
-  END IF;
+  -- Creating the zero-stock assignment with its threshold first lets a later
+  -- purchase or transfer enter safely; never create positive stock without a minimum.
+  INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo,updated_at)
+  VALUES(p_producto_id,p_almacen_id,0,p_minimo,now())
+  ON CONFLICT(producto_id,almacen_id)
+  DO UPDATE SET minimo=EXCLUDED.minimo,updated_at=now();
 
   RETURN jsonb_build_object('producto_id',p_producto_id,'almacen_id',p_almacen_id,'minimo',p_minimo);
 END;
