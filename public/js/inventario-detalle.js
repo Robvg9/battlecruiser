@@ -24,7 +24,7 @@
     transferencia_entrada: 'Transferencia · entrada',
     movimiento_interno: 'Movimiento interno',
     vale: 'Vale de salida',
-    merma: 'Merma',
+    merma: 'Baja',
     baja: 'Baja',
     ajuste: 'Ajuste'
   };
