@@ -91,5 +91,11 @@ test("Merma is presented as Baja with selectable predefined reasons and a requir
   assert.match(operations, /otherInput\.required = isOther/);
   assert.match(operations, /rpc\('crear_baja'/);
   assert.ok(approvals.includes("Baja pendiente"));
-  assert.ok(approvals.includes("for(const tipo of ['bajas'])"));
+  assert.match(approvals, /async function ensureForms\(\)/);
+  assert.match(approvals, /window\.refrescarProductos/);
+  assert.match(approvals, /window\.refrescarAlmacenes/);
+  assert.match(approvals, /rpc\('crear_baja'/);
+  for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
+    assert.ok(approvals.includes('value="' + reason + '"'), "missing approval Baja reason " + reason);
+  }
 });
