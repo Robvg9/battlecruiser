@@ -669,7 +669,7 @@
       // the missing .from() method block the inventory RPC and its filters.
       const warehouseCatalogRequest = typeof client.from === 'function'
         ? Promise.resolve().then(function () {
-            return client.from('almacenes').select('id, nombre').order('nombre');
+            return client.from('almacenes').select('id, nombre, activo').eq('activo', true).order('nombre');
           }).catch(function (error) {
             return { data: [], error: error };
           })
@@ -713,12 +713,18 @@
           if (cached.length) warehouseCatalog = cached;
         } catch (_) {}
       }
+      warehouseCatalog = warehouseCatalog.filter(function (warehouse) {
+        return warehouse && warehouse.id && warehouse.activo !== false;
+      });
       if (warehouseCatalog.length) {
         try {
           if (!window._cache) window._cache = {};
-          if (!Array.isArray(window._cache.almacenes) || !window._cache.almacenes.length) {
-            window._cache.almacenes = warehouseCatalog;
-          }
+          const merged = new Map();
+          (Array.isArray(window._cache.almacenes) ? window._cache.almacenes : []).forEach(function (warehouse) {
+            if (warehouse && warehouse.id && warehouse.activo !== false) merged.set(String(warehouse.id), warehouse);
+          });
+          warehouseCatalog.forEach(function (warehouse) { merged.set(String(warehouse.id), warehouse); });
+          window._cache.almacenes = Array.from(merged.values());
         } catch (_) {}
       }
       if (!warehouseCatalog.length && warehousesRes.error) {
