@@ -112,12 +112,12 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.13'));
   assert.ok(app.includes('["m51-movimientos-centro.js","51.10"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.10"), 'the offline shell must precache the refreshed movement listener');
-  assert.ok(app.includes('["inventario-detalle.js","68"]'), 'the minimum editor must refresh');
-  assert.ok(app.includes('["m53-inventario-centro.js","53.6"]'), 'M53 must refresh for pending minimum status');
+  assert.ok(app.includes('["inventario-detalle.js","69"]'), 'the minimum editor must refresh');
+  assert.ok(app.includes('["m53-inventario-centro.js","53.7"]'), 'M53 must refresh for pending minimum status');
   assert.ok(app.includes('["ui-operaciones-hub.js","43.1"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261107.3"]'), 'the finance operations form must refresh');
   assert.ok(app.includes('["aprobaciones-admin.js","20261107.2"]'), 'the approval form must refresh');
-  assert.ok(sw.includes("./js/inventario-detalle.js?v=68"), 'the offline shell must precache the updated minimum editor');
+  assert.ok(sw.includes("./js/inventario-detalle.js?v=69"), 'the offline shell must precache the updated minimum editor');
   assert.ok(index.includes('js/productos.js?v=20261107.2'), 'the product view must refresh its category subscriber');
   assert.ok(index.includes('js/almacenes.js?v=20261107.1'), 'the warehouse view must refresh its tab subscriber');
   assert.ok(sw.includes("./js/productos.js?v=20261107.2"), 'the product view must refresh offline');
@@ -180,8 +180,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(sw.includes("./js/m76-movimientos-operaciones.js?v=76.3"), "M76 must be precached for offline use");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.12/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
-  assert.match(index, /<script src="js\/productos\.js\?v=20261107\.1"><\/script>/);
-  assert.match(sw, /\.\/js\/productos\.js\?v=20261107\.1/, "the offline shell must precache the updated product module version");
+  assert.match(index, /<script src="js\/productos\.js\?v=20261107\.2"><\/script>/);
+  assert.match(sw, /\.\/js\/productos\.js\?v=20261107\.2/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.24"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
