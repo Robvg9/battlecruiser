@@ -480,6 +480,7 @@ BEGIN
     coalesce(sum(coalesce(s.cantidad,0)),0)::numeric,
     coalesce(mm.minimo,0)::numeric,
     CASE
+      WHEN bool_or(coalesce(vm.minimo,0)<=0) THEN 'sin_minimo'
       WHEN coalesce(sum(coalesce(s.cantidad,0)),0)<=0 THEN 'agotado'
       WHEN coalesce(mm.minimo,0)>0 AND sum(coalesce(s.cantidad,0))<=mm.minimo THEN 'bajo'
       ELSE 'normal'
@@ -494,6 +495,11 @@ BEGIN
         'producto_id',v.id,
         'nombre',v.variante_nombre,
         'cantidad',coalesce(s.cantidad,0),
+        'minimo',coalesce(vm.minimo,0),
+        'estado',CASE WHEN coalesce(vm.minimo,0)<=0 THEN 'sin_minimo'
+          WHEN coalesce(s.cantidad,0)<=0 THEN 'agotado'
+          WHEN coalesce(vm.minimo,0)>0 AND coalesce(s.cantidad,0)<=vm.minimo THEN 'bajo'
+          ELSE 'normal' END,
         'unidad',v.unidad,
         'costo_promedio',coalesce(lv.costo_promedio,0),
         'valor_inventario',coalesce(lv.valor_inventario,0)
@@ -504,6 +510,7 @@ BEGIN
   JOIN public.productos v ON v.producto_padre_id=p.id AND v.activo=true
   LEFT JOIN public.stock s ON s.producto_id=v.id AND s.almacen_id=a.id
   LEFT JOIN public.productos_stock_mixto_minimos mm ON mm.producto_id=p.id AND mm.almacen_id=a.id
+  LEFT JOIN public.productos_stock_mixto_minimos vm ON vm.producto_id=v.id AND vm.almacen_id=a.id
   LEFT JOIN LATERAL (
     SELECT
       CASE WHEN sum(l.cantidad_restante)>0
