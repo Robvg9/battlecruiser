@@ -125,6 +125,10 @@ BEGIN
     FROM public.gastos g
     LEFT JOIN public.almacenes a ON a.id=g.almacen_id
     WHERE g.estado='PENDIENTE'
+      AND (
+        public.tiene_permiso('gastos','editar_any')
+        OR public.tiene_permiso('auditoria','editar_any')
+      )
 
     UNION ALL
 
@@ -134,6 +138,10 @@ BEGIN
     JOIN public.almacenes a ON a.id=m.almacen_id
     JOIN public.productos p ON p.id=m.producto_id
     WHERE m.estado='PENDIENTE'
+      AND (
+        public.tiene_permiso('mermas','editar_any')
+        OR public.tiene_permiso('auditoria','editar_any')
+      )
 
     UNION ALL
 
