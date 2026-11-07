@@ -28,7 +28,7 @@ test("Each mixed-inventory flavor has an independent minimum for each warehouse"
   assert.match(migration, /tiene_permiso\('stock','editar'\)/);
   assert.match(migration, /LEFT JOIN public\.productos_stock_mixto_minimos vm ON vm\.producto_id=v\.id AND vm\.almacen_id=a\.id/);
   assert.match(migration, /'minimo',coalesce\(vm\.minimo,0\)/);
-  assert.match(migration, /'estado',CASE WHEN coalesce\(s\.cantidad,0\)<=0 THEN 'agotado'/);
+  assert.match(migration, /'estado',CASE WHEN coalesce\(vm\.minimo,0\)<=0 THEN 'sin_minimo'/);
 });
 
 test("Inventory detail edits and saves a separate threshold for each flavor", () => {
@@ -46,6 +46,7 @@ test("Inventory detail edits and saves a separate threshold for each flavor", ()
 test("Inventory cards and alerts recognize a low flavor even when total product stock is sufficient", () => {
   assert.match(inventory, /variant\.minimo/);
   assert.match(inventory, /variant\.estado === 'sin_minimo'/);
+  assert.match(inventory, /minimosPendientes/);
   assert.match(inventory, /minimosPendientes/);
   assert.match(inventory, /mín\. ' \+ qtyFmt\(minimum\)/);
 });
