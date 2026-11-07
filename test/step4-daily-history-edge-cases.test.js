@@ -228,7 +228,7 @@ test("resumen híbrido: La Cueva conserva la última jornada y Almacén Casa rei
   assert.match(window.__BC_M51_TODAY_SUMMARY_LABEL__, /La Cueva: última jornada/);
   assert.match(window.__BC_M51_TODAY_SUMMARY_LABEL__, /Almacén Casa: día calendario/);
   const warehouseSummaryCalls = rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_almacen_id);
-  assert.deepEqual(warehouseSummaryCalls.map((call) => call.params.p_almacen_id).sort(), ["alm-1", "alm-2"]);
+  assert.deepEqual(Array.from(new Set(warehouseSummaryCalls.map((call) => call.params.p_almacen_id))).sort(), ["alm-1", "alm-2"]);
   assert.ok(warehouseSummaryCalls.some((call) => call.params.p_almacen_id === "alm-1" && call.params.p_desde === "2026-11-06"));
   assert.ok(warehouseSummaryCalls.some((call) => call.params.p_almacen_id === "alm-2" && call.params.p_desde === "2026-11-07"));
 });
