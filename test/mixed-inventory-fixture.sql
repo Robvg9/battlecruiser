@@ -49,7 +49,7 @@ CREATE TABLE public.stock(
   producto_id uuid NOT NULL REFERENCES public.productos(id),
   almacen_id uuid NOT NULL REFERENCES public.almacenes(id),
   cantidad numeric NOT NULL DEFAULT 0,
-  minimo numeric NOT NULL DEFAULT 0,
+  minimo numeric DEFAULT NULL,
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(producto_id,almacen_id)
 );
@@ -73,3 +73,12 @@ CREATE OR REPLACE FUNCTION public.bc_actor_is_admin()
 RETURNS boolean LANGUAGE sql STABLE AS $$
   SELECT coalesce(current_setting('test.bc_admin',true),'true')='true'
 $$;
+
+-- Legacy product/warehouse stock row with an unset minimum. The new minimum
+-- migration must backfill this row and make the column mandatory.
+INSERT INTO public.almacenes(id,nombre)
+VALUES ('55555555-5555-4555-8555-555555555555','Almacén legado');
+INSERT INTO public.productos(id,nombre,unidad,precio_normal,activo)
+VALUES ('66666666-6666-4666-8666-666666666666','Producto legado','unidad',1,true);
+INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
+VALUES ('66666666-6666-4666-8666-666666666666','55555555-5555-4555-8555-555555555555',0,NULL);
