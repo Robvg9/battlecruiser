@@ -389,20 +389,7 @@ safeInit("lista-productos", () => {
     }
     const btnConfigurarSabores = e.target.closest(".btn-configurar-sabores");
     if (btnConfigurarSabores) {
-      const producto = (_cache.productos || []).find((p) => String(p.id) === String(btnConfigurarSabores.dataset.id));
-      if (producto) {
-        await iniciarEdicionProducto(producto);
-        const toggle = document.getElementById("prod-inventario-mixto");
-        const list = document.getElementById("prod-variantes-lista");
-        if (toggle && !toggle.checked) toggle.checked = true;
-        if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
-        sincronizarEditorVariantesProducto();
-        if (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(producto.id)) await cargarSnapshotAsignacionMixtaProducto(producto.id);
-        setMsg("msg-productos", "Asigna manualmente las unidades reales de cada sabor y define su mínimo por almacén. El valor y las capas FIFO de la compra se conservarán proporcionalmente.", true);
-        renderPanelAsignacionMixtaProducto();
-        const section = document.getElementById("prod-inventario-mixto-settings");
-        if (section) section.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      await window.bcAbrirConfiguracionSabores(btnConfigurarSabores.dataset.id);
       return;
     }
     const btnEditar = e.target.closest(".btn-editar-producto");
@@ -799,6 +786,32 @@ async function iniciarEdicionProducto(p) {
   else { _productoMixtoSnapshot = null; renderPanelAsignacionMixtaProducto(); }
   document.getElementById("form-producto").scrollIntoView({ behavior: "smooth", block: "center" });
 }
+
+window.bcAbrirConfiguracionSabores = async function (productId) {
+  const productTab = document.querySelector('.tab-btn[data-tab="productos"]');
+  const productPanel = document.getElementById("tab-productos");
+  if (productTab && productPanel && !productPanel.classList.contains("visible")) productTab.click();
+
+  const producto = (_cache.productos || []).find((p) => String(p.id) === String(productId));
+  if (!producto) throw new Error("No se encontró el producto. Actualiza el catálogo e inténtalo de nuevo.");
+
+  await iniciarEdicionProducto(producto);
+  const toggle = document.getElementById("prod-inventario-mixto");
+  const list = document.getElementById("prod-variantes-lista");
+  if (toggle && !toggle.checked) toggle.checked = true;
+  if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
+  sincronizarEditorVariantesProducto();
+
+  if (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(producto.id)) {
+    const snapshot = await cargarSnapshotAsignacionMixtaProducto(producto.id);
+    if (!snapshot) throw new Error("No se pudo leer el stock actual. No se ha convertido ni modificado inventario.");
+  }
+  setMsg("msg-productos", "PASO 1: escribe cada sabor. PASO 2: indica las unidades reales y el mínimo de cada sabor en cada almacén. PASO 3: confirma la distribución y guarda. El stock no se repartirá automáticamente.", true);
+  renderPanelAsignacionMixtaProducto();
+  const section = document.getElementById("prod-inventario-mixto-settings");
+  if (section) section.scrollIntoView({ behavior: "smooth", block: "center" });
+  return true;
+};
 
 function cancelarEdicionProducto() {
   document.getElementById("form-producto").reset();
