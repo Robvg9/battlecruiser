@@ -63,11 +63,14 @@ test("A forced stock refresh bypasses withCache and updates the shared stock cac
   assert.match(warehouses, /await cargarStockAlmacenes\(true\)/);
   assert.match(warehouses, /_cache\.stock = \[\]/);
   assert.match(warehouses, /_stockCargaEstado !== "ok"/);
+  assert.match(warehouses, /if \(!force\) return _stockCargaPromise/);
+  assert.match(warehouses, /pendingRead\.catch/);
+  assert.match(warehouses, /return cargarStockAlmacenes\(true\)/);
 });
 
 test("A committed purchase refresh error is reported as a refresh issue, not as a failed purchase", () => {
   assert.match(purchase, /registrar_compra_multiple/);
-  assert.match(purchase, /Compra registrada en Supabase\. No se pudo confirmar la lectura inmediata del inventario/);
+  assert.equal((purchase.match(/No se pudo confirmar la lectura inmediata del inventario/g) || []).length, 2);
   assert.match(purchase, /await refrescarStockYSelects\(\)/);
   assert.match(purchase, /bcNotificarCambioDatos\('compra', false\)/);
 });
@@ -96,6 +99,5 @@ test("Field labels are hidden, disabled placeholders rather than selectable drop
       "expected hidden disabled placeholder: " + text
     );
   }
-  assert.match(index, /<option value="" disabled selected hidden>Selecciona una categoría<\/option>/);
   assert.match(index, /<option value="" disabled selected hidden>Selecciona una categoría<\/option>/);
 });
