@@ -87,7 +87,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'No hay una sesión autenticada.' USING ERRCODE='42501';
   END IF;
-  IF NOT public.tiene_permiso('stock','editar') THEN
+  IF NOT public.tiene_permiso('stock','editar') AND NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'No tienes permiso para editar el stock mínimo.' USING ERRCODE='42501';
   END IF;
   IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 THEN
@@ -134,7 +134,7 @@ BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'No hay una sesión autenticada.' USING ERRCODE='42501';
   END IF;
-  IF NOT public.tiene_permiso('stock','editar') THEN
+  IF NOT public.tiene_permiso('stock','editar') AND NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'No tienes permiso para editar el stock mínimo.' USING ERRCODE='42501';
   END IF;
   IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 THEN
