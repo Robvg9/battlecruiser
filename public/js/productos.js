@@ -328,7 +328,7 @@ function renderProductosLista() {
     if (puedeEditar) {
       botones = `<span class="lista-item-acciones">
           <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
-          <button type="button" class="btn-configurar-sabores" data-id="${p.id}">${p.inventario_mixto ? "Editar sabores" : "Configurar sabores"}</button>
+          <button type="button" class="btn-editar-producto btn-configurar-sabores" data-id="${p.id}">${p.inventario_mixto ? "Editar sabores" : "Configurar sabores"}</button>
           <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
         </span>`;
     }
