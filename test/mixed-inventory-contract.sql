@@ -94,6 +94,16 @@ BEGIN
     RAISE EXCEPTION 'Legacy stock decrease was blocked while minimum was pending';
   END IF;
 
+  v_failed:=false;
+  BEGIN
+    UPDATE public.stock SET almacen_id=v_warehouse_a
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id='55555555-5555-4555-8555-555555555555';
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Positive stock was reassigned to another warehouse without a minimum'; END IF;
+
   PERFORM public.bc_actualizar_stock_minimo_obligatorio(
     '66666666-6666-4666-8666-666666666666',
     '55555555-5555-4555-8555-555555555555',5
