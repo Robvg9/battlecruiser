@@ -76,13 +76,23 @@ BEGIN
   -- A normal product must have an explicitly entered positive minimum per warehouse.
   v_failed:=false;
   BEGIN
-    UPDATE public.stock SET cantidad=1
+    UPDATE public.stock SET cantidad=6
     WHERE producto_id='66666666-6666-4666-8666-666666666666'
       AND almacen_id='55555555-5555-4555-8555-555555555555';
   EXCEPTION WHEN check_violation THEN
     v_failed:=true;
   END;
-  IF NOT v_failed THEN RAISE EXCEPTION 'Normal product stock moved without a positive minimum'; END IF;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Normal product stock increase accepted without a positive minimum'; END IF;
+
+  -- Existing stock can still be sold or written off while its minimum is being configured.
+  UPDATE public.stock SET cantidad=4
+  WHERE producto_id='66666666-6666-4666-8666-666666666666'
+    AND almacen_id='55555555-5555-4555-8555-555555555555';
+  IF (SELECT cantidad FROM public.stock
+      WHERE producto_id='66666666-6666-4666-8666-666666666666'
+        AND almacen_id='55555555-5555-4555-8555-555555555555')<>4 THEN
+    RAISE EXCEPTION 'Legacy stock decrease was blocked while minimum was pending';
+  END IF;
 
   PERFORM public.bc_actualizar_stock_minimo_obligatorio(
     '66666666-6666-4666-8666-666666666666',
@@ -93,7 +103,7 @@ BEGIN
         AND almacen_id='55555555-5555-4555-8555-555555555555')<>5 THEN
     RAISE EXCEPTION 'The required normal-product warehouse minimum was not saved';
   END IF;
-  UPDATE public.stock SET cantidad=1
+  UPDATE public.stock SET cantidad=5
   WHERE producto_id='66666666-6666-4666-8666-666666666666'
     AND almacen_id='55555555-5555-4555-8555-555555555555';
   v_failed:=false;
