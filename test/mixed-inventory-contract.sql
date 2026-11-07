@@ -16,6 +16,15 @@ DECLARE
   v_count integer;
   v_failed boolean;
   v_message text;
+  v_conversion_parent uuid;
+  v_conversion_apple uuid;
+  v_conversion_pear uuid;
+  v_conversion_lot_1 uuid;
+  v_conversion_lot_2 uuid;
+  v_history jsonb;
+  v_history_remaining numeric;
+  v_inventory_minimum numeric;
+  v_total_fifo_value numeric;
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_user::text,false);
   INSERT INTO public.almacenes(id,nombre) VALUES
@@ -363,6 +372,130 @@ BEGIN
     RAISE EXCEPTION 'Flavor SKUs remained active after disabling mixed mode';
   END IF;
 
+  -- A stocked generic product is converted using a user-provided flavor split.
+  -- The operation is atomic, keeps each purchase cost/date and its FIFO lineage,
+  -- removes the parent's global minimum, and exposes the sum of child minima.
+  INSERT INTO public.productos(nombre,unidad,precio_normal,activo)
+    VALUES('Nectar de lata','unidad',20,true)
+    RETURNING id INTO v_conversion_parent;
+  INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
+    VALUES(v_conversion_parent,v_warehouse_a,3,1);
+  INSERT INTO public.lotes_compra(
+    producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen
+  ) VALUES(
+    v_conversion_parent,v_warehouse_a,1,1,1.00,now()-interval '2 days','compra'
+  ) RETURNING id INTO v_conversion_lot_1;
+  INSERT INTO public.lotes_compra(
+    producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen
+  ) VALUES(
+    v_conversion_parent,v_warehouse_a,2,2,2.00,now()-interval '1 day','compra'
+  ) RETURNING id INTO v_conversion_lot_2;
+
+  v_failed:=false;
+  BEGIN
+    PERFORM public.configurar_producto_inventario_mixto_con_asignaciones(
+      v_conversion_parent,true,
+      jsonb_build_array(jsonb_build_object('nombre','Manzana'),jsonb_build_object('nombre','Pera')),
+      jsonb_build_array(
+        jsonb_build_object('almacen_id',v_warehouse_a,'variantes',jsonb_build_array(
+          jsonb_build_object('nombre','Manzana','cantidad',0.9,'minimo',0.5),
+          jsonb_build_object('nombre','Pera','cantidad',2,'minimo',0.75))),
+        jsonb_build_object('almacen_id',v_warehouse_b,'variantes',jsonb_build_array(
+          jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+          jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
+        jsonb_build_object('almacen_id',v_warehouse_c,'variantes',jsonb_build_array(
+          jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+          jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
+        jsonb_build_object('almacen_id','55555555-5555-4555-8555-555555555555'::uuid,'variantes',jsonb_build_array(
+          jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+          jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4)))
+      )
+    );
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Conversion accepted flavor allocations that did not sum to generic stock'; END IF;
+  IF (SELECT inventario_mixto FROM public.productos WHERE id=v_conversion_parent)
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_parent AND almacen_id=v_warehouse_a)<>3
+     OR (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id=v_conversion_parent AND almacen_id=v_warehouse_a)<>3 THEN
+    RAISE EXCEPTION 'Rejected conversion changed generic stock, its purchase layers, or product mode';
+  END IF;
+
+  v_result:=public.configurar_producto_inventario_mixto_con_asignaciones(
+    v_conversion_parent,true,
+    jsonb_build_array(jsonb_build_object('nombre','Manzana'),jsonb_build_object('nombre','Pera')),
+    jsonb_build_array(
+      jsonb_build_object('almacen_id',v_warehouse_a,'variantes',jsonb_build_array(
+        jsonb_build_object('nombre','Manzana','cantidad',1,'minimo',0.5),
+        jsonb_build_object('nombre','Pera','cantidad',2,'minimo',0.75))),
+      jsonb_build_object('almacen_id',v_warehouse_b,'variantes',jsonb_build_array(
+        jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+        jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
+      jsonb_build_object('almacen_id',v_warehouse_c,'variantes',jsonb_build_array(
+        jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+        jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
+      jsonb_build_object('almacen_id','55555555-5555-4555-8555-555555555555'::uuid,'variantes',jsonb_build_array(
+        jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+        jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4)))
+    )
+  );
+  SELECT id INTO v_conversion_apple FROM public.productos
+    WHERE producto_padre_id=v_conversion_parent AND variante_nombre='Manzana' AND activo=true;
+  SELECT id INTO v_conversion_pear FROM public.productos
+    WHERE producto_padre_id=v_conversion_parent AND variante_nombre='Pera' AND activo=true;
+  IF v_conversion_apple IS NULL OR v_conversion_pear IS NULL THEN
+    RAISE EXCEPTION 'Conversion did not create both flavor SKUs';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.stock WHERE producto_id=v_conversion_parent)
+     OR EXISTS(SELECT 1 FROM public.productos_stock_mixto_minimos WHERE producto_id=v_conversion_parent) THEN
+    RAISE EXCEPTION 'Mixed parent kept a global stock row or a general minimum';
+  END IF;
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_apple AND almacen_id=v_warehouse_a)<>1
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_pear AND almacen_id=v_warehouse_a)<>2
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_conversion_apple AND almacen_id=v_warehouse_a)<>0.5
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_conversion_pear AND almacen_id=v_warehouse_a)<>0.75 THEN
+    RAISE EXCEPTION 'Manually allocated quantities or flavor-specific minimums were not preserved';
+  END IF;
+  IF (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id=v_conversion_parent)<>0
+     OR (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id IN (v_conversion_apple,v_conversion_pear))<>3 THEN
+    RAISE EXCEPTION 'Generic FIFO layers were not moved to the flavor SKUs';
+  END IF;
+  SELECT sum(cantidad_restante*costo_unitario) INTO v_total_fifo_value
+  FROM public.lotes_compra WHERE producto_id IN (v_conversion_apple,v_conversion_pear) AND almacen_id=v_warehouse_a;
+  IF v_total_fifo_value<>5 THEN
+    RAISE EXCEPTION 'Conversion changed the original FIFO inventory value: %',v_total_fifo_value;
+  END IF;
+  IF (SELECT count(*) FROM public.lotes_compra_conversion_mixta
+      WHERE lote_origen_id IN (v_conversion_lot_1,v_conversion_lot_2))<>4 THEN
+    RAISE EXCEPTION 'Source purchase layers were not mapped to both flavor SKUs';
+  END IF;
+  SELECT minimo,cantidad INTO v_inventory_minimum,v_qty
+  FROM public.inventario_mixto_enriquecido(v_warehouse_a)
+  WHERE producto_id=v_conversion_parent;
+  IF v_inventory_minimum<>1.25 OR v_qty<>3 THEN
+    RAISE EXCEPTION 'Composite minimum must equal the sum of flavor minimums; got minimum %, stock %',v_inventory_minimum,v_qty;
+  END IF;
+  SELECT sum(cantidad_restante),count(*) INTO v_history_remaining,v_count
+  FROM public.historial_compras(NULL,NULL,v_conversion_parent,v_warehouse_a,100,0);
+  IF v_history_remaining<>3 OR v_count<>2 THEN
+    RAISE EXCEPTION 'Original purchase history did not show the remaining converted FIFO balance: %, rows %',v_history_remaining,v_count;
+  END IF;
+  SELECT sum(cantidad_restante),count(*) INTO v_history_remaining,v_count
+  FROM public.historial_compras(NULL,NULL,v_conversion_apple,v_warehouse_a,100,0);
+  IF v_history_remaining<>1 OR v_count<>2 THEN
+    RAISE EXCEPTION 'Filtering purchase history by a flavor did not isolate its converted layers: %, rows %',v_history_remaining,v_count;
+  END IF;
+  v_history:=public.historial_premium_detalle('compras',v_conversion_lot_1);
+  IF (v_history->>'cantidad_restante')::numeric<>1
+     OR jsonb_array_length(v_history->'asignaciones')<>2 THEN
+    RAISE EXCEPTION 'Premium purchase detail lost the converted flavor allocation: %',v_history;
+  END IF;
+  v_history:=public.bc_obtener_snapshot_conversion_mixta(v_conversion_parent);
+  IF NOT (v_history->>'inventario_mixto')::boolean
+     OR jsonb_array_length(v_history->'almacenes')<>4 THEN
+    RAISE EXCEPTION 'Conversion snapshot did not expose the mixed product and all active warehouses';
+  END IF;
+
   -- Stock writes lock parent before variant, serializing them with mode changes.
   IF position('WHERE id=v_parent_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))=0
      OR position('WHERE id=NEW.producto_id FOR SHARE' IN pg_get_functiondef('public.bc_guard_mixed_stock_sku()'::regprocedure))=0
@@ -380,7 +513,13 @@ BEGIN
      OR has_function_privilege('anon','public.bc_seed_mixed_variant_minimum()','EXECUTE') THEN
     RAISE EXCEPTION 'Anonymous role can execute a stock-minimum or trigger function';
   END IF;
-  IF NOT has_function_privilege('authenticated','public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric)','EXECUTE')
+  IF has_function_privilege('anon','public.configurar_producto_inventario_mixto_con_asignaciones(uuid,boolean,jsonb,jsonb)','EXECUTE')
+     OR has_function_privilege('anon','public.bc_obtener_snapshot_conversion_mixta(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can configure or inspect mixed stock conversion';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.configurar_producto_inventario_mixto_con_asignaciones(uuid,boolean,jsonb,jsonb)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc_obtener_snapshot_conversion_mixta(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric)','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.bc_actualizar_stock_minimo_variante(uuid,uuid,numeric)','EXECUTE') THEN
     RAISE EXCEPTION 'Authenticated role cannot execute the authorized stock-minimum RPCs';
   END IF;

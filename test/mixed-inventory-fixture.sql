@@ -67,6 +67,16 @@ CREATE TABLE public.lotes_compra(
   compra_id uuid
 );
 
+CREATE TABLE public.compras(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  proveedor text,
+  usuario_nombre text
+);
+CREATE TABLE public.usuarios(
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre text
+);
+
 CREATE OR REPLACE FUNCTION public.tiene_permiso(p_modulo text,p_accion text)
 RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE OR REPLACE FUNCTION public.bc_actor_is_admin()

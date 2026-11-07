@@ -328,6 +328,7 @@ function renderProductosLista() {
     if (puedeEditar) {
       botones = `<span class="lista-item-acciones">
           <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
+          ${p.activo !== false ? `<button type="button" class="btn-editar-producto btn-configurar-sabores" data-id="${p.id}">${p.inventario_mixto ? "Editar sabores" : "Configurar sabores"}</button>` : ""}
           <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
         </span>`;
     }
@@ -384,6 +385,24 @@ safeInit("lista-productos", () => {
       const inputBuscar = document.getElementById("productos-buscar");
       if (inputBuscar) inputBuscar.value = "";
       renderProductosLista();
+      return;
+    }
+    const btnConfigurarSabores = e.target.closest(".btn-configurar-sabores");
+    if (btnConfigurarSabores) {
+      const producto = (_cache.productos || []).find((p) => String(p.id) === String(btnConfigurarSabores.dataset.id));
+      if (producto) {
+        await iniciarEdicionProducto(producto);
+        const toggle = document.getElementById("prod-inventario-mixto");
+        const list = document.getElementById("prod-variantes-lista");
+        if (toggle && !toggle.checked) toggle.checked = true;
+        if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
+        sincronizarEditorVariantesProducto();
+        if (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(producto.id)) await cargarSnapshotAsignacionMixtaProducto(producto.id);
+        setMsg("msg-productos", "Asigna manualmente las unidades reales de cada sabor y define su mínimo por almacén. El valor y las capas FIFO de la compra se conservarán proporcionalmente.", true);
+        renderPanelAsignacionMixtaProducto();
+        const section = document.getElementById("prod-inventario-mixto-settings");
+        if (section) section.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
     const btnEditar = e.target.closest(".btn-editar-producto");
@@ -488,16 +507,18 @@ safeInit("prod-inventario-mixto", () => {
   const add = document.getElementById("prod-variante-agregar");
   const list = document.getElementById("prod-variantes-lista");
   if (!toggle || !add || !list) return;
-  toggle.addEventListener("change", sincronizarEditorVariantesProducto);
+  toggle.addEventListener("change", async () => { sincronizarEditorVariantesProducto(); const id = document.getElementById("prod-editando-id")?.value || ""; if (toggle.checked && id && (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(id))) await cargarSnapshotAsignacionMixtaProducto(id); else renderPanelAsignacionMixtaProducto(); });
   add.addEventListener("click", () => {
     agregarFilaVarianteProducto("", "");
     const inputs = list.querySelectorAll(".prod-variante-nombre");
     if (inputs.length) inputs[inputs.length - 1].focus();
+    renderPanelAsignacionMixtaProducto();
   });
   list.addEventListener("click", (e) => {
     const remove = e.target.closest(".prod-variante-quitar");
-    if (remove) remove.closest(".prod-variante-row").remove();
+    if (remove) { remove.closest(".prod-variante-row").remove(); renderPanelAsignacionMixtaProducto(); }
   });
+  list.addEventListener("change", (e) => { if (e.target && e.target.classList.contains("prod-variante-nombre")) renderPanelAsignacionMixtaProducto(); });
   sincronizarEditorVariantesProducto();
 });
 
@@ -508,6 +529,210 @@ function obtenerVariantesFormularioProducto() {
     id: row.dataset.varianteId || null,
     nombre: (row.querySelector(".prod-variante-nombre")?.value || "").trim()
   }));
+}
+
+
+let _productoMixtoSnapshot = null;
+
+async function cargarSnapshotAsignacionMixtaProducto(productoId) {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  if (panel) {
+    panel.hidden = false;
+    panel.classList.remove("hidden");
+    panel.innerHTML = '<p class="bc-mixed-assignment-loading">Consultando existencias y capas FIFO por almacén…</p>';
+  }
+  try {
+    const result = await client.rpc("bc_obtener_snapshot_conversion_mixta", { p_producto_id: productoId });
+    if (result.error) throw result.error;
+    _productoMixtoSnapshot = result.data || null;
+    if (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(productoId)) {
+      throw new Error("Supabase no devolvió el estado de inventario esperado.");
+    }
+    renderPanelAsignacionMixtaProducto();
+    return _productoMixtoSnapshot;
+  } catch (error) {
+    _productoMixtoSnapshot = null;
+    if (panel) {
+      panel.hidden = false;
+      panel.classList.remove("hidden");
+      panel.innerHTML = '<p class="bc-mixed-assignment-error">No se pudo consultar el inventario actual. No guardes la conversión hasta poder revisar los saldos y lotes de cada almacén.</p>';
+    }
+    setMsg("msg-productos", "No se pudo preparar la conversión de sabores: " + explicarError(error, "consultar inventario"), false);
+    return null;
+  }
+}
+
+function capturarCamposAsignacionMixtaProducto() {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  const state = new Map();
+  if (!panel) return state;
+  panel.querySelectorAll("[data-mixed-quantity],[data-mixed-minimum]").forEach((input) => {
+    const key = [input.dataset.warehouseId || "", input.dataset.variantIndex || "", input.hasAttribute("data-mixed-quantity") ? "cantidad" : "minimo"].join("|");
+    state.set(key, input.value);
+  });
+  return state;
+}
+
+function renderPanelAsignacionMixtaProducto() {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  const toggle = document.getElementById("prod-inventario-mixto");
+  if (!panel) return;
+  if (!toggle || !toggle.checked) {
+    panel.hidden = true;
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+    return;
+  }
+  const snapshot = _productoMixtoSnapshot;
+  if (!snapshot) {
+    panel.hidden = false;
+    panel.classList.remove("hidden");
+    panel.innerHTML = '<p class="bc-mixed-assignment-error">Aún no se ha podido verificar el inventario actual. Vuelve a abrir el producto o actualiza los catálogos.</p>';
+    return;
+  }
+  const previous = capturarCamposAsignacionMixtaProducto();
+  const variants = obtenerVariantesFormularioProducto().filter((v) => v.nombre);
+  const warehouses = Array.isArray(snapshot.almacenes) ? snapshot.almacenes : [];
+  const mixed = !!snapshot.inventario_mixto;
+  const needsConfirmation = !mixed && warehouses.some((w) => Number(w.stock_generico || 0) > 0 || Number(w.cantidad_fifo_generica || 0) > 0);
+  const escape = (value) => typeof escHtml === "function"
+    ? escHtml(String(value == null ? "" : value))
+    : String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+  if (!variants.length) {
+    panel.hidden = false;
+    panel.classList.remove("hidden");
+    panel.innerHTML = '<div class="bc-mixed-assignment-heading"><strong>Distribución y mínimos por almacén</strong><p>Primero agrega al menos un sabor.</p></div>';
+    return;
+  }
+  if (!warehouses.length) {
+    panel.hidden = false;
+    panel.classList.remove("hidden");
+    panel.innerHTML = '<p class="bc-mixed-assignment-error">No hay almacenes activos ni asignaciones históricas que se puedan configurar.</p>';
+    return;
+  }
+
+  const html = warehouses.map((warehouse) => {
+    const warehouseId = String(warehouse.almacen_id || "");
+    const genericStock = Number(warehouse.stock_generico || 0);
+    const fifoQty = Number(warehouse.cantidad_fifo_generica || 0);
+    const lotCount = Number(warehouse.lotes_abiertos_genericos || 0);
+    const coherent = mixed || warehouse.coherente_fifo !== false;
+    const oldVariants = Array.isArray(warehouse.variantes) ? warehouse.variantes : [];
+    const flavorRows = variants.map((variant, index) => {
+      const existing = oldVariants.find((candidate) =>
+        (variant.id && String(candidate.producto_id) === String(variant.id)) ||
+        (!variant.id && String(candidate.nombre || "").trim().toLocaleLowerCase() === variant.nombre.toLocaleLowerCase())
+      );
+      const oldQuantity = Number(existing && existing.cantidad || 0);
+      const qtyKey = [warehouseId,index,"cantidad"].join("|");
+      const minKey = [warehouseId,index,"minimo"].join("|");
+      const qtyValue = mixed ? String(oldQuantity) : (previous.has(qtyKey) ? previous.get(qtyKey) : (genericStock === 0 ? "0" : ""));
+      const oldMinimum = Number(existing && existing.minimo || 0);
+      const minimumValue = previous.has(minKey) ? previous.get(minKey) : (mixed && oldMinimum > 0 ? String(oldMinimum) : "");
+      return '<div class="bc-mixed-assignment-flavor" data-variant-index="' + index + '">' +
+        '<strong>' + escape(variant.nombre) + '</strong>' +
+        '<label>Unidades asignadas' +
+          '<input type="number" min="0" step="any" inputmode="decimal" required data-mixed-quantity data-warehouse-id="' + escape(warehouseId) + '" data-variant-index="' + index + '" value="' + escape(qtyValue) + '"' + (mixed ? ' readonly aria-readonly="true"' : '') + '>' +
+        '</label>' +
+        '<label>Mínimo obligatorio' +
+          '<input type="number" min="0.001" step="any" inputmode="decimal" required data-mixed-minimum data-warehouse-id="' + escape(warehouseId) + '" data-variant-index="' + index + '" value="' + escape(minimumValue) + '" placeholder="Mayor que 0">' +
+        '</label>' +
+      '</div>';
+    }).join("");
+    const genericInfo = mixed
+      ? '<p class="bc-mixed-assignment-meta">Inventario mixto ya activo · cantidades existentes protegidas.</p>'
+      : '<p class="bc-mixed-assignment-meta">Stock genérico: <strong>' + fmtQtyProducto(genericStock) + '</strong> · Lotes FIFO abiertos: <strong>' + fmtQtyProducto(lotCount) + '</strong> · Unidades en lotes: <strong>' + fmtQtyProducto(fifoQty) + '</strong></p>';
+    const integrity = coherent
+      ? ""
+      : '<p class="bc-mixed-assignment-error">El stock físico y las cantidades restantes de los lotes FIFO no coinciden. Este almacén debe reconciliarse antes de convertir.</p>';
+    return '<section class="bc-mixed-assignment-warehouse" data-warehouse-card data-warehouse-id="' + escape(warehouseId) + '" data-required-quantity="' + escape(genericStock) + '" data-mixed="' + (mixed ? "true" : "false") + '">' +
+      '<div class="bc-mixed-assignment-warehouse-heading"><strong>' + escape(warehouse.almacen || "Almacén") + '</strong><span>' + (warehouse.activo ? "Activo" : "Histórico") + '</span></div>' +
+      genericInfo + integrity +
+      '<div class="bc-mixed-assignment-flavors">' + flavorRows + '</div>' +
+      '<div class="bc-mixed-assignment-total" data-allocation-feedback></div>' +
+    '</section>';
+  }).join("");
+
+  panel.hidden = false;
+  panel.classList.remove("hidden");
+  panel.innerHTML = '<div class="bc-mixed-assignment-heading"><strong>Distribución de inventario y mínimos por almacén</strong>' +
+    '<p>Configura un mínimo mayor que cero para cada sabor en cada almacén. Los productos con sabores no tendrán un mínimo general: su mínimo compuesto será la suma de estos mínimos.</p></div>' +
+    '<div class="bc-mixed-assignment-note"><strong>Conservación de costos y FIFO</strong><p>Cuando exista stock genérico, tú defines cuántas unidades reales corresponden a cada sabor. El sistema distribuirá proporcionalmente cada capa de compra entre los sabores, conservará sus costos, fecha y orden FIFO, y mantendrá el registro de la compra original. No se inventará ninguna cantidad.</p></div>' +
+    html +
+    (needsConfirmation
+      ? '<label class="bc-mixed-assignment-confirm"><input type="checkbox" data-confirm-mixed-conversion> Confirmo que las cantidades asignadas corresponden al conteo real de cada sabor y autorizo esta clasificación de las existencias actuales.</label>'
+      : '') +
+    '<p class="bc-mixed-assignment-footnote">La conversión y sus capas FIFO se guardan en una sola transacción. Si una comprobación no coincide, nada se convierte.</p>';
+  actualizarTotalesPanelAsignacionMixta();
+}
+
+function actualizarTotalesPanelAsignacionMixta() {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  if (!panel) return;
+  panel.querySelectorAll("[data-warehouse-card]").forEach((card) => {
+    if (card.dataset.mixed === "true") return;
+    const expected = Number(card.dataset.requiredQuantity || 0);
+    let total = 0;
+    let valid = true;
+    card.querySelectorAll("[data-mixed-quantity]").forEach((input) => {
+      if (input.value.trim() === "" || !Number.isFinite(Number(input.value)) || Number(input.value) < 0) valid = false;
+      else total += Number(input.value);
+    });
+    const output = card.querySelector("[data-allocation-feedback]");
+    if (!output) return;
+    const difference = Math.abs(total - expected);
+    output.textContent = valid && difference <= 0.000001
+      ? "Asignación completa: " + fmtQtyProducto(total) + " / " + fmtQtyProducto(expected)
+      : "Pendiente: asigna " + fmtQtyProducto(expected) + " unidades en total. Llevas " + (valid ? fmtQtyProducto(total) : "cantidades incompletas") + ".";
+    output.classList.toggle("is-valid", valid && difference <= 0.000001);
+    output.classList.toggle("is-invalid", !valid || difference > 0.000001);
+  });
+}
+
+safeInit("prod-variantes-asignacion", () => {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  if (!panel) return;
+  panel.addEventListener("input", actualizarTotalesPanelAsignacionMixta);
+});
+
+function prepararAsignacionesMixtasProducto(variants) {
+  const snapshot = _productoMixtoSnapshot;
+  const panel = document.getElementById("prod-variantes-asignacion");
+  if (!snapshot || !panel) return { ok: false, error: "No se ha podido verificar el inventario de este producto." };
+  const mixed = !!snapshot.inventario_mixto;
+  const requiresConfirmation = !mixed && (snapshot.almacenes || []).some((w) =>
+    Number(w.stock_generico || 0) > 0 || Number(w.cantidad_fifo_generica || 0) > 0
+  );
+  if (requiresConfirmation && !panel.querySelector("[data-confirm-mixed-conversion]")?.checked) {
+    return { ok: false, error: "Confirma que las cantidades por sabor corresponden al inventario real antes de convertir." };
+  }
+  const assignments = [];
+  for (const warehouse of (snapshot.almacenes || [])) {
+    const warehouseId = String(warehouse.almacen_id || "");
+    if (!warehouse.coherente_fifo && !mixed) {
+      return { ok: false, error: "El stock y los lotes FIFO no coinciden en " + (warehouse.almacen || "un almacén") + ". Reconcílialos antes de convertir." };
+    }
+    const flavorRows = [];
+    let sum = 0;
+    for (let index=0; index<variants.length; index++) {
+      const qtyInput = panel.querySelector('[data-mixed-quantity][data-warehouse-id="' + warehouseId + '"][data-variant-index="' + index + '"]');
+      const minimumInput = panel.querySelector('[data-mixed-minimum][data-warehouse-id="' + warehouseId + '"][data-variant-index="' + index + '"]');
+      if (!qtyInput || !minimumInput || qtyInput.value.trim() === "" || minimumInput.value.trim() === "") {
+        return { ok: false, error: "Completa las unidades y el mínimo de " + variants[index].nombre + " en " + (warehouse.almacen || "cada almacén") + "." };
+      }
+      const quantity = Number(qtyInput.value);
+      const minimum = Number(minimumInput.value);
+      if (!Number.isFinite(quantity) || quantity < 0) return { ok: false, error: "La cantidad de " + variants[index].nombre + " no es válida." };
+      if (!Number.isFinite(minimum) || minimum <= 0) return { ok: false, error: "El mínimo de " + variants[index].nombre + " debe ser mayor que cero." };
+      sum += quantity;
+      flavorRows.push({ nombre: variants[index].nombre, cantidad: quantity, minimo: minimum });
+    }
+    if (!mixed && Math.abs(sum - Number(warehouse.stock_generico || 0)) > 0.000001) {
+      return { ok: false, error: "En " + (warehouse.almacen || "un almacén") + ", las cantidades de los sabores deben sumar exactamente " + fmtQtyProducto(warehouse.stock_generico || 0) + "." };
+    }
+    assignments.push({ almacen_id: warehouseId, variantes: flavorRows });
+  }
+  return { ok: true, data: assignments };
 }
 
 async function iniciarEdicionProducto(p) {
@@ -570,6 +795,8 @@ async function iniciarEdicionProducto(p) {
     wrap.classList.add("hidden");
   }
   setMsg("msg-prod-imagen", "", true);
+  if (mixedToggle && mixedToggle.checked) await cargarSnapshotAsignacionMixtaProducto(p.id);
+  else { _productoMixtoSnapshot = null; renderPanelAsignacionMixtaProducto(); }
   document.getElementById("form-producto").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
@@ -585,6 +812,8 @@ function cancelarEdicionProducto() {
   const mixedToggle = document.getElementById("prod-inventario-mixto");
   if (mixedToggle) mixedToggle.checked = false;
   renderEditorVariantesProducto([]);
+  _productoMixtoSnapshot = null;
+  renderPanelAsignacionMixtaProducto();
   sincronizarEditorVariantesProducto();
   const submitBtn = document.getElementById("prod-submit-btn");
   if (submitBtn) submitBtn.textContent = "Agregar producto";
@@ -659,6 +888,12 @@ safeInit("form-producto", () => {
         return;
       }
     }
+    let asignacionesMixtas = [];
+    if (mixedEnabled) {
+      const prepared = prepararAsignacionesMixtasProducto(variants);
+      if (!prepared.ok) { setMsg("msg-productos", prepared.error, false); return; }
+      asignacionesMixtas = prepared.data;
+    }
     if ((needsMixedConfig || formatoMayorista || (previousProduct && previousProduct.presentacion_id)) && !navigator.onLine) {
       setMsg("msg-productos", needsMixedConfig
         ? "Necesitas conexión para configurar el inventario por sabores. El producto no se ha guardado."
@@ -726,10 +961,11 @@ safeInit("form-producto", () => {
     }
     const productoIdReal = editandoId || resultado.data;
     if (needsMixedConfig && productoIdReal) {
-      const config = await client.rpc("configurar_producto_inventario_mixto", {
+      const config = await client.rpc("configurar_producto_inventario_mixto_con_asignaciones", {
         p_producto_id: productoIdReal,
         p_habilitar: mixedEnabled,
-        p_variantes: mixedEnabled ? variants : []
+        p_variantes: mixedEnabled ? variants : [],
+        p_asignaciones: mixedEnabled ? asignacionesMixtas : []
       });
       if (config.error) {
         setMsg("msg-productos", "Los datos básicos del producto se guardaron, pero no se pudo aplicar la configuración de sabores: " + explicarError(config.error, "configurar inventario mixto"), false);

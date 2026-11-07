@@ -229,7 +229,7 @@
           ? '<div class="bc-inv-minimum-feedback is-success" role="status">' + esc(feedback.message) + '</div>'
           : '';
         const editor = variants.length
-          ? '<strong class="bc-inv-minimum-readonly">Mínimos individuales por sabor</strong>'
+          ? '<strong class="bc-inv-minimum-readonly">' + (warehouse.minimo == null ? 'Mínimo compuesto pendiente' : 'Mínimo compuesto: ' + esc(qtyFmt(minimum))) + '</strong>'
           : (editable
             ? '<div class="bc-inv-minimum-controls">' +
                 '<input id="' + inputId + '" data-bc-minimum-input type="number" min="0.001" step="any" inputmode="decimal" required value="' + esc(String(minimum > 0 ? minimum : '')) + '" aria-label="Stock mínimo de ' + esc(warehouse.almacen || 'almacén') + '">' +
@@ -248,7 +248,7 @@
             '<span class="bc-inv-warehouse-status">' + esc(estadoLabel(status)) + '</span></div>' +
           '<div class="bc-inv-detail-row"><span>Stock actual</span><strong>' +
             esc(qtyFmt(warehouse.cantidad) + ' ' + (warehouse.unidad || unit)) + '</strong></div>' +
-          '<div class="bc-inv-minimum-editor"><label for="' + (editable ? inputId : '') + '">Stock mínimo</label>' +
+          '<div class="bc-inv-minimum-editor"><label for="' + (editable ? inputId : '') + '">' + (variants.length ? 'Mínimo compuesto' : 'Stock mínimo') + '</label>' +
             editor + savedFeedback + hint +
           '</div>' +
           (variants.length
@@ -275,7 +275,7 @@
             '<strong>Agregar este producto a otro almacén</strong>' +
             '<p>Se creará la asignación con stock 0. Define primero su mínimo obligatorio para poder recibir compras o transferencias.</p>' +
             '<div class="bc-inv-add-warehouse-controls">' +
-              '<select data-bc-new-warehouse aria-label="Nuevo almacén"><option value="">Seleccionar almacén…</option>' +
+              '<select data-bc-new-warehouse aria-label="Nuevo almacén"><option value="" disabled selected hidden>Seleccionar almacén…</option>' +
                 unassignedWarehouses.map(warehouse => '<option value="' + esc(warehouse.id) + '">' + esc(warehouse.nombre) + '</option>').join('') +
               '</select>' +
               '<input data-bc-new-warehouse-minimum type="number" min="0.001" step="any" inputmode="decimal" placeholder="Stock mínimo" aria-label="Stock mínimo obligatorio">' +
