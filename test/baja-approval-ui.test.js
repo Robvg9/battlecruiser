@@ -43,12 +43,15 @@ test("approval UI renders Bajas and updates the control-center badge from the sa
 test("inventory detail has a direct route into the flavor and per-warehouse minimum wizard", () => {
   const detail = read("public/js/inventario-detalle.js");
   const products = read("public/js/productos.js");
+  const css = read("public/style.css");
   assert.match(detail, /data-bc-configure-flavors/);
   assert.match(detail, /bcAbrirConfiguracionSabores/);
   assert.match(products, /window\.bcAbrirConfiguracionSabores = async function/);
   assert.match(products, /cargarSnapshotAsignacionMixtaProducto\(producto\.id\)/);
   assert.match(products, /mínimo de cada sabor en cada almacén/);
   assert.match(products, /stock no se repartirá automáticamente/i);
+  assert.match(css, /\.bc-inv-flavors-setup/);
+  assert.match(css, /white-space: normal/);
 });
 
 test("PWA release and cache manifest are aligned at 9.5.80", () => {
