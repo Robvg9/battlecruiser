@@ -89,7 +89,7 @@ async function boot(t, options = {}) {
           { fecha: "2026-11-04T10:00:00Z", tipo: "transferencia_entrada", producto: "Bizcocho", almacen: "La Cueva", cantidad: 20, usuario: "Prueba" }
         ], error: null
       };
-      if (name === "bc_actualizar_stock_minimo") {
+      if (name === "bc_actualizar_stock_minimo_obligatorio") {
         if (options.canEdit === false) {
           return { data: null, error: { code: "42501", message: "No tenés permiso para editar el stock mínimo." } };
         }
@@ -211,10 +211,10 @@ test("Inventario: guardar cambia solo el mínimo del almacén elegido y conserva
   assert.ok(input && button);
   input.value = "220";
   button.click();
-  assert.ok(await waitFor(() => rpcCalls.some((call) => call.name === "bc_actualizar_stock_minimo")));
+  assert.ok(await waitFor(() => rpcCalls.some((call) => call.name === "bc_actualizar_stock_minimo_obligatorio")));
   assert.ok(await waitFor(() => modal.textContent.includes("Stock mínimo guardado.")));
 
-  const call = rpcCalls.find((item) => item.name === "bc_actualizar_stock_minimo");
+  const call = rpcCalls.find((item) => item.name === "bc_actualizar_stock_minimo_obligatorio");
   assert.equal(call.args.p_producto_id, "biz");
   assert.equal(call.args.p_almacen_id, "a2");
   assert.equal(call.args.p_minimo, 220);
@@ -238,7 +238,7 @@ test("Inventario: el permiso de stock es aplicado por el RPC y un rechazo no con
   section.querySelector("[data-bc-save-minimum]").click();
   assert.ok(await waitFor(() => section.textContent.includes("No tenés permiso")),
     "el error del RPC debe mostrarse al usuario");
-  assert.equal(rpcCalls.filter(call => call.name === "bc_actualizar_stock_minimo").length, 1);
+  assert.equal(rpcCalls.filter(call => call.name === "bc_actualizar_stock_minimo_obligatorio").length, 1);
   assert.equal(fixtureRows.find(row => row.almacen_id === "a1").minimo, 5,
     "un rechazo por permiso no modifica el mínimo");
 });
@@ -251,8 +251,8 @@ test("Inventario: un mínimo negativo no llega al RPC", async (t) => {
   target.querySelector("[data-bc-minimum-input]").value = "-1";
   target.querySelector("[data-bc-save-minimum]").click();
   await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.equal(rpcCalls.filter((call) => call.name === "bc_actualizar_stock_minimo").length, 0);
-  assert.match(target.textContent, /mínimo válido/i);
+  assert.equal(rpcCalls.filter((call) => call.name === "bc_actualizar_stock_minimo_obligatorio").length, 0);
+  assert.match(target.textContent, /mínimo válido|mayor que cero/i);
 });
 
 test("Inventario: stock cambiado en otro módulo refresca la vista visible sin recargar la PWA", async (t) => {
