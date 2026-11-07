@@ -405,6 +405,9 @@ BEGIN
           jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
         jsonb_build_object('almacen_id',v_warehouse_c,'variantes',jsonb_build_array(
           jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+          jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
+        jsonb_build_object('almacen_id','55555555-5555-4555-8555-555555555555'::uuid,'variantes',jsonb_build_array(
+          jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
           jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4)))
       )
     );
@@ -429,6 +432,9 @@ BEGIN
         jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
         jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
       jsonb_build_object('almacen_id',v_warehouse_c,'variantes',jsonb_build_array(
+        jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
+        jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
+      jsonb_build_object('almacen_id','55555555-5555-4555-8555-555555555555'::uuid,'variantes',jsonb_build_array(
         jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
         jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4)))
     )
@@ -486,7 +492,7 @@ BEGIN
   END IF;
   v_history:=public.bc_obtener_snapshot_conversion_mixta(v_conversion_parent);
   IF NOT (v_history->>'inventario_mixto')::boolean
-     OR jsonb_array_length(v_history->'almacenes')<>3 THEN
+     OR jsonb_array_length(v_history->'almacenes')<>4 THEN
     RAISE EXCEPTION 'Conversion snapshot did not expose the mixed product and all active warehouses';
   END IF;
 
