@@ -312,6 +312,7 @@
           lineas = [];
           render();
           msg('✓ Compra registrada. Stock actualizado.', true);
+          if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
           if (typeof refrescarStockYSelects === 'function') await refrescarStockYSelects();
           return;
         }
