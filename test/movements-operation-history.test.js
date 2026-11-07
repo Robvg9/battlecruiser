@@ -89,7 +89,7 @@ test("M76 usa el resumen diario aunque el historial visible esté filtrado", asy
   await new Promise(resolve => window.setTimeout(resolve, 10));
   const cards = Array.from(window.document.querySelectorAll("#mov-resumen-m51 .bc-m51-metric"));
   assert.deepEqual(cards.map(x => x.querySelector(".bc-m51-metric-label").textContent.trim()),
-    ["Compras", "Mov. internos", "Bajas", "Reinversiones"]);
+    ["Compras", "Movimientos internos", "Bajas", "Reinversiones"]);
   assert.deepEqual(cards.map(x => x.querySelector(".bc-m51-metric-value").textContent.trim()), ["1", "2", "1", "1"]);
   assert.doesNotMatch(window.document.getElementById("mov-resumen-m51").textContent, /Operaciones/);
 });
@@ -134,7 +134,7 @@ test("M76 muestra una sola tarjeta por operación comercial, no una por producto
   assert.ok(!categories.includes("Movimientos"), "no queda un filtro genérico de movimientos");
   assert.doesNotMatch(window.document.getElementById("mov-resumen-m51").textContent, /Operaciones/);
   assert.deepEqual(Array.from(window.document.querySelectorAll("#mov-resumen-m51 .bc-m51-metric-label")).map(el => el.textContent.trim()),
-    ["Compras", "Mov. internos", "Bajas", "Reinversiones"]);
+    ["Compras", "Movimientos internos", "Bajas", "Reinversiones"]);
 });
 
 test("M76 abre el detalle flotante con todas las líneas y el recorrido de almacén", async (t) => {
