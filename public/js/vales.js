@@ -21,7 +21,7 @@ function mostrarDetalleVale(valeId) {
     return;
   }
   const fechaHora = vale.fecha ? fechaHoraCompleta(vale.fecha) : "—";
-  const tipoEtiqueta = { merma: "Merma", donacion: "Donación", regalo: "Regalo", vencido: "Vencido" }[vale.tipo] || vale.tipo || "—";
+  const tipoEtiqueta = { merma: "Baja", donacion: "Donación", regalo: "Regalo", vencido: "Vencido" }[vale.tipo] || vale.tipo || "—";
   cont.innerHTML = '<div class="detalle-cabecera">'
     + '<span class="detalle-tipo">Vale #' + (vale.id ? idCorto(vale.id) : "—") + '</span>'
     + '<button type="button" class="detalle-cerrar-btn vale-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
