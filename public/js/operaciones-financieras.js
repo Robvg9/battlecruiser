@@ -15,9 +15,9 @@
     if(!tab||document.getElementById(ID))return;
     if(!(can('reinversiones','crear')||can('gastos','crear')||can('bajas','crear')||can('gastos','editar_any')||can('auditoria','editar_any')))return;
     const b=document.createElement('div');b.className='cc-bloque';b.id=ID;
-    b.innerHTML=`<h3>💰 Operaciones de caja e inventario</h3><p class="muted">Gasto = sale dinero. Baja = sale producto. Reinversión = sale dinero y entra producto.</p><div id="fin-gasto-wrap"></div><div id="fin-salida-wrap"></div><form id="form-reinversion" class="inline-form"><h4>🟢 Reinversión</h4><select id="rein-almacen" required><option value="">Almacén</option></select><input id="rein-proveedor" placeholder="Proveedor (opcional)"><div id="rein-lineas" class="lista"></div><div class="btn-row"><button type="button" id="rein-add">+ Agregar producto</button><button type="submit">Registrar reinversión</button></div><p class="msg" id="rein-msg"></p></form><div class="cc-bloque" id="fin-historial"><h4>📒 Movimientos de caja</h4><div class="lista" id="fin-caja-lista"><p class="lista-estado">Cargando…</p></div><h4>📦 Reinversiones recientes</h4><div class="lista" id="fin-reinv-lista"><p class="lista-estado">Cargando…</p></div></div>`;
+    b.innerHTML=`<h3>💰 Operaciones de caja e inventario</h3><p class="muted">Gasto = sale dinero. Baja = sale producto. Reinversión = sale dinero y entra producto.</p><div id="fin-gasto-wrap"></div><div id="fin-salida-wrap"></div><form id="form-reinversion" class="inline-form"><h4>🟢 Reinversión</h4><select id="rein-almacen" required><option value="" disabled selected hidden>Almacén</option></select><input id="rein-proveedor" placeholder="Proveedor (opcional)"><div id="rein-lineas" class="lista"></div><div class="btn-row"><button type="button" id="rein-add">+ Agregar producto</button><button type="submit">Registrar reinversión</button></div><p class="msg" id="rein-msg"></p></form><div class="cc-bloque" id="fin-historial"><h4>📒 Movimientos de caja</h4><div class="lista" id="fin-caja-lista"><p class="lista-estado">Cargando…</p></div><h4>📦 Reinversiones recientes</h4><div class="lista" id="fin-reinv-lista"><p class="lista-estado">Cargando…</p></div></div>`;
     tab.insertBefore(b,tab.firstChild);
-    const alm=document.getElementById('rein-almacen');alm.innerHTML='<option value="">Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
+    const alm=document.getElementById('rein-almacen');alm.innerHTML='<option value="" disabled selected hidden>Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
     document.getElementById('rein-add').onclick=addLine;
     document.getElementById('form-reinversion').onsubmit=submit;
     addLine();
@@ -32,8 +32,8 @@
     if(!can('gastos','crear'))return;
     const old=document.querySelectorAll('#admin-solicitudes form');
     old.forEach(f=>{const h=f.querySelector('h4');if(h&&/Gasto/i.test(h.textContent))f.style.display='none'});
-    host.innerHTML=`<form id="form-gasto-operativo" class="inline-form"><h4>💸 Gasto</h4><input id="fin-g-concepto" placeholder="Motivo / concepto" required><input id="fin-g-monto" type="number" min="0.01" step="0.01" placeholder="Cantidad de dinero" required><input id="fin-g-desc" placeholder="Descripción (opcional)"><select id="fin-g-almacen"><option value="">Almacén (opcional)</option></select><button type="submit">Enviar a aprobación</button><p class="msg" id="fin-g-msg"></p></form>`;
-    document.getElementById('fin-g-almacen').innerHTML='<option value="">Almacén (opcional)</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
+    host.innerHTML=`<form id="form-gasto-operativo" class="inline-form"><h4>💸 Gasto</h4><input id="fin-g-concepto" placeholder="Motivo / concepto" required><input id="fin-g-monto" type="number" min="0.01" step="0.01" placeholder="Cantidad de dinero" required><input id="fin-g-desc" placeholder="Descripción (opcional)"><select id="fin-g-almacen"><option value="" disabled selected hidden>Almacén (opcional)</option></select><button type="submit">Enviar a aprobación</button><p class="msg" id="fin-g-msg"></p></form>`;
+    document.getElementById('fin-g-almacen').innerHTML='<option value="" disabled selected hidden>Almacén (opcional)</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
     document.getElementById('form-gasto-operativo').onsubmit=submitGasto;
   }
 
@@ -54,18 +54,18 @@
     old.forEach(f=>{const h=f.querySelector('h4');if(h&&/(Merma|Baja)/i.test(h.textContent))f.style.display='none'});
     host.innerHTML=`<form id="form-salida-producto" class="inline-form">
       <h4>📉 Registrar baja de producto</h4>
-      <select id="sal-almacen" required><option value="">Almacén</option></select>
+      <select id="sal-almacen" required><option value="" disabled selected hidden>Almacén</option></select>
       <select id="sal-prod" required>${productOptions()}</select>
       <input id="sal-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required>
       <select id="sal-motivo" required>
-        <option value="">Motivo de la baja</option><option value="Rotura">Rotura</option>
+        <option value="" disabled selected hidden>Motivo de la baja</option><option value="Rotura">Rotura</option>
         <option value="Hechado a perder">Hechado a perder</option><option value="El Jefe lo cogió">El Jefe lo cogió</option>
         <option value="Vencimiento">Vencimiento</option><option value="Daño o deterioro">Daño o deterioro</option>
         <option value="Pérdida">Pérdida</option><option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option>
       </select>
       <input id="sal-motivo-otro" maxlength="180" placeholder="Explica el otro motivo" hidden>
       <button type="submit">Enviar a revisión</button><p class="msg" id="sal-msg"></p></form>`;
-    document.getElementById('sal-almacen').innerHTML='<option value="">Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
+    document.getElementById('sal-almacen').innerHTML='<option value="" disabled selected hidden>Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
     const reason=document.getElementById('sal-motivo'),other=document.getElementById('sal-motivo-otro');
     reason.addEventListener('change',()=>{other.hidden=reason.value!=='Otro';other.required=reason.value==='Otro';if(!other.required)other.value=''});
     document.getElementById('form-salida-producto').onsubmit=submitSalida;
@@ -86,9 +86,9 @@
     }catch(err){msg.textContent='No se pudo registrar: '+(err.message||err)}
   }
 
-  function productOptions(){const rows=productos();const operational=typeof productosOperativos==='function'?productosOperativos(rows):rows.filter(p=>p.activo!==false&&(!p.inventario_mixto||!!p.producto_padre_id));return '<option value="">Producto</option>'+operational.filter(p=>p.activo!==false).map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
-  function addLine(){const host=document.getElementById('rein-lineas');if(!host)return;const row=document.createElement('div');row.className='rep-fila rein-linea';row.innerHTML=`<select class="rein-prod" required>${productOptions()}</select><select class="rein-pres"><option value="">Unidad base</option></select><input class="rein-qty" type="number" min="0.001" step="any" placeholder="Cantidad" required><input class="rein-cost" type="number" min="0.01" step="0.01" placeholder="Costo total" required><button type="button" class="cc-accion rein-del">×</button>`;host.appendChild(row);row.querySelector('.rein-prod').onchange=()=>loadPres(row);row.querySelector('.rein-del').onclick=()=>{if(host.children.length>1)row.remove()};}
-  async function loadPres(row){const prod=row.querySelector('.rein-prod').value,pres=row.querySelector('.rein-pres');pres.innerHTML='<option value="">Unidad base</option>';if(!prod)return;try{const data=await withCache('asociaciones:'+prod,()=>client.from('producto_presentaciones').select('id,factor,activo,presentacion_id,presentaciones(nombre)').eq('producto_id',prod).eq('activo',true).order('created_at'));(data||[]).forEach(x=>{const o=document.createElement('option');o.value=x.presentacion_id;o.textContent=(x.presentaciones?.nombre||'Presentación')+' × '+x.factor;pres.appendChild(o)});}catch(e){console.warn('[Battlecruiser] presentaciones reinversion',e)}}
+  function productOptions(){const rows=productos();const operational=typeof productosOperativos==='function'?productosOperativos(rows):rows.filter(p=>p.activo!==false&&(!p.inventario_mixto||!!p.producto_padre_id));return '<option value="" disabled selected hidden>Producto</option>'+operational.filter(p=>p.activo!==false).map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
+  function addLine(){const host=document.getElementById('rein-lineas');if(!host)return;const row=document.createElement('div');row.className='rep-fila rein-linea';row.innerHTML=`<select class="rein-prod" required>${productOptions()}</select><select class="rein-pres"><option value="" disabled selected hidden>Unidad base</option></select><input class="rein-qty" type="number" min="0.001" step="any" placeholder="Cantidad" required><input class="rein-cost" type="number" min="0.01" step="0.01" placeholder="Costo total" required><button type="button" class="cc-accion rein-del">×</button>`;host.appendChild(row);row.querySelector('.rein-prod').onchange=()=>loadPres(row);row.querySelector('.rein-del').onclick=()=>{if(host.children.length>1)row.remove()};}
+  async function loadPres(row){const prod=row.querySelector('.rein-prod').value,pres=row.querySelector('.rein-pres');pres.innerHTML='<option value="" disabled selected hidden>Unidad base</option>';if(!prod)return;try{const data=await withCache('asociaciones:'+prod,()=>client.from('producto_presentaciones').select('id,factor,activo,presentacion_id,presentaciones(nombre)').eq('producto_id',prod).eq('activo',true).order('created_at'));(data||[]).forEach(x=>{const o=document.createElement('option');o.value=x.presentacion_id;o.textContent=(x.presentaciones?.nombre||'Presentación')+' × '+x.factor;pres.appendChild(o)});}catch(e){console.warn('[Battlecruiser] presentaciones reinversion',e)}}
 
   async function submit(e){
     e.preventDefault();const msg=document.getElementById('rein-msg');msg.textContent='';const almacen=document.getElementById('rein-almacen').value,rows=[...document.querySelectorAll('#rein-lineas .rein-linea')];
@@ -106,12 +106,33 @@
   }
 
   async function ensureCatalogs(){
-    const tasks=[];
-    if(!productos().some(p=>p&&p.activo!==false)&&typeof window.refrescarProductos==='function')tasks.push(Promise.resolve().then(()=>window.refrescarProductos()));
-    if(!almacenes().length&&typeof window.refrescarAlmacenes==='function')tasks.push(Promise.resolve().then(()=>window.refrescarAlmacenes()));
-    const results=await Promise.allSettled(tasks);
-    const failed=results.find(x=>x.status==='rejected');
-    if(failed)console.warn('[BattleCruiser] No se pudieron cargar catálogos de Operaciones financieras:',failed.reason);
+    try {
+      if(typeof window.bcRefrescarCatalogosOperativos==='function') {
+        await window.bcRefrescarCatalogosOperativos(false);
+      } else {
+        const api=window.client || (typeof client!=='undefined'?client:null);
+        if(api && typeof api.from==='function') {
+          const results=await Promise.all([
+            api.from('productos').select('id,nombre,activo,inventario_mixto,producto_padre_id,variante_nombre').order('nombre'),
+            api.from('almacenes').select('id,nombre,activo').eq('activo',true).order('nombre')
+          ]);
+          if(results[0].error)throw results[0].error;
+          if(results[1].error)throw results[1].error;
+          if(!window._cache)window._cache={};
+          window._cache.productos=Array.isArray(results[0].data)?results[0].data:[];
+          window._cache.almacenes=Array.isArray(results[1].data)?results[1].data:[];
+        } else {
+          const tasks=[];
+          if(typeof window.refrescarProductos==='function')tasks.push(Promise.resolve().then(()=>window.refrescarProductos()));
+          if(typeof window.refrescarAlmacenes==='function')tasks.push(Promise.resolve().then(()=>window.refrescarAlmacenes()));
+          const results=await Promise.allSettled(tasks);
+          const failed=results.find(x=>x.status==='rejected');
+          if(failed)throw failed.reason;
+        }
+      }
+    } catch(error) {
+      console.warn('[BattleCruiser] No se pudieron actualizar desde Supabase los catálogos de Operaciones financieras:',error);
+    }
     return {products:productos().filter(p=>p&&p.activo!==false),warehouses:almacenes()};
   }
 
