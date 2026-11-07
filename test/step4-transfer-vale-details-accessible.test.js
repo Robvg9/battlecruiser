@@ -107,7 +107,8 @@ test("Paso 4 R12: un clic en un vale abre el detalle con tipo, producto, almacé
     );
     const panel = window.document.getElementById("vale-detalle");
     assert.equal(panel.classList.contains("hidden"), false);
-    assert.match(panel.textContent, /Merma/i);
+    assert.match(panel.textContent, /Baja/i);
+    assert.doesNotMatch(panel.textContent, /Merma/i);
     assert.match(panel.textContent, /Harina/);
     assert.match(panel.textContent, /La Cueva/);
     assert.match(panel.textContent, /2\.50 u/);

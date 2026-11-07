@@ -13,9 +13,9 @@
   function ensure(){
     const tab=document.getElementById('tab-operacion');
     if(!tab||document.getElementById(ID))return;
-    if(!(can('reinversiones','crear')||can('gastos','crear')||can('mermas','crear')||can('bajas','crear')||can('gastos','editar_any')||can('auditoria','editar_any')))return;
+    if(!(can('reinversiones','crear')||can('gastos','crear')||can('bajas','crear')||can('gastos','editar_any')||can('auditoria','editar_any')))return;
     const b=document.createElement('div');b.className='cc-bloque';b.id=ID;
-    b.innerHTML=`<h3>💰 Operaciones de caja e inventario</h3><p class="muted">Gasto = sale dinero. Baja/merma = sale producto. Reinversión = sale dinero y entra producto.</p><div id="fin-gasto-wrap"></div><div id="fin-salida-wrap"></div><form id="form-reinversion" class="inline-form"><h4>🟢 Reinversión</h4><select id="rein-almacen" required><option value="">Almacén</option></select><input id="rein-proveedor" placeholder="Proveedor (opcional)"><div id="rein-lineas" class="lista"></div><div class="btn-row"><button type="button" id="rein-add">+ Agregar producto</button><button type="submit">Registrar reinversión</button></div><p class="msg" id="rein-msg"></p></form><div class="cc-bloque" id="fin-historial"><h4>📒 Movimientos de caja</h4><div class="lista" id="fin-caja-lista"><p class="lista-estado">Cargando…</p></div><h4>📦 Reinversiones recientes</h4><div class="lista" id="fin-reinv-lista"><p class="lista-estado">Cargando…</p></div></div>`;
+    b.innerHTML=`<h3>💰 Operaciones de caja e inventario</h3><p class="muted">Gasto = sale dinero. Baja = sale producto. Reinversión = sale dinero y entra producto.</p><div id="fin-gasto-wrap"></div><div id="fin-salida-wrap"></div><form id="form-reinversion" class="inline-form"><h4>🟢 Reinversión</h4><select id="rein-almacen" required><option value="">Almacén</option></select><input id="rein-proveedor" placeholder="Proveedor (opcional)"><div id="rein-lineas" class="lista"></div><div class="btn-row"><button type="button" id="rein-add">+ Agregar producto</button><button type="submit">Registrar reinversión</button></div><p class="msg" id="rein-msg"></p></form><div class="cc-bloque" id="fin-historial"><h4>📒 Movimientos de caja</h4><div class="lista" id="fin-caja-lista"><p class="lista-estado">Cargando…</p></div><h4>📦 Reinversiones recientes</h4><div class="lista" id="fin-reinv-lista"><p class="lista-estado">Cargando…</p></div></div>`;
     tab.insertBefore(b,tab.firstChild);
     const alm=document.getElementById('rein-almacen');alm.innerHTML='<option value="">Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
     document.getElementById('rein-add').onclick=addLine;
@@ -48,16 +48,43 @@
   }
 
   function ensureSalida(){
-    const host=document.getElementById('fin-salida-wrap');if(!host||document.getElementById('form-salida-producto'))return;if(!(can('mermas','crear')||can('bajas','crear')))return;
-    const old=document.querySelectorAll('#admin-solicitudes form');old.forEach(f=>{const h=f.querySelector('h4');if(h&&/(Merma|Baja)/i.test(h.textContent))f.style.display='none'});
-    host.innerHTML=`<form id="form-salida-producto" class="inline-form"><h4>🔴 Salida de producto — Baja / Merma</h4><select id="sal-tipo"><option value="merma">Merma</option><option value="baja">Baja</option></select><select id="sal-almacen" required><option value="">Almacén</option></select><select id="sal-prod" required>${productOptions()}</select><input id="sal-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required><input id="sal-motivo" placeholder="Motivo" required><button type="submit">Enviar a revisión</button><p class="msg" id="sal-msg"></p></form>`;
+    const host=document.getElementById('fin-salida-wrap');
+    if(!host||document.getElementById('form-salida-producto')||!can('bajas','crear'))return;
+    const old=document.querySelectorAll('#admin-solicitudes form');
+    old.forEach(f=>{const h=f.querySelector('h4');if(h&&/(Merma|Baja)/i.test(h.textContent))f.style.display='none'});
+    host.innerHTML=`<form id="form-salida-producto" class="inline-form">
+      <h4>📉 Registrar baja de producto</h4>
+      <select id="sal-almacen" required><option value="">Almacén</option></select>
+      <select id="sal-prod" required>${productOptions()}</select>
+      <input id="sal-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required>
+      <select id="sal-motivo" required>
+        <option value="">Motivo de la baja</option><option value="Rotura">Rotura</option>
+        <option value="Hechado a perder">Hechado a perder</option><option value="El Jefe lo cogió">El Jefe lo cogió</option>
+        <option value="Vencimiento">Vencimiento</option><option value="Daño o deterioro">Daño o deterioro</option>
+        <option value="Pérdida">Pérdida</option><option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option>
+      </select>
+      <input id="sal-motivo-otro" maxlength="180" placeholder="Explica el otro motivo" hidden>
+      <button type="submit">Enviar a revisión</button><p class="msg" id="sal-msg"></p></form>`;
     document.getElementById('sal-almacen').innerHTML='<option value="">Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
+    const reason=document.getElementById('sal-motivo'),other=document.getElementById('sal-motivo-otro');
+    reason.addEventListener('change',()=>{other.hidden=reason.value!=='Otro';other.required=reason.value==='Otro';if(!other.required)other.value=''});
     document.getElementById('form-salida-producto').onsubmit=submitSalida;
   }
 
   async function submitSalida(e){
     e.preventDefault();const msg=document.getElementById('sal-msg');
-    try{const tipo=document.getElementById('sal-tipo').value;await rpc(tipo==='merma'?'crear_merma':'crear_baja',{p_almacen_id:document.getElementById('sal-almacen').value,p_producto_id:document.getElementById('sal-prod').value,p_cantidad:Number(document.getElementById('sal-cant').value),p_motivo:document.getElementById('sal-motivo').value,p_idempotency_key:key()});e.target.reset();msg.textContent='✓ Solicitud enviada a revisión administrativa. El stock no cambia hasta aprobar.';if(typeof refrescarAprobacionesAdmin==='function')refrescarAprobacionesAdmin();await refrescarFinanzas();}catch(err){msg.textContent='No se pudo registrar: '+(err.message||err)}}
+    const warehouse=document.getElementById('sal-almacen').value,product=document.getElementById('sal-prod').value;
+    const quantity=Number(document.getElementById('sal-cant').value),reason=document.getElementById('sal-motivo').value;
+    const other=document.getElementById('sal-motivo-otro');
+    const motive=reason==='Otro'?'Otro: '+String(other&&other.value||'').trim():reason;
+    if(!warehouse||!product||!(quantity>0)||!reason||(reason==='Otro'&&!(other&&other.value.trim()))){msg.textContent='Completa almacén, producto, cantidad y motivo de la baja.';return}
+    try{
+      await rpc('crear_baja',{p_almacen_id:warehouse,p_producto_id:product,p_cantidad:quantity,p_motivo:motive,p_idempotency_key:key()});
+      e.target.reset();other.hidden=true;other.required=false;
+      msg.textContent='✓ Solicitud de baja enviada a revisión administrativa. El stock no cambia hasta aprobar.';
+      if(typeof refrescarAprobacionesAdmin==='function')refrescarAprobacionesAdmin();await refrescarFinanzas();
+    }catch(err){msg.textContent='No se pudo registrar: '+(err.message||err)}
+  }
 
   function productOptions(){const rows=productos();const operational=typeof productosOperativos==='function'?productosOperativos(rows):rows.filter(p=>p.activo!==false&&(!p.inventario_mixto||!!p.producto_padre_id));return '<option value="">Producto</option>'+operational.filter(p=>p.activo!==false).map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
   function addLine(){const host=document.getElementById('rein-lineas');if(!host)return;const row=document.createElement('div');row.className='rep-fila rein-linea';row.innerHTML=`<select class="rein-prod" required>${productOptions()}</select><select class="rein-pres"><option value="">Unidad base</option></select><input class="rein-qty" type="number" min="0.001" step="any" placeholder="Cantidad" required><input class="rein-cost" type="number" min="0.01" step="0.01" placeholder="Costo total" required><button type="button" class="cc-accion rein-del">×</button>`;host.appendChild(row);row.querySelector('.rein-prod').onchange=()=>loadPres(row);row.querySelector('.rein-del').onclick=()=>{if(host.children.length>1)row.remove()};}
@@ -78,8 +105,52 @@
     }catch(e){caja.innerHTML='<p class="lista-estado">No se pudo cargar el historial de caja.</p>';reinv.innerHTML='<p class="lista-estado">No se pudo cargar el historial de reinversiones.</p>'}
   }
 
-  function start(){ensure();ensureGasto();ensureSalida();refrescarFinanzas();if(!window.__bcFinanzasTimer)window.__bcFinanzasTimer=setInterval(()=>{ensure();ensureGasto();ensureSalida();refrescarFinanzas()},10000)}
+  async function ensureCatalogs(){
+    const tasks=[];
+    if(!productos().some(p=>p&&p.activo!==false)&&typeof window.refrescarProductos==='function')tasks.push(Promise.resolve().then(()=>window.refrescarProductos()));
+    if(!almacenes().length&&typeof window.refrescarAlmacenes==='function')tasks.push(Promise.resolve().then(()=>window.refrescarAlmacenes()));
+    const results=await Promise.allSettled(tasks);
+    const failed=results.find(x=>x.status==='rejected');
+    if(failed)console.warn('[BattleCruiser] No se pudieron cargar catálogos de Operaciones financieras:',failed.reason);
+    return {products:productos().filter(p=>p&&p.activo!==false),warehouses:almacenes()};
+  }
+
+  function refreshSelectors(){
+    const stores=almacenes(),productsHtml=productOptions();
+    ['rein-almacen','sal-almacen','fin-g-almacen'].forEach(id=>{
+      const select=document.getElementById(id);if(!select)return;
+      const value=select.value;const optional=id==='fin-g-almacen';
+      select.innerHTML='<option value="">'+(optional?'Almacén (opcional)':'Almacén')+'</option>'+stores.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nombre)+'</option>').join('');
+      if(stores.some(a=>String(a.id)===String(value)))select.value=value;
+    });
+    document.querySelectorAll('#rein-lineas .rein-prod, #sal-prod').forEach(select=>{
+      const value=select.value;select.innerHTML=productsHtml;
+      if(Array.from(select.options).some(o=>o.value===value))select.value=value;
+    });
+  }
+
+  async function start(){
+    if(window.__bcFinanzasLoading)return;
+    window.__bcFinanzasLoading=true;
+    try{
+      const catalogs=await ensureCatalogs();
+      if(!catalogs.products.length||!catalogs.warehouses.length){
+        const tab=document.getElementById('tab-operacion');
+        if(tab){
+          let warning=tab.querySelector('#fin-catalog-warning');
+          if(!warning){warning=document.createElement('p');warning.id='fin-catalog-warning';warning.className='msg';tab.insertBefore(warning,tab.firstChild)}
+          warning.textContent='No se pudieron cargar los productos o almacenes activos. Actualiza los catálogos antes de registrar una operación de inventario.';
+        }
+        return;
+      }
+      const warning=document.getElementById('fin-catalog-warning');if(warning)warning.remove();
+      ensure();ensureGasto();ensureSalida();refreshSelectors();refrescarFinanzas();
+    }finally{
+      window.__bcFinanzasLoading=false;
+      if(!window.__bcFinanzasTimer)window.__bcFinanzasTimer=setInterval(()=>{start()},10000);
+    }
+  }
   window.refrescarFinanzas=refrescarFinanzas;
   document.addEventListener('DOMContentLoaded',()=>setTimeout(start,1500));
-  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b&&b.dataset.tab==='operacion')setTimeout(()=>{ensure();ensureGasto();ensureSalida();refrescarFinanzas()},200)});
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b&&b.dataset.tab==='operacion')setTimeout(()=>{start()},200)});
 })();

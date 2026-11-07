@@ -6,7 +6,7 @@
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '41';
+  var HUB_VER = '43';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
@@ -15,8 +15,27 @@
   }
   function esc(v) { return typeof escHtml === 'function' ? escHtml(v) : String(v == null ? '' : v); }
   function key() { return crypto.randomUUID(); }
-  function products() { return Array.isArray(window._cache && window._cache.productos) ? window._cache.productos.filter(function (p) { return p.activo !== false; }) : []; }
+  function products() {
+    var rows = Array.isArray(window._cache && window._cache.productos) ? window._cache.productos : [];
+    return typeof window.productosOperativos === 'function'
+      ? window.productosOperativos(rows).filter(function (p) { return p.activo !== false; })
+      : rows.filter(function (p) { return p && p.activo !== false && (!p.inventario_mixto || !!p.producto_padre_id); });
+  }
   function stores() { return Array.isArray(window._cache && window._cache.almacenes) ? window._cache.almacenes.filter(function (a) { return a.activo !== false; }) : []; }
+  async function ensureOperationCatalogs(required) {
+    var tasks = [];
+    if (!stores().length && typeof window.refrescarAlmacenes === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarAlmacenes(); }));
+    if (!products().length && typeof window.refrescarProductos === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarProductos(); }));
+    var results = await Promise.allSettled(tasks);
+    var failed = results.find(function (result) { return result.status === 'rejected'; });
+    if (failed) console.warn('[BattleCruiser] No se pudieron preparar los catálogos de Operaciones:', failed.reason);
+    var available = { products: products(), stores: stores() };
+    if (required && (!available.products.length || !available.stores.length)) {
+      alert('No se pudieron cargar los productos y almacenes activos. Actualiza los catálogos e inténtalo de nuevo.');
+      return false;
+    }
+    return true;
+  }
   function productOpts() { return '<option value="">Seleccionar producto…</option>' + products().map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>'; }).join(''); }
   function storeOpts(optional) { return '<option value="">' + (optional ? 'Almacén (opcional)' : 'Seleccionar almacén…') + '</option>' + stores().map(function (a) { return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>'; }).join(''); }
 
@@ -134,8 +153,9 @@
     return r.data;
   }
 
-  function openGasto() {
+  async function openGasto() {
     if (!requireCrear('gastos')) return;
+    if (!(await ensureOperationCatalogs(false))) return;
     openModal({
       icon: '💸', title: 'Registrar gasto', submitText: 'Enviar a aprobación',
       bodyHtml:
@@ -158,25 +178,47 @@
     });
   }
 
-  function openMerma() {
-    if (!requireCrear('mermas')) return;
+  async function openBaja() {
+    if (!requireCrear('bajas')) return;
+    if (!(await ensureOperationCatalogs(true))) return;
     openModal({
-      icon: '📦', title: 'Registrar merma', submitText: 'Enviar a revisión',
+      icon: '📦', title: 'Registrar baja', submitText: 'Enviar a revisión',
       submitBg: 'rgba(180,60,60,.9)', submitColor: '#fff',
       bodyHtml:
         '<div class="field"><span>Almacén</span><select id="op-m-alm" required>' + storeOpts(false) + '</select></div>' +
         '<div class="field"><span>Producto</span><select id="op-m-prod" required>' + productOpts() + '</select></div>' +
         '<div class="field"><span>Cantidad</span><input id="op-m-cant" type="number" min="0.001" step="any" placeholder="0" required></div>' +
-        '<div class="field"><span>Motivo</span><input id="op-m-motivo" placeholder="Motivo de la merma" required></div>' +
-        '<p class="muted" style="margin:0;font-size:12px">El stock no cambia hasta aprobación administrativa.</p>',
+        '<div class="field"><span>Motivo de la baja</span><select id="op-m-motivo" required>' +
+          '<option value="">Selecciona un motivo…</option><option value="Rotura">Rotura</option>' +
+          '<option value="Hechado a perder">Hechado a perder</option><option value="El Jefe lo cogió">El Jefe lo cogió</option>' +
+          '<option value="Vencimiento">Vencimiento</option><option value="Daño o deterioro">Daño o deterioro</option>' +
+          '<option value="Pérdida">Pérdida</option><option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option>' +
+        '</select></div><div class="field" id="op-m-otro-wrap" hidden><span>Explica el motivo</span><input id="op-m-otro" maxlength="180" placeholder="Describe el motivo"></div>' +
+        '<p class="muted" style="margin:0;font-size:12px">La baja se enviará a revisión. El stock no cambia hasta su aprobación.</p>',
+      afterOpen: function (back) {
+        var reason = back.querySelector('#op-m-motivo');
+        var otherWrap = back.querySelector('#op-m-otro-wrap');
+        var otherInput = back.querySelector('#op-m-otro');
+        if (!reason || !otherWrap || !otherInput) return;
+        function syncOther() {
+          var isOther = reason.value === 'Otro';
+          otherWrap.hidden = !isOther;
+          otherInput.required = isOther;
+          if (!isOther) otherInput.value = '';
+        }
+        reason.addEventListener('change', syncOther);
+        syncOther();
+      },
       onSubmit: async function (setMsg) {
-        if (!requireCrear('mermas')) { setMsg('Sin permiso para registrar mermas.', false); throw new Error('permiso'); }
+        if (!requireCrear('bajas')) { setMsg('Sin permiso para registrar bajas.', false); throw new Error('permiso'); }
         var alm = document.getElementById('op-m-alm').value;
         var prod = document.getElementById('op-m-prod').value;
         var cant = Number(document.getElementById('op-m-cant').value);
-        var motivo = document.getElementById('op-m-motivo').value.trim();
-        if (!alm || !prod || !(cant > 0) || !motivo) { setMsg('Completá todos los campos.', false); throw new Error('validación'); }
-        await rpc('crear_merma', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
+        var motivoSeleccionado = document.getElementById('op-m-motivo').value;
+        var otro = document.getElementById('op-m-otro');
+        var motivo = motivoSeleccionado === 'Otro' ? ('Otro: ' + String(otro && otro.value || '').trim()) : motivoSeleccionado;
+        if (!alm || !prod || !(cant > 0) || !motivo || (motivoSeleccionado === 'Otro' && !(otro && otro.value.trim()))) { setMsg('Completa almacén, producto, cantidad y motivo.', false); throw new Error('validación'); }
+        await rpc('crear_baja', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
         setMsg('✓ Solicitud enviada a revisión.', true);
         if (typeof refrescarAprobacionesAdmin === 'function') refrescarAprobacionesAdmin();
         if (typeof refrescarFinanzas === 'function') refrescarFinanzas();
@@ -185,8 +227,9 @@
     });
   }
 
-  function openReinversion() {
+  async function openReinversion() {
     if (!requireCrear('reinversiones')) return;
+    if (!(await ensureOperationCatalogs(true))) return;
     openModal({
       icon: '🔄', title: 'Registrar reinversión', submitText: 'Registrar reinversión',
       submitBg: 'rgba(50,140,90,.95)', submitColor: '#fff',
@@ -377,8 +420,8 @@
     if (can('gastos', 'ver') && can('gastos', 'crear')) {
       cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
     }
-    if (can('mermas', 'ver') && can('mermas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Registrar merma', desc: 'Productos que salen de inventario por merma.', go: 'Registrar merma', fn: openMerma });
+    if (can('bajas', 'ver') && can('bajas', 'crear')) {
+      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Productos que salen del inventario por pérdida, daño o consumo interno.', go: 'Registrar baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
@@ -390,8 +433,8 @@
     if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
       cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
     }
-    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
-      cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, merma y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
+    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
+      cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, baja y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
     }
     return cards;
   }

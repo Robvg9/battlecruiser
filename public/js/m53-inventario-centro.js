@@ -1,4 +1,4 @@
-// BattleCruiser — M53.1: Centro profesional de control de inventario
+// BattleCruiser — M53.6: Centro profesional de control de inventario
 // Única autoridad visual de #tab-inventario. Reutiliza RPC inventario_enriquecido.
 // Mantiene inventario-detalle.js (modal) y mision-d-stock-reposicion.js (stock bajo).
 (function () {
@@ -188,7 +188,7 @@
 
       const estado = document.createElement('select');
       estado.id = 'inv-filtro-estado-select';
-      estado.innerHTML = '<option value="todos">Todos los estados</option><option value="bajo">Bajo mínimo</option><option value="agotado">Agotados</option><option value="normal">Normales</option>';
+      estado.innerHTML = '<option value="todos">Todos los estados</option><option value="sin_minimo">Mínimo pendiente</option><option value="bajo">Bajo mínimo</option><option value="agotado">Agotados</option><option value="normal">Normales</option>';
 
       const buscar = document.createElement('input');
       buscar.type = 'search';
@@ -318,15 +318,28 @@
   }
 
   function estadoMeta(estado) {
+    if (estado === 'sin_minimo') return { label: 'Mínimo pendiente', cls: 'bajo' };
     if (estado === 'agotado') return { label: 'Agotado', cls: 'agotado' };
     if (estado === 'bajo') return { label: 'Bajo mínimo', cls: 'bajo' };
     return { label: 'Disponible', cls: 'normal' };
   }
 
   function estadoAlmacen(row) {
-    if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
-    if (row && row.estado === 'bajo') return 'bajo';
-    if (row && row.minimo != null && num(row.cantidad) <= num(row.minimo)) return 'bajo';
+    const variants = row && Array.isArray(row.variantes) ? row.variantes : [];
+    if (variants.length) {
+      if (variants.some(function (variant) {
+        return variant && (variant.estado === 'sin_minimo' || num(variant.minimo) <= 0);
+      })) return 'sin_minimo';
+      if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
+      if (variants.some(function (variant) {
+        return variant && (variant.estado === 'bajo' || variant.estado === 'agotado' ||
+          num(variant.cantidad) <= num(variant.minimo));
+      })) return 'bajo';
+      return 'normal';
+    }
+    if (!row || row.minimo == null || num(row.minimo) <= 0) return 'sin_minimo';
+    if (row.estado === 'agotado' || num(row.cantidad) <= 0) return 'agotado';
+    if (row.estado === 'bajo' || num(row.cantidad) <= num(row.minimo)) return 'bajo';
     return 'normal';
   }
 
@@ -346,12 +359,14 @@
       group.almacenes.push({
         almacen_id: row.almacen_id || null, almacen: row.almacen || '—', cantidad: num(row.cantidad),
         minimo: row.minimo == null ? null : num(row.minimo), estado: estadoAlmacen(row),
-        unidad: row.unidad || group.unidad, variantes: Array.isArray(row.variantes) ? row.variantes : []
+        unidad: row.unidad || group.unidad, variantes: Array.isArray(row.variantes) ? row.variantes : [],
+        sin_asignacion: !!row.__bc_sin_asignacion
       });
     });
     return Array.from(groups.values()).map(function (group) {
       group.almacenes.sort(function (x, y) { return String(x.almacen).localeCompare(String(y.almacen), 'es'); });
-      group.estado = group.cantidad <= 0 ? 'agotado' :
+      group.estado = group.almacenes.some(function (x) { return x.estado === 'sin_minimo'; }) ? 'sin_minimo' :
+        group.cantidad <= 0 ? 'agotado' :
         (group.almacenes.some(function (x) { return x.estado === 'bajo'; }) ? 'bajo' : 'normal');
       group.almacen = group.almacenes.map(function (x) { return x.almacen; }).join(' ');
       return group;
@@ -362,15 +377,17 @@
     const products = agruparProductos(rows);
     return {
       totalValor: (rows || []).reduce(function (sum, row) { return sum + num(row.valor_inventario); }, 0),
-      agotados: products.filter(function (p) { return p.estado === 'agotado'; }).length,
-      bajos: products.filter(function (p) { return p.estado === 'bajo'; }).length,
+      agotados: products.filter(function (p) { return p.cantidad <= 0 && p.almacenes.some(function (a) { return !a.sin_asignacion; }); }).length,
+      bajos: products.filter(function (p) { return p.almacenes.some(function (a) { return a.estado === 'bajo'; }); }).length,
+      minimosPendientes: products.filter(function (p) { return p.estado === 'sin_minimo'; }).length,
       productos: products.length
     };
   }
 
   function applyFilters() {
     let rows = agruparProductos(_allRows);
-    if (_estado === 'agotado') rows = rows.filter(function (p) { return p.estado === 'agotado'; });
+    if (_estado === 'sin_minimo') rows = rows.filter(function (p) { return p.estado === 'sin_minimo'; });
+    else if (_estado === 'agotado') rows = rows.filter(function (p) { return p.cantidad <= 0; });
     else if (_estado === 'bajo') rows = rows.filter(function (p) { return p.estado === 'bajo'; });
     else if (_estado === 'normal') rows = rows.filter(function (p) { return p.estado === 'normal'; });
     const q = (_search || '').toLowerCase().trim();
@@ -412,6 +429,11 @@
     if (!el) return;
     const t = totalsFrom(_allRows);
     let html = '';
+    if (t.minimosPendientes > 0) {
+      html += '<div class="bc-m53-alert bc-m53-alert-warn" data-m53-filter="sin_minimo" role="button" tabindex="0">' +
+        '<strong>🟠 Mínimo pendiente</strong><span>' + qtyFmt(t.minimosPendientes) + ' producto' + (t.minimosPendientes === 1 ? '' : 's') +
+        '</span><button type="button" class="bc-m53-alert-action" data-m53-filter="sin_minimo">Configurar</button></div>';
+    }
     if (t.agotados > 0) {
       html += '<div class="bc-m53-alert bc-m53-alert-crit" data-m53-filter="agotado" role="button" tabindex="0">' +
         '<strong>🔴 Agotados</strong><span>' + qtyFmt(t.agotados) + ' producto' + (t.agotados === 1 ? '' : 's') +
@@ -439,7 +461,7 @@
       chips.push({ key: 'almacen', label: opt ? opt.textContent : sel.value });
     }
     if (_estado && _estado !== 'todos') {
-      const labels = { bajo: 'Bajo mínimo', agotado: 'Agotados', normal: 'Normales' };
+      const labels = { sin_minimo: 'Mínimo pendiente', bajo: 'Bajo mínimo', agotado: 'Agotados', normal: 'Normales' };
       chips.push({ key: 'estado', label: labels[_estado] || _estado });
     }
     if (_search) chips.push({ key: 'search', label: '“' + _search + '”' });
@@ -515,8 +537,12 @@
           variantWarehouses.map(function (warehouse) {
             return '<div class="bc-m53-variant-row"><strong>' + esc(warehouse.almacen) + '</strong><span></span></div>' +
               warehouse.variantes.map(function (variant) {
+                const minimum = num(variant.minimo);
+                const state = variant.estado || (num(variant.cantidad) <= 0 ? 'agotado' : (minimum > 0 && num(variant.cantidad) <= minimum ? 'bajo' : 'normal'));
+                const meta = estadoMeta(state);
                 return '<div class="bc-m53-variant-row"><span>' + esc(variant.nombre || 'Variante') + '</span><strong>' +
-                  qtyFmt(variant.cantidad) + ' ' + esc(variant.unidad || unit) + '</strong></div>';
+                  qtyFmt(variant.cantidad) + ' ' + esc(variant.unidad || unit) + '</strong><span>mín. ' + qtyFmt(minimum) +
+                  ' · ' + esc(meta.label) + '</span></div>';
               }).join('');
           }).join('') + '</div></details>'
         : '';
@@ -643,7 +669,7 @@
       // the missing .from() method block the inventory RPC and its filters.
       const warehouseCatalogRequest = typeof client.from === 'function'
         ? Promise.resolve().then(function () {
-            return client.from('almacenes').select('id, nombre').order('nombre');
+            return client.from('almacenes').select('id, nombre, activo').eq('activo', true).order('nombre');
           }).catch(function (error) {
             return { data: [], error: error };
           })
@@ -687,6 +713,20 @@
           if (cached.length) warehouseCatalog = cached;
         } catch (_) {}
       }
+      warehouseCatalog = warehouseCatalog.filter(function (warehouse) {
+        return warehouse && warehouse.id && warehouse.activo !== false;
+      });
+      if (warehouseCatalog.length) {
+        try {
+          if (!window._cache) window._cache = {};
+          const merged = new Map();
+          (Array.isArray(window._cache.almacenes) ? window._cache.almacenes : []).forEach(function (warehouse) {
+            if (warehouse && warehouse.id && warehouse.activo !== false) merged.set(String(warehouse.id), warehouse);
+          });
+          warehouseCatalog.forEach(function (warehouse) { merged.set(String(warehouse.id), warehouse); });
+          window._cache.almacenes = Array.from(merged.values());
+        } catch (_) {}
+      }
       if (!warehouseCatalog.length && warehousesRes.error) {
         console.warn('[BattleCruiser] M53 no pudo resolver IDs de almacén desde catálogo:', warehousesRes.error);
       }
@@ -710,9 +750,50 @@
       });
       // Replace child SKU rows with one parent summary; their real product IDs
       // remain in the expandable details and in every transactional table.
-      _allRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
+      const ordinaryVisibleRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
         return !mixedVariantIds.has(String(row.producto_id));
-      }).concat(mixedRows);
+      });
+      const visibleProductIds = new Set(
+        ordinaryVisibleRows.map(function (row) { return String(row.producto_id); })
+          .concat(mixedRows.map(function (row) { return String(row.producto_id); }))
+      );
+      let productCatalog = [];
+      try {
+        productCatalog = Array.isArray(window._cache && window._cache.productos)
+          ? window._cache.productos
+          : (typeof _cache !== 'undefined' && Array.isArray(_cache.productos) ? _cache.productos : []);
+      } catch (_) {}
+      if (!productCatalog.length && typeof window.refrescarProductos === 'function') {
+        try {
+          await window.refrescarProductos();
+          productCatalog = Array.isArray(window._cache && window._cache.productos)
+            ? window._cache.productos
+            : (typeof _cache !== 'undefined' && Array.isArray(_cache.productos) ? _cache.productos : []);
+        } catch (error) {
+          console.warn('[BattleCruiser] M53 no pudo cargar el catálogo de productos sin stock:', error);
+        }
+      }
+      // Catalog-only normal products must remain configurable before their first
+      // purchase or transfer. Do not synthesize rows when a warehouse filter is
+      // active, because the product may already be assigned to another warehouse.
+      const unassignedProductRows = !almacen ? productCatalog.filter(function (product) {
+        return product && product.activo !== false && !product.producto_padre_id &&
+          !product.inventario_mixto && !visibleProductIds.has(String(product.id));
+      }).map(function (product) {
+        return {
+          producto_id: product.id,
+          producto: product.nombre,
+          almacen: 'Sin almacén asignado',
+          almacen_id: null,
+          cantidad: 0,
+          minimo: null,
+          estado: 'sin_minimo',
+          unidad: product.unidad || 'u',
+          valor_inventario: 0,
+          __bc_sin_asignacion: true
+        };
+      }) : [];
+      _allRows = ordinaryVisibleRows.concat(mixedRows, unassignedProductRows);
       window._invFilas = _allRows;
       _page = 0;
       _loading = false;

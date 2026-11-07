@@ -13,7 +13,8 @@
     ? window.numberFmt(value)
     : new Intl.NumberFormat('es-ES', { useGrouping: true, maximumFractionDigits: 2 })
       .formatToParts(num(value)).map(part => part.type === 'group' ? '\u202f' : part.value).join('');
-  const estadoLabel = state => state === 'agotado' ? '🔴 Agotado'
+  const estadoLabel = state => state === 'sin_minimo' ? '🟠 Mínimo pendiente'
+    : state === 'agotado' ? '🔴 Agotado'
     : state === 'bajo' ? '🟡 Bajo mínimo' : '🟢 Disponible';
   const MOVEMENT_LABELS = {
     compra: 'Compra',
@@ -23,7 +24,7 @@
     transferencia_entrada: 'Transferencia · entrada',
     movimiento_interno: 'Movimiento interno',
     vale: 'Vale de salida',
-    merma: 'Merma',
+    merma: 'Baja',
     baja: 'Baja',
     ajuste: 'Ajuste'
   };
@@ -39,8 +40,17 @@
   }
 
   function estadoAlmacen(warehouse) {
+    const variants = warehouse && Array.isArray(warehouse.variantes) ? warehouse.variantes : [];
+    if (variants.length) {
+      if (variants.some(variant => variant && num(variant.minimo) <= 0)) return 'sin_minimo';
+      if (num(warehouse.cantidad) <= 0) return 'agotado';
+      if (variants.some(variant => variant &&
+        (variant.estado === 'bajo' || variant.estado === 'agotado' || num(variant.cantidad) <= num(variant.minimo)))) return 'bajo';
+      return 'normal';
+    }
+    if (!warehouse || warehouse.minimo == null || num(warehouse.minimo) <= 0) return 'sin_minimo';
     if (num(warehouse.cantidad) <= 0) return 'agotado';
-    if (warehouse.minimo != null && num(warehouse.cantidad) <= num(warehouse.minimo)) return 'bajo';
+    if (num(warehouse.cantidad) <= num(warehouse.minimo)) return 'bajo';
     return 'normal';
   }
 
@@ -48,7 +58,8 @@
     if (!fila || !Array.isArray(fila.almacenes)) return;
     fila.almacenes.forEach(warehouse => { warehouse.estado = estadoAlmacen(warehouse); });
     fila.cantidad = fila.almacenes.reduce((sum, warehouse) => sum + num(warehouse.cantidad), 0);
-    fila.estado = fila.cantidad <= 0 ? 'agotado'
+    fila.estado = fila.almacenes.some(warehouse => warehouse.estado === 'sin_minimo') ? 'sin_minimo'
+      : fila.cantidad <= 0 ? 'agotado'
       : fila.almacenes.some(warehouse => warehouse.estado === 'bajo') ? 'bajo' : 'normal';
   }
 
@@ -70,11 +81,12 @@
         modal.classList.add('hidden');
         return;
       }
+      const variantButton = event.target.closest('[data-bc-save-variant-minimum]');
+      if (variantButton) { event.preventDefault(); guardarMinimoVariante(variantButton); return; }
+      const assignButton = event.target.closest('[data-bc-assign-warehouse]');
+      if (assignButton) { event.preventDefault(); asignarAlmacenConMinimo(assignButton); return; }
       const button = event.target.closest('[data-bc-save-minimum]');
-      if (button) {
-        event.preventDefault();
-        guardarMinimo(button);
-      }
+      if (button) { event.preventDefault(); guardarMinimo(button); }
     });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && !modal.classList.contains('hidden')) modal.classList.add('hidden');
@@ -164,8 +176,8 @@
   function render(fila, meta, movements, movementError, feedback, loadingExtra) {
     const modal = ensureModal();
     const body = modal.querySelector('.bc-inv-modal-body');
-    const stores = Array.isArray(fila.almacenes) && fila.almacenes.length
-      ? fila.almacenes
+    const stores = Array.isArray(fila.almacenes)
+      ? fila.almacenes.filter(warehouse => warehouse && !warehouse.sin_asignacion)
       : [{ almacen: fila.almacen, almacen_id: fila.almacen_id, cantidad: fila.cantidad,
           minimo: fila.minimo, estado: fila.estado, unidad: fila.unidad, variantes: fila.variantes }];
     const total = stores.reduce((sum, warehouse) => sum + num(warehouse.cantidad), 0);
@@ -177,13 +189,23 @@
       ? meta.presentaciones.nombre : '';
     const mixed = !!(meta && meta.inventario_mixto) ||
       stores.some(warehouse => Array.isArray(warehouse.variantes) && warehouse.variantes.length > 0);
+    const productId = fila.producto_id || fila.id || '';
+    const warehouseCatalog = Array.isArray(window._cache && window._cache.almacenes)
+      ? window._cache.almacenes.filter(warehouse => warehouse && warehouse.activo !== false && warehouse.id)
+      : [];
+    const assignedWarehouseIds = new Set(stores.map(warehouse => String(warehouse.almacen_id || warehouse.id || '')).filter(Boolean));
+    const unassignedWarehouses = !mixed && !loadingExtra
+      ? warehouseCatalog.filter(warehouse => !assignedWarehouseIds.has(String(warehouse.id)))
+      : [];
 
     modal.querySelector('h2').textContent = fila.producto || (meta && meta.nombre) || 'Producto';
     body.innerHTML =
       '<div class="bc-inv-product-summary">' +
         '<span class="bc-inv-product-status">' + esc(estadoLabel(fila.estado)) + '</span>' +
         '<strong>' + esc(qtyFmt(total) + ' ' + unit) + '</strong>' +
-        '<span>existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes</span>' +
+        '<span>' + (stores.length
+          ? 'existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes'
+          : 'Sin almacenes asignados · define un mínimo para comenzar') + '</span>' +
       '</div>' +
       '<section class="bc-inv-product-meta" aria-label="Datos del producto">' +
         '<div class="bc-inv-meta-title">Datos del producto</div>' +
@@ -206,17 +228,21 @@
         const savedFeedback = feedback && String(feedback.almacenId) === String(warehouseId)
           ? '<div class="bc-inv-minimum-feedback is-success" role="status">' + esc(feedback.message) + '</div>'
           : '';
-        const editor = editable
-          ? '<div class="bc-inv-minimum-controls">' +
-              '<input id="' + inputId + '" data-bc-minimum-input type="number" min="0" step="any" inputmode="decimal" value="' + esc(String(minimum)) + '" aria-label="Stock mínimo de ' + esc(warehouse.almacen || 'almacén') + '">' +
-              '<button type="button" class="bc-inv-minimum-save" data-bc-save-minimum data-product-id="' + esc(productId) + '" data-warehouse-id="' + esc(warehouseId) + '">Guardar</button>' +
-            '</div>'
-          : '<strong class="bc-inv-minimum-readonly">' + esc(qtyFmt(minimum)) + '</strong>';
+        const editor = variants.length
+          ? '<strong class="bc-inv-minimum-readonly">Mínimos individuales por sabor</strong>'
+          : (editable
+            ? '<div class="bc-inv-minimum-controls">' +
+                '<input id="' + inputId + '" data-bc-minimum-input type="number" min="0.001" step="any" inputmode="decimal" required value="' + esc(String(minimum > 0 ? minimum : '')) + '" aria-label="Stock mínimo de ' + esc(warehouse.almacen || 'almacén') + '">' +
+                '<button type="button" class="bc-inv-minimum-save" data-bc-save-minimum data-product-id="' + esc(productId) + '" data-warehouse-id="' + esc(warehouseId) + '">Guardar</button>' +
+              '</div>'
+            : '<strong class="bc-inv-minimum-readonly">' + esc(qtyFmt(minimum)) + '</strong>');
         const hint = variants.length
-          ? '<p class="bc-inv-minimum-hint">Este producto controla stock por variantes; su mínimo todavía no se edita desde este formulario.</p>'
+          ? '<p class="bc-inv-minimum-hint">Cada sabor necesita un mínimo mayor que cero en este almacén. Configúralos debajo.</p>'
           : (!hasIdentity
             ? '<p class="bc-inv-minimum-hint is-warning">No se pudo identificar este almacén para habilitar el guardado. Actualiza Inventario y vuelve a abrir el producto.</p>'
-            : (!getClient() ? '<p class="bc-inv-minimum-hint is-warning">La conexión no está disponible para guardar el mínimo.</p>' : ''));
+            : (minimum <= 0
+              ? '<p class="bc-inv-minimum-hint is-warning">Obligatorio: define un mínimo mayor que cero para este almacén.</p>'
+              : (!getClient() ? '<p class="bc-inv-minimum-hint is-warning">La conexión no está disponible para guardar el mínimo.</p>' : '')));
         return '<section class="bc-inv-warehouse-detail" data-warehouse-id="' + esc(warehouseId) + '">' +
           '<div class="bc-inv-warehouse-heading"><strong>' + esc(warehouse.almacen || 'Almacén') + '</strong>' +
             '<span class="bc-inv-warehouse-status">' + esc(estadoLabel(status)) + '</span></div>' +
@@ -228,12 +254,35 @@
           (variants.length
             ? '<div class="bc-inv-variants-title">Existencias por sabor / variante</div>' +
               variants.map(function (variant) {
-                return '<div class="bc-inv-variant-row"><span>' + esc(variant.nombre || 'Variante') +
-                  '</span><strong>' + esc(qtyFmt(variant.cantidad) + ' ' + (variant.unidad || unit)) + '</strong></div>';
+                const variantId = variant.producto_id || '';
+                const variantMinimum = variant.minimo == null ? 0 : num(variant.minimo);
+                const variantState = variant.estado || (variantMinimum <= 0 ? 'sin_minimo' : (num(variant.cantidad) <= 0 ? 'agotado' : (num(variant.cantidad) <= variantMinimum ? 'bajo' : 'normal')));
+                const variantFeedback = feedback && String(feedback.variantId || '') === String(variantId) && String(feedback.almacenId || '') === String(warehouseId)
+                  ? '<div class="bc-inv-minimum-feedback is-success" role="status">' + esc(feedback.message) + '</div>' : '';
+                const variantEditor = variantId && warehouseId && getClient()
+                  ? '<div class="bc-inv-variant-minimum"><label>Stock mínimo</label><input data-bc-variant-minimum-input type="number" min="0.001" step="any" required inputmode="decimal" value="' + esc(String(variantMinimum > 0 ? variantMinimum : '')) + '" aria-label="Stock mínimo de ' + esc(variant.nombre || 'variante') + '">' +
+                    '<button type="button" class="bc-inv-minimum-save" data-bc-save-variant-minimum data-variant-id="' + esc(variantId) + '" data-warehouse-id="' + esc(warehouseId) + '">Guardar</button></div>'
+                  : '<span class="bc-inv-minimum-readonly">Mínimo: ' + esc(qtyFmt(variantMinimum)) + '</span>';
+                return '<div class="bc-inv-variant-row"><div class="bc-inv-variant-main"><strong>' + esc(variant.nombre || 'Variante') + '</strong>' +
+                  '<span>' + esc(qtyFmt(variant.cantidad) + ' ' + (variant.unidad || unit)) + ' · ' + esc(estadoLabel(variantState)) + '</span></div>' +
+                  variantEditor + variantFeedback + '</div>';
               }).join('')
             : '') +
         '</section>';
       }).join('') +
+      (unassignedWarehouses.length && productId && getClient()
+        ? '<section class="bc-inv-add-warehouse">' +
+            '<strong>Agregar este producto a otro almacén</strong>' +
+            '<p>Se creará la asignación con stock 0. Define primero su mínimo obligatorio para poder recibir compras o transferencias.</p>' +
+            '<div class="bc-inv-add-warehouse-controls">' +
+              '<select data-bc-new-warehouse aria-label="Nuevo almacén"><option value="">Seleccionar almacén…</option>' +
+                unassignedWarehouses.map(warehouse => '<option value="' + esc(warehouse.id) + '">' + esc(warehouse.nombre) + '</option>').join('') +
+              '</select>' +
+              '<input data-bc-new-warehouse-minimum type="number" min="0.001" step="any" inputmode="decimal" placeholder="Stock mínimo" aria-label="Stock mínimo obligatorio">' +
+              '<button type="button" class="bc-inv-minimum-save" data-bc-assign-warehouse data-product-id="' + esc(productId) + '">Asignar</button>' +
+            '</div><div class="bc-inv-minimum-feedback" data-bc-assign-feedback role="status"></div>' +
+          '</section>'
+        : '') +
       '<section class="bc-inv-history" aria-label="Movimientos recientes">' +
         '<div class="bc-inv-history-heading"><strong>Movimientos recientes</strong><span>Últimos 5</span></div>' +
         (loadingExtra
@@ -257,6 +306,75 @@
     render(filaActual, meta, history.rows, history.error, feedback || null, false);
   }
 
+  async function asignarAlmacenConMinimo(button) {
+    if (!button || button.disabled) return;
+    const section = button.closest('.bc-inv-add-warehouse');
+    const select = section && section.querySelector('[data-bc-new-warehouse]');
+    const input = section && section.querySelector('[data-bc-new-warehouse-minimum]');
+    const productId = button.getAttribute('data-product-id');
+    const warehouseId = select && select.value;
+    const raw = String(input && input.value || '').trim();
+    const minimum = raw === '' ? NaN : Number(raw);
+    const feedback = section && section.querySelector('[data-bc-assign-feedback]');
+    if (!section || !select || !input || !feedback || !productId) return;
+    if (!warehouseId || !Number.isFinite(minimum) || minimum <= 0) {
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'Selecciona un almacén y define un mínimo mayor que cero.';
+      return;
+    }
+    const supabaseClient = getClient();
+    if (!supabaseClient || typeof supabaseClient.rpc !== 'function') {
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'No está disponible la conexión con el inventario.';
+      return;
+    }
+    const originalText = button.textContent;
+    button.disabled = true;
+    select.disabled = true;
+    input.disabled = true;
+    button.textContent = 'Asignando…';
+    feedback.className = 'bc-inv-minimum-feedback';
+    feedback.textContent = 'Creando la asignación con stock 0 y guardando el mínimo…';
+    try {
+      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo_obligatorio', {
+        p_producto_id: productId,
+        p_almacen_id: warehouseId,
+        p_minimo: minimum
+      });
+      if (!result || result.error) throw new Error(result && result.error && (result.error.message || result.error.details) || 'No se pudo asignar el almacén.');
+      if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('stock_minimum', false);
+      const currentStores = Array.isArray(filaActual && filaActual.almacenes)
+        ? filaActual.almacenes.filter(warehouse => warehouse && !warehouse.sin_asignacion)
+        : [];
+      const selectedWarehouseName = select.options[select.selectedIndex] ? select.options[select.selectedIndex].textContent : 'Nuevo almacén';
+      const updatedFila = Object.assign({}, filaActual || {}, {
+        almacenes: currentStores.concat([{
+          almacen_id: warehouseId, almacen: selectedWarehouseName, cantidad: 0,
+          minimo: minimum, estado: 'agotado', unidad: (filaActual && filaActual.unidad) || 'u', variantes: []
+        }])
+      });
+      let refreshed = null;
+      if (typeof window.refrescarInventario === 'function') {
+        try {
+          await window.refrescarInventario();
+          const rows = Array.isArray(window._invFilas) ? window._invFilas : [];
+          refreshed = rows.find(row => String(row.producto_id || row.id) === String(productId)) || null;
+        } catch (_) { refreshed = null; }
+      }
+      await abrirProducto(refreshed || updatedFila, {
+        almacenId: warehouseId,
+        message: '✓ Almacén asignado con stock 0 y mínimo obligatorio guardado.'
+      });
+    } catch (error) {
+      button.disabled = false;
+      select.disabled = false;
+      input.disabled = false;
+      button.textContent = originalText;
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'No se pudo asignar: ' + String(error && error.message || error);
+    }
+  }
+
   async function guardarMinimo(button) {
     if (button.disabled) return;
     const modal = document.getElementById('bc-inv-producto-modal');
@@ -275,9 +393,9 @@
     }
     const raw = String(input.value || '').trim();
     const minimum = raw === '' ? NaN : Number(raw);
-    if (!Number.isFinite(minimum) || minimum < 0) {
+    if (!Number.isFinite(minimum) || minimum <= 0) {
       feedback.className = 'bc-inv-minimum-feedback is-error';
-      feedback.textContent = 'Introduce un mínimo válido igual o mayor que 0.';
+      feedback.textContent = 'Introduce un mínimo válido: debe ser obligatorio y mayor que cero.';
       input.focus();
       return;
     }
@@ -298,7 +416,7 @@
     try {
       // The RPC is the authority for stock.edit permission; the UI must not
       // hide the editor because a client-side permission cache is still stale.
-      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo', {
+      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo_obligatorio', {
         p_producto_id: productId,
         p_almacen_id: warehouseId,
         p_minimo: minimum
@@ -341,6 +459,43 @@
     }
   }
 
+  async function guardarMinimoVariante(button) {
+    if (!button || button.disabled) return;
+    const row = button.closest('.bc-inv-variant-row');
+    const input = row && row.querySelector('[data-bc-variant-minimum-input]');
+    const variantId = button.getAttribute('data-variant-id');
+    const warehouseId = button.getAttribute('data-warehouse-id');
+    if (!row || !input || !variantId || !warehouseId) return;
+    const raw = String(input.value || '').trim();
+    const minimum = raw === '' ? NaN : Number(raw);
+    let feedback = row.querySelector('.bc-inv-minimum-feedback');
+    if (!feedback) { feedback = document.createElement('div'); feedback.className = 'bc-inv-minimum-feedback'; feedback.setAttribute('role', 'status'); row.appendChild(feedback); }
+    if (!Number.isFinite(minimum) || minimum <= 0) { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'Introduce un mínimo válido para este sabor: debe ser mayor que cero.'; input.focus(); return; }
+    const supabaseClient = getClient();
+    if (!supabaseClient || typeof supabaseClient.rpc !== 'function') { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'No está disponible la conexión con el inventario.'; return; }
+    const originalText = button.textContent;
+    button.disabled = true; input.disabled = true; button.textContent = 'Guardando…';
+    feedback.className = 'bc-inv-minimum-feedback'; feedback.textContent = 'Guardando mínimo del sabor…';
+    try {
+      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo_variante', { p_producto_id: variantId, p_almacen_id: warehouseId, p_minimo: minimum });
+      if (!result || result.error) throw new Error(result && result.error && (result.error.message || result.error.details) || 'No se pudo guardar el mínimo del sabor.');
+      if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('stock_minimum', false);
+      let refreshed = null;
+      if (typeof window.refrescarInventario === 'function') {
+        try {
+          await window.refrescarInventario();
+          const rows = Array.isArray(window._invFilas) ? window._invFilas : [];
+          const currentId = filaActual && (filaActual.producto_id || filaActual.id);
+          refreshed = rows.find(item => String(item.producto_id || item.id) === String(currentId)) || null;
+        } catch (_) { refreshed = null; }
+      }
+      await abrirProducto(refreshed || filaActual, { almacenId: warehouseId, variantId: variantId, message: '✓ Mínimo del sabor guardado.' });
+    } catch (error) {
+      button.disabled = false; input.disabled = false; button.textContent = originalText;
+      feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'No se pudo guardar: ' + String(error && error.message || error);
+    }
+  }
+
   function bind() {
     const list = document.getElementById('inv-detalle');
     if (!list) { setTimeout(bind, 500); return; }
@@ -373,8 +528,16 @@
       '.bc-inv-minimum-feedback{grid-column:1/-1;min-height:1em;font-size:.7rem;color:var(--mist,#aaa)}' +
       '.bc-inv-minimum-feedback.is-success{color:#9fc4ad}.bc-inv-minimum-feedback.is-error{color:#e88a96}' +
       '.bc-inv-minimum-hint{grid-column:1/-1;margin:0;font-size:.67rem;color:var(--mist,#aaa)}.bc-inv-minimum-hint.is-warning{color:#e8c56a}' +
+      '.bc-inv-add-warehouse{margin:10px 0;padding:10px;border:1px dashed rgba(201,162,77,.35);border-radius:8px;display:grid;gap:7px}' +
+      '.bc-inv-add-warehouse>strong{font-size:.8rem;color:var(--gold,#c9a24d)}.bc-inv-add-warehouse>p{margin:0;font-size:.7rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-add-warehouse-controls{display:grid;grid-template-columns:minmax(0,1fr) 105px auto;gap:6px;align-items:center}' +
+      '.bc-inv-add-warehouse-controls select,.bc-inv-add-warehouse-controls input{min-width:0;width:100%;height:36px;box-sizing:border-box;padding:0 7px;border:1px solid rgba(201,162,77,.35);border-radius:6px;background:var(--void,#0c1c18);color:var(--text,#eee);font:inherit;font-size:.75rem}' +
+      '@media(max-width:430px){.bc-inv-add-warehouse-controls{grid-template-columns:1fr 1fr}.bc-inv-add-warehouse-controls select{grid-column:1/-1}.bc-inv-add-warehouse-controls button{grid-column:1/-1}}' +
       '.bc-inv-variants-title{padding-top:6px;font-size:.69rem;color:var(--gold,#c9a24d)}' +
-      '.bc-inv-variant-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:.75rem;color:var(--mist,#aaa)}.bc-inv-variant-row strong{color:var(--text,#eee)}' +
+      '.bc-inv-variant-row{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:7px 0;font-size:.75rem;color:var(--mist,#aaa);border-top:1px solid rgba(201,162,77,.1)}' +
+      '.bc-inv-variant-main{display:flex;justify-content:space-between;gap:8px;align-items:center}.bc-inv-variant-main strong{color:var(--text,#eee)}' +
+      '.bc-inv-variant-minimum{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}.bc-inv-variant-minimum label{font-size:.68rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-variant-minimum input{width:86px;height:32px;box-sizing:border-box;padding:0 7px;border:1px solid rgba(201,162,77,.35);border-radius:6px;background:var(--void,#0c1c18);color:var(--text,#eee);font:inherit}' +
       '.bc-inv-history{margin-top:7px;padding-top:9px;border-top:1px solid rgba(201,162,77,.2)}' +
       '.bc-inv-history-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}.bc-inv-history-heading strong{font-size:.8rem}.bc-inv-history-heading span{font-size:.66rem;color:var(--mist,#aaa)}' +
       '.bc-inv-history-list{display:flex;flex-direction:column;gap:5px}.bc-inv-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid rgba(201,162,77,.1);border-radius:7px;background:rgba(255,255,255,.015)}' +
