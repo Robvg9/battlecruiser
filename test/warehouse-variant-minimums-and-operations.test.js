@@ -41,6 +41,7 @@ test("Each mixed-inventory flavor has an independent minimum for each warehouse"
   assert.match(migration, /INSERT INTO public\.stock\(producto_id,almacen_id,cantidad,minimo,updated_at\)/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.bc_seed_mixed_variant_minimum\(\) FROM PUBLIC,anon/);
   assert.match(migration, /tiene_permiso\('stock','editar'\)/);
+  assert.match(migration, /NOT public\.bc_actor_is_admin\(\)/);
   assert.match(migration, /LEFT JOIN public\.productos_stock_mixto_minimos vm ON vm\.producto_id=v\.id AND vm\.almacen_id=a\.id/);
   assert.match(migration, /'minimo',coalesce\(vm\.minimo,0\)/);
   assert.match(migration, /'estado',CASE WHEN coalesce\(vm\.minimo,0\)<=0 THEN 'sin_minimo'/);
