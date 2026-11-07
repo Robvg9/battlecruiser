@@ -6,6 +6,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
+const baseMigration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
 const migration = read("supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql");
 const detail = read("public/js/inventario-detalle.js");
 const inventory = read("public/js/m53-inventario-centro.js");
@@ -22,6 +23,12 @@ test("Every stock row has a non-null minimum and existing nulls are safely initi
   assert.match(migration, /UPDATE OF cantidad,producto_id,almacen_id,minimo ON public\.stock/);
   assert.match(migration, /NEW\.minimo IS DISTINCT FROM OLD\.minimo/);
   assert.match(migration, /UPDATE OF cantidad,producto_id,almacen_id,minimo/);
+});
+
+test("The prerequisite mixed-inventory migration remains safe if migration history replays it after the minimum migration", () => {
+  assert.match(baseMigration, /LEFT JOIN public\.productos_stock_mixto_minimos vm ON vm\.producto_id=v\.id AND vm\.almacen_id=a\.id/);
+  assert.match(baseMigration, /'minimo',coalesce\(vm\.minimo,0\)/);
+  assert.match(baseMigration, /'estado',CASE WHEN coalesce\(vm\.minimo,0\)<=0 THEN 'sin_minimo'/);
 });
 
 test("Each mixed-inventory flavor has an independent minimum for each warehouse", () => {
