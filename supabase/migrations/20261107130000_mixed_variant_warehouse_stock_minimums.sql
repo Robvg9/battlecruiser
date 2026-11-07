@@ -47,7 +47,7 @@ SECURITY DEFINER
 SET search_path TO 'public','pg_temp'
 AS $minimum_guard$
 BEGIN
-  IF NEW.cantidad > 0 AND coalesce(NEW.minimo,0) <= 0 THEN
+  IF NEW.cantidad > 0 AND (coalesce(NEW.minimo,0) <= 0 OR NEW.minimo::text IN ('NaN','Infinity','-Infinity')) THEN
     -- Keep legacy stock saleable while minimums are being configured. Only
     -- inserts or increases are blocked; decreases (sales, bajas, transfer-outs)
     -- remain possible during the transition.
@@ -90,7 +90,7 @@ BEGIN
   IF NOT public.tiene_permiso('stock','editar') AND NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'No tienes permiso para editar el stock mínimo.' USING ERRCODE='42501';
   END IF;
-  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 THEN
+  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 OR p_minimo::text IN ('NaN','Infinity','-Infinity') THEN
     RAISE EXCEPTION 'El stock mínimo es obligatorio y debe ser mayor que cero.' USING ERRCODE='22023';
   END IF;
 
@@ -137,7 +137,7 @@ BEGIN
   IF NOT public.tiene_permiso('stock','editar') AND NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'No tienes permiso para editar el stock mínimo.' USING ERRCODE='42501';
   END IF;
-  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 THEN
+  IF p_producto_id IS NULL OR p_almacen_id IS NULL OR p_minimo IS NULL OR p_minimo<=0 OR p_minimo::text IN ('NaN','Infinity','-Infinity') THEN
     RAISE EXCEPTION 'Producto, almacén y mínimo válido son obligatorios.' USING ERRCODE='22023';
   END IF;
 
