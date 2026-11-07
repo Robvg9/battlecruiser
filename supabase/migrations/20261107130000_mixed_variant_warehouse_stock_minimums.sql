@@ -48,8 +48,13 @@ SET search_path TO 'public','pg_temp'
 AS $minimum_guard$
 BEGIN
   IF NEW.cantidad > 0 AND coalesce(NEW.minimo,0) <= 0 THEN
-    RAISE EXCEPTION 'Antes de mover existencias, configura un stock mínimo mayor que cero para este producto y almacén.'
-      USING ERRCODE='23514';
+    -- Keep legacy stock saleable while minimums are being configured. Only
+    -- inserts or increases are blocked; decreases (sales, bajas, transfer-outs)
+    -- remain possible during the transition.
+    IF TG_OP='INSERT' OR NEW.cantidad > OLD.cantidad THEN
+      RAISE EXCEPTION 'Antes de agregar o aumentar existencias, configura un stock mínimo mayor que cero para este producto y almacén.'
+        USING ERRCODE='23514';
+    END IF;
   END IF;
   RETURN NEW;
 END;
