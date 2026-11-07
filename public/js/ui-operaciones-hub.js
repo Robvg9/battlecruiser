@@ -6,7 +6,7 @@
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '41';
+  var HUB_VER = '42';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
