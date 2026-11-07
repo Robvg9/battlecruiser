@@ -238,7 +238,7 @@
         <section id="prod-inventario-mixto-settings" class="prod-inventario-mixto-settings">
           <label class="prod-inventario-mixto-toggle" for="prod-inventario-mixto">
             <input type="checkbox" id="prod-inventario-mixto">
-            <span><strong>Controlar inventario por sabores / variantes</strong><small>Actívalo en un producto ya creado desde su botón «Configurar sabores». Cada sabor tendrá stock, compras, transferencias y mínimo independientes por almacén. Antes de activar, el stock genérico y sus lotes abiertos deben quedar en cero; nunca repartimos existencias automáticamente.</small></span>
+            <span><strong>Controlar inventario por sabores / variantes</strong><small>Actívalo en un producto ya creado desde su botón «Configurar sabores». Cada sabor tendrá stock, compras, transferencias y mínimo independientes por almacén. Después, en Inventario, abre el producto y edita el mínimo debajo de cada sabor en cada almacén. Antes de activar, el stock genérico y sus lotes abiertos deben quedar en cero; nunca repartimos existencias automáticamente.</small></span>
           </label>
           <div id="prod-variantes-editor" class="prod-variantes-editor hidden" hidden>
             <div class="prod-variantes-heading"><strong>Sabores o variantes</strong><small>Escribe tú el nombre de cada uno. Ejemplo: Manzana, Pera, Piña.</small></div>
@@ -407,7 +407,7 @@
 
     <section id="tab-inventario" class="tab-panel">
       <div class="pendientes-header"><h3>Inventario</h3><span id="inv-conn-info" class="muted"></span></div>
-      <p class="muted">Existencia, mínimo, estado, costo promedio y valoración de inventario.</p>
+      <p class="muted">Existencia, mínimo, estado, costo promedio y valoración. Abre cada producto para editar su mínimo por almacén y por sabor.</p>
       <div class="mando-filtros">
         <select id="inv-filtro-almacen"><option value="">Todos los almacenes</option></select>
         <button type="button" id="inv-refrescar-btn" class="cc-accion">Refrescar</button>
