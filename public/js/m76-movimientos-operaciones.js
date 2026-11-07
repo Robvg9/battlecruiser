@@ -333,7 +333,7 @@
       return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(value) + '</div></div>';
     }
     metrics.innerHTML = metric('Compras', state.summaryUnavailable ? '—' : counts.compra) +
-      metric('Mov. internos', state.summaryUnavailable ? '—' : counts.transferencia) +
+      metric('Movimientos internos', state.summaryUnavailable ? '—' : counts.transferencia) +
       metric('Bajas', state.summaryUnavailable ? '—' : counts.baja) +
       metric('Reinversiones', state.summaryUnavailable ? '—' : counts.reinversion);
     let summaryNote = metrics.querySelector('.bc-m76-summary-note');

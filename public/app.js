@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.73 — Transferencias múltiples compactas y vistas reactivas
+// v9.5.74 — Transferencias múltiples compactas y vistas reactivas
 (function hotfixV9475(){
   const VERSION="9.5.74";
   window.__BC_VERSION__=VERSION;

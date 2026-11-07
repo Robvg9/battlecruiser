@@ -445,7 +445,7 @@
       return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(String(value)) + '</div></div>';
     }
     el.innerHTML = card('Compras', counts.compras.size) +
-      card('Mov. internos', counts.internos.size) +
+      card('Movimientos internos', counts.internos.size) +
       card('Bajas', counts.bajas.size) +
       card('Reinversiones', counts.reinversiones.size);
   }
@@ -675,7 +675,7 @@
     }
     if (!navigator.onLine) {
       if (conn) conn.textContent = '⚪ Sin conexión — datos no disponibles';
-      _allRows = []; _filtered = []; _lastError = null; _loading = false;
+      _allRows = []; _todayRows = null; _todaySummaryError = true; _todaySummaryTruncated = false; _filtered = []; _lastError = null; _loading = false;
       const el = document.getElementById('mov-detalle');
       if (el) el.innerHTML = '<div class="bc-m51-empty">⚪ Sin conexión — los movimientos requieren datos de Supabase.</div>';
       return;
@@ -776,9 +776,17 @@
       if (group.open) _expandedHistoryDays.add(day);
       else _expandedHistoryDays.delete(day);
     }, true);
+    ['today','history'].forEach(function (mode) {
+      const button = tab.querySelector(mode === 'today' ? '#mov-view-today' : '#mov-view-history');
+      if (button && !button.dataset.m51ViewBound) {
+        button.dataset.m51ViewBound = '1';
+        button.addEventListener('click', function (event) {
+          event.preventDefault(); event.stopPropagation(); cambiarVista(mode);
+        });
+      }
+    });
     tab.addEventListener('click', function (e) {
-      if (e.target.closest('#mov-view-today')) { cambiarVista('today'); return; }
-      if (e.target.closest('#mov-view-history')) { cambiarVista('history'); return; }
+      if (e.target.closest('#mov-view-today, #mov-view-history')) return;
       if (e.target.closest('#mov-retry-btn, #mov-empty-clear')) {
         if (e.target.closest('#mov-empty-clear')) limpiarFiltrosUI();
         cargarMovimientos(); return;
