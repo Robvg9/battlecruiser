@@ -13,11 +13,15 @@ const operations = read("public/js/ui-operaciones-hub.js");
 const approvals = read("public/js/aprobaciones-admin.js");
 const index = read("public/index.html");
 const finance = read("public/js/operaciones-financieras.js");
+const app = read("public/app.js");
 
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
   assert.match(migration, /ALTER TABLE public\.stock ALTER COLUMN minimo SET NOT NULL/);
   assert.match(migration, /ALTER TABLE public\.stock ALTER COLUMN minimo SET DEFAULT 0/);
+  assert.match(migration, /UPDATE OF cantidad,producto_id,almacen_id,minimo ON public\.stock/);
+  assert.match(migration, /NEW\.minimo IS DISTINCT FROM OLD\.minimo/);
+  assert.match(migration, /UPDATE OF cantidad,producto_id,almacen_id,minimo/);
 });
 
 test("Each mixed-inventory flavor has an independent minimum for each warehouse", () => {
@@ -40,6 +44,8 @@ test("Inventory detail edits and saves a separate threshold for each flavor", ()
   assert.match(detail, /minimum <= 0/);
   assert.match(detail, /min="0.001"/);
   assert.match(index, /data-estado="sin_minimo"/);
+  assert.match(index, /<option value="merma">Baja<\/option>/);
+  assert.doesNotMatch(index, /<option value="merma">Merma<\/option>/);
   assert.match(inventory, /option value="sin_minimo">Mínimo pendiente/);
   assert.match(detail, /variant\.minimo/);
   assert.match(detail, /Mínimos individuales por sabor/);
@@ -80,6 +86,13 @@ test("The financial operations panel loads catalogs before building inventory fo
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(finance.includes('value="' + reason + '"') || finance.includes(">" + reason + "<"), "missing financial Baja reason " + reason);
   }
+});
+
+test("Release cache keys are refreshed for the modified inventory and Operations modules", () => {
+  assert.match(app, /m53-inventario-centro\.js","53\.6/);
+  assert.match(app, /ui-operaciones-hub\.js","43\.0/);
+  assert.match(app, /operaciones-financieras\.js","20261107\.2/);
+  assert.match(app, /aprobaciones-admin\.js","20261107\.1/);
 });
 
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
