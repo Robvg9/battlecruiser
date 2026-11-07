@@ -304,6 +304,65 @@
     render(filaActual, meta, history.rows, history.error, feedback || null, false);
   }
 
+  async function asignarAlmacenConMinimo(button) {
+    if (!button || button.disabled) return;
+    const section = button.closest('.bc-inv-add-warehouse');
+    const select = section && section.querySelector('[data-bc-new-warehouse]');
+    const input = section && section.querySelector('[data-bc-new-warehouse-minimum]');
+    const productId = button.getAttribute('data-product-id');
+    const warehouseId = select && select.value;
+    const raw = String(input && input.value || '').trim();
+    const minimum = raw === '' ? NaN : Number(raw);
+    const feedback = section && section.querySelector('[data-bc-assign-feedback]');
+    if (!section || !select || !input || !feedback || !productId) return;
+    if (!warehouseId || !Number.isFinite(minimum) || minimum <= 0) {
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'Selecciona un almacén y define un mínimo mayor que cero.';
+      return;
+    }
+    const supabaseClient = getClient();
+    if (!supabaseClient || typeof supabaseClient.rpc !== 'function') {
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'No está disponible la conexión con el inventario.';
+      return;
+    }
+    const originalText = button.textContent;
+    button.disabled = true;
+    select.disabled = true;
+    input.disabled = true;
+    button.textContent = 'Asignando…';
+    feedback.className = 'bc-inv-minimum-feedback';
+    feedback.textContent = 'Creando la asignación con stock 0 y guardando el mínimo…';
+    try {
+      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo_obligatorio', {
+        p_producto_id: productId,
+        p_almacen_id: warehouseId,
+        p_minimo: minimum
+      });
+      if (!result || result.error) throw new Error(result && result.error && (result.error.message || result.error.details) || 'No se pudo asignar el almacén.');
+      if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('stock_minimum', false);
+      let refreshed = null;
+      if (typeof window.refrescarInventario === 'function') {
+        try {
+          await window.refrescarInventario();
+          const rows = Array.isArray(window._invFilas) ? window._invFilas : [];
+          refreshed = rows.find(row => String(row.producto_id || row.id) === String(productId)) || null;
+        } catch (_) { refreshed = null; }
+      }
+      await abrirProducto(refreshed || filaActual, {
+        almacenId: warehouseId,
+        message: '✓ Almacén asignado con stock 0 y mínimo obligatorio guardado.'
+      });
+    } catch (error) {
+      button.disabled = false;
+      select.disabled = false;
+      input.disabled = false;
+      button.textContent = originalText;
+      feedback.className = 'bc-inv-minimum-feedback is-error';
+      feedback.textContent = 'No se pudo asignar: ' + String(error && error.message || error);
+    }
+  }
+
   async function guardarMinimo(button) {
     if (button.disabled) return;
     const modal = document.getElementById('bc-inv-producto-modal');
