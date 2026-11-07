@@ -357,6 +357,15 @@ BEGIN
   IF has_function_privilege('anon','public.configurar_producto_inventario_mixto(uuid,boolean,jsonb)','EXECUTE') THEN
     RAISE EXCEPTION 'Anonymous role can configure mixed inventory';
   END IF;
+  IF has_function_privilege('anon','public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric)','EXECUTE')
+     OR has_function_privilege('anon','public.bc_actualizar_stock_minimo_variante(uuid,uuid,numeric)','EXECUTE')
+     OR has_function_privilege('anon','public.bc_seed_mixed_variant_minimum()','EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can execute a stock-minimum or trigger function';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc_actualizar_stock_minimo_variante(uuid,uuid,numeric)','EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated role cannot execute the authorized stock-minimum RPCs';
+  END IF;
   IF has_table_privilege('authenticated','public.productos_stock_mixto_minimos','INSERT') THEN
     RAISE EXCEPTION 'Authenticated role can write mixed minimums directly';
   END IF;
