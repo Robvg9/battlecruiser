@@ -300,7 +300,7 @@
     const minimum = raw === '' ? NaN : Number(raw);
     if (!Number.isFinite(minimum) || minimum <= 0) {
       feedback.className = 'bc-inv-minimum-feedback is-error';
-      feedback.textContent = 'El stock mínimo es obligatorio y debe ser mayor que cero.';
+      feedback.textContent = 'Introduce un mínimo válido: debe ser obligatorio y mayor que cero.';
       input.focus();
       return;
     }
@@ -375,7 +375,7 @@
     const minimum = raw === '' ? NaN : Number(raw);
     let feedback = row.querySelector('.bc-inv-minimum-feedback');
     if (!feedback) { feedback = document.createElement('div'); feedback.className = 'bc-inv-minimum-feedback'; feedback.setAttribute('role', 'status'); row.appendChild(feedback); }
-    if (!Number.isFinite(minimum) || minimum <= 0) { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'El stock mínimo del sabor es obligatorio y debe ser mayor que cero.'; input.focus(); return; }
+    if (!Number.isFinite(minimum) || minimum <= 0) { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'Introduce un mínimo válido para este sabor: debe ser mayor que cero.'; input.focus(); return; }
     const supabaseClient = getClient();
     if (!supabaseClient || typeof supabaseClient.rpc !== 'function') { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'No está disponible la conexión con el inventario.'; return; }
     const originalText = button.textContent;
