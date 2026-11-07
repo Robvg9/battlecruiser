@@ -343,6 +343,16 @@
       });
       if (!result || result.error) throw new Error(result && result.error && (result.error.message || result.error.details) || 'No se pudo asignar el almacén.');
       if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('stock_minimum', false);
+      const currentStores = Array.isArray(filaActual && filaActual.almacenes)
+        ? filaActual.almacenes.filter(warehouse => warehouse && !warehouse.sin_asignacion)
+        : [];
+      const selectedWarehouseName = select.options[select.selectedIndex] ? select.options[select.selectedIndex].textContent : 'Nuevo almacén';
+      const updatedFila = Object.assign({}, filaActual || {}, {
+        almacenes: currentStores.concat([{
+          almacen_id: warehouseId, almacen: selectedWarehouseName, cantidad: 0,
+          minimo: minimum, estado: 'agotado', unidad: (filaActual && filaActual.unidad) || 'u', variantes: []
+        }])
+      });
       let refreshed = null;
       if (typeof window.refrescarInventario === 'function') {
         try {
@@ -351,7 +361,7 @@
           refreshed = rows.find(row => String(row.producto_id || row.id) === String(productId)) || null;
         } catch (_) { refreshed = null; }
       }
-      await abrirProducto(refreshed || filaActual, {
+      await abrirProducto(refreshed || updatedFila, {
         almacenId: warehouseId,
         message: '✓ Almacén asignado con stock 0 y mínimo obligatorio guardado.'
       });
