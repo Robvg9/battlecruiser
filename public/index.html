@@ -210,7 +210,7 @@
       <form id="form-producto" class="inline-form">
         <input type="hidden" id="prod-editando-id" value="">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
-        <select id="prod-categoria" required aria-label="Categoría"><option value="">Selecciona una categoría</option></select>
+        <select id="prod-categoria" required aria-label="Categoría"><option value="" disabled selected hidden>Selecciona una categoría</option></select>
         <input id="prod-unidad" type="hidden" value="unidad" aria-label="Unidad base interna del inventario">
         <datalist id="presentaciones-comunes"></datalist>
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio" required>
