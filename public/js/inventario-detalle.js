@@ -83,6 +83,8 @@
       }
       const variantButton = event.target.closest('[data-bc-save-variant-minimum]');
       if (variantButton) { event.preventDefault(); guardarMinimoVariante(variantButton); return; }
+      const assignButton = event.target.closest('[data-bc-assign-warehouse]');
+      if (assignButton) { event.preventDefault(); asignarAlmacenConMinimo(assignButton); return; }
       const button = event.target.closest('[data-bc-save-minimum]');
       if (button) { event.preventDefault(); guardarMinimo(button); }
     });
@@ -187,6 +189,14 @@
       ? meta.presentaciones.nombre : '';
     const mixed = !!(meta && meta.inventario_mixto) ||
       stores.some(warehouse => Array.isArray(warehouse.variantes) && warehouse.variantes.length > 0);
+    const productId = fila.producto_id || fila.id || '';
+    const warehouseCatalog = Array.isArray(window._cache && window._cache.almacenes)
+      ? window._cache.almacenes.filter(warehouse => warehouse && warehouse.activo !== false && warehouse.id)
+      : [];
+    const assignedWarehouseIds = new Set(stores.map(warehouse => String(warehouse.almacen_id || warehouse.id || '')).filter(Boolean));
+    const unassignedWarehouses = !mixed && !loadingExtra
+      ? warehouseCatalog.filter(warehouse => !assignedWarehouseIds.has(String(warehouse.id)))
+      : [];
 
     modal.querySelector('h2').textContent = fila.producto || (meta && meta.nombre) || 'Producto';
     body.innerHTML =
@@ -258,6 +268,19 @@
             : '') +
         '</section>';
       }).join('') +
+      (unassignedWarehouses.length && productId && getClient()
+        ? '<section class="bc-inv-add-warehouse">' +
+            '<strong>Agregar este producto a otro almacén</strong>' +
+            '<p>Se creará la asignación con stock 0. Define primero su mínimo obligatorio para poder recibir compras o transferencias.</p>' +
+            '<div class="bc-inv-add-warehouse-controls">' +
+              '<select data-bc-new-warehouse aria-label="Nuevo almacén"><option value="">Seleccionar almacén…</option>' +
+                unassignedWarehouses.map(warehouse => '<option value="' + esc(warehouse.id) + '">' + esc(warehouse.nombre) + '</option>').join('') +
+              '</select>' +
+              '<input data-bc-new-warehouse-minimum type="number" min="0.001" step="any" inputmode="decimal" placeholder="Stock mínimo" aria-label="Stock mínimo obligatorio">' +
+              '<button type="button" class="bc-inv-minimum-save" data-bc-assign-warehouse data-product-id="' + esc(productId) + '">Asignar</button>' +
+            '</div><div class="bc-inv-minimum-feedback" data-bc-assign-feedback role="status"></div>' +
+          '</section>'
+        : '') +
       '<section class="bc-inv-history" aria-label="Movimientos recientes">' +
         '<div class="bc-inv-history-heading"><strong>Movimientos recientes</strong><span>Últimos 5</span></div>' +
         (loadingExtra
@@ -434,6 +457,11 @@
       '.bc-inv-minimum-feedback{grid-column:1/-1;min-height:1em;font-size:.7rem;color:var(--mist,#aaa)}' +
       '.bc-inv-minimum-feedback.is-success{color:#9fc4ad}.bc-inv-minimum-feedback.is-error{color:#e88a96}' +
       '.bc-inv-minimum-hint{grid-column:1/-1;margin:0;font-size:.67rem;color:var(--mist,#aaa)}.bc-inv-minimum-hint.is-warning{color:#e8c56a}' +
+      '.bc-inv-add-warehouse{margin:10px 0;padding:10px;border:1px dashed rgba(201,162,77,.35);border-radius:8px;display:grid;gap:7px}' +
+      '.bc-inv-add-warehouse>strong{font-size:.8rem;color:var(--gold,#c9a24d)}.bc-inv-add-warehouse>p{margin:0;font-size:.7rem;color:var(--mist,#aaa)}' +
+      '.bc-inv-add-warehouse-controls{display:grid;grid-template-columns:minmax(0,1fr) 105px auto;gap:6px;align-items:center}' +
+      '.bc-inv-add-warehouse-controls select,.bc-inv-add-warehouse-controls input{min-width:0;width:100%;height:36px;box-sizing:border-box;padding:0 7px;border:1px solid rgba(201,162,77,.35);border-radius:6px;background:var(--void,#0c1c18);color:var(--text,#eee);font:inherit;font-size:.75rem}' +
+      '@media(max-width:430px){.bc-inv-add-warehouse-controls{grid-template-columns:1fr 1fr}.bc-inv-add-warehouse-controls select{grid-column:1/-1}.bc-inv-add-warehouse-controls button{grid-column:1/-1}}' +
       '.bc-inv-variants-title{padding-top:6px;font-size:.69rem;color:var(--gold,#c9a24d)}' +
       '.bc-inv-variant-row{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:7px 0;font-size:.75rem;color:var(--mist,#aaa);border-top:1px solid rgba(201,162,77,.1)}' +
       '.bc-inv-variant-main{display:flex;justify-content:space-between;gap:8px;align-items:center}.bc-inv-variant-main strong{color:var(--text,#eee)}' +
