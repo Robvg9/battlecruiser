@@ -12,6 +12,7 @@ DECLARE
   v_result jsonb;
   v_qty numeric;
   v_names text[];
+  v_variantes jsonb;
   v_count integer;
   v_failed boolean;
   v_message text;
@@ -49,6 +50,54 @@ BEGIN
   UPDATE public.stock SET cantidad=10 WHERE producto_id=v_pear AND almacen_id=v_warehouse_a;
   INSERT INTO public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario)
     VALUES(v_apple,v_warehouse_a,20,20,1.50),(v_pear,v_warehouse_a,10,10,1.75);
+
+  -- The required-minimum migration must safely normalize historical NULLs.
+  IF EXISTS (
+    SELECT 1 FROM public.stock
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id='55555555-5555-4555-8555-555555555555'
+      AND minimo IS DISTINCT FROM 0
+  ) THEN
+    RAISE EXCEPTION 'Legacy NULL minimum was not backfilled to zero';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='stock' AND column_name='minimo'
+      AND (is_nullable<>'NO' OR column_default IS NULL)
+  ) THEN
+    RAISE EXCEPTION 'Stock minimum column must be NOT NULL and have a safe default';
+  END IF;
+
+  -- Each flavor receives its own minimum, independently for each warehouse.
+  PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_a,25);
+  PERFORM public.bc_actualizar_stock_minimo_variante(v_pear,v_warehouse_a,12);
+  PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_b,3);
+  IF (SELECT minimo FROM public.productos_stock_mixto_minimos
+      WHERE producto_id=v_apple AND almacen_id=v_warehouse_a)<>25
+     OR (SELECT minimo FROM public.productos_stock_mixto_minimos
+      WHERE producto_id=v_apple AND almacen_id=v_warehouse_b)<>3
+     OR (SELECT minimo FROM public.productos_stock_mixto_minimos
+      WHERE producto_id=v_pear AND almacen_id=v_warehouse_a)<>12 THEN
+    RAISE EXCEPTION 'Flavor minimums were not persisted independently per warehouse';
+  END IF;
+  SELECT variantes INTO v_variantes
+  FROM public.inventario_mixto_enriquecido(v_warehouse_a)
+  WHERE producto_id=v_parent;
+  IF NOT (v_variantes @> jsonb_build_array(jsonb_build_object(
+      'producto_id',v_apple,'minimo',25,'estado','bajo'
+    ))) OR NOT (v_variantes @> jsonb_build_array(jsonb_build_object(
+      'producto_id',v_pear,'minimo',12,'estado','bajo'
+    ))) THEN
+    RAISE EXCEPTION 'Inventory API did not expose flavor-specific minimum and status: %',v_variantes;
+  END IF;
+  SELECT variantes INTO v_variantes
+  FROM public.inventario_mixto_enriquecido(v_warehouse_b)
+  WHERE producto_id=v_parent;
+  IF NOT (v_variantes @> jsonb_build_array(jsonb_build_object(
+      'producto_id',v_apple,'minimo',3
+    ))) THEN
+    RAISE EXCEPTION 'A flavor minimum leaked across warehouses: %',v_variantes;
+  END IF;
 
   -- A mixed parent cannot be used as a generic stock SKU by old or new RPC callers.
   v_failed:=false;
@@ -189,4 +238,4 @@ BEGIN
 END
 $$;
 
-SELECT 'PASS: optional mixed inventory, variant identities, stock, FIFO guard, transfer separation, warehouse seeding, aggregation, admin ACL and safe disable' AS result;
+SELECT 'PASS: mixed inventory, flavor minimums per warehouse, legacy minimum backfill, identities, stock, FIFO guard, transfer separation, warehouse seeding, aggregation, admin ACL and safe disable' AS result;
