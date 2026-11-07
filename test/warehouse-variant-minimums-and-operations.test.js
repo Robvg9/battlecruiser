@@ -43,6 +43,7 @@ test("Inventory detail edits and saves a separate threshold for each flavor", ()
   assert.match(inventory, /option value="sin_minimo">Mínimo pendiente/);
   assert.match(detail, /variant\.minimo/);
   assert.match(detail, /Mínimos individuales por sabor/);
+  assert.match(detail, /merma: 'Baja'/, 'legacy movements must display as Baja');
 });
 
 test("Inventory cards and alerts recognize a low flavor even when total product stock is sufficient", () => {
