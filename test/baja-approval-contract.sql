@@ -2,6 +2,8 @@ DO $contract$
 DECLARE
   v_owner uuid := '11111111-1111-4111-8111-111111111111';
   v_staff uuid := '22222222-2222-4222-8222-222222222222';
+  v_expense_approver uuid := '55555555-5555-4555-8555-555555555555';
+  v_merma_approver uuid := '66666666-6666-4666-8666-666666666666';
   v_store uuid := '33333333-3333-4333-8333-333333333333';
   v_product uuid := '44444444-4444-4444-8444-444444444444';
   v_owner_baja uuid;
@@ -81,6 +83,40 @@ BEGIN
 
   IF v_visible <> 1 THEN
     RAISE EXCEPTION 'Authorized approver cannot see the pending Baja in the admin queue.';
+  END IF;
+
+  -- The Baja approver must not see unrelated pending expenses or mermas.
+  SELECT count(*) INTO v_visible FROM public.listar_aprobaciones_admin();
+  IF v_visible <> 1 THEN
+    RAISE EXCEPTION 'Baja-only approver received rows from other approval modules.';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', v_expense_approver::text, false);
+  SELECT count(*) INTO v_visible
+  FROM public.listar_aprobaciones_admin() a
+  WHERE a.tipo = 'gasto';
+  IF v_visible <> 1 THEN
+    RAISE EXCEPTION 'Expense approver cannot see the pending expense.';
+  END IF;
+  SELECT count(*) INTO v_visible
+  FROM public.listar_aprobaciones_admin() a
+  WHERE a.tipo <> 'gasto';
+  IF v_visible <> 0 THEN
+    RAISE EXCEPTION 'Expense-only approver received unrelated approval rows.';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', v_merma_approver::text, false);
+  SELECT count(*) INTO v_visible
+  FROM public.listar_aprobaciones_admin() a
+  WHERE a.tipo = 'merma';
+  IF v_visible <> 1 THEN
+    RAISE EXCEPTION 'Merma approver cannot see the pending merma.';
+  END IF;
+  SELECT count(*) INTO v_visible
+  FROM public.listar_aprobaciones_admin() a
+  WHERE a.tipo <> 'merma';
+  IF v_visible <> 0 THEN
+    RAISE EXCEPTION 'Merma-only approver received unrelated approval rows.';
   END IF;
 
   PERFORM set_config('request.jwt.claim.sub', v_staff::text, false);
