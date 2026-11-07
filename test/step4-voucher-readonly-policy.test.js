@@ -49,7 +49,8 @@ test("Paso 4 RWHT 118: detalle de vale existente es consultable en modo lectura 
   const detail = window.document.getElementById("vale-detalle");
   assert.equal(detail.classList.contains("hidden"), false);
   assert.match(detail.textContent, /vale-fixture-118/);
-  assert.match(detail.textContent, /Merma/);
+  assert.match(detail.textContent, /Baja/);
+  assert.doesNotMatch(detail.textContent, /Merma/);
   assert.match(detail.textContent, /Producto fixture/);
   assert.match(detail.textContent, /La Cueva/);
   assert.match(detail.textContent, /2\.00 u/);
