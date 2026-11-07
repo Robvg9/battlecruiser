@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/20261104183000_product_mixed_inventory_variants.sql'
+      - 'supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql'
       - 'test/mixed-inventory-fixture.sql'
       - 'test/mixed-inventory-contract.sql'
       - '.github/workflows/mixed-inventory-postgres.yml'
@@ -57,6 +58,15 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_mixed_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261104183000_product_mixed_inventory_variants.sql
+
+      - name: Apply required warehouse and flavor minimum migration
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_mixed_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql
 
       - name: Verify optional variant stock and safe operations
         env:
