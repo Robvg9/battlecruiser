@@ -117,9 +117,9 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
 
 test("Release cache keys are refreshed for the modified inventory and Operations modules", () => {
   assert.match(app, /m53-inventario-centro\.js","53\.6/);
-  assert.match(app, /ui-operaciones-hub\.js","43\.0/);
-  assert.match(app, /operaciones-financieras\.js","20261107\.2/);
-  assert.match(app, /aprobaciones-admin\.js","20261107\.1/);
+  assert.match(app, /ui-operaciones-hub\.js","43\.1/);
+  assert.match(app, /operaciones-financieras\.js","20261107\.3/);
+  assert.match(app, /aprobaciones-admin\.js","20261107\.2/);
 });
 
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
