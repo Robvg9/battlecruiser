@@ -40,6 +40,7 @@ test("Inventory detail edits and saves a separate threshold for each flavor", ()
   assert.match(detail, /minimum <= 0/);
   assert.match(detail, /min="0.001"/);
   assert.match(index, /data-estado="sin_minimo"/);
+  assert.match(inventory, /option value="sin_minimo">Mínimo pendiente/);
   assert.match(detail, /variant\.minimo/);
   assert.match(detail, /Mínimos individuales por sabor/);
 });
