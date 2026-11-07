@@ -43,7 +43,7 @@ test("Inventory cards and alerts recognize a low flavor even when total product 
 });
 
 test("Operations loads product and warehouse catalogs before opening stock-related forms", () => {
-  assert.match(operations, /async function ensureOperationCatalogs\(\)/);
+  assert.match(operations, /async function ensureOperationCatalogs\(required\)/);
   for (const name of ["openGasto", "openBaja", "openReinversion"]) {
     assert.match(operations, new RegExp("async function " + name + "\\(\\)[\\s\\S]*?await ensureOperationCatalogs\\("));
   }
