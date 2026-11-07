@@ -113,6 +113,10 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["m51-movimientos-centro.js","51.10"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.10"), 'the offline shell must precache the refreshed movement listener');
   assert.ok(app.includes('["inventario-detalle.js","67"]'), 'the minimum editor must refresh');
+  assert.ok(app.includes('["m53-inventario-centro.js","53.6"]'), 'M53 must refresh for pending minimum status');
+  assert.ok(app.includes('["ui-operaciones-hub.js","43.0"]'), 'the Operations hub must refresh');
+  assert.ok(app.includes('["operaciones-financieras.js","20261107.2"]'), 'the finance operations form must refresh');
+  assert.ok(app.includes('["aprobaciones-admin.js","20261107.1"]'), 'the approval form must refresh');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=67"), 'the offline shell must precache the updated minimum editor');
   assert.ok(index.includes('js/productos.js?v=20261106.1'), 'the product view must refresh its category subscriber');
   assert.ok(index.includes('js/almacenes.js?v=20261106.1'), 'the warehouse view must refresh its tab subscriber');
