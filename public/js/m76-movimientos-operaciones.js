@@ -6,7 +6,7 @@
 
   const PAGE_SIZE = 40;
   const TZ = 'America/Havana';
-  const state = { rows: [], summaryRows: null, summaryUnavailable: false, summaryTruncated: false, operations: [], page: 0, selected: null, trigger: null, installed: false, historyTruncated: false };
+  const state = { rows: [], summaryRows: null, summaryUnavailable: false, summaryTruncated: false, summaryLabel: '', operations: [], page: 0, selected: null, trigger: null, installed: false, historyTruncated: false };
 
   function text(value) { return String(value == null ? '' : value); }
   function esc(value) {
@@ -326,9 +326,9 @@
     const maxPage = Math.max(0, Math.ceil(state.operations.length / PAGE_SIZE) - 1);
     state.page = Math.min(state.page, maxPage);
     const summarySource = state.summaryRows === null ? state.rows : state.summaryRows;
-    const todayOps = groupOperations(summarySource).filter(op => dateKey(op.fecha) === businessTodayKey());
+    const summaryOps = groupOperations(summarySource);
     const counts = { compra: 0, transferencia: 0, baja: 0, reinversion: 0 };
-    todayOps.forEach(op => { if (Object.prototype.hasOwnProperty.call(counts, op.kind)) counts[op.kind]++; });
+    summaryOps.forEach(op => { if (Object.prototype.hasOwnProperty.call(counts, op.kind)) counts[op.kind]++; });
     function metric(label, value) {
       return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(value) + '</div></div>';
     }
@@ -337,14 +337,16 @@
       metric('Bajas', state.summaryUnavailable ? '—' : counts.baja) +
       metric('Reinversiones', state.summaryUnavailable ? '—' : counts.reinversion);
     let summaryNote = metrics.querySelector('.bc-m76-summary-note');
-    if (state.summaryUnavailable || state.summaryTruncated) {
+    const summaryMessages = [];
+    if (state.summaryUnavailable) summaryMessages.push('No se pudo actualizar el resumen por almacén. Revisa la conexión y actualiza.');
+    else if (state.summaryTruncated) summaryMessages.push('El resumen alcanzó el límite de seguridad de registros.');
+    if (state.summaryLabel) summaryMessages.push(state.summaryLabel);
+    if (summaryMessages.length) {
       if (!summaryNote) {
         summaryNote = document.createElement('div'); summaryNote.className = 'bc-m76-summary-note';
         summaryNote.setAttribute('role', 'status'); metrics.appendChild(summaryNote);
       }
-      summaryNote.textContent = state.summaryUnavailable
-        ? 'No se pudo actualizar el resumen diario. Revisa la conexión y actualiza.'
-        : 'El resumen diario alcanzó el límite de seguridad de registros.';
+      summaryNote.textContent = summaryMessages.join(' · ');
     } else if (summaryNote) summaryNote.remove();
 
     const start = state.page * PAGE_SIZE;
@@ -588,6 +590,7 @@
           state.summaryRows = Array.isArray(detail.todayRows) ? detail.todayRows.slice() : null;
           state.summaryUnavailable = !!detail.todaySummaryError;
           state.summaryTruncated = !!detail.todaySummaryTruncated;
+          state.summaryLabel = text(detail.todaySummaryLabel || '');
           state.historyTruncated = !!detail.historyTruncated;
           state.page = 0;
           if (installUi()) renderOperations();
@@ -603,6 +606,7 @@
     if (Array.isArray(window.__BC_M51_TODAY_ROWS__)) state.summaryRows = window.__BC_M51_TODAY_ROWS__.slice();
     state.summaryUnavailable = !!window.__BC_M51_TODAY_SUMMARY_ERROR__;
     state.summaryTruncated = !!window.__BC_M51_TODAY_SUMMARY_TRUNCATED__;
+    state.summaryLabel = text(window.__BC_M51_TODAY_SUMMARY_LABEL__ || '');
     state.historyTruncated = !!window.__BC_M51_HISTORY_TRUNCATED__;
     hookData();
     installUi();
@@ -628,7 +632,7 @@
     }
   }
 
-  window.__BC_M76_TEST__ = { groupOperations, renderOperations, getState: () => ({ rows: state.rows, summaryRows: state.summaryRows, operations: state.operations }) };
+  window.__BC_M76_TEST__ = { groupOperations, renderOperations, getState: () => ({ rows: state.rows, summaryRows: state.summaryRows, summaryLabel: state.summaryLabel, operations: state.operations }) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 })();
