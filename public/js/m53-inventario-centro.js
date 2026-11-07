@@ -188,7 +188,7 @@
 
       const estado = document.createElement('select');
       estado.id = 'inv-filtro-estado-select';
-      estado.innerHTML = '<option value="todos">Todos los estados</option><option value="bajo">Bajo mínimo</option><option value="agotado">Agotados</option><option value="normal">Normales</option>';
+      estado.innerHTML = '<option value="todos">Todos los estados</option><option value="sin_minimo">Mínimo pendiente</option><option value="bajo">Bajo mínimo</option><option value="agotado">Agotados</option><option value="normal">Normales</option>';
 
       const buscar = document.createElement('input');
       buscar.type = 'search';
