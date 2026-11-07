@@ -143,6 +143,10 @@ BEGIN
     JOIN public.almacenes a ON a.id=b.almacen_id
     JOIN public.productos p ON p.id=b.producto_id
     WHERE b.estado='PENDIENTE'
+      AND (
+        public.tiene_permiso('bajas','editar_any')
+        OR public.tiene_permiso('auditoria','editar_any')
+      )
 
     ORDER BY 3 DESC;
 END;
