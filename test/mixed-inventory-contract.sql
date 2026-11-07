@@ -379,16 +379,16 @@ BEGIN
     VALUES('Nectar de lata','unidad',20,true)
     RETURNING id INTO v_conversion_parent;
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
-    VALUES(v_conversion_parent,v_warehouse_a,100,1);
+    VALUES(v_conversion_parent,v_warehouse_a,3,1);
   INSERT INTO public.lotes_compra(
     producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen
   ) VALUES(
-    v_conversion_parent,v_warehouse_a,60,60,1.00,now()-interval '2 days','compra'
+    v_conversion_parent,v_warehouse_a,1,1,1.00,now()-interval '2 days','compra'
   ) RETURNING id INTO v_conversion_lot_1;
   INSERT INTO public.lotes_compra(
     producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,fecha_compra,origen
   ) VALUES(
-    v_conversion_parent,v_warehouse_a,40,40,2.00,now()-interval '1 day','compra'
+    v_conversion_parent,v_warehouse_a,2,2,2.00,now()-interval '1 day','compra'
   ) RETURNING id INTO v_conversion_lot_2;
 
   v_failed:=false;
@@ -398,8 +398,8 @@ BEGIN
       jsonb_build_array(jsonb_build_object('nombre','Manzana'),jsonb_build_object('nombre','Pera')),
       jsonb_build_array(
         jsonb_build_object('almacen_id',v_warehouse_a,'variantes',jsonb_build_array(
-          jsonb_build_object('nombre','Manzana','cantidad',59,'minimo',10),
-          jsonb_build_object('nombre','Pera','cantidad',40,'minimo',20))),
+          jsonb_build_object('nombre','Manzana','cantidad',0.9,'minimo',0.5),
+          jsonb_build_object('nombre','Pera','cantidad',2,'minimo',0.75))),
         jsonb_build_object('almacen_id',v_warehouse_b,'variantes',jsonb_build_array(
           jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
           jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
@@ -416,8 +416,8 @@ BEGIN
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'Conversion accepted flavor allocations that did not sum to generic stock'; END IF;
   IF (SELECT inventario_mixto FROM public.productos WHERE id=v_conversion_parent)
-     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_parent AND almacen_id=v_warehouse_a)<>100
-     OR (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id=v_conversion_parent AND almacen_id=v_warehouse_a)<>100 THEN
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_parent AND almacen_id=v_warehouse_a)<>3
+     OR (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id=v_conversion_parent AND almacen_id=v_warehouse_a)<>3 THEN
     RAISE EXCEPTION 'Rejected conversion changed generic stock, its purchase layers, or product mode';
   END IF;
 
@@ -426,8 +426,8 @@ BEGIN
     jsonb_build_array(jsonb_build_object('nombre','Manzana'),jsonb_build_object('nombre','Pera')),
     jsonb_build_array(
       jsonb_build_object('almacen_id',v_warehouse_a,'variantes',jsonb_build_array(
-        jsonb_build_object('nombre','Manzana','cantidad',60,'minimo',10),
-        jsonb_build_object('nombre','Pera','cantidad',40,'minimo',20))),
+        jsonb_build_object('nombre','Manzana','cantidad',1,'minimo',0.5),
+        jsonb_build_object('nombre','Pera','cantidad',2,'minimo',0.75))),
       jsonb_build_object('almacen_id',v_warehouse_b,'variantes',jsonb_build_array(
         jsonb_build_object('nombre','Manzana','cantidad',0,'minimo',3),
         jsonb_build_object('nombre','Pera','cantidad',0,'minimo',4))),
@@ -450,19 +450,19 @@ BEGIN
      OR EXISTS(SELECT 1 FROM public.productos_stock_mixto_minimos WHERE producto_id=v_conversion_parent) THEN
     RAISE EXCEPTION 'Mixed parent kept a global stock row or a general minimum';
   END IF;
-  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_apple AND almacen_id=v_warehouse_a)<>60
-     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_pear AND almacen_id=v_warehouse_a)<>40
-     OR (SELECT minimo FROM public.stock WHERE producto_id=v_conversion_apple AND almacen_id=v_warehouse_a)<>10
-     OR (SELECT minimo FROM public.stock WHERE producto_id=v_conversion_pear AND almacen_id=v_warehouse_a)<>20 THEN
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_apple AND almacen_id=v_warehouse_a)<>1
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_conversion_pear AND almacen_id=v_warehouse_a)<>2
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_conversion_apple AND almacen_id=v_warehouse_a)<>0.5
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_conversion_pear AND almacen_id=v_warehouse_a)<>0.75 THEN
     RAISE EXCEPTION 'Manually allocated quantities or flavor-specific minimums were not preserved';
   END IF;
   IF (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id=v_conversion_parent)<>0
-     OR (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id IN (v_conversion_apple,v_conversion_pear))<>100 THEN
+     OR (SELECT sum(cantidad_restante) FROM public.lotes_compra WHERE producto_id IN (v_conversion_apple,v_conversion_pear))<>3 THEN
     RAISE EXCEPTION 'Generic FIFO layers were not moved to the flavor SKUs';
   END IF;
   SELECT sum(cantidad_restante*costo_unitario) INTO v_total_fifo_value
   FROM public.lotes_compra WHERE producto_id IN (v_conversion_apple,v_conversion_pear) AND almacen_id=v_warehouse_a;
-  IF v_total_fifo_value<>140 THEN
+  IF v_total_fifo_value<>5 THEN
     RAISE EXCEPTION 'Conversion changed the original FIFO inventory value: %',v_total_fifo_value;
   END IF;
   IF (SELECT count(*) FROM public.lotes_compra_conversion_mixta
@@ -472,21 +472,21 @@ BEGIN
   SELECT minimo,cantidad INTO v_inventory_minimum,v_qty
   FROM public.inventario_mixto_enriquecido(v_warehouse_a)
   WHERE producto_id=v_conversion_parent;
-  IF v_inventory_minimum<>30 OR v_qty<>100 THEN
+  IF v_inventory_minimum<>1.25 OR v_qty<>3 THEN
     RAISE EXCEPTION 'Composite minimum must equal the sum of flavor minimums; got minimum %, stock %',v_inventory_minimum,v_qty;
   END IF;
   SELECT sum(cantidad_restante),count(*) INTO v_history_remaining,v_count
   FROM public.historial_compras(NULL,NULL,v_conversion_parent,v_warehouse_a,100,0);
-  IF v_history_remaining<>100 OR v_count<>2 THEN
+  IF v_history_remaining<>3 OR v_count<>2 THEN
     RAISE EXCEPTION 'Original purchase history did not show the remaining converted FIFO balance: %, rows %',v_history_remaining,v_count;
   END IF;
   SELECT sum(cantidad_restante),count(*) INTO v_history_remaining,v_count
   FROM public.historial_compras(NULL,NULL,v_conversion_apple,v_warehouse_a,100,0);
-  IF v_history_remaining<>60 OR v_count<>2 THEN
+  IF v_history_remaining<>1 OR v_count<>2 THEN
     RAISE EXCEPTION 'Filtering purchase history by a flavor did not isolate its converted layers: %, rows %',v_history_remaining,v_count;
   END IF;
   v_history:=public.historial_premium_detalle('compras',v_conversion_lot_1);
-  IF (v_history->>'cantidad_restante')::numeric<>60
+  IF (v_history->>'cantidad_restante')::numeric<>1
      OR jsonb_array_length(v_history->'asignaciones')<>2 THEN
     RAISE EXCEPTION 'Premium purchase detail lost the converted flavor allocation: %',v_history;
   END IF;

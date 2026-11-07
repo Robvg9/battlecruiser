@@ -122,6 +122,10 @@ DECLARE
   v_assignment_count integer := 0;
   v_variant_count integer := 0;
   v_index integer := 0;
+  v_variant_index integer := 0;
+  v_lot_index integer := 0;
+  v_lot_count integer := 0;
+  v_allocated_for_variant numeric := 0;
   v_warehouse record;
   v_warehouse_ids uuid[] := ARRAY[]::uuid[];
   v_variant_ids uuid[] := ARRAY[]::uuid[];
@@ -366,8 +370,16 @@ BEGIN
     SELECT coalesce(sum((x.value->>'cantidad')::numeric),0)
     INTO v_parent_stock
     FROM jsonb_array_elements(v_assignment->'variantes') x;
+    SELECT count(*) INTO v_lot_count
+    FROM public.lotes_compra
+    WHERE producto_id=p_producto_id AND almacen_id=nullif(v_assignment->>'almacen_id','')::uuid
+      AND cantidad_restante>0;
 
+    v_variant_index:=0;
     FOR v_item IN SELECT value FROM jsonb_array_elements(v_assignment->'variantes') LOOP
+      v_variant_index:=v_variant_index+1;
+      v_allocated_for_variant:=0;
+      v_lot_index:=0;
       v_nombre:=nullif(btrim(v_item->>'nombre'),'');
       SELECT id INTO v_variant_id FROM public.productos
       WHERE producto_padre_id=p_producto_id AND activo=true AND lower(variante_nombre)=lower(v_nombre)
@@ -375,7 +387,7 @@ BEGIN
       v_variant_qty:=(v_item->>'cantidad')::numeric;
       v_variant_min:=(v_item->>'minimo')::numeric;
 
-      IF v_parent_stock>0 AND v_variant_qty>0 THEN
+      IF v_parent_stock>0 THEN
         FOR v_source_lot IN
           SELECT id,cantidad_restante,cantidad_inicial,costo_unitario,fecha_compra,origen,usuario_id,compra_id
           FROM public.lotes_compra
@@ -384,7 +396,28 @@ BEGIN
           ORDER BY fecha_compra,id
           FOR UPDATE
         LOOP
-          v_take:=v_source_lot.cantidad_restante*v_variant_qty/v_parent_stock;
+          v_lot_index:=v_lot_index+1;
+          IF v_variant_index < v_count THEN
+            -- For every non-final flavor, let the last FIFO layer absorb the
+            -- numeric division residue so that the flavor quantity is exact.
+            IF v_lot_index=v_lot_count THEN
+              v_take:=v_variant_qty-v_allocated_for_variant;
+            ELSE
+              v_take:=v_source_lot.cantidad_restante*v_variant_qty/v_parent_stock;
+            END IF;
+            v_allocated_for_variant:=v_allocated_for_variant+v_take;
+          ELSE
+            -- The final flavor receives each layer's exact remaining balance.
+            -- Row totals stay exact, and total assignment equality makes its
+            -- overall flavor quantity exact as well.
+            SELECT v_source_lot.cantidad_restante-coalesce(sum(m.cantidad_transferida),0)
+            INTO v_take
+            FROM public.lotes_compra_conversion_mixta m
+            WHERE m.lote_origen_id=v_source_lot.id;
+          END IF;
+          IF v_take<0 OR v_take>v_source_lot.cantidad_restante THEN
+            RAISE EXCEPTION 'La distribución proporcional produjo un residuo inválido en una capa FIFO. No se modificó el inventario.' USING ERRCODE='23514';
+          END IF;
           IF v_take>0 THEN
             INSERT INTO public.lotes_compra(
               producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,
