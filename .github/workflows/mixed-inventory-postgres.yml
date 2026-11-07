@@ -68,6 +68,15 @@ jobs:
           PGDATABASE: battlecruiser_mixed_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql
 
+      - name: Verify prerequisite migration is safe to replay after minimums
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_mixed_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261104183000_product_mixed_inventory_variants.sql
+
       - name: Verify optional variant stock and safe operations
         env:
           PGHOST: localhost
