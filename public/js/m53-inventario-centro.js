@@ -318,18 +318,23 @@
   }
 
   function estadoMeta(estado) {
+    if (estado === 'sin_minimo') return { label: 'Mínimo pendiente', cls: 'bajo' };
     if (estado === 'agotado') return { label: 'Agotado', cls: 'agotado' };
     if (estado === 'bajo') return { label: 'Bajo mínimo', cls: 'bajo' };
     return { label: 'Disponible', cls: 'normal' };
   }
 
   function estadoAlmacen(row) {
+    const variants = row && Array.isArray(row.variantes) ? row.variantes : [];
+    if (row && (row.minimo == null || num(row.minimo) <= 0)) return 'sin_minimo';
+    if (variants.some(function (variant) {
+      return variant && (variant.estado === 'sin_minimo' || num(variant.minimo) <= 0);
+    })) return 'sin_minimo';
     if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
     if (row && row.estado === 'bajo') return 'bajo';
     if (row && row.minimo != null && num(row.cantidad) <= num(row.minimo)) return 'bajo';
-    const variants = row && Array.isArray(row.variantes) ? row.variantes : [];
     if (variants.some(function (variant) {
-      return variant && (variant.estado === 'bajo' || (num(variant.minimo) > 0 && num(variant.cantidad) <= num(variant.minimo)));
+      return variant && (variant.estado === 'bajo' || num(variant.cantidad) <= num(variant.minimo));
     })) return 'bajo';
     return 'normal';
   }
@@ -355,7 +360,8 @@
     });
     return Array.from(groups.values()).map(function (group) {
       group.almacenes.sort(function (x, y) { return String(x.almacen).localeCompare(String(y.almacen), 'es'); });
-      group.estado = group.cantidad <= 0 ? 'agotado' :
+      group.estado = group.almacenes.some(function (x) { return x.estado === 'sin_minimo'; }) ? 'sin_minimo' :
+        group.cantidad <= 0 ? 'agotado' :
         (group.almacenes.some(function (x) { return x.estado === 'bajo'; }) ? 'bajo' : 'normal');
       group.almacen = group.almacenes.map(function (x) { return x.almacen; }).join(' ');
       return group;
@@ -366,15 +372,17 @@
     const products = agruparProductos(rows);
     return {
       totalValor: (rows || []).reduce(function (sum, row) { return sum + num(row.valor_inventario); }, 0),
-      agotados: products.filter(function (p) { return p.estado === 'agotado'; }).length,
+      agotados: products.filter(function (p) { return p.cantidad <= 0; }).length,
       bajos: products.filter(function (p) { return p.estado === 'bajo'; }).length,
+      minimosPendientes: products.filter(function (p) { return p.estado === 'sin_minimo'; }).length,
       productos: products.length
     };
   }
 
   function applyFilters() {
     let rows = agruparProductos(_allRows);
-    if (_estado === 'agotado') rows = rows.filter(function (p) { return p.estado === 'agotado'; });
+    if (_estado === 'sin_minimo') rows = rows.filter(function (p) { return p.estado === 'sin_minimo'; });
+    else if (_estado === 'agotado') rows = rows.filter(function (p) { return p.cantidad <= 0; });
     else if (_estado === 'bajo') rows = rows.filter(function (p) { return p.estado === 'bajo'; });
     else if (_estado === 'normal') rows = rows.filter(function (p) { return p.estado === 'normal'; });
     const q = (_search || '').toLowerCase().trim();
@@ -416,6 +424,11 @@
     if (!el) return;
     const t = totalsFrom(_allRows);
     let html = '';
+    if (t.minimosPendientes > 0) {
+      html += '<div class="bc-m53-alert bc-m53-alert-warn" data-m53-filter="sin_minimo" role="button" tabindex="0">' +
+        '<strong>🟠 Mínimo pendiente</strong><span>' + qtyFmt(t.minimosPendientes) + ' producto' + (t.minimosPendientes === 1 ? '' : 's') +
+        '</span><button type="button" class="bc-m53-alert-action" data-m53-filter="sin_minimo">Configurar</button></div>';
+    }
     if (t.agotados > 0) {
       html += '<div class="bc-m53-alert bc-m53-alert-crit" data-m53-filter="agotado" role="button" tabindex="0">' +
         '<strong>🔴 Agotados</strong><span>' + qtyFmt(t.agotados) + ' producto' + (t.agotados === 1 ? '' : 's') +
@@ -443,7 +456,7 @@
       chips.push({ key: 'almacen', label: opt ? opt.textContent : sel.value });
     }
     if (_estado && _estado !== 'todos') {
-      const labels = { bajo: 'Bajo mínimo', agotado: 'Agotados', normal: 'Normales' };
+      const labels = { sin_minimo: 'Mínimo pendiente', bajo: 'Bajo mínimo', agotado: 'Agotados', normal: 'Normales' };
       chips.push({ key: 'estado', label: labels[_estado] || _estado });
     }
     if (_search) chips.push({ key: 'search', label: '“' + _search + '”' });
