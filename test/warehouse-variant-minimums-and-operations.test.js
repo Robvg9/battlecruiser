@@ -125,9 +125,9 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /inventario-detalle\.js","68"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.match(app, /movimiento-multiple\.js","20261107\.1/);
-  assert.match(index, /productos\.js\\?v=20261107\.1/);
-  assert.match(index, /almacenes\.js\\?v=20261107\.1/);
-  assert.match(index, /app\.js\\?v=9\.5\.78/);
+  assert.match(index, /productos\.js\?v=20261107\.1/);
+  assert.match(index, /almacenes\.js\?v=20261107\.1/);
+  assert.match(index, /app\.js\?v=9\.5\.78/);
   assert.match(index, /v9\.5\.78 — BattleCruiser/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.78"/);
   for (const asset of [
