@@ -127,6 +127,23 @@ BEGIN
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'Normal product minimum accepted zero'; END IF;
 
+  -- Legacy RPC/direct update paths must not clear an already configured minimum
+  -- while positive stock remains; stock decreases still remain permitted.
+  v_failed:=false;
+  BEGIN
+    UPDATE public.stock SET minimo=0
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id='55555555-5555-4555-8555-555555555555';
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Configured minimum was cleared while positive stock remained'; END IF;
+  IF (SELECT minimo FROM public.stock
+      WHERE producto_id='66666666-6666-4666-8666-666666666666'
+        AND almacen_id='55555555-5555-4555-8555-555555555555')<>5 THEN
+    RAISE EXCEPTION 'Legacy minimum-clear attempt changed the configured threshold';
+  END IF;
+
   -- Before configuration, each flavor is surfaced as requiring a minimum.
   SELECT variantes INTO v_variantes
   FROM public.inventario_mixto_enriquecido(v_warehouse_a)
