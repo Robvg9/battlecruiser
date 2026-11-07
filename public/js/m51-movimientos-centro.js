@@ -18,6 +18,7 @@
   let _todayRows = null;
   let _todaySummaryError = false;
   let _todaySummaryTruncated = false;
+  let _todaySummaryLabel = '';
   let _filtered = [];
   let _page = 0;
   let _search = '';
@@ -432,8 +433,15 @@
   function renderResumen() {
     const el = document.getElementById('mov-resumen-m51');
     if (!el) return;
+    function card(label, value) {
+      return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(String(value)) + '</div></div>';
+    }
+    if (_todaySummaryError || !Array.isArray(_todayRows)) {
+      el.innerHTML = card('Compras', '—') + card('Movimientos internos', '—') + card('Bajas', '—') + card('Reinversiones', '—');
+      return;
+    }
     const counts = { compras: new Set(), reinversiones: new Set(), bajas: new Set(), internos: new Set() };
-    _filtered.forEach(function (m, index) {
+    _todayRows.forEach(function (m, index) {
       const t = normalizarTipo(m.tipo);
       const id = String(m.operacion_id || m.id || ('row-' + index));
       if (t === 'compra') counts.compras.add(id);
@@ -441,9 +449,6 @@
       else if (t === 'merma' || t === 'baja') counts.bajas.add(id);
       else if (t === 'transferencia_salida' || t === 'transferencia_entrada') counts.internos.add(id);
     });
-    function card(label, value) {
-      return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(String(value)) + '</div></div>';
-    }
     el.innerHTML = card('Compras', counts.compras.size) +
       card('Movimientos internos', counts.internos.size) +
       card('Bajas', counts.bajas.size) +
@@ -588,10 +593,11 @@
     window.__BC_M51_TODAY_ROWS__ = Array.isArray(_todayRows) ? _todayRows.slice() : null;
     window.__BC_M51_TODAY_SUMMARY_ERROR__ = !!_todaySummaryError;
     window.__BC_M51_TODAY_SUMMARY_TRUNCATED__ = !!_todaySummaryTruncated;
+    window.__BC_M51_TODAY_SUMMARY_LABEL__ = _todaySummaryLabel;
     window.__BC_M51_HISTORY_TRUNCATED__ = !!_historyTruncated;
     try {
       window.dispatchEvent(new CustomEvent('bc:m51-rows', {
-        detail: { rows: window.__BC_M51_ROWS__, todayRows: window.__BC_M51_TODAY_ROWS__, todaySummaryError: window.__BC_M51_TODAY_SUMMARY_ERROR__, todaySummaryTruncated: window.__BC_M51_TODAY_SUMMARY_TRUNCATED__, historyTruncated: window.__BC_M51_HISTORY_TRUNCATED__ }
+        detail: { rows: window.__BC_M51_ROWS__, todayRows: window.__BC_M51_TODAY_ROWS__, todaySummaryError: window.__BC_M51_TODAY_SUMMARY_ERROR__, todaySummaryTruncated: window.__BC_M51_TODAY_SUMMARY_TRUNCATED__, todaySummaryLabel: window.__BC_M51_TODAY_SUMMARY_LABEL__, historyTruncated: window.__BC_M51_HISTORY_TRUNCATED__ }
       }));
     } catch (_) {}
   }
@@ -642,23 +648,52 @@
     _pendingSummaryMove = null;
   }
 
-  async function cargarResumenDiario(client, today) {
+  async function cargarResumenVentanas(client) {
+    const response = await client.rpc('bc_movimientos_resumen_ventanas', {});
+    if (response.error) throw response.error;
+    const windows = Array.isArray(response.data) ? response.data : [];
     const rows = [];
-    let offset = 0;
+    let scanned = 0;
     let truncated = false;
-    while (true) {
-      const res = await client.rpc('movimientos_producto', {
-        p_producto_id: null, p_almacen_id: null, p_desde: today, p_hasta: today,
-        p_tipo: null, p_limite: FETCH_LIMIT, p_offset: offset
-      });
-      if (res.error) throw res.error;
-      const pageRows = Array.isArray(res.data) ? res.data : [];
-      rows.push.apply(rows, pageRows);
-      if (pageRows.length < FETCH_LIMIT) break;
-      if (rows.length >= HISTORY_MAX_ROWS) { truncated = true; break; }
-      offset += pageRows.length;
+    const labels = [];
+
+    for (const item of windows) {
+      if (!item || !item.almacen_id || !item.desde || !item.hasta) continue;
+      const desde = fechaGrupoKey(item.desde);
+      const hasta = fechaGrupoKey(item.hasta);
+      const inicioMs = new Date(item.desde).getTime();
+      const finMs = new Date(item.hasta).getTime();
+      if (!desde || !hasta || desde === 'sin-fecha' || hasta === 'sin-fecha' ||
+          !Number.isFinite(inicioMs) || !Number.isFinite(finMs) || finMs < inicioMs) continue;
+
+      const modo = String(item.modo || '').toUpperCase();
+      let detalleModo = 'día calendario';
+      if (modo === 'JORNADA_ACTIVA') detalleModo = 'jornada en curso';
+      else if (modo === 'ULTIMA_JORNADA') detalleModo = 'última jornada';
+      else if (modo === 'DIARIO_SIN_JORNADA') detalleModo = 'día calendario (hasta abrir la primera jornada)';
+      labels.push(String(item.almacen || 'Almacén') + ': ' + detalleModo);
+
+      let offset = 0;
+      while (true) {
+        const result = await client.rpc('movimientos_producto', {
+          p_producto_id: null, p_almacen_id: item.almacen_id, p_desde: desde, p_hasta: hasta,
+          p_tipo: null, p_limite: FETCH_LIMIT, p_offset: offset
+        });
+        if (result.error) throw result.error;
+        const pageRows = Array.isArray(result.data) ? result.data : [];
+        scanned += pageRows.length;
+        pageRows.forEach(function (row) {
+          const timestamp = new Date(row && row.fecha).getTime();
+          if (Number.isFinite(timestamp) && timestamp >= inicioMs && timestamp <= finMs) rows.push(row);
+        });
+        if (pageRows.length < FETCH_LIMIT) break;
+        if (scanned >= HISTORY_MAX_ROWS) { truncated = true; break; }
+        offset += pageRows.length;
+      }
+      if (truncated) break;
     }
-    return { rows: rows.slice(0, HISTORY_MAX_ROWS), truncated };
+
+    return { rows: rows.slice(0, HISTORY_MAX_ROWS), truncated: truncated || rows.length > HISTORY_MAX_ROWS, label: labels.join(' · ') };
   }
 
   async function cargarMovimientos() {
@@ -666,7 +701,7 @@
     prepararNavegacionDesdeResumen();
     const conn = document.getElementById('mov-conn-info');
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('reportes', 'ver')) {
-      _allRows = []; _todayRows = []; _todaySummaryError = true; _filtered = []; _lastError = null; _loading = false;
+      _allRows = []; _todayRows = []; _todaySummaryError = true; _todaySummaryLabel = ''; _filtered = []; _lastError = null; _loading = false;
       const el = document.getElementById('mov-detalle');
       if (el) el.innerHTML = '<div class="bc-m51-empty">No tenés permiso para ver movimientos.</div>';
       const metrics = document.getElementById('mov-resumen-m51');
@@ -675,7 +710,7 @@
     }
     if (!navigator.onLine) {
       if (conn) conn.textContent = '⚪ Sin conexión — datos no disponibles';
-      _allRows = []; _todayRows = null; _todaySummaryError = true; _todaySummaryTruncated = false; _filtered = []; _lastError = null; _loading = false;
+      _allRows = []; _todayRows = null; _todaySummaryError = true; _todaySummaryTruncated = false; _todaySummaryLabel = ''; _filtered = []; _lastError = null; _loading = false;
       const el = document.getElementById('mov-detalle');
       if (el) el.innerHTML = '<div class="bc-m51-empty">⚪ Sin conexión — los movimientos requieren datos de Supabase.</div>';
       return;
@@ -706,7 +741,7 @@
           } else {
             _lastError = String(res.error.message || res.error.code || res.error);
           }
-          _allRows = []; _todayRows = null; _todaySummaryError = true; _filtered = []; _loading = false; paint(); return;
+          _allRows = []; _todayRows = null; _todaySummaryError = true; _todaySummaryLabel = ''; _filtered = []; _loading = false; paint(); return;
         }
         const pageRows = Array.isArray(res.data) ? res.data : [];
         collected.push.apply(collected, pageRows);
@@ -718,23 +753,21 @@
         offset += pageRows.length;
       }
       _allRows = collected.slice(0, maxRows);
-      const primaryIsDailyUnfiltered = f.desde === today && f.hasta === today && !f.almacen && !f.tipo;
-      if (primaryIsDailyUnfiltered) {
-        _todayRows = _allRows.slice(); _todaySummaryTruncated = !!_historyTruncated; _todaySummaryError = false;
-      } else {
-        try {
-          const summary = await cargarResumenDiario(client, today);
-          _todayRows = summary.rows; _todaySummaryTruncated = summary.truncated; _todaySummaryError = false;
-        } catch (summaryError) {
-          console.warn('[BattleCruiser] No se pudo cargar el resumen diario:', summaryError);
-          _todayRows = null; _todaySummaryTruncated = false; _todaySummaryError = true;
-        }
+      try {
+        const summary = await cargarResumenVentanas(client);
+        _todayRows = summary.rows;
+        _todaySummaryTruncated = summary.truncated;
+        _todaySummaryLabel = summary.label;
+        _todaySummaryError = false;
+      } catch (summaryError) {
+        console.warn('[BattleCruiser] No se pudo cargar el resumen por almacén:', summaryError);
+        _todayRows = null; _todaySummaryTruncated = false; _todaySummaryLabel = ''; _todaySummaryError = true;
       }
       _page = 0; applySearchAndPage(); seleccionarNavegacionDesdeResumen(); _loading = false; _lastError = null; paint();
     } catch (e) {
       console.warn('[BattleCruiser] M51 movimientos_producto:', e);
       _lastError = String(e && e.message ? e.message : e);
-      _allRows = []; _todayRows = null; _todaySummaryError = true; _filtered = []; _loading = false; paint();
+      _allRows = []; _todayRows = null; _todaySummaryError = true; _todaySummaryLabel = ''; _filtered = []; _loading = false; paint();
     }
   }
 
