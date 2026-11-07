@@ -42,7 +42,8 @@ BEGIN
   IF (SELECT count(*) FROM public.producto_presentaciones WHERE producto_id IN (v_apple,v_pear) AND activo)=0 THEN
     RAISE EXCEPTION 'Parent presentation conversions were not copied to the variants';
   END IF;
-  IF (SELECT count(*) FROM public.stock WHERE producto_id IN (v_apple,v_pear))<>4 THEN
+  IF (SELECT count(*) FROM public.stock WHERE producto_id IN (v_apple,v_pear))
+     <> 2*(SELECT count(*) FROM public.almacenes WHERE activo=true) THEN
     RAISE EXCEPTION 'Every active flavor must have one stock row per existing warehouse';
   END IF;
 
