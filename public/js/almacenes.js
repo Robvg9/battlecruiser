@@ -415,9 +415,12 @@ async function refrescarStockYSelects() {
   const refreshedStock = await cargarStockAlmacenes(true);
   if (_stockCargaEstado !== "ok") {
     // Never leave stale quantities available to the transfer validator after a
-    // confirmed purchase if the fresh database read itself failed.
+    // committed operation if the fresh database read itself failed. Return a
+    // safe empty result instead of throwing into offline reconciliation callers.
     _cache.stock = [];
-    throw new Error("No se pudo leer el stock actualizado desde Supabase. La operación anterior puede estar registrada; actualiza el inventario antes de validar otra transferencia.");
+    window.__BC_STOCK_CONFIRMED__ = false;
+    console.warn("[BattleCruiser] No se pudo confirmar stock nuevo desde Supabase; las transferencias quedan bloqueadas hasta actualizar.");
+    return [];
   }
   return refreshedStock;
 }
