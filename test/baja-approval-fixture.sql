@@ -160,12 +160,16 @@ $function$;
 
 INSERT INTO public.usuarios (id, nombre) VALUES
   ('11111111-1111-4111-8111-111111111111', 'Dueño de prueba'),
-  ('22222222-2222-4222-8222-222222222222', 'Empleado de prueba');
+  ('22222222-2222-4222-8222-222222222222', 'Empleado de prueba'),
+  ('55555555-5555-4555-8555-555555555555', 'Aprobador de gastos'),
+  ('66666666-6666-4666-8666-666666666666', 'Aprobador de mermas');
 
 INSERT INTO public.permisos_usuario (usuario_id, seccion, accion, permitido) VALUES
   ('11111111-1111-4111-8111-111111111111', 'bajas', 'crear', true),
   ('11111111-1111-4111-8111-111111111111', 'bajas', 'editar_any', true),
-  ('22222222-2222-4222-8222-222222222222', 'bajas', 'crear', true);
+  ('22222222-2222-4222-8222-222222222222', 'bajas', 'crear', true),
+  ('55555555-5555-4555-8555-555555555555', 'gastos', 'editar_any', true),
+  ('66666666-6666-4666-8666-666666666666', 'mermas', 'editar_any', true);
 
 INSERT INTO public.almacenes (id, nombre)
 VALUES ('33333333-3333-4333-8333-333333333333', 'Almacén de prueba');
@@ -186,4 +190,19 @@ VALUES (
   '44444444-4444-4444-8444-444444444444',
   '2026-11-01T10:00:00Z',
   50
+);
+
+
+-- One row from each other approval domain proves that module permissions stay isolated.
+INSERT INTO public.gastos (almacen_id, concepto, monto, estado, creado_nombre, descripcion)
+VALUES (
+  '33333333-3333-4333-8333-333333333333',
+  'Gasto pendiente de prueba', 10, 'PENDIENTE', 'Usuario de prueba', 'No debe mostrarse a aprobadores de Baja.'
+);
+
+INSERT INTO public.mermas (almacen_id, producto_id, cantidad, estado, creado_nombre, motivo)
+VALUES (
+  '33333333-3333-4333-8333-333333333333',
+  '44444444-4444-4444-8444-444444444444',
+  1, 'PENDIENTE', 'Usuario de prueba', 'No debe mostrarse a aprobadores de Baja.'
 );
