@@ -23,6 +23,8 @@ test("Every stock row has a non-null minimum and existing nulls are safely initi
   assert.match(migration, /ALTER TABLE public\.stock ALTER COLUMN minimo SET DEFAULT 0/);
   assert.match(migration, /UPDATE OF cantidad,producto_id,almacen_id,minimo ON public\.stock/);
   assert.match(migration, /NEW\.minimo IS DISTINCT FROM OLD\.minimo/);
+  assert.match(migration, /NEW\.minimo::text IN \('NaN','Infinity','-Infinity'\)/);
+  assert.match(migration, /p_minimo::text IN \('NaN','Infinity','-Infinity'\)/);
   assert.match(migration, /UPDATE OF cantidad,producto_id,almacen_id,minimo/);
 });
 
