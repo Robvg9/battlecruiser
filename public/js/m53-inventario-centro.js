@@ -327,6 +327,10 @@
     if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
     if (row && row.estado === 'bajo') return 'bajo';
     if (row && row.minimo != null && num(row.cantidad) <= num(row.minimo)) return 'bajo';
+    const variants = row && Array.isArray(row.variantes) ? row.variantes : [];
+    if (variants.some(function (variant) {
+      return variant && (variant.estado === 'bajo' || (num(variant.minimo) > 0 && num(variant.cantidad) <= num(variant.minimo)));
+    })) return 'bajo';
     return 'normal';
   }
 
@@ -515,8 +519,12 @@
           variantWarehouses.map(function (warehouse) {
             return '<div class="bc-m53-variant-row"><strong>' + esc(warehouse.almacen) + '</strong><span></span></div>' +
               warehouse.variantes.map(function (variant) {
+                const minimum = num(variant.minimo);
+                const state = variant.estado || (num(variant.cantidad) <= 0 ? 'agotado' : (minimum > 0 && num(variant.cantidad) <= minimum ? 'bajo' : 'normal'));
+                const meta = estadoMeta(state);
                 return '<div class="bc-m53-variant-row"><span>' + esc(variant.nombre || 'Variante') + '</span><strong>' +
-                  qtyFmt(variant.cantidad) + ' ' + esc(variant.unidad || unit) + '</strong></div>';
+                  qtyFmt(variant.cantidad) + ' ' + esc(variant.unidad || unit) + '</strong><span>mín. ' + qtyFmt(minimum) +
+                  ' · ' + esc(meta.label) + '</span></div>';
               }).join('');
           }).join('') + '</div></details>'
         : '';
