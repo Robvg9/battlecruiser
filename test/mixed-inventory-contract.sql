@@ -126,6 +126,15 @@ BEGIN
     v_failed:=true;
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'Normal product minimum accepted zero'; END IF;
+  v_failed:=false;
+  BEGIN
+    PERFORM public.bc_actualizar_stock_minimo_obligatorio(
+      '66666666-6666-4666-8666-666666666666',v_warehouse_a,'NaN'::numeric
+    );
+  EXCEPTION WHEN invalid_parameter_value THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Normal product minimum accepted NaN'; END IF;
 
   -- Legacy RPC/direct update paths must not clear an already configured minimum
   -- while positive stock remains; stock decreases still remain permitted.
@@ -143,6 +152,15 @@ BEGIN
         AND almacen_id='55555555-5555-4555-8555-555555555555')<>5 THEN
     RAISE EXCEPTION 'Legacy minimum-clear attempt changed the configured threshold';
   END IF;
+  v_failed:=false;
+  BEGIN
+    UPDATE public.stock SET minimo='NaN'::numeric
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id='55555555-5555-4555-8555-555555555555';
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'A non-finite minimum was stored on positive stock'; END IF;
 
   -- A not-yet-assigned warehouse can be explicitly assigned at zero stock,
   -- but only together with its own positive minimum.
