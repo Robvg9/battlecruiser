@@ -53,7 +53,8 @@ BEGIN
     -- remain possible during the transition.
     IF TG_OP='INSERT' OR NEW.cantidad > OLD.cantidad OR
        NEW.producto_id IS DISTINCT FROM OLD.producto_id OR
-       NEW.almacen_id IS DISTINCT FROM OLD.almacen_id THEN
+       NEW.almacen_id IS DISTINCT FROM OLD.almacen_id OR
+       NEW.minimo IS DISTINCT FROM OLD.minimo THEN
       RAISE EXCEPTION 'Antes de agregar o aumentar existencias, configura un stock mínimo mayor que cero para este producto y almacén.'
         USING ERRCODE='23514';
     END IF;
@@ -64,7 +65,7 @@ $minimum_guard$;
 
 DROP TRIGGER IF EXISTS bc_require_positive_stock_minimum ON public.stock;
 CREATE TRIGGER bc_require_positive_stock_minimum
-BEFORE INSERT OR UPDATE OF cantidad,producto_id,almacen_id ON public.stock
+BEFORE INSERT OR UPDATE OF cantidad,producto_id,almacen_id,minimo ON public.stock
 FOR EACH ROW EXECUTE FUNCTION public.bc_require_positive_stock_minimum();
 
 REVOKE ALL ON FUNCTION public.bc_require_positive_stock_minimum() FROM PUBLIC,anon;
