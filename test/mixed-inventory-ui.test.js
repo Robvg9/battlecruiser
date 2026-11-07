@@ -27,7 +27,6 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
     assert.equal(d.querySelectorAll("#prod-variantes-editor").length, 1);
     assert.equal(d.querySelectorAll("#prod-variantes-lista").length, 1);
     assert.equal(d.querySelectorAll("#prod-variante-agregar").length, 1);
-    assert.equal(d.querySelectorAll("#prod-variantes-asignacion").length, 1);
     assert.match(d.querySelector("#prod-inventario-mixto-settings").textContent, /mínimo compuesto/);
     assert.match(d.querySelector("#prod-inventario-mixto-settings").textContent, /indica manualmente cuántas unidades reales/);
     assert.equal(d.querySelectorAll("#prod-variantes-asignacion").length, 1);
@@ -108,5 +107,5 @@ test("Cache versions are bumped for the updated PWA inventory and admin assets",
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
   assert.match(index, /app\.js\?v=9\.5\.79/);
   assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.79"/);
-  assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.6"\]/);
+  assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.7"\]/);
 });
