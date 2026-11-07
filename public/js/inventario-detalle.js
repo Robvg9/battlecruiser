@@ -81,6 +81,20 @@
         modal.classList.add('hidden');
         return;
       }
+      const configureFlavorsButton = event.target.closest('[data-bc-configure-flavors]');
+      if (configureFlavorsButton) {
+        event.preventDefault();
+        const productId = configureFlavorsButton.getAttribute('data-product-id');
+        modal.classList.add('hidden');
+        if (typeof window.bcAbrirConfiguracionSabores !== 'function') {
+          window.alert('No se pudo abrir el configurador de sabores. Actualiza la aplicación e inténtalo de nuevo.');
+          return;
+        }
+        Promise.resolve(window.bcAbrirConfiguracionSabores(productId)).catch(error => {
+          window.alert(String(error && (error.message || error) || 'No se pudo abrir el configurador de sabores.'));
+        });
+        return;
+      }
       const variantButton = event.target.closest('[data-bc-save-variant-minimum]');
       if (variantButton) { event.preventDefault(); guardarMinimoVariante(variantButton); return; }
       const assignButton = event.target.closest('[data-bc-assign-warehouse]');
@@ -190,6 +204,9 @@
     const mixed = !!(meta && meta.inventario_mixto) ||
       stores.some(warehouse => Array.isArray(warehouse.variantes) && warehouse.variantes.length > 0);
     const productId = fila.producto_id || fila.id || '';
+    const canConfigureFlavors = !!productId && !mixed &&
+      typeof window.tienePermiso === 'function' &&
+      (window.tienePermiso('productos', 'editar') || window.tienePermiso('productos', 'editar_any'));
     const warehouseCatalog = Array.isArray(window._cache && window._cache.almacenes)
       ? window._cache.almacenes.filter(warehouse => warehouse && warehouse.activo !== false && warehouse.id)
       : [];
@@ -206,6 +223,9 @@
         '<span>' + (stores.length
           ? 'existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes'
           : 'Sin almacenes asignados · define un mínimo para comenzar') + '</span>' +
+        (canConfigureFlavors
+          ? '<div class="bc-inv-flavors-setup"><p>¿Quieres controlar este producto por sabores? Configura aquí los sabores y el mínimo independiente de cada uno por almacén.</p><button type="button" class="cc-accion" data-bc-configure-flavors data-product-id="' + esc(productId) + '">Configurar sabores y mínimos</button></div>'
+          : '') +
       '</div>' +
       '<section class="bc-inv-product-meta" aria-label="Datos del producto">' +
         '<div class="bc-inv-meta-title">Datos del producto</div>' +
