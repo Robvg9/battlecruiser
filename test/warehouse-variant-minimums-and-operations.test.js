@@ -12,6 +12,7 @@ const inventory = read("public/js/m53-inventario-centro.js");
 const operations = read("public/js/ui-operaciones-hub.js");
 const approvals = read("public/js/aprobaciones-admin.js");
 const index = read("public/index.html");
+const finance = read("public/js/operaciones-financieras.js");
 
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
@@ -62,6 +63,19 @@ test("Operations loads product and warehouse catalogs before opening stock-relat
   assert.ok(operations.includes("await ensureOperationCatalogs(false)"));
   assert.ok(operations.includes("await ensureOperationCatalogs(true)"));
   assert.ok(operations.includes("No se pudieron cargar los productos y almacenes activos."));
+});
+
+test("The financial operations panel loads catalogs before building inventory forms and registers only Baja", () => {
+  assert.match(finance, /async function ensureCatalogs\(\)/);
+  assert.match(finance, /window\.refrescarProductos/);
+  assert.match(finance, /window\.refrescarAlmacenes/);
+  assert.match(finance, /async function start\(\)/);
+  assert.match(finance, /refreshSelectors\(\)/);
+  assert.match(finance, /crear_baja/);
+  assert.doesNotMatch(finance, /crear_merma/);
+  assert.match(finance, /Motivo de la baja/);
+  assert.match(finance, /Otro/);
+  assert.match(finance, /for \(const reason of/);
 });
 
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
