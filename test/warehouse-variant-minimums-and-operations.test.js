@@ -43,7 +43,7 @@ test("Inventory cards and alerts recognize a low flavor even when total product 
 
 test("Operations loads product and warehouse catalogs before opening stock-related forms", () => {
   assert.match(operations, /async function ensureOperationCatalogs\(\)/);
-  for (const name of ["openGasto", "openMerma", "openReinversion"]) {
+  for (const name of ["openGasto", "openBaja", "openReinversion"]) {
     assert.match(operations, new RegExp("async function " + name + "\\(\\)[\\s\\S]*?await ensureOperationCatalogs\\(\\);"));
   }
   assert.match(operations, /window\.refrescarAlmacenes/);
@@ -54,9 +54,10 @@ test("Operations loads product and warehouse catalogs before opening stock-relat
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
   assert.match(operations, /title: 'Registrar baja'/);
   assert.match(operations, /title: 'Registrar baja', desc:/);
+  assert.match(operations, /can\('bajas', 'ver'\) && can\('bajas', 'crear'\)/);
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(operations.includes('value="' + reason + '"'), "missing reason " + reason);
   }
   assert.match(operations, /otherInput\.required = isOther/);
-  assert.match(operations, /rpc\('crear_merma'/);
+  assert.match(operations, /rpc\('crear_baja'/);
 });
