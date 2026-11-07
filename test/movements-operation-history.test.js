@@ -70,6 +70,30 @@ function fixture(t) {
   return window;
 }
 
+
+test("M76 usa el resumen diario aunque el historial visible esté filtrado", async (t) => {
+  const window = fixture(t);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const date = {}; parts.forEach(x => { if (x.type !== "literal") date[x.type] = x.value; });
+  const at = date.year + "-" + date.month + "-" + date.day + "T12:00:00";
+  const visibleRows = commercialRows("BUY-FILTERED", "compra", 1, at, 900);
+  const todayRows = [
+    ...commercialRows("BUY-TODAY", "compra", 2, at, 910),
+    ...transferRows("TR-TODAY-A", 2, at, 920),
+    ...transferRows("TR-TODAY-B", 1, at, 930),
+    ...commercialRows("REINV-TODAY", "reinversion", 1, at, 940),
+    ...commercialRows("BAJA-TODAY", "baja", 1, at, 950)
+  ];
+  window.renderMovimientos(visibleRows);
+  window.dispatchEvent(new window.CustomEvent("bc:m51-rows", { detail: { rows: visibleRows, todayRows, historyTruncated: false } }));
+  await new Promise(resolve => window.setTimeout(resolve, 10));
+  const cards = Array.from(window.document.querySelectorAll("#mov-resumen-m51 .bc-m51-metric"));
+  assert.deepEqual(cards.map(x => x.querySelector(".bc-m51-metric-label").textContent.trim()),
+    ["Compras", "Movimientos internos", "Bajas", "Reinversiones"]);
+  assert.deepEqual(cards.map(x => x.querySelector(".bc-m51-metric-value").textContent.trim()), ["1", "2", "1", "1"]);
+  assert.doesNotMatch(window.document.getElementById("mov-resumen-m51").textContent, /Operaciones/);
+});
+
 test("M76 agrupa ambas caras de una transferencia y no duplica unidades", (t) => {
   const window = fixture(t);
   const rows = transferRows("TR-4", 4, "2026-11-06T10:00:00", 100);
@@ -87,6 +111,7 @@ test("M76 muestra una sola tarjeta por operación comercial, no una por producto
     ...transferRows("TR-4", 4, "2026-11-06T10:00:00", 100),
     ...transferRows("TR-12", 12, "2026-11-06T11:00:00", 200),
     ...commercialRows("BUY-4", "compra", 4, "2026-11-06T12:00:00", 300),
+    ...commercialRows("BUY-8", "compra", 3, "2026-11-06T12:30:00", 350),
     ...commercialRows("REINV-2", "reinversion", 2, "2026-11-06T13:00:00", 400),
     ...commercialRows("BAJA-1", "baja", 1, "2026-11-06T14:00:00", 500)
   ];
@@ -94,10 +119,12 @@ test("M76 muestra una sola tarjeta por operación comercial, no una por producto
   await new Promise(resolve => window.setTimeout(resolve, 10));
 
   const operations = window.__BC_M76_TEST__.getState().operations;
-  assert.equal(operations.length, 5);
+  assert.equal(operations.length, 6);
+  assert.equal(operations.filter(op => op.kind === 'compra').length, 2);
+  assert.equal(operations.find(op => op.reference === 'BUY-8').productCount, 3);
   assert.equal(operations.find(op => op.reference === "TR-4").productCount, 4);
   assert.equal(operations.find(op => op.reference === "TR-12").productCount, 12);
-  assert.equal(window.document.querySelectorAll(".bc-m76-op-card").length, 5);
+  assert.equal(window.document.querySelectorAll(".bc-m76-op-card").length, 6);
   assert.equal(window.document.querySelectorAll(".bc-m76-category").length, 5);
   const categories = Array.from(window.document.querySelectorAll(".bc-m76-category")).map(button => button.textContent.trim());
   assert.ok(categories.includes("Compras"));
@@ -105,8 +132,9 @@ test("M76 muestra una sola tarjeta por operación comercial, no una por producto
   assert.ok(categories.includes("Bajas"));
   assert.ok(categories.includes("Movimientos internos"));
   assert.ok(!categories.includes("Movimientos"), "no queda un filtro genérico de movimientos");
-  assert.match(window.document.getElementById("mov-resumen-m51").textContent, /Operaciones/);
-  assert.doesNotMatch(window.document.getElementById("mov-resumen-m51").textContent, /^Movimientos/);
+  assert.doesNotMatch(window.document.getElementById("mov-resumen-m51").textContent, /Operaciones/);
+  assert.deepEqual(Array.from(window.document.querySelectorAll("#mov-resumen-m51 .bc-m51-metric-label")).map(el => el.textContent.trim()),
+    ["Compras", "Movimientos internos", "Bajas", "Reinversiones"]);
 });
 
 test("M76 abre el detalle flotante con todas las líneas y el recorrido de almacén", async (t) => {
@@ -146,11 +174,12 @@ test("M76 recibe el snapshot completo de M51 después de paginar el historial", 
   }));
   window.__BC_M51_ROWS__ = rows;
   window.dispatchEvent(new window.CustomEvent("bc:m51-rows", {
-    detail: { rows, historyTruncated: false }
+    detail: { rows, todayRows: rows, historyTruncated: false }
   }));
   await new Promise(resolve => window.setTimeout(resolve, 10));
   const state = window.__BC_M76_TEST__.getState();
   assert.equal(state.rows.length, 1200);
+  assert.equal(state.summaryRows.length, 1200);
   assert.equal(state.operations.length, 1200);
   assert.equal(window.document.querySelector(".bc-m76-pagination").textContent.includes("1200 operaciones"), true);
 });

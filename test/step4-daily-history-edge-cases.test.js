@@ -187,11 +187,12 @@ test("Paso 4: entrar en Historial conserva almacén y tipo, pero quita los lími
   assert.equal(warehouse.value, "alm-1");
   assert.equal(type.value, "compra");
 
-  const lastRequest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
-  assert.equal(lastRequest.params.p_desde, null);
-  assert.equal(lastRequest.params.p_hasta, null);
-  assert.equal(lastRequest.params.p_almacen_id, "alm-1");
-  assert.equal(lastRequest.params.p_tipo, "compra");
+  const historyRequest = rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_almacen_id === "alm-1" && call.params.p_tipo === "compra" && call.params.p_desde === null && call.params.p_hasta === null).at(-1);
+  assert.ok(historyRequest, "el RPC principal del historial debe quitar los límites de hoy y conservar almacén/tipo");
+  assert.equal(historyRequest.params.p_desde, null);
+  assert.equal(historyRequest.params.p_hasta, null);
+  assert.equal(historyRequest.params.p_almacen_id, "alm-1");
+  assert.equal(historyRequest.params.p_tipo, "compra");
 
   const rendered = visibleRows(window).join("\n");
   assert.match(rendered, /Compra hoy La Cueva/);

@@ -1,4 +1,4 @@
-// BattleCruiser — M76.1: historial de operaciones compactas + acciones con iconos
+// BattleCruiser — M76.2: listas guardadas, resumen diario y filtros compactos
 (function () {
   'use strict';
   if (window.__BC_M76_MOVEMENTS__) return;
@@ -6,7 +6,7 @@
 
   const PAGE_SIZE = 40;
   const TZ = 'America/Havana';
-  const state = { rows: [], operations: [], page: 0, selected: null, trigger: null, installed: false, historyTruncated: false };
+  const state = { rows: [], summaryRows: null, summaryUnavailable: false, summaryTruncated: false, operations: [], page: 0, selected: null, trigger: null, installed: false, historyTruncated: false };
 
   function text(value) { return String(value == null ? '' : value); }
   function esc(value) {
@@ -60,6 +60,11 @@
     if (key === 'sin-fecha') return 'Sin fecha';
     const p = key.split('-').map(Number);
     return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
+  }
+  function businessTodayKey() {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const o = {}; parts.forEach(x => { if (x.type !== 'literal') o[x.type] = x.value; });
+    return o.year + '-' + o.month + '-' + o.day;
   }
   function timeLabel(value) {
     if (!value) return '—';
@@ -195,7 +200,10 @@
     const style = document.createElement('style');
     style.id = 'bc-m76-style';
     style.textContent = [
-      '#tab-movimientos .bc-m51-view-switch{padding:7px 9px!important;margin:5px 0 7px!important;border-radius:8px!important}',
+      '#tab-movimientos .bc-m51-view-switch{display:none!important}',
+      '#tab-movimientos .bc-m51-chips{display:none!important}',
+      '#tab-movimientos .bc-m51-status{display:none!important}',
+      '#tab-movimientos .bc-m76-history-heading{margin:10px 0 8px;font-size:.9rem;font-weight:700;color:var(--text)}',
       '#tab-movimientos .bc-m51-view-copy span{display:none!important}',
       '#tab-movimientos .bc-m51-view-copy strong{font-size:.82rem!important}',
       '#tab-movimientos .bc-m51-view-btn{min-height:32px!important;padding:5px 11px!important}',
@@ -209,10 +217,13 @@
       '#tab-movimientos .bc-m76-filter-advanced{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:7px;align-items:end;padding-top:7px;border-top:1px solid rgba(212,176,92,.1)}',
       '#tab-movimientos .bc-m76-filter-advanced[hidden]{display:none!important}',
       '#tab-movimientos .bc-m76-filter-advanced .bc-m51-filter input,#tab-movimientos .bc-m76-filter-advanced .bc-m51-filter select{height:34px!important}',
-      '#tab-movimientos .bc-m76-category-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 7px;scrollbar-width:thin}',
-      '#tab-movimientos .bc-m76-category{flex:0 0 auto;min-height:31px;padding:5px 10px;border:1px solid rgba(212,176,92,.18);border-radius:999px;background:rgba(18,42,36,.55);color:var(--mist);font-size:.72rem;font-weight:600}',
+      '#tab-movimientos .bc-m76-category-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;overflow:visible;width:100%;min-width:0;padding:2px 0 7px}',
+      '#tab-movimientos .bc-m76-category{display:flex;align-items:center;justify-content:center;width:100%;min-width:0;min-height:38px;padding:5px 3px;border:1px solid rgba(212,176,92,.18);border-radius:999px;background:rgba(18,42,36,.55);color:var(--mist);font-size:.68rem;font-weight:600;line-height:1.12;text-align:center;white-space:normal;overflow-wrap:anywhere}',
       '#tab-movimientos .bc-m76-category[aria-pressed="true"]{background:rgba(212,176,92,.14);border-color:var(--gold);color:var(--gold-bright)}',
-      '#tab-movimientos .bc-m51-metrics{gap:6px!important;margin-bottom:7px!important}',
+      '#tab-movimientos .bc-m51-metrics{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px!important;margin-bottom:7px!important}',
+      '#tab-movimientos .bc-m51-metric{min-width:0;text-align:center}',
+      '#tab-movimientos .bc-m51-metric-label{min-height:2.2em;line-height:1.1!important;white-space:normal!important;overflow-wrap:anywhere}',
+      '#tab-movimientos .bc-m76-summary-note{grid-column:1/-1;font-size:.68rem;color:var(--mist);padding:3px 5px}',
       '#tab-movimientos .bc-m51-metric{padding:8px 9px!important}',
       '#tab-movimientos .bc-m51-metric-label{font-size:.61rem!important}',
       '#tab-movimientos .bc-m51-metric-value{font-size:1.02rem!important;margin-top:2px!important}',
@@ -241,7 +252,7 @@
       '.bc-m76-icon-only{display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 38px;width:38px;min-width:38px;height:38px;min-height:38px;padding:0!important;border-radius:50%!important;line-height:1;white-space:nowrap}',
       '.bc-m76-icon-only svg{display:block;width:18px;height:18px}.bc-m76-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}',
       '@media(max-width:980px){#tab-movimientos .bc-m76-filter-advanced{grid-template-columns:repeat(2,minmax(0,1fr))}}',
-      '@media(max-width:640px){#tab-movimientos .bc-m76-filter-advanced{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-movimientos .bc-m76-op-card{grid-template-columns:minmax(0,1fr) auto;padding:9px}#tab-movimientos .bc-m76-modal-card{max-height:93vh;padding:11px}.bc-m76-modal{padding:8px}}'
+      '@media(max-width:640px){#tab-movimientos .bc-m76-filter-advanced{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-movimientos .bc-m76-category-tabs{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}#tab-movimientos .bc-m76-category{min-height:40px;padding:5px 1px;font-size:.58rem;letter-spacing:-.015em}#tab-movimientos .bc-m51-metric{padding:7px 3px!important}#tab-movimientos .bc-m51-metric-label{font-size:.56rem!important}#tab-movimientos .bc-m51-metric-value{font-size:.95rem!important}#tab-movimientos .bc-m76-op-card{grid-template-columns:minmax(0,1fr) auto;padding:9px}#tab-movimientos .bc-m76-modal-card{max-height:93vh;padding:11px}.bc-m76-modal{padding:8px}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -279,7 +290,9 @@
     state.trigger = trigger || null;
     const title = modal.querySelector('#bc-m76-modal-title');
     const body = modal.querySelector('#bc-m76-modal-body');
-    if (title) title.textContent = 'Detalle · ' + op.label;
+    if (title) title.textContent = op.kind === 'transferencia'
+      ? 'Movimiento interno · ' + (op.almacen || 'Almacenes')
+      : (op.kind === 'compra' ? 'Compra · ' + (op.almacen || 'Almacén') : 'Detalle · ' + op.label);
     const general = field('Operación', op.label) + field('Fecha y hora', timeLabel(op.fecha)) +
       field('Responsable', op.usuario || '—') + field('Referencia', op.reference || '—');
     const location = op.kind === 'transferencia'
@@ -312,44 +325,59 @@
     state.operations = groupOperations(state.rows).filter(op => !search || op.searchText.indexOf(search) >= 0);
     const maxPage = Math.max(0, Math.ceil(state.operations.length / PAGE_SIZE) - 1);
     state.page = Math.min(state.page, maxPage);
-    const counts = { total: state.operations.length, compra: 0, reinversion: 0, baja: 0, transferencia: 0 };
-    state.operations.forEach(op => { if (Object.prototype.hasOwnProperty.call(counts, op.kind)) counts[op.kind]++; });
+    const summarySource = state.summaryRows === null ? state.rows : state.summaryRows;
+    const todayOps = groupOperations(summarySource).filter(op => dateKey(op.fecha) === businessTodayKey());
+    const counts = { compra: 0, transferencia: 0, baja: 0, reinversion: 0 };
+    todayOps.forEach(op => { if (Object.prototype.hasOwnProperty.call(counts, op.kind)) counts[op.kind]++; });
     function metric(label, value) {
       return '<div class="bc-m51-metric"><div class="bc-m51-metric-label">' + esc(label) + '</div><div class="bc-m51-metric-value">' + esc(value) + '</div></div>';
     }
-    metrics.innerHTML = metric('Operaciones', counts.total) + metric('Compras', counts.compra) +
-      metric('Reinversiones', counts.reinversion) + metric('Bajas', counts.baja) + metric('Internos', counts.transferencia);
+    metrics.innerHTML = metric('Compras', state.summaryUnavailable ? '—' : counts.compra) +
+      metric('Movimientos internos', state.summaryUnavailable ? '—' : counts.transferencia) +
+      metric('Bajas', state.summaryUnavailable ? '—' : counts.baja) +
+      metric('Reinversiones', state.summaryUnavailable ? '—' : counts.reinversion);
+    let summaryNote = metrics.querySelector('.bc-m76-summary-note');
+    if (state.summaryUnavailable || state.summaryTruncated) {
+      if (!summaryNote) {
+        summaryNote = document.createElement('div'); summaryNote.className = 'bc-m76-summary-note';
+        summaryNote.setAttribute('role', 'status'); metrics.appendChild(summaryNote);
+      }
+      summaryNote.textContent = state.summaryUnavailable
+        ? 'No se pudo actualizar el resumen diario. Revisa la conexión y actualiza.'
+        : 'El resumen diario alcanzó el límite de seguridad de registros.';
+    } else if (summaryNote) summaryNote.remove();
 
     const start = state.page * PAGE_SIZE;
     const pageItems = state.operations.slice(start, start + PAGE_SIZE);
-    const days = new Map();
-    pageItems.forEach(function (op, index) {
-      const key = dateKey(op.fecha);
-      if (!days.has(key)) days.set(key, []);
-      days.get(key).push({ op, index: start + index });
-    });
+    const isHistory = !!(document.getElementById('mov-view-history') &&
+      document.getElementById('mov-view-history').getAttribute('aria-pressed') === 'true');
+    const heading = tab.querySelector('.bc-m76-history-heading');
+    if (heading) heading.textContent = isHistory ? 'Historial de movimientos' : 'Historial de hoy';
+    const cardHtml = function (op, index) {
+      const label = op.kind === 'transferencia' ? 'Movimiento interno' : op.label;
+      return '<button type="button" class="bc-m76-op-card" data-bc-m76-op="' + index + '">' +
+        '<span><span class="bc-m76-op-name">' + esc(label) + '</span>' +
+        '<span class="bc-m76-op-products">' + esc(op.productCount) + ' producto' + (op.productCount === 1 ? '' : 's') + '</span>' +
+        '<span class="bc-m76-op-meta">' + esc(op.almacen || 'Ubicación no identificada') + ' · ' + esc(timeLabel(op.fecha)) + '</span></span>' +
+        '<span><span class="bc-m76-op-total">' + esc(number(op.totalUnits).toLocaleString('es-ES')) + ' u</span>' +
+        '<span class="bc-m76-op-user">' + esc(op.usuario || '—') + '　›</span></span></button>';
+    };
     if (!pageItems.length) {
       list.innerHTML = '<div class="bc-m51-empty"><strong>Sin operaciones</strong><br>No hay registros que coincidan con la búsqueda y los filtros elegidos.</div>';
+    } else if (!isHistory) {
+      list.innerHTML = pageItems.map((op, index) => cardHtml(op, start + index)).join('');
     } else {
+      const days = new Map();
+      pageItems.forEach(function (op, index) {
+        const key = dateKey(op.fecha);
+        if (!days.has(key)) days.set(key, []);
+        days.get(key).push({ op, index: start + index });
+      });
       let html = '';
       days.forEach(function (items, day) {
-        if (document.getElementById('mov-view-history') && document.getElementById('mov-view-history').getAttribute('aria-pressed') === 'true') {
-          html += '<details class="bc-m51-group bc-m51-group-collapsible" open><summary class="bc-m51-group-head"><span class="bc-m51-group-title">' +
-            esc(dateLabel(day)) + '</span><span class="bc-m51-group-count">' + items.length + ' operación' + (items.length === 1 ? '' : 'es') + '</span></summary>';
-        } else {
-          html += '<section class="bc-m51-group"><div class="bc-m51-group-head"><span class="bc-m51-group-title">' +
-            esc(dateLabel(day)) + '</span><span class="bc-m51-group-count">' + items.length + ' operación' + (items.length === 1 ? '' : 'es') + '</span></div>';
-        }
-        items.forEach(function (entry) {
-          const op = entry.op;
-          html += '<button type="button" class="bc-m76-op-card" data-bc-m76-op="' + entry.index + '">' +
-            '<span><span class="bc-m76-op-name">' + esc(op.label) + '</span>' +
-            '<span class="bc-m76-op-products">' + esc(op.productCount) + ' producto' + (op.productCount === 1 ? '' : 's') + '</span>' +
-            '<span class="bc-m76-op-meta">' + esc(op.almacen || 'Ubicación no identificada') + ' · ' + esc(timeLabel(op.fecha)) + '</span></span>' +
-            '<span><span class="bc-m76-op-total">' + esc(number(op.totalUnits).toLocaleString('es-ES')) + ' u</span>' +
-            '<span class="bc-m76-op-user">' + esc(op.usuario || '—') + '　›</span></span></button>';
-        });
-        html += document.getElementById('mov-view-history') && document.getElementById('mov-view-history').getAttribute('aria-pressed') === 'true' ? '</details>' : '</section>';
+        html += '<details class="bc-m51-group bc-m51-group-collapsible" open><summary class="bc-m51-group-head"><span class="bc-m51-group-title">' + esc(dateLabel(day)) + '</span></summary>';
+        items.forEach(entry => { html += cardHtml(entry.op, entry.index); });
+        html += '</details>';
       });
       list.innerHTML = html;
     }
@@ -434,8 +462,10 @@
       button.setAttribute('aria-pressed', category.type === '' ? 'true' : 'false');
       host.appendChild(button);
     });
+    const metrics = tab.querySelector('.bc-m51-metrics');
     const switcher = tab.querySelector('.bc-m51-view-switch');
-    if (switcher) switcher.after(host);
+    if (metrics) metrics.after(host);
+    else if (switcher) switcher.after(host);
     else {
       const filters = tab.querySelector('.bc-m51-filters');
       if (filters) filters.before(host);
@@ -462,6 +492,11 @@
     ensureFilterLayout(tab);
     ensureCategoryTabs(tab);
     ensurePagination(tab);
+    let heading = tab.querySelector('.bc-m76-history-heading');
+    if (!heading) {
+      heading = document.createElement('h4'); heading.className = 'bc-m76-history-heading'; heading.textContent = 'Historial de hoy';
+      const list = tab.querySelector('#mov-detalle'); if (list) list.before(heading);
+    }
     const legacyDrawer = tab.querySelector('#mov-drawer-m51');
     if (legacyDrawer) { legacyDrawer.setAttribute('aria-hidden', 'true'); legacyDrawer.style.setProperty('display', 'none', 'important'); }
     const sectionTitle = tab.querySelector('.bc-m51-hero h3');
@@ -550,6 +585,9 @@
         const detail = event && event.detail || {};
         if (Array.isArray(detail.rows)) {
           state.rows = detail.rows.slice();
+          state.summaryRows = Array.isArray(detail.todayRows) ? detail.todayRows.slice() : null;
+          state.summaryUnavailable = !!detail.todaySummaryError;
+          state.summaryTruncated = !!detail.todaySummaryTruncated;
           state.historyTruncated = !!detail.historyTruncated;
           state.page = 0;
           if (installUi()) renderOperations();
@@ -562,6 +600,9 @@
     injectStyles();
     setupGlobalIcons(document);
     if (Array.isArray(window.__BC_M51_ROWS__)) state.rows = window.__BC_M51_ROWS__.slice();
+    if (Array.isArray(window.__BC_M51_TODAY_ROWS__)) state.summaryRows = window.__BC_M51_TODAY_ROWS__.slice();
+    state.summaryUnavailable = !!window.__BC_M51_TODAY_SUMMARY_ERROR__;
+    state.summaryTruncated = !!window.__BC_M51_TODAY_SUMMARY_TRUNCATED__;
     state.historyTruncated = !!window.__BC_M51_HISTORY_TRUNCATED__;
     hookData();
     installUi();
@@ -587,7 +628,7 @@
     }
   }
 
-  window.__BC_M76_TEST__ = { groupOperations, renderOperations, getState: () => ({ rows: state.rows, operations: state.operations }) };
+  window.__BC_M76_TEST__ = { groupOperations, renderOperations, getState: () => ({ rows: state.rows, summaryRows: state.summaryRows, operations: state.operations }) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 })();
