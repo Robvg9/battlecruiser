@@ -45,7 +45,7 @@ test("inventory detail has a direct route into the flavor and per-warehouse mini
   assert.match(products, /window\.bcAbrirConfiguracionSabores = async function/);
   assert.match(products, /cargarSnapshotAsignacionMixtaProducto\(producto\.id\)/);
   assert.match(products, /mínimo de cada sabor en cada almacén/);
-  assert.match(products, /No se repartirá automáticamente/);
+  assert.match(products, /stock no se repartirá automáticamente/i);
 });
 
 test("PWA release and cache manifest are aligned at 9.5.80", () => {
