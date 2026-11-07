@@ -1,0 +1,69 @@
+name: BattleCruiser Baja Approval — PostgreSQL 17
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20261107223000_baja_owner_autoapproval_and_admin_queue.sql'
+      - 'test/baja-approval-fixture.sql'
+      - 'test/baja-approval-contract.sql'
+      - '.github/workflows/baja-approval-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baja-approval-contract:
+    name: Baja auto-approval, FIFO and queue contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: battlecruiser_baja_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d battlecruiser_baja_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Create disposable fixture
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_baja_test
+        run: psql -v ON_ERROR_STOP=1 -f test/baja-approval-fixture.sql
+
+      - name: Apply Baja approval migration
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_baja_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261107223000_baja_owner_autoapproval_and_admin_queue.sql
+
+      - name: Verify approval, FIFO and authorization contract
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_baja_test
+        run: psql -v ON_ERROR_STOP=1 -f test/baja-approval-contract.sql
