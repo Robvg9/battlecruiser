@@ -176,8 +176,8 @@
   function render(fila, meta, movements, movementError, feedback, loadingExtra) {
     const modal = ensureModal();
     const body = modal.querySelector('.bc-inv-modal-body');
-    const stores = Array.isArray(fila.almacenes) && fila.almacenes.length
-      ? fila.almacenes
+    const stores = Array.isArray(fila.almacenes)
+      ? fila.almacenes.filter(warehouse => warehouse && !warehouse.sin_asignacion)
       : [{ almacen: fila.almacen, almacen_id: fila.almacen_id, cantidad: fila.cantidad,
           minimo: fila.minimo, estado: fila.estado, unidad: fila.unidad, variantes: fila.variantes }];
     const total = stores.reduce((sum, warehouse) => sum + num(warehouse.cantidad), 0);
@@ -203,7 +203,9 @@
       '<div class="bc-inv-product-summary">' +
         '<span class="bc-inv-product-status">' + esc(estadoLabel(fila.estado)) + '</span>' +
         '<strong>' + esc(qtyFmt(total) + ' ' + unit) + '</strong>' +
-        '<span>existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes</span>' +
+        '<span>' + (stores.length
+          ? 'existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes'
+          : 'Sin almacenes asignados · define un mínimo para comenzar') + '</span>' +
       '</div>' +
       '<section class="bc-inv-product-meta" aria-label="Datos del producto">' +
         '<div class="bc-inv-meta-title">Datos del producto</div>' +
