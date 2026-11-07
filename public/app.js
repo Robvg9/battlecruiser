@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.76 — Mínimos por sabor y almacén; Operaciones y Baja
+// v9.5.76 — Resumen por jornada operativa y día calendario; mínimos por sabor y almacén; Operaciones y Baja
 (function hotfixV9475(){
   const VERSION="9.5.76";
   window.__BC_VERSION__=VERSION;
