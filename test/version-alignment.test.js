@@ -104,38 +104,38 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 
 
 test('movement operations load multi-product transfer before the compact modal', () => {
-  const multiAt = app.indexOf('["movimiento-multiple.js","20261106.1"]');
+  const multiAt = app.indexOf('["movimiento-multiple.js","20261107.1"]');
   const modalAt = app.indexOf('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"]');
   assert.notEqual(multiAt, -1, 'the multi-transfer module must load dynamically');
   assert.ok(multiAt < modalAt, 'the multi-transfer module must load before the modal');
-  assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261106.1'));
+  assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261107.1'));
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.13'));
   assert.ok(app.includes('["m51-movimientos-centro.js","51.10"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.10"), 'the offline shell must precache the refreshed movement listener');
-  assert.ok(app.includes('["inventario-detalle.js","67"]'), 'the minimum editor must refresh');
+  assert.ok(app.includes('["inventario-detalle.js","68"]'), 'the minimum editor must refresh');
   assert.ok(app.includes('["m53-inventario-centro.js","53.6"]'), 'M53 must refresh for pending minimum status');
-  assert.ok(app.includes('["ui-operaciones-hub.js","43.0"]'), 'the Operations hub must refresh');
-  assert.ok(app.includes('["operaciones-financieras.js","20261107.2"]'), 'the finance operations form must refresh');
-  assert.ok(app.includes('["aprobaciones-admin.js","20261107.1"]'), 'the approval form must refresh');
+  assert.ok(app.includes('["ui-operaciones-hub.js","43.1"]'), 'the Operations hub must refresh');
+  assert.ok(app.includes('["operaciones-financieras.js","20261107.3"]'), 'the finance operations form must refresh');
+  assert.ok(app.includes('["aprobaciones-admin.js","20261107.2"]'), 'the approval form must refresh');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=67"), 'the offline shell must precache the updated minimum editor');
-  assert.ok(index.includes('js/productos.js?v=20261106.1'), 'the product view must refresh its category subscriber');
-  assert.ok(index.includes('js/almacenes.js?v=20261106.1'), 'the warehouse view must refresh its tab subscriber');
-  assert.ok(sw.includes("./js/productos.js?v=20261106.1"), 'the product view must refresh offline');
+  assert.ok(index.includes('js/productos.js?v=20261107.1'), 'the product view must refresh its category subscriber');
+  assert.ok(index.includes('js/almacenes.js?v=20261107.1'), 'the warehouse view must refresh its tab subscriber');
+  assert.ok(sw.includes("./js/productos.js?v=20261107.1"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
   assert.ok(almacenes.includes("bc:data-changed"), "the warehouse screen must subscribe to data changes");
-  assert.ok(app.includes('["compra-multiple.js","27.14"]'), "the purchase module must load its reactive catalog listener");
+  assert.ok(app.includes('["compra-multiple.js","27.15"]'), "the purchase module must load its reactive catalog listener");
   assert.ok(compra.includes("__BC_COMPRA_DATA_EVENTS__"), "the active purchase modal must refresh its dependent catalog after changes");
   assert.ok(compra.includes("bcNotificarCambioDatos('compra', false)"), "atomic multi-purchases must publish a stock change");
   assert.ok(productos.includes("bcNotificarCambioDatos(estabaEditando ?"), "direct catalog saves must publish product changes");
-  assert.ok(sw.includes("./js/compra-multiple.js?v=27.14"), "the purchase module's reactive listener must be available offline");
+  assert.ok(sw.includes("./js/compra-multiple.js?v=27.15"), "the purchase module's reactive listener must be available offline");
   assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
   assert.ok(index.includes('js/transferencias.js?v=20261106.1'), "transfer history must load its reactive subscriber");
   assert.ok(sw.includes('./js/transferencias.js?v=20261106.1'), "transfer history must be cached with its reactive subscriber");
 });
 
-// PWA 9.5.77 uses warehouse-specific movement summary windows and aligns release cache keys.
+// PWA 9.5.78 uses warehouse-specific movement summary windows and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /const VERSION=["']9\.5\.77["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.77["']/);
@@ -232,7 +232,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.77"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.78"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -279,9 +279,9 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
   assert.ok(index.includes('style.css?v=9.5.64'));
-  assert.ok(index.includes('app.js?v=9.5.77'));
+  assert.ok(index.includes('app.js?v=9.5.78'));
   assert.ok(sw.includes('./style.css?v=9.5.64'));
-  assert.ok(sw.includes('./app.js?v=9.5.77'));
+  assert.ok(sw.includes('./app.js?v=9.5.78'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
