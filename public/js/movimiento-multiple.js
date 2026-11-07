@@ -49,6 +49,9 @@
     poblarSelects(); actualizarStockHint();
   }
   function validarStock(id, amount, source) {
+    if (window.__BC_STOCK_CONFIRMED__ === false) {
+      return { ok: false, message: 'No se pudo confirmar el inventario actualizado desde Supabase. Actualiza el inventario antes de transferir.' };
+    }
     const info = stockDisponible(id, source);
     if (!info) return { ok: true, info: null };
     const available = Number(info.cantidad) || 0;
