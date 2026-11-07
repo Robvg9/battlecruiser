@@ -28,6 +28,9 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
     assert.equal(d.querySelectorAll("#prod-variantes-lista").length, 1);
     assert.equal(d.querySelectorAll("#prod-variante-agregar").length, 1);
     assert.equal(d.querySelectorAll("#prod-variantes-asignacion").length, 1);
+    assert.match(d.querySelector("#prod-inventario-mixto-settings").textContent, /mínimo compuesto/);
+    assert.match(d.querySelector("#prod-inventario-mixto-settings").textContent, /indica manualmente cuántas unidades reales/);
+    assert.equal(d.querySelectorAll("#prod-variantes-asignacion").length, 1);
     assert.equal(d.getElementById("prod-inventario-mixto").checked, false,
       "mixed inventory is disabled unless the owner opts in");
     assert.ok(d.getElementById("prod-variantes-lista").closest("#form-producto"));
@@ -101,9 +104,9 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
-  assert.match(index, /productos\.js\?v=20261107\.1/);
+  assert.match(index, /productos\.js\?v=20261107\.2/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.78/);
+  assert.match(index, /app\.js\?v=9\.5\.79/);
   assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.79"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.6"\]/);
 });

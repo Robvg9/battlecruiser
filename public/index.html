@@ -238,13 +238,14 @@
         <section id="prod-inventario-mixto-settings" class="prod-inventario-mixto-settings">
           <label class="prod-inventario-mixto-toggle" for="prod-inventario-mixto">
             <input type="checkbox" id="prod-inventario-mixto">
-            <span><strong>Controlar inventario por sabores / variantes</strong><small>Actívalo en un producto ya creado desde su botón «Configurar sabores». Cada sabor tendrá stock, compras, transferencias y mínimo independientes por almacén. Después, en Inventario, abre el producto y edita el mínimo debajo de cada sabor en cada almacén. Antes de activar, el stock genérico y sus lotes abiertos deben quedar en cero; nunca repartimos existencias automáticamente.</small></span>
+            <span><strong>Controlar inventario por sabores / variantes</strong><small>Actívalo en un producto ya creado desde su botón «Configurar sabores». Cada sabor tendrá stock, compras, transferencias y un mínimo obligatorio independiente por almacén. El producto padre no tendrá mínimo general: Inventario mostrará el mínimo compuesto, calculado sumando los mínimos de sus sabores. Si ya existe stock genérico, indica manualmente cuántas unidades reales corresponden a cada sabor en cada almacén; los costos y las capas FIFO de las compras se conservarán.</small></span>
           </label>
           <div id="prod-variantes-editor" class="prod-variantes-editor hidden" hidden>
             <div class="prod-variantes-heading"><strong>Sabores o variantes</strong><small>Escribe tú el nombre de cada uno. Ejemplo: Manzana, Pera, Piña.</small></div>
             <div id="prod-variantes-lista" class="prod-variantes-lista"></div>
             <button type="button" id="prod-variante-agregar" class="cc-accion">+ Agregar sabor o variante</button>
           </div>
+          <div id="prod-variantes-asignacion" class="prod-variantes-asignacion hidden" hidden></div>
         </section>
         <button type="submit" id="prod-submit-btn">Agregar producto</button>
         <button type="button" id="prod-cancelar-edicion" class="hidden">Cancelar edición</button>

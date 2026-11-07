@@ -24,14 +24,15 @@ test("Existing product cards expose a direct entry point to configure or edit fl
   assert.match(products, /Editar sabores/);
   assert.match(products, /toggle\.checked = true/);
   assert.match(products, /agregarFilaVarianteProducto\("", ""\)/);
-  assert.match(index, /stock genérico y sus lotes abiertos deben quedar en cero/);
+  assert.match(index, /indica manualmente cuántas unidades reales corresponden a cada sabor/);
 });
 
 test("Flavor editor saves a positive minimum independently for each variant and warehouse", () => {
   assert.match(inventoryDetail, /data-bc-save-variant-minimum/);
   assert.match(inventoryDetail, /bc_actualizar_stock_minimo_variante/);
   assert.match(inventoryDetail, /variant\.minimo/);
-  assert.match(inventoryDetail, /Mínimos individuales por sabor/);
+  assert.match(inventoryDetail, /Mínimo compuesto/);
+  assert.match(inventoryDetail, /Cada sabor necesita un mínimo mayor que cero en este almacén/);
   assert.match(inventoryCenter, /inventario_mixto_enriquecido/);
   assert.match(inventoryCenter, /variant\.minimo/);
 });
