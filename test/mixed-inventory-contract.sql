@@ -47,10 +47,14 @@ BEGIN
     RAISE EXCEPTION 'Every active flavor must have one stock row per existing warehouse';
   END IF;
 
-  UPDATE public.stock SET cantidad=20 WHERE producto_id=v_apple AND almacen_id=v_warehouse_a;
-  UPDATE public.stock SET cantidad=10 WHERE producto_id=v_pear AND almacen_id=v_warehouse_a;
-  INSERT INTO public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario)
-    VALUES(v_apple,v_warehouse_a,20,20,1.50),(v_pear,v_warehouse_a,10,10,1.75);
+  -- Positive inventory writes are forbidden until each SKU/warehouse minimum is set.
+  v_failed:=false;
+  BEGIN
+    UPDATE public.stock SET cantidad=1 WHERE producto_id=v_apple AND almacen_id=v_warehouse_a;
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Stock movement accepted without a positive flavor minimum'; END IF;
 
   -- The required-minimum migration must safely normalize historical NULLs.
   IF EXISTS (
@@ -70,6 +74,16 @@ BEGIN
   END IF;
 
   -- A normal product must have an explicitly entered positive minimum per warehouse.
+  v_failed:=false;
+  BEGIN
+    UPDATE public.stock SET cantidad=1
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id='55555555-5555-4555-8555-555555555555';
+  EXCEPTION WHEN check_violation THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Normal product stock moved without a positive minimum'; END IF;
+
   PERFORM public.bc_actualizar_stock_minimo_obligatorio(
     '66666666-6666-4666-8666-666666666666',
     '55555555-5555-4555-8555-555555555555',5
@@ -79,6 +93,9 @@ BEGIN
         AND almacen_id='55555555-5555-4555-8555-555555555555')<>5 THEN
     RAISE EXCEPTION 'The required normal-product warehouse minimum was not saved';
   END IF;
+  UPDATE public.stock SET cantidad=1
+  WHERE producto_id='66666666-6666-4666-8666-666666666666'
+    AND almacen_id='55555555-5555-4555-8555-555555555555';
   v_failed:=false;
   BEGIN
     PERFORM public.bc_actualizar_stock_minimo_obligatorio(
@@ -111,6 +128,10 @@ BEGIN
   PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_a,25);
   PERFORM public.bc_actualizar_stock_minimo_variante(v_pear,v_warehouse_a,12);
   PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_b,3);
+  UPDATE public.stock SET cantidad=20 WHERE producto_id=v_apple AND almacen_id=v_warehouse_a;
+  UPDATE public.stock SET cantidad=10 WHERE producto_id=v_pear AND almacen_id=v_warehouse_a;
+  INSERT INTO public.lotes_compra(producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario)
+    VALUES(v_apple,v_warehouse_a,20,20,1.50),(v_pear,v_warehouse_a,10,10,1.75);
   IF (SELECT minimo FROM public.stock WHERE producto_id=v_apple AND almacen_id=v_warehouse_a)<>25
      OR (SELECT minimo FROM public.stock WHERE producto_id=v_pear AND almacen_id=v_warehouse_a)<>12 THEN
     RAISE EXCEPTION 'The flavor minimum RPC did not synchronize the stock rows';
