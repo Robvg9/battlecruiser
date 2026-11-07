@@ -144,6 +144,30 @@ BEGIN
     RAISE EXCEPTION 'Legacy minimum-clear attempt changed the configured threshold';
   END IF;
 
+  -- A not-yet-assigned warehouse can be explicitly assigned at zero stock,
+  -- but only together with its own positive minimum.
+  IF EXISTS(SELECT 1 FROM public.stock
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id=v_warehouse_b) THEN
+    RAISE EXCEPTION 'Fixture unexpectedly has a stock assignment in warehouse B';
+  END IF;
+  PERFORM public.bc_actualizar_stock_minimo_obligatorio(
+    '66666666-6666-4666-8666-666666666666',v_warehouse_b,2
+  );
+  IF NOT EXISTS(SELECT 1 FROM public.stock
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id=v_warehouse_b AND cantidad=0 AND minimo=2) THEN
+    RAISE EXCEPTION 'Minimum setup did not create the zero-stock warehouse assignment';
+  END IF;
+  UPDATE public.stock SET cantidad=2
+  WHERE producto_id='66666666-6666-4666-8666-666666666666'
+    AND almacen_id=v_warehouse_b;
+  IF NOT EXISTS(SELECT 1 FROM public.stock
+    WHERE producto_id='66666666-6666-4666-8666-666666666666'
+      AND almacen_id=v_warehouse_b AND cantidad=2 AND minimo=2) THEN
+    RAISE EXCEPTION 'Stock could not be received after configuring the destination minimum';
+  END IF;
+
   -- Before configuration, each flavor is surfaced as requiring a minimum.
   SELECT variantes INTO v_variantes
   FROM public.inventario_mixto_enriquecido(v_warehouse_a)
