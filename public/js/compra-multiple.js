@@ -103,7 +103,7 @@
         '<div class="seccion-principal">' +
           '<div class="inline-form compra-cabecera">' +
             '<div><label class="muted" for="compra-multiple-almacen">Almacén destino</label>' +
-            '<select id="compra-multiple-almacen" required><option value="">Seleccionar almacén</option></select></div>' +
+            '<select id="compra-multiple-almacen" required><option value="" disabled selected hidden>Seleccionar almacén</option></select></div>' +
             '<div><label class="muted" for="compra-multiple-proveedor">Proveedor <span class="muted">(opcional)</span></label>' +
             '<input id="compra-multiple-proveedor" placeholder="Nombre del proveedor"></div>' +
             '<div><label class="muted" for="compra-multiple-fecha">Fecha</label>' +
@@ -111,8 +111,8 @@
           '</div>' +
           '<h3 class="compra-subtitulo">Agregar productos</h3>' +
           '<div class="inline-form compra-linea-editor">' +
-            '<select id="compra-multiple-producto" aria-label="Producto"><option value="">Producto</option></select>' +
-            '<select id="compra-multiple-presentacion" aria-label="Unidad o presentación"><option value="">Unidad base</option></select>' +
+            '<select id="compra-multiple-producto" aria-label="Producto"><option value="" disabled selected hidden>Producto</option></select>' +
+            '<select id="compra-multiple-presentacion" aria-label="Unidad o presentación"><option value="" disabled selected hidden>Unidad base</option></select>' +
             '<input id="compra-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad">' +
             '<input id="compra-multiple-costo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Costo" aria-label="Costo por unidad o presentación">' +
             '<button type="button" id="compra-multiple-add">+ Añadir</button>' +
@@ -151,11 +151,11 @@
 
     function poblar(){
       var av = almacen.value, pv = producto.value;
-      almacen.innerHTML = '<option value="">Almacén de destino</option>' +
+      almacen.innerHTML = '<option value="" disabled selected hidden>Almacén de destino</option>' +
         almacenes().filter(function(a){ return a.activo !== false; }).map(function(a){
           return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>';
         }).join('');
-      producto.innerHTML = '<option value="">Producto</option>' +
+      producto.innerHTML = '<option value="" disabled selected hidden>Producto</option>' +
         productos().filter(function(p){ return p.activo !== false; }).map(function(p){
           return '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>';
         }).join('');
@@ -182,9 +182,9 @@
     async function cargarPresentaciones(){
       var pid = producto.value;
       presentacion.disabled = true;
-      presentacion.innerHTML = '<option value="">Cargando…</option>';
+      presentacion.innerHTML = '<option value="" disabled selected hidden>Cargando…</option>';
       presActual = await presentacionesDeProducto(pid);
-      presentacion.innerHTML = '<option value="">Unidad base</option>' +
+      presentacion.innerHTML = '<option value="" disabled selected hidden>Unidad base</option>' +
         presActual.map(function(p){
           var nom = (p.presentaciones && p.presentaciones.nombre) || 'Presentación';
           return '<option value="' + esc(p.presentacion_id) + '">' + esc(nom) + ' · ×' + Number(p.factor) + '</option>';
@@ -343,7 +343,7 @@
       proveedor.value = '';
       fecha.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       producto.value = '';
-      presentacion.innerHTML = '<option value="">Unidad base</option>';
+      presentacion.innerHTML = '<option value="" disabled selected hidden>Unidad base</option>';
       presActual = [];
       actualizarCamposPresentacion();
       msg('', true);
