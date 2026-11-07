@@ -13,7 +13,8 @@
     ? window.numberFmt(value)
     : new Intl.NumberFormat('es-ES', { useGrouping: true, maximumFractionDigits: 2 })
       .formatToParts(num(value)).map(part => part.type === 'group' ? '\u202f' : part.value).join('');
-  const estadoLabel = state => state === 'agotado' ? '🔴 Agotado'
+  const estadoLabel = state => state === 'sin_minimo' ? '🟠 Mínimo pendiente'
+    : state === 'agotado' ? '🔴 Agotado'
     : state === 'bajo' ? '🟡 Bajo mínimo' : '🟢 Disponible';
   const MOVEMENT_LABELS = {
     compra: 'Compra',
@@ -39,8 +40,9 @@
   }
 
   function estadoAlmacen(warehouse) {
+    if (warehouse.minimo == null || num(warehouse.minimo) <= 0) return 'sin_minimo';
     if (num(warehouse.cantidad) <= 0) return 'agotado';
-    if (warehouse.minimo != null && num(warehouse.cantidad) <= num(warehouse.minimo)) return 'bajo';
+    if (num(warehouse.cantidad) <= num(warehouse.minimo)) return 'bajo';
     return 'normal';
   }
 
@@ -48,7 +50,8 @@
     if (!fila || !Array.isArray(fila.almacenes)) return;
     fila.almacenes.forEach(warehouse => { warehouse.estado = estadoAlmacen(warehouse); });
     fila.cantidad = fila.almacenes.reduce((sum, warehouse) => sum + num(warehouse.cantidad), 0);
-    fila.estado = fila.cantidad <= 0 ? 'agotado'
+    fila.estado = fila.almacenes.some(warehouse => warehouse.estado === 'sin_minimo') ? 'sin_minimo'
+      : fila.cantidad <= 0 ? 'agotado'
       : fila.almacenes.some(warehouse => warehouse.estado === 'bajo') ? 'bajo' : 'normal';
   }
 
@@ -209,15 +212,17 @@
           ? '<strong class="bc-inv-minimum-readonly">Mínimos individuales por sabor</strong>'
           : (editable
             ? '<div class="bc-inv-minimum-controls">' +
-                '<input id="' + inputId + '" data-bc-minimum-input type="number" min="0" step="any" inputmode="decimal" value="' + esc(String(minimum)) + '" aria-label="Stock mínimo de ' + esc(warehouse.almacen || 'almacén') + '">' +
+                '<input id="' + inputId + '" data-bc-minimum-input type="number" min="0.001" step="any" inputmode="decimal" required value="' + esc(String(minimum > 0 ? minimum : '')) + '" aria-label="Stock mínimo de ' + esc(warehouse.almacen || 'almacén') + '">' +
                 '<button type="button" class="bc-inv-minimum-save" data-bc-save-minimum data-product-id="' + esc(productId) + '" data-warehouse-id="' + esc(warehouseId) + '">Guardar</button>' +
               '</div>'
             : '<strong class="bc-inv-minimum-readonly">' + esc(qtyFmt(minimum)) + '</strong>');
         const hint = variants.length
-          ? '<p class="bc-inv-minimum-hint">Cada sabor tiene su propio mínimo y estado; configúralos debajo.</p>'
-          : (!hasIdentity
-            ? '<p class="bc-inv-minimum-hint is-warning">No se pudo identificar este almacén para habilitar el guardado. Actualiza Inventario y vuelve a abrir el producto.</p>'
-            : (!getClient() ? '<p class="bc-inv-minimum-hint is-warning">La conexión no está disponible para guardar el mínimo.</p>' : ''));
+          ? '<p class="bc-inv-minimum-hint">Cada sabor necesita un mínimo mayor que cero en este almacén. Configúralos debajo.</p>'
+          : (minimum <= 0
+            ? '<p class="bc-inv-minimum-hint is-warning">Obligatorio: define un mínimo mayor que cero para este almacén.</p>'
+            : (!hasIdentity
+              ? '<p class="bc-inv-minimum-hint is-warning">No se pudo identificar este almacén para habilitar el guardado. Actualiza Inventario y vuelve a abrir el producto.</p>'
+              : (!getClient() ? '<p class="bc-inv-minimum-hint is-warning">La conexión no está disponible para guardar el mínimo.</p>' : '')));
         return '<section class="bc-inv-warehouse-detail" data-warehouse-id="' + esc(warehouseId) + '">' +
           '<div class="bc-inv-warehouse-heading"><strong>' + esc(warehouse.almacen || 'Almacén') + '</strong>' +
             '<span class="bc-inv-warehouse-status">' + esc(estadoLabel(status)) + '</span></div>' +
@@ -231,11 +236,11 @@
               variants.map(function (variant) {
                 const variantId = variant.producto_id || '';
                 const variantMinimum = variant.minimo == null ? 0 : num(variant.minimo);
-                const variantState = variant.estado || (num(variant.cantidad) <= 0 ? 'agotado' : (variantMinimum > 0 && num(variant.cantidad) <= variantMinimum ? 'bajo' : 'normal'));
+                const variantState = variant.estado || (variantMinimum <= 0 ? 'sin_minimo' : (num(variant.cantidad) <= 0 ? 'agotado' : (num(variant.cantidad) <= variantMinimum ? 'bajo' : 'normal')));
                 const variantFeedback = feedback && String(feedback.variantId || '') === String(variantId) && String(feedback.almacenId || '') === String(warehouseId)
                   ? '<div class="bc-inv-minimum-feedback is-success" role="status">' + esc(feedback.message) + '</div>' : '';
                 const variantEditor = variantId && warehouseId && getClient()
-                  ? '<div class="bc-inv-variant-minimum"><label>Stock mínimo</label><input data-bc-variant-minimum-input type="number" min="0" step="any" inputmode="decimal" value="' + esc(String(variantMinimum)) + '" aria-label="Stock mínimo de ' + esc(variant.nombre || 'variante') + '">' +
+                  ? '<div class="bc-inv-variant-minimum"><label>Stock mínimo</label><input data-bc-variant-minimum-input type="number" min="0.001" step="any" required inputmode="decimal" value="' + esc(String(variantMinimum > 0 ? variantMinimum : '')) + '" aria-label="Stock mínimo de ' + esc(variant.nombre || 'variante') + '">' +
                     '<button type="button" class="bc-inv-minimum-save" data-bc-save-variant-minimum data-variant-id="' + esc(variantId) + '" data-warehouse-id="' + esc(warehouseId) + '">Guardar</button></div>'
                   : '<span class="bc-inv-minimum-readonly">Mínimo: ' + esc(qtyFmt(variantMinimum)) + '</span>';
                 return '<div class="bc-inv-variant-row"><div class="bc-inv-variant-main"><strong>' + esc(variant.nombre || 'Variante') + '</strong>' +
@@ -286,9 +291,9 @@
     }
     const raw = String(input.value || '').trim();
     const minimum = raw === '' ? NaN : Number(raw);
-    if (!Number.isFinite(minimum) || minimum < 0) {
+    if (!Number.isFinite(minimum) || minimum <= 0) {
       feedback.className = 'bc-inv-minimum-feedback is-error';
-      feedback.textContent = 'Introduce un mínimo válido igual o mayor que 0.';
+      feedback.textContent = 'El stock mínimo es obligatorio y debe ser mayor que cero.';
       input.focus();
       return;
     }
@@ -309,7 +314,7 @@
     try {
       // The RPC is the authority for stock.edit permission; the UI must not
       // hide the editor because a client-side permission cache is still stale.
-      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo', {
+      const result = await supabaseClient.rpc('bc_actualizar_stock_minimo_obligatorio', {
         p_producto_id: productId,
         p_almacen_id: warehouseId,
         p_minimo: minimum
@@ -363,7 +368,7 @@
     const minimum = raw === '' ? NaN : Number(raw);
     let feedback = row.querySelector('.bc-inv-minimum-feedback');
     if (!feedback) { feedback = document.createElement('div'); feedback.className = 'bc-inv-minimum-feedback'; feedback.setAttribute('role', 'status'); row.appendChild(feedback); }
-    if (!Number.isFinite(minimum) || minimum < 0) { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'Introduce un mínimo válido igual o mayor que 0.'; input.focus(); return; }
+    if (!Number.isFinite(minimum) || minimum <= 0) { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'El stock mínimo del sabor es obligatorio y debe ser mayor que cero.'; input.focus(); return; }
     const supabaseClient = getClient();
     if (!supabaseClient || typeof supabaseClient.rpc !== 'function') { feedback.className = 'bc-inv-minimum-feedback is-error'; feedback.textContent = 'No está disponible la conexión con el inventario.'; return; }
     const originalText = button.textContent;
