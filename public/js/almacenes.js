@@ -273,15 +273,20 @@ function cargarStockAlmacenes(force) {
         }).catch(function () {});
       }
 
-      var stockP = bcConTimeoutLocal(
-        withCache("stock", function () {
-          return client
-            .from("stock")
-            .select("producto_id, almacen_id, cantidad, minimo");
-        }),
-        BC_STOCK_TIMEOUT_MS,
-        "stock"
-      );
+      // A forced refresh must bypass withCache entirely. Purchases and
+      // transfers commit to Supabase first; reusing a fulfilled cache entry
+      // leaves the stock validator reading the previous balance until reload.
+      var stockRequest = force
+        ? Promise.resolve().then(function () {
+            return client.from("stock").select("producto_id, almacen_id, cantidad, minimo");
+          }).then(function (result) {
+            if (result && result.error) throw result.error;
+            return result && Array.isArray(result.data) ? result.data : [];
+          })
+        : withCache("stock", function () {
+            return client.from("stock").select("producto_id, almacen_id, cantidad, minimo");
+          });
+      var stockP = bcConTimeoutLocal(stockRequest, BC_STOCK_TIMEOUT_MS, "stock");
 
       var pair = await Promise.all([stockP, productosP]);
       var stock = pair[0];
@@ -390,7 +395,9 @@ async function refrescarStockYSelects() {
   } catch (e) {
     console.warn("[BattleCruiser] refrescarStockYSelects productos", e);
   }
-  await cargarStockAlmacenes(_stockCargaEstado !== "ok");
+  // Read the post-commit balance from Supabase, not from the last completed
+  // cache load. This keeps Transfers immediately consistent after a purchase.
+  await cargarStockAlmacenes(true);
 }
 
 safeInit("form-almacen", () => {
