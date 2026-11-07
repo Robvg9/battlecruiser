@@ -44,7 +44,8 @@
     if (variants.length) {
       if (variants.some(variant => variant && num(variant.minimo) <= 0)) return 'sin_minimo';
       if (num(warehouse.cantidad) <= 0) return 'agotado';
-      if (variants.some(variant => variant && num(variant.cantidad) <= num(variant.minimo))) return 'bajo';
+      if (variants.some(variant => variant &&
+        (variant.estado === 'bajo' || variant.estado === 'agotado' || num(variant.cantidad) <= num(variant.minimo)))) return 'bajo';
       return 'normal';
     }
     if (!warehouse || warehouse.minimo == null || num(warehouse.minimo) <= 0) return 'sin_minimo';
