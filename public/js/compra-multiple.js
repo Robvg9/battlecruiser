@@ -291,8 +291,12 @@
             msg('✓ Compra registrada. Stock actualizado.', true);
             if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
             if (typeof refrescarStockYSelects === 'function') {
-              try { await refrescarStockYSelects(); }
-              catch (refreshError) {
+              try {
+                await refrescarStockYSelects();
+                if (window.__BC_STOCK_CONFIRMED__ === false) {
+                  msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario. No inicies otra transferencia hasta que se actualice.', false);
+                }
+              } catch (refreshError) {
                 msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario: ' + (refreshError && refreshError.message || refreshError) + ' No inicies otra transferencia hasta actualizar el inventario.', false);
               }
             }
@@ -319,8 +323,12 @@
           msg('✓ Compra registrada. Stock actualizado.', true);
           if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
           if (typeof refrescarStockYSelects === 'function') {
-            try { await refrescarStockYSelects(); }
-            catch (refreshError) {
+            try {
+              await refrescarStockYSelects();
+              if (window.__BC_STOCK_CONFIRMED__ === false) {
+                msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario. No inicies otra transferencia hasta que se actualice.', false);
+              }
+            } catch (refreshError) {
               msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario: ' + (refreshError && refreshError.message || refreshError) + ' No inicies otra transferencia hasta actualizar el inventario.', false);
             }
           }
