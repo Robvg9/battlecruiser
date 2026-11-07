@@ -359,7 +359,8 @@
       group.almacenes.push({
         almacen_id: row.almacen_id || null, almacen: row.almacen || '—', cantidad: num(row.cantidad),
         minimo: row.minimo == null ? null : num(row.minimo), estado: estadoAlmacen(row),
-        unidad: row.unidad || group.unidad, variantes: Array.isArray(row.variantes) ? row.variantes : []
+        unidad: row.unidad || group.unidad, variantes: Array.isArray(row.variantes) ? row.variantes : [],
+        sin_asignacion: !!row.__bc_sin_asignacion
       });
     });
     return Array.from(groups.values()).map(function (group) {
@@ -376,7 +377,7 @@
     const products = agruparProductos(rows);
     return {
       totalValor: (rows || []).reduce(function (sum, row) { return sum + num(row.valor_inventario); }, 0),
-      agotados: products.filter(function (p) { return p.cantidad <= 0; }).length,
+      agotados: products.filter(function (p) { return p.cantidad <= 0 && p.almacenes.some(function (a) { return !a.sin_asignacion; }); }).length,
       bajos: products.filter(function (p) { return p.almacenes.some(function (a) { return a.estado === 'bajo'; }); }).length,
       minimosPendientes: products.filter(function (p) { return p.estado === 'sin_minimo'; }).length,
       productos: products.length
@@ -735,9 +736,40 @@
       });
       // Replace child SKU rows with one parent summary; their real product IDs
       // remain in the expandable details and in every transactional table.
-      _allRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
+      const ordinaryVisibleRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
         return !mixedVariantIds.has(String(row.producto_id));
-      }).concat(mixedRows);
+      });
+      const visibleProductIds = new Set(
+        ordinaryVisibleRows.map(function (row) { return String(row.producto_id); })
+          .concat(mixedRows.map(function (row) { return String(row.producto_id); }))
+      );
+      let productCatalog = [];
+      try {
+        productCatalog = Array.isArray(window._cache && window._cache.productos)
+          ? window._cache.productos
+          : (typeof _cache !== 'undefined' && Array.isArray(_cache.productos) ? _cache.productos : []);
+      } catch (_) {}
+      // Catalog-only normal products must remain configurable before their first
+      // purchase or transfer. Do not synthesize rows when a warehouse filter is
+      // active, because the product may already be assigned to another warehouse.
+      const unassignedProductRows = !almacen ? productCatalog.filter(function (product) {
+        return product && product.activo !== false && !product.producto_padre_id &&
+          !product.inventario_mixto && !visibleProductIds.has(String(product.id));
+      }).map(function (product) {
+        return {
+          producto_id: product.id,
+          producto: product.nombre,
+          almacen: 'Sin almacén asignado',
+          almacen_id: null,
+          cantidad: 0,
+          minimo: null,
+          estado: 'sin_minimo',
+          unidad: product.unidad || 'u',
+          valor_inventario: 0,
+          __bc_sin_asignacion: true
+        };
+      }) : [];
+      _allRows = ordinaryVisibleRows.concat(mixedRows, unassignedProductRows);
       window._invFilas = _allRows;
       _page = 0;
       _loading = false;
