@@ -8,7 +8,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
 const baseMigration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
 const migration = read("supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql");
-const conversionMigration = read("supabase/migrations/20261107230000_mixed_inventory_conversion_composite_minimum.sql");
+const conversionMigration = read("supabase/migrations/20261107211007_mixed_inventory_conversion_composite_minimum.sql");
 const detail = read("public/js/inventario-detalle.js");
 const inventory = read("public/js/m53-inventario-centro.js");
 const operations = read("public/js/ui-operaciones-hub.js");
