@@ -326,16 +326,19 @@
 
   function estadoAlmacen(row) {
     const variants = row && Array.isArray(row.variantes) ? row.variantes : [];
-    if (row && (row.minimo == null || num(row.minimo) <= 0)) return 'sin_minimo';
-    if (variants.some(function (variant) {
-      return variant && (variant.estado === 'sin_minimo' || num(variant.minimo) <= 0);
-    })) return 'sin_minimo';
-    if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
-    if (row && row.estado === 'bajo') return 'bajo';
-    if (row && row.minimo != null && num(row.cantidad) <= num(row.minimo)) return 'bajo';
-    if (variants.some(function (variant) {
-      return variant && (variant.estado === 'bajo' || num(variant.cantidad) <= num(variant.minimo));
-    })) return 'bajo';
+    if (variants.length) {
+      if (variants.some(function (variant) {
+        return variant && (variant.estado === 'sin_minimo' || num(variant.minimo) <= 0);
+      })) return 'sin_minimo';
+      if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
+      if (variants.some(function (variant) {
+        return variant && (variant.estado === 'bajo' || num(variant.cantidad) <= num(variant.minimo));
+      })) return 'bajo';
+      return 'normal';
+    }
+    if (!row || row.minimo == null || num(row.minimo) <= 0) return 'sin_minimo';
+    if (row.estado === 'agotado' || num(row.cantidad) <= 0) return 'agotado';
+    if (row.estado === 'bajo' || num(row.cantidad) <= num(row.minimo)) return 'bajo';
     return 'normal';
   }
 
@@ -373,7 +376,7 @@
     return {
       totalValor: (rows || []).reduce(function (sum, row) { return sum + num(row.valor_inventario); }, 0),
       agotados: products.filter(function (p) { return p.cantidad <= 0; }).length,
-      bajos: products.filter(function (p) { return p.estado === 'bajo'; }).length,
+      bajos: products.filter(function (p) { return p.almacenes.some(function (a) { return a.estado === 'bajo'; }); }).length,
       minimosPendientes: products.filter(function (p) { return p.estado === 'sin_minimo'; }).length,
       productos: products.length
     };
