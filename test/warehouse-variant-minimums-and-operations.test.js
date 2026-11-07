@@ -10,6 +10,7 @@ const migration = read("supabase/migrations/20261107130000_mixed_variant_warehou
 const detail = read("public/js/inventario-detalle.js");
 const inventory = read("public/js/m53-inventario-centro.js");
 const operations = read("public/js/ui-operaciones-hub.js");
+const approvals = read("public/js/aprobaciones-admin.js");
 
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
@@ -44,11 +45,14 @@ test("Inventory cards and alerts recognize a low flavor even when total product 
 test("Operations loads product and warehouse catalogs before opening stock-related forms", () => {
   assert.match(operations, /async function ensureOperationCatalogs\(\)/);
   for (const name of ["openGasto", "openBaja", "openReinversion"]) {
-    assert.match(operations, new RegExp("async function " + name + "\\(\\)[\\s\\S]*?await ensureOperationCatalogs\\(\\);"));
+    assert.match(operations, new RegExp("async function " + name + "\\(\\)[\\s\\S]*?await ensureOperationCatalogs\\("));
   }
   assert.match(operations, /window\.refrescarAlmacenes/);
   assert.match(operations, /window\.refrescarProductos/);
   assert.match(operations, /window\.productosOperativos\(rows\)/);
+  assert.ok(operations.includes("await ensureOperationCatalogs(false)"));
+  assert.ok(operations.includes("await ensureOperationCatalogs(true)"));
+  assert.ok(operations.includes("No se pudieron cargar los productos y almacenes activos."));
 });
 
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
@@ -60,4 +64,6 @@ test("Merma is presented as Baja with selectable predefined reasons and a requir
   }
   assert.match(operations, /otherInput\.required = isOther/);
   assert.match(operations, /rpc\('crear_baja'/);
+  assert.ok(approvals.includes("Baja pendiente"));
+  assert.ok(approvals.includes("for(const tipo of ['bajas'])"));
 });
