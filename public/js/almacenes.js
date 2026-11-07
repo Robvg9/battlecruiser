@@ -244,12 +244,21 @@ function seleccionarAlmacen(id) {
 
 function cargarStockAlmacenes(force) {
   if (_stockCargaEstado === "loading" && _stockCargaPromise) {
-    return _stockCargaPromise;
+    if (!force) return _stockCargaPromise;
+    // If an older read was already in flight at the moment a purchase committed,
+    // wait for it and then issue a new, forced read. Never treat that older read
+    // as confirmation of the post-commit balance.
+    var pendingRead = _stockCargaPromise;
+    _cache.stock = [];
+    return pendingRead.catch(function () { return []; }).then(function () {
+      return cargarStockAlmacenes(true);
+    });
   }
   if (_stockCargaEstado === "ok" && !force) {
     renderPanelAlmacenSeleccionado();
     return Promise.resolve(_cache.stock || []);
   }
+  if (force) _cache.stock = [];
   _stockCargaEstado = "loading";
   _stockCargaError = null;
   renderPanelAlmacenSeleccionado();
