@@ -39,7 +39,7 @@ async function waitFor(predicate, timeout = 1500) {
   return Boolean(predicate());
 }
 
-function setup(t, { now = "2026-10-27T17:00:00.000Z", fixtures = [] } = {}) {
+function setup(t, { now = "2026-10-27T17:00:00.000Z", fixtures = [], windows = [] } = {})
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
       "<section id='tab-movimientos' class='tab-panel visible'>" +
@@ -72,6 +72,7 @@ function setup(t, { now = "2026-10-27T17:00:00.000Z", fixtures = [] } = {}) {
   window.client = {
     rpc: async (name, params) => {
       rpcCalls.push({ name, params: { ...params } });
+      if (name === "bc_movimientos_resumen_ventanas") return { data: windows.map((item) => ({ ...item })), error: null };
       if (name !== "movimientos_producto") return { data: [], error: null };
       const rows = fixtures.filter((row) =>
         (!params.p_desde || businessDay(row.fecha) >= params.p_desde) &&
@@ -198,4 +199,45 @@ test("Paso 4: entrar en Historial conserva almacén y tipo, pero quita los lími
   assert.match(rendered, /Compra hoy La Cueva/);
   assert.match(rendered, /Compra ayer La Cueva/);
   assert.doesNotMatch(rendered, /Venta hoy La Cueva|Compra hoy Reserva/);
+});
+
+
+test("resumen híbrido: La Cueva conserva la última jornada y Almacén Casa reinicia por día", async (t) => {
+  const fixtures = [
+    record("Compra de la última jornada", "compra", "La Cueva", "alm-1", "2026-11-06T16:00:00.000Z"),
+    record("Transferencia de la última jornada", "transferencia_entrada", "La Cueva", "alm-1", "2026-11-06T20:00:00.000Z"),
+    record("Compra posterior al cierre", "compra", "La Cueva", "alm-1", "2026-11-07T03:45:00.000Z"),
+    record("Compra de hoy en Casa", "compra", "Almacén Casa", "alm-2", "2026-11-07T06:00:00.000Z"),
+    record("Compra de ayer en Casa", "compra", "Almacén Casa", "alm-2", "2026-11-06T18:00:00.000Z"),
+    record("Reinversión de hoy en Casa", "reinversion", "Almacén Casa", "alm-2", "2026-11-07T08:00:00.000Z")
+  ];
+  const windows = [
+    { almacen_id: "alm-1", almacen: "La Cueva", tipo: "minorista", desde: "2026-11-06T14:00:00.000Z", hasta: "2026-11-07T03:30:00.000Z", modo: "ULTIMA_JORNADA" },
+    { almacen_id: "alm-2", almacen: "Almacén Casa", tipo: "almacenamiento", desde: "2026-11-07T05:00:00.000Z", hasta: "2026-11-07T10:00:00.000Z", modo: "DIARIO" }
+  ];
+  const { window, rpcCalls } = setup(t, { now: "2026-11-07T10:00:00.000Z", fixtures, windows });
+  assert.ok(await waitFor(() => Array.isArray(window.__BC_M51_TODAY_ROWS__)), "el resumen independiente debe terminar");
+  const summary = window.__BC_M51_TODAY_ROWS__;
+  const products = summary.map((row) => row.producto);
+  assert.deepEqual(products.sort(), [
+    "Compra de hoy en Casa",
+    "Compra de la última jornada",
+    "Reinversión de hoy en Casa",
+    "Transferencia de la última jornada"
+  ].sort());
+  assert.match(window.__BC_M51_TODAY_SUMMARY_LABEL__, /La Cueva: última jornada/);
+  assert.match(window.__BC_M51_TODAY_SUMMARY_LABEL__, /Almacén Casa: día calendario/);
+  const warehouseSummaryCalls = rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_almacen_id);
+  assert.deepEqual(warehouseSummaryCalls.map((call) => call.params.p_almacen_id).sort(), ["alm-1", "alm-2"]);
+  assert.ok(warehouseSummaryCalls.some((call) => call.params.p_almacen_id === "alm-1" && call.params.p_desde === "2026-11-06"));
+  assert.ok(warehouseSummaryCalls.some((call) => call.params.p_almacen_id === "alm-2" && call.params.p_desde === "2026-11-07"));
+});
+
+test("La ventana de jornada elige jornadas reales y mantiene intactos los datos", () => {
+  assert.match(migration, /s\.estado IN \('EN_CURSO','COMPLETADA'\)/);
+  assert.match(migration, /ORDER BY CASE WHEN j\.estado='EN_CURSO' THEN 0 ELSE 1 END/);
+  assert.match(migration, /j\.inicio_real DESC NULLS LAST/);
+  assert.match(migration, /'ULTIMA_JORNADA'/);
+  assert.match(migration, /'DIARIO_SIN_JORNADA'/);
+  assert.doesNotMatch(migration, /INSERT INTO public\.turno_sesiones|UPDATE public\.turno_sesiones|DELETE FROM public\.turno_sesiones/i);
 });
