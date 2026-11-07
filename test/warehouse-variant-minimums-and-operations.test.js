@@ -89,7 +89,7 @@ test("Operations loads product and warehouse catalogs before opening stock-relat
   assert.match(operations, /window\.productosOperativos\(rows\)/);
   assert.ok(operations.includes("await ensureOperationCatalogs(false)"));
   assert.ok(operations.includes("await ensureOperationCatalogs(true)"));
-  assert.ok(operations.includes("No se pudieron cargar los productos y almacenes activos."));
+  assert.ok(operations.includes("No se pudieron cargar los productos y almacenes activos desde Supabase."));
 });
 
 test("The financial operations panel loads catalogs before building inventory forms and registers only Baja", () => {
@@ -133,8 +133,10 @@ test("Merma is presented as Baja with selectable predefined reasons and a requir
   assert.match(operations, /rpc\('crear_baja'/);
   assert.ok(approvals.includes("Baja pendiente"));
   assert.match(approvals, /async function ensureForms\(\)/);
-  assert.match(approvals, /window\.refrescarProductos/);
-  assert.match(approvals, /window\.refrescarAlmacenes/);
+  assert.match(approvals, /window\.bcRefrescarCatalogosOperativos\(true\)/);
+  assert.match(approvals, /api\.from\('productos'\)/);
+  assert.match(approvals, /api\.from\('almacenes'\)/);
+  assert.match(approvals, /No se pudo confirmar la actualización de los catálogos/);
   assert.match(approvals, /rpc\('crear_baja'/);
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(approvals.includes('value="' + reason + '"'), "missing approval Baja reason " + reason);
