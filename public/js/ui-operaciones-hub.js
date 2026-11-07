@@ -22,14 +22,19 @@
       : rows.filter(function (p) { return p && p.activo !== false && (!p.inventario_mixto || !!p.producto_padre_id); });
   }
   function stores() { return Array.isArray(window._cache && window._cache.almacenes) ? window._cache.almacenes.filter(function (a) { return a.activo !== false; }) : []; }
-  async function ensureOperationCatalogs() {
+  async function ensureOperationCatalogs(required) {
     var tasks = [];
     if (!stores().length && typeof window.refrescarAlmacenes === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarAlmacenes(); }));
     if (!products().length && typeof window.refrescarProductos === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarProductos(); }));
     var results = await Promise.allSettled(tasks);
     var failed = results.find(function (result) { return result.status === 'rejected'; });
     if (failed) console.warn('[BattleCruiser] No se pudieron preparar los catálogos de Operaciones:', failed.reason);
-    return { products: products(), stores: stores() };
+    var available = { products: products(), stores: stores() };
+    if (required && (!available.products.length || !available.stores.length)) {
+      alert('No se pudieron cargar los productos y almacenes activos. Actualiza los catálogos e inténtalo de nuevo.');
+      return false;
+    }
+    return true;
   }
   function productOpts() { return '<option value="">Seleccionar producto…</option>' + products().map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>'; }).join(''); }
   function storeOpts(optional) { return '<option value="">' + (optional ? 'Almacén (opcional)' : 'Seleccionar almacén…') + '</option>' + stores().map(function (a) { return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>'; }).join(''); }
@@ -150,7 +155,7 @@
 
   async function openGasto() {
     if (!requireCrear('gastos')) return;
-    await ensureOperationCatalogs();
+    if (!(await ensureOperationCatalogs(false))) return;
     openModal({
       icon: '💸', title: 'Registrar gasto', submitText: 'Enviar a aprobación',
       bodyHtml:
@@ -175,7 +180,7 @@
 
   async function openBaja() {
     if (!requireCrear('bajas')) return;
-    await ensureOperationCatalogs();
+    if (!(await ensureOperationCatalogs(true))) return;
     openModal({
       icon: '📦', title: 'Registrar baja', submitText: 'Enviar a revisión',
       submitBg: 'rgba(180,60,60,.9)', submitColor: '#fff',
@@ -224,7 +229,7 @@
 
   async function openReinversion() {
     if (!requireCrear('reinversiones')) return;
-    await ensureOperationCatalogs();
+    if (!(await ensureOperationCatalogs(true))) return;
     openModal({
       icon: '🔄', title: 'Registrar reinversión', submitText: 'Registrar reinversión',
       submitBg: 'rgba(50,140,90,.95)', submitColor: '#fff',
