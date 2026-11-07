@@ -14,6 +14,7 @@ const operations = read("public/js/ui-operaciones-hub.js");
 const approvals = read("public/js/aprobaciones-admin.js");
 const index = read("public/index.html");
 const finance = read("public/js/operaciones-financieras.js");
+const vales = read("public/js/vales.js");
 const app = read("public/app.js");
 
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
@@ -101,6 +102,14 @@ test("The financial operations panel loads catalogs before building inventory fo
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(finance.includes('value="' + reason + '"') || finance.includes(">" + reason + "<"), "missing financial Baja reason " + reason);
   }
+});
+
+test("The legacy vale type keeps its stored value but is presented as Baja", () => {
+  assert.match(index, /<option value="merma">Baja<\/option>/);
+  assert.match(vales, /merma: "Baja"/);
+  assert.doesNotMatch(vales, /merma: "Merma"/);
+  assert.match(index, /js\/vales\.js\?v=20261107\.1/);
+  assert.match(read("public/service-worker.js"), /\.\/js\/vales\.js\?v=20261107\.1/);
 });
 
 test("Release cache keys are refreshed for the modified inventory and Operations modules", () => {
