@@ -397,7 +397,14 @@ async function refrescarStockYSelects() {
   }
   // Read the post-commit balance from Supabase, not from the last completed
   // cache load. This keeps Transfers immediately consistent after a purchase.
-  await cargarStockAlmacenes(true);
+  const refreshedStock = await cargarStockAlmacenes(true);
+  if (_stockCargaEstado !== "ok") {
+    // Never leave stale quantities available to the transfer validator after a
+    // confirmed purchase if the fresh database read itself failed.
+    _cache.stock = [];
+    throw new Error("No se pudo leer el stock actualizado desde Supabase. La operación anterior puede estar registrada; actualiza el inventario antes de validar otra transferencia.");
+  }
+  return refreshedStock;
 }
 
 safeInit("form-almacen", () => {
