@@ -357,7 +357,7 @@
       const label = op.kind === 'transferencia' ? 'Movimiento interno' : op.label;
       return '<button type="button" class="bc-m76-op-card" data-bc-m76-op="' + index + '">' +
         '<span><span class="bc-m76-op-name">' + esc(label) + '</span>' +
-        '<span class="bc-m76-op-products">Lista guardada · ' + esc(op.productCount) + ' producto' + (op.productCount === 1 ? '' : 's') + '</span>' +
+        '<span class="bc-m76-op-products">' + esc(op.productCount) + ' producto' + (op.productCount === 1 ? '' : 's') + '</span>' +
         '<span class="bc-m76-op-meta">' + esc(op.almacen || 'Ubicación no identificada') + ' · ' + esc(timeLabel(op.fecha)) + '</span></span>' +
         '<span><span class="bc-m76-op-total">' + esc(number(op.totalUnits).toLocaleString('es-ES')) + ' u</span>' +
         '<span class="bc-m76-op-user">' + esc(op.usuario || '—') + '　›</span></span></button>';
