@@ -120,7 +120,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(sw.includes("./js/inventario-detalle.js?v=70"), 'the offline shell must precache the updated minimum editor');
   assert.ok(index.includes('js/productos.js?v=20261107.3'), 'the product view must refresh its category subscriber');
   assert.ok(index.includes('js/almacenes.js?v=20261107.1'), 'the warehouse view must refresh its tab subscriber');
-  assert.ok(sw.includes("./js/productos.js?v=20261107.2"), 'the product view must refresh offline');
+  assert.ok(sw.includes("./js/productos.js?v=20261107.3"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
