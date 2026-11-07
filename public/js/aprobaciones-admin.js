@@ -27,7 +27,7 @@ async function ensureForms(){
   let block=document.getElementById('admin-solicitudes');
   if(!block){
     block=document.createElement('div');block.className='cc-bloque';block.id='admin-solicitudes';
-    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos y bajas quedan pendientes hasta revisión administrativa.</p><div class="admin-sol-grid"></div>';
+    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos quedan pendientes. Las bajas se aprueban automáticamente cuando quien las registra tiene permiso global para aprobarlas; las demás esperan revisión administrativa.</p><div class="admin-sol-grid"></div>';
     tab.insertBefore(block,tab.firstChild);
   }
   const grid=block.querySelector('.admin-sol-grid');
@@ -93,7 +93,7 @@ async function ensureForms(){
       '<option value="Daño o deterioro">Daño o deterioro</option><option value="Pérdida">Pérdida</option>'+
       '<option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option></select>'+
       '<input id="adm-b-otro" maxlength="180" placeholder="Explica el otro motivo" hidden>'+
-      '<button type="submit">Enviar a revisión</button>';
+      '<button type="submit">'+(can('bajas','editar_any')||can('auditoria','editar_any')?'Registrar y aprobar Baja':'Enviar a revisión')+'</button>';
     const reason=form.querySelector('#adm-b-motivo'),other=form.querySelector('#adm-b-otro');
     reason.addEventListener('change',()=>{other.hidden=reason.value!=='Otro';other.required=reason.value==='Otro';if(!other.required)other.value=''});
     form.onsubmit=async e=>{
@@ -102,7 +102,14 @@ async function ensureForms(){
       const quantity=Number(form.querySelector('#adm-b-cant').value),selected=reason.value;
       const motive=selected==='Otro'?'Otro: '+String(other.value||'').trim():selected;
       if(!warehouse||!product||!(quantity>0)||!selected||(selected==='Otro'&&!other.value.trim())){alert('Completa almacén, producto, cantidad y motivo de la baja.');return}
-      try{await rpc('crear_baja',{p_almacen_id:warehouse,p_producto_id:product,p_cantidad:quantity,p_motivo:motive,p_idempotency_key:key()});form.reset();other.hidden=true;other.required=false;await load();alert('✓ Baja enviada a aprobación.')}
+      try{
+        const ownerApproval=can('bajas','editar_any')||can('auditoria','editar_any');
+        await rpc('crear_baja',{p_almacen_id:warehouse,p_producto_id:product,p_cantidad:quantity,p_motivo:motive,p_idempotency_key:key()});
+        form.reset();other.hidden=true;other.required=false;await load();
+        alert(ownerApproval
+          ? '✓ Baja autoaprobada. El stock y FIFO ya fueron actualizados.'
+          : '✓ Baja enviada a aprobación.');
+      }
       catch(x){alert(x.message||x)}
     };
     grid.appendChild(form);
