@@ -39,7 +39,9 @@ test("Flavor editor saves a positive minimum independently for each variant and 
 test("Operations hub reloads both catalogs from Supabase instead of trusting non-empty stale cache", () => {
   assert.match(operationsHub, /async function ensureOperationCatalogs\(required\)/);
   assert.match(operationsHub, /api\.from\('productos'\)/);
+  assert.match(operationsHub, /categorias\(nombre\),presentaciones\(nombre\)/);
   assert.match(operationsHub, /api\.from\('almacenes'\)/);
+  assert.match(operationsHub, /select\('id,nombre,tipo,activo'\)/);
   assert.match(operationsHub, /window\._cache\.productos = Array\.isArray\(results\[0\]\.data\)/);
   assert.match(operationsHub, /window\._cache\.almacenes = Array\.isArray\(results\[1\]\.data\)/);
   assert.match(operationsHub, /window\.bcRefrescarCatalogosOperativos = ensureOperationCatalogs/);
@@ -63,6 +65,7 @@ test("A forced stock refresh bypasses withCache and updates the shared stock cac
   assert.match(warehouses, /await cargarStockAlmacenes\(true\)/);
   assert.match(warehouses, /_cache\.stock = \[\]/);
   assert.match(warehouses, /_stockCargaEstado !== "ok"/);
+  assert.match(warehouses, /window\.__BC_STOCK_CONFIRMED__ = true/);
   assert.match(warehouses, /if \(!force\) return _stockCargaPromise/);
   assert.match(warehouses, /pendingRead\.catch/);
   assert.match(warehouses, /return cargarStockAlmacenes\(true\)/);
@@ -79,6 +82,7 @@ test("Transfer stock is refreshed after inventory changes and no longer uses the
   assert.match(transfer, /window\.refrescarStockYSelects\(\)/);
   assert.match(transfer, /No se pudo sincronizar inventario en Transferencias/);
   assert.match(transfer, /detail\.operation === 'compra'/);
+  assert.match(transfer, /window\.__BC_STOCK_CONFIRMED__ === false/);
   assert.match(transfer, /<option value="" disabled selected hidden>Origen<\/option>/);
   assert.match(transfer, /<option value="" disabled selected hidden>Destino<\/option>/);
   assert.match(transfer, /<option value="" disabled selected hidden>Producto<\/option>/);
