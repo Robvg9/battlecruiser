@@ -49,7 +49,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public','pg_temp'
-AS $
+AS $minimum$
 DECLARE
   v_producto public.productos%ROWTYPE;
 BEGIN
@@ -83,7 +83,7 @@ BEGIN
 
   RETURN jsonb_build_object('producto_id',p_producto_id,'almacen_id',p_almacen_id,'minimo',p_minimo);
 END;
-$;
+$minimum$;
 
 REVOKE ALL ON FUNCTION public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.bc_actualizar_stock_minimo_obligatorio(uuid,uuid,numeric) TO authenticated;
