@@ -713,6 +713,14 @@
           if (cached.length) warehouseCatalog = cached;
         } catch (_) {}
       }
+      if (warehouseCatalog.length) {
+        try {
+          if (!window._cache) window._cache = {};
+          if (!Array.isArray(window._cache.almacenes) || !window._cache.almacenes.length) {
+            window._cache.almacenes = warehouseCatalog;
+          }
+        } catch (_) {}
+      }
       if (!warehouseCatalog.length && warehousesRes.error) {
         console.warn('[BattleCruiser] M53 no pudo resolver IDs de almacén desde catálogo:', warehousesRes.error);
       }
