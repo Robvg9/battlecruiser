@@ -69,10 +69,52 @@ BEGIN
     RAISE EXCEPTION 'Stock minimum column must be NOT NULL and have a safe default';
   END IF;
 
+  -- A normal product must have an explicitly entered positive minimum per warehouse.
+  PERFORM public.bc_actualizar_stock_minimo_obligatorio(
+    '66666666-6666-4666-8666-666666666666',
+    '55555555-5555-4555-8555-555555555555',5
+  );
+  IF (SELECT minimo FROM public.stock
+      WHERE producto_id='66666666-6666-4666-8666-666666666666'
+        AND almacen_id='55555555-5555-4555-8555-555555555555')<>5 THEN
+    RAISE EXCEPTION 'The required normal-product warehouse minimum was not saved';
+  END IF;
+  v_failed:=false;
+  BEGIN
+    PERFORM public.bc_actualizar_stock_minimo_obligatorio(
+      '66666666-6666-4666-8666-666666666666',
+      '55555555-5555-4555-8555-555555555555',0
+    );
+  EXCEPTION WHEN invalid_parameter_value THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Normal product minimum accepted zero'; END IF;
+
+  -- Before configuration, each flavor is surfaced as requiring a minimum.
+  SELECT variantes INTO v_variantes
+  FROM public.inventario_mixto_enriquecido(v_warehouse_a)
+  WHERE producto_id=v_parent;
+  IF NOT (v_variantes @> jsonb_build_array(jsonb_build_object('producto_id',v_apple,'minimo',0,'estado','sin_minimo')))
+     OR NOT (v_variantes @> jsonb_build_array(jsonb_build_object('producto_id',v_pear,'minimo',0,'estado','sin_minimo'))) THEN
+    RAISE EXCEPTION 'Unconfigured flavor minimums were not reported as pending: %',v_variantes;
+  END IF;
+
   -- Each flavor receives its own minimum, independently for each warehouse.
+  v_failed:=false;
+  BEGIN
+    PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_a,0);
+  EXCEPTION WHEN invalid_parameter_value THEN
+    v_failed:=true;
+  END;
+  IF NOT v_failed THEN RAISE EXCEPTION 'Flavor minimum accepted zero'; END IF;
+
   PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_a,25);
   PERFORM public.bc_actualizar_stock_minimo_variante(v_pear,v_warehouse_a,12);
   PERFORM public.bc_actualizar_stock_minimo_variante(v_apple,v_warehouse_b,3);
+  IF (SELECT minimo FROM public.stock WHERE producto_id=v_apple AND almacen_id=v_warehouse_a)<>25
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_pear AND almacen_id=v_warehouse_a)<>12 THEN
+    RAISE EXCEPTION 'The flavor minimum RPC did not synchronize the stock rows';
+  END IF;
   IF (SELECT minimo FROM public.productos_stock_mixto_minimos
       WHERE producto_id=v_apple AND almacen_id=v_warehouse_a)<>25
      OR (SELECT minimo FROM public.productos_stock_mixto_minimos
@@ -239,4 +281,4 @@ BEGIN
 END
 $$;
 
-SELECT 'PASS: mixed inventory, flavor minimums per warehouse, legacy minimum backfill, identities, stock, FIFO guard, transfer separation, warehouse seeding, aggregation, admin ACL and safe disable' AS result;
+SELECT 'PASS: mandatory positive minima per warehouse and flavor, pending-minimum status, legacy backfill, mixed inventory, identities, stock, FIFO guard, transfer separation, warehouse seeding, aggregation, admin ACL and safe disable' AS result;
