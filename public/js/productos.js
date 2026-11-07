@@ -328,6 +328,7 @@ function renderProductosLista() {
     if (puedeEditar) {
       botones = `<span class="lista-item-acciones">
           <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
+          ${p.activo !== false ? `<button type="button" class="btn-editar-producto btn-configurar-sabores" data-id="${p.id}">${p.inventario_mixto ? "Editar sabores" : "Configurar sabores"}</button>` : ""}
           <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
         </span>`;
     }
@@ -384,6 +385,22 @@ safeInit("lista-productos", () => {
       const inputBuscar = document.getElementById("productos-buscar");
       if (inputBuscar) inputBuscar.value = "";
       renderProductosLista();
+      return;
+    }
+    const btnConfigurarSabores = e.target.closest(".btn-configurar-sabores");
+    if (btnConfigurarSabores) {
+      const producto = (_cache.productos || []).find((p) => String(p.id) === String(btnConfigurarSabores.dataset.id));
+      if (producto) {
+        await iniciarEdicionProducto(producto);
+        const toggle = document.getElementById("prod-inventario-mixto");
+        const list = document.getElementById("prod-variantes-lista");
+        if (toggle && !toggle.checked) toggle.checked = true;
+        if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
+        sincronizarEditorVariantesProducto();
+        setMsg("msg-productos", "Añade los sabores. Para evitar pérdidas, el stock genérico y los lotes abiertos deben quedar en cero antes de activar la conversión.", true);
+        const section = document.getElementById("prod-inventario-mixto-settings");
+        if (section) section.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
     const btnEditar = e.target.closest(".btn-editar-producto");

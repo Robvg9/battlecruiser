@@ -23,21 +23,49 @@
   }
   function stores() { return Array.isArray(window._cache && window._cache.almacenes) ? window._cache.almacenes.filter(function (a) { return a.activo !== false; }) : []; }
   async function ensureOperationCatalogs(required) {
-    var tasks = [];
-    if (!stores().length && typeof window.refrescarAlmacenes === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarAlmacenes(); }));
-    if (!products().length && typeof window.refrescarProductos === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarProductos(); }));
-    var results = await Promise.allSettled(tasks);
-    var failed = results.find(function (result) { return result.status === 'rejected'; });
-    if (failed) console.warn('[BattleCruiser] No se pudieron preparar los catálogos de Operaciones:', failed.reason);
+    var catalogError = null;
+    var api = window.client || null;
+    try { if (!api && typeof client !== 'undefined') api = client; } catch (_) {}
+    try {
+      if (api && typeof api.from === 'function') {
+        var results = await Promise.all([
+          api.from('productos')
+            .select('id,nombre,unidad,precio_normal,precio_mayorista,activo,imagen_url,categoria_id,presentacion_id,inventario_mixto,producto_padre_id,variante_nombre,categorias(nombre),presentaciones(nombre)')
+            .order('nombre'),
+          api.from('almacenes')
+            .select('id,nombre,tipo,activo')
+            .order('nombre')
+        ]);
+        if (results[0].error) throw results[0].error;
+        if (results[1].error) throw results[1].error;
+        if (!window._cache) window._cache = {};
+        window._cache.productos = Array.isArray(results[0].data) ? results[0].data : [];
+        window._cache.almacenes = Array.isArray(results[1].data) ? results[1].data : [];
+      } else {
+        var tasks = [];
+        if (typeof window.refrescarAlmacenes === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarAlmacenes(); }));
+        if (typeof window.refrescarProductos === 'function') tasks.push(Promise.resolve().then(function () { return window.refrescarProductos(); }));
+        var settled = await Promise.allSettled(tasks);
+        var failed = settled.find(function (result) { return result.status === 'rejected'; });
+        if (failed) throw failed.reason;
+      }
+    } catch (error) {
+      catalogError = error;
+      console.warn('[BattleCruiser] No se pudieron actualizar desde Supabase los catálogos de Operaciones:', error);
+    }
     var available = { products: products(), stores: stores() };
-    if (required && (!available.products.length || !available.stores.length)) {
-      alert('No se pudieron cargar los productos y almacenes activos. Actualiza los catálogos e inténtalo de nuevo.');
+    if (required && (catalogError || !available.products.length || !available.stores.length)) {
+      var reason = catalogError && (catalogError.message || catalogError.details)
+        ? ' Detalle: ' + String(catalogError.message || catalogError.details)
+        : (!available.products.length ? ' No hay productos activos disponibles.' : ' No hay almacenes activos disponibles.');
+      alert('No se pudieron cargar los productos y almacenes activos desde Supabase. Comprueba la conexión e inténtalo de nuevo.' + reason);
       return false;
     }
     return true;
   }
-  function productOpts() { return '<option value="">Seleccionar producto…</option>' + products().map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>'; }).join(''); }
-  function storeOpts(optional) { return '<option value="">' + (optional ? 'Almacén (opcional)' : 'Seleccionar almacén…') + '</option>' + stores().map(function (a) { return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>'; }).join(''); }
+  window.bcRefrescarCatalogosOperativos = ensureOperationCatalogs;
+  function productOpts() { return '<option value="" disabled selected hidden>Seleccionar producto…</option>' + products().map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>'; }).join(''); }
+  function storeOpts(optional) { return '<option value="" disabled selected hidden>' + (optional ? 'Almacén (opcional)' : 'Seleccionar almacén…') + '</option>' + stores().map(function (a) { return '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>'; }).join(''); }
 
   function injectCss() {
     if (document.getElementById('bc-op-hub-css')) return;

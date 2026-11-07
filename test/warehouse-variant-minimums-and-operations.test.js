@@ -16,6 +16,7 @@ const index = read("public/index.html");
 const finance = read("public/js/operaciones-financieras.js");
 const vales = read("public/js/vales.js");
 const app = read("public/app.js");
+const serviceWorker = read("public/service-worker.js");
 
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
@@ -89,7 +90,7 @@ test("Operations loads product and warehouse catalogs before opening stock-relat
   assert.match(operations, /window\.productosOperativos\(rows\)/);
   assert.ok(operations.includes("await ensureOperationCatalogs(false)"));
   assert.ok(operations.includes("await ensureOperationCatalogs(true)"));
-  assert.ok(operations.includes("No se pudieron cargar los productos y almacenes activos."));
+  assert.ok(operations.includes("No se pudieron cargar los productos y almacenes activos desde Supabase."));
 });
 
 test("The financial operations panel loads catalogs before building inventory forms and registers only Baja", () => {
@@ -115,11 +116,31 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
   assert.match(read("public/service-worker.js"), /\.\/js\/vales\.js\?v=20261107\.1/);
 });
 
-test("Release cache keys are refreshed for the modified inventory and Operations modules", () => {
+test("Release cache keys and Service Worker precache match the modified inventory and Operations modules", () => {
+  assert.match(app, /const VERSION="9\.5\.78"/);
   assert.match(app, /m53-inventario-centro\.js","53\.6/);
-  assert.match(app, /ui-operaciones-hub\.js","43\.0/);
-  assert.match(app, /operaciones-financieras\.js","20261107\.2/);
-  assert.match(app, /aprobaciones-admin\.js","20261107\.1/);
+  assert.match(app, /ui-operaciones-hub\.js","43\.1/);
+  assert.match(app, /operaciones-financieras\.js","20261107\.3/);
+  assert.match(app, /aprobaciones-admin\.js","20261107\.2/);
+  assert.match(app, /inventario-detalle\.js","68"/);
+  assert.match(app, /compra-multiple\.js","27\.15"/);
+  assert.match(app, /movimiento-multiple\.js","20261107\.1/);
+  assert.match(index, /productos\.js\?v=20261107\.1/);
+  assert.match(index, /almacenes\.js\?v=20261107\.1/);
+  assert.match(index, /app\.js\?v=9\.5\.78/);
+  assert.match(index, /v9\.5\.78 — BattleCruiser/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.78"/);
+  for (const asset of [
+    "inventario-detalle.js?v=68",
+    "operaciones-financieras.js?v=20261107.3",
+    "aprobaciones-admin.js?v=20261107.2",
+    "ui-operaciones-hub.js?v=43.1",
+    "almacenes.js?v=20261107.1",
+    "m53-inventario-centro.js?v=53.6",
+    "movimiento-multiple.js?v=20261107.1",
+    "productos.js?v=20261107.1",
+    "compra-multiple.js?v=27.15"
+  ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
 
 test("Merma is presented as Baja with selectable predefined reasons and a required detail for Otro", () => {
@@ -133,8 +154,10 @@ test("Merma is presented as Baja with selectable predefined reasons and a requir
   assert.match(operations, /rpc\('crear_baja'/);
   assert.ok(approvals.includes("Baja pendiente"));
   assert.match(approvals, /async function ensureForms\(\)/);
-  assert.match(approvals, /window\.refrescarProductos/);
-  assert.match(approvals, /window\.refrescarAlmacenes/);
+  assert.match(approvals, /window\.bcRefrescarCatalogosOperativos\(true\)/);
+  assert.match(approvals, /api\.from\('productos'\)/);
+  assert.match(approvals, /api\.from\('almacenes'\)/);
+  assert.match(approvals, /No se pudo confirmar la actualización de los catálogos/);
   assert.match(approvals, /rpc\('crear_baja'/);
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(approvals.includes('value="' + reason + '"'), "missing approval Baja reason " + reason);

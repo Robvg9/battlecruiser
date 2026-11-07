@@ -275,7 +275,7 @@
             '<strong>Agregar este producto a otro almacén</strong>' +
             '<p>Se creará la asignación con stock 0. Define primero su mínimo obligatorio para poder recibir compras o transferencias.</p>' +
             '<div class="bc-inv-add-warehouse-controls">' +
-              '<select data-bc-new-warehouse aria-label="Nuevo almacén"><option value="">Seleccionar almacén…</option>' +
+              '<select data-bc-new-warehouse aria-label="Nuevo almacén"><option value="" disabled selected hidden>Seleccionar almacén…</option>' +
                 unassignedWarehouses.map(warehouse => '<option value="' + esc(warehouse.id) + '">' + esc(warehouse.nombre) + '</option>').join('') +
               '</select>' +
               '<input data-bc-new-warehouse-minimum type="number" min="0.001" step="any" inputmode="decimal" placeholder="Stock mínimo" aria-label="Stock mínimo obligatorio">' +

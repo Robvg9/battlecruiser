@@ -82,7 +82,7 @@
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
       <a class="login-utility bc-bootstrap-entry" id="bootstrap-first-admin-link" href="bootstrap.html">Inicializar primer administrador</a>
-      <p class="footnote app-version-label">v9.5.77 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.78 — BattleCruiser</p>
     </form>
   </div>
 
@@ -210,7 +210,7 @@
       <form id="form-producto" class="inline-form">
         <input type="hidden" id="prod-editando-id" value="">
         <input id="prod-nombre" placeholder="Nombre del producto" required>
-        <select id="prod-categoria" required aria-label="Categoría"><option value="">Selecciona una categoría</option></select>
+        <select id="prod-categoria" required aria-label="Categoría"><option value="" disabled selected hidden>Selecciona una categoría</option></select>
         <input id="prod-unidad" type="hidden" value="unidad" aria-label="Unidad base interna del inventario">
         <datalist id="presentaciones-comunes"></datalist>
         <input id="prod-precio-normal" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Precio" required>
@@ -238,7 +238,7 @@
         <section id="prod-inventario-mixto-settings" class="prod-inventario-mixto-settings">
           <label class="prod-inventario-mixto-toggle" for="prod-inventario-mixto">
             <input type="checkbox" id="prod-inventario-mixto">
-            <span><strong>Controlar inventario por sabores / variantes</strong><small>Opcional. Solo se activa en este producto. Cada sabor tendrá stock, compras y transferencias independientes.</small></span>
+            <span><strong>Controlar inventario por sabores / variantes</strong><small>Actívalo en un producto ya creado desde su botón «Configurar sabores». Cada sabor tendrá stock, compras, transferencias y mínimo independientes por almacén. Después, en Inventario, abre el producto y edita el mínimo debajo de cada sabor en cada almacén. Antes de activar, el stock genérico y sus lotes abiertos deben quedar en cero; nunca repartimos existencias automáticamente.</small></span>
           </label>
           <div id="prod-variantes-editor" class="prod-variantes-editor hidden" hidden>
             <div class="prod-variantes-heading"><strong>Sabores o variantes</strong><small>Escribe tú el nombre de cada uno. Ejemplo: Manzana, Pera, Piña.</small></div>
@@ -407,7 +407,7 @@
 
     <section id="tab-inventario" class="tab-panel">
       <div class="pendientes-header"><h3>Inventario</h3><span id="inv-conn-info" class="muted"></span></div>
-      <p class="muted">Existencia, mínimo, estado, costo promedio y valoración de inventario.</p>
+      <p class="muted">Existencia, mínimo, estado, costo promedio y valoración. Abre cada producto para editar su mínimo por almacén y por sabor.</p>
       <div class="mando-filtros">
         <select id="inv-filtro-almacen"><option value="">Todos los almacenes</option></select>
         <button type="button" id="inv-refrescar-btn" class="cc-accion">Refrescar</button>
@@ -656,7 +656,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.77 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.78 — BattleCruiser</span>
     </footer>
   </div>
 
@@ -668,9 +668,9 @@
 <script src="js/loading-guard.js"></script>
 <script src="js/centro-control.js?v=9.5.69"></script>
 <script src="js/navegacion.js?v=9.5.64"></script>
-<script src="js/productos.js?v=20261106.1"></script>
+<script src="js/productos.js?v=20261107.1"></script>
 <script src="js/presentaciones.js?v=20261105.2"></script>
-<script src="js/almacenes.js?v=20261106.1"></script>
+<script src="js/almacenes.js?v=20261107.1"></script>
 <script src="js/transferencias.js?v=20261106.1"></script>
 <script src="js/vales.js?v=20261107.1"></script>
 <script src="js/ventas.js?v=20261105.2"></script>
@@ -687,6 +687,6 @@
 <script src="js/comunicacion.js?v=9.5.64"></script>
 <script src="js/hotfix-configuracion-20260902.js?v=20261020.4"></script>
 <script src="js/mi-cuenta.js?v=1.2"></script>
-<script src="app.js?v=9.5.77"></script>
+<script src="app.js?v=9.5.78"></script>
 </body>
 </html>
