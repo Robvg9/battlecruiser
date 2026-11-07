@@ -267,10 +267,10 @@ test("Paso 4 movimientos: la Dependienta ve cuatro categorías operativas y no c
     tipoSelect.value = scenario.type;
     window.document.getElementById("mov-refrescar-btn").click();
     assert.ok(await waitFor(() => {
-      const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
-      return latest?.params?.p_tipo === scenario.type && visibleRows(window).length === scenario.expected;
+      const latest = rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_tipo === scenario.type).at(-1);
+      return Boolean(latest) && visibleRows(window).length === scenario.expected;
     }), "el filtro " + scenario.type + " debe devolver las filas operativas esperadas");
-    const latest = rpcCalls.filter((call) => call.name === "movimientos_producto").at(-1);
+    const latest = rpcCalls.filter((call) => call.name === "movimientos_producto" && call.params.p_tipo === scenario.type).at(-1);
     assert.equal(latest.params.p_tipo, scenario.type);
     assert.ok(visibleRows(window).every(row => row.includes(scenario.product)));
   }
