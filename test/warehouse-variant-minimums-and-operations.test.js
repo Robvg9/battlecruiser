@@ -135,14 +135,14 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(index, /v9\.5\.79 — BattleCruiser/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.79"/);
   for (const asset of [
-    "inventario-detalle.js?v=69",
+    "inventario-detalle.js?v=70",
     "operaciones-financieras.js?v=20261107.3",
-    "aprobaciones-admin.js?v=20261107.2",
+    "aprobaciones-admin.js?v=20261107.3",
     "ui-operaciones-hub.js?v=43.1",
     "almacenes.js?v=20261107.1",
     "m53-inventario-centro.js?v=53.7",
     "movimiento-multiple.js?v=20261107.1",
-    "productos.js?v=20261107.2",
+    "productos.js?v=20261107.3",
     "compra-multiple.js?v=27.15"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
