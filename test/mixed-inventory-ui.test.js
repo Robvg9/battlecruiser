@@ -16,7 +16,7 @@ const finance = read("public/js/operaciones-financieras.js");
 const m53 = read("public/js/m53-inventario-centro.js");
 const detail = read("public/js/inventario-detalle.js");
 const migration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
-const conversionMigration = read("supabase/migrations/20261107230000_mixed_inventory_conversion_composite_minimum.sql");
+const conversionMigration = read("supabase/migrations/20261107211007_mixed_inventory_conversion_composite_minimum.sql");
 
 test("Mixed inventory stays opt-in and flavor names are entered by the administrator in the product form", () => {
   const { JSDOM } = require("jsdom");
