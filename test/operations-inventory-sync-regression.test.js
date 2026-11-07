@@ -96,6 +96,6 @@ test("Field labels are hidden, disabled placeholders rather than selectable drop
       "expected hidden disabled placeholder: " + text
     );
   }
-  assert.match(index, /Selecciona una categoría<\/option>/);
-  assert.match(index, /Selecciona una categoría<\/option>/);
+  assert.match(index, /<option value="" disabled selected hidden>Selecciona una categoría<\/option>/);
+  assert.match(index, /<option value="" disabled selected hidden>Selecciona una categoría<\/option>/);
 });
