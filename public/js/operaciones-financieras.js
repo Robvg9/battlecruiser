@@ -130,21 +130,27 @@
   }
 
   async function start(){
-    const catalogs=await ensureCatalogs();
-    if(!catalogs.products.length||!catalogs.warehouses.length){
-      const tab=document.getElementById('tab-operacion');
-      if(tab){
-        let warning=tab.querySelector('#fin-catalog-warning');
-        if(!warning){warning=document.createElement('p');warning.id='fin-catalog-warning';warning.className='msg';tab.insertBefore(warning,tab.firstChild)}
-        warning.textContent='No se pudieron cargar los productos o almacenes activos. Actualiza los catálogos antes de registrar una operación de inventario.';
+    if(window.__bcFinanzasLoading)return;
+    window.__bcFinanzasLoading=true;
+    try{
+      const catalogs=await ensureCatalogs();
+      if(!catalogs.products.length||!catalogs.warehouses.length){
+        const tab=document.getElementById('tab-operacion');
+        if(tab){
+          let warning=tab.querySelector('#fin-catalog-warning');
+          if(!warning){warning=document.createElement('p');warning.id='fin-catalog-warning';warning.className='msg';tab.insertBefore(warning,tab.firstChild)}
+          warning.textContent='No se pudieron cargar los productos o almacenes activos. Actualiza los catálogos antes de registrar una operación de inventario.';
+        }
+        return;
       }
-      return;
+      const warning=document.getElementById('fin-catalog-warning');if(warning)warning.remove();
+      ensure();ensureGasto();ensureSalida();refreshSelectors();refrescarFinanzas();
+    }finally{
+      window.__bcFinanzasLoading=false;
+      if(!window.__bcFinanzasTimer)window.__bcFinanzasTimer=setInterval(()=>{start()},10000);
     }
-    const warning=document.getElementById('fin-catalog-warning');if(warning)warning.remove();
-    ensure();ensureGasto();ensureSalida();refreshSelectors();refrescarFinanzas();
-    if(!window.__bcFinanzasTimer)window.__bcFinanzasTimer=setInterval(()=>{start()},10000);
   }
   window.refrescarFinanzas=refrescarFinanzas;
   document.addEventListener('DOMContentLoaded',()=>setTimeout(start,1500));
-  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b&&b.dataset.tab==='operacion')setTimeout(()=>{ensure();ensureGasto();ensureSalida();refrescarFinanzas()},200)});
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b&&b.dataset.tab==='operacion')setTimeout(()=>{start()},200)});
 })();
