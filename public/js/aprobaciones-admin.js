@@ -39,6 +39,7 @@ async function ensureForms(){
   }
   if(!can('bajas','crear')||grid.querySelector('#adm-baja-form')||formsLoading)return;
   formsLoading=true;
+  let catalogsFresh=true;
   try{
     try {
       if(typeof window.bcRefrescarCatalogosOperativos==='function') {
@@ -61,7 +62,14 @@ async function ensureForms(){
         }
       }
     } catch(error) {
+      catalogsFresh=false;
       console.warn('[BattleCruiser] No se pudieron actualizar catálogos de Baja desde Supabase:',error);
+    }
+    if(!catalogsFresh) {
+      let warning=grid.querySelector('#adm-baja-catalog-warning');
+      if(!warning){warning=document.createElement('p');warning.id='adm-baja-catalog-warning';warning.className='msg';grid.appendChild(warning)}
+      warning.textContent='No se pudo confirmar la actualización de los catálogos desde Supabase. No se habilita la baja con datos posiblemente desactualizados.';
+      return;
     }
     const raw=productos();
     const operational=typeof window.productosOperativos==='function'
