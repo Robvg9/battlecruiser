@@ -212,3 +212,26 @@ test("M76 compacta filtros y conserva etiquetas accesibles en botones con iconos
   assert.ok(account.querySelector("svg"));
   assert.equal(account.getAttribute("aria-label"), "Mi cuenta");
 });
+
+
+test("M76 conserva los contadores de la última jornada aunque sea de un día anterior", async (t) => {
+  const window = fixture(t);
+  const visibleRows = commercialRows("VISIBLE-TODAY", "compra", 1, "2026-11-07T12:00:00", 800);
+  const retainedRows = [
+    ...commercialRows("JOURNEY-BUY", "compra", 2, "2026-11-06T12:00:00", 810),
+    ...transferRows("JOURNEY-TRANSFER", 2, "2026-11-06T13:00:00", 820),
+    ...commercialRows("JOURNEY-REINV", "reinversion", 1, "2026-11-06T14:00:00", 830),
+    ...commercialRows("JOURNEY-WRITEOFF", "baja", 1, "2026-11-06T15:00:00", 840)
+  ];
+  window.renderMovimientos(visibleRows);
+  window.dispatchEvent(new window.CustomEvent("bc:m51-rows", {
+    detail: { rows: visibleRows, todayRows: retainedRows,
+      todaySummaryLabel: "La Cueva: última jornada · Almacén Casa: día calendario",
+      historyTruncated: false }
+  }));
+  await new Promise(resolve => window.setTimeout(resolve, 10));
+  const cards = Array.from(window.document.querySelectorAll("#mov-resumen-m51 .bc-m51-metric"));
+  assert.deepEqual(cards.map(x => x.querySelector(".bc-m51-metric-value").textContent.trim()), ["1", "1", "1", "1"]);
+  assert.match(window.document.getElementById("mov-resumen-m51").textContent, /última jornada/);
+  assert.equal(window.__BC_M76_TEST__.getState().summaryRows.length, retainedRows.length);
+});
