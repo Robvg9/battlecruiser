@@ -49,8 +49,8 @@ async function ensureForms(){
         const api=window.client || (typeof client!=='undefined'?client:null);
         if(api && typeof api.from==='function') {
           const results=await Promise.all([
-            api.from('productos').select('id,nombre,activo,inventario_mixto,producto_padre_id,variante_nombre').order('nombre'),
-            api.from('almacenes').select('id,nombre,activo').eq('activo',true).order('nombre')
+            api.from('productos').select('id,nombre,unidad,precio_normal,precio_mayorista,activo,imagen_url,categoria_id,presentacion_id,inventario_mixto,producto_padre_id,variante_nombre,categorias(nombre),presentaciones(nombre)').order('nombre'),
+            api.from('almacenes').select('id,nombre,tipo,activo').order('nombre')
           ]);
           if(results[0].error)throw results[0].error;
           if(results[1].error)throw results[1].error;
