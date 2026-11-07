@@ -31,9 +31,9 @@
     if (!selectors) return;
     const old = { o: selectors.origin.value, d: selectors.destination.value, p: selectors.product.value };
     const as = almacenes(), ps = productos().filter(p => p.activo !== false && p.estado !== false);
-    selectors.origin.innerHTML = '<option value="">Origen</option>' + as.map(a => '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>').join('');
-    selectors.destination.innerHTML = '<option value="">Destino</option>' + as.map(a => '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>').join('');
-    selectors.product.innerHTML = '<option value="">Seleccionar producto</option>' + ps.map(p => '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>').join('');
+    selectors.origin.innerHTML = '<option value="" disabled selected hidden>Origen</option>' + as.map(a => '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>').join('');
+    selectors.destination.innerHTML = '<option value="" disabled selected hidden>Destino</option>' + as.map(a => '<option value="' + esc(a.id) + '">' + esc(a.nombre) + '</option>').join('');
+    selectors.product.innerHTML = '<option value="" disabled selected hidden>Producto</option>' + ps.map(p => '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>').join('');
     if (as.some(a => String(a.id) === old.o)) selectors.origin.value = old.o;
     if (as.some(a => String(a.id) === old.d)) selectors.destination.value = old.d;
     if (ps.some(p => String(p.id) === old.p)) selectors.product.value = old.p;
@@ -130,6 +130,8 @@
       '#movimiento-multiple-panel{margin:0;padding:0;background:transparent;border:0;display:flex;flex-direction:column;gap:9px}' +
       '#movimiento-multiple-panel .mov-transfer-intro{margin:0;color:var(--mist);font-size:.78rem;line-height:1.35}' +
       '#movimiento-multiple-panel .mov-transfer-warehouses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}' +
+      '#movimiento-multiple-panel .mov-transfer-warehouses label,#movimiento-multiple-panel .mov-transfer-line-editor label{display:grid;gap:4px;min-width:0}' +
+      '#movimiento-multiple-panel .mov-transfer-warehouses label>span,#movimiento-multiple-panel .mov-transfer-line-editor label>span{font-size:11px;color:var(--mist)}' +
       '#movimiento-multiple-panel .mov-transfer-line-editor{display:grid;grid-template-columns:minmax(0,1fr) 104px auto;gap:7px;align-items:center}' +
       '#movimiento-multiple-panel select,#movimiento-multiple-panel input{width:100%;height:42px;min-width:0;box-sizing:border-box;padding:0 10px;border:1px solid rgba(212,176,92,.32);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font-size:.82rem}' +
       '#movimiento-multiple-panel button{min-height:40px;padding:8px 12px;border:1px solid rgba(212,176,92,.28);border-radius:7px;background:var(--stone-2);color:var(--text);font-weight:600;cursor:pointer}' +
@@ -156,9 +158,9 @@
     panel.className = 'movimiento-vale-panel'; panel.setAttribute('aria-label', 'Nueva transferencia con varios productos');
     panel.innerHTML =
       '<p class="mov-transfer-intro">Agrupa varios productos del mismo origen al mismo destino. Se registra una sola transferencia.</p>' +
-      '<div class="mov-transfer-warehouses"><select id="mov-multiple-origen" aria-label="Almacén de origen"><option value="">Origen</option></select>' +
-      '<select id="mov-multiple-destino" aria-label="Almacén de destino"><option value="">Destino</option></select></div>' +
-      '<div class="mov-transfer-line-editor"><select id="mov-multiple-producto" aria-label="Producto"><option value="">Seleccionar producto</option></select>' +
+      '<div class="mov-transfer-warehouses"><label><span>Origen</span><select id="mov-multiple-origen" aria-label="Almacén de origen"><option value="" disabled selected hidden>Seleccionar origen</option></select></label>' +
+      '<label><span>Destino</span><select id="mov-multiple-destino" aria-label="Almacén de destino"><option value="" disabled selected hidden>Seleccionar destino</option></select></label></div>' +
+      '<div class="mov-transfer-line-editor"><label><span>Producto</span><select id="mov-multiple-producto" aria-label="Producto"><option value="" disabled selected hidden>Seleccionar producto</option></select></label>' +
       '<input id="mov-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad a transferir">' +
       '<button type="button" id="mov-multiple-add">+ Agregar</button></div>' +
       '<p id="mov-multiple-stock" class="muted mov-transfer-stock">El stock se valida en el almacén de origen.</p>' +
@@ -186,10 +188,26 @@
     window.__BC_MOVIMIENTO_MULTIPLE_REFRESH__ = asegurarCatalogos;
     window.__BC_MOVIMIENTO_MULTIPLE_STATE__ = () => ({ lineas: lineas.map(x => Object.assign({}, x)), enviando });
     window.addEventListener('bc:data-changed', function (event) {
-      const domains = event.detail && event.detail.domains || [];
+      const detail = event.detail || {};
+      const domains = detail.domains || [];
       if (!['products', 'warehouses', 'stock', 'inventory', 'categories'].some(domain => domains.includes(domain))) return;
-      if (event.detail && event.detail.offline) { actualizarStockHint(); return; }
-      window.setTimeout(() => { asegurarCatalogos().catch(() => {}); actualizarStockHint(); }, 180);
+      if (detail.offline || !navigator.onLine) { actualizarStockHint(); return; }
+      // Nueva compra ya espera su refresco forzado al terminar. Para las demás
+      // mutaciones volvemos a leer stock de Supabase antes de recalcular transferencias.
+      if (!detail.remote && detail.operation === 'compra') return;
+      window.setTimeout(async function () {
+        try {
+          if (domains.includes('stock') && typeof window.refrescarStockYSelects === 'function') {
+            await window.refrescarStockYSelects();
+          } else {
+            await asegurarCatalogos();
+          }
+        } catch (error) {
+          console.warn('[BattleCruiser] No se pudo sincronizar inventario en Transferencias:', error);
+        }
+        poblarSelects();
+        actualizarStockHint();
+      }, 180);
     });
     asegurarCatalogos(); render();
   }
