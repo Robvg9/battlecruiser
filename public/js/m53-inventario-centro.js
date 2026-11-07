@@ -757,6 +757,14 @@
           ? window._cache.productos
           : (typeof _cache !== 'undefined' && Array.isArray(_cache.productos) ? _cache.productos : []);
       } catch (_) {}
+      if (!productCatalog.length && typeof window.refrescarProductos === 'function') {
+        try {
+          await window.refrescarProductos();
+          productCatalog = Array.isArray(window._cache && window._cache.productos) ? window._cache.productos : [];
+        } catch (error) {
+          console.warn('[BattleCruiser] M53 no pudo cargar el catálogo de productos sin stock:', error);
+        }
+      }
       // Catalog-only normal products must remain configurable before their first
       // purchase or transfer. Do not synthesize rows when a warehouse filter is
       // active, because the product may already be assigned to another warehouse.
