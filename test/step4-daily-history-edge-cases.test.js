@@ -39,7 +39,7 @@ async function waitFor(predicate, timeout = 1500) {
   return Boolean(predicate());
 }
 
-function setup(t, { now = "2026-10-27T17:00:00.000Z", fixtures = [], windows = [] } = {})
+function setup(t, { now = "2026-10-27T17:00:00.000Z", fixtures = [], windows = [] } = {}) {
   const dom = new JSDOM(
     "<!doctype html><html lang='es'><head></head><body>" +
       "<section id='tab-movimientos' class='tab-panel visible'>" +
