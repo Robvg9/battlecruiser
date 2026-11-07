@@ -250,6 +250,7 @@ function cargarStockAlmacenes(force) {
     // as confirmation of the post-commit balance.
     var pendingRead = _stockCargaPromise;
     _cache.stock = [];
+    window.__BC_STOCK_CONFIRMED__ = false;
     return pendingRead.catch(function () { return []; }).then(function () {
       return cargarStockAlmacenes(true);
     });
@@ -258,7 +259,10 @@ function cargarStockAlmacenes(force) {
     renderPanelAlmacenSeleccionado();
     return Promise.resolve(_cache.stock || []);
   }
-  if (force) _cache.stock = [];
+  if (force) {
+    _cache.stock = [];
+    window.__BC_STOCK_CONFIRMED__ = false;
+  }
   _stockCargaEstado = "loading";
   _stockCargaError = null;
   renderPanelAlmacenSeleccionado();
@@ -300,12 +304,14 @@ function cargarStockAlmacenes(force) {
       var pair = await Promise.all([stockP, productosP]);
       var stock = pair[0];
       _cache.stock = Array.isArray(stock) ? stock : [];
+      window.__BC_STOCK_CONFIRMED__ = true;
       _stockCargaEstado = "ok";
       _stockCargaError = null;
       try { if (typeof renderResumen === "function") renderResumen(); } catch (e) {}
       return _cache.stock;
     } catch (e) {
       console.warn("[BattleCruiser] cargarStockAlmacenes", e);
+      window.__BC_STOCK_CONFIRMED__ = false;
       _stockCargaEstado = "error";
       _stockCargaError = (e && e.message) ? e.message : "Error de red";
       return [];
