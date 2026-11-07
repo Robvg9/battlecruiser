@@ -19,7 +19,7 @@ async function resolver(x,decision,real=null,comentario=null){if(decision==='REC
 async function contarEntrega(id){const raw=prompt('¿Cuánto dinero contaste realmente?');if(raw===null)return;const amount=Number(String(raw).replace(',','.'));if(!Number.isFinite(amount)||amount<0)return alert('Monto inválido.');try{await rpc('registrar_recepcion_entrega_caja',{p_entrega_id:id,p_monto_contado:amount,p_observacion_conteo:prompt('Observación (opcional):')||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
 async function revisarEntrega(id,decision){let c=decision==='rechazar'?prompt('Motivo obligatorio del rechazo:'):prompt('Comentario de aprobación (opcional):');if(decision==='rechazar'&&(!c||!c.trim()))return;try{await rpc('revisar_entrega_caja',{p_entrega_id:id,p_decision:decision,p_comentario:c||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
 async function revisarCuadre(id,decision){let c=prompt(decision==='rechazar'?'Motivo obligatorio del rechazo:':'Comentario de aprobación (opcional):');if(decision==='rechazar'&&(!c||!c.trim()))return;try{await rpc('revisar_cuadre',{p_cuadre_id:id,p_decision:decision,p_comentario:c||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
-function select(id,label,items){return '<label class="field"><span>'+label+'</span><select id="'+id+'"><option value="">Seleccionar…</option>'+items.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.nombre)+'</option>').join('')+'</select></label>'}
+function select(id,label,items){return '<label class="field"><span>'+label+'</span><select id="'+id+'"><option value="" disabled selected hidden>Seleccionar…</option>'+items.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.nombre)+'</option>').join('')+'</select></label>'}
 let formsLoading=false;
 async function ensureForms(){
   const tab=document.getElementById('tab-operacion');
@@ -40,12 +40,29 @@ async function ensureForms(){
   if(!can('bajas','crear')||grid.querySelector('#adm-baja-form')||formsLoading)return;
   formsLoading=true;
   try{
-    const tasks=[];
-    if(!productos().some(p=>p&&p.activo!==false)&&typeof window.refrescarProductos==='function')tasks.push(Promise.resolve().then(()=>window.refrescarProductos()));
-    if(!almacenes().length&&typeof window.refrescarAlmacenes==='function')tasks.push(Promise.resolve().then(()=>window.refrescarAlmacenes()));
-    const results=await Promise.allSettled(tasks);
-    const failed=results.find(x=>x.status==='rejected');
-    if(failed)console.warn('[BattleCruiser] No se pudieron cargar catálogos para Baja:',failed.reason);
+    try {
+      if(typeof window.bcRefrescarCatalogosOperativos==='function') {
+        const ready=await window.bcRefrescarCatalogosOperativos(true);
+        if(!ready)return;
+      } else {
+        const api=window.client || (typeof client!=='undefined'?client:null);
+        if(api && typeof api.from==='function') {
+          const results=await Promise.all([
+            api.from('productos').select('id,nombre,activo,inventario_mixto,producto_padre_id,variante_nombre').order('nombre'),
+            api.from('almacenes').select('id,nombre,activo').eq('activo',true).order('nombre')
+          ]);
+          if(results[0].error)throw results[0].error;
+          if(results[1].error)throw results[1].error;
+          if(!window._cache)window._cache={};
+          window._cache.productos=Array.isArray(results[0].data)?results[0].data:[];
+          window._cache.almacenes=Array.isArray(results[1].data)?results[1].data:[];
+        } else {
+          throw new Error('Cliente Supabase no disponible para actualizar catálogos.');
+        }
+      }
+    } catch(error) {
+      console.warn('[BattleCruiser] No se pudieron actualizar catálogos de Baja desde Supabase:',error);
+    }
     const raw=productos();
     const operational=typeof window.productosOperativos==='function'
       ? window.productosOperativos(raw)
@@ -62,7 +79,7 @@ async function ensureForms(){
     const form=document.createElement('form');form.id='adm-baja-form';form.className='inline-form';
     form.innerHTML='<h4>📉 Baja</h4>'+select('adm-b-alm','Almacén',activeStores)+select('adm-b-prod','Producto',activeProducts)+
       '<input id="adm-b-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required>'+
-      '<select id="adm-b-motivo" required><option value="">Motivo de la baja</option>'+
+      '<select id="adm-b-motivo" required><option value="" disabled selected hidden>Motivo de la baja</option>'+
       '<option value="Rotura">Rotura</option><option value="Hechado a perder">Hechado a perder</option>'+
       '<option value="El Jefe lo cogió">El Jefe lo cogió</option><option value="Vencimiento">Vencimiento</option>'+
       '<option value="Daño o deterioro">Daño o deterioro</option><option value="Pérdida">Pérdida</option>'+
