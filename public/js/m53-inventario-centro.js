@@ -332,7 +332,8 @@
       })) return 'sin_minimo';
       if (row && (row.estado === 'agotado' || num(row.cantidad) <= 0)) return 'agotado';
       if (variants.some(function (variant) {
-        return variant && (variant.estado === 'bajo' || num(variant.cantidad) <= num(variant.minimo));
+        return variant && (variant.estado === 'bajo' || variant.estado === 'agotado' ||
+          num(variant.cantidad) <= num(variant.minimo));
       })) return 'bajo';
       return 'normal';
     }
