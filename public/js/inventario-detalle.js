@@ -40,7 +40,14 @@
   }
 
   function estadoAlmacen(warehouse) {
-    if (warehouse.minimo == null || num(warehouse.minimo) <= 0) return 'sin_minimo';
+    const variants = warehouse && Array.isArray(warehouse.variantes) ? warehouse.variantes : [];
+    if (variants.length) {
+      if (variants.some(variant => variant && num(variant.minimo) <= 0)) return 'sin_minimo';
+      if (num(warehouse.cantidad) <= 0) return 'agotado';
+      if (variants.some(variant => variant && num(variant.cantidad) <= num(variant.minimo))) return 'bajo';
+      return 'normal';
+    }
+    if (!warehouse || warehouse.minimo == null || num(warehouse.minimo) <= 0) return 'sin_minimo';
     if (num(warehouse.cantidad) <= 0) return 'agotado';
     if (num(warehouse.cantidad) <= num(warehouse.minimo)) return 'bajo';
     return 'normal';
@@ -218,10 +225,10 @@
             : '<strong class="bc-inv-minimum-readonly">' + esc(qtyFmt(minimum)) + '</strong>');
         const hint = variants.length
           ? '<p class="bc-inv-minimum-hint">Cada sabor necesita un mínimo mayor que cero en este almacén. Configúralos debajo.</p>'
-          : (minimum <= 0
-            ? '<p class="bc-inv-minimum-hint is-warning">Obligatorio: define un mínimo mayor que cero para este almacén.</p>'
-            : (!hasIdentity
-              ? '<p class="bc-inv-minimum-hint is-warning">No se pudo identificar este almacén para habilitar el guardado. Actualiza Inventario y vuelve a abrir el producto.</p>'
+          : (!hasIdentity
+            ? '<p class="bc-inv-minimum-hint is-warning">No se pudo identificar este almacén para habilitar el guardado. Actualiza Inventario y vuelve a abrir el producto.</p>'
+            : (minimum <= 0
+              ? '<p class="bc-inv-minimum-hint is-warning">Obligatorio: define un mínimo mayor que cero para este almacén.</p>'
               : (!getClient() ? '<p class="bc-inv-minimum-hint is-warning">La conexión no está disponible para guardar el mínimo.</p>' : '')));
         return '<section class="bc-inv-warehouse-detail" data-warehouse-id="' + esc(warehouseId) + '">' +
           '<div class="bc-inv-warehouse-heading"><strong>' + esc(warehouse.almacen || 'Almacén') + '</strong>' +
