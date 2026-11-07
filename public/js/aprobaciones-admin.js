@@ -20,7 +20,69 @@ async function contarEntrega(id){const raw=prompt('¿Cuánto dinero contaste rea
 async function revisarEntrega(id,decision){let c=decision==='rechazar'?prompt('Motivo obligatorio del rechazo:'):prompt('Comentario de aprobación (opcional):');if(decision==='rechazar'&&(!c||!c.trim()))return;try{await rpc('revisar_entrega_caja',{p_entrega_id:id,p_decision:decision,p_comentario:c||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
 async function revisarCuadre(id,decision){let c=prompt(decision==='rechazar'?'Motivo obligatorio del rechazo:':'Comentario de aprobación (opcional):');if(decision==='rechazar'&&(!c||!c.trim()))return;try{await rpc('revisar_cuadre',{p_cuadre_id:id,p_decision:decision,p_comentario:c||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
 function select(id,label,items){return '<label class="field"><span>'+label+'</span><select id="'+id+'"><option value="">Seleccionar…</option>'+items.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.nombre)+'</option>').join('')+'</select></label>'}
-function ensureForms(){const tab=document.getElementById('tab-operacion');if(!tab||document.getElementById('admin-solicitudes'))return;if(!(can('gastos','crear')||can('mermas','crear')||can('bajas','crear')))return;const b=document.createElement('div');b.className='cc-bloque';b.id='admin-solicitudes';b.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos y bajas quedan pendientes hasta revisión administrativa.</p><div class="admin-sol-grid"></div>';tab.insertBefore(b,tab.firstChild);const g=b.querySelector('.admin-sol-grid');if(can('gastos','crear')){const f=document.createElement('form');f.className='inline-form';f.innerHTML='<h4>💸 Gasto</h4><input id="adm-g-concepto" placeholder="Concepto" required><input id="adm-g-monto" type="number" min="0.01" step="0.01" placeholder="Monto" required><input id="adm-g-desc" placeholder="Descripción"><button type="submit">Solicitar gasto</button>';f.onsubmit=async e=>{e.preventDefault();try{await rpc('crear_gasto',{p_concepto:document.getElementById('adm-g-concepto').value,p_monto:Number(document.getElementById('adm-g-monto').value),p_descripcion:document.getElementById('adm-g-desc').value||null,p_idempotency_key:key()});f.reset();await load();alert('✓ Gasto enviado a aprobación.')}catch(x){alert(x.message||x)}};g.appendChild(f)}for(const tipo of ['bajas'])if(can(tipo,'crear')){const p=tipo==='mermas'?'m':'b',f=document.createElement('form');f.className='inline-form';f.innerHTML='<h4>'+ (tipo==='mermas'?'⚠️ Merma':'📉 Baja')+'</h4>'+select('adm-'+p+'-alm','Almacén',almacenes())+select('adm-'+p+'-prod','Producto',productos())+'<input id="adm-'+p+'-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required><input id="adm-'+p+'-motivo" placeholder="Motivo" required><button type="submit">Enviar a revisión</button>';f.onsubmit=async e=>{e.preventDefault();try{await rpc(tipo==='mermas'?'crear_merma':'crear_baja',{p_almacen_id:document.getElementById('adm-'+p+'-alm').value,p_producto_id:document.getElementById('adm-'+p+'-prod').value,p_cantidad:Number(document.getElementById('adm-'+p+'-cant').value),p_motivo:document.getElementById('adm-'+p+'-motivo').value,p_idempotency_key:key()});f.reset();await load();alert('✓ Solicitud enviada a aprobación.')}catch(x){alert(x.message||x)}};g.appendChild(f)}}
-function start(){ensurePanel();ensureForms();load();if(!window.__bcAdminApprovalTimer)window.__bcAdminApprovalTimer=setInterval(()=>{ensureForms();load()},30000)}
+let formsLoading=false;
+async function ensureForms(){
+  const tab=document.getElementById('tab-operacion');
+  if(!tab||(!can('gastos','crear')&&!can('bajas','crear')))return;
+  let block=document.getElementById('admin-solicitudes');
+  if(!block){
+    block=document.createElement('div');block.className='cc-bloque';block.id='admin-solicitudes';
+    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos y bajas quedan pendientes hasta revisión administrativa.</p><div class="admin-sol-grid"></div>';
+    tab.insertBefore(block,tab.firstChild);
+  }
+  const grid=block.querySelector('.admin-sol-grid');
+  if(can('gastos','crear')&&!grid.querySelector('#adm-gasto-form')){
+    const form=document.createElement('form');form.id='adm-gasto-form';form.className='inline-form';
+    form.innerHTML='<h4>💸 Gasto</h4><input id="adm-g-concepto" placeholder="Concepto" required><input id="adm-g-monto" type="number" min="0.01" step="0.01" placeholder="Monto" required><input id="adm-g-desc" placeholder="Descripción"><button type="submit">Solicitar gasto</button>';
+    form.onsubmit=async e=>{e.preventDefault();try{await rpc('crear_gasto',{p_concepto:document.getElementById('adm-g-concepto').value,p_monto:Number(document.getElementById('adm-g-monto').value),p_descripcion:document.getElementById('adm-g-desc').value||null,p_idempotency_key:key()});form.reset();await load();alert('✓ Gasto enviado a aprobación.')}catch(x){alert(x.message||x)}};
+    grid.appendChild(form);
+  }
+  if(!can('bajas','crear')||grid.querySelector('#adm-baja-form')||formsLoading)return;
+  formsLoading=true;
+  try{
+    const tasks=[];
+    if(!productos().some(p=>p&&p.activo!==false)&&typeof window.refrescarProductos==='function')tasks.push(Promise.resolve().then(()=>window.refrescarProductos()));
+    if(!almacenes().length&&typeof window.refrescarAlmacenes==='function')tasks.push(Promise.resolve().then(()=>window.refrescarAlmacenes()));
+    const results=await Promise.allSettled(tasks);
+    const failed=results.find(x=>x.status==='rejected');
+    if(failed)console.warn('[BattleCruiser] No se pudieron cargar catálogos para Baja:',failed.reason);
+    const raw=productos();
+    const operational=typeof window.productosOperativos==='function'
+      ? window.productosOperativos(raw)
+      : raw.filter(p=>p&&p.activo!==false&&(!p.inventario_mixto||!!p.producto_padre_id));
+    const activeProducts=operational.filter(p=>p&&p.activo!==false);
+    const activeStores=almacenes();
+    let warning=grid.querySelector('#adm-baja-catalog-warning');
+    if(!activeProducts.length||!activeStores.length){
+      if(!warning){warning=document.createElement('p');warning.id='adm-baja-catalog-warning';warning.className='msg';grid.appendChild(warning)}
+      warning.textContent='No se pudieron cargar productos y almacenes activos. Actualiza los catálogos antes de solicitar una baja.';
+      return;
+    }
+    if(warning)warning.remove();
+    const form=document.createElement('form');form.id='adm-baja-form';form.className='inline-form';
+    form.innerHTML='<h4>📉 Baja</h4>'+select('adm-b-alm','Almacén',activeStores)+select('adm-b-prod','Producto',activeProducts)+
+      '<input id="adm-b-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required>'+
+      '<select id="adm-b-motivo" required><option value="">Motivo de la baja</option>'+
+      '<option value="Rotura">Rotura</option><option value="Hechado a perder">Hechado a perder</option>'+
+      '<option value="El Jefe lo cogió">El Jefe lo cogió</option><option value="Vencimiento">Vencimiento</option>'+
+      '<option value="Daño o deterioro">Daño o deterioro</option><option value="Pérdida">Pérdida</option>'+
+      '<option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option></select>'+
+      '<input id="adm-b-otro" maxlength="180" placeholder="Explica el otro motivo" hidden>'+
+      '<button type="submit">Enviar a revisión</button>';
+    const reason=form.querySelector('#adm-b-motivo'),other=form.querySelector('#adm-b-otro');
+    reason.addEventListener('change',()=>{other.hidden=reason.value!=='Otro';other.required=reason.value==='Otro';if(!other.required)other.value=''});
+    form.onsubmit=async e=>{
+      e.preventDefault();
+      const warehouse=form.querySelector('#adm-b-alm').value,product=form.querySelector('#adm-b-prod').value;
+      const quantity=Number(form.querySelector('#adm-b-cant').value),selected=reason.value;
+      const motive=selected==='Otro'?'Otro: '+String(other.value||'').trim():selected;
+      if(!warehouse||!product||!(quantity>0)||!selected||(selected==='Otro'&&!other.value.trim())){alert('Completa almacén, producto, cantidad y motivo de la baja.');return}
+      try{await rpc('crear_baja',{p_almacen_id:warehouse,p_producto_id:product,p_cantidad:quantity,p_motivo:motive,p_idempotency_key:key()});form.reset();other.hidden=true;other.required=false;await load();alert('✓ Baja enviada a aprobación.')}
+      catch(x){alert(x.message||x)}
+    };
+    grid.appendChild(form);
+  }finally{formsLoading=false}
+}
+async function start(){ensurePanel();await ensureForms();load();if(!window.__bcAdminApprovalTimer)window.__bcAdminApprovalTimer=setInterval(()=>{ensureForms();load()},30000)}
 window.refrescarAprobacionesAdmin=load;document.addEventListener('DOMContentLoaded',()=>setTimeout(start,1200));document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b)setTimeout(()=>{ensureForms();if(b.dataset.tab==='resumen')load()},300)});
 })();
