@@ -30,6 +30,8 @@ test("Each mixed-inventory flavor has an independent minimum for each warehouse"
   assert.match(migration, /bc_actualizar_stock_minimo_obligatorio/);
   assert.match(migration, /p_minimo<=0/);
   assert.match(migration, /bc_actualizar_stock_minimo_variante/);
+  assert.match(migration, /INSERT INTO public\.stock\(producto_id,almacen_id,cantidad,minimo,updated_at\)/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.bc_seed_mixed_variant_minimum\(\) FROM PUBLIC,anon/);
   assert.match(migration, /tiene_permiso\('stock','editar'\)/);
   assert.match(migration, /LEFT JOIN public\.productos_stock_mixto_minimos vm ON vm\.producto_id=v\.id AND vm\.almacen_id=a\.id/);
   assert.match(migration, /'minimo',coalesce\(vm\.minimo,0\)/);
@@ -47,8 +49,14 @@ test("Inventory detail edits and saves a separate threshold for each flavor", ()
   assert.match(index, /<option value="merma">Baja<\/option>/);
   assert.doesNotMatch(index, /<option value="merma">Merma<\/option>/);
   assert.match(inventory, /option value="sin_minimo">Mínimo pendiente/);
+  assert.match(inventory, /unassignedProductRows/);
+  assert.match(inventory, /__bc_sin_asignacion/);
+  assert.match(inventory, /window\.refrescarProductos/);
   assert.match(detail, /variant\.minimo/);
   assert.match(detail, /Mínimos individuales por sabor/);
+  assert.match(detail, /data-bc-assign-warehouse/);
+  assert.match(detail, /bc_actualizar_stock_minimo_obligatorio/);
+  assert.match(detail, /Sin almacenes asignados/);
   assert.match(detail, /merma: 'Baja'/, 'legacy movements must display as Baja');
 });
 
