@@ -177,7 +177,7 @@ test("PWA release 9.5.82 loads and precaches the dashboard and cash handover UI"
   assert.match(SW, /BC_SW_VERSION = "9.5.82"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
   assert.match(INDEX, /app\.js\?v=9.5.82/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.81/);
+  assert.match(INDEX, /style\.css\?v=9\.5\.82/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
