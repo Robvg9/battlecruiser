@@ -19,7 +19,7 @@
 
   function isProductSelect(select) {
     if (!select || select.tagName !== 'SELECT' || select.dataset.bcProductSearch === '1') return false;
-    if (select.disabled || select.multiple) return false;
+    if (select.multiple) return false;
     if (select.id === 'venta-producto' && document.getElementById('venta-producto-buscar')) return false;
     const label = select.closest('label');
     const labelText = label ? label.textContent : '';
