@@ -106,6 +106,9 @@
   }
 
   async function ensureCatalogs(){
+    const api=window.client || (typeof client!=='undefined'?client:null);
+    if(!api||!api.auth||typeof api.auth.getSession!=='function')return {products:[],warehouses:[]};
+    try{const sessionPack=await api.auth.getSession();if(!sessionPack||sessionPack.error||!sessionPack.data||!sessionPack.data.session||!sessionPack.data.session.user)return {products:[],warehouses:[]};}catch(_){return {products:[],warehouses:[]};}
     let catalogReady=true;
     try {
       if(typeof window.bcRefrescarCatalogosOperativos==='function') {
@@ -178,4 +181,5 @@
   window.refrescarFinanzas=refrescarFinanzas;
   document.addEventListener('DOMContentLoaded',()=>setTimeout(start,1500));
   document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b&&b.dataset.tab==='operacion')setTimeout(()=>{start()},200)});
+  try{const api=window.client||(typeof client!=='undefined'?client:null);if(api&&api.auth&&typeof api.auth.onAuthStateChange==='function')api.auth.onAuthStateChange((event,session)=>{if(session&&['SIGNED_IN','INITIAL_SESSION','TOKEN_REFRESHED'].includes(event))setTimeout(()=>start(),0)})}catch(_){/* The Operations tab click retries after the session is established. */}
 })();
