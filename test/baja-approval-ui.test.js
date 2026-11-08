@@ -13,7 +13,7 @@ test("Baja approval migration auto-approves only creators with global approval a
   assert.match(sql, /tiene_permiso\('bajas','editar_any'\)/);
   assert.match(sql, /tiene_permiso\('auditoria','editar_any'\)/);
   assert.match(sql, /_aplicar_salida_aprobada\(p_almacen_id, p_producto_id, p_cantidad\)/);
-  assert.match(sql, /VALUES\([\s\S]*'PENDIENTE', p_idempotency_key\)/);
+  assert.match(sql, /VALUES\([\s\S]*'PENDIENTE', p_idempotency_key\s*\)/);
   assert.match(sql, /UPDATE public\.bajas[\s\S]*SET estado = 'APROBADA'/);
   assert.match(sql, /revisado_por = auth\.uid\(\)/);
   assert.match(sql, /fecha_revision = now\(\)/);
