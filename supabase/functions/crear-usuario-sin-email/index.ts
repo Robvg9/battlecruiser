@@ -89,16 +89,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const { data: profiles, error: profilesError } = await admin
-    .from("usuarios").select("id,nombre,username");
+    .from("usuarios").select("username");
   if (profilesError) return json(503, { error: "No se pudo validar el usuario y su alias." });
-  const normalizedName = nombre.toLocaleLowerCase();
-  const duplicateName = (profiles || []).some((row: any) =>
-    String(row.nombre || "").trim().toLocaleLowerCase() === normalizedName
-  );
   const duplicateUsername = (profiles || []).some((row: any) =>
     String(row.username || "").trim().toLowerCase() === username
   );
-  if (duplicateName) return json(409, { error: "Ya existe una persona con ese nombre completo." });
   if (duplicateUsername) return json(409, { error: "Ese usuario corto ya está ocupado. Prueba otro alias." });
 
   const provisionalId = crypto.randomUUID();
@@ -134,7 +129,12 @@ Deno.serve(async (req: Request) => {
   if (profileError || !profile || profile.role_id !== roleId || profile.username !== username) {
     try { await admin.from("usuarios").delete().eq("id", userId); } catch (_) {}
     try { await admin.auth.admin.deleteUser(userId); } catch (_) {}
-    return json(500, { error: "No se pudo guardar el perfil, el alias y el rol. No quedó una cuenta parcial." });
+    const duplicate = String(profileError?.code || "").toUpperCase() === "23505";
+    return json(duplicate ? 409 : 500, {
+      error: duplicate
+        ? "Ese usuario corto acaba de ser reservado por otra cuenta. Elige otro alias."
+        : "No se pudo guardar el perfil, el alias y el rol. No quedó una cuenta parcial.",
+    });
   }
 
   return json(200, {

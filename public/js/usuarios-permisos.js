@@ -389,6 +389,7 @@ function puedeVerOperacionesLocal() {
   return (
     tienePermiso("gastos", "crear") ||
     tienePermiso("mermas", "crear") ||
+    tienePermiso("bajas", "crear") ||
     tienePermiso("reinversiones", "crear") ||
     tienePermiso("responsabilidades", "crear") ||
     tienePermiso("incidencias", "crear")

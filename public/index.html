@@ -238,8 +238,15 @@
         <section id="prod-inventario-mixto-settings" class="prod-inventario-mixto-settings">
           <label class="prod-inventario-mixto-toggle" for="prod-inventario-mixto">
             <input type="checkbox" id="prod-inventario-mixto">
-            <span><strong>Controlar inventario por sabores / variantes</strong><small>Actívalo en un producto ya creado desde su botón «Configurar sabores». Cada sabor tendrá stock, compras, transferencias y un mínimo obligatorio independiente por almacén. El producto padre no tendrá mínimo general: Inventario mostrará el mínimo compuesto, calculado sumando los mínimos de sus sabores. Si ya existe stock genérico, indica manualmente cuántas unidades reales corresponden a cada sabor en cada almacén; los costos y las capas FIFO de las compras se conservarán.</small></span>
+            <span><strong>Controlar inventario por sabores / variantes</strong><small>Activa el control por sabores para este producto.</small></span>
           </label>
+          <details class="bc-mixed-assignment-help bc-mixed-assignment-help-product">
+            <summary>Ver más...</summary>
+            <div class="bc-mixed-assignment-help-content">
+              <p>Cada sabor tendrá stock, compras y transferencias independientes, además de un mínimo obligatorio por almacén. El producto principal no tendrá mínimo general: Inventario mostrará un mínimo compuesto que suma los mínimos de los sabores.</p>
+              <p>Si ya existe stock genérico, indica manualmente cuántas unidades reales corresponden a cada sabor y almacén. Los costos y las capas FIFO de las compras se conservarán; el sistema no inventa cantidades ni reparte existencias automáticamente.</p>
+            </div>
+          </details>
           <div id="prod-variantes-editor" class="prod-variantes-editor hidden" hidden>
             <div class="prod-variantes-heading"><strong>Sabores o variantes</strong><small>Escribe tú el nombre de cada uno. Ejemplo: Manzana, Pera, Piña.</small></div>
             <div id="prod-variantes-lista" class="prod-variantes-lista"></div>
