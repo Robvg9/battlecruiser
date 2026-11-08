@@ -914,6 +914,8 @@ async function iniciarEdicionProducto(p) {
 
 window.bcAbrirConfiguracionSabores = async function (productId, options) {
   _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : null;
+  const form = document.getElementById("form-producto");
+  if (form && _bcMixedConfigReturnTab) form.classList.add("bc-mixed-config-mode");
   const productTab = document.querySelector('.tab-btn[data-tab="productos"]');
   const productPanel = document.getElementById("tab-productos");
   if (productTab && productPanel && !productPanel.classList.contains("visible")) productTab.click();
@@ -922,6 +924,12 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
   if (!producto) throw new Error("No se encontró el producto. Actualiza el catálogo e inténtalo de nuevo.");
 
   await iniciarEdicionProducto(producto);
+  if (_bcMixedConfigReturnTab) {
+    const submit = document.getElementById("prod-submit-btn");
+    const cancel = document.getElementById("prod-cancelar-edicion");
+    if (submit) submit.hidden = true;
+    if (cancel) cancel.hidden = true;
+  }
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
   if (toggle && !toggle.checked) toggle.checked = true;
@@ -940,6 +948,8 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
 };
 
 function cancelarEdicionProducto() {
+  const form = document.getElementById("form-producto");
+  if (form) form.classList.remove("bc-mixed-config-mode");
   document.getElementById("form-producto").reset();
   document.getElementById("prod-editando-id").value = "";
   const unidadInput = document.getElementById("prod-unidad");
@@ -955,9 +965,9 @@ function cancelarEdicionProducto() {
   renderPanelAsignacionMixtaProducto();
   sincronizarEditorVariantesProducto();
   const submitBtn = document.getElementById("prod-submit-btn");
-  if (submitBtn) submitBtn.textContent = "Agregar producto";
+  if (submitBtn) { submitBtn.hidden = false; submitBtn.textContent = "Agregar producto"; }
   const cancelarBtn = document.getElementById("prod-cancelar-edicion");
-  if (cancelarBtn) cancelarBtn.classList.add("hidden");
+  if (cancelarBtn) { cancelarBtn.hidden = false; cancelarBtn.classList.add("hidden"); }
   document.getElementById("prod-imagen-preview-wrap").classList.add("hidden");
   document.getElementById("prod-imagen-preview").removeAttribute("src");
   document.getElementById("prod-imagen-preview").dataset.guardada = "false";
