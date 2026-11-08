@@ -921,20 +921,25 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
   if (productTab && productPanel && !productPanel.classList.contains("visible")) productTab.click();
 
   const producto = (_cache.productos || []).find((p) => String(p.id) === String(productId));
-  if (!producto) throw new Error("No se encontró el producto. Actualiza el catálogo e inténtalo de nuevo.");
+  if (!producto) {
+    if (form && _bcMixedConfigReturnTab) form.classList.remove("bc-mixed-config-mode");
+    setMsg("msg-productos", "No se encontró el producto en el catálogo. Actualiza Inventario e inténtalo de nuevo.", false);
+    restaurarTabConfiguracionSabores();
+    return false;
+  }
 
-  await iniciarEdicionProducto(producto);
   if (_bcMixedConfigReturnTab) {
     const submit = document.getElementById("prod-submit-btn");
     const cancel = document.getElementById("prod-cancelar-edicion");
     if (submit) submit.hidden = true;
-    // Keep a safe escape visible while the Supabase snapshot is loading.
+    // Show the safe exit before any session/catalogue/snapshot read can wait.
     if (cancel) {
       cancel.hidden = false;
       cancel.classList.remove("hidden");
       cancel.textContent = "Volver a Inventario";
     }
   }
+  await iniciarEdicionProducto(producto);
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
   if (toggle && !toggle.checked) toggle.checked = true;
