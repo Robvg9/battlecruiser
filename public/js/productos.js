@@ -928,7 +928,12 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
     const submit = document.getElementById("prod-submit-btn");
     const cancel = document.getElementById("prod-cancelar-edicion");
     if (submit) submit.hidden = true;
-    if (cancel) cancel.hidden = true;
+    // Keep a safe escape visible while the Supabase snapshot is loading.
+    if (cancel) {
+      cancel.hidden = false;
+      cancel.classList.remove("hidden");
+      cancel.textContent = "Volver a Inventario";
+    }
   }
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
@@ -936,11 +941,28 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
   if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
   sincronizarEditorVariantesProducto();
 
-  if (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(producto.id)) {
-    const snapshot = await cargarSnapshotAsignacionMixtaProducto(producto.id);
-    if (!snapshot) throw new Error("No se pudo leer el stock actual. No se ha convertido ni modificado inventario.");
+  let snapshotReady = !!(_productoMixtoSnapshot && String(_productoMixtoSnapshot.producto_id) === String(producto.id));
+  if (!snapshotReady) {
+    try {
+      const snapshot = await cargarSnapshotAsignacionMixtaProducto(producto.id);
+      snapshotReady = !!(snapshot && _productoMixtoSnapshot && String(_productoMixtoSnapshot.producto_id) === String(producto.id));
+    } catch (error) {
+      console.warn("[BattleCruiser] No se pudo leer el snapshot para configurar sabores:", error);
+      snapshotReady = false;
+    }
+  }
+  if (!snapshotReady) {
+    // Show the read error without stranding the user in the compact editor.
+    renderPanelAsignacionMixtaProducto();
+    setMsg("msg-productos", "No se pudo leer el stock actual. No se ha convertido ni modificado inventario. Puedes volver a Inventario y reintentar.", false);
+    return false;
   }
   setMsg("msg-productos", "Configuración lista. Completa los almacenes y guarda el inventario por sabores.", true);
+  const fallbackCancel = document.getElementById("prod-cancelar-edicion");
+  if (_bcMixedConfigReturnTab && fallbackCancel) {
+    fallbackCancel.hidden = true;
+    fallbackCancel.classList.add("hidden");
+  }
   renderPanelAsignacionMixtaProducto();
   const section = document.getElementById("prod-inventario-mixto-settings");
   if (section) section.scrollIntoView({ behavior: "smooth", block: "center" });
