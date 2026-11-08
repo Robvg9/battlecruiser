@@ -629,8 +629,8 @@ function renderPanelAsignacionMixtaProducto() {
       '</div>';
     }).join("");
     const genericInfo = mixed
-      ? '<p class="bc-mixed-assignment-meta">Inventario mixto ya activo · cantidades existentes protegidas.</p>'
-      : '<p class="bc-mixed-assignment-meta">Stock genérico: <strong>' + fmtQtyProducto(genericStock) + '</strong> · Lotes FIFO abiertos: <strong>' + fmtQtyProducto(lotCount) + '</strong> · Unidades en lotes: <strong>' + fmtQtyProducto(fifoQty) + '</strong></p>';
+      ? '<p class="bc-mixed-assignment-meta">Cantidades actuales protegidas · mínimos editables.</p>'
+      : '<p class="bc-mixed-assignment-meta">Stock: <strong>' + fmtQtyProducto(genericStock) + '</strong> · FIFO: ' + fmtQtyProducto(fifoQty) + ' (' + fmtQtyProducto(lotCount) + ' capas)</p>';
     const integrity = coherent
       ? ""
       : '<p class="bc-mixed-assignment-error">El stock físico y las cantidades restantes de los lotes FIFO no coinciden. Este almacén debe reconciliarse antes de convertir.</p>';
@@ -686,6 +686,15 @@ function actualizarTotalesPanelAsignacionMixta() {
   });
 }
 
+function mostrarFeedbackAsignacionMixta(message, success) {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  const feedback = panel && panel.querySelector("[data-mixed-save-feedback]");
+  if (!feedback) return;
+  feedback.textContent = message || "";
+  feedback.classList.toggle("is-error", !!message && !success);
+  feedback.classList.toggle("is-success", !!message && !!success);
+}
+
 safeInit("prod-variantes-asignacion", () => {
   const panel = document.getElementById("prod-variantes-asignacion");
   if (!panel) return;
@@ -698,11 +707,13 @@ safeInit("prod-variantes-asignacion", () => {
       save.disabled = true;
       const original = save.textContent;
       save.textContent = "Guardando...";
+      mostrarFeedbackAsignacionMixta("Guardando y verificando en Supabase…", true);
       try {
         await window.bcGuardarConfiguracionSabores();
       } catch (error) {
-        setMsg("msg-productos", "No se guardó la configuración. Tus datos siguen en pantalla: " +
-          explicarError(error, "guardar inventario por sabores"), false);
+        const detail = explicarError(error, "guardar inventario por sabores");
+        mostrarFeedbackAsignacionMixta("No se guardó: " + detail + " · Los datos siguen en pantalla.", false);
+        setMsg("msg-productos", "No se guardó la configuración. Tus datos siguen en pantalla: " + detail, false);
       } finally {
         if (save.isConnected) {
           save.disabled = false;
@@ -789,7 +800,10 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
     throw new Error("Añade al menos un sabor y utiliza nombres únicos de hasta 80 caracteres.");
   }
   const prepared = prepararAsignacionesMixtasProducto(variants);
-  if (!prepared.ok) throw new Error(prepared.error);
+  if (!prepared.ok) {
+    mostrarFeedbackAsignacionMixta(prepared.error, false);
+    throw new Error(prepared.error);
+  }
   const result = await client.rpc("configurar_producto_inventario_mixto_con_asignaciones", {
     p_producto_id: targetId,
     p_habilitar: true,
@@ -824,6 +838,7 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
   }
 
   _productoMixtoSnapshot = snapshot;
+  mostrarFeedbackAsignacionMixta("✓ Guardado y verificado en Supabase.", true);
   setMsg("msg-productos", "✓ Inventario por sabores guardado y verificado en el servidor.", true);
   cancelarEdicionProducto();
   if (typeof refrescarProductos === "function") await refrescarProductos();
