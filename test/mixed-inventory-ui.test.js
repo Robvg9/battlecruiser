@@ -48,7 +48,9 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.match(products, /data-confirm-mixed-conversion/);
   assert.ok(products.includes('<details class="bc-mixed-assignment-help">'));
   assert.ok(products.includes("Ayuda · reparto y FIFO"));
-  assert.ok(products.includes("data-mixed-save-configuration"));\n  assert.ok(products.includes("data-mixed-save-feedback"));\n  assert.ok(products.includes("mostrarFeedbackAsignacionMixta"));
+  assert.ok(products.includes("data-mixed-save-configuration"));
+  assert.ok(products.includes("data-mixed-save-feedback"));
+  assert.ok(products.includes("mostrarFeedbackAsignacionMixta"));
   assert.ok(products.includes("bcGuardarConfiguracionSabores"));
   assert.ok(products.includes("restaurarTabConfiguracionSabores"));
   assert.ok(products.includes("bc-mixed-config-mode"));
