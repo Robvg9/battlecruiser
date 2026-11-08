@@ -161,7 +161,7 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   assert.notEqual(multiple, -1, "app.js debe cargar el módulo de transferencias múltiples");
   assert.ok(multiple < modal, "el panel múltiple debe existir antes de inicializar el modal");
   assert.ok(modal < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
-  assert.match(sw, /movimiento-multiple\.js\?v=20261107\.1/);
+  assert.match(sw, /movimiento-multiple\.js\?v=20261108\.1/);
 });test("Transferencias: añadir varios productos registra una sola operación con todas las líneas", async (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="transferencias"]').click();
@@ -265,9 +265,11 @@ test("Transferencias: recupera catálogos y rellena el panel múltiple al abrir"
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(warehouseLoads, 1);
   assert.equal(productLoads, 1);
-  assert.equal(window.document.querySelectorAll("#mov-multiple-origen option[value='a']").length, 1);
-  assert.equal(window.document.querySelectorAll("#mov-multiple-destino option[value='b']").length, 1);
-  assert.equal(window.document.querySelectorAll("#mov-multiple-producto option[value='p1']").length, 1);
+  const activePanel = window.document.querySelector("#bc165-overlay #movimiento-multiple-panel");
+  assert.ok(activePanel, "el modal debe conservar un único panel de transferencia activo");
+  assert.equal(activePanel.querySelectorAll("#mov-multiple-origen option[value='a']").length, 1);
+  assert.equal(activePanel.querySelectorAll("#mov-multiple-destino option[value='b']").length, 1);
+  assert.equal(activePanel.querySelectorAll("#mov-multiple-producto option[value='p1']").length, 1);
   const feedback = window.document.querySelector(".bc165-feedback");
   assert.ok(!feedback || feedback.hidden || !feedback.textContent);
 });test("Transferencias: sin catálogos presenta el panel y explica el bloqueo sin habilitar el formulario individual", async (t) => {
