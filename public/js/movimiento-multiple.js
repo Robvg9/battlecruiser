@@ -16,7 +16,7 @@
     return row ? { cantidad: Number(row.cantidad) || 0, aproximado: false } : null;
   }
   function fmt(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
-  let lineas = [], enviando = false, selectors = null;
+  let lineas = [], enviando = false, selectors = null, catalogosRefreshPromise = null;
 
   function feedback(message, success) {
     const el = document.getElementById('mov-multiple-msg');
@@ -38,31 +38,37 @@
     if (as.some(a => String(a.id) === old.d)) selectors.destination.value = old.d;
     if (ps.some(p => String(p.id) === old.p)) selectors.product.value = old.p;
   }
-  async function asegurarCatalogos() {
-    poblarSelects();
-    const api = window.client || (typeof client !== 'undefined' ? client : null);
-    if (!api || !api.auth || typeof api.auth.getSession !== 'function') {
-      window.__BC_STOCK_CONFIRMED__ = false;
-      return;
-    }
-    try {
-      const authState = await api.auth.getSession();
-      if (!authState || authState.error || !authState.data || !authState.data.session || !authState.data.session.user) {
+  function asegurarCatalogos() {
+    if (catalogosRefreshPromise) return catalogosRefreshPromise;
+    catalogosRefreshPromise = (async function () {
+      poblarSelects();
+      const api = window.client || (typeof client !== 'undefined' ? client : null);
+      if (!api || !api.auth || typeof api.auth.getSession !== 'function') {
         window.__BC_STOCK_CONFIRMED__ = false;
         return;
       }
-    } catch (_) {
-      window.__BC_STOCK_CONFIRMED__ = false;
-      return;
-    }
-    const needsFreshStock = navigator.onLine && window.__BC_STOCK_CONFIRMED__ !== true;
-    if (almacenes().length && productos().length && !needsFreshStock) return;
-    try {
-      if (!almacenes().length && typeof window.refrescarAlmacenes === 'function') await window.refrescarAlmacenes();
-      if ((needsFreshStock || !productos().length || !almacenes().length) && typeof window.refrescarStockYSelects === 'function') await window.refrescarStockYSelects();
-      else if (!productos().length && typeof window.refrescarProductos === 'function') await window.refrescarProductos();
-    } catch (e) { console.warn('[BattleCruiser] No se pudieron cargar catálogos de transferencia:', e); }
-    poblarSelects(); actualizarStockHint();
+      try {
+        const authState = await api.auth.getSession();
+        if (!authState || authState.error || !authState.data || !authState.data.session || !authState.data.session.user) {
+          window.__BC_STOCK_CONFIRMED__ = false;
+          return;
+        }
+      } catch (_) {
+        window.__BC_STOCK_CONFIRMED__ = false;
+        return;
+      }
+      const needsFreshStock = navigator.onLine && window.__BC_STOCK_CONFIRMED__ !== true;
+      if (almacenes().length && productos().length && !needsFreshStock) return;
+      try {
+        if (!almacenes().length && typeof window.refrescarAlmacenes === 'function') await window.refrescarAlmacenes();
+        if ((needsFreshStock || !productos().length || !almacenes().length) && typeof window.refrescarStockYSelects === 'function') await window.refrescarStockYSelects();
+        else if (!productos().length && typeof window.refrescarProductos === 'function') await window.refrescarProductos();
+      } catch (e) { console.warn('[BattleCruiser] No se pudieron cargar catálogos de transferencia:', e); }
+      poblarSelects(); actualizarStockHint();
+    })();
+    return catalogosRefreshPromise.finally(function () {
+      catalogosRefreshPromise = null;
+    });
   }
   function validarStock(id, amount, source) {
     if (window.__BC_STOCK_CONFIRMED__ === false) {
