@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.81 — Guardado de sabores y usuarios con alias
+// v9.5.82 — Recuperación de catálogos y buscadores
 (function hotfixV9475(){
-  const VERSION="9.5.81";
+  const VERSION="9.5.82";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
