@@ -191,6 +191,23 @@
     });
     window.__BC_MOVIMIENTO_MULTIPLE_REFRESH__ = asegurarCatalogos;
     window.__BC_MOVIMIENTO_MULTIPLE_STATE__ = () => ({ lineas: lineas.map(x => Object.assign({}, x)), enviando });
+    // The movement editor may initialize before Auth restores a saved session.
+    // Retry the catalogue and authoritative stock read after Supabase emits a
+    // session event; never relax RLS or fall back to anon table grants.
+    try {
+      const api = window.client || (typeof client !== 'undefined' ? client : null);
+      if (api && api.auth && typeof api.auth.onAuthStateChange === 'function') {
+        api.auth.onAuthStateChange(function (event, session) {
+          if (!session || !['SIGNED_IN', 'INITIAL_SESSION', 'TOKEN_REFRESHED'].includes(event)) return;
+          window.setTimeout(async function () {
+            try { await asegurarCatalogos(); }
+            finally { poblarSelects(); actualizarStockHint(); }
+          }, 0);
+        });
+      }
+    } catch (error) {
+      console.warn('[BattleCruiser] No se pudo enlazar el refresco de Transferencias con Auth:', error);
+    }
     window.addEventListener('bc:data-changed', function (event) {
       const detail = event.detail || {};
       const domains = detail.domains || [];
