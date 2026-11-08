@@ -51,6 +51,10 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.ok(products.includes("data-mixed-save-configuration"));\n  assert.ok(products.includes("data-mixed-save-feedback"));\n  assert.ok(products.includes("mostrarFeedbackAsignacionMixta"));
   assert.ok(products.includes("bcGuardarConfiguracionSabores"));
   assert.ok(products.includes("restaurarTabConfiguracionSabores"));
+  assert.ok(products.includes("bc-mixed-config-mode"));
+  assert.ok(products.includes('submit.hidden = true'));
+  assert.ok(products.includes('data-mixed-save-feedback'));
+  assert.ok(index.includes("prod-inventario-mixto-settings"));
   assert.ok(detail.includes("returnTo: 'inventario'"));
   assert.match(products, /minimum <= 0/);
   assert.match(products, /nombre: \(row\.querySelector\("\.prod-variante-nombre"\)/);
