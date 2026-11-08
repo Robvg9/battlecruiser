@@ -55,6 +55,10 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.ok(products.includes("restaurarTabConfiguracionSabores"));
   assert.ok(products.includes("bc-mixed-config-mode"));
   assert.ok(products.includes('submit.hidden = true'));
+  assert.ok(products.includes('cancel.textContent = "Volver a Inventario"'));
+  assert.ok(products.includes("if (!snapshotReady)"));
+  assert.ok(products.includes("renderPanelAsignacionMixtaProducto();"));
+  assert.ok(products.includes("return false;"));
   assert.ok(products.includes('data-mixed-save-feedback'));
   assert.ok(index.includes("prod-inventario-mixto-settings"));
   assert.ok(detail.includes("returnTo: 'inventario'"));
