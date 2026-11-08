@@ -128,7 +128,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /inventario-detalle\.js","71"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.match(app, /movimiento-multiple\.js","20261107\.1/);
-  assert.match(index, /productos\.js\?v=20261108\.1/);
+  assert.match(index, /productos\.js\?v=20261108\.2/);
   assert.match(index, /style\.css\?v=9\.5\.81/);
   assert.match(index, /almacenes\.js\?v=20261107\.1/);
   assert.match(index, /app\.js\?v=9\.5\.81/);
@@ -136,13 +136,13 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.81"/);
   for (const asset of [
     "inventario-detalle.js?v=71",
-    "operaciones-financieras.js?v=20261107.3",
-    "aprobaciones-admin.js?v=20261107.3",
+    "operaciones-financieras.js?v=20261108.4",
+    "aprobaciones-admin.js?v=20261108.4",
     "ui-operaciones-hub.js?v=43.1",
-    "almacenes.js?v=20261107.1",
+    "almacenes.js?v=20261108.1",
     "m53-inventario-centro.js?v=53.7",
-    "movimiento-multiple.js?v=20261107.1",
-    "productos.js?v=20261108.1",
+    "movimiento-multiple.js?v=20261108.1",
+    "productos.js?v=20261108.2",
     "compra-multiple.js?v=27.15"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
