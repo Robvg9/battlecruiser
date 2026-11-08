@@ -18,7 +18,7 @@ test("Step 8 release version is aligned across the PWA and Service Worker shell"
   const workerVersion = sw.match(/BC_SW_VERSION = "([^"]+)"/);
   assert.ok(appVersion && workerVersion);
   assert.equal(workerVersion[1], appVersion[1]);
-  assert.ok(index.includes('href="style.css?v=9.5.81"'), "the stylesheet cache key must refresh with the new mixed-inventory configuration UI");
+  assert.ok(index.includes('href="style.css?v=9.5.82"'), "the stylesheet cache key must refresh with the new mixed-inventory configuration UI");
   assert.ok(index.includes('v' + appVersion[1] + ' — BattleCruiser'));
   assert.ok(index.includes('app.js?v=' + appVersion[1]));
   assert.ok(sw.includes("./style.css"));
