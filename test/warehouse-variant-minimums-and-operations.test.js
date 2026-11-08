@@ -139,7 +139,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "operaciones-financieras.js?v=20261108.4",
     "aprobaciones-admin.js?v=20261108.4",
     "ui-operaciones-hub.js?v=43.1",
-    "almacenes.js?v=20261108.1",
+    "almacenes.js?v=20261107.1",
     "m53-inventario-centro.js?v=53.7",
     "movimiento-multiple.js?v=20261108.1",
     "productos.js?v=20261108.2",
