@@ -70,40 +70,9 @@
       catalogosRefreshPromise = null;
     });
   }
-  async function actualizarInventarioConfirmado() {
-    const api = window.client || (typeof client !== 'undefined' ? client : null);
-    if (!navigator.onLine || !api || !api.auth || typeof api.auth.getSession !== 'function') {
-      window.__BC_STOCK_CONFIRMED__ = false;
-      window.__BC_STOCK_ERROR__ = 'No hay conexión o cliente autenticado disponible.';
-      return false;
-    }
-    try {
-      const auth = await api.auth.getSession();
-      if (!auth || auth.error || !auth.data || !auth.data.session ||
-          !auth.data.session.user || !auth.data.session.access_token) {
-        window.__BC_STOCK_CONFIRMED__ = false;
-        window.__BC_STOCK_ERROR__ = 'No hay una sesión autenticada activa.';
-        return false;
-      }
-      if (typeof window.refrescarStockYSelects !== 'function') {
-        window.__BC_STOCK_ERROR__ = 'El actualizador de existencias no está disponible.';
-        return false;
-      }
-      await window.refrescarStockYSelects();
-      if (window.__BC_STOCK_CONFIRMED__ !== true) return false;
-      poblarSelects();
-      actualizarStockHint();
-      return true;
-    } catch (error) {
-      window.__BC_STOCK_CONFIRMED__ = false;
-      window.__BC_STOCK_ERROR__ = error && error.message ? error.message : 'Error al leer Supabase.';
-      return false;
-    }
-  }
   function validarStock(id, amount, source) {
-    if (window.__BC_STOCK_CONFIRMED__ !== true) {
-      const detail = window.__BC_STOCK_ERROR__ ? ' Detalle: ' + String(window.__BC_STOCK_ERROR__) : '';
-      return { ok: false, message: 'No se ha confirmado una lectura reciente del inventario desde Supabase. Actualiza existencias antes de transferir.' + detail };
+    if (window.__BC_STOCK_CONFIRMED__ === false) {
+      return { ok: false, message: 'No se pudo confirmar el inventario actualizado desde Supabase. Actualiza el inventario antes de transferir.' };
     }
     const info = stockDisponible(id, source);
     if (!info) return { ok: true, info: null };
@@ -134,13 +103,7 @@
     if (count) count.textContent = fmt(lineas.length);
     host.querySelectorAll('[data-mov-remove]').forEach(b => b.addEventListener('click', () => { lineas.splice(Number(b.dataset.movRemove), 1); render(); }));
   }
-  async function agregarLinea() {
-    if (window.__BC_STOCK_CONFIRMED__ !== true) {
-      feedback('Actualizando existencias desde Supabase…', true);
-      if (!(await actualizarInventarioConfirmado())) {
-        return feedback('No se pudo confirmar el inventario. ' + (window.__BC_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), false);
-      }
-    }
+  function agregarLinea() {
     const id = selectors.product.value, source = selectors.origin.value, dest = selectors.destination.value;
     const amount = Number(selectors.quantity.value), prod = producto(id);
     if (!source || !dest) return feedback('Selecciona origen y destino.', false);
@@ -159,12 +122,6 @@
     if (!source || !dest) return feedback('Selecciona el origen y el destino.', false);
     if (String(source) === String(dest)) return feedback('El origen y el destino deben ser distintos.', false);
     if (!lineas.length) return feedback('Agrega al menos un producto antes de registrar.', false);
-    if (window.__BC_STOCK_CONFIRMED__ !== true) {
-      feedback('Confirmando el inventario actualizado…', true);
-      if (!(await actualizarInventarioConfirmado())) {
-        return feedback('No se puede registrar la transferencia sin confirmar el inventario. ' + (window.__BC_STOCK_ERROR__ || 'Reintenta la lectura.'), false);
-      }
-    }
     for (const item of lineas) {
       const valid = validarStock(item.producto_id, item.cantidad, source);
       if (!valid.ok) return feedback(item.nombre + ': ' + valid.message, false);
@@ -206,7 +163,6 @@
       '#movimiento-multiple-panel #mov-multiple-add,#movimiento-multiple-panel #mov-multiple-confirmar{background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;border:0}' +
       '#movimiento-multiple-panel .mov-transfer-stock{margin:-3px 0 0;font-size:.72rem;min-height:1em}' +
       '#movimiento-multiple-panel .mov-transfer-stock.is-low{color:#e0a06f}' +
-      '#movimiento-multiple-panel #mov-multiple-refresh-stock{min-height:34px;padding:6px 10px;font-size:.72rem;justify-self:start}' +
       '#movimiento-multiple-panel .mov-transfer-lines-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 0;font-size:.72rem;letter-spacing:.04em}' +
       '#movimiento-multiple-panel .mov-transfer-lines{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow:auto}' +
       '#movimiento-multiple-panel .mov-transfer-line{display:grid;grid-template-columns:minmax(0,1fr) auto 32px;gap:8px;align-items:center;padding:7px 8px;background:var(--void,#0c1c18);border:1px solid rgba(212,176,92,.16);border-radius:7px;font-size:.78rem}' +
@@ -233,7 +189,6 @@
       '<input id="mov-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad a transferir">' +
       '<button type="button" id="mov-multiple-add">+ Agregar</button></div>' +
       '<p id="mov-multiple-stock" class="muted mov-transfer-stock">El stock se valida en el almacén de origen.</p>' +
-      '<button type="button" id="mov-multiple-refresh-stock">Actualizar existencias</button>' +
       '<div class="mov-transfer-lines-head"><strong>PRODUCTOS DE LA TRANSFERENCIA</strong><span><b id="mov-multiple-count">0</b> líneas</span></div>' +
       '<div id="mov-multiple-lineas" class="mov-transfer-lines"></div>' +
       '<div class="mov-transfer-actions"><button type="button" id="mov-multiple-confirmar">Registrar transferencia</button><button type="button" id="mov-multiple-limpiar">Limpiar</button></div>' +
@@ -251,17 +206,6 @@
     });
     selectors.quantity.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); agregarLinea(); } });
     panel.querySelector('#mov-multiple-add').addEventListener('click', agregarLinea);
-    panel.querySelector('#mov-multiple-refresh-stock').addEventListener('click', async function () {
-      const button = this;
-      button.disabled = true;
-      button.textContent = 'Actualizando…';
-      feedback('Leyendo existencias directamente desde Supabase…', true);
-      const ok = await actualizarInventarioConfirmado();
-      button.disabled = false;
-      button.textContent = 'Actualizar existencias';
-      feedback(ok ? '✓ Inventario actualizado y confirmado desde Supabase.' :
-        'No se pudo confirmar el inventario. ' + (window.__BC_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), ok);
-    });
     panel.querySelector('#mov-multiple-confirmar').addEventListener('click', confirmarTransferencia);
     panel.querySelector('#mov-multiple-limpiar').addEventListener('click', function () {
       lineas = []; selectors.quantity.value = ''; feedback('Lista limpiada.', true); render(); actualizarStockHint();

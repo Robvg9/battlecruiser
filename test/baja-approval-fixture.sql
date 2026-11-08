@@ -1,4 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $roles$ BEGIN CREATE ROLE anon; EXCEPTION WHEN duplicate_object THEN NULL; END; $roles$;
+DO $roles$ BEGIN CREATE ROLE authenticated; EXCEPTION WHEN duplicate_object THEN NULL; END; $roles$;
+DO $roles$ BEGIN CREATE ROLE service_role; EXCEPTION WHEN duplicate_object THEN NULL; END; $roles$;
 CREATE SCHEMA auth;
 
 CREATE OR REPLACE FUNCTION auth.uid()
