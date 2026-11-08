@@ -40,6 +40,16 @@ function setup(t) {
     return timers.map((timer) => timer.delay);
   };
   window.clearTimeout = () => {};
+  // These transfer fixtures model an owner already signed in with a
+  // freshly confirmed inventory snapshot. Separate recovery tests explicitly
+  // clear this flag before exercising the retry path.
+  window.client = {
+    auth: {
+      getSession: async () => ({ data: { session: { user: { id: "owner-fixture" } } }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
+    }
+  };
+  window.__BC_STOCK_CONFIRMED__ = true;
   window._cache = {
     productos: [
       { id: "p1", nombre: "Producto 1", activo: true },
@@ -238,6 +248,7 @@ test("Transferencias: recupera catálogos y rellena el panel múltiple al abrir"
   const { window } = setup(t);
   window._cache.productos = [];
   window._cache.almacenes = [];
+  window.__BC_STOCK_CONFIRMED__ = false;
   ["mov-multiple-origen", "mov-multiple-destino", "mov-multiple-producto"].forEach((id) => {
     window.document.getElementById(id).innerHTML = '<option value="">Selecciona…</option>';
   });
