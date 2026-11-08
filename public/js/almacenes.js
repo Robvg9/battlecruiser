@@ -242,7 +242,9 @@ function seleccionarAlmacen(id) {
   }
 }
 
-function cargarStockAlmacenes(force) {
+let _stockCargaForcedPromise = null;
+function cargarStockAlmacenes(force, internalForcedRetry) {
+  if (_stockCargaForcedPromise && !internalForcedRetry) return _stockCargaForcedPromise;
   if (_stockCargaEstado === "loading" && _stockCargaPromise) {
     if (!force) return _stockCargaPromise;
     // If an older read was already in flight at the moment a purchase committed,
@@ -251,9 +253,11 @@ function cargarStockAlmacenes(force) {
     var pendingRead = _stockCargaPromise;
     _cache.stock = [];
     window.__BC_STOCK_CONFIRMED__ = false;
-    return pendingRead.catch(function () { return []; }).then(function () {
-      return cargarStockAlmacenes(true);
-    });
+    if (_stockCargaForcedPromise) return _stockCargaForcedPromise;
+    _stockCargaForcedPromise = pendingRead.catch(function () { return []; }).then(function () {
+      return cargarStockAlmacenes(true, true);
+    }).finally(function () { _stockCargaForcedPromise = null; });
+    return _stockCargaForcedPromise;
   }
   if (_stockCargaEstado === "ok" && !force) {
     renderPanelAlmacenSeleccionado();
@@ -305,6 +309,7 @@ function cargarStockAlmacenes(force) {
       var stock = pair[0];
       _cache.stock = Array.isArray(stock) ? stock : [];
       window.__BC_STOCK_CONFIRMED__ = true;
+      window.__BC_STOCK_ERROR__ = null;
       _stockCargaEstado = "ok";
       _stockCargaError = null;
       try { if (typeof renderResumen === "function") renderResumen(); } catch (e) {}
@@ -314,6 +319,7 @@ function cargarStockAlmacenes(force) {
       window.__BC_STOCK_CONFIRMED__ = false;
       _stockCargaEstado = "error";
       _stockCargaError = (e && e.message) ? e.message : "Error de red";
+      window.__BC_STOCK_ERROR__ = _stockCargaError;
       return [];
     } finally {
       clearTimeout(safetyTimer);
@@ -322,6 +328,10 @@ function cargarStockAlmacenes(force) {
     }
   })();
 
+  if (force && !internalForcedRetry) {
+    _stockCargaForcedPromise = _stockCargaPromise.finally(function () { _stockCargaForcedPromise = null; });
+    return _stockCargaForcedPromise;
+  }
   return _stockCargaPromise;
 }
 
@@ -399,7 +409,7 @@ async function refrescarAlmacenes() {
   return almacenes;
 }
 
-async function refrescarStockYSelects() {
+async function bcRefrescarStockYSelectsInterno() {
   try {
     const { productos } = await refrescarProductos();
     const productosMovimiento = typeof productosOperativos === "function"
@@ -423,6 +433,14 @@ async function refrescarStockYSelects() {
     return [];
   }
   return refreshedStock;
+}
+
+let _bcStockSelectsRefreshPromise = null;
+function refrescarStockYSelects() {
+  if (_bcStockSelectsRefreshPromise) return _bcStockSelectsRefreshPromise;
+  const current = bcRefrescarStockYSelectsInterno();
+  _bcStockSelectsRefreshPromise = current.finally(function () { _bcStockSelectsRefreshPromise = null; });
+  return _bcStockSelectsRefreshPromise;
 }
 
 safeInit("form-almacen", () => {
