@@ -56,20 +56,20 @@ test("inventory detail has a direct route into the flavor and per-warehouse mini
   assert.match(products, /window\.bcAbrirConfiguracionSabores = async function/);
   assert.match(products, /cargarSnapshotAsignacionMixtaProducto\(producto\.id\)/);
   assert.match(products, /mínimo de cada sabor en cada almacén/);
-  assert.match(products, /stock no se repartirá automáticamente/i);
+  assert.match(products, /no se inventará ninguna cantidad/i);
   assert.match(css, /\.bc-inv-flavors-setup/);
   assert.match(css, /white-space: normal/);
 });
 
-test("PWA release and cache manifest are aligned at 9.5.80", () => {
+test("PWA release and cache manifest are aligned at 9.5.81", () => {
   const app = read("public/app.js");
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
-  assert.match(app, /VERSION="9\.5\.80"/);
-  assert.match(index, /app\.js\?v=9\.5\.80/);
-  assert.match(index, /style\.css\?v=9\.5\.80/);
-  assert.match(sw, /BC_SW_VERSION = "9\.5\.80"/);
-  assert.match(sw, /inventario-detalle\.js\?v=70/);
+  assert.match(app, /VERSION="9\.5\.81"/);
+  assert.match(index, /app\.js\?v=9\.5\.81/);
+  assert.match(index, /style\.css\?v=9\.5\.81/);
+  assert.match(sw, /BC_SW_VERSION = "9\.5\.81"/);
+  assert.match(sw, /inventario-detalle\.js\?v=71/);
   assert.match(sw, /aprobaciones-admin\.js\?v=20261107\.3/);
-  assert.match(sw, /productos\.js\?v=20261107\.3/);
+  assert.match(sw, /productos\.js\?v=20261108\.1/);
 });
