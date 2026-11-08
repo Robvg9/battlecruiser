@@ -119,7 +119,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["aprobaciones-admin.js","20261108.4"]'), 'the approval form must refresh');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=71"), 'the offline shell must precache the updated minimum editor');
   assert.ok(index.includes('js/productos.js?v=20261108.2'), 'the product view must refresh its category subscriber');
-  assert.ok(index.includes('js/almacenes.js?v=20261108.1'), 'the warehouse view must refresh its tab subscriber');
+  assert.ok(index.includes('js/almacenes.js?v=20261107.1'), 'the warehouse view must refresh its tab subscriber');
   assert.ok(sw.includes("./js/productos.js?v=20261108.2"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
@@ -190,7 +190,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.81 — Guardado de sabores y usuarios con alias/);
+  assert.match(app, /v9\.5\.82 — Recuperación de catálogos y buscadores/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.81"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.82',
