@@ -45,7 +45,7 @@ function setup(t) {
   // clear this flag before exercising the retry path.
   window.client = {
     auth: {
-      getSession: async () => ({ data: { session: { user: { id: "owner-fixture" } } }, error: null }),
+      getSession: async () => ({ data: { session: { user: { id: "owner-fixture" }, access_token: "test-access-token" } }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
     }
   };
