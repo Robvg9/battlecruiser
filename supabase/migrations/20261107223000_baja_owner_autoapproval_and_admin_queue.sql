@@ -2,6 +2,11 @@
 -- Los usuarios sin ese permiso siguen generando una solicitud PENDIENTE.
 BEGIN;
 
+-- A request key can create at most one Baja per creator, even under concurrent retries.
+CREATE UNIQUE INDEX IF NOT EXISTS bajas_creador_idempotency_key_uidx
+ON public.bajas (creado_por, idempotency_key)
+WHERE idempotency_key IS NOT NULL;
+
 CREATE OR REPLACE FUNCTION public.crear_baja(
   p_almacen_id uuid,
   p_producto_id uuid,
@@ -29,27 +34,6 @@ BEGIN
     RAISE EXCEPTION 'Cantidad y motivo son obligatorios';
   END IF;
 
-  -- A repeated request returns its existing record and never applies stock/FIFO twice.
-  IF p_idempotency_key IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.bajas
-    WHERE idempotency_key = p_idempotency_key AND creado_por = auth.uid()
-  ) THEN
-    SELECT id INTO v_id
-    FROM public.bajas
-    WHERE idempotency_key = p_idempotency_key AND creado_por = auth.uid()
-    LIMIT 1;
-    RETURN v_id;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM public.stock
-    WHERE almacen_id = p_almacen_id
-      AND producto_id = p_producto_id
-      AND cantidad >= p_cantidad
-  ) THEN
-    RAISE EXCEPTION 'Stock insuficiente para solicitar esta baja';
-  END IF;
-
   SELECT nombre INTO v_nombre
   FROM public.usuarios
   WHERE id = auth.uid();
@@ -60,32 +44,57 @@ BEGIN
     public.tiene_permiso('bajas','editar_any')
     OR public.tiene_permiso('auditoria','editar_any');
 
-  -- Stock and FIFO are changed before the insert but inside the same transaction:
-  -- if FIFO or stock validation fails, neither the movement nor the Baja is committed.
-  IF v_auto_aprobar THEN
-    PERFORM public._aplicar_salida_aprobada(p_almacen_id, p_producto_id, p_cantidad);
-  END IF;
-
+  -- Reserve the idempotency key before any stock/FIFO write. A concurrent retry
+  -- waits on the unique index and returns the first transaction's Baja id.
   INSERT INTO public.bajas(
     almacen_id, producto_id, cantidad, motivo, ciclo_id, sesion_id,
-    creado_por, creado_nombre, estado,
-    revisado_por, revisado_nombre, comentario_revision, fecha_revision,
-    idempotency_key
+    creado_por, creado_nombre, estado, idempotency_key
   )
   VALUES(
     p_almacen_id, p_producto_id, p_cantidad, btrim(p_motivo), p_ciclo_id, p_sesion_id,
-    auth.uid(), v_nombre,
-    CASE WHEN v_auto_aprobar THEN 'APROBADA' ELSE 'PENDIENTE' END,
-    CASE WHEN v_auto_aprobar THEN auth.uid() ELSE NULL END,
-    CASE WHEN v_auto_aprobar THEN v_nombre ELSE NULL END,
-    CASE WHEN v_auto_aprobar
-      THEN 'Autoaprobada al registrarse: el creador tiene permiso global de aprobación de Bajas.'
-      ELSE NULL
-    END,
-    CASE WHEN v_auto_aprobar THEN now() ELSE NULL END,
-    p_idempotency_key
+    auth.uid(), v_nombre, 'PENDIENTE', p_idempotency_key
   )
+  ON CONFLICT (creado_por, idempotency_key)
+    WHERE idempotency_key IS NOT NULL
+  DO NOTHING
   RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    SELECT id INTO v_id
+    FROM public.bajas
+    WHERE creado_por = auth.uid()
+      AND idempotency_key = p_idempotency_key
+    LIMIT 1;
+
+    IF v_id IS NULL THEN
+      RAISE EXCEPTION 'No se pudo recuperar la Baja asociada a la clave de idempotencia.';
+    END IF;
+    RETURN v_id;
+  END IF;
+
+  -- The placeholder row and any inventory change are in the same transaction.
+  -- A validation/FIFO failure rolls back the row and the entire operation.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.stock
+    WHERE almacen_id = p_almacen_id
+      AND producto_id = p_producto_id
+      AND cantidad >= p_cantidad
+  ) THEN
+    RAISE EXCEPTION 'Stock insuficiente para solicitar esta baja';
+  END IF;
+
+  IF v_auto_aprobar THEN
+    PERFORM public._aplicar_salida_aprobada(p_almacen_id, p_producto_id, p_cantidad);
+
+    UPDATE public.bajas
+    SET estado = 'APROBADA',
+        revisado_por = auth.uid(),
+        revisado_nombre = v_nombre,
+        comentario_revision = 'Autoaprobada al registrarse: el creador tiene permiso global de aprobación de Bajas.',
+        fecha_revision = now(),
+        actualizado_en = now()
+    WHERE id = v_id;
+  END IF;
 
   RETURN v_id;
 END;
