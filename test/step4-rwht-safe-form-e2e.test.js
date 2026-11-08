@@ -1216,6 +1216,7 @@ test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nu
   };
   const form = c.document.getElementById("form-nuevo-usuario");
   const name = c.document.getElementById("nuevo-usuario-nombre");
+  const username = c.document.getElementById("nuevo-usuario-username");
   const password = c.document.getElementById("nuevo-usuario-password");
   const role = c.document.getElementById("nuevo-usuario-rol");
   const msg = c.document.getElementById("msg-nuevo-usuario");
@@ -1228,11 +1229,12 @@ test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nu
   password.value = "valid-pass-fixture";
   role.value = "role-fixture";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
-  assert.ok(await esperarHasta(() => /usuario es obligatorio/i.test(msg.textContent)),
-    "nombre vacío debe rechazarse");
+  assert.ok(await esperarHasta(() => /nombre completo/i.test(msg.textContent)),
+    "nombre completo vacío debe rechazarse");
   assert.equal(invokes.length, 0, "la validación no debe invocar Edge Function");
 
   name.value = "Usuario fixture";
+  username.value = "usuario-fixture";
   password.value = "123";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
   assert.ok(await esperarHasta(() => /al menos 6 caracteres/i.test(msg.textContent)),
@@ -1247,11 +1249,12 @@ test("Paso 4 RWHT: alta de usuario valida campos y usa Edge Function fixture, nu
   assert.equal(invokes.length, 0, "el rol obligatorio debe validarse antes de invocar");
 
   role.value = "role-fixture";
+  username.value = "usuario-fixture";
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
   assert.ok(await esperarHasta(() => invokes.length === 1), "la alta válida debe invocar el mock una sola vez");
   assert.deepEqual(invokes[0], {
     name: "crear-usuario-sin-email",
-    body: { nombre: "Usuario fixture", password: "valid-pass-fixture", role_id: "role-fixture" }
+    body: { nombre: "Usuario fixture", username: "usuario-fixture", password: "valid-pass-fixture", role_id: "role-fixture" }
   });
   assert.ok(await esperarHasta(() => /Usuario creado correctamente/i.test(msg.textContent)),
     "la UI debe anunciar el éxito de la Edge Function fixture");

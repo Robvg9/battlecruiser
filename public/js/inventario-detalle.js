@@ -90,7 +90,7 @@
           window.alert('No se pudo abrir el configurador de sabores. Actualiza la aplicación e inténtalo de nuevo.');
           return;
         }
-        Promise.resolve(window.bcAbrirConfiguracionSabores(productId)).catch(error => {
+        Promise.resolve(window.bcAbrirConfiguracionSabores(productId, { returnTo: 'inventario' })).catch(error => {
           window.alert(String(error && (error.message || error) || 'No se pudo abrir el configurador de sabores.'));
         });
         return;
@@ -224,7 +224,7 @@
           ? 'existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes'
           : 'Sin almacenes asignados · define un mínimo para comenzar') + '</span>' +
         (canConfigureFlavors
-          ? '<div class="bc-inv-flavors-setup"><p>¿Quieres controlar este producto por sabores? Configura aquí los sabores y el mínimo independiente de cada uno por almacén.</p><button type="button" class="cc-accion" data-bc-configure-flavors data-product-id="' + esc(productId) + '">Configurar sabores y mínimos</button></div>'
+          ? '<div class="bc-inv-flavors-setup"><details><summary>¿Controlar por sabores?</summary><p>Define el stock real y el mínimo independiente de cada sabor en cada almacén.</p></details><button type="button" class="cc-accion" data-bc-configure-flavors data-product-id="' + esc(productId) + '">Configurar sabores y mínimos</button></div>'
           : '') +
       '</div>' +
       '<section class="bc-inv-product-meta" aria-label="Datos del producto">' +

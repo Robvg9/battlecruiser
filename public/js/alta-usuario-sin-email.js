@@ -29,6 +29,12 @@
     document.head.appendChild(s);
   }
 
+  function sugerirUsuarioCorto(nombre) {
+    return String(nombre || '').trim().split(/\s+/)[0]
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 24);
+  }
+
   function ensureFormFields() {
     var form = document.getElementById(FORM_ID);
     if (!form) return null;
@@ -36,25 +42,54 @@
     var email = document.getElementById('nuevo-usuario-email');
     if (email) {
       var wrap = email.closest('label') || email.parentElement;
-      if (wrap && wrap !== form && wrap.querySelectorAll('input').length <= 1) {
-        wrap.remove();
-      } else {
-        email.remove();
-      }
+      if (wrap && wrap !== form && wrap.querySelectorAll('input').length <= 1) wrap.remove();
+      else email.remove();
     }
-    form.querySelectorAll('input[type="email"]').forEach(function (n) {
-      n.remove();
-    });
+    form.querySelectorAll('input[type="email"]').forEach(function (n) { n.remove(); });
 
     var nombre = document.getElementById('nuevo-usuario-nombre');
+    var pass = document.getElementById('nuevo-usuario-password');
     if (nombre) {
-      nombre.placeholder = 'Usuario';
-      nombre.setAttribute('autocomplete', 'off');
+      nombre.placeholder = 'Nombre completo';
+      nombre.setAttribute('aria-label', 'Nombre completo');
+      nombre.setAttribute('autocomplete', 'name');
       nombre.type = 'text';
       nombre.required = true;
+      nombre.maxLength = 120;
     }
 
-    var pass = document.getElementById('nuevo-usuario-password');
+    var username = document.getElementById('nuevo-usuario-username');
+    if (!username) {
+      username = document.createElement('input');
+      username.id = 'nuevo-usuario-username';
+      username.type = 'text';
+      username.required = true;
+      username.maxLength = 24;
+      username.autocomplete = 'username';
+      username.autocapitalize = 'none';
+      username.spellcheck = false;
+      username.setAttribute('aria-label', 'Usuario corto para iniciar sesión');
+      username.placeholder = 'Usuario corto (ej. evelyn)';
+      if (pass && pass.parentNode === form) form.insertBefore(username, pass);
+      else if (nombre && nombre.parentNode === form) nombre.insertAdjacentElement('afterend', username);
+      else form.appendChild(username);
+    }
+
+    if (nombre && nombre.dataset.bcShortUsernameBound !== '1') {
+      nombre.dataset.bcShortUsernameBound = '1';
+      nombre.addEventListener('input', function () {
+        if (username.dataset.manual === '1') return;
+        username.value = sugerirUsuarioCorto(nombre.value);
+      });
+    }
+    if (username.dataset.bcAliasBound !== '1') {
+      username.dataset.bcAliasBound = '1';
+      username.addEventListener('input', function () {
+        username.dataset.manual = '1';
+        username.value = username.value.toLowerCase().replace(/\s+/g, '-');
+      });
+    }
+
     if (pass) {
       pass.placeholder = 'Contraseña (mínimo 6 caracteres)';
       pass.required = true;
@@ -71,11 +106,8 @@
       ph.value = '';
       ph.textContent = 'Seleccionar rol…';
       rol.appendChild(ph);
-      if (pass && pass.parentNode === form) {
-        form.insertBefore(rol, pass.nextSibling);
-      } else {
-        form.appendChild(rol);
-      }
+      if (pass && pass.parentNode === form) form.insertBefore(rol, pass.nextSibling);
+      else form.appendChild(rol);
     }
 
     if (!document.getElementById('nuevo-usuario-cancelar')) {
@@ -88,17 +120,15 @@
         var modal = document.getElementById('ud-modal-crear');
         if (modal) modal.classList.remove('open');
         form.reset();
+        if (username) delete username.dataset.manual;
         setMsg('', false);
       });
       var submit = form.querySelector('button[type="submit"]');
       if (submit) {
         submit.textContent = 'Crear usuario';
         form.insertBefore(cancel, submit);
-      } else {
-        form.appendChild(cancel);
-      }
+      } else form.appendChild(cancel);
     }
-
     return form;
   }
 
@@ -144,11 +174,18 @@
       var passEl = document.getElementById('nuevo-usuario-password');
       var rolEl = document.getElementById('nuevo-usuario-rol');
       var nombre = nombreEl ? nombreEl.value.trim() : '';
+      var usernameEl = document.getElementById('nuevo-usuario-username');
+      var username = usernameEl ? usernameEl.value.trim().toLowerCase() : '';
       var password = passEl ? passEl.value : '';
       var roleId = rolEl ? rolEl.value.trim() : '';
 
-      if (!nombre) {
-        setMsg('El usuario es obligatorio.', false);
+      if (!nombre || nombre.length < 2 || nombre.length > 120) {
+        setMsg('Escribe el nombre completo (entre 2 y 120 caracteres).', false);
+        return;
+      }
+      if (!/^[a-z0-9][a-z0-9._-]{2,23}$/.test(username)) {
+        setMsg('El usuario corto debe tener 3–24 caracteres: letras, números, punto, guion o guion bajo.', false);
+        if (usernameEl) usernameEl.focus();
         return;
       }
       if (!password || password.length < 6) {
@@ -175,7 +212,7 @@
         }
 
         var invoke = await client.functions.invoke('crear-usuario-sin-email', {
-          body: { nombre: nombre, password: password, role_id: roleId },
+          body: { nombre: nombre, username: username, password: password, role_id: roleId },
         });
 
         var data = invoke.data;
@@ -208,8 +245,9 @@
           return;
         }
 
-        setMsg('Usuario creado correctamente.', true);
+        setMsg('Usuario creado correctamente. Puede iniciar sesión con: ' + (data.username || username), true);
         form.reset();
+        if (usernameEl) delete usernameEl.dataset.manual;
         poblarRoles();
         if (typeof refrescarUsuarios === 'function') await refrescarUsuarios();
         setTimeout(function () {
