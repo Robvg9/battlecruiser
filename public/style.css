@@ -1086,3 +1086,7 @@ textarea:focus-visible {
 .bc-product-select-search-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;width:100%;min-width:0}
 .bc-product-select-search{box-sizing:border-box;width:100%;min-width:0;min-height:34px;padding:7px 9px;border:1px solid rgba(212,176,92,.24);border-radius:7px;background:rgba(0,0,0,.18);color:var(--mist);font:inherit;font-size:12px}
 .bc-product-select-no-results{color:var(--mist);font-size:10px;line-height:1.25}
+
+/* Keep the only flavor save actions visible while the allocation panel scrolls. */
+.bc-mixed-assignment-actions{position:sticky;bottom:0;z-index:5;display:flex;gap:7px;flex-wrap:wrap;padding:8px 0 max(8px,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(16,28,40,0),rgba(16,28,40,.98) 24%);backdrop-filter:blur(8px)}
+.bc-mixed-assignment-actions button{flex:1 1 130px;min-height:38px}
