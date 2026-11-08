@@ -40,6 +40,21 @@
   }
   async function asegurarCatalogos() {
     poblarSelects();
+    const api = window.client || (typeof client !== 'undefined' ? client : null);
+    if (!api || !api.auth || typeof api.auth.getSession !== 'function') {
+      window.__BC_STOCK_CONFIRMED__ = false;
+      return;
+    }
+    try {
+      const authState = await api.auth.getSession();
+      if (!authState || authState.error || !authState.data || !authState.data.session || !authState.data.session.user) {
+        window.__BC_STOCK_CONFIRMED__ = false;
+        return;
+      }
+    } catch (_) {
+      window.__BC_STOCK_CONFIRMED__ = false;
+      return;
+    }
     const needsFreshStock = navigator.onLine && window.__BC_STOCK_CONFIRMED__ !== true;
     if (almacenes().length && productos().length && !needsFreshStock) return;
     try {
