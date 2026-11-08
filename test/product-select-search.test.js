@@ -34,7 +34,7 @@ test("product search filters static and dynamically inserted product selects wit
       "the existing sale product search is not duplicated");
 
     const host = dom.window.document.createElement("div");
-    host.innerHTML = '<select class="rein-prod"><option value="">Producto</option><option value="a">Refresco</option></select>';
+    host.innerHTML = '<select id="mov-multiple-producto"><option value="">Producto</option><option value="a">Refresco</option></select>';
     dom.window.document.body.appendChild(host);
     await new Promise(resolve => dom.window.setTimeout(resolve, 0));
     assert.ok(host.querySelector(".bc-product-select-search"), "dynamic operations pickers also receive search");
