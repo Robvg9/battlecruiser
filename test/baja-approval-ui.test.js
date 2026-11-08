@@ -13,9 +13,13 @@ test("Baja approval migration auto-approves only creators with global approval a
   assert.match(sql, /tiene_permiso\('bajas','editar_any'\)/);
   assert.match(sql, /tiene_permiso\('auditoria','editar_any'\)/);
   assert.match(sql, /_aplicar_salida_aprobada\(p_almacen_id, p_producto_id, p_cantidad\)/);
-  assert.match(sql, /CASE WHEN v_auto_aprobar THEN 'APROBADA' ELSE 'PENDIENTE' END/);
-  assert.match(sql, /CASE WHEN v_auto_aprobar THEN auth\.uid\(\) ELSE NULL END/);
+  assert.match(sql, /VALUES\([\s\S]*'PENDIENTE', p_idempotency_key\)/);
+  assert.match(sql, /UPDATE public\.bajas[\s\S]*SET estado = 'APROBADA'/);
+  assert.match(sql, /revisado_por = auth\.uid\(\)/);
+  assert.match(sql, /fecha_revision = now\(\)/);
   assert.match(sql, /p_idempotency_key/);
+  assert.ok(sql.indexOf('INSERT INTO public.bajas(') < sql.indexOf('PERFORM public._aplicar_salida_aprobada('));
+  assert.ok(sql.indexOf('PERFORM public._aplicar_salida_aprobada(') < sql.indexOf("SET estado = 'APROBADA'"));
   assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS bajas_creador_idempotency_key_uidx/);
   assert.match(sql, /ON CONFLICT \(creado_por, idempotency_key\)/);
   assert.match(sql, /WHERE idempotency_key IS NOT NULL/);
