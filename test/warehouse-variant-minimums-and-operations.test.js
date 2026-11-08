@@ -125,7 +125,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /ui-operaciones-hub\.js","43\.1/);
   assert.match(app, /operaciones-financieras\.js","20261107\.3/);
   assert.match(app, /aprobaciones-admin\.js","20261107\.3/);
-  assert.match(app, /inventario-detalle\.js","70"/);
+  assert.match(app, /inventario-detalle\.js","71"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.match(app, /movimiento-multiple\.js","20261107\.1/);
   assert.match(index, /productos\.js\?v=20261108\.1/);
