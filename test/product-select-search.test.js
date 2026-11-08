@@ -30,7 +30,7 @@ test("product search filters static and dynamically inserted product selects wit
     assert.equal(select.options[1].value, "juice", "filtering keeps original option IDs");
     assert.equal(dom.window.document.querySelector("#prod-categoria").parentElement.querySelector(".bc-product-select-search"), null,
       "category selector is not treated as a product selector");
-    assert.equal(dom.window.document.querySelector("#venta-producto").parentElement.querySelector(".bc-product-select-search"), null,
+    assert.equal(dom.window.document.querySelector("#venta-producto").closest(".bc-product-select-search-wrap"), null,
       "the existing sale product search is not duplicated");
 
     const host = dom.window.document.createElement("div");
