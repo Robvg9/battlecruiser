@@ -308,3 +308,16 @@ test("native Add opens the single M26 modal and preserves the existing product c
  assert.equal(c.getAddClickRegistrations(),1,"initialization retries must not duplicate the Add handler");
  assert.equal(c.getFormSubmitRegistrations(),2,"initialization retries must not duplicate submit handlers");
 });
+
+test("Inventory flavor setup opens the M26 modal and exposes the nested controls", () => {
+  const products = read("public/js/productos.js");
+  const modal = read("public/js/m26-ui-integridad.js");
+  const css = read("public/style.css");
+  assert.match(products, /__BCM26_openProductModal\(\)/);
+  assert.match(products, /__BCM26_setCommercialOptionsExpanded\(true\)/);
+  assert.match(products, /data-mixed-cancel-configuration/);
+  assert.match(modal, /form\.appendChild\(commercial\)/);
+  assert.match(modal, /commercialFields\.appendChild\(mixedSettings\)/);
+  assert.match(css, /#form-producto\.bc-mixed-config-mode \.bc-product-commercial-settings/);
+  assert.match(css, /#form-producto\.bc-mixed-config-mode #prod-inventario-mixto-settings/);
+});

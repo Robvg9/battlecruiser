@@ -544,7 +544,7 @@ async function cargarSnapshotAsignacionMixtaProducto(productoId) {
     if (panel) {
       panel.hidden = false;
       panel.classList.remove("hidden");
-      panel.innerHTML = '<p class="bc-mixed-assignment-error">No se pudo consultar el inventario actual. No guardes la conversión hasta poder revisar los saldos y lotes de cada almacén.</p>';
+      panel.innerHTML = '<div class="bc-mixed-assignment-error-wrap"><p class="bc-mixed-assignment-error">No se pudo consultar el inventario actual. No guardes la conversión hasta poder revisar los saldos y lotes de cada almacén.</p><button type="button" class="cc-accion" data-mixed-cancel-configuration>Volver a Inventario</button></div>';
     }
     setMsg("msg-productos", "No se pudo preparar la conversión de sabores: " + explicarError(error, "consultar inventario"), false);
     return null;
@@ -563,6 +563,16 @@ function capturarCamposAsignacionMixtaProducto() {
 }
 
 function renderPanelAsignacionMixtaProducto() {
+  const stablePanel = document.getElementById("prod-variantes-asignacion");
+  if (stablePanel && !stablePanel.dataset.bcReturnHandler) {
+    stablePanel.dataset.bcReturnHandler = "1";
+    stablePanel.addEventListener("click", event => {
+      if (event.target.closest("[data-mixed-cancel-configuration]")) {
+        event.preventDefault();
+        window.bcSalirConfiguracionSabores();
+      }
+    });
+  }
   const panel = document.getElementById("prod-variantes-asignacion");
   const toggle = document.getElementById("prod-inventario-mixto");
   if (!panel) return;
@@ -576,7 +586,7 @@ function renderPanelAsignacionMixtaProducto() {
   if (!snapshot) {
     panel.hidden = false;
     panel.classList.remove("hidden");
-    panel.innerHTML = '<p class="bc-mixed-assignment-error">Aún no se ha podido verificar el inventario actual. Vuelve a abrir el producto o actualiza los catálogos.</p>';
+    panel.innerHTML = '<div class="bc-mixed-assignment-error-wrap"><p class="bc-mixed-assignment-error">Aún no se ha podido verificar el inventario actual. Vuelve a abrir el producto o actualiza los catálogos.</p><button type="button" class="cc-accion" data-mixed-cancel-configuration>Volver a Inventario</button></div>';
     return;
   }
   const previous = capturarCamposAsignacionMixtaProducto();
@@ -596,7 +606,7 @@ function renderPanelAsignacionMixtaProducto() {
   if (!warehouses.length) {
     panel.hidden = false;
     panel.classList.remove("hidden");
-    panel.innerHTML = '<p class="bc-mixed-assignment-error">No hay almacenes activos ni asignaciones históricas que se puedan configurar.</p>';
+    panel.innerHTML = '<div class="bc-mixed-assignment-error-wrap"><p class="bc-mixed-assignment-error">No hay almacenes activos ni asignaciones históricas que se puedan configurar.</p><button type="button" class="cc-accion" data-mixed-cancel-configuration>Volver a Inventario</button></div>';
     return;
   }
 
@@ -781,6 +791,9 @@ function restaurarTabConfiguracionSabores() {
 }
 window.bcSalirConfiguracionSabores = function () {
   cancelarEdicionProducto();
+  if (typeof window.__BCM26_closeProductModal === "function") window.__BCM26_closeProductModal(false);
+  const form = document.getElementById("form-producto");
+  if (form) form.classList.remove("bc-mixed-config-mode");
   restaurarTabConfiguracionSabores();
 };
 
@@ -841,6 +854,9 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
   mostrarFeedbackAsignacionMixta("✓ Guardado y verificado en Supabase.", true);
   setMsg("msg-productos", "✓ Inventario por sabores guardado y verificado en el servidor.", true);
   cancelarEdicionProducto();
+  if (typeof window.__BCM26_closeProductModal === "function") window.__BCM26_closeProductModal(false);
+  const compactForm = document.getElementById("form-producto");
+  if (compactForm) compactForm.classList.remove("bc-mixed-config-mode");
   if (typeof refrescarProductos === "function") await refrescarProductos();
   if (typeof window.bcNotificarCambioDatos === "function") window.bcNotificarCambioDatos("producto", false);
   restaurarTabConfiguracionSabores();
@@ -940,6 +956,8 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
     }
   }
   await iniciarEdicionProducto(producto);
+  if (typeof window.__BCM26_openProductModal === "function") window.__BCM26_openProductModal();
+  if (typeof window.__BCM26_setCommercialOptionsExpanded === "function") window.__BCM26_setCommercialOptionsExpanded(true);
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
   if (toggle && !toggle.checked) toggle.checked = true;
