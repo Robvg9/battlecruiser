@@ -1072,3 +1072,9 @@ textarea:focus-visible {
   white-space: normal;
   text-align: center;
 }
+
+
+/* Search inside product pickers without changing the underlying select contract. */
+.bc-product-select-search-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;width:100%;min-width:0}
+.bc-product-select-search{box-sizing:border-box;width:100%;min-width:0;min-height:34px;padding:7px 9px;border:1px solid rgba(212,176,92,.24);border-radius:7px;background:rgba(0,0,0,.18);color:var(--mist);font:inherit;font-size:12px}
+.bc-product-select-no-results{color:var(--mist);font-size:10px;line-height:1.25}
