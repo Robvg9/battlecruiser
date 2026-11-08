@@ -16,6 +16,9 @@ test("Baja approval migration auto-approves only creators with global approval a
   assert.match(sql, /CASE WHEN v_auto_aprobar THEN 'APROBADA' ELSE 'PENDIENTE' END/);
   assert.match(sql, /CASE WHEN v_auto_aprobar THEN auth\.uid\(\) ELSE NULL END/);
   assert.match(sql, /p_idempotency_key/);
+  assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS bajas_creador_idempotency_key_uidx/);
+  assert.match(sql, /ON CONFLICT \(creado_por, idempotency_key\)/);
+  assert.match(sql, /WHERE idempotency_key IS NOT NULL/);
 });
 
 test("admin approval RPC returns pending Bajas only to users authorized to approve them", () => {
