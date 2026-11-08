@@ -24,11 +24,11 @@ function select(id,label,items){return '<label class="field"><span>'+label+'</sp
 let formsLoading=false;
 async function ensureForms(){
   const tab=document.getElementById('tab-operacion');
-  if(!tab||(!can('gastos','crear')&&!can('bajas','crear'))||!(await hasLiveSession()))return;
+  if(!tab||!can('gastos','crear')||!(await hasLiveSession()))return;
   let block=document.getElementById('admin-solicitudes');
   if(!block){
     block=document.createElement('div');block.className='cc-bloque';block.id='admin-solicitudes';
-    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos quedan pendientes. Las bajas se aprueban automáticamente cuando quien las registra tiene permiso global para aprobarlas; las demás esperan revisión administrativa.</p><div class="admin-sol-grid"></div>';
+    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos quedan pendientes de revisión administrativa.</p><div class="admin-sol-grid"></div>';
     tab.insertBefore(block,tab.firstChild);
   }
   const grid=block.querySelector('.admin-sol-grid');

@@ -21,6 +21,7 @@
     host = document.createElement('section');
     host.id = 'bc-bajas-multiple-host';
     host.className = 'cc-bloque bc-bajas-multiple';
+    host.hidden = true;
     host.innerHTML =
       '<h3>📉 Lista de bajas</h3>' +
       '<p class="bc-bajas-intro">Agrega varios productos de un mismo almacén y envía toda la lista en una sola operación. Las solicitudes normales quedan pendientes de revisión; el inventario y FIFO solo cambian cuando se aprueban.</p>' +
@@ -202,5 +203,18 @@
       });
     }
   } catch (_) { /* activating the Operations tab retries catalog loading */ }
+  window.abrirBajasMultiple = async function () {
+    if (!canCreate()) return false;
+    const host = ensureUI();
+    if (!host) return false;
+    host.hidden = false;
+    host.style.display = 'block';
+    await loadCatalogs(true);
+    if (typeof host.scrollIntoView === 'function') host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const warehouse = document.getElementById('bc-bajas-warehouse');
+    if (warehouse) warehouse.focus({ preventScroll: true });
+    return true;
+  };
   window.refrescarBajasMultiple = () => loadCatalogs(true);
+  window.setTimeout(() => start(false), 1300);
 })();
