@@ -112,15 +112,15 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.13'));
   assert.ok(app.includes('["m51-movimientos-centro.js","51.10"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.10"), 'the offline shell must precache the refreshed movement listener');
-  assert.ok(app.includes('["inventario-detalle.js","70"]'), 'the minimum editor must refresh');
+  assert.ok(app.includes('["inventario-detalle.js","71"]'), 'the minimum editor must refresh');
   assert.ok(app.includes('["m53-inventario-centro.js","53.7"]'), 'M53 must refresh for pending minimum status');
   assert.ok(app.includes('["ui-operaciones-hub.js","43.1"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261107.3"]'), 'the finance operations form must refresh');
   assert.ok(app.includes('["aprobaciones-admin.js","20261107.3"]'), 'the approval form must refresh');
-  assert.ok(sw.includes("./js/inventario-detalle.js?v=70"), 'the offline shell must precache the updated minimum editor');
-  assert.ok(index.includes('js/productos.js?v=20261107.3'), 'the product view must refresh its category subscriber');
+  assert.ok(sw.includes("./js/inventario-detalle.js?v=71"), 'the offline shell must precache the updated minimum editor');
+  assert.ok(index.includes('js/productos.js?v=20261108.1'), 'the product view must refresh its category subscriber');
   assert.ok(index.includes('js/almacenes.js?v=20261107.1'), 'the warehouse view must refresh its tab subscriber');
-  assert.ok(sw.includes("./js/productos.js?v=20261107.3"), 'the product view must refresh offline');
+  assert.ok(sw.includes("./js/productos.js?v=20261108.1"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
@@ -137,8 +137,8 @@ test('movement operations load multi-product transfer before the compact modal',
 
 // PWA 9.5.81 uses warehouse-specific movement summary windows and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.80["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.80["']/);
+  assert.match(app, /const VERSION=["']9\.5\.81["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.81["']/);
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
@@ -154,7 +154,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.80["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.81["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261105\.4/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.2/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -190,8 +190,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261020\.4"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261020\.4/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.80 — Aprobaciones de Baja, accesos a sabores y mínimos/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.80"><\/script>/);
+  assert.match(app, /v9\.5\.81 — Aprobaciones de Baja, accesos a sabores y mínimos/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.81"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.81',
     'js/centro-control.js?v=9.5.70',
@@ -222,7 +222,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.80['"]\);/);
+  assert.match(m68, /const VER = String\(window\.__BC_VERSION__ \|\| ['"]9\.5\.81['"]\);/);
 });
 
 
@@ -272,8 +272,8 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.13"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.13/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.80["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.80["']/);
+  assert.match(app, /const VERSION=["']9\.5\.81["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.81["']/);
 });
 
 
