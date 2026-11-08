@@ -56,6 +56,12 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.ok(products.includes("bc-mixed-config-mode"));
   assert.ok(products.includes('submit.hidden = true'));
   assert.ok(products.includes('cancel.textContent = "Volver a Inventario"'));
+  const flavorOpen = products.indexOf("window.bcAbrirConfiguracionSabores = async function");
+  const safeExit = products.indexOf("cancel.hidden = false", flavorOpen);
+  const editorWait = products.indexOf("await iniciarEdicionProducto(producto);", flavorOpen);
+  assert.ok(safeExit > flavorOpen && safeExit < editorWait, "return action must be visible before the snapshot wait");
+  assert.ok(products.includes("form.classList.remove(\"bc-mixed-config-mode\")"));
+  assert.ok(products.includes("restaurarTabConfiguracionSabores();"));
   assert.ok(products.includes("if (!snapshotReady)"));
   assert.ok(products.includes("renderPanelAsignacionMixtaProducto();"));
   assert.ok(products.includes("return false;"));
