@@ -1019,35 +1019,43 @@ textarea:focus-visible {
 
 
 /* Mixed inventory conversion: manual flavor allocation and per-warehouse minima. */
-.prod-variantes-asignacion { display:grid; gap:12px; margin:12px 0 4px; padding:12px; border:1px solid rgba(212,176,92,.28); border-radius:12px; background:rgba(16,28,40,.72); }
+.prod-variantes-asignacion { display:grid; gap:8px; margin:8px 0 3px; padding:9px; border:1px solid rgba(212,176,92,.24); border-radius:10px; background:rgba(16,28,40,.72); }
 .bc-mixed-assignment-heading strong { display:block; color:var(--gold,var(--mist)); font-size:14px; }
-.bc-mixed-assignment-heading p,.bc-mixed-assignment-note p,.bc-mixed-assignment-footnote { margin:5px 0 0; color:var(--mist); font-size:12px; line-height:1.45; }
+.bc-mixed-assignment-heading p,.bc-mixed-assignment-note p,.bc-mixed-assignment-footnote { margin:3px 0 0; color:var(--mist); font-size:11px; line-height:1.35; }
 .bc-mixed-assignment-note { padding:10px; border-radius:8px; background:rgba(212,176,92,.08); }
 .bc-mixed-assignment-note strong { color:var(--gold,var(--mist)); font-size:12px; }
-.bc-mixed-assignment-warehouse { min-width:0; padding:11px; border:1px solid rgba(255,255,255,.12); border-radius:9px; background:rgba(255,255,255,.025); }
+.bc-mixed-assignment-warehouse { min-width:0; padding:8px; border:1px solid rgba(255,255,255,.12); border-radius:8px; background:rgba(255,255,255,.025); }
 .bc-mixed-assignment-warehouse-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
 .bc-mixed-assignment-warehouse-heading strong { min-width:0; color:var(--mist); font-size:13px; }
 .bc-mixed-assignment-warehouse-heading span { color:var(--muted,var(--mist)); font-size:10px; }
 .bc-mixed-assignment-meta { margin:4px 0 9px; color:var(--mist); font-size:11px; line-height:1.4; }
-.bc-mixed-assignment-flavors { display:grid; gap:8px; }
-.bc-mixed-assignment-flavor { display:grid; grid-template-columns:minmax(0,1fr) repeat(2,minmax(90px,.8fr)); align-items:end; gap:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,.1); }
+.bc-mixed-assignment-flavors { display:grid; gap:5px; }
+.bc-mixed-assignment-flavor { display:grid; grid-template-columns:minmax(0,1fr) repeat(2,minmax(90px,.8fr)); align-items:end; gap:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,.1); }
 .bc-mixed-assignment-flavor > strong { align-self:center; color:var(--mist); font-size:12px; }
 .bc-mixed-assignment-flavor label { display:grid; gap:4px; color:var(--mist); font-size:10px; }
-.bc-mixed-assignment-flavor input { width:100%; min-width:0; min-height:38px; padding:7px; border:1px solid rgba(212,176,92,.28); border-radius:7px; background:rgba(0,0,0,.18); color:var(--mist); font:inherit; font-size:12px; }
+.bc-mixed-assignment-flavor input { width:100%; min-width:0; min-height:34px; padding:6px 7px; border:1px solid rgba(212,176,92,.24); border-radius:6px; background:rgba(0,0,0,.18); color:var(--mist); font:inherit; font-size:12px; }
 .bc-mixed-assignment-flavor input[readonly] { opacity:.7; }
-.bc-mixed-assignment-total { margin-top:9px; color:var(--mist); font-size:11px; font-weight:600; }
+.bc-mixed-assignment-total { margin-top:6px; color:var(--mist); font-size:10px; font-weight:600; }
 .bc-mixed-assignment-total.is-valid { color:#5bd39b; }
 .bc-mixed-assignment-total.is-invalid { color:#f0b66c; }
-.bc-mixed-assignment-confirm { display:flex; align-items:flex-start; gap:9px; padding:10px; border:1px solid rgba(212,176,92,.32); border-radius:8px; color:var(--mist); font-size:11px; line-height:1.45; }
+.bc-mixed-assignment-confirm { display:flex; align-items:flex-start; gap:8px; padding:8px; border:1px solid rgba(212,176,92,.28); border-radius:7px; color:var(--mist); font-size:10px; line-height:1.35; }
 .bc-mixed-assignment-confirm input { flex:0 0 auto; margin-top:2px; }
-.bc-mixed-assignment-error { margin:6px 0; padding:8px; border-left:3px solid #e2a65f; background:rgba(226,166,95,.09); color:var(--mist); font-size:11px; line-height:1.4; }
+.bc-mixed-assignment-error { margin:5px 0; padding:7px; border-left:3px solid #e2a65f; background:rgba(226,166,95,.09); color:var(--mist); font-size:10px; line-height:1.35; }
 .bc-mixed-assignment-loading { color:var(--mist); font-size:12px; }
 .bc-mixed-assignment-footnote { font-size:10px; opacity:.86; }
 @media (max-width:520px) {
-  .prod-variantes-asignacion { padding:9px; }
-  .bc-mixed-assignment-flavor { grid-template-columns:1fr 1fr; }
+  .prod-variantes-asignacion { padding:7px; gap:7px; }
+  .bc-mixed-assignment-flavor { grid-template-columns:1fr 1fr; gap:5px; }
   .bc-mixed-assignment-flavor > strong { grid-column:1 / -1; }
 }
+.bc-mixed-assignment-help { margin:0; }
+.bc-mixed-assignment-help summary { color:var(--gold,var(--mist)); font-size:10px; cursor:pointer; }
+.bc-mixed-assignment-help-content { display:grid; gap:3px; padding:5px 7px; border-left:2px solid rgba(212,176,92,.28); }
+.bc-mixed-assignment-help-content p { margin:0; color:var(--mist); font-size:10px; line-height:1.35; }
+.bc-mixed-assignment-save-feedback { min-height:0; margin:0; color:var(--mist); font-size:10px; line-height:1.35; }
+.bc-mixed-assignment-save-feedback:empty { display:none; }
+.bc-mixed-assignment-save-feedback.is-error { color:#f0b66c; }
+.bc-mixed-assignment-save-feedback.is-success { color:#5bd39b; }
 
 
 /* Inventario: acceso directo a configuración de sabores y mínimos por almacén. */
@@ -1072,3 +1080,18 @@ textarea:focus-visible {
   white-space: normal;
   text-align: center;
 }
+
+
+/* Search inside product pickers without changing the underlying select contract. */
+.bc-product-select-search-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;width:100%;min-width:0}
+.bc-product-select-search{box-sizing:border-box;width:100%;min-width:0;min-height:34px;padding:7px 9px;border:1px solid rgba(212,176,92,.24);border-radius:7px;background:rgba(0,0,0,.18);color:var(--mist);font:inherit;font-size:12px}
+.bc-product-select-no-results{color:var(--mist);font-size:10px;line-height:1.25}
+
+/* Keep the only flavor save actions visible while the allocation panel scrolls. */
+.bc-mixed-assignment-actions{position:sticky;bottom:0;z-index:5;display:flex;gap:7px;flex-wrap:wrap;padding:8px 0 max(8px,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(16,28,40,0),rgba(16,28,40,.98) 24%);backdrop-filter:blur(8px)}
+.bc-mixed-assignment-actions button{flex:1 1 130px;min-height:38px}
+
+/* Inventory opens a focused flavor-only mode instead of the full product editor. */
+#form-producto.bc-mixed-config-mode>:not(#prod-inventario-mixto-settings):not(#prod-submit-btn):not(#prod-cancelar-edicion):not(#prod-editando-id){display:none!important}
+#form-producto.bc-mixed-config-mode{gap:0}
+#form-producto.bc-mixed-config-mode #prod-inventario-mixto-settings{margin:0}

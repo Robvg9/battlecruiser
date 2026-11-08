@@ -40,6 +40,16 @@ function setup(t) {
     return timers.map((timer) => timer.delay);
   };
   window.clearTimeout = () => {};
+  // These transfer fixtures model an owner already signed in with a
+  // freshly confirmed inventory snapshot. Separate recovery tests explicitly
+  // clear this flag before exercising the retry path.
+  window.client = {
+    auth: {
+      getSession: async () => ({ data: { session: { user: { id: "owner-fixture" } } }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
+    }
+  };
+  window.__BC_STOCK_CONFIRMED__ = true;
   window._cache = {
     productos: [
       { id: "p1", nombre: "Producto 1", activo: true },
@@ -151,7 +161,7 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   assert.notEqual(multiple, -1, "app.js debe cargar el módulo de transferencias múltiples");
   assert.ok(multiple < modal, "el panel múltiple debe existir antes de inicializar el modal");
   assert.ok(modal < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
-  assert.match(sw, /movimiento-multiple\.js\?v=20261107\.1/);
+  assert.match(sw, /movimiento-multiple\.js\?v=20261108\.1/);
 });test("Transferencias: añadir varios productos registra una sola operación con todas las líneas", async (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="transferencias"]').click();
@@ -238,6 +248,7 @@ test("Transferencias: recupera catálogos y rellena el panel múltiple al abrir"
   const { window } = setup(t);
   window._cache.productos = [];
   window._cache.almacenes = [];
+  window.__BC_STOCK_CONFIRMED__ = false;
   ["mov-multiple-origen", "mov-multiple-destino", "mov-multiple-producto"].forEach((id) => {
     window.document.getElementById(id).innerHTML = '<option value="">Selecciona…</option>';
   });
@@ -249,14 +260,17 @@ test("Transferencias: recupera catálogos y rellena el panel múltiple al abrir"
   window.refrescarStockYSelects = async () => {
     productLoads++;
     window._cache.productos = [{ id: "p1", nombre: "Producto 1", activo: true }];
+    window.__BC_STOCK_CONFIRMED__ = true;
   };
   window.document.querySelector('[data-bc165="transferencias"]').click();
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(warehouseLoads, 1);
   assert.equal(productLoads, 1);
-  assert.equal(window.document.querySelectorAll("#mov-multiple-origen option[value='a']").length, 1);
-  assert.equal(window.document.querySelectorAll("#mov-multiple-destino option[value='b']").length, 1);
-  assert.equal(window.document.querySelectorAll("#mov-multiple-producto option[value='p1']").length, 1);
+  const activePanel = window.document.querySelector("#bc165-overlay #movimiento-multiple-panel");
+  assert.ok(activePanel, "el modal debe conservar un único panel de transferencia activo");
+  assert.equal(activePanel.querySelectorAll("#mov-multiple-origen option[value='a']").length, 1);
+  assert.equal(activePanel.querySelectorAll("#mov-multiple-destino option[value='b']").length, 1);
+  assert.equal(activePanel.querySelectorAll("#mov-multiple-producto option[value='p1']").length, 1);
   const feedback = window.document.querySelector(".bc165-feedback");
   assert.ok(!feedback || feedback.hidden || !feedback.textContent);
 });test("Transferencias: sin catálogos presenta el panel y explica el bloqueo sin habilitar el formulario individual", async (t) => {

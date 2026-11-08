@@ -629,8 +629,8 @@ function renderPanelAsignacionMixtaProducto() {
       '</div>';
     }).join("");
     const genericInfo = mixed
-      ? '<p class="bc-mixed-assignment-meta">Inventario mixto ya activo · cantidades existentes protegidas.</p>'
-      : '<p class="bc-mixed-assignment-meta">Stock genérico: <strong>' + fmtQtyProducto(genericStock) + '</strong> · Lotes FIFO abiertos: <strong>' + fmtQtyProducto(lotCount) + '</strong> · Unidades en lotes: <strong>' + fmtQtyProducto(fifoQty) + '</strong></p>';
+      ? '<p class="bc-mixed-assignment-meta">Cantidades actuales protegidas · mínimos editables.</p>'
+      : '<p class="bc-mixed-assignment-meta">Stock: <strong>' + fmtQtyProducto(genericStock) + '</strong> · FIFO: ' + fmtQtyProducto(fifoQty) + ' (' + fmtQtyProducto(lotCount) + ' capas)</p>';
     const integrity = coherent
       ? ""
       : '<p class="bc-mixed-assignment-error">El stock físico y las cantidades restantes de los lotes FIFO no coinciden. Este almacén debe reconciliarse antes de convertir.</p>';
@@ -686,6 +686,15 @@ function actualizarTotalesPanelAsignacionMixta() {
   });
 }
 
+function mostrarFeedbackAsignacionMixta(message, success) {
+  const panel = document.getElementById("prod-variantes-asignacion");
+  const feedback = panel && panel.querySelector("[data-mixed-save-feedback]");
+  if (!feedback) return;
+  feedback.textContent = message || "";
+  feedback.classList.toggle("is-error", !!message && !success);
+  feedback.classList.toggle("is-success", !!message && !!success);
+}
+
 safeInit("prod-variantes-asignacion", () => {
   const panel = document.getElementById("prod-variantes-asignacion");
   if (!panel) return;
@@ -698,11 +707,13 @@ safeInit("prod-variantes-asignacion", () => {
       save.disabled = true;
       const original = save.textContent;
       save.textContent = "Guardando...";
+      mostrarFeedbackAsignacionMixta("Guardando y verificando en Supabase…", true);
       try {
         await window.bcGuardarConfiguracionSabores();
       } catch (error) {
-        setMsg("msg-productos", "No se guardó la configuración. Tus datos siguen en pantalla: " +
-          explicarError(error, "guardar inventario por sabores"), false);
+        const detail = explicarError(error, "guardar inventario por sabores");
+        mostrarFeedbackAsignacionMixta("No se guardó: " + detail + " · Los datos siguen en pantalla.", false);
+        setMsg("msg-productos", "No se guardó la configuración. Tus datos siguen en pantalla: " + detail, false);
       } finally {
         if (save.isConnected) {
           save.disabled = false;
@@ -789,7 +800,10 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
     throw new Error("Añade al menos un sabor y utiliza nombres únicos de hasta 80 caracteres.");
   }
   const prepared = prepararAsignacionesMixtasProducto(variants);
-  if (!prepared.ok) throw new Error(prepared.error);
+  if (!prepared.ok) {
+    mostrarFeedbackAsignacionMixta(prepared.error, false);
+    throw new Error(prepared.error);
+  }
   const result = await client.rpc("configurar_producto_inventario_mixto_con_asignaciones", {
     p_producto_id: targetId,
     p_habilitar: true,
@@ -824,6 +838,7 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
   }
 
   _productoMixtoSnapshot = snapshot;
+  mostrarFeedbackAsignacionMixta("✓ Guardado y verificado en Supabase.", true);
   setMsg("msg-productos", "✓ Inventario por sabores guardado y verificado en el servidor.", true);
   cancelarEdicionProducto();
   if (typeof refrescarProductos === "function") await refrescarProductos();
@@ -899,13 +914,31 @@ async function iniciarEdicionProducto(p) {
 
 window.bcAbrirConfiguracionSabores = async function (productId, options) {
   _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : null;
+  const form = document.getElementById("form-producto");
+  if (form && _bcMixedConfigReturnTab) form.classList.add("bc-mixed-config-mode");
   const productTab = document.querySelector('.tab-btn[data-tab="productos"]');
   const productPanel = document.getElementById("tab-productos");
   if (productTab && productPanel && !productPanel.classList.contains("visible")) productTab.click();
 
   const producto = (_cache.productos || []).find((p) => String(p.id) === String(productId));
-  if (!producto) throw new Error("No se encontró el producto. Actualiza el catálogo e inténtalo de nuevo.");
+  if (!producto) {
+    if (form && _bcMixedConfigReturnTab) form.classList.remove("bc-mixed-config-mode");
+    setMsg("msg-productos", "No se encontró el producto en el catálogo. Actualiza Inventario e inténtalo de nuevo.", false);
+    restaurarTabConfiguracionSabores();
+    return false;
+  }
 
+  if (_bcMixedConfigReturnTab) {
+    const submit = document.getElementById("prod-submit-btn");
+    const cancel = document.getElementById("prod-cancelar-edicion");
+    if (submit) submit.hidden = true;
+    // Show the safe exit before any session/catalogue/snapshot read can wait.
+    if (cancel) {
+      cancel.hidden = false;
+      cancel.classList.remove("hidden");
+      cancel.textContent = "Volver a Inventario";
+    }
+  }
   await iniciarEdicionProducto(producto);
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
@@ -913,11 +946,28 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
   if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
   sincronizarEditorVariantesProducto();
 
-  if (!_productoMixtoSnapshot || String(_productoMixtoSnapshot.producto_id) !== String(producto.id)) {
-    const snapshot = await cargarSnapshotAsignacionMixtaProducto(producto.id);
-    if (!snapshot) throw new Error("No se pudo leer el stock actual. No se ha convertido ni modificado inventario.");
+  let snapshotReady = !!(_productoMixtoSnapshot && String(_productoMixtoSnapshot.producto_id) === String(producto.id));
+  if (!snapshotReady) {
+    try {
+      const snapshot = await cargarSnapshotAsignacionMixtaProducto(producto.id);
+      snapshotReady = !!(snapshot && _productoMixtoSnapshot && String(_productoMixtoSnapshot.producto_id) === String(producto.id));
+    } catch (error) {
+      console.warn("[BattleCruiser] No se pudo leer el snapshot para configurar sabores:", error);
+      snapshotReady = false;
+    }
+  }
+  if (!snapshotReady) {
+    // Show the read error without stranding the user in the compact editor.
+    renderPanelAsignacionMixtaProducto();
+    setMsg("msg-productos", "No se pudo leer el stock actual. No se ha convertido ni modificado inventario. Puedes volver a Inventario y reintentar.", false);
+    return false;
   }
   setMsg("msg-productos", "Configuración lista. Completa los almacenes y guarda el inventario por sabores.", true);
+  const fallbackCancel = document.getElementById("prod-cancelar-edicion");
+  if (_bcMixedConfigReturnTab && fallbackCancel) {
+    fallbackCancel.hidden = true;
+    fallbackCancel.classList.add("hidden");
+  }
   renderPanelAsignacionMixtaProducto();
   const section = document.getElementById("prod-inventario-mixto-settings");
   if (section) section.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -925,6 +975,8 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
 };
 
 function cancelarEdicionProducto() {
+  const form = document.getElementById("form-producto");
+  if (form) form.classList.remove("bc-mixed-config-mode");
   document.getElementById("form-producto").reset();
   document.getElementById("prod-editando-id").value = "";
   const unidadInput = document.getElementById("prod-unidad");
@@ -940,9 +992,9 @@ function cancelarEdicionProducto() {
   renderPanelAsignacionMixtaProducto();
   sincronizarEditorVariantesProducto();
   const submitBtn = document.getElementById("prod-submit-btn");
-  if (submitBtn) submitBtn.textContent = "Agregar producto";
+  if (submitBtn) { submitBtn.hidden = false; submitBtn.textContent = "Agregar producto"; }
   const cancelarBtn = document.getElementById("prod-cancelar-edicion");
-  if (cancelarBtn) cancelarBtn.classList.add("hidden");
+  if (cancelarBtn) { cancelarBtn.hidden = false; cancelarBtn.classList.add("hidden"); }
   document.getElementById("prod-imagen-preview-wrap").classList.add("hidden");
   document.getElementById("prod-imagen-preview").removeAttribute("src");
   document.getElementById("prod-imagen-preview").dataset.guardada = "false";
