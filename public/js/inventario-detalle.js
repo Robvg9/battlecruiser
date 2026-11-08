@@ -90,7 +90,7 @@
           window.alert('No se pudo abrir el configurador de sabores. Actualiza la aplicación e inténtalo de nuevo.');
           return;
         }
-        Promise.resolve(window.bcAbrirConfiguracionSabores(productId)).catch(error => {
+        Promise.resolve(window.bcAbrirConfiguracionSabores(productId, { returnTo: 'inventario' })).catch(error => {
           window.alert(String(error && (error.message || error) || 'No se pudo abrir el configurador de sabores.'));
         });
         return;

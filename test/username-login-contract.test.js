@@ -251,3 +251,28 @@ test("login bridge handles preflight before enforcing the production origin and 
   assert.match(edge, /if \(origin !== APP_ORIGIN\) return reply\(\{ error: "Origen no permitido\." \}, 403\);/,
     "all actual POST requests still require the exact production origin");
 });
+
+
+test("short username is separate from the full display name and resolves server-side", () => {
+  assert.ok(usernameMigration.includes("ADD COLUMN IF NOT EXISTS username text"));
+  assert.ok(usernameMigration.includes("usuarios_username_normalized_uidx"));
+  assert.ok(usernameMigration.includes("lower(trim(u.username))"));
+  assert.ok(usernameMigration.includes("lower(trim(u.nombre))"));
+  assert.match(userForm, /nuevo-usuario-username/);
+  assert.match(userForm, /Usuario corto/);
+  assert.ok(userForm.includes("username: username"));
+});
+
+test("user creation persists the selected role and does not insert a role-less profile", () => {
+  assert.match(userCreate, /username/);
+  assert.match(userCreate, /role_id: roleId/);
+  assert.ok(userCreate.includes(".upsert("));
+  assert.ok(!userCreate.includes("role_id: null"));
+});
+
+test("a Baja-only role can open Operations and submit requests without approval privileges", () => {
+  assert.ok(permissionsNavigation.includes('["gastos", "mermas", "bajas", "reinversiones"'));
+  assert.ok(usernameMigration.includes("p.seccion='bajas' AND p.accion IN ('ver','crear')"));
+  assert.ok(usernameMigration.includes("tiene_permiso('bajas','crear')"));
+  assert.ok(!usernameMigration.includes("p.accion IN ('ver','crear','editar_any')"));
+});

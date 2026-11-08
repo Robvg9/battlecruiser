@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
 // v9.5.80 — Aprobaciones de Baja, accesos a sabores y mínimos
 (function hotfixV9475(){
-  const VERSION="9.5.80";
+  const VERSION="9.5.81";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -19,7 +19,7 @@
     ["configuracion.js","20261104.1"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js","20261107.3"],["aprobaciones-admin.js","20261107.3"],
     ["m26-ui-integridad.js","26.40"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.7"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.3"],["ui-operaciones-hub.js","43.1"],
-    ["alta-usuario-sin-email.js","46.1"],["m22-sesiones-en-m21.js","25.5"],["m22-fe-patches-m21.js","22.1"],
+    ["alta-usuario-sin-email.js","46.2"],["m22-sesiones-en-m21.js","25.5"],["m22-fe-patches-m21.js","22.1"],
     ["m23-fe-almacenes-turnos.js","23.1"],["m23-1-fe-dinero-icono.js","23.2"],["m24-asignaciones-operativas.js","24.4"],
     ["m24-2-asignar-sesion-ui.js","24.6"],["m24-2-asignaciones-selects-repair.js","24.5"],["m25-fe-sync-turno-ventas.js","25.1"],
     ["m26-ventas-ux.js","26.5"],["m26-6-stock-cart-patch.js","26.6"],["m26-7-ventas-repair.js","26.7"],["m26-8-ventas-cart-confirm.js","26.8"],
@@ -29,7 +29,7 @@
     ["m27-5-ventas-precio-politica.js","27.5b7"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6g"],
     ["m27-6b-venta-payload-pres.js","27.6b2"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7f"],
     ["mision-d-stock-reposicion.js","D.11"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
-    ["inventario-detalle.js","70"],["compra-multiple.js","27.15"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
+    ["inventario-detalle.js","71"],["compra-multiple.js","27.15"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
     ["m29-turnos-organizacion.js","29.21"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.21"],["turno-cash-handover-ui.js","1.0"],["hotfix-turno-forceclose-20260902.js","20261030.1"],["m34-turnos-filter-final.js","34.3"],
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.2"],
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],

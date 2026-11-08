@@ -1,61 +1,39 @@
 // BattleCruiser — Edge Function: crear-usuario-sin-email
-// Contrato canónico (v1). Desplegada en papxnkkjtkxsitcsvcme.
-// El administrador NO envía correo: el backend genera un email técnico interno.
-//
-// POST body JSON:
-//   { "nombre": string, "password": string, "role_id": uuid }
-//
-// Éxito 200:
-//   { "ok": true, "id": uuid, "nombre": string, "role_id": uuid }
-//
-// Errores 4xx:
-//   { "error": string }
-//
-// Seguridad:
-//   - Requiere JWT de usuario autenticado
-//   - Verifica permiso usuarios/crear
-//   - Crea auth.users con service role (email técnico no visible en UI)
-//   - Inserta public.usuarios + role_id
-//   - Si falla el perfil tras crear Auth, intenta borrar el user de Auth
+// Creates an Auth identity and its application profile with a separate short
+// login username and the role selected by the administrator.
 
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Content-Type": "application/json",
+  "Cache-Control": "no-store",
 };
 
 function json(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
+  return new Response(JSON.stringify(body), { status, headers: cors });
 }
 
-function emailTecnico(nombre: string, id: string): string {
-  const slug = nombre
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/^\.+|\.+$/g, "")
-    .slice(0, 40) || "user";
+function normalizarUsuario(value: string): string {
+  return value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function emailTecnico(username: string, id: string): string {
+  const slug = username.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "user";
   const short = id.replace(/-/g, "").slice(0, 12);
   return `${slug}.${short}@users.battlecruiser.internal`;
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: cors });
-  }
-  if (req.method !== "POST") {
-    return json(405, { error: "Método no permitido" });
-  }
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method !== "POST") return json(405, { error: "Método no permitido." });
 
   const authHeader = req.headers.get("Authorization") || "";
   if (!authHeader.startsWith("Bearer ") || authHeader.length < 20) {
-    return json(401, { error: "Sesión inválida" });
+    return json(401, { error: "Sesión inválida." });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -65,121 +43,107 @@ Deno.serve(async (req) => {
     return json(500, { error: "Configuración del servidor incompleta." });
   }
 
-  const userClient = createClient(supabaseUrl, anonKey, {
+  const caller = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const { data: userData, error: userError } = await caller.auth.getUser();
+  if (userError || !userData?.user) return json(401, { error: "Sesión inválida." });
 
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData?.user) {
-    return json(401, { error: "Sesión inválida" });
-  }
-
-  const { data: puedeCrear, error: permErr } = await userClient.rpc("tiene_permiso", {
+  const { data: allowed, error: permissionError } = await caller.rpc("tiene_permiso", {
     p_seccion: "usuarios",
     p_accion: "crear",
   });
-  if (permErr) {
-    const { error: listErr } = await userClient.rpc("listar_usuarios_admin", {});
-    if (listErr) {
-      return json(403, { error: "No tenés permiso para crear usuarios." });
-    }
-  } else if (puedeCrear !== true) {
-    return json(403, { error: "No tenés permiso para crear usuarios." });
+  if (permissionError || allowed !== true) {
+    return json(403, { error: "No tienes permiso para crear usuarios." });
   }
 
-  let body: { nombre?: string; password?: string; role_id?: string; usuario?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return json(400, { error: "Cuerpo JSON inválido." });
-  }
+  let body: { nombre?: unknown; username?: unknown; password?: unknown; role_id?: unknown };
+  try { body = await req.json(); }
+  catch { return json(400, { error: "Solicitud inválida." }); }
 
-  const nombre = String(body.nombre || body.usuario || "").trim();
-  const password = String(body.password || "");
-  const roleId = String(body.role_id || "").trim();
+  const nombre = typeof body.nombre === "string" ? body.nombre.trim() : "";
+  const username = typeof body.username === "string" ? normalizarUsuario(body.username) : "";
+  const password = typeof body.password === "string" ? body.password : "";
+  const roleId = typeof body.role_id === "string" ? body.role_id.trim() : "";
 
-  if (!nombre) return json(400, { error: "El usuario es obligatorio." });
-  if (nombre.length < 2) return json(400, { error: "El usuario debe tener al menos 2 caracteres." });
-  if (!password || password.length < 6) {
-    return json(400, { error: "La contraseña debe tener al menos 6 caracteres." });
+  if (nombre.length < 2 || nombre.length > 120) {
+    return json(400, { error: "El nombre completo debe tener entre 2 y 120 caracteres." });
   }
-  if (!roleId) return json(400, { error: "Debés seleccionar un rol." });
+  if (!/^[a-z0-9][a-z0-9._-]{2,23}$/.test(username)) {
+    return json(400, { error: "El usuario corto debe tener 3–24 caracteres: letras, números, punto, guion o guion bajo." });
+  }
+  if (password.length < 6 || password.length > 256) {
+    return json(400, { error: "La contraseña debe tener entre 6 y 256 caracteres." });
+  }
+  if (!roleId) return json(400, { error: "Selecciona un rol." });
 
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: existentes, error: dupErr } = await admin
-    .from("usuarios")
-    .select("id,nombre")
-    .ilike("nombre", nombre);
-  if (dupErr) {
-    return json(500, { error: "No se pudo validar el nombre de usuario." });
-  }
-  if ((existentes || []).some((u) => (u.nombre || "").toLowerCase() === nombre.toLowerCase())) {
-    return json(409, { error: "Ya existe un usuario con ese nombre." });
+  const { data: role, error: roleError } = await admin
+    .from("roles").select("id,nombre,activo").eq("id", roleId).maybeSingle();
+  if (roleError || !role || role.activo === false) {
+    return json(400, { error: "El rol seleccionado no existe o está desactivado." });
   }
 
-  const { data: rol, error: rolErr } = await admin
-    .from("roles")
-    .select("id,nombre,activo")
-    .eq("id", roleId)
-    .maybeSingle();
-  if (rolErr || !rol) {
-    return json(400, { error: "El rol seleccionado no existe." });
-  }
-  if (rol.activo === false) {
-    return json(400, { error: "Ese rol está desactivado." });
-  }
+  const { data: profiles, error: profilesError } = await admin
+    .from("usuarios").select("id,nombre,username");
+  if (profilesError) return json(503, { error: "No se pudo validar el usuario y su alias." });
+  const normalizedName = nombre.toLocaleLowerCase();
+  const duplicateName = (profiles || []).some((row: any) =>
+    String(row.nombre || "").trim().toLocaleLowerCase() === normalizedName
+  );
+  const duplicateUsername = (profiles || []).some((row: any) =>
+    String(row.username || "").trim().toLowerCase() === username
+  );
+  if (duplicateName) return json(409, { error: "Ya existe una persona con ese nombre completo." });
+  if (duplicateUsername) return json(409, { error: "Ese usuario corto ya está ocupado. Prueba otro alias." });
 
   const provisionalId = crypto.randomUUID();
-  const email = emailTecnico(nombre, provisionalId);
-
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+  const email = emailTecnico(username, provisionalId);
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { nombre, battlecruiser_username: nombre },
+    user_metadata: { nombre, username, battlecruiser_username: username },
   });
-
-  if (createErr || !created?.user?.id) {
-    const msg = (createErr?.message || "").toLowerCase();
-    if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
-      return json(409, { error: "Ya existe una cuenta con ese identificador. Probá otro nombre." });
+  if (createError || !created?.user?.id) {
+    const message = (createError?.message || "").toLowerCase();
+    if (message.includes("already") || message.includes("registered") || message.includes("exists")) {
+      return json(409, { error: "No se pudo reservar ese usuario. Elige otro alias." });
     }
-    return json(400, {
-      error: createErr?.message || "No se pudo crear el usuario en autenticación.",
-    });
+    return json(400, { error: createError?.message || "No se pudo crear la cuenta." });
   }
 
-  const newId = created.user.id;
+  const userId = created.user.id;
+  const { data: profile, error: profileError } = await admin
+    .from("usuarios")
+    .upsert({
+      id: userId,
+      nombre,
+      username,
+      role_id: roleId,
+      activo: true,
+      archivado: false,
+    }, { onConflict: "id" })
+    .select("id,nombre,username,role_id")
+    .single();
 
-  const { error: perfilErr } = await admin.from("usuarios").insert({
-    id: newId,
-    nombre,
-    role_id: roleId,
-    activo: true,
-  });
-
-  if (perfilErr) {
-    try {
-      await admin.auth.admin.deleteUser(newId);
-    } catch (_) {}
-    const pmsg = (perfilErr.message || "").toLowerCase();
-    if (pmsg.includes("duplicate") || pmsg.includes("unique")) {
-      return json(409, { error: "Ya existe un usuario con ese nombre." });
-    }
-    return json(500, {
-      error: "No se pudo crear el perfil interno. No quedó un usuario parcial.",
-    });
+  if (profileError || !profile || profile.role_id !== roleId || profile.username !== username) {
+    try { await admin.from("usuarios").delete().eq("id", userId); } catch (_) {}
+    try { await admin.auth.admin.deleteUser(userId); } catch (_) {}
+    return json(500, { error: "No se pudo guardar el perfil, el alias y el rol. No quedó una cuenta parcial." });
   }
 
   return json(200, {
     ok: true,
-    id: newId,
+    id: userId,
     nombre,
+    username,
     role_id: roleId,
-    rol: rol.nombre,
+    rol: role.nombre,
+    message: "Usuario creado correctamente.",
   });
 });
