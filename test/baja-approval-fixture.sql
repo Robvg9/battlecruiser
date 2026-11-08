@@ -83,6 +83,10 @@ CREATE TABLE public.bajas (
   actualizado_en timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX bajas_creador_idempotency_key_uidx
+ON public.bajas (creado_por, idempotency_key)
+WHERE idempotency_key IS NOT NULL;
+
 CREATE TABLE public.gastos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   creado_en timestamptz NOT NULL DEFAULT now(),
