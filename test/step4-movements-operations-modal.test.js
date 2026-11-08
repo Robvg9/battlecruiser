@@ -260,6 +260,7 @@ test("Transferencias: recupera catálogos y rellena el panel múltiple al abrir"
   window.refrescarStockYSelects = async () => {
     productLoads++;
     window._cache.productos = [{ id: "p1", nombre: "Producto 1", activo: true }];
+    window.__BC_STOCK_CONFIRMED__ = true;
   };
   window.document.querySelector('[data-bc165="transferencias"]').click();
   await new Promise((resolve) => setTimeout(resolve, 0));
