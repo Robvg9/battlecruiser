@@ -40,10 +40,11 @@
   }
   async function asegurarCatalogos() {
     poblarSelects();
-    if (almacenes().length && productos().length) return;
+    const needsFreshStock = navigator.onLine && window.__BC_STOCK_CONFIRMED__ !== true;
+    if (almacenes().length && productos().length && !needsFreshStock) return;
     try {
       if (!almacenes().length && typeof window.refrescarAlmacenes === 'function') await window.refrescarAlmacenes();
-      if ((!productos().length || !almacenes().length) && typeof window.refrescarStockYSelects === 'function') await window.refrescarStockYSelects();
+      if ((needsFreshStock || !productos().length || !almacenes().length) && typeof window.refrescarStockYSelects === 'function') await window.refrescarStockYSelects();
       else if (!productos().length && typeof window.refrescarProductos === 'function') await window.refrescarProductos();
     } catch (e) { console.warn('[BattleCruiser] No se pudieron cargar catálogos de transferencia:', e); }
     poblarSelects(); actualizarStockHint();
