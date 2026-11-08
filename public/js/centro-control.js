@@ -314,22 +314,33 @@ async function refrescarCentroControl() {
   refrescarBadgeCentroControl(asuntos);
 }
 
-// hay asuntos críticos (REQUIERE_ATENCION) no vistos. Reutiliza el mismo
-// patrón que el badge de Pendientes (.pendientes-tab-badge).
+// El badge del Centro de Control agrega alertas críticas y aprobaciones administrativas.
+let _bcAprobacionesAdminPendientes = 0;
+let _bcAsuntosCentroControlBadge = [];
+
 function refrescarBadgeCentroControl(asuntos) {
+  if (Array.isArray(asuntos)) _bcAsuntosCentroControlBadge = asuntos;
   const badge = document.getElementById("resumen-tab-badge");
   if (!badge) return;
-  const criticosNoVistos = asuntos.filter((a) => a.prioridad === "critico" && !a.visto).length;
-  if (criticosNoVistos === 0) {
+  const criticosNoVistos = _bcAsuntosCentroControlBadge
+    .filter((a) => a.prioridad === "critico" && !a.visto).length;
+  const total = criticosNoVistos + _bcAprobacionesAdminPendientes;
+  if (total === 0) {
     badge.classList.add("hidden");
     badge.classList.remove("atencion");
     badge.textContent = "";
   } else {
-    badge.textContent = String(criticosNoVistos);
+    badge.textContent = String(total);
     badge.classList.add("atencion");
     badge.classList.remove("hidden");
   }
 }
+
+window.bcActualizarBadgeAprobacionesAdmin = function (cantidad) {
+  const total = Number(cantidad);
+  _bcAprobacionesAdminPendientes = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
+  refrescarBadgeCentroControl();
+};
 
 // existentes y la navegación por tabs. Un solo listener delegado (no uno
 // por botón, los items se recrean en cada refresco). Evita botones muertos.

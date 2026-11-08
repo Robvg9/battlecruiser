@@ -1048,3 +1048,27 @@ textarea:focus-visible {
   .bc-mixed-assignment-flavor { grid-template-columns:1fr 1fr; }
   .bc-mixed-assignment-flavor > strong { grid-column:1 / -1; }
 }
+
+
+/* Inventario: acceso directo a configuración de sabores y mínimos por almacén. */
+.bc-inv-flavors-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: var(--stone);
+}
+.bc-inv-flavors-setup p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.bc-inv-flavors-setup .cc-accion {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
