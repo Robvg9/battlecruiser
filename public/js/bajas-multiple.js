@@ -274,7 +274,7 @@
     const warehouse = document.getElementById('bc-bajas-warehouse');
     const warehouseTrigger = warehouse && warehouse.parentElement && warehouse.parentElement.querySelector('.bc-product-picker-trigger');
     if (warehouseTrigger) warehouseTrigger.focus({ preventScroll: true });
-    else if (warehouse) warehouse.focus({ preventScroll: true });
+    else { const dialog = modal.querySelector('.bc-bajas-modal-dialog'); if (dialog) dialog.focus({ preventScroll: true }); }
     return true;
   };
   window.refrescarBajasMultiple = () => loadCatalogs(true);
