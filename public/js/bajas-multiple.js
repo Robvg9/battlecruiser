@@ -1,8 +1,8 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.5') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.5';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.6') return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.6';
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
   let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
@@ -43,7 +43,8 @@
         almacen_id: String(line.almacen_id),
         producto_id: String(line.producto_id),
         cantidad: Number(line.cantidad),
-        motivo: String(line.motivo)
+        motivo: String(line.motivo),
+        motivo_general: String(line.motivo_general || '')
       }))
     });
     let fingerprint;
@@ -279,6 +280,7 @@
     if (!defaultReason || (defaultReason === 'Otro' && !defaultOther)) {
       return message('Selecciona el motivo general de la lista (y descríbelo si es Otro).', 'error');
     }
+    const generalReason = defaultReason === 'Otro' ? 'Otro: ' + defaultOther : defaultReason;
     const lines = [];
     for (const row of rows) {
       const product = row.querySelector('.bc-baja-product').value;
@@ -289,7 +291,13 @@
       if (!product || !Number.isFinite(quantity) || quantity <= 0 || !reason || (reason === 'Otro' && !other)) {
         return message('Completa producto y cantidad; revisa el motivo general o el motivo particular marcado.', 'error');
       }
-      lines.push({ almacen_id: warehouse, producto_id: product, cantidad: quantity, motivo: reason === 'Otro' ? 'Otro: ' + other : reason });
+      lines.push({
+        almacen_id: warehouse,
+        producto_id: product,
+        cantidad: quantity,
+        motivo: reason === 'Otro' ? 'Otro: ' + other : reason,
+        motivo_general: generalReason
+      });
     }
     const api = apiClient();
     if (!api || !api.auth || typeof api.rpc !== 'function') {
@@ -364,8 +372,8 @@
       if (defaultOtherEl) { defaultOtherEl.value = ''; defaultOtherEl.required = false; }
       document.getElementById('bc-bajas-lines').innerHTML = '';
       const approved = created.every(item => item.estado === 'APROBADA');
-      message(approved ? '✓ Lista registrada y aprobada. Stock y FIFO actualizados.'
-        : '✓ Lista enviada a revisión administrativa. El stock no cambia hasta aprobar.', 'success');
+      message(approved ? '✓ Lista registrada como una sola solicitud y aprobada. Stock y FIFO actualizados.'
+        : '✓ Lista enviada como una sola solicitud a revisión administrativa. El stock no cambia hasta aprobar.', 'success');
       succeeded = true;
       if (typeof window.refrescarAprobacionesAdmin === 'function') {
         try { await window.refrescarAprobacionesAdmin(); }
