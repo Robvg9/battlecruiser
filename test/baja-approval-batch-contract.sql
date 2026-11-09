@@ -117,8 +117,9 @@ BEGIN
   -- The same payload and key must return the original request and its original child rows.
   IF (v_retry->>'solicitud_id')::uuid<>v_request
      OR (v_retry->>'count')::integer<>2
-     OR jsonb_array_length(v_retry->'bajas')<>2 THEN
-    RAISE EXCEPTION 'An idempotent retry did not return the same grouped request and lines.';
+     OR jsonb_array_length(v_retry->'bajas')<>2
+     OR v_retry->'bajas' IS DISTINCT FROM v_batch->'bajas' THEN
+    RAISE EXCEPTION 'An idempotent retry did not return the same grouped request, line IDs and order.';
   END IF;
 
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
