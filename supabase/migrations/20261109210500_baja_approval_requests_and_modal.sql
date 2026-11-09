@@ -452,7 +452,8 @@ BEGIN
     FROM public.bajas_solicitudes s
     JOIN public.almacenes a ON a.id=s.almacen_id
     JOIN public.bajas b ON b.solicitud_id=s.id AND b.estado='PENDIENTE'
-    WHERE (public.tiene_permiso('bajas','editar_any') OR public.tiene_permiso('auditoria','editar_any'))
+    WHERE s.estado='PENDIENTE'
+      AND (public.tiene_permiso('bajas','editar_any') OR public.tiene_permiso('auditoria','editar_any'))
     GROUP BY s.id,s.creado_en,s.creado_nombre,a.nombre,s.motivo_general
 
     UNION ALL
@@ -546,6 +547,7 @@ DECLARE
   v_nombre text;
   v_cantidad_real numeric;
   v_total integer := 0;
+  v_pending_count integer := 0;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'No hay sesión autenticada.' USING ERRCODE='42501';
@@ -570,6 +572,10 @@ BEGIN
          SELECT 1 FROM public.bajas b
          WHERE b.id=x.id AND b.solicitud_id=p_solicitud_id AND b.estado='PENDIENTE'
        )
+       OR x.cantidad_real > (
+         SELECT b.cantidad FROM public.bajas b
+         WHERE b.id=x.id AND b.solicitud_id=p_solicitud_id AND b.estado='PENDIENTE'
+       )
   ) THEN
     RAISE EXCEPTION 'Una o más cantidades reales no pertenecen a esta lista o son inválidas.';
   END IF;
@@ -589,6 +595,38 @@ BEGIN
     RAISE EXCEPTION 'La lista de Bajas no está pendiente o no existe.';
   END IF;
 
+  -- Lock every pending child before checking exact coverage. A direct/legacy
+  -- reviewer cannot race this grouped decision halfway through the list.
+  PERFORM 1
+  FROM public.bajas b
+  WHERE b.solicitud_id=p_solicitud_id AND b.estado='PENDIENTE'
+  ORDER BY b.creado_en,b.id
+  FOR UPDATE;
+
+  SELECT count(*)::integer INTO v_pending_count
+  FROM public.bajas b
+  WHERE b.solicitud_id=p_solicitud_id AND b.estado='PENDIENTE';
+
+  IF v_pending_count=0 THEN
+    RAISE EXCEPTION 'La lista no contiene líneas pendientes para resolver.';
+  END IF;
+
+  IF p_decision='APROBAR' AND jsonb_array_length(p_lineas_reales)<>v_pending_count THEN
+    RAISE EXCEPTION 'Debes enviar la cantidad real de todos los productos de la lista.';
+  END IF;
+
+  IF p_decision='APROBAR' AND EXISTS (
+    SELECT 1
+    FROM public.bajas b
+    WHERE b.solicitud_id=p_solicitud_id AND b.estado='PENDIENTE'
+      AND NOT EXISTS (
+        SELECT 1 FROM jsonb_to_recordset(p_lineas_reales) AS x(id uuid,cantidad_real numeric)
+        WHERE x.id=b.id
+      )
+  ) THEN
+    RAISE EXCEPTION 'Falta una o más líneas pendientes en la decisión de aprobación.';
+  END IF;
+
   SELECT nombre INTO v_nombre FROM public.usuarios WHERE id=auth.uid();
 
   FOR v_line IN
@@ -605,7 +643,9 @@ BEGIN
       FROM jsonb_to_recordset(p_lineas_reales) AS x(id uuid,cantidad_real numeric)
       WHERE x.id=v_line.id
       LIMIT 1;
-      v_cantidad_real:=coalesce(v_cantidad_real,v_line.cantidad);
+      IF v_cantidad_real IS NULL THEN
+        RAISE EXCEPTION 'Falta la cantidad real de una línea de la lista.';
+      END IF;
     END IF;
 
     PERFORM public.resolver_aprobacion_operativa(
