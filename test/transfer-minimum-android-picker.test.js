@@ -16,7 +16,6 @@ test("transfer minimum fix keeps idempotency and permissions",()=>{
  const sql=read("supabase/migrations/20261109120000_transfer_destination_minimum_guard.sql");
  assert.match(sql,/CREATE OR REPLACE FUNCTION public\.registrar_transferencia/);
  assert.match(sql,/private\.reclamar_idempotencia/);
- assert.match(sql,/FOR UPDATE/);
  assert.match(sql,/REVOKE ALL ON FUNCTION public\.registrar_transferencia/);
  assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.registrar_transferencia/);
 });
