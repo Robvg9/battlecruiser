@@ -1,8 +1,8 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.4') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.4';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.5) return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.5;
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
   let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
