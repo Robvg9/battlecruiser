@@ -172,7 +172,7 @@ async function resolverDesdeModal(decision){
   setApprovalMessage(decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
   try{
     if(type==='baja_lista'){
-      const lineInputs=Array.from(modal.querySelectorAll('[data-bc-approval-line-qty]'));
+      const lineInputs=Array.from(modal.querySelectorAll('[data-bc-approval-line-qty]')).filter(input=>!input.disabled);
       const lines=lineInputs.map(input=>({id:input.dataset.lineId,cantidad_real:Number(input.value)}));
       if(decision==='APROBAR'&&lines.some(line=>!Number.isFinite(line.cantidad_real)||line.cantidad_real<=0)){
         throw new Error('Cada producto debe tener una cantidad real mayor que cero.');
