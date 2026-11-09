@@ -140,6 +140,7 @@
       return true;
     } catch (error) {
       window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
+      window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
       window.__BC_TRANSFER_STOCK_ERROR__ = error && error.message ? error.message : 'Error al leer el inventario desde Supabase.';
       return false;
     }
@@ -209,7 +210,7 @@
     if (!lineas.length) return feedback('Agrega al menos un producto antes de registrar.', false);
     feedback('Confirmando las existencias actuales desde Supabase…', true);
     if (!(await actualizarInventarioConfirmado())) {
-      return feedback('No se puede registrar la transferencia sin confirmar el inventario. ' + (window.__BC_STOCK_ERROR__ || 'Reintenta la lectura.'), false);
+      return feedback('No se puede registrar la transferencia sin confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Reintenta la lectura.'), false);
     }
     for (const item of lineas) {
       const valid = validarStock(item.producto_id, item.cantidad, source);
@@ -304,7 +305,7 @@
       const ok = await actualizarInventarioConfirmado();
       button.disabled = false; button.textContent = 'Actualizar existencias';
       feedback(ok ? '✓ Inventario actualizado y confirmado desde Supabase.' :
-        'No se pudo confirmar el inventario. ' + (window.__BC_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), ok);
+        'No se pudo confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), ok);
     });
     panel.querySelector('#mov-multiple-confirmar').addEventListener('click', confirmarTransferencia);
     panel.querySelector('#mov-multiple-limpiar').addEventListener('click', function () {
@@ -319,7 +320,15 @@
       const api = window.client || (typeof client !== 'undefined' ? client : null);
       if (api && api.auth && typeof api.auth.onAuthStateChange === 'function') {
         api.auth.onAuthStateChange(function (event, session) {
-          if (!session || !['SIGNED_IN', 'INITIAL_SESSION', 'TOKEN_REFRESHED'].includes(event)) return;
+          if (event === 'SIGNED_OUT' || !session) {
+            window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
+            window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
+            window.__BC_TRANSFER_STOCK_USER_ID__ = null;
+            window.__BC_TRANSFER_STOCK_ERROR__ = 'La sesión terminó; vuelve a autenticarte para leer existencias.';
+            actualizarStockHint();
+            return;
+          }
+          if (!['SIGNED_IN', 'INITIAL_SESSION', 'TOKEN_REFRESHED'].includes(event)) return;
           window.setTimeout(async function () {
             try { await asegurarCatalogos(); }
             finally { poblarSelects(); actualizarStockHint(); }
@@ -329,21 +338,36 @@
     } catch (error) {
       console.warn('[BattleCruiser] No se pudo enlazar el refresco de Transferencias con Auth:', error);
     }
+    window.addEventListener('offline', function () {
+      window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
+      window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
+      window.__BC_TRANSFER_STOCK_ERROR__ = 'Sin conexión: se requiere una nueva lectura al reconectar.';
+      actualizarStockHint();
+    });
+    window.addEventListener('online', function () {
+      window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
+      window.__BC_TRANSFER_STOCK_ERROR__ = null;
+      asegurarCatalogos();
+    });
     window.addEventListener('bc:data-changed', function (event) {
       const detail = event.detail || {};
       const domains = detail.domains || [];
       if (!['products', 'warehouses', 'stock', 'inventory', 'categories'].some(domain => domains.includes(domain))) return;
-      if (detail.offline || !navigator.onLine) { actualizarStockHint(); return; }
+      if (detail.offline || !navigator.onLine) {
+        window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
+        window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
+        window.__BC_TRANSFER_STOCK_ERROR__ = 'Sin conexión: se requiere una nueva lectura al reconectar.';
+        actualizarStockHint(); return;
+      }
       // Nueva compra ya espera su refresco forzado al terminar. Para las demás
       // mutaciones volvemos a leer stock de Supabase antes de recalcular transferencias.
       if (!detail.remote && detail.operation === 'compra') return;
       window.setTimeout(async function () {
         try {
-          if (domains.includes('stock') && typeof window.refrescarStockYSelects === 'function') {
-            await window.refrescarStockYSelects();
-          } else {
-            await asegurarCatalogos();
-          }
+          if (domains.includes('products') && typeof window.refrescarProductos === 'function') await window.refrescarProductos();
+          if (domains.includes('warehouses') && typeof window.refrescarAlmacenes === 'function') await window.refrescarAlmacenes();
+          if (domains.includes('stock') || domains.includes('inventory')) await actualizarInventarioConfirmado();
+          else await asegurarCatalogos();
         } catch (error) {
           console.warn('[BattleCruiser] No se pudo sincronizar inventario en Transferencias:', error);
         }
