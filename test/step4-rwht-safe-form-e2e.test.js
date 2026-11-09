@@ -810,7 +810,7 @@ test("Paso 4 RWHT: cantidad cero/negativa o superior al stock se bloquea sin con
     c.window.document.getElementById("form-transferencia").dispatchEvent(
       new c.window.Event("submit", { bubbles: true, cancelable: true })
     );
-    assert.ok(caso.esperado.test(c.window.document.getElementById("msg-transferencias").textContent),
+    assert.ok(await esperarHasta(() => caso.esperado.test(c.window.document.getElementById("msg-transferencias").textContent)),
       "debe mostrar el rechazo correcto para cantidad=" + caso.cantidad);
     assert.equal(c.calls.length, 0, "el dato inválido no debe llegar al ejecutor");
     assert.equal(c.confirmations, 0, "el dato inválido no debe pedir confirmación");
