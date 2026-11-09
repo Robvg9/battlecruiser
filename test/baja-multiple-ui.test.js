@@ -7,7 +7,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: pendingKey/);
  assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
  assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
- assert.match(module,/Never force a refresh just because expiry is near/);
+ assert.doesNotMatch(module,/auth\.getSession\(\)/);
  assert.doesNotMatch(module,/!await hasSession\(\)/);
  assert.match(module,/function ensureModal\(\)/);
  assert.match(module,/window\.abrirBajasMultiple = async function/);
