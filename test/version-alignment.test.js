@@ -190,7 +190,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.2"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.2/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.88 — Correcciones operativas: sabores, transferencias y selectores/);
+  assert.match(app, /v9\.5\.88 — Guardado visible de sabores, Bajas idempotentes y estabilidad PWA/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.88"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.88',
@@ -233,7 +233,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.87"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.88"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
