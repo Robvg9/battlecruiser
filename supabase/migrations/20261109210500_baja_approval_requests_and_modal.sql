@@ -56,7 +56,7 @@ WITH grouped AS (
     END AS estado,
     count(*)::integer AS total_lineas,
     sum(b.cantidad) AS cantidad_total,
-    CASE WHEN count(DISTINCT b.revisado_por)=1 THEN max(b.revisado_por) END AS revisado_por,
+    CASE WHEN count(DISTINCT b.revisado_por)=1 THEN (array_agg(b.revisado_por) FILTER (WHERE b.revisado_por IS NOT NULL))[1] END AS revisado_por,
     CASE WHEN count(DISTINCT b.revisado_nombre)=1 THEN max(b.revisado_nombre) END AS revisado_nombre,
     CASE WHEN count(DISTINCT b.comentario_revision)=1 THEN max(b.comentario_revision) END AS comentario_revision,
     max(b.fecha_revision) AS fecha_revision
@@ -223,7 +223,7 @@ BEGIN
         idempotency_key,payload_hash,total_lineas,cantidad_total
       )
       SELECT
-        max(x.almacen_id),auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'Motivos específicos por producto'),
+        (array_agg(x.almacen_id))[1],auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'Motivos específicos por producto'),
         CASE
           WHEN bool_and(b.estado='APROBADA') THEN 'APROBADA'
           WHEN bool_and(b.estado='RECHAZADA') THEN 'RECHAZADA'
@@ -316,7 +316,7 @@ BEGIN
     idempotency_key,payload_hash,total_lineas,cantidad_total
   )
   SELECT
-    max(x.almacen_id),auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'Motivos específicos por producto'),
+    (array_agg(x.almacen_id))[1],auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'Motivos específicos por producto'),
     'PENDIENTE',p_idempotency_key,v_payload_hash,v_count,sum(x.cantidad)
   FROM jsonb_to_recordset(p_lineas) AS x(
     almacen_id uuid,producto_id uuid,cantidad numeric,motivo text,motivo_general text
@@ -553,7 +553,7 @@ BEGIN
   IF NOT (public.tiene_permiso('bajas','editar_any') OR public.tiene_permiso('auditoria','editar_any')) THEN
     RAISE EXCEPTION 'Sin permiso para resolver listas de Bajas.' USING ERRCODE='42501';
   END IF;
-  IF p_decision NOT IN ('APROBAR','RECHAZAR') THEN
+  IF p_decision IS NULL OR p_decision NOT IN ('APROBAR','RECHAZAR') THEN
     RAISE EXCEPTION 'Decisión inválida.';
   END IF;
   IF p_decision='RECHAZAR' AND NULLIF(btrim(p_comentario),'') IS NULL THEN
