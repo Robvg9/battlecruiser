@@ -192,7 +192,7 @@ BEGIN
   SELECT
     count(*) FILTER (WHERE b.id IS NOT NULL),
     count(DISTINCT b.solicitud_id) FILTER (WHERE b.solicitud_id IS NOT NULL),
-    min(b.solicitud_id) FILTER (WHERE b.solicitud_id IS NOT NULL)
+    (array_agg(b.solicitud_id) FILTER (WHERE b.solicitud_id IS NOT NULL))[1]
   INTO v_existing,v_parent_count,v_solicitud_id
   FROM jsonb_array_elements(p_lineas) WITH ORDINALITY AS item(value,ordinality)
   LEFT JOIN public.bajas b
