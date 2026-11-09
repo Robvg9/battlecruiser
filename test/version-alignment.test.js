@@ -187,8 +187,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
-  assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.2"><\/script>/);
-  assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.2/);
+  assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
+  assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
   assert.match(app, /v9\.5\.88 — Guardado visible de sabores, Bajas idempotentes y estabilidad PWA/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.88"><\/script>/);
@@ -219,7 +219,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(networkCore.includes('baseUrl + "/auth/v1/health"'), "Supabase Auth health is the public connectivity probe");
   assert.ok(!networkCore.includes('baseUrl + "/rest/v1/"'), "publishable keys must not probe the secret-only REST schema root");
   assert.match(networkCore, /PROBE_TIMEOUT_MS = 12000/);
-  assert.match(networkCore, /fallosSondeoSeguidos >= 2/, "one isolated probe failure must not flip the app offline");
+  assert.match(networkCore, /fallosSondeoSeguidos >= 3/, "one isolated probe failure must not flip the app offline");
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
