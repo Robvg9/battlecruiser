@@ -37,7 +37,7 @@ test("approval UI renders Bajas and updates the control-center badge from the sa
   const ui = read("public/js/aprobaciones-admin.js");
   const center = read("public/js/centro-control.js");
   assert.match(ui, /listar_aprobaciones_admin/);
-  assert.match(ui, /p_tipo:x\.tipo/);
+  assert.match(ui, /p_tipo:type/);
   assert.match(ui, /Baja pendiente/);
   assert.doesNotMatch(ui, /id='adm-baja-form'/);
   assert.match(read('public/js/bajas-multiple.js'), /crear_bajas_multiple/);
