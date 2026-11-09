@@ -700,7 +700,7 @@ test("Paso 4 UI: mensaje sin conversación seleccionada se bloquea sin enviar RP
 // Additional isolated UI tests. All writes below terminate in in-memory mocks;
 // no test calls a production Supabase endpoint or changes live business data.
 
-function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result = { ok: true, data: "transfer-fixture" } } = {}) {
+function crearContextoTransferenciaFixture({ stock = 8, confirm = true, stockRefreshOk = true, result = { ok: true, data: "transfer-fixture" } } = {}) {
   const dom = new JSDOM(
     "<!doctype html><html><body>" +
       "<form id='form-transferencia'>" +
@@ -718,6 +718,19 @@ function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result =
   const { window } = dom;
   const calls = [];
   let confirmations = 0;
+  let stockRefreshCalls = 0;
+  window.__BC_TRANSFER_STOCK_CONFIRMED__ = true;
+  window.__BC_TRANSFER_STOCK_SNAPSHOT__ = [{ producto_id: "p-fixture", almacen_id: "a-fixture", cantidad: stock }];
+  window.__BC_TRANSFER_STOCK_REFRESH__ = async () => {
+    stockRefreshCalls += 1;
+    if (!stockRefreshOk) {
+      window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
+      window.__BC_TRANSFER_STOCK_ERROR__ = "No se pudo leer el inventario del fixture.";
+      return false;
+    }
+    window.__BC_TRANSFER_STOCK_CONFIRMED__ = true;
+    return true;
+  };
   window.safeInit = (_selector, callback) => callback();
   window.tienePermiso = (section, action) => section === "transferencias" && action === "crear";
   window.setMsg = (id, message) => { const node = window.document.getElementById(id); if (node) node.textContent = message; };
@@ -755,7 +768,7 @@ function crearContextoTransferenciaFixture({ stock = 8, confirm = true, result =
   };
   const source = fs.readFileSync(path.join(__dirname, "..", "public", "js", "transferencias.js"), "utf8");
   window.eval(source);
-  return { dom, window, calls, get confirmations() { return confirmations; } };
+  return { dom, window, calls, get confirmations() { return confirmations; }, get stockRefreshCalls() { return stockRefreshCalls; } };
 }
 
 test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad y solo un submit", async (t) => {
@@ -780,6 +793,7 @@ test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad
     }
   });
   assert.equal(c.confirmations, 1, "la segunda pulsación no debe abrir otra confirmación");
+  assert.equal(c.stockRefreshCalls, 2, "la transferencia exige lectura fresca antes y después de ejecutar la operación");
   assert.equal(submit.disabled, false, "el botón debe habilitarse al finalizar");
   assert.equal(submit.textContent, "Transferir", "el texto original se debe restaurar");
 });
@@ -800,7 +814,20 @@ test("Paso 4 RWHT: cantidad cero/negativa o superior al stock se bloquea sin con
       "debe mostrar el rechazo correcto para cantidad=" + caso.cantidad);
     assert.equal(c.calls.length, 0, "el dato inválido no debe llegar al ejecutor");
     assert.equal(c.confirmations, 0, "el dato inválido no debe pedir confirmación");
+    assert.equal(c.stockRefreshCalls, 1, "la validación de stock usa una lectura fresca antes de permitir el envío");
   }
+});
+
+test("Paso 4 RWHT: la transferencia se bloquea cuando Supabase no confirma la lectura de stock", async (t) => {
+  const c = crearContextoTransferenciaFixture({ stockRefreshOk: false });
+  t.after(() => c.dom.window.close());
+  const form = c.window.document.getElementById("form-transferencia");
+  form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
+  assert.ok(await esperarHasta(() => /No se pudo confirmar el inventario actual desde Supabase/i.test(c.window.document.getElementById("msg-transferencias").textContent)),
+    "debe mostrar que no se pudo confirmar el stock");
+  assert.equal(c.stockRefreshCalls, 1);
+  assert.equal(c.calls.length, 0, "no se ejecuta una transferencia con stock desconocido");
+  assert.equal(c.confirmations, 0, "no se pide confirmación de una operación que no puede validarse");
 });
 
 function crearContextoPresentacionesFixture({ presentaciones = [] } = {}) {
