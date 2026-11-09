@@ -125,7 +125,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
   assert.ok(almacenes.includes("bc:data-changed"), "the warehouse screen must subscribe to data changes");
-  assert.ok(app.includes('["compra-multiple.js","27.15"]'), "the purchase module must load its reactive catalog listener");
+  assert.ok(app.includes('["compra-multiple.js","27.16"]'), "the purchase module must load its reactive catalog listener");
   assert.ok(compra.includes("__BC_COMPRA_DATA_EVENTS__"), "the active purchase modal must refresh its dependent catalog after changes");
   assert.ok(compra.includes("bcNotificarCambioDatos('compra', false)"), "atomic multi-purchases must publish a stock change");
   assert.ok(productos.includes("bcNotificarCambioDatos(estabaEditando ?"), "direct catalog saves must publish product changes");
