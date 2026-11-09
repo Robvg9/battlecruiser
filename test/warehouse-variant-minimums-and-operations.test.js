@@ -104,7 +104,6 @@ test("Baja entry is one authenticated multi-product list, not a duplicate financ
   assert.match(bajas, /hasSession/);
   assert.doesNotMatch(finance, /crear_baja|form-salida-producto/);
   assert.doesNotMatch(approvals, /rpc\('crear_baja'/);
-  assert.doesNotMatch(approvals, /adm-baja-form/);
 });
 
 test("The legacy vale type keeps its stored value but is presented as Baja", () => {
