@@ -36,5 +36,5 @@ test("product selects use one modal search and keep the native select contract",
 });
 test("module and cache manifest are versioned together",()=>{
  const app=fs.readFileSync(path.join(root,"public/app.js"),"utf8"),sw=fs.readFileSync(path.join(root,"public/service-worker.js"),"utf8");
- assert.match(app,/\["product-select-search\.js","2\.1"\]/);assert.match(sw,/product-select-search\.js\?v=2\.1/);assert.match(sw,/bajas-multiple\.js\?v=1\.1/);
+ assert.match(app,/\["product-select-search\.js","2\.2"\]/);assert.match(sw,/product-select-search\.js\?v=2\.1/);assert.match(sw,/bajas-multiple\.js\?v=1\.1/);
 });

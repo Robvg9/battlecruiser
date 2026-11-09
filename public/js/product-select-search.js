@@ -1,8 +1,8 @@
 // BattleCruiser — shared searchable chooser for operational products and warehouses.
 (function () {
   'use strict';
-  if (window.__BC_PRODUCT_SELECT_PICKER__ === '2.1') return;
-  window.__BC_PRODUCT_SELECT_PICKER__ = '2.1';
+  if (window.__BC_PRODUCT_SELECT_PICKER__ === '2.2') return;
+  window.__BC_PRODUCT_SELECT_PICKER__ = '2.2';
   const PRODUCT_KNOWN = new Set(['compra-producto','venta-producto','trf-producto','vale-producto','pp-producto-select','mov-multiple-producto']);
   const WAREHOUSE_KNOWN = new Set(['alm-selector','compra-multiple-almacen','trf-origen','trf-destino','vale-almacen','mov-multiple-origen','mov-multiple-destino','bc-bajas-warehouse','inv-filtro-almacen','op-g-alm','op-r-alm']);
   const PRODUCT_EXCLUDED = /categor[ií]|presentaci[oó]n|almac[eé]n|warehouse|motivo|estado|tipo|pago|prioridad|usuario/i;
@@ -47,8 +47,22 @@
       }
     });
     search.addEventListener('input', render);
+    syncViewport();
+    window.addEventListener('resize', syncViewport, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncViewport, { passive: true });
+      window.visualViewport.addEventListener('scroll', syncViewport, { passive: true });
+    }
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && modal && !modal.hidden) close(); });
     return modal;
+  }
+  function syncViewport() {
+    if (!modal) return;
+    const viewport = window.visualViewport;
+    const top = viewport ? Math.max(0, viewport.offsetTop || 0) : 0;
+    const height = viewport ? Math.max(240, viewport.height || window.innerHeight) : Math.max(240, window.innerHeight || 600);
+    modal.style.setProperty('--bc-picker-viewport-top', top + 'px');
+    modal.style.setProperty('--bc-picker-viewport-height', height + 'px');
   }
   function update(select) {
     const button = select.parentElement && select.parentElement.querySelector('.bc-product-picker-trigger');
@@ -79,8 +93,8 @@
     active = select; activeKind = kind || select.dataset.bcPickerKind || 'product'; ensureModal();
     const noun = select.dataset.bcPickerNoun || (activeKind === 'warehouse' ? 'almacén' : activeKind === 'product' ? 'producto' : 'opción');
     title.textContent = 'Elegir ' + noun; search.placeholder = 'Buscar ' + noun + '…'; search.setAttribute('aria-label', 'Buscar ' + noun);
-    search.value = ''; render(); modal.hidden = false; document.body.classList.add('bc-product-picker-open');
-    window.setTimeout(() => search.focus(), 0);
+    search.value = ''; render(); syncViewport(); modal.hidden = false; document.body.classList.add('bc-product-picker-open');
+    window.setTimeout(() => { syncViewport(); search.focus({ preventScroll: true }); }, 0);
   }
   function close() { if (!modal) return; modal.hidden = true; document.body.classList.remove('bc-product-picker-open'); active = null; }
   function attach(select) {

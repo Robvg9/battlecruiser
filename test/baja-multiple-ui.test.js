@@ -7,6 +7,8 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.match(module,/hasSession/);assert.match(module,/p_idempotency_key: pendingKey/);
  assert.match(module,/function ensureModal\(\)/);
  assert.match(module,/window\.abrirBajasMultiple = async function/);
+ assert.match(module,/warehouseTrigger\.focus\(\{ preventScroll: true \}\)/);
+ assert.doesNotMatch(module,/if \(warehouse\) warehouse\.focus/);
  assert.match(module,/modal\.hidden = false/);
  assert.match(module,/bc-bajas-modal-open/);
  assert.match(module,/api\.auth\.refreshSession\(\)/);

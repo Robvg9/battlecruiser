@@ -1,8 +1,8 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.1') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.1';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.2') return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.2';
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
   let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
@@ -272,7 +272,9 @@
     document.body.classList.add('bc-bajas-modal-open');
     await loadCatalogs(true);
     const warehouse = document.getElementById('bc-bajas-warehouse');
-    if (warehouse) warehouse.focus({ preventScroll: true });
+    const warehouseTrigger = warehouse && warehouse.parentElement && warehouse.parentElement.querySelector('.bc-product-picker-trigger');
+    if (warehouseTrigger) warehouseTrigger.focus({ preventScroll: true });
+    else if (warehouse) warehouse.focus({ preventScroll: true });
     return true;
   };
   window.refrescarBajasMultiple = () => loadCatalogs(true);
