@@ -68,9 +68,9 @@ test("PWA release and cache manifest are aligned at 9.5.89", () => {
   assert.match(app, /VERSION="9\.5\.89"/);
   assert.match(index, /app\.js\?v=9\.5\.89/);
   assert.match(index, /style\.css\?v=9\.5\.89/);
-  assert.match(sw, /BC_SW_VERSION = "9.5.88"/);
+  assert.match(sw, /BC_SW_VERSION = "9.5.89"/);
   assert.match(sw, /inventario-detalle\.js\?v=71/);
-  assert.match(sw, /aprobaciones-admin\.js\?v=20261109\.1/);
+  assert.match(sw, /aprobaciones-admin\.js\?v=20261109\.1/);\n  assert.match(app, /bajas-multiple\.js","1\.6/);\n  assert.match(sw, /bajas-multiple\.js\?v=1\.6/);
   assert.match(sw, /productos\.js\?v=20261109\.3/);
 });
 
