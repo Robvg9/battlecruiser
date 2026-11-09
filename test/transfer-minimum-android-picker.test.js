@@ -1,19 +1,19 @@
 "use strict";
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
 const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,file),"utf8");
-test("transfer updates an existing destination row before attempting any insert",()=>{
- const sql=read("supabase/migrations/20261109120000_transfer_destination_minimum_guard.sql");
- assert.match(sql,/UPDATE public\.stock[\s\S]*?SET cantidad = cantidad \+ v_cantidad_final/);
- assert.match(sql,/IF NOT FOUND THEN/);
- assert.match(sql,/productos_stock_mixto_minimos/);
- assert.match(sql,/v_minimo_destino IS NULL OR v_minimo_destino <= 0/);
- assert.match(sql,/VALUES \(v_producto_id, p_destino_id, v_cantidad_final, v_minimo_destino, now\(\)\)/);
- assert.doesNotMatch(sql,/VALUES \(v_producto_id, p_destino_id, v_cantidad_final, 0\)/);
+test("transfer can create destination stock first and defer its minimum",()=>{
+ const sql=read("supabase/migrations/20261109150000_transfer_destination_minimum_optional.sql");
+ assert.match(sql,/current_setting\('app\.bc_transfer_destination_write',true\) = 'on'/);
+ assert.match(sql,/set_config\('app\.bc_transfer_destination_write','on',true\)/);
+ assert.match(sql,/set_config\('app\.bc_transfer_destination_write','off',true\)/);
+ assert.match(sql,/VALUES\(v_producto_id,p_destino_id,v_cantidad_final,0,now\(\)\)/);
+ assert.match(sql,/private\.reclamar_idempotencia/);
  assert.doesNotMatch(sql,/DISABLE TRIGGER|DROP TRIGGER|session_replication_role/i);
- assert.match(sql,/Configura primero un stock mínimo positivo para este producto en el almacén de destino/);
+ assert.match(sql,/GRANT EXECUTE ON FUNCTION public\.registrar_transferencia/);
 });
+
 test("transfer minimum fix keeps idempotency and permissions",()=>{
- const sql=read("supabase/migrations/20261109120000_transfer_destination_minimum_guard.sql");
+ const sql=read("supabase/migrations/20261109150000_transfer_destination_minimum_optional.sql");
  assert.match(sql,/CREATE OR REPLACE FUNCTION public\.registrar_transferencia/);
  assert.match(sql,/private\.reclamar_idempotencia/);
  assert.match(sql,/REVOKE ALL ON FUNCTION public\.registrar_transferencia/);
