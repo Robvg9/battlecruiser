@@ -63,7 +63,9 @@ function renderTransferenciasLista() {
 
 function stockDisponibleOrigen(producto_id, origen_id) {
   if (!producto_id || !origen_id) return null;
-  const fila = (_cache.stock || []).find(
+  const stockSnapshot = Array.isArray(window.__BC_TRANSFER_STOCK_SNAPSHOT__)
+    ? window.__BC_TRANSFER_STOCK_SNAPSHOT__ : (_cache.stock || []);
+  const fila = stockSnapshot.find(
     (s) => String(s.producto_id) === String(producto_id) && String(s.almacen_id) === String(origen_id)
   );
   let base = fila ? Number(fila.cantidad) || 0 : 0;

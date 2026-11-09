@@ -346,8 +346,8 @@
     });
   }
 
-  // Either route's 2xx response proves reachability. A slow Auth endpoint will not
-  // mask a healthy Data API (and vice versa). Queue replay still needs confirmed 2xx.
+  // The REST schema root requires a secret key and rejects publishable keys with 401.
+  // Use Auth health for connectivity; data operations report their own authorization/errors.
   if (typeof window.sondearBackend === "function" && !window.sondearBackend.__bcF1Timed) {
     window.sondearBackend = function sondearBackendProtegido() {
       if (sondeoBackendEnCurso) return sondeoBackendEnCurso;
@@ -370,10 +370,7 @@
 
         var controllers = [];
         try {
-          var success = await Promise.any([
-            sondearRuta("auth", baseUrl + "/auth/v1/health", apiKey, controllers),
-            sondearRuta("data-api", baseUrl + "/rest/v1/", apiKey, controllers)
-          ]);
+          var success = await sondearRuta("auth", baseUrl + "/auth/v1/health", apiKey, controllers);
           controllers.forEach(function (controller) {
             try { if (!controller.signal.aborted) controller.abort(); } catch (e) {}
           });
@@ -381,7 +378,7 @@
           registrarDiagnosticoSondeo("online", "response_ok", startedAt, {
             service: success.service,
             httpStatus: typeof success.response.status === "number" ? success.response.status : 0,
-            attemptedServices: "auth+data-api"
+            attemptedServices: "auth-health"
           });
           if (typeof marcarConectividadReal === "function") marcarConectividadReal("online");
           emitirRecuperacionBackendSiPendiente();
@@ -402,7 +399,7 @@
             service: httpError && httpError.service ? httpError.service : undefined,
             httpStatus: httpError && typeof httpError.httpStatus === "number" && httpError.httpStatus > 0 ? httpError.httpStatus : undefined,
             consecutiveFailures: fallosSondeoSeguidos,
-            attemptedServices: "auth+data-api"
+            attemptedServices: "auth-health"
           });
           // Ignore one missed probe while online; the watchdog retries quickly.
           // Two consecutive failures are required before marking the backend offline.

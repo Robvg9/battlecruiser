@@ -286,6 +286,11 @@
   function cerrarModalProducto(cancelar) {
     var modal = document.getElementById('bc-product-modal');
     var form = document.getElementById('form-producto');
+    if (cancelar && form && form.classList.contains('bc-mixed-config-mode') &&
+        typeof window.bcSalirConfiguracionSabores === 'function') {
+      window.bcSalirConfiguracionSabores();
+      return;
+    }
     if (cancelar) {
       if (typeof window.cancelarEdicionProducto === 'function') {
         try {

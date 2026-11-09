@@ -929,9 +929,12 @@ async function iniciarEdicionProducto(p) {
 }
 
 window.bcAbrirConfiguracionSabores = async function (productId, options) {
-  _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : null;
+  const activeTab = document.querySelector(".tab-btn[data-tab].active")?.dataset.tab
+    || document.querySelector(".tab-panel.visible")?.id?.replace(/^tab-/, "")
+    || "productos";
+  _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : activeTab;
   const form = document.getElementById("form-producto");
-  if (form && _bcMixedConfigReturnTab) form.classList.add("bc-mixed-config-mode");
+  if (form) form.classList.add("bc-mixed-config-mode");
   const productTab = document.querySelector('.tab-btn[data-tab="productos"]');
   const productPanel = document.getElementById("tab-productos");
   if (productTab && productPanel && !productPanel.classList.contains("visible")) productTab.click();
@@ -957,6 +960,8 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
   }
   await iniciarEdicionProducto(producto);
   if (typeof window.__BCM26_openProductModal === "function") window.__BCM26_openProductModal();
+  const modalTitle = document.getElementById("bc-product-modal-title");
+  if (modalTitle) modalTitle.textContent = "Configurar sabores y mínimos";
   if (typeof window.__BCM26_setCommercialOptionsExpanded === "function") window.__BCM26_setCommercialOptionsExpanded(true);
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");

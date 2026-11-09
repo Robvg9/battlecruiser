@@ -1,12 +1,13 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.0') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.0';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.1') return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.1';
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
-  let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null;
+  let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
   function canCreate() { return typeof window.tienePermiso === 'function' && window.tienePermiso('bajas','crear'); }
+  function refreshPicker(root) { if (typeof window.__BC_PRODUCT_PICKER_REFRESH__ === 'function') window.__BC_PRODUCT_PICKER_REFRESH__(root || document.body); }
   function message(value, kind) {
     const el = document.getElementById('bc-bajas-message');
     if (!el) return;
@@ -72,15 +73,17 @@
     if (!select) return;
     const old = select.value;
     select.innerHTML = '<option value="" disabled selected hidden>Seleccionar almacén…</option>';
-    warehouses.forEach(item => { const o = document.createElement('option'); o.value=item.id; o.textContent=item.nombre; select.appendChild(o); });
+    warehouses.forEach(item => { const option = document.createElement('option'); option.value=item.id; option.textContent=item.nombre; select.appendChild(option); });
     if (warehouses.some(item => String(item.id) === String(old))) select.value = old;
+    refreshPicker(select);
   }
   function fillProductSelect(select) {
     if (!select) return;
     const old = select.value;
     select.innerHTML = '<option value="" disabled selected hidden>Seleccionar producto…</option>';
-    products.forEach(item => { const o = document.createElement('option'); o.value=item.id; o.textContent=item.nombre; select.appendChild(o); });
+    products.forEach(item => { const option = document.createElement('option'); option.value=item.id; option.textContent=item.nombre; select.appendChild(option); });
     if (products.some(item => String(item.id) === String(old))) select.value = old;
+    refreshPicker(select);
   }
   function addRow() {
     const host = document.getElementById('bc-bajas-lines');
@@ -96,6 +99,7 @@
       '<label class="bc-baja-line-other" hidden><span>Explica el motivo</span><input class="bc-baja-other" maxlength="180" placeholder="Describe el otro motivo"></label>';
     host.appendChild(row);
     fillProductSelect(row.querySelector('.bc-baja-product'));
+    refreshPicker(row);
     const reason = row.querySelector('.bc-baja-reason');
     REASONS.forEach(value => { const o = document.createElement('option'); o.value=value; o.textContent=value; reason.appendChild(o); });
     const otherWrap = row.querySelector('.bc-baja-line-other'), other = row.querySelector('.bc-baja-other');
@@ -124,41 +128,53 @@
     } catch (_) { return false; }
   }
   async function loadCatalogs(force) {
-    if (loading || !canCreate()) return;
+    if (!canCreate()) return false;
+    if (catalogLoadPromise) return catalogLoadPromise;
     const host = ensureUI();
-    if (!host || (!force && products.length && warehouses.length)) return;
+    if (!host) return false;
+    if (!force && products.length && warehouses.length) return true;
     loading = true;
     const add = host.querySelector('#bc-baja-add');
     if (add) add.disabled = true;
     message('Actualizando productos y almacenes autorizados…', '');
-    try {
-      const api = apiClient();
-      if (!api || !await hasSession()) {
-        message('Tu sesión no está activa. Vuelve a iniciar sesión para cargar los catálogos.', 'error');
-        return;
-      }
-      const results = await Promise.all([
-        api.from('productos').select('id,nombre,activo,inventario_mixto,producto_padre_id').eq('activo', true).order('nombre', { ascending: true }),
-        api.from('almacenes').select('id,nombre,activo').eq('activo', true).order('nombre', { ascending: true })
-      ]);
-      if (results[0].error) throw results[0].error;
-      if (results[1].error) throw results[1].error;
-      const raw = Array.isArray(results[0].data) ? results[0].data : [];
-      const operational = typeof window.productosOperativos === 'function'
-        ? window.productosOperativos(raw) : raw.filter(p => !p.inventario_mixto || !!p.producto_padre_id);
-      products = operational.filter(p => p && p.id && p.nombre && p.activo !== false);
-      warehouses = (Array.isArray(results[1].data) ? results[1].data : []).filter(a => a && a.id && a.activo !== false);
-      fillWarehouseSelect();
-      host.querySelectorAll('.bc-baja-product').forEach(fillProductSelect);
-      if (!host.querySelector('.bc-baja-line')) addRow();
-      message(products.length && warehouses.length ? 'Catálogos actualizados. Añade los productos que incluirá esta lista.'
-        : 'No hay productos o almacenes activos disponibles.', products.length && warehouses.length ? 'success' : 'error');
-    } catch (error) {
-      message('No se pudieron cargar productos y almacenes: ' + String(error && (error.message || error) || 'Error desconocido'), 'error');
-    } finally {
-      loading = false;
-      if (add) add.disabled = false;
-    }
+    const request = (async function () {
+      try {
+        const api = apiClient();
+        if (!api || !await hasSession()) {
+          message('Tu sesión no está activa. Vuelve a iniciar sesión para cargar los catálogos.', 'error');
+          return false;
+        }
+        const results = await Promise.all([
+          api.from('productos').select('id,nombre,activo,inventario_mixto,producto_padre_id').eq('activo', true).order('nombre', { ascending: true }),
+          api.from('almacenes').select('id,nombre,activo').eq('activo', true).order('nombre', { ascending: true })
+        ]);
+        if (results[0].error) throw results[0].error;
+        if (results[1].error) throw results[1].error;
+        const raw = Array.isArray(results[0].data) ? results[0].data : [];
+        let operational = raw;
+        if (typeof window.productosOperativos === 'function') {
+          const candidate = window.productosOperativos(raw);
+          if (Array.isArray(candidate)) operational = candidate;
+        } else operational = raw.filter(product => !product.inventario_mixto || !!product.producto_padre_id);
+        products = operational.filter(product => product && product.id && product.nombre && product.activo !== false);
+        warehouses = (Array.isArray(results[1].data) ? results[1].data : []).filter(item => item && item.id && item.activo !== false);
+        fillWarehouseSelect();
+        host.querySelectorAll('.bc-baja-product').forEach(fillProductSelect);
+        if (!host.querySelector('.bc-baja-line')) addRow();
+        refreshPicker(host);
+        if (products.length && warehouses.length) {
+          message(products.length + ' productos y ' + warehouses.length + ' almacenes disponibles. Añade los productos de esta lista.', 'success');
+          return true;
+        }
+        message('No hay productos o almacenes activos disponibles para registrar la Baja.', 'error');
+        return false;
+      } catch (error) {
+        message('No se pudieron cargar productos y almacenes: ' + String(error && (error.message || error) || 'Error desconocido'), 'error');
+        return false;
+      } finally { loading = false; if (add) add.disabled = false; }
+    })();
+    catalogLoadPromise = request.finally(function () { catalogLoadPromise = null; });
+    return catalogLoadPromise;
   }
   async function submit(event) {
     event.preventDefault();
