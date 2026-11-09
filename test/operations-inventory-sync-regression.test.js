@@ -94,6 +94,10 @@ test("Transfer stock uses a fresh authenticated RPC snapshot and avoids stock re
   assert.match(transfer, /tienePermiso\('transferencias','crear'\)/);
   assert.match(transfer, /Supabase tardó demasiado/);
   assert.match(transfer, /await actualizarInventarioConfirmado\(\)/);
+  assert.match(transfer, /stockRefreshPromise/);
+  assert.match(transfer, /window\.__BC_TRANSFER_STOCK_REFRESH__ = actualizarInventarioConfirmado/);
+  assert.match(transferencias, /await refreshStock\(\)/);
+  assert.match(transferencias, /__BC_TRANSFER_STOCK_CONFIRMED__ !== true/);
   assert.match(transferencias, /__BC_TRANSFER_STOCK_SNAPSHOT__/);
   assert.doesNotMatch(transfer, /refrescarStockYSelects/);
   assert.doesNotMatch(transfer, /window\.__BC_STOCK_ERROR__/);

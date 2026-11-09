@@ -102,6 +102,14 @@ function actualizarStockTransferenciaUI() {
   }
   const info = stockDisponibleOrigen(producto_id, origen);
   if (!info) { el.textContent = ""; return; }
+  if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
+    el.textContent = window.__BC_TRANSFER_STOCK_ERROR__
+      ? "Existencias sin confirmar: " + window.__BC_TRANSFER_STOCK_ERROR__
+      : "Actualizando existencias desde Supabase…";
+    el.className = "msg error";
+    if (cantInput) cantInput.removeAttribute("max");
+    return;
+  }
   const disp = info.cantidad;
   el.textContent =
     "Stock disponible en origen: " +
@@ -172,8 +180,15 @@ safeInit("form-transferencia", () => {
       return;
     }
 
+    const refreshStock = window.__BC_TRANSFER_STOCK_REFRESH__;
+    if (typeof refreshStock !== "function" || !(await refreshStock())) {
+      const detail = window.__BC_TRANSFER_STOCK_ERROR__ ? " " + window.__BC_TRANSFER_STOCK_ERROR__ : "";
+      setMsg("msg-transferencias", "No se pudo confirmar el inventario actual desde Supabase. No se inició la transferencia." + detail, false);
+      actualizarStockTransferenciaUI();
+      return;
+    }
     const stockInfo = stockDisponibleOrigen(producto_id, origen);
-    if (stockInfo && stockInfo.cantidad < cantidad) {
+    if (!stockInfo || stockInfo.cantidad < cantidad) {
       const disp = fmtNumTransfer(stockInfo.cantidad);
       setMsg("msg-transferencias", "Stock insuficiente en el almacén origen (disponible: " + disp +
         (stockInfo.aproximado ? " · estimado con pendientes" : "") + ").", false);
@@ -212,6 +227,7 @@ safeInit("form-transferencia", () => {
       setMsg("msg-transferencias", "Transferencia registrada. El stock se movió de origen a destino.", true);
       await refrescarTransferencias();
       await refrescarStockYSelects();
+      if (typeof window.__BC_TRANSFER_STOCK_REFRESH__ === "function") await window.__BC_TRANSFER_STOCK_REFRESH__();
       actualizarStockTransferenciaUI();
     } finally {
       _enviandoTransferencia = false;

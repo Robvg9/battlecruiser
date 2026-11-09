@@ -1151,3 +1151,59 @@ body.bc-product-picker-open{overflow:hidden}
 .bc-bajas-modal-close{width:36px;height:36px;min-height:36px;flex:0 0 36px;border:1px solid rgba(201,162,77,.25);border-radius:8px;background:transparent;color:var(--text);font-size:23px}
 .bc-bajas-modal-content{padding:14px;overflow:auto;overscroll-behavior:contain}
 body.bc-bajas-modal-open{overflow:hidden}
+
+/* Dedicated, compact mode for configuring flavor inventory from Inventory. */
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-form-top,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-edit-legacy-heading,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-commercial-fields > .bc-product-commercial-field,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-commercial-fields > .prod-imagen-campo,
+#bc-product-modal #form-producto.bc-mixed-config-mode #prod-submit-btn {
+  display:none!important;
+}
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-commercial-panel,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-commercial-fields {
+  display:block!important;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+#bc-product-modal #form-producto.bc-mixed-config-mode .prod-inventario-mixto-settings {
+  display:flex!important;
+  flex-direction:column;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:10px;
+  gap:9px;
+}
+#bc-product-modal #form-producto.bc-mixed-config-mode .prod-variantes-lista,
+#bc-product-modal #form-producto.bc-mixed-config-mode .prod-variantes-asignacion,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-warehouse,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-flavors,
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-flavor {
+  min-width:0;
+  max-width:100%;
+}
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-form-actions {
+  justify-content:flex-end;
+  margin-top:10px;
+  padding-top:9px;
+}
+#bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-form-actions #bc-product-modal-cancel {
+  display:inline-flex!important;
+  min-height:40px;
+  align-items:center;
+  justify-content:center;
+  white-space:normal;
+}
+@media(max-width:520px) {
+  #bc-product-modal #form-producto.bc-mixed-config-mode .prod-inventario-mixto-settings {padding:8px;gap:8px}
+  #bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-warehouse {padding:8px}
+  #bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-flavor {grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px}
+  #bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-flavor > strong {grid-column:1/-1}
+  #bc-product-modal #form-producto.bc-mixed-config-mode .prod-variante-row {grid-template-columns:minmax(0,1fr) auto}
+  #bc-product-modal #form-producto.bc-mixed-config-mode .prod-variante-row button {max-width:86px}
+}

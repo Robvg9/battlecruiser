@@ -18,7 +18,7 @@
     return row ? { cantidad: Number(row.cantidad) || 0, aproximado: false } : null;
   }
   function fmt(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
-  let lineas = [], enviando = false, selectors = null, catalogosRefreshPromise = null;
+  let lineas = [], enviando = false, selectors = null, catalogosRefreshPromise = null, stockRefreshPromise = null;
   if (!Array.isArray(window.__BC_TRANSFER_STOCK_SNAPSHOT__)) window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
   if (typeof window.__BC_TRANSFER_STOCK_CONFIRMED__ !== 'boolean') window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
   if (typeof window.__BC_TRANSFER_STOCK_USER_ID__ !== 'string') window.__BC_TRANSFER_STOCK_USER_ID__ = null;
@@ -93,7 +93,7 @@
     })();
     return catalogosRefreshPromise.finally(function () { catalogosRefreshPromise = null; });
   }
-  async function actualizarInventarioConfirmado() {
+  async function ejecutarActualizacionInventarioConfirmado() {
     const api = window.client || (typeof client !== 'undefined' ? client : null);
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('transferencias','crear')) {
       window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
@@ -145,6 +145,14 @@
       return false;
     }
   }
+  function actualizarInventarioConfirmado() {
+    if (stockRefreshPromise) return stockRefreshPromise;
+    const request = ejecutarActualizacionInventarioConfirmado();
+    stockRefreshPromise = request.finally(function () { stockRefreshPromise = null; });
+    return stockRefreshPromise;
+  }
+  window.__BC_TRANSFER_STOCK_REFRESH__ = actualizarInventarioConfirmado;
+
   function validarStock(id, amount, source) {
     if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
       const detail = window.__BC_TRANSFER_STOCK_ERROR__ ? ' Detalle: ' + String(window.__BC_TRANSFER_STOCK_ERROR__) : '';

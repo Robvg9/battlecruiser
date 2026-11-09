@@ -949,13 +949,12 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
 
   if (_bcMixedConfigReturnTab) {
     const submit = document.getElementById("prod-submit-btn");
-    const cancel = document.getElementById("prod-cancelar-edicion");
+    const cancel = document.getElementById("bc-product-modal-cancel");
     if (submit) submit.hidden = true;
-    // Show the safe exit before any session/catalogue/snapshot read can wait.
+    // A dedicated, visible exit is available before any catalogue/snapshot read can wait.
     if (cancel) {
       cancel.hidden = false;
-      cancel.classList.remove("hidden");
-      cancel.textContent = "Volver a Inventario";
+      cancel.textContent = _bcMixedConfigReturnTab === "inventario" ? "Volver a Inventario" : "Cerrar configuración";
     }
   }
   await iniciarEdicionProducto(producto);

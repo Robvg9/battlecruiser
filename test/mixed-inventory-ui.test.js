@@ -58,6 +58,10 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.match(products, /_bcMixedConfigReturnTab = options && options\.returnTo \? String\(options\.returnTo\) : activeTab/);
   assert.match(productModal, /form\.classList\.contains\('bc-mixed-config-mode'\)/);
   assert.match(productModal, /window\.bcSalirConfiguracionSabores\(\)/);
+  assert.match(products, /document\.getElementById\("bc-product-modal-cancel"\)/);
+  assert.match(read("public/style.css"), /bc-mixed-config-mode \.bc-product-form-top/);
+  assert.match(read("public/style.css"), /bc-mixed-config-mode #prod-submit-btn/);
+  assert.match(read("public/style.css"), /bc-mixed-config-mode \.prod-inventario-mixto-settings/);
   assert.ok(products.includes('submit.hidden = true'));
   assert.ok(products.includes('cancel.textContent = "Volver a Inventario"'));
   const flavorOpen = products.indexOf("window.bcAbrirConfiguracionSabores = async function");
