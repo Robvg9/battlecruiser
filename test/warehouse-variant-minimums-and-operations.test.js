@@ -21,15 +21,14 @@ const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
 
 test("Purchases can add stock before a minimum is configured, then leave minimum setup pending", () => {
-  assert.match(purchaseMinimumMigration, /app\\.bc_purchase_stock_write/);
-  assert.match(purchaseMinimumMigration, \/bc_apply_stock_purchase_increment/);
-  assert.match(purchaseMinimumMigration, /CREATE OR REPLACE FUNCTION public\\.registrar_compra\\(/);
-  assert.match(purchaseMinimumMigration, /CREATE OR REPLACE FUNCTION public\\.registrar_compra_multiple\\(/);
+  assert.match(purchaseMinimumMigration, /app\.bc_purchase_stock_write/);
+  assert.match(purchaseMinimumMigration, /private\.bc_apply_stock_purchase_increment/);
+  assert.match(purchaseMinimumMigration, /CREATE OR REPLACE FUNCTION public\.registrar_compra\(/);
+  assert.match(purchaseMinimumMigration, /CREATE OR REPLACE FUNCTION public\.registrar_compra_multiple\(/);
   const purchaseFunctions = purchaseMinimumMigration.slice(purchaseMinimumMigration.indexOf("CREATE OR REPLACE FUNCTION public.registrar_compra("));
-  assert.doesNotMatch(purchaseFunctions, /INSERT INTO public\\.stock/i);
-  assert.match(purchaseFunctions, /PERFORM private\\.bc_apply_stock_purchase_increment/);
+  assert.doesNotMatch(purchaseFunctions, /INSERT INTO public\.stock/i);
+  assert.match(purchaseFunctions, /PERFORM private\.bc_apply_stock_purchase_increment/);
 });
-
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
   assert.match(migration, /ALTER TABLE public\.stock ALTER COLUMN minimo SET NOT NULL/);
