@@ -40,6 +40,6 @@ test("purchase and movement modal cache keys match the active release", () => {
   assert.ok(appVersion && workerVersion);
   assert.equal(workerVersion[1], appVersion[1]);
   assert.ok(serviceWorker.includes("./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.13"));
-  assert.ok(serviceWorker.includes("./js/compra-multiple.js?v=27.15"));
+  assert.ok(serviceWorker.includes("./js/compra-multiple.js?v=27.16"));
   assert.ok(index.includes('app.js?v=' + appVersion[1]));
 });
