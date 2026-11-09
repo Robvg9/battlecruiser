@@ -105,7 +105,7 @@ BEGIN
     jsonb_build_array(
       jsonb_build_object(
         'almacen_id',v_store,'producto_id',v_product_a,'cantidad',3,
-        'motivo','Rotura','motivo_general','Retiro por control de qualidade'
+        'motivo','Rotura','motivo_general','Retiro por control de calidad'
       ),
       jsonb_build_object(
         'almacen_id',v_store,'producto_id',v_product_b,'cantidad',4,
@@ -115,10 +115,10 @@ BEGIN
     'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0001'::uuid
   );
   -- Fingerprints must match the exact first payload; retry with it below.
-  IF (v_retry->>'solicitud_id')::uuid=v_request THEN
-    NULL;
-  ELSE
-    RAISE EXCEPTION 'An idempotent retry created a second request.';
+  IF (v_retry->>'solicitud_id')::uuid<>v_request
+     OR (v_retry->>'count')::integer<>2
+     OR jsonb_array_length(v_retry->'bajas')<>2 THEN
+    RAISE EXCEPTION 'An idempotent retry did not return the same grouped request and lines.';
   END IF;
 
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
