@@ -86,7 +86,7 @@ test("multi-line Baja submissions stay one administrative request with per-line 
   assert.match(sql, /motivo_general/);
   assert.match(sql, /obtener_detalle_solicitud_baja_admin/);
   assert.match(sql, /resolver_solicitud_bajas_admin/);
-  assert.match(sql, /REVOKE ALL ON TABLE public\.bajas_solicitudes FROM PUBLIC,anon,authenticated/);
+  assert.match(sql, /REVOKE ALL ON TABLE public\.bajas_solicitudes FROM PUBLIC,anon,authenticated,service_role/);
   assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
 });
 
