@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/migrations/20261107223000_baja_owner_autoapproval_and_admin_queue.sql'
+      - 'supabase/migrations/20261108180000_bajas_multiple_atomic_request.sql'
       - 'test/baja-approval-fixture.sql'
       - 'test/baja-approval-contract.sql'
       - '.github/workflows/baja-approval-postgres.yml'
@@ -58,6 +59,15 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_baja_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261107223000_baja_owner_autoapproval_and_admin_queue.sql
+
+      - name: Apply atomic multi-Baja migration
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_baja_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261108180000_bajas_multiple_atomic_request.sql
 
       - name: Verify approval, FIFO and authorization contract
         env:

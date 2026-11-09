@@ -1082,16 +1082,72 @@ textarea:focus-visible {
 }
 
 
-/* Search inside product pickers without changing the underlying select contract. */
-.bc-product-select-search-wrap{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;width:100%;min-width:0}
-.bc-product-select-search{box-sizing:border-box;width:100%;min-width:0;min-height:34px;padding:7px 9px;border:1px solid rgba(212,176,92,.24);border-radius:7px;background:rgba(0,0,0,.18);color:var(--mist);font:inherit;font-size:12px}
-.bc-product-select-no-results{color:var(--mist);font-size:10px;line-height:1.25}
-
+/* Product selection: one compact field, one shared searchable modal. */
+.bc-product-picker-field{position:relative;display:block;width:100%;min-width:0}
+.bc-product-picker-native-select{position:absolute!important;width:1px!important;height:1px!important;min-height:1px!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%)!important;overflow:hidden!important;white-space:nowrap!important;border:0!important;padding:0!important}
+.bc-product-picker-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:9px 12px;border:1px solid rgba(212,176,92,.32);border-radius:8px;background:var(--void,#0c1c18);color:var(--text);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.bc-product-picker-trigger:after{content:"⌕";font-size:18px;color:var(--gold);flex:0 0 auto}
+.bc-product-picker-trigger.is-placeholder{color:var(--mist)}
+.bc-product-picker-modal[hidden]{display:none!important}
+.bc-product-picker-modal{position:fixed;inset:0;z-index:100500;display:grid;place-items:center;padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom))}
+.bc-product-picker-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.74);backdrop-filter:blur(4px)}
+.bc-product-picker-dialog{position:relative;display:flex;flex-direction:column;gap:12px;width:min(100%,560px);max-height:min(82dvh,720px);padding:16px;border:1px solid rgba(212,176,92,.35);border-radius:14px;background:var(--stone,#16211e);box-shadow:0 20px 70px rgba(0,0,0,.5);min-height:220px}
+.bc-product-picker-header{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--gold-bright,#e4c77b)}
+.bc-product-picker-close{width:36px;height:36px;min-height:36px;border:1px solid rgba(212,176,92,.28);border-radius:8px;background:transparent;color:var(--text);font-size:22px}
+#bc-product-picker-search{box-sizing:border-box;width:100%;min-height:46px;padding:10px 12px;border:1px solid rgba(212,176,92,.42);border-radius:9px;background:var(--void,#0c1c18);color:var(--text);font:inherit;font-size:15px}
+.bc-product-picker-results{display:flex;flex-direction:column;gap:5px;overflow-y:auto;overscroll-behavior:contain;min-height:90px}
+.bc-product-picker-result{width:100%;min-height:42px;padding:10px 12px;border:1px solid rgba(212,176,92,.14);border-radius:8px;background:rgba(0,0,0,.14);color:var(--text);font:inherit;text-align:left}
+.bc-product-picker-result.is-selected{border-color:var(--gold);background:rgba(201,162,77,.12)}
+.bc-product-picker-status{margin:0;color:var(--mist);font-size:11px}
+body.bc-product-picker-open{overflow:hidden}
 /* Keep the only flavor save actions visible while the allocation panel scrolls. */
 .bc-mixed-assignment-actions{position:sticky;bottom:0;z-index:5;display:flex;gap:7px;flex-wrap:wrap;padding:8px 0 max(8px,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(16,28,40,0),rgba(16,28,40,.98) 24%);backdrop-filter:blur(8px)}
 .bc-mixed-assignment-actions button{flex:1 1 130px;min-height:38px}
 
-/* Inventory opens a focused flavor-only mode instead of the full product editor. */
-#form-producto.bc-mixed-config-mode>:not(#prod-inventario-mixto-settings):not(#prod-submit-btn):not(#prod-cancelar-edicion):not(#prod-editando-id){display:none!important}
+/* Inventory opens the official M26 modal and exposes its nested flavor settings. */
+#form-producto.bc-mixed-config-mode>:not(.bc-product-commercial-settings):not(.bc-product-form-actions):not(#prod-editando-id){display:none!important}
 #form-producto.bc-mixed-config-mode{gap:0}
-#form-producto.bc-mixed-config-mode #prod-inventario-mixto-settings{margin:0}
+#form-producto.bc-mixed-config-mode .bc-product-commercial-settings{display:block!important;visibility:visible!important}
+#form-producto.bc-mixed-config-mode .bc-product-commercial-toggle{display:none!important}
+#form-producto.bc-mixed-config-mode .bc-product-commercial-panel{display:block!important;visibility:visible!important;height:auto!important}
+#form-producto.bc-mixed-config-mode .bc-product-commercial-fields{display:flex!important;flex-direction:column!important}
+#form-producto.bc-mixed-config-mode .bc-product-commercial-fields>:not(#prod-inventario-mixto-settings){display:none!important}
+#form-producto.bc-mixed-config-mode #prod-inventario-mixto-settings{display:block!important;visibility:visible!important;margin:0}
+#form-producto.bc-mixed-config-mode #prod-variantes-editor,
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion{display:flex!important;visibility:visible!important}
+#form-producto.bc-mixed-config-mode .bc-product-form-actions{display:none!important}
+.bc-mixed-assignment-error-wrap{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.bc-mixed-assignment-error-wrap .cc-accion{min-height:38px;white-space:normal}
+
+/* Atomic multi-line Baja form. */
+.bc-bajas-multiple{display:flex;flex-direction:column;gap:12px}
+.bc-bajas-multiple .bc-bajas-intro{margin:0;color:var(--mist);font-size:12px;line-height:1.45}
+.bc-bajas-multiple .bc-bajas-lines{display:flex;flex-direction:column;gap:9px}
+.bc-bajas-multiple .bc-baja-line{display:grid;grid-template-columns:minmax(0,1fr) 112px 36px;gap:8px;align-items:end;padding:10px;border:1px solid rgba(212,176,92,.2);border-radius:9px;background:rgba(0,0,0,.12)}
+.bc-bajas-multiple .bc-baja-line-product{grid-column:1/3;min-width:0}
+.bc-bajas-multiple .bc-baja-line-qty{min-width:0}
+.bc-bajas-multiple .bc-baja-line-reason{grid-column:1/3;min-width:0}
+.bc-bajas-multiple .bc-baja-line-other{grid-column:1/-1}
+.bc-bajas-multiple .bc-baja-line-remove{width:36px;height:36px;min-height:36px;padding:0;font-size:20px}
+.bc-bajas-multiple label{display:grid;gap:5px;min-width:0}
+.bc-bajas-multiple label>span{font-size:11px;color:var(--mist)}
+.bc-bajas-multiple input,.bc-bajas-multiple select{box-sizing:border-box;width:100%;min-width:0;min-height:40px;padding:8px 10px;border:1px solid rgba(212,176,92,.28);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font:inherit;font-size:13px}
+.bc-bajas-multiple .bc-bajas-actions{display:flex;flex-wrap:wrap;gap:8px}
+.bc-bajas-multiple .bc-bajas-actions button{flex:1 1 155px;min-height:42px}
+.bc-bajas-multiple #bc-baja-submit{background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;border:0;font-weight:700}
+.bc-bajas-multiple .bc-bajas-message{margin:0;min-height:1.2em;font-size:12px}
+.bc-bajas-multiple .bc-bajas-message.is-error{color:#e7a078}
+.bc-bajas-multiple .bc-bajas-message.is-success{color:#9bc9a5}
+@media(max-width:420px){.bc-bajas-multiple .bc-baja-line{grid-template-columns:minmax(0,1fr) 92px 32px;gap:6px;padding:8px}.bc-bajas-multiple .bc-baja-line-remove{width:32px;height:34px;min-height:34px}}
+
+/* Batch Bajas open in one responsive modal from the Operations hub. */
+.bc-bajas-multiple-modal[hidden]{display:none!important}
+.bc-bajas-multiple-modal{position:fixed;inset:0;z-index:100700;display:grid;place-items:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.bc-bajas-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(5px)}
+.bc-bajas-modal-dialog{position:relative;display:flex;flex-direction:column;width:min(100%,620px);max-height:92dvh;overflow:auto;border:1px solid rgba(201,162,77,.28);border-radius:14px;background:linear-gradient(180deg,rgba(16,36,32,.99),rgba(10,24,20,.99));box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.bc-bajas-modal-head{position:sticky;top:0;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(201,162,77,.16);background:rgba(14,30,26,.98)}
+.bc-bajas-modal-head h2{margin:0;color:var(--gold-bright);font-size:19px}
+.bc-bajas-modal-head p{margin:4px 0 0;color:var(--mist);font-size:11px;line-height:1.35}
+.bc-bajas-modal-close{width:36px;height:36px;min-height:36px;flex:0 0 36px;border:1px solid rgba(201,162,77,.25);border-radius:8px;background:transparent;color:var(--text);font-size:23px}
+.bc-bajas-modal-content{padding:14px;overflow:auto;overscroll-behavior:contain}
+body.bc-bajas-modal-open{overflow:hidden}

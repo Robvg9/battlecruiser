@@ -208,51 +208,12 @@
 
   async function openBaja() {
     if (!requireCrear('bajas')) return;
-    if (!(await ensureOperationCatalogs(true))) return;
-    openModal({
-      icon: '📦', title: 'Registrar baja', submitText: 'Enviar a revisión',
-      submitBg: 'rgba(180,60,60,.9)', submitColor: '#fff',
-      bodyHtml:
-        '<div class="field"><span>Almacén</span><select id="op-m-alm" required>' + storeOpts(false) + '</select></div>' +
-        '<div class="field"><span>Producto</span><select id="op-m-prod" required>' + productOpts() + '</select></div>' +
-        '<div class="field"><span>Cantidad</span><input id="op-m-cant" type="number" min="0.001" step="any" placeholder="0" required></div>' +
-        '<div class="field"><span>Motivo de la baja</span><select id="op-m-motivo" required>' +
-          '<option value="">Selecciona un motivo…</option><option value="Rotura">Rotura</option>' +
-          '<option value="Hechado a perder">Hechado a perder</option><option value="El Jefe lo cogió">El Jefe lo cogió</option>' +
-          '<option value="Vencimiento">Vencimiento</option><option value="Daño o deterioro">Daño o deterioro</option>' +
-          '<option value="Pérdida">Pérdida</option><option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option>' +
-        '</select></div><div class="field" id="op-m-otro-wrap" hidden><span>Explica el motivo</span><input id="op-m-otro" maxlength="180" placeholder="Describe el motivo"></div>' +
-        '<p class="muted" style="margin:0;font-size:12px">La baja se enviará a revisión. El stock no cambia hasta su aprobación.</p>',
-      afterOpen: function (back) {
-        var reason = back.querySelector('#op-m-motivo');
-        var otherWrap = back.querySelector('#op-m-otro-wrap');
-        var otherInput = back.querySelector('#op-m-otro');
-        if (!reason || !otherWrap || !otherInput) return;
-        function syncOther() {
-          var isOther = reason.value === 'Otro';
-          otherWrap.hidden = !isOther;
-          otherInput.required = isOther;
-          if (!isOther) otherInput.value = '';
-        }
-        reason.addEventListener('change', syncOther);
-        syncOther();
-      },
-      onSubmit: async function (setMsg) {
-        if (!requireCrear('bajas')) { setMsg('Sin permiso para registrar bajas.', false); throw new Error('permiso'); }
-        var alm = document.getElementById('op-m-alm').value;
-        var prod = document.getElementById('op-m-prod').value;
-        var cant = Number(document.getElementById('op-m-cant').value);
-        var motivoSeleccionado = document.getElementById('op-m-motivo').value;
-        var otro = document.getElementById('op-m-otro');
-        var motivo = motivoSeleccionado === 'Otro' ? ('Otro: ' + String(otro && otro.value || '').trim()) : motivoSeleccionado;
-        if (!alm || !prod || !(cant > 0) || !motivo || (motivoSeleccionado === 'Otro' && !(otro && otro.value.trim()))) { setMsg('Completa almacén, producto, cantidad y motivo.', false); throw new Error('validación'); }
-        await rpc('crear_baja', { p_almacen_id: alm, p_producto_id: prod, p_cantidad: cant, p_motivo: motivo, p_idempotency_key: key() });
-        setMsg('✓ Solicitud enviada a revisión.', true);
-        if (typeof refrescarAprobacionesAdmin === 'function') refrescarAprobacionesAdmin();
-        if (typeof refrescarFinanzas === 'function') refrescarFinanzas();
-        setTimeout(closeModal, 900);
-      }
-    });
+    if (typeof window.abrirBajasMultiple !== 'function') {
+      alert('El listado de Bajas todavía se está cargando. Vuelve a abrir Operaciones en unos segundos.');
+      return;
+    }
+    const opened = await window.abrirBajasMultiple();
+    if (!opened) alert('No se pudo abrir la lista de Bajas. Comprueba tu sesión y vuelve a intentar.');
   }
 
   async function openReinversion() {
@@ -449,7 +410,7 @@
       cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
     }
     if (can('bajas', 'ver') && can('bajas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Productos que salen del inventario por pérdida, daño o consumo interno.', go: 'Registrar baja', fn: openBaja });
+      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Registra varios productos y cantidades en una sola lista.', go: 'Registrar baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
       cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });

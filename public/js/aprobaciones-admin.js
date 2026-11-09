@@ -24,11 +24,11 @@ function select(id,label,items){return '<label class="field"><span>'+label+'</sp
 let formsLoading=false;
 async function ensureForms(){
   const tab=document.getElementById('tab-operacion');
-  if(!tab||(!can('gastos','crear')&&!can('bajas','crear'))||!(await hasLiveSession()))return;
+  if(!tab||!can('gastos','crear')||!(await hasLiveSession()))return;
   let block=document.getElementById('admin-solicitudes');
   if(!block){
     block=document.createElement('div');block.className='cc-bloque';block.id='admin-solicitudes';
-    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos quedan pendientes. Las bajas se aprueban automáticamente cuando quien las registra tiene permiso global para aprobarlas; las demás esperan revisión administrativa.</p><div class="admin-sol-grid"></div>';
+    block.innerHTML='<h3>Solicitar aprobación</h3><p class="muted">Los gastos quedan pendientes de revisión administrativa.</p><div class="admin-sol-grid"></div>';
     tab.insertBefore(block,tab.firstChild);
   }
   const grid=block.querySelector('.admin-sol-grid');
@@ -38,83 +38,12 @@ async function ensureForms(){
     form.onsubmit=async e=>{e.preventDefault();try{await rpc('crear_gasto',{p_concepto:document.getElementById('adm-g-concepto').value,p_monto:Number(document.getElementById('adm-g-monto').value),p_descripcion:document.getElementById('adm-g-desc').value||null,p_idempotency_key:key()});form.reset();await load();alert('✓ Gasto enviado a aprobación.')}catch(x){alert(x.message||x)}};
     grid.appendChild(form);
   }
-  if(!can('bajas','crear')||grid.querySelector('#adm-baja-form')||formsLoading)return;
-  formsLoading=true;
-  let catalogsFresh=true;
-  try{
-    try {
-      if(typeof window.bcRefrescarCatalogosOperativos==='function') {
-        const ready=await window.bcRefrescarCatalogosOperativos(true);
-        if(!ready)return;
-      } else {
-        const api=window.client || (typeof client!=='undefined'?client:null);
-        if(api && typeof api.from==='function') {
-          const results=await Promise.all([
-            api.from('productos').select('id,nombre,unidad,precio_normal,precio_mayorista,activo,imagen_url,categoria_id,presentacion_id,inventario_mixto,producto_padre_id,variante_nombre,categorias(nombre),presentaciones(nombre)').order('nombre'),
-            api.from('almacenes').select('id,nombre,tipo,activo').order('nombre')
-          ]);
-          if(results[0].error)throw results[0].error;
-          if(results[1].error)throw results[1].error;
-          if(!window._cache)window._cache={};
-          window._cache.productos=Array.isArray(results[0].data)?results[0].data:[];
-          window._cache.almacenes=Array.isArray(results[1].data)?results[1].data:[];
-        } else {
-          throw new Error('Cliente Supabase no disponible para actualizar catálogos.');
-        }
-      }
-    } catch(error) {
-      catalogsFresh=false;
-      console.warn('[BattleCruiser] No se pudieron actualizar catálogos de Baja desde Supabase:',error);
-    }
-    if(!catalogsFresh) {
-      let warning=grid.querySelector('#adm-baja-catalog-warning');
-      if(!warning){warning=document.createElement('p');warning.id='adm-baja-catalog-warning';warning.className='msg';grid.appendChild(warning)}
-      warning.textContent='No se pudo confirmar la actualización de los catálogos desde Supabase. No se habilita la baja con datos posiblemente desactualizados.';
-      return;
-    }
-    const raw=productos();
-    const operational=typeof window.productosOperativos==='function'
-      ? window.productosOperativos(raw)
-      : raw.filter(p=>p&&p.activo!==false&&(!p.inventario_mixto||!!p.producto_padre_id));
-    const activeProducts=operational.filter(p=>p&&p.activo!==false);
-    const activeStores=almacenes();
-    let warning=grid.querySelector('#adm-baja-catalog-warning');
-    if(!activeProducts.length||!activeStores.length){
-      if(!warning){warning=document.createElement('p');warning.id='adm-baja-catalog-warning';warning.className='msg';grid.appendChild(warning)}
-      warning.textContent='No se pudieron cargar productos y almacenes activos. Actualiza los catálogos antes de solicitar una baja.';
-      return;
-    }
-    if(warning)warning.remove();
-    const form=document.createElement('form');form.id='adm-baja-form';form.className='inline-form';
-    form.innerHTML='<h4>📉 Baja</h4>'+select('adm-b-alm','Almacén',activeStores)+select('adm-b-prod','Producto',activeProducts)+
-      '<input id="adm-b-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required>'+
-      '<select id="adm-b-motivo" required><option value="" disabled selected hidden>Motivo de la baja</option>'+
-      '<option value="Rotura">Rotura</option><option value="Hechado a perder">Hechado a perder</option>'+
-      '<option value="El Jefe lo cogió">El Jefe lo cogió</option><option value="Vencimiento">Vencimiento</option>'+
-      '<option value="Daño o deterioro">Daño o deterioro</option><option value="Pérdida">Pérdida</option>'+
-      '<option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option></select>'+
-      '<input id="adm-b-otro" maxlength="180" placeholder="Explica el otro motivo" hidden>'+
-      '<button type="submit">'+(can('bajas','editar_any')||can('auditoria','editar_any')?'Registrar y aprobar Baja':'Enviar a revisión')+'</button>';
-    const reason=form.querySelector('#adm-b-motivo'),other=form.querySelector('#adm-b-otro');
-    reason.addEventListener('change',()=>{other.hidden=reason.value!=='Otro';other.required=reason.value==='Otro';if(!other.required)other.value=''});
-    form.onsubmit=async e=>{
-      e.preventDefault();
-      const warehouse=form.querySelector('#adm-b-alm').value,product=form.querySelector('#adm-b-prod').value;
-      const quantity=Number(form.querySelector('#adm-b-cant').value),selected=reason.value;
-      const motive=selected==='Otro'?'Otro: '+String(other.value||'').trim():selected;
-      if(!warehouse||!product||!(quantity>0)||!selected||(selected==='Otro'&&!other.value.trim())){alert('Completa almacén, producto, cantidad y motivo de la baja.');return}
-      try{
-        const ownerApproval=can('bajas','editar_any')||can('auditoria','editar_any');
-        await rpc('crear_baja',{p_almacen_id:warehouse,p_producto_id:product,p_cantidad:quantity,p_motivo:motive,p_idempotency_key:key()});
-        form.reset();other.hidden=true;other.required=false;await load();
-        alert(ownerApproval
-          ? '✓ Baja autoaprobada. El stock y FIFO ya fueron actualizados.'
-          : '✓ Baja enviada a aprobación.');
-      }
-      catch(x){alert(x.message||x)}
-    };
-    grid.appendChild(form);
-  }finally{formsLoading=false}
+  // Bajas are entered only through the dedicated batch editor.
+  if(can('bajas','crear')){
+    const stale=grid.querySelector('#adm-baja-form');if(stale)stale.remove();
+    const warning=grid.querySelector('#adm-baja-catalog-warning');if(warning)warning.remove();
+  }
+
 }
 async function start(){if(!(await hasLiveSession()))return;ensurePanel();await ensureForms();load();if(!window.__bcAdminApprovalTimer)window.__bcAdminApprovalTimer=setInterval(()=>{ensureForms();load()},30000)}
 window.refrescarAprobacionesAdmin=load;document.addEventListener('DOMContentLoaded',()=>setTimeout(start,1200));document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tab]');if(b)setTimeout(()=>{ensureForms();if(b.dataset.tab==='resumen')load()},300)});

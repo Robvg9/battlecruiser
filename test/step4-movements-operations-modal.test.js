@@ -45,7 +45,7 @@ function setup(t) {
   // clear this flag before exercising the retry path.
   window.client = {
     auth: {
-      getSession: async () => ({ data: { session: { user: { id: "owner-fixture" } } }, error: null }),
+      getSession: async () => ({ data: { session: { user: { id: "owner-fixture" }, access_token: "test-access-token" } }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
     }
   };
@@ -161,7 +161,7 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   assert.notEqual(multiple, -1, "app.js debe cargar el módulo de transferencias múltiples");
   assert.ok(multiple < modal, "el panel múltiple debe existir antes de inicializar el modal");
   assert.ok(modal < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
-  assert.match(sw, /movimiento-multiple\.js\?v=20261108\.1/);
+  assert.match(sw, /movimiento-multiple\.js\?v=20261108\.2/);
 });test("Transferencias: añadir varios productos registra una sola operación con todas las líneas", async (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="transferencias"]').click();
@@ -177,7 +177,9 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   panel.querySelector("#mov-multiple-add").click();
   assert.equal(window.__BC_MOVIMIENTO_MULTIPLE_STATE__().lineas.length, 2);
   panel.querySelector("#mov-multiple-confirmar").click();
-  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  for (let attempt = 0; attempt < 10 && window.__transferCalls.length === 0; attempt++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
   assert.equal(window.__transferCalls.length, 1, "la lista completa debe usar un solo RPC");
   assert.equal(window.__transferCalls[0].type, "transferencia");
   assert.deepEqual(

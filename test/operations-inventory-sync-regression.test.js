@@ -46,17 +46,21 @@ test("Operations hub reloads both catalogs from Supabase instead of trusting non
   assert.match(operationsHub, /window\._cache\.productos = Array\.isArray\(results\[0\]\.data\)/);
   assert.match(operationsHub, /window\._cache\.almacenes = Array\.isArray\(results\[1\]\.data\)/);
   assert.match(operationsHub, /window\.bcRefrescarCatalogosOperativos = ensureOperationCatalogs/);
-  assert.match(operationsHub, /rpc\('crear_baja'/);
+  assert.match(operationsHub, /async function openBaja\(\)/);
+  assert.match(operationsHub, /window\.abrirBajasMultiple/);
+  assert.doesNotMatch(operationsHub, /rpc\('crear_baja'/);
   assert.doesNotMatch(operationsHub, /rpc\('crear_merma'/);
 });
 
-test("Finance and approval Baja forms require fresh catalogs before use", () => {
-  assert.match(finance, /window\.bcRefrescarCatalogosOperativos\(true\)/);
-  assert.match(finance, /catalogReady\s*\?\s*\{products:/);
-  assert.match(finance, /rpc\('crear_baja'/);
-  assert.match(approvals, /window\.bcRefrescarCatalogosOperativos\(true\)/);
-  assert.match(approvals, /catalogsFresh/);
-  assert.match(approvals, /No se pudo confirmar la actualización de los catálogos/);
+test("Baja form has one authenticated batch entry point and no competing single-row forms", () => {
+  const bajas = read("public/js/bajas-multiple.js");
+  assert.match(bajas, /async function hasSession/);
+  assert.match(bajas, /api\.from\('productos'\)/);
+  assert.match(bajas, /api\.from\('almacenes'\)/);
+  assert.match(bajas, /api\.rpc\('crear_bajas_multiple'/);
+  assert.match(operationsHub, /window\.abrirBajasMultiple/);
+  assert.doesNotMatch(finance, /form-salida-producto|rpc\('crear_baja'/);
+  assert.doesNotMatch(approvals, /rpc\('crear_baja'/);
 });
 
 test("A forced stock refresh bypasses withCache and updates the shared stock cache", () => {
@@ -69,7 +73,8 @@ test("A forced stock refresh bypasses withCache and updates the shared stock cac
   assert.match(warehouses, /window\.__BC_STOCK_CONFIRMED__ = true/);
   assert.match(warehouses, /if \(!force\) return _stockCargaPromise/);
   assert.match(warehouses, /pendingRead\.catch/);
-  assert.match(warehouses, /return cargarStockAlmacenes\(true\)/);
+  assert.match(warehouses, /return cargarStockAlmacenes\(true, true\)/);
+  assert.match(warehouses, /_stockCargaForcedPromise/);
 });
 
 test("A committed purchase refresh error is reported as a refresh issue, not as a failed purchase", () => {
@@ -84,7 +89,7 @@ test("Transfer stock is refreshed after inventory changes and no longer uses the
   assert.match(transfer, /window\.refrescarStockYSelects\(\)/);
   assert.match(transfer, /No se pudo sincronizar inventario en Transferencias/);
   assert.match(transfer, /detail\.operation === 'compra'/);
-  assert.match(transfer, /window\.__BC_STOCK_CONFIRMED__ === false/);
+  assert.match(transfer, /window\.__BC_STOCK_CONFIRMED__ !== true/);
   assert.match(transfer, /<option value="" disabled selected hidden>Origen<\/option>/);
   assert.match(transfer, /<option value="" disabled selected hidden>Destino<\/option>/);
   assert.match(transfer, /<option value="" disabled selected hidden>Producto<\/option>/);
@@ -96,12 +101,13 @@ test("Field labels are hidden, disabled placeholders rather than selectable drop
     "Producto",
     "Unidad base",
     "Seleccionar…",
-    "Motivo de la baja"
+    "Seleccionar motivo"
   ]) {
     assert.ok(
       purchase.includes('disabled selected hidden>' + text) ||
       finance.includes('disabled selected hidden>' + text) ||
-      approvals.includes('disabled selected hidden>' + text),
+      approvals.includes('disabled selected hidden>' + text) ||
+      read("public/js/bajas-multiple.js").includes('disabled selected hidden>' + text + '…'),
       "expected hidden disabled placeholder: " + text
     );
   }

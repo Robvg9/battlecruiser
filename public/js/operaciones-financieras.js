@@ -13,7 +13,7 @@
   function ensure(){
     const tab=document.getElementById('tab-operacion');
     if(!tab||document.getElementById(ID))return;
-    if(!(can('reinversiones','crear')||can('gastos','crear')||can('bajas','crear')||can('gastos','editar_any')||can('auditoria','editar_any')))return;
+    if(!(can('reinversiones','crear')||can('gastos','crear')||can('gastos','editar_any')||can('auditoria','editar_any')))return;
     const b=document.createElement('div');b.className='cc-bloque';b.id=ID;
     b.innerHTML=`<h3>💰 Operaciones de caja e inventario</h3><p class="muted">Gasto = sale dinero. Baja = sale producto. Reinversión = sale dinero y entra producto.</p><div id="fin-gasto-wrap"></div><div id="fin-salida-wrap"></div><form id="form-reinversion" class="inline-form"><h4>🟢 Reinversión</h4><select id="rein-almacen" required><option value="" disabled selected hidden>Almacén</option></select><input id="rein-proveedor" placeholder="Proveedor (opcional)"><div id="rein-lineas" class="lista"></div><div class="btn-row"><button type="button" id="rein-add">+ Agregar producto</button><button type="submit">Registrar reinversión</button></div><p class="msg" id="rein-msg"></p></form><div class="cc-bloque" id="fin-historial"><h4>📒 Movimientos de caja</h4><div class="lista" id="fin-caja-lista"><p class="lista-estado">Cargando…</p></div><h4>📦 Reinversiones recientes</h4><div class="lista" id="fin-reinv-lista"><p class="lista-estado">Cargando…</p></div></div>`;
     tab.insertBefore(b,tab.firstChild);
@@ -22,7 +22,6 @@
     document.getElementById('form-reinversion').onsubmit=submit;
     addLine();
     ensureGasto();
-    ensureSalida();
     refrescarFinanzas();
   }
 
@@ -44,45 +43,6 @@
       e.target.reset();msg.textContent='✓ Gasto enviado a aprobación. No descuenta caja hasta ser aprobado.';
       if(typeof refrescarAprobacionesAdmin==='function')refrescarAprobacionesAdmin();
       await refrescarFinanzas();
-    }catch(err){msg.textContent='No se pudo registrar: '+(err.message||err)}
-  }
-
-  function ensureSalida(){
-    const host=document.getElementById('fin-salida-wrap');
-    if(!host||document.getElementById('form-salida-producto')||!can('bajas','crear'))return;
-    const old=document.querySelectorAll('#admin-solicitudes form');
-    old.forEach(f=>{const h=f.querySelector('h4');if(h&&/(Merma|Baja)/i.test(h.textContent))f.style.display='none'});
-    host.innerHTML=`<form id="form-salida-producto" class="inline-form">
-      <h4>📉 Registrar baja de producto</h4>
-      <select id="sal-almacen" required><option value="" disabled selected hidden>Almacén</option></select>
-      <select id="sal-prod" required>${productOptions()}</select>
-      <input id="sal-cant" type="number" min="0.001" step="any" placeholder="Cantidad" required>
-      <select id="sal-motivo" required>
-        <option value="" disabled selected hidden>Motivo de la baja</option><option value="Rotura">Rotura</option>
-        <option value="Hechado a perder">Hechado a perder</option><option value="El Jefe lo cogió">El Jefe lo cogió</option>
-        <option value="Vencimiento">Vencimiento</option><option value="Daño o deterioro">Daño o deterioro</option>
-        <option value="Pérdida">Pérdida</option><option value="Consumo interno">Consumo interno</option><option value="Otro">Otro</option>
-      </select>
-      <input id="sal-motivo-otro" maxlength="180" placeholder="Explica el otro motivo" hidden>
-      <button type="submit">Enviar a revisión</button><p class="msg" id="sal-msg"></p></form>`;
-    document.getElementById('sal-almacen').innerHTML='<option value="" disabled selected hidden>Almacén</option>'+almacenes().map(a=>`<option value="${esc(a.id)}">${esc(a.nombre)}</option>`).join('');
-    const reason=document.getElementById('sal-motivo'),other=document.getElementById('sal-motivo-otro');
-    reason.addEventListener('change',()=>{other.hidden=reason.value!=='Otro';other.required=reason.value==='Otro';if(!other.required)other.value=''});
-    document.getElementById('form-salida-producto').onsubmit=submitSalida;
-  }
-
-  async function submitSalida(e){
-    e.preventDefault();const msg=document.getElementById('sal-msg');
-    const warehouse=document.getElementById('sal-almacen').value,product=document.getElementById('sal-prod').value;
-    const quantity=Number(document.getElementById('sal-cant').value),reason=document.getElementById('sal-motivo').value;
-    const other=document.getElementById('sal-motivo-otro');
-    const motive=reason==='Otro'?'Otro: '+String(other&&other.value||'').trim():reason;
-    if(!warehouse||!product||!(quantity>0)||!reason||(reason==='Otro'&&!(other&&other.value.trim()))){msg.textContent='Completa almacén, producto, cantidad y motivo de la baja.';return}
-    try{
-      await rpc('crear_baja',{p_almacen_id:warehouse,p_producto_id:product,p_cantidad:quantity,p_motivo:motive,p_idempotency_key:key()});
-      e.target.reset();other.hidden=true;other.required=false;
-      msg.textContent='✓ Solicitud de baja enviada a revisión administrativa. El stock no cambia hasta aprobar.';
-      if(typeof refrescarAprobacionesAdmin==='function')refrescarAprobacionesAdmin();await refrescarFinanzas();
     }catch(err){msg.textContent='No se pudo registrar: '+(err.message||err)}
   }
 
@@ -151,7 +111,7 @@
       select.innerHTML='<option value="" disabled selected hidden>'+(optional?'Almacén (opcional)':'Almacén')+'</option>'+stores.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nombre)+'</option>').join('');
       if(stores.some(a=>String(a.id)===String(value)))select.value=value;
     });
-    document.querySelectorAll('#rein-lineas .rein-prod, #sal-prod').forEach(select=>{
+    document.querySelectorAll('#rein-lineas .rein-prod').forEach(select=>{
       const value=select.value;select.innerHTML=productsHtml;
       if(Array.from(select.options).some(o=>o.value===value))select.value=value;
     });
@@ -159,6 +119,7 @@
 
   async function start(){
     if(window.__bcFinanzasLoading)return;
+    if(!(can('reinversiones','crear')||can('gastos','crear')||can('gastos','editar_any')||can('auditoria','editar_any')))return;
     window.__bcFinanzasLoading=true;
     try{
       const catalogs=await ensureCatalogs();
@@ -175,7 +136,7 @@
       ensure();ensureGasto();ensureSalida();refreshSelectors();refrescarFinanzas();
     }finally{
       window.__bcFinanzasLoading=false;
-      if(!window.__bcFinanzasTimer)window.__bcFinanzasTimer=setInterval(()=>{start()},10000);
+      // Catalog refreshes are event-driven; do not poll every 10 seconds.
     }
   }
   window.refrescarFinanzas=refrescarFinanzas;
