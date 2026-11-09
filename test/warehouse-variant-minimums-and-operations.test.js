@@ -101,7 +101,8 @@ test("Baja entry is one authenticated multi-product list, not a duplicate financ
   assert.match(bajas, /id="bc-bajas-multiple-form"/);
   assert.match(bajas, /id="bc-baja-add"/);
   assert.match(bajas, /crear_bajas_multiple/);
-  assert.match(bajas, /hasSession/);
+  assert.doesNotMatch(bajas, /hasSession/);
+   assert.doesNotMatch(bajas, /auth\.getSession\(\)/);
   assert.doesNotMatch(finance, /crear_baja|form-salida-producto/);
   assert.doesNotMatch(approvals, /rpc\('crear_baja'/);
 });
@@ -123,7 +124,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /inventario-detalle\.js","71"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
-  assert.match(index, /productos\.js\?v=20261109\.1/);
+  assert.match(index, /productos\.js\?v=20261109\.2/);
   assert.match(index, /style\.css\?v=9\.5\.86/);
   assert.match(index, /almacenes\.js\?v=20261109\.1/);
   assert.match(index, /app\.js\?v=9\.5\.86/);
