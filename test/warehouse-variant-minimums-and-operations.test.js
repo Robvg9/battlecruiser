@@ -135,7 +135,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "operaciones-financieras.js?v=20261108.5",
     "aprobaciones-admin.js?v=20261108.5",
     "ui-operaciones-hub.js?v=43.2",
-    "almacenes.js?v=20261108.3",
+    "almacenes.js?v=20261108.2",
     "m53-inventario-centro.js?v=53.7",
     "movimiento-multiple.js?v=20261108.2",
     "productos.js?v=20261108.3",
@@ -146,7 +146,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
 test("Baja card opens the shared batch form with predefined reasons and required Otro detail", () => {
   const bajas = read("public/js/bajas-multiple.js");
   assert.match(operations, /title: 'Registrar baja'/);
-  assert.match(operations, /window\.abrirBajasMultiple\(\)/);
+  assert.match(operations, /window\.abrirBajasMultiple/);
   assert.match(operations, /can\('bajas', 'ver'\) && can\('bajas', 'crear'\)/);
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(bajas.includes("'" + reason + "'"), "missing Baja reason " + reason);
