@@ -17,7 +17,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.match(module,/bc-bajas-modal-open/);
  assert.match(module,/api\.auth\.refreshSession\(\)/);
  assert.match(module,/tokenRejected/);
- assert.match(module,/p_idempotency_key: pendingKey/);
+ assert.match(module,/const requestIdempotencyKey = pendingKey/);
  assert.match(module,/persistentRequestKey\(warehouse, lines\)/);
  assert.match(module,/PENDING_REQUEST_PREFIX/);
  assert.doesNotMatch(admin,/id='adm-baja-form'/);assert.doesNotMatch(finance,/form-salida-producto/);
