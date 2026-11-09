@@ -9,6 +9,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 const baseMigration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
 const migration = read("supabase/migrations/20261107130000_mixed_variant_warehouse_stock_minimums.sql");
 const conversionMigration = read("supabase/migrations/20261107211007_mixed_inventory_conversion_composite_minimum.sql");
+const purchaseMinimumMigration = read("supabase/migrations/20261109180500_defer_stock_minimum_for_purchases.sql");
 const detail = read("public/js/inventario-detalle.js");
 const inventory = read("public/js/m53-inventario-centro.js");
 const operations = read("public/js/ui-operaciones-hub.js");
@@ -18,6 +19,16 @@ const finance = read("public/js/operaciones-financieras.js");
 const vales = read("public/js/vales.js");
 const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
+
+test("Purchases can add stock before a minimum is configured, then leave minimum setup pending", () => {
+  assert.match(purchaseMinimumMigration, /app\\.bc_purchase_stock_write/);
+  assert.match(purchaseMinimumMigration, /bc_apply_stock_purchase_increment/);
+  assert.match(purchaseMinimumMigration, /CREATE OR REPLACE FUNCTION public\\.registrar_compra\\(/);
+  assert.match(purchaseMinimumMigration, /CREATE OR REPLACE FUNCTION public\\.registrar_compra_multiple\\(/);
+  const purchaseFunctions = purchaseMinimumMigration.slice(purchaseMinimumMigration.indexOf("CREATE OR REPLACE FUNCTION public.registrar_compra("));
+  assert.doesNotMatch(purchaseFunctions, /INSERT INTO public\\.stock/i);
+  assert.match(purchaseFunctions, /PERFORM public\\.bc_apply_stock_purchase_increment/);
+});
 
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
