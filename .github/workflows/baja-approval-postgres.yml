@@ -6,6 +6,8 @@ on:
     paths:
       - 'supabase/migrations/20261107223000_baja_owner_autoapproval_and_admin_queue.sql'
       - 'supabase/migrations/20261108180000_bajas_multiple_atomic_request.sql'
+      - 'supabase/migrations/20261109210500_baja_approval_requests_and_modal.sql'
+      - 'test/baja-approval-batch-contract.sql'
       - 'test/baja-approval-fixture.sql'
       - 'test/baja-approval-contract.sql'
       - '.github/workflows/baja-approval-postgres.yml'
@@ -69,6 +71,15 @@ jobs:
           PGDATABASE: battlecruiser_baja_test
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261108180000_bajas_multiple_atomic_request.sql
 
+      - name: Apply grouped Baja request and floating-review migration
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_baja_test
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261109210500_baja_approval_requests_and_modal.sql
+
       - name: Verify approval, FIFO and authorization contract
         env:
           PGHOST: localhost
@@ -77,3 +88,12 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: battlecruiser_baja_test
         run: psql -v ON_ERROR_STOP=1 -f test/baja-approval-contract.sql
+
+      - name: Verify grouped requests, historical backfill and atomic admin decisions
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: battlecruiser_baja_test
+        run: psql -v ON_ERROR_STOP=1 -f test/baja-approval-batch-contract.sql
