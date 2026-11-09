@@ -190,7 +190,24 @@
     submitButton.disabled = true; submitButton.textContent = 'Enviando lista…'; addButton.disabled = true;
     message('Enviando la lista completa en una sola transacción…', '');
     try {
-      const result = await api.rpc('crear_bajas_multiple', { p_lineas: lines, p_idempotency_key: pendingKey });
+      // A 401 after the preflight session check means the access token may
+      // have expired between the session read and the RPC. Refresh once and
+      // retry with the exact same idempotency key; never create a second list.
+      const params = { p_lineas: lines, p_idempotency_key: pendingKey };
+      let result = await api.rpc('crear_bajas_multiple', params);
+      const tokenRejected = result && result.error && (
+        Number(result.error.status) === 401 ||
+        /jwt.*(expired|invalid)|missing.*authorization|no authorization header/i.test(
+          String(result.error.message || result.error.details || '')
+        )
+      );
+      if (tokenRejected && api.auth && typeof api.auth.refreshSession === 'function') {
+        const refreshed = await api.auth.refreshSession();
+        const freshSession = refreshed && !refreshed.error && refreshed.data && refreshed.data.session;
+        if (freshSession && freshSession.user && freshSession.access_token) {
+          result = await api.rpc('crear_bajas_multiple', params);
+        }
+      }
       if (result.error) throw result.error;
       const created = result.data && Array.isArray(result.data.bajas) ? result.data.bajas : [];
       const approved = created.length > 0 && created.every(item => item.estado === 'APROBADA');
