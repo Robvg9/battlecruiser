@@ -7,6 +7,7 @@ DECLARE
   v_product_b uuid := '99999999-9999-4999-8999-999999999999';
   v_history_product uuid := '77777777-7777-4777-8777-777777777777';
   v_history_request uuid;
+  v_historical_reason text;
   v_request uuid;
   v_batch jsonb;
   v_retry jsonb;
@@ -42,6 +43,12 @@ BEGIN
   FROM public.bajas b WHERE b.solicitud_id=v_history_request;
   IF v_count<>2 THEN
     RAISE EXCEPTION 'Historical backfill should group exactly two rows; got %.',v_count;
+  END IF;
+
+  SELECT motivo_general INTO v_historical_reason
+  FROM public.bajas_solicitudes WHERE id=v_history_request;
+  IF v_historical_reason<>'Solicitud histórica agrupada; el motivo general no quedó registrado. Consulte los motivos individuales por producto.' THEN
+    RAISE EXCEPTION 'Historical grouping must not invent a general reason from per-product motives.';
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.bajas b
