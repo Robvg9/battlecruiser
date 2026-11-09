@@ -190,7 +190,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.1"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.1/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.85 — Recuperación de catálogos y buscadores/);
+  assert.match(app, /v9\.5\.85 — Correcciones operativas: sabores, transferencias y selectores/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.85"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.85',
