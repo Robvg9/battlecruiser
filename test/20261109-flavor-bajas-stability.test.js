@@ -15,9 +15,10 @@ test("Bajas retries persist the same idempotency key by canonical request payloa
  assert.match(js,/const PENDING_REQUEST_PREFIX = 'bc:bajas:pending:v1:'/);
  assert.match(js,/async function persistentRequestKey\(warehouse, lines\)/);
  assert.match(js,/crypto\.subtle\.digest\('SHA-256'/);
- assert.match(js,/p_idempotency_key: pendingKey/);
+ assert.match(js,/p_idempotency_key: requestIdempotencyKey/);
  assert.match(js,/requestKey\.storage\.removeItem\(requestKey\.storageKey\)/);
  assert.match(js,/created\.length !== lines\.length/);
+ assert.match(js,/submitting = true;[\\s\\S]*await persistentRequestKey\\(warehouse, lines\\)/,"the submission lock must be active before the asynchronous key calculation");
 });
 test("Bajas success is not converted into a failed submission by the approvals-panel refresh",()=>{
  const js=read("public/js/bajas-multiple.js");
@@ -25,7 +26,7 @@ test("Bajas success is not converted into a failed submission by the approvals-p
  const end=js.indexOf("function start(force)",start);
  const submit=js.slice(start,end);
  assert.ok(submit.indexOf("succeeded = true") < submit.indexOf("await window.refrescarAprobacionesAdmin()"));
- assert.match(submit,/catch\(refreshError\)/);
+ assert.match(submit,/catch\s*\(refreshError\)/);
  assert.ok(submit.indexOf("if (succeeded) addRow()")>submit.indexOf("submitting = false"));
 });
 test("Android Bajas modal has exactly one active scroll area and no overlapping sticky action footer",()=>{
