@@ -53,6 +53,9 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.ok(products.includes("data-mixed-save-feedback"));
   assert.ok(products.includes("mostrarFeedbackAsignacionMixta"));
   assert.ok(products.includes("bcGuardarConfiguracionSabores"));
+  assert.match(products,/async function rpcMixtoConReintento/);
+  assert.match(products,/configuration RPC is repeat-safe/);
+  assert.match(products,/cargarSnapshotAsignacionMixtaProducto\(targetId\)/);
   assert.ok(products.includes("restaurarTabConfiguracionSabores"));
   assert.ok(products.includes("bc-mixed-config-mode"));
   assert.match(products, /_bcMixedConfigReturnTab = options && options\.returnTo \? String\(options\.returnTo\) : activeTab/);
