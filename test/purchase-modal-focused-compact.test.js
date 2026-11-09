@@ -16,6 +16,7 @@ function createPurchaseWindow(t) {
   const w = dom.window;
   const rpcCalls = [];
   let readCalls = 0;
+  const fromTables = [];
 
   Object.defineProperty(w.navigator, "onLine", { configurable: true, value: true });
   Object.defineProperty(w.crypto, "randomUUID", { configurable: true, value: () => "purchase-test-idempotency" });
@@ -31,9 +32,16 @@ function createPurchaseWindow(t) {
       rpcCalls.push({ name, payload });
       return { data: { ok: true }, error: null };
     },
-    from: () => {
+    from: (table) => {
       readCalls++;
-      throw new Error("La pantalla de nueva compra no debe leer el historial.");
+      fromTables.push(table);
+      if (table !== "stock") throw new Error("La pantalla de nueva compra no debe leer el historial de compras.");
+      const query = {
+        select: () => query,
+        eq: () => query,
+        in: async () => ({ data: [{ producto_id: "product-1", minimo: 0 }], error: null })
+      };
+      return query;
     }
   };
 
@@ -42,7 +50,7 @@ function createPurchaseWindow(t) {
     w.document.dispatchEvent(new w.Event("DOMContentLoaded"));
   }
   t.after(() => w.close());
-  return { w, rpcCalls, get readCalls() { return readCalls; } };
+  return { w, rpcCalls, fromTables, get readCalls() { return readCalls; } };
 }
 
 const tick = (w) => new Promise((resolve) => w.setTimeout(resolve, 0));
@@ -98,8 +106,10 @@ test("confirmar compra conserva el RPC de alta y no consulta compras anteriores"
   assert.equal(rpcCalls[0].payload.p_lineas[0].producto_id, "product-1");
   assert.equal(rpcCalls[0].payload.p_lineas[0].cantidad, 12);
   assert.equal(rpcCalls[0].payload.p_lineas[0].costo_unitario, 3.5);
-  assert.equal(ctx.readCalls, 0);
+  assert.equal(ctx.readCalls, 1);
+  assert.deepEqual(ctx.fromTables, ["stock"]);
   assert.match(d.getElementById("compra-multiple-msg").textContent, /Compra registrada/);
+  assert.match(d.getElementById("compra-multiple-msg").textContent, /Ahora configura el stock mínimo en Almacén principal para: Arroz/);
 });
 
 test("una compra con varias líneas nunca se fragmenta si falla el RPC de lista", async (t) => {
