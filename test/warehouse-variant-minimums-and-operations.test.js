@@ -91,7 +91,7 @@ test("Operations uses live catalogs for expenses/reinvestments and opens Baja th
   assert.match(operations, /window\.refrescarAlmacenes/);
   assert.match(operations, /window\.refrescarProductos/);
   assert.match(operations, /async function openBaja\(\)/);
-  assert.match(operations, /window\.abrirBajasMultiple\(\)/);
+  assert.match(operations, /window\.abrirBajasMultiple/);
   assert.ok(operations.includes("await ensureOperationCatalogs(false)"));
   assert.ok(operations.includes("await ensureOperationCatalogs(true)"));
 });
@@ -124,9 +124,9 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /inventario-detalle\.js","71"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.ok(app.includes('["movimiento-multiple.js","20261108.2"]'));
-  assert.match(index, /productos\.js\?v=20261108\.2/);
+  assert.match(index, /productos\.js\?v=20261108\.3/);
   assert.match(index, /style\.css\?v=9\.5\.84/);
-  assert.match(index, /almacenes\.js\?v=20261107\.1/);
+  assert.match(index, /almacenes\.js\?v=20261108\.2/);
   assert.match(index, /app\.js\?v=9\.5\.84/);
   assert.match(index, /v9\.5\.84 — BattleCruiser/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.84"/);

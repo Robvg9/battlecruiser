@@ -1139,3 +1139,15 @@ body.bc-product-picker-open{overflow:hidden}
 .bc-bajas-multiple .bc-bajas-message.is-error{color:#e7a078}
 .bc-bajas-multiple .bc-bajas-message.is-success{color:#9bc9a5}
 @media(max-width:420px){.bc-bajas-multiple .bc-baja-line{grid-template-columns:minmax(0,1fr) 92px 32px;gap:6px;padding:8px}.bc-bajas-multiple .bc-baja-line-remove{width:32px;height:34px;min-height:34px}}
+
+/* Batch Bajas open in one responsive modal from the Operations hub. */
+.bc-bajas-multiple-modal[hidden]{display:none!important}
+.bc-bajas-multiple-modal{position:fixed;inset:0;z-index:100700;display:grid;place-items:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.bc-bajas-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(5px)}
+.bc-bajas-modal-dialog{position:relative;display:flex;flex-direction:column;width:min(100%,620px);max-height:92dvh;overflow:auto;border:1px solid rgba(201,162,77,.28);border-radius:14px;background:linear-gradient(180deg,rgba(16,36,32,.99),rgba(10,24,20,.99));box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.bc-bajas-modal-head{position:sticky;top:0;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(201,162,77,.16);background:rgba(14,30,26,.98)}
+.bc-bajas-modal-head h2{margin:0;color:var(--gold-bright);font-size:19px}
+.bc-bajas-modal-head p{margin:4px 0 0;color:var(--mist);font-size:11px;line-height:1.35}
+.bc-bajas-modal-close{width:36px;height:36px;min-height:36px;flex:0 0 36px;border:1px solid rgba(201,162,77,.25);border-radius:8px;background:transparent;color:var(--text);font-size:23px}
+.bc-bajas-modal-content{padding:14px;overflow:auto;overscroll-behavior:contain}
+body.bc-bajas-modal-open{overflow:hidden}

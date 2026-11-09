@@ -13,25 +13,52 @@
     el.textContent = value || '';
     el.className = 'bc-bajas-message' + (kind ? ' is-' + kind : '');
   }
+  function ensureModal() {
+    let modal = document.getElementById('bc-bajas-multiple-modal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'bc-bajas-multiple-modal';
+    modal.className = 'bc-bajas-multiple-modal';
+    modal.hidden = true;
+    modal.innerHTML =
+      '<div class="bc-bajas-modal-backdrop" data-bc-bajas-close></div>' +
+      '<section class="bc-bajas-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-bajas-modal-title" tabindex="-1">' +
+        '<header class="bc-bajas-modal-head"><div><h2 id="bc-bajas-modal-title">📉 Lista de bajas</h2><p>Varios productos, un solo envío y una sola revisión.</p></div>' +
+        '<button type="button" class="bc-bajas-modal-close" data-bc-bajas-close aria-label="Cerrar">×</button></header>' +
+        '<div class="bc-bajas-modal-content"></div>' +
+      '</section>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', event => {
+      if (event.target.closest('[data-bc-bajas-close]')) closeListModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !modal.hidden) closeListModal();
+    });
+    return modal;
+  }
+  function closeListModal() {
+    const modal = document.getElementById('bc-bajas-multiple-modal');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove('bc-bajas-modal-open');
+  }
   function ensureUI() {
-    const tab = document.getElementById('tab-operacion');
-    if (!tab || !canCreate()) return null;
+    if (!canCreate()) return null;
+    const modal = ensureModal();
     let host = document.getElementById('bc-bajas-multiple-host');
     if (host) return host;
     host = document.createElement('section');
     host.id = 'bc-bajas-multiple-host';
-    host.className = 'cc-bloque bc-bajas-multiple';
-    host.hidden = true;
+    host.className = 'bc-bajas-multiple';
     host.innerHTML =
-      '<h3>📉 Lista de bajas</h3>' +
-      '<p class="bc-bajas-intro">Agrega varios productos de un mismo almacén y envía toda la lista en una sola operación. Las solicitudes normales quedan pendientes de revisión; el inventario y FIFO solo cambian cuando se aprueban.</p>' +
+      '<p class="bc-bajas-intro">Selecciona un almacén y añade los productos que correspondan. Cada línea lleva su cantidad y motivo; toda la lista se envía en una única operación. Las solicitudes de usuarios sin permiso global de aprobación quedan pendientes y no modifican el stock/FIFO hasta ser aprobadas.</p>' +
       '<form id="bc-bajas-multiple-form">' +
         '<label><span>Almacén</span><select id="bc-bajas-warehouse" required><option value="" disabled selected hidden>Seleccionar almacén…</option></select></label>' +
         '<div class="bc-bajas-lines" id="bc-bajas-lines"></div>' +
         '<div class="bc-bajas-actions"><button type="button" id="bc-baja-add">+ Añadir producto</button><button type="submit" id="bc-baja-submit">Enviar lista a revisión</button></div>' +
         '<p class="bc-bajas-message" id="bc-bajas-message" role="status" aria-live="polite"></p>' +
       '</form>';
-    tab.insertBefore(host, tab.firstChild);
+    modal.querySelector('.bc-bajas-modal-content').appendChild(host);
     const form = host.querySelector('#bc-bajas-multiple-form');
     host.querySelector('#bc-baja-add').addEventListener('click', addRow);
     form.addEventListener('submit', submit);
@@ -207,10 +234,10 @@
     if (!canCreate()) return false;
     const host = ensureUI();
     if (!host) return false;
-    host.hidden = false;
-    host.style.display = 'block';
+    const modal = ensureModal();
+    modal.hidden = false;
+    document.body.classList.add('bc-bajas-modal-open');
     await loadCatalogs(true);
-    if (typeof host.scrollIntoView === 'function') host.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const warehouse = document.getElementById('bc-bajas-warehouse');
     if (warehouse) warehouse.focus({ preventScroll: true });
     return true;

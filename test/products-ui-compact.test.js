@@ -4,6 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const {JSDOM}=require("jsdom");
+const read=(file)=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const SOURCE=fs.readFileSync(path.join(__dirname,"..","public","js","m75-productos-ui-compacto.js"),"utf8");
 function fixture(){
  const html=[

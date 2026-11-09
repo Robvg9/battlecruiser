@@ -8,8 +8,9 @@ test("product selects use one modal search and keep the native select contract",
   dom.window.eval(source);const select=dom.window.document.getElementById("trf-producto"),field=select.parentElement;
   assert.ok(field.querySelector(".bc-product-picker-trigger"));assert.equal(field.querySelectorAll("input").length,0);
   assert.ok(select.classList.contains("bc-product-picker-native-select"));
-  assert.equal(dom.window.document.querySelectorAll("#bc-product-picker-modal").length,1);
-  field.querySelector("button").click();const modal=dom.window.document.getElementById("bc-product-picker-modal");assert.equal(modal.hidden,false);
+  assert.equal(dom.window.document.querySelectorAll("#bc-product-picker-modal").length,0,"the shared modal is created on demand");
+  field.querySelector("button").click();const modal=dom.window.document.getElementById("bc-product-picker-modal");
+  assert.equal(dom.window.document.querySelectorAll("#bc-product-picker-modal").length,1);assert.equal(modal.hidden,false);
   const search=modal.querySelector("#bc-product-picker-search");search.value="jugo";search.dispatchEvent(new dom.window.Event("input",{bubbles:true}));
   assert.equal(modal.querySelectorAll(".bc-product-picker-result").length,1);
   modal.querySelector(".bc-product-picker-result").click();assert.equal(select.value,"juice");assert.equal(modal.hidden,true);
