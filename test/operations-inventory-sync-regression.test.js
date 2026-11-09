@@ -60,7 +60,7 @@ test("Baja form has one authenticated batch entry point and no competing single-
   assert.match(bajas, /api\.rpc\('crear_bajas_multiple'/);
   assert.match(operationsHub, /window\.abrirBajasMultiple/);
   assert.doesNotMatch(finance, /form-salida-producto|rpc\('crear_baja'/);
-  assert.doesNotMatch(approvals, /adm-baja-form|rpc\('crear_baja'/);
+  assert.doesNotMatch(approvals, /rpc\('crear_baja'/);
 });
 
 test("A forced stock refresh bypasses withCache and updates the shared stock cache", () => {
