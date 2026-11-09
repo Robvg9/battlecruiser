@@ -442,7 +442,7 @@
   }
 
   // Android may suspend a PWA in the background, so no browser timer can promise a permanent socket.
-  // Probe on resume, monitor every 30s while visible, and retry failures with bounded backoff.
+  // Probe on resume, monitor every 60s while visible, and retry failures with bounded backoff.
   function iniciarVigilanciaConectividad() {
     if (window.__BC_CONNECTIVITY_WATCHDOG_INSTALLED__) return;
     if (typeof document === "undefined" || typeof document.addEventListener !== "function") return;
