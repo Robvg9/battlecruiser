@@ -3,7 +3,7 @@ const test=require("node:test"),assert=require("node:assert/strict"),fs=require(
 const root=path.join(__dirname,".."),source=fs.readFileSync(path.join(root,"public/js/product-select-search.js"),"utf8");
 test("product selects use one modal search and keep the native select contract",async()=>{
  const {JSDOM}=require("jsdom");
- const dom=new JSDOM(`<!doctype html><body><label><span>Producto</span><select id="trf-producto"><option value="" disabled selected>Producto</option><option value="juice">Jugo La Estancia</option><option value="water">Agua</option></select></label><label><span>Producto</span><select id="bc-baja-producto-1"><option value="">Producto</option><option value="coffee">Café</option></select></label><label><span>Categoría</span><select id="prod-categoria"><option value="">Categoría</option></select></label><label><span>Almacén de origen</span><select id="mov-multiple-origen"><option value="">Origen</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><label><span>Almacén de destino</span><select id="mov-multiple-destino"><option value="">Destino</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><input id="venta-producto-buscar"><select id="venta-producto"><option value="">Producto</option></select></body>`,{runScripts:"outside-only"});
+ const dom=new JSDOM(`<!doctype html><body><label><span>Producto</span><select id="trf-producto"><option value="" disabled selected>Producto</option><option value="juice">Jugo La Estancia</option><option value="water">Agua</option></select></label><label><span>Producto</span><select id="bc-baja-producto-1"><option value="">Producto</option><option value="coffee">Café</option></select></label><label><span>Categoría</span><select id="prod-categoria"><option value="">Categoría</option><option value="bebidas">Bebidas</option></select></label><label><span>Almacén de origen</span><select id="mov-multiple-origen"><option value="">Origen</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><label><span>Almacén de destino</span><select id="mov-multiple-destino"><option value="">Destino</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><input id="venta-producto-buscar"><select id="venta-producto"><option value="">Producto</option></select></body>`,{runScripts:"outside-only"});
  try{
   dom.window.eval(source);const select=dom.window.document.getElementById("trf-producto"),field=select.parentElement;
   assert.ok(field.querySelector(".bc-product-picker-trigger"));assert.equal(field.querySelectorAll("input").length,0);
@@ -24,7 +24,13 @@ test("product selects use one modal search and keep the native select contract",
   assert.equal(modal.querySelectorAll(".bc-product-picker-result").length,1);
   modal.querySelector(".bc-product-picker-result").click();assert.equal(origin.value,"b");
   assert.equal(originField.querySelector("button").textContent,"La Cueva");
-  assert.equal(dom.window.document.querySelector("#prod-categoria").closest(".bc-product-picker-field"),null);
+  const category=dom.window.document.querySelector("#prod-categoria"),categoryField=category.parentElement;
+  assert.ok(categoryField.querySelector(".bc-product-picker-trigger"),"all entity selectors share the chooser");
+  categoryField.querySelector("button").click();
+  assert.equal(modal.querySelector("#bc-product-picker-title").textContent,"Elegir categoría");
+  search.value="bebidas";search.dispatchEvent(new dom.window.Event("input",{bubbles:true}));
+  assert.equal(modal.querySelectorAll(".bc-product-picker-result").length,1);
+  modal.querySelector(".bc-product-picker-result").click();assert.equal(category.value,"bebidas");
   assert.equal(dom.window.document.querySelector("#venta-producto").closest(".bc-product-picker-field"),null);
  }finally{dom.window.close();}
 });

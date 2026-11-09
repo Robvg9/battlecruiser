@@ -15,11 +15,12 @@
   }
   function kindFor(select) {
     if (!select || select.tagName !== 'SELECT' || select.multiple || select.dataset.bcSelectPicker === '1' || select.dataset.bcProductPicker === '1') return null;
+    if (select.closest('#legacy-product-purchase') || select.closest('#bc-product-picker-modal')) return null;
     const text = identity(select);
     if (select.id === 'venta-producto' && document.getElementById('venta-producto-buscar')) return null;
     if (!WAREHOUSE_EXCLUDED.test(text) && (WAREHOUSE_KNOWN.has(select.id) || /almac[eé]n|warehouse|origen|destino/i.test(text))) return 'warehouse';
     if (!PRODUCT_EXCLUDED.test(text) && (PRODUCT_KNOWN.has(select.id) || /producto|product|(^|[-_])prod($|[-_])/i.test(text))) return 'product';
-    return null;
+    return 'generic';
   }
   function ensureModal() {
     if (modal) return modal;
@@ -53,8 +54,9 @@
     const button = select.parentElement && select.parentElement.querySelector('.bc-product-picker-trigger');
     if (!button) return;
     const option = Array.from(select.options).find(item => item.value === select.value);
-    const noun = select.dataset.bcPickerKind === 'warehouse' ? 'almacén' : 'producto';
+    const noun = select.dataset.bcPickerNoun || (select.dataset.bcPickerKind === 'warehouse' ? 'almacén' : select.dataset.bcPickerKind === 'product' ? 'producto' : 'opción');
     button.textContent = option ? option.textContent.trim() : 'Elegir ' + noun + '…';
+    button.disabled = !!select.disabled;
     button.classList.toggle('is-placeholder', !option || !select.value); button.title = button.textContent;
     button.setAttribute('aria-label', 'Elegir ' + noun);
   }
@@ -69,12 +71,12 @@
       button.setAttribute('role', 'option'); button.setAttribute('aria-selected', option.value === active.value ? 'true' : 'false');
       button.setAttribute('data-bc-product-value', option.value); button.textContent = option.textContent.trim(); results.appendChild(button);
     });
-    const plural = activeKind === 'warehouse' ? 'almacenes' : 'productos';
+    const plural = activeKind === 'warehouse' ? 'almacenes' : activeKind === 'product' ? 'productos' : 'opciones';
     status.textContent = matches.length ? matches.length + ' ' + plural : 'No hay ' + plural + ' que coincidan.';
   }
   function open(select, kind) {
     active = select; activeKind = kind || select.dataset.bcPickerKind || 'product'; ensureModal();
-    const noun = activeKind === 'warehouse' ? 'almacén' : 'producto';
+    const noun = select.dataset.bcPickerNoun || (activeKind === 'warehouse' ? 'almacén' : activeKind === 'product' ? 'producto' : 'opción');
     title.textContent = 'Elegir ' + noun; search.placeholder = 'Buscar ' + noun + '…'; search.setAttribute('aria-label', 'Buscar ' + noun);
     search.value = ''; render(); modal.hidden = false; document.body.classList.add('bc-product-picker-open');
     window.setTimeout(() => search.focus(), 0);
@@ -84,9 +86,11 @@
     const kind = kindFor(select); if (!kind || !select.parentNode) return;
     const field = document.createElement('div'); field.className = 'bc-product-picker-field'; field.dataset.bcProductPickerField = '1';
     const button = document.createElement('button'); button.type = 'button'; button.className = 'bc-product-picker-trigger is-placeholder';
-    button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-label', kind === 'warehouse' ? 'Elegir almacén' : 'Elegir producto');
+    const text = identity(select).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
+    const noun = /almacen|warehouse|origen|destino/.test(text) ? 'almacén' : /producto|product/.test(text) ? 'producto' : /categor/.test(text) ? 'categoría' : /presentacion/.test(text) ? 'presentación' : /proveedor/.test(text) ? 'proveedor' : /usuario|empleado|trabajador/.test(text) ? 'persona' : /pago/.test(text) ? 'método de pago' : /estado/.test(text) ? 'estado' : /tipo/.test(text) ? 'tipo' : /motivo/.test(text) ? 'motivo' : /unidad/.test(text) ? 'unidad' : /rol/.test(text) ? 'rol' : 'opción';
+    button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-label', 'Elegir ' + noun);
     button.addEventListener('click', () => open(select, kind));
-    select.dataset.bcSelectPicker = '1'; select.dataset.bcPickerKind = kind; select.dataset.bcProductPicker = '1';
+    select.dataset.bcSelectPicker = '1'; select.dataset.bcPickerKind = kind; select.dataset.bcPickerNoun = noun; select.dataset.bcProductPicker = '1';
     select.classList.add('bc-product-picker-native-select'); select.parentNode.insertBefore(field, select); field.append(button, select); update(select);
     select.addEventListener('change', () => update(select));
     new MutationObserver(() => { update(select); if (active === select && modal && !modal.hidden) render(); })
