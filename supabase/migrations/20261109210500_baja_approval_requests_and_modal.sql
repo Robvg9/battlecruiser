@@ -352,7 +352,7 @@ BEGIN
       END,
       revisado_por=CASE
         WHEN NOT EXISTS(SELECT 1 FROM public.bajas b WHERE b.solicitud_id=s.id AND b.estado='PENDIENTE')
-        THEN (SELECT max(b.revisado_por) FROM public.bajas b WHERE b.solicitud_id=s.id)
+        THEN (SELECT (array_agg(b.revisado_por) FILTER (WHERE b.revisado_por IS NOT NULL))[1] FROM public.bajas b WHERE b.solicitud_id=s.id)
         ELSE NULL
       END,
       revisado_nombre=CASE
