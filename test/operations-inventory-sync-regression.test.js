@@ -16,6 +16,8 @@ const approvals = read("public/js/aprobaciones-admin.js");
 const warehouses = read("public/js/almacenes.js");
 const purchase = read("public/js/compra-multiple.js");
 const transfer = read("public/js/movimiento-multiple.js");
+const transferencias = read("public/js/transferencias.js");
+const network = read("public/js/network-core.js");
 const index = read("public/index.html");
 
 test("Existing product cards expose a direct entry point to configure or edit flavors", () => {
@@ -85,14 +87,31 @@ test("A committed purchase refresh error is reported as a refresh issue, not as 
   assert.match(purchase, /bcNotificarCambioDatos\('compra', false\)/);
 });
 
-test("Transfer stock is refreshed after inventory changes and no longer uses the stale post-purchase cache", () => {
-  assert.match(transfer, /window\.refrescarStockYSelects\(\)/);
-  assert.match(transfer, /No se pudo sincronizar inventario en Transferencias/);
-  assert.match(transfer, /detail\.operation === 'compra'/);
-  assert.match(transfer, /window\.__BC_STOCK_CONFIRMED__ !== true/);
+test("Transfer stock uses a fresh authenticated RPC snapshot and avoids stock reads for unauthorized roles", () => {
+  assert.match(transfer, /api\.rpc\('bc_stock_operativo'\)/);
+  assert.match(transfer, /__BC_TRANSFER_STOCK_SNAPSHOT__/);
+  assert.match(transfer, /__BC_TRANSFER_STOCK_CONFIRMED__/);
+  assert.match(transfer, /tienePermiso\('transferencias','crear'\)/);
+  assert.match(transfer, /Supabase tardó demasiado/);
+  assert.match(transfer, /await actualizarInventarioConfirmado\(\)/);
+  assert.match(transfer, /stockRefreshPromise/);
+  assert.match(transfer, /window\.__BC_TRANSFER_STOCK_REFRESH__ = actualizarInventarioConfirmado/);
+  assert.match(transferencias, /await refreshStock\(\)/);
+  assert.match(transferencias, /__BC_TRANSFER_STOCK_CONFIRMED__ !== true/);
+  assert.match(transferencias, /__BC_TRANSFER_STOCK_SNAPSHOT__/);
+  assert.match(transferencias, /window\.__BC_TRANSFER_STOCK_REFRESH__/);
+  assert.match(transferencias, /await refreshStock\(\)/);
+  assert.match(transferencias, /No se pudo confirmar el inventario actual desde Supabase/);
+  assert.match(transferencias, /__BC_TRANSFER_STOCK_CONFIRMED__ !== true/);
+  assert.doesNotMatch(transfer, /refrescarStockYSelects/);
+  assert.doesNotMatch(transfer, /window\.__BC_STOCK_ERROR__/);
+  assert.match(transfer, /addEventListener\('offline'/);
+  assert.match(transfer, /addEventListener\('online'/);
   assert.match(transfer, /<option value="" disabled selected hidden>Origen<\/option>/);
   assert.match(transfer, /<option value="" disabled selected hidden>Destino<\/option>/);
   assert.match(transfer, /<option value="" disabled selected hidden>Producto<\/option>/);
+  assert.match(network, /auth\/v1\/health/);
+  assert.doesNotMatch(network, /baseUrl \+ "\/rest\/v1\/"/);
 });
 
 test("Field labels are hidden, disabled placeholders rather than selectable dropdown entries", () => {

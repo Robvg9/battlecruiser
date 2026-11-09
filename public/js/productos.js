@@ -929,9 +929,12 @@ async function iniciarEdicionProducto(p) {
 }
 
 window.bcAbrirConfiguracionSabores = async function (productId, options) {
-  _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : null;
+  const activeTab = document.querySelector(".tab-btn[data-tab].active")?.dataset.tab
+    || document.querySelector(".tab-panel.visible")?.id?.replace(/^tab-/, "")
+    || "productos";
+  _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : activeTab;
   const form = document.getElementById("form-producto");
-  if (form && _bcMixedConfigReturnTab) form.classList.add("bc-mixed-config-mode");
+  if (form) form.classList.add("bc-mixed-config-mode");
   const productTab = document.querySelector('.tab-btn[data-tab="productos"]');
   const productPanel = document.getElementById("tab-productos");
   if (productTab && productPanel && !productPanel.classList.contains("visible")) productTab.click();
@@ -944,20 +947,24 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
     return false;
   }
 
+  // Open the actual modal first so the visible exit exists before async product details load.
+  const editIdField = document.getElementById("prod-editando-id");
+  if (editIdField) editIdField.value = producto.id;
+  if (typeof window.__BCM26_openProductModal === "function") window.__BCM26_openProductModal();
+  const modalTitle = document.getElementById("bc-product-modal-title");
+  if (modalTitle) modalTitle.textContent = "Configurar sabores y mínimos";
+  if (typeof window.__BCM26_setCommercialOptionsExpanded === "function") window.__BCM26_setCommercialOptionsExpanded(true);
   if (_bcMixedConfigReturnTab) {
     const submit = document.getElementById("prod-submit-btn");
-    const cancel = document.getElementById("prod-cancelar-edicion");
+    const cancel = document.getElementById("bc-product-modal-cancel");
     if (submit) submit.hidden = true;
-    // Show the safe exit before any session/catalogue/snapshot read can wait.
     if (cancel) {
       cancel.hidden = false;
-      cancel.classList.remove("hidden");
-      cancel.textContent = "Volver a Inventario";
+      cancel.textContent = _bcMixedConfigReturnTab === "inventario" ? "Volver a Inventario" : "Cerrar configuración";
     }
   }
   await iniciarEdicionProducto(producto);
-  if (typeof window.__BCM26_openProductModal === "function") window.__BCM26_openProductModal();
-  if (typeof window.__BCM26_setCommercialOptionsExpanded === "function") window.__BCM26_setCommercialOptionsExpanded(true);
+  if (!_bcMixedConfigReturnTab || !form?.classList.contains("bc-mixed-config-mode")) return false;
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
   if (toggle && !toggle.checked) toggle.checked = true;

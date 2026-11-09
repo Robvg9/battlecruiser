@@ -38,7 +38,7 @@ function createProbe(fetchImpl, online = true, options = {}) {
   return { window, connectivity };
 }
 
-test("probe checks both Auth and Data API without depending on an owner session", async () => {
+test("probe checks the public Auth health endpoint without a privileged REST key", async () => {
   const requests = [];
   const probe = createProbe(async function (url, init) {
     requests.push({ url, init });
@@ -46,11 +46,10 @@ test("probe checks both Auth and Data API without depending on an owner session"
   });
   const result = await probe.window.sondearBackend();
   assert.equal(result, true);
-  assert.equal(requests.length, 2, "Auth and Data API are checked in parallel.");
-  assert.deepEqual(requests.map((r) => r.url).sort(), [
-    "https://test-project.supabase.co/auth/v1/health",
-    "https://test-project.supabase.co/rest/v1/"
-  ].sort());
+  assert.equal(requests.length, 1, "Only Auth health is probed with the publishable key.");
+  assert.deepEqual(requests.map((r) => r.url), [
+    "https://test-project.supabase.co/auth/v1/health"
+  ]);
   for (const request of requests) {
     assert.equal(request.init.method, "GET");
     assert.equal(request.init.headers.apikey, "test-publishable-key");
@@ -59,7 +58,7 @@ test("probe checks both Auth and Data API without depending on an owner session"
   assert.equal(probe.window.__BC_BACKEND_PROBE__.status, "online");
   assert.equal(probe.window.__BC_BACKEND_PROBE__.reason, "response_ok");
   assert.equal(probe.window.__BC_BACKEND_PROBE__.httpStatus, 200);
-  assert.ok(["auth", "data-api"].includes(probe.window.__BC_BACKEND_PROBE__.service));
+  assert.equal(probe.window.__BC_BACKEND_PROBE__.service, "auth");
   assert.deepEqual(probe.connectivity, ["online"]);
 });
 

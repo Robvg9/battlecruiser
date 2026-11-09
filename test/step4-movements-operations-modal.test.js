@@ -47,9 +47,15 @@ function setup(t) {
     auth: {
       getSession: async () => ({ data: { session: { user: { id: "owner-fixture" }, access_token: "test-access-token" } }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
-    }
+    },
+    rpc: async (name) => ({ data: [
+      { id: "s1", producto_id: "p1", almacen_id: "a", cantidad: 40, minimo: 0 },
+      { id: "s2", producto_id: "p2", almacen_id: "a", cantidad: 25, minimo: 0 }
+    ], error: null })
   };
-  window.__BC_STOCK_CONFIRMED__ = true;
+  window.__BC_TRANSFER_STOCK_CONFIRMED__ = true;
+  window.__BC_TRANSFER_STOCK_USER_ID__ = "owner-fixture";
+  window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
   window._cache = {
     productos: [
       { id: "p1", nombre: "Producto 1", activo: true },
@@ -161,7 +167,7 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   assert.notEqual(multiple, -1, "app.js debe cargar el módulo de transferencias múltiples");
   assert.ok(multiple < modal, "el panel múltiple debe existir antes de inicializar el modal");
   assert.ok(modal < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
-  assert.match(sw, /movimiento-multiple\.js\?v=20261108\.2/);
+  assert.match(sw, /movimiento-multiple\.js\?v=20261109\.1/);
 });test("Transferencias: añadir varios productos registra una sola operación con todas las líneas", async (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="transferencias"]').click();

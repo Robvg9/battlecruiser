@@ -100,25 +100,22 @@ function createHarness(responses, options = {}) {
   };
 }
 
-test("either a healthy Auth or Data API route keeps the app online; one failed probe is tolerated", async () => {
+test("Auth health is the connectivity probe; the publishable key is not sent to the REST schema root", async () => {
   const h = createHarness([
-    { ok: false, status: 503 },
     { ok: true, status: 200 },
     { ok: false, status: 503 },
-    new TypeError("Failed to fetch"),
-    { ok: true, status: 200 },
     { ok: true, status: 200 }
   ]);
 
   assert.equal(await h.advanceNextTimer(), 0);
-  assert.equal(h.requestCount(), 2, "The probe checks Auth and Data API in parallel.");
+  assert.equal(h.requestCount(), 1, "Only the public Auth health endpoint is probed.");
   assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "response_ok");
-  assert.equal(h.window.__BC_BACKEND_PROBE__.service, "data-api");
+  assert.equal(h.window.__BC_BACKEND_PROBE__.service, "auth");
   assert.equal(h.window.__TEST_CONNECTIVITY__, "online");
   assert.equal([...h.timers.values()][0].delay, 30000);
 
   assert.equal(await h.advanceNextTimer(), 30000);
-  assert.equal(h.requestCount(), 4);
+  assert.equal(h.requestCount(), 2);
   assert.equal(h.window.__BC_BACKEND_PROBE__.status, "degraded");
   assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "server_http_error");
   assert.equal(h.window.__BC_BACKEND_PROBE__.consecutiveFailures, 1);
@@ -126,17 +123,14 @@ test("either a healthy Auth or Data API route keeps the app online; one failed p
   assert.equal([...h.timers.values()][0].delay, 3000);
 
   assert.equal(await h.advanceNextTimer(), 3000);
-  assert.equal(h.requestCount(), 6);
+  assert.equal(h.requestCount(), 3);
   assert.equal(h.window.__BC_BACKEND_PROBE__.status, "online");
   assert.equal(h.window.__BC_BACKEND_RECOVERY_PENDING__, false);
   assert.ok(h.diagnosticEvents.includes("bc:backend-reconnected"));
 });
 
-test("heartbeat stops when hidden and resumes with an immediate two-route probe", async () => {
-  const h = createHarness([
-    { ok: true, status: 200 }, { ok: true, status: 200 },
-    { ok: true, status: 200 }, { ok: true, status: 200 }
-  ]);
+test("heartbeat stops when hidden and resumes with an immediate Auth health probe", async () => {
+  const h = createHarness([{ ok: true, status: 200 }, { ok: true, status: 200 }]);
   h.setVisible(false);
   assert.equal(h.timers.size, 0, "No background polling timer should survive visibility:hidden.");
   assert.equal(h.requestCount(), 0);
@@ -144,24 +138,22 @@ test("heartbeat stops when hidden and resumes with an immediate two-route probe"
   h.setVisible(true);
   assert.equal([...h.timers.values()][0].delay, 0, "Resume should trigger an immediate probe.");
   await h.advanceNextTimer();
-  assert.equal(h.requestCount(), 2);
+  assert.equal(h.requestCount(), 1);
   assert.equal([...h.timers.values()][0].delay, 30000);
 
   h.setVisible(false);
   assert.equal(h.timers.size, 0, "Hiding the PWA cancels its foreground heartbeat.");
   h.setVisible(true);
   await h.advanceNextTimer();
-  assert.equal(h.requestCount(), 4);
+  assert.equal(h.requestCount(), 2);
 });
 
-test("concurrent manual and automatic probes share one pair of HTTP requests", async () => {
-  const h = createHarness([
-    { ok: true, status: 200 }, { ok: true, status: 200 }
-  ]);
+test("concurrent manual and automatic probes share one Auth health request", async () => {
+  const h = createHarness([{ ok: true, status: 200 }]);
   const first = h.window.sondearBackend();
   const second = h.window.sondearBackend();
   await h.flushMicrotasks();
-  assert.equal(h.requestCount(), 2, "Single-flight guard shares one dual-route probe, not four requests.");
+  assert.equal(h.requestCount(), 1, "Single-flight guard shares one Auth health request.");
   assert.equal(await first, true);
   assert.equal(await second, true);
 });

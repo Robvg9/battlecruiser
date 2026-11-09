@@ -15,6 +15,7 @@ const warehouses = read("public/js/almacenes.js");
 const finance = read("public/js/operaciones-financieras.js");
 const m53 = read("public/js/m53-inventario-centro.js");
 const detail = read("public/js/inventario-detalle.js");
+const productModal = read("public/js/m26-ui-integridad.js");
 const migration = read("supabase/migrations/20261104183000_product_mixed_inventory_variants.sql");
 const conversionMigration = read("supabase/migrations/20261107211007_mixed_inventory_conversion_composite_minimum.sql");
 
@@ -54,12 +55,22 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.ok(products.includes("bcGuardarConfiguracionSabores"));
   assert.ok(products.includes("restaurarTabConfiguracionSabores"));
   assert.ok(products.includes("bc-mixed-config-mode"));
+  assert.match(products, /_bcMixedConfigReturnTab = options && options\.returnTo \? String\(options\.returnTo\) : activeTab/);
+  assert.match(productModal, /form\.classList\.contains\('bc-mixed-config-mode'\)/);
+  assert.match(productModal, /window\.bcSalirConfiguracionSabores\(\)/);
+  assert.match(products, /document\.getElementById\("bc-product-modal-cancel"\)/);
+  assert.match(read("public/style.css"), /bc-mixed-config-mode \.bc-product-form-top/);
+  assert.match(read("public/style.css"), /bc-mixed-config-mode #prod-submit-btn/);
+  assert.match(read("public/style.css"), /bc-mixed-config-mode \.prod-inventario-mixto-settings/);
   assert.ok(products.includes('submit.hidden = true'));
-  assert.ok(products.includes('cancel.textContent = "Volver a Inventario"'));
+  assert.match(products, /cancel\.textContent = _bcMixedConfigReturnTab === "inventario" \? "Volver a Inventario"/);
   const flavorOpen = products.indexOf("window.bcAbrirConfiguracionSabores = async function");
+  const modalOpen = products.indexOf("window.__BCM26_openProductModal()", flavorOpen);
   const safeExit = products.indexOf("cancel.hidden = false", flavorOpen);
   const editorWait = products.indexOf("await iniciarEdicionProducto(producto);", flavorOpen);
-  assert.ok(safeExit > flavorOpen && safeExit < editorWait, "return action must be visible before the snapshot wait");
+  assert.ok(modalOpen > flavorOpen && safeExit > modalOpen && safeExit < editorWait,
+    "the product modal must exist before the visible exit is shown, and the exit must precede async product loading");
+  assert.match(products, /if \(!_bcMixedConfigReturnTab \|\| !form\?\.classList\.contains\("bc-mixed-config-mode"\)\) return false/);
   assert.ok(products.includes("form.classList.remove(\"bc-mixed-config-mode\")"));
   assert.ok(products.includes("restaurarTabConfiguracionSabores();"));
   assert.ok(products.includes("if (!snapshotReady)"));
@@ -127,9 +138,9 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
-  assert.match(index, /productos\.js\?v=20261108\.3/);
+  assert.match(index, /productos\.js\?v=20261109\.1/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.84/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.84"/);
+  assert.match(index, /app\.js\?v=9\.5\.85/);
+  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.85"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.7"\]/);
 });

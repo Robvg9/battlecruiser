@@ -21,6 +21,8 @@ test("Operations catalog refresh does not query products or warehouses as anon",
 });
 
 test("Transfer product entry retries authoritative stock when a previous read failed", () => {
-  assert.match(transfers, /const needsFreshStock = navigator\.onLine && window\.__BC_STOCK_CONFIRMED__ !== true/);
-  assert.match(transfers, /needsFreshStock \|\| !productos\(\)\.length/);
+  assert.match(transfers, /navigator\.onLine && window\.__BC_TRANSFER_STOCK_CONFIRMED__ !== true/);
+  assert.match(transfers, /api\.rpc\('bc_stock_operativo'\)/);
+  assert.match(transfers, /__BC_TRANSFER_STOCK_SNAPSHOT__/);
+  assert.match(transfers, /tienePermiso\('transferencias','crear'\)/);
 });
