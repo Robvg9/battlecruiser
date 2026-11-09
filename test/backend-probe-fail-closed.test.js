@@ -72,6 +72,10 @@ test("a non-OK result records HTTP status and needs two consecutive failed probe
   assert.equal(await probe.window.sondearBackend(), false);
   assert.equal(probe.window.__BC_BACKEND_PROBE__.status, "degraded");
   assert.equal(probe.window.__BC_BACKEND_PROBE__.consecutiveFailures, 2);
+  assert.deepEqual(probe.connectivity, [], "Two failed probes still remain degraded.");
+  assert.equal(await probe.window.sondearBackend(), false);
+  assert.equal(probe.window.__BC_BACKEND_PROBE__.status, "degraded");
+  assert.equal(probe.window.__BC_BACKEND_PROBE__.consecutiveFailures, 3);
   assert.deepEqual(probe.connectivity, ["offline"]);
 });
 
@@ -82,6 +86,8 @@ test("unexpected runtime exceptions fail closed without making a single miss equ
   assert.equal(probe.window.__BC_BACKEND_PROBE__.reason, "probe_error");
   assert.deepEqual(probe.connectivity, []);
   await probe.window.sondearBackend();
+  assert.deepEqual(probe.connectivity, [], "Two runtime failures are not enough to call the backend offline.");
+  await probe.window.sondearBackend();
   assert.deepEqual(probe.connectivity, ["offline"]);
 });
 
@@ -91,6 +97,8 @@ test("a rejected network request is degraded first and offline only after a repe
   assert.equal(probe.window.__BC_BACKEND_PROBE__.status, "degraded");
   assert.equal(probe.window.__BC_BACKEND_PROBE__.reason, "network_error");
   assert.deepEqual(probe.connectivity, []);
+  await probe.window.sondearBackend();
+  assert.deepEqual(probe.connectivity, [], "Two runtime failures are not enough to call the backend offline.");
   await probe.window.sondearBackend();
   assert.deepEqual(probe.connectivity, ["offline"]);
 });
