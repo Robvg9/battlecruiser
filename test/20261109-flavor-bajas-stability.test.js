@@ -18,7 +18,9 @@ test("Bajas retries persist the same idempotency key by canonical request payloa
  assert.match(js,/p_idempotency_key: requestIdempotencyKey/);
  assert.match(js,/requestKey\.storage\.removeItem\(requestKey\.storageKey\)/);
  assert.match(js,/created\.length !== lines\.length/);
- assert.match(js,/submitting = true;[\\s\\S]*await persistentRequestKey\\(warehouse, lines\\)/,"the submission lock must be active before the asynchronous key calculation");
+ const submitLock = js.indexOf("submitting = true;");
+ const keyCalculation = js.indexOf("await persistentRequestKey(warehouse, lines)");
+ assert.ok(submitLock >= 0 && keyCalculation > submitLock, "the submission lock must be active before the asynchronous key calculation");
 });
 test("Bajas success is not converted into a failed submission by the approvals-panel refresh",()=>{
  const js=read("public/js/bajas-multiple.js");
