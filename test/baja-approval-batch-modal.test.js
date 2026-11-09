@@ -102,7 +102,7 @@ test("one Baja list opens one floating detail modal and approves all lines throu
 
   const resolved = calls.filter(call => call.name === "resolver_solicitud_bajas_admin");
   assert.equal(resolved.length, 1, "the list must be resolved once, not once per product");
-  assert.deepEqual(resolved[0].params, {
+  assert.equal(JSON.stringify(resolved[0].params), JSON.stringify({
     p_solicitud_id: "request-1",
     p_decision: "APROBAR",
     p_comentario: null,
@@ -110,7 +110,7 @@ test("one Baja list opens one floating detail modal and approves all lines throu
       { id: "baja-1", cantidad_real: 2 },
       { id: "baja-2", cantidad_real: 1 }
     ]
-  });
+  }));
   assert.equal(w.document.getElementById("admin-aprobacion-modal").hidden, true);
   assert.equal(calls.filter(call => call.name === "resolver_aprobacion_operativa").length, 0);
 });
@@ -131,7 +131,7 @@ test("rejecting a Baja list requires a reason and then rejects the parent reques
   assert.equal(resolved[0].params.p_solicitud_id, "request-1");
   assert.equal(resolved[0].params.p_decision, "RECHAZAR");
   assert.equal(resolved[0].params.p_comentario, "Motivo no corresponde.");
-  assert.deepEqual(resolved[0].params.p_lineas_reales, []);
+  assert.equal(JSON.stringify(resolved[0].params.p_lineas_reales), "[]");
 });
 
 test("approval modal is fixed to the viewport and only its body scrolls on Android", () => {
