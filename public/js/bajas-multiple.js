@@ -1,8 +1,8 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.2') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.2';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.3') return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.3';
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
   let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
@@ -54,7 +54,12 @@
     host.innerHTML =
       '<p class="bc-bajas-intro">Selecciona un almacén y añade los productos que correspondan. Cada línea lleva su cantidad y motivo; toda la lista se envía en una única operación. Las solicitudes de usuarios sin permiso global de aprobación quedan pendientes y no modifican el stock/FIFO hasta ser aprobadas.</p>' +
       '<form id="bc-bajas-multiple-form">' +
-        '<label><span>Almacén</span><select id="bc-bajas-warehouse" required><option value="" disabled selected hidden>Seleccionar almacén…</option></select></label>' +
+        '<div class="bc-bajas-context-fields">' +
+          '<label><span>Almacén</span><select id="bc-bajas-warehouse" required><option value="" disabled selected hidden>Seleccionar almacén…</option></select></label>' +
+          '<label><span>Motivo general de la lista</span><select id="bc-bajas-default-reason" required><option value="" disabled selected hidden>Seleccionar motivo…</option></select></label>' +
+          '<label id="bc-bajas-default-other-wrap" hidden><span>Explica el motivo general</span><input id="bc-bajas-default-other" maxlength="180" placeholder="Describe el motivo"></label>' +
+        '</div>' +
+        '<div class="bc-bajas-list-heading"><strong>PRODUCTOS A DAR DE BAJA</strong><span id="bc-bajas-line-count">0 productos</span></div>' +
         '<div class="bc-bajas-lines" id="bc-bajas-lines"></div>' +
         '<div class="bc-bajas-actions"><button type="button" id="bc-baja-add">+ Añadir producto</button><button type="submit" id="bc-baja-submit">Enviar lista a revisión</button></div>' +
         '<p class="bc-bajas-message" id="bc-bajas-message" role="status" aria-live="polite"></p>' +
@@ -62,6 +67,13 @@
     modal.querySelector('.bc-bajas-modal-content').appendChild(host);
     const form = host.querySelector('#bc-bajas-multiple-form');
     host.querySelector('#bc-baja-add').addEventListener('click', addRow);
+    const defaultReason = host.querySelector('#bc-bajas-default-reason');
+    REASONS.forEach(value => { const option=document.createElement('option'); option.value=value; option.textContent=value; defaultReason.appendChild(option); });
+    defaultReason.addEventListener('change', () => {
+      const wrap=host.querySelector('#bc-bajas-default-other-wrap'), input=host.querySelector('#bc-bajas-default-other');
+      wrap.hidden=defaultReason.value!=='Otro'; input.required=defaultReason.value==='Otro';
+      pendingKey=null;
+    });
     form.addEventListener('submit', submit);
     form.addEventListener('input', () => { if (!submitting) pendingKey = null; });
     form.addEventListener('change', () => { if (!submitting) pendingKey = null; });
@@ -91,25 +103,43 @@
     const rowId = ++sequence;
     const row = document.createElement('div');
     row.className = 'bc-baja-line';
+    row.dataset.reasonOverride='false';
     row.innerHTML =
       '<label class="bc-baja-line-product"><span>Producto</span><select class="bc-baja-product" id="bc-baja-producto-' + rowId + '" required><option value="" disabled selected hidden>Seleccionar producto…</option></select></label>' +
       '<label class="bc-baja-line-qty"><span>Cantidad</span><input class="bc-baja-quantity" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="0" required></label>' +
       '<button type="button" class="bc-baja-line-remove" aria-label="Quitar producto">×</button>' +
-      '<label class="bc-baja-line-reason"><span>Motivo</span><select class="bc-baja-reason" required><option value="" disabled selected hidden>Seleccionar motivo…</option></select></label>' +
-      '<label class="bc-baja-line-other" hidden><span>Explica el motivo</span><input class="bc-baja-other" maxlength="180" placeholder="Describe el otro motivo"></label>';
+      '<button type="button" class="bc-baja-line-reason-toggle">Motivo distinto</button>' +
+      '<label class="bc-baja-line-reason" hidden><span>Motivo solo para este producto</span><select class="bc-baja-reason"><option value="" selected>Usar motivo general</option></select></label>' +
+      '<label class="bc-baja-line-other" hidden><span>Explica este motivo</span><input class="bc-baja-other" maxlength="180" placeholder="Describe el motivo"></label>';
     host.appendChild(row);
     fillProductSelect(row.querySelector('.bc-baja-product'));
     refreshPicker(row);
     const reason = row.querySelector('.bc-baja-reason');
     REASONS.forEach(value => { const o = document.createElement('option'); o.value=value; o.textContent=value; reason.appendChild(o); });
     const otherWrap = row.querySelector('.bc-baja-line-other'), other = row.querySelector('.bc-baja-other');
+    const reasonWrap = row.querySelector('.bc-baja-line-reason');
+    row.querySelector('.bc-baja-line-reason-toggle').addEventListener('click', event => {
+      const enabled = row.dataset.reasonOverride !== 'true';
+      row.dataset.reasonOverride = enabled ? 'true' : 'false';
+      reasonWrap.hidden = !enabled;
+      event.currentTarget.textContent = enabled ? 'Usar motivo general' : 'Motivo distinto';
+      if (!enabled) { reason.value=''; other.value=''; otherWrap.hidden=true; other.required=false; }
+      pendingKey=null;
+      updateLineCount();
+    });
     reason.addEventListener('change', () => { otherWrap.hidden = reason.value !== 'Otro'; other.required = reason.value === 'Otro'; });
     row.querySelector('.bc-baja-line-remove').addEventListener('click', () => {
       if (host.children.length > 1) row.remove();
       else { row.querySelector('.bc-baja-product').value=''; row.querySelector('.bc-baja-quantity').value=''; reason.value=''; other.value=''; otherWrap.hidden=true; other.required=false; }
       pendingKey = null;
+      updateLineCount();
     });
     pendingKey = null;
+    updateLineCount();
+  }
+  function updateLineCount() {
+    const host=document.getElementById('bc-bajas-lines'), count=document.getElementById('bc-bajas-line-count');
+    if (count) { const n=host ? host.children.length : 0; count.textContent=n+' '+(n===1?'producto':'productos'); }
   }
   async function hasSession() {
     const api = apiClient();
@@ -118,12 +148,9 @@
       const result = await api.auth.getSession();
       if (!result || result.error || !result.data || !result.data.session ||
           !result.data.session.user || !result.data.session.access_token) return false;
-      const expiry = Number(result.data.session.expires_at || 0) * 1000;
-      if (expiry && expiry < Date.now() + 30000 && typeof api.auth.refreshSession === 'function') {
-        const refreshed = await api.auth.refreshSession();
-        return !!(refreshed && !refreshed.error && refreshed.data && refreshed.data.session &&
-          refreshed.data.session.user && refreshed.data.session.access_token);
-      }
+      // Never force a refresh just because expiry is near: parallel callers can
+      // race the rotating refresh token and provoke Supabase Auth 429 responses.
+      // The RPC below is authoritative; it refreshes once only after a real 401.
       return true;
     } catch (_) { return false; }
   }
@@ -140,8 +167,8 @@
     const request = (async function () {
       try {
         const api = apiClient();
-        if (!api || !await hasSession()) {
-          message('Tu sesión no está activa. Vuelve a iniciar sesión para cargar los catálogos.', 'error');
+        if (!api) {
+          message('No se pudo inicializar Supabase. Recarga la aplicación e inténtalo de nuevo.', 'error');
           return false;
         }
         const results = await Promise.all([
@@ -184,20 +211,26 @@
     const warehouse = document.getElementById('bc-bajas-warehouse') && document.getElementById('bc-bajas-warehouse').value;
     const rows = Array.from(form ? form.querySelectorAll('.bc-baja-line') : []);
     if (!warehouse || !rows.length) return message('Selecciona un almacén y añade al menos un producto.', 'error');
+    const defaultReason = document.getElementById('bc-bajas-default-reason')?.value || '';
+    const defaultOther = document.getElementById('bc-bajas-default-other')?.value.trim() || '';
+    if (!defaultReason || (defaultReason === 'Otro' && !defaultOther)) {
+      return message('Selecciona el motivo general de la lista (y descríbelo si es Otro).', 'error');
+    }
     const lines = [];
     for (const row of rows) {
       const product = row.querySelector('.bc-baja-product').value;
       const quantity = Number(row.querySelector('.bc-baja-quantity').value);
-      const reason = row.querySelector('.bc-baja-reason').value;
-      const other = row.querySelector('.bc-baja-other').value.trim();
+      const customReason = row.dataset.reasonOverride === 'true';
+      const reason = customReason ? row.querySelector('.bc-baja-reason').value : defaultReason;
+      const other = customReason ? row.querySelector('.bc-baja-other').value.trim() : defaultOther;
       if (!product || !Number.isFinite(quantity) || quantity <= 0 || !reason || (reason === 'Otro' && !other)) {
-        return message('Completa producto, cantidad y motivo en todas las líneas.', 'error');
+        return message('Completa producto y cantidad; revisa el motivo general o el motivo particular marcado.', 'error');
       }
       lines.push({ almacen_id: warehouse, producto_id: product, cantidad: quantity, motivo: reason === 'Otro' ? 'Otro: ' + other : reason });
     }
     const api = apiClient();
-    if (!api || !await hasSession()) {
-      return message('La sesión de Supabase no está activa. Vuelve a iniciar sesión; la lista se conserva.', 'error');
+    if (!api || !api.auth || typeof api.rpc !== 'function') {
+      return message('No se pudo inicializar la sesión de Supabase. Recarga la aplicación; la lista se conserva.', 'error');
     }
     pendingKey = pendingKey || (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : null);
     if (!pendingKey) return message('No se pudo generar una clave segura para evitar duplicados. Recarga la aplicación.', 'error');
@@ -229,6 +262,12 @@
       const approved = created.length > 0 && created.every(item => item.estado === 'APROBADA');
       pendingKey = null;
       form.reset();
+      const defaultReason=document.getElementById('bc-bajas-default-reason');
+      if (defaultReason) defaultReason.value='';
+      const defaultOtherWrap=document.getElementById('bc-bajas-default-other-wrap');
+      if (defaultOtherWrap) defaultOtherWrap.hidden=true;
+      const defaultOther=document.getElementById('bc-bajas-default-other');
+      if (defaultOther) { defaultOther.value=''; defaultOther.required=false; }
       document.getElementById('bc-bajas-lines').innerHTML = '';
       addRow();
       message(approved ? '✓ Lista registrada y aprobada. Stock y FIFO actualizados.'
