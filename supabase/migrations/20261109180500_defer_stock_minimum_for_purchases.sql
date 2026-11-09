@@ -31,7 +31,7 @@ BEGIN
 END;
 $minimum_guard$;
 
-CREATE OR REPLACE FUNCTION public.bc_apply_stock_purchase_increment(
+CREATE OR REPLACE FUNCTION private.bc_apply_stock_purchase_increment(
   p_producto_id uuid,
   p_almacen_id uuid,
   p_cantidad numeric
@@ -58,7 +58,7 @@ BEGIN
 END;
 $purchase_stock$;
 
-REVOKE ALL ON FUNCTION public.bc_apply_stock_purchase_increment(uuid,uuid,numeric) FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION private.bc_apply_stock_purchase_increment(uuid,uuid,numeric) FROM PUBLIC,anon,authenticated;
 
 CREATE OR REPLACE FUNCTION public.registrar_compra(
   p_producto_id uuid,
@@ -159,7 +159,7 @@ BEGIN
   )
   RETURNING id INTO v_lote_id;
 
-  PERFORM public.bc_apply_stock_purchase_increment(
+  PERFORM private.bc_apply_stock_purchase_increment(
     p_producto_id,p_almacen_id,v_cantidad_final
   );
 
@@ -298,7 +298,7 @@ BEGIN
       v_costo_unitario_base,coalesce(p_fecha,now()),'compra',v_uid,v_compra_id
     );
 
-    PERFORM public.bc_apply_stock_purchase_increment(
+    PERFORM private.bc_apply_stock_purchase_increment(
       v_producto_id,p_almacen_id,v_cantidad_final
     );
 
