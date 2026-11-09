@@ -5,6 +5,10 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  const module=read("public/js/bajas-multiple.js"),admin=read("public/js/aprobaciones-admin.js"),finance=read("public/js/operaciones-financieras.js");
  assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add"/);assert.match(module,/crear_bajas_multiple/);
  assert.match(module,/hasSession/);assert.match(module,/p_idempotency_key: pendingKey/);
+ assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
+ assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
+ assert.match(module,/Never force a refresh just because expiry is near/);
+ assert.doesNotMatch(module,/!await hasSession\(\)/);
  assert.match(module,/function ensureModal\(\)/);
  assert.match(module,/window\.abrirBajasMultiple = async function/);
  assert.match(module,/warehouseTrigger\.focus\(\{ preventScroll: true \}\)/);
@@ -12,6 +16,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.match(module,/modal\.hidden = false/);
  assert.match(module,/bc-bajas-modal-open/);
  assert.match(module,/api\.auth\.refreshSession\(\)/);
+ assert.match(module,/tokenRejected/);
  assert.match(module,/const params = \{ p_lineas: lines, p_idempotency_key: pendingKey \}/);
  assert.doesNotMatch(admin,/id='adm-baja-form'/);assert.doesNotMatch(finance,/form-salida-producto/);
  assert.doesNotMatch(finance,/setInterval\(\(\)=>\{start\(\)\},10000\)/);
@@ -36,5 +41,7 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(module,/refreshPicker\(host\)/);
  assert.match(css,/bc-baja-line-product\{grid-column:1\/-1/);
  assert.match(css,/bc-baja-line-qty\{grid-column:1\/3/);
+ assert.match(css,/bc-bajas-context-fields/);
+ assert.match(css,/bc-bajas-list-heading/);
  assert.match(hub,/await window\.abrirBajasMultiple\(\)/);
 });
