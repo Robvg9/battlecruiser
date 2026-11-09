@@ -239,7 +239,7 @@ safeInit("form-transferencia", () => {
         if (textoOriginal) submitBtn.textContent = textoOriginal;
       }
     }
-  });;
+  });
 });
 
 async function mostrarDetalleTransferencia(trfId) {
