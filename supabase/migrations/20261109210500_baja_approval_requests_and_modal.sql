@@ -34,7 +34,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS bajas_solicitudes_creador_idempotency_uidx
   WHERE idempotency_key IS NOT NULL;
 
 ALTER TABLE public.bajas_solicitudes ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE public.bajas_solicitudes FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON TABLE public.bajas_solicitudes FROM PUBLIC,anon,authenticated,service_role;
 
 -- Backfill existing multi-line requests using PostgreSQL transaction_timestamp:
 -- every row created by one call to crear_bajas_multiple has the exact same
@@ -620,13 +620,15 @@ BEGIN
     RAISE EXCEPTION 'La lista no contiene líneas pendientes para resolver.';
   END IF;
 
-  UPDATE public.bajas_solicitudes
+  UPDATE public.bajas_solicitudes s
   SET estado=CASE WHEN p_decision='APROBAR' THEN 'APROBADA' ELSE 'RECHAZADA' END,
+      total_lineas=(SELECT count(*) FROM public.bajas b WHERE b.solicitud_id=s.id),
+      cantidad_total=(SELECT coalesce(sum(b.cantidad),0) FROM public.bajas b WHERE b.solicitud_id=s.id),
       revisado_por=auth.uid(),
       revisado_nombre=v_nombre,
       comentario_revision=NULLIF(btrim(p_comentario),''),
       fecha_revision=now()
-  WHERE id=p_solicitud_id;
+  WHERE s.id=p_solicitud_id;
 
   RETURN jsonb_build_object(
     'ok',true,
