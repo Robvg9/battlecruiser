@@ -166,7 +166,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.64/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.13"\]/, "the Step 7 jornada UI must be loaded dynamically");
-  assert.match(app, /\["m26-ui-integridad\.js","26\.40"\]/);
+  assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
   assert.match(sw, /\.\/js\/m26-ui-integridad\.js\?v=26\.40/, "the unified commercial-options panel must be available offline");
@@ -292,7 +292,7 @@ test('Administration UI modules refresh their cache keys', () => {
   assert.match(app, /\["m26-ui-integridad\.js","26\.40"\]/);
   assert.match(app, /\["roles-en-usuarios\.js","33\.7"\]/);
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.12"\]/);
-  assert.match(sw, /m26-ui-integridad\.js\?v=26\.40/);
+  assert.match(sw, /m26-ui-integridad\.js\?v=26\.41/);
   assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.12/);
   assert.match(sw, /catalogos\.js\?v=20261106\.1/);
 });
