@@ -236,7 +236,22 @@
       if (!result || !result.ok) throw (result && result.error) || new Error('No se pudo registrar la transferencia.');
       if (result.offline) feedback('✓ Transferencia guardada en este dispositivo; se sincronizará al recuperar la conexión.', true);
       else {
-        feedback('✓ Transferencia registrada. Se movieron ' + summary + ' en una sola operación.', true);
+        let missingMinimums = [];
+        try {
+          const api = window.client || (typeof client !== 'undefined' ? client : null);
+          if (api && api.from) {
+            const ids = lineas.map(item => item.producto_id);
+            const check = await api.from('stock').select('producto_id,minimo').eq('almacen_id', dest).in('producto_id', ids);
+            if (!check.error) {
+              const minimumByProduct = new Map((check.data || []).map(row => [String(row.producto_id), Number(row.minimo || 0)]));
+              missingMinimums = lineas.filter(item => !(minimumByProduct.get(String(item.producto_id)) > 0)).map(item => item.nombre);
+            }
+          }
+        } catch (_) { /* transfer success must not be reversed by an optional warning read */ }
+        feedback(missingMinimums.length
+          ? '✓ Transferencia registrada. Se movieron ' + summary + '. Ahora configura el mínimo en destino para: ' + missingMinimums.join(', ') + '.'
+          : '✓ Transferencia registrada. Se movieron ' + summary + ' en una sola operación.',
+          true);
         if (typeof window.refrescarTransferencias === 'function') await window.refrescarTransferencias();
         await actualizarInventarioConfirmado();
       }

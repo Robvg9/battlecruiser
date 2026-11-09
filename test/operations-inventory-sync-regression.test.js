@@ -56,7 +56,8 @@ test("Operations hub reloads both catalogs from Supabase instead of trusting non
 
 test("Baja form has one authenticated batch entry point and no competing single-row forms", () => {
   const bajas = read("public/js/bajas-multiple.js");
-  assert.match(bajas, /async function hasSession/);
+  assert.doesNotMatch(bajas, /async function hasSession/);
+   assert.doesNotMatch(bajas, /auth\.getSession\(\)/, "Bajas must not force a preflight refresh that races the rotating refresh token");
   assert.match(bajas, /api\.from\('productos'\)/);
   assert.match(bajas, /api\.from\('almacenes'\)/);
   assert.match(bajas, /api\.rpc\('crear_bajas_multiple'/);

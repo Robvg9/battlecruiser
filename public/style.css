@@ -1208,3 +1208,28 @@ body.bc-bajas-modal-open{overflow:hidden}
   #bc-product-modal #form-producto.bc-mixed-config-mode .prod-variante-row {grid-template-columns:minmax(0,1fr) auto}
   #bc-product-modal #form-producto.bc-mixed-config-mode .prod-variante-row button {max-width:86px}
 }
+
+
+/* Compact multi-item Bajas form: one shared reason, per-line overrides only when needed. */
+.bc-bajas-context-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:12px}
+.bc-bajas-context-fields label{display:grid;gap:5px;min-width:0}
+.bc-bajas-context-fields label>span{font-size:11px;color:var(--mist)}
+.bc-bajas-context-fields input,.bc-bajas-context-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:40px;padding:8px 10px;border:1px solid rgba(212,176,92,.28);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font:inherit;font-size:13px}
+.bc-bajas-list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;font-size:11px;letter-spacing:.04em;color:var(--mist)}
+.bc-bajas-list-heading strong{color:var(--gold-bright)}
+.bc-bajas-multiple .bc-bajas-lines{gap:6px;max-height:38dvh;overflow:auto;padding:1px;overscroll-behavior:contain}
+.bc-bajas-multiple .bc-baja-line{grid-template-columns:minmax(0,1fr) 104px 34px;gap:7px;padding:8px 9px;align-items:center}
+.bc-bajas-multiple .bc-baja-line-product{grid-column:1;grid-row:1;min-width:0}
+.bc-bajas-multiple .bc-baja-line-qty{grid-column:2;grid-row:1;min-width:0}
+.bc-bajas-multiple .bc-baja-line-remove{grid-column:3;grid-row:1;width:34px;height:36px;min-height:36px}
+.bc-bajas-multiple .bc-baja-line-reason-toggle{grid-column:1/-1;justify-self:start;min-height:28px;padding:4px 8px;border:0;background:transparent;color:var(--gold-bright);font-size:11px}
+.bc-bajas-multiple .bc-baja-line-reason,.bc-bajas-multiple .bc-baja-line-other{grid-column:1/-1}
+.bc-bajas-multiple .bc-baja-line-reason[hidden],.bc-bajas-multiple .bc-baja-line-other[hidden]{display:none!important}
+.bc-bajas-multiple .bc-baja-line-reason select{min-height:34px}
+.bc-bajas-multiple .bc-bajas-actions{position:sticky;bottom:0;padding-top:8px;background:linear-gradient(180deg,transparent,rgba(10,24,20,.98) 25%)}
+@media(max-width:480px){
+ .bc-bajas-context-fields{grid-template-columns:1fr}
+ .bc-bajas-multiple .bc-bajas-lines{max-height:34dvh}
+ .bc-bajas-multiple .bc-baja-line{grid-template-columns:minmax(0,1fr) 86px 32px;gap:6px;padding:7px}
+ .bc-bajas-multiple .bc-baja-line-remove{width:32px;height:34px;min-height:34px}
+}

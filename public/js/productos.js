@@ -742,6 +742,32 @@ safeInit("prod-variantes-asignacion", () => {
   });
 });
 
+async function rpcMixtoConReintento(nombre, parametros) {
+  const ejecutar = () => client.rpc(nombre, parametros);
+  let resultado = await ejecutar().catch(error => ({ error }));
+  if (!resultado.error) return resultado;
+  const error = resultado.error;
+  const status = Number(error.status || error.code || 0);
+  const detail = String(error.message || error.details || error || "");
+  const authRejected = status === 401 || /jwt.*(expired|invalid)|missing.*authorization|no authorization header/i.test(detail);
+  if (authRejected && client.auth && typeof client.auth.refreshSession === "function") {
+    const refreshed = await client.auth.refreshSession().catch(refreshError => ({ error: refreshError }));
+    if (refreshed && !refreshed.error && refreshed.data && refreshed.data.session &&
+        refreshed.data.session.user && refreshed.data.session.access_token) {
+      resultado = await ejecutar().catch(retryError => ({ error: retryError }));
+      if (!resultado.error) return resultado;
+    }
+  } else if (status === 429 || status >= 500 || /failed to fetch|networkerror|timeout/i.test(detail)) {
+    // The configuration RPC is repeat-safe: it locks the parent and applies
+    // the exact submitted variant/warehouse values. Retry once after a short
+    // pause to survive transient gateway/auth throttling without duplicating stock.
+    await new Promise(resolve => window.setTimeout(resolve, 700));
+    resultado = await ejecutar().catch(retryError => ({ error: retryError }));
+    if (!resultado.error) return resultado;
+  }
+  return resultado;
+}
+
 function prepararAsignacionesMixtasProducto(variants) {
   const snapshot = _productoMixtoSnapshot;
   const panel = document.getElementById("prod-variantes-asignacion");
@@ -799,9 +825,13 @@ window.bcSalirConfiguracionSabores = function () {
 
 window.bcGuardarConfiguracionSabores = async function (productId) {
   const targetId = productId || document.getElementById("prod-editando-id")?.value;
-  if (!targetId || !_productoMixtoSnapshot ||
-      String(_productoMixtoSnapshot.producto_id) !== String(targetId)) {
-    throw new Error("No se pudo confirmar la identidad ni el inventario actual del producto. Vuelve a abrirlo desde Inventario.");
+  if (!targetId) throw new Error("No se pudo identificar el producto que vas a configurar.");
+  if (!_productoMixtoSnapshot) {
+    const loaded = await cargarSnapshotAsignacionMixtaProducto(targetId);
+    if (!loaded) throw new Error("No se pudo consultar el inventario actual. Tus datos no se enviaron; revisa la conexión e inténtalo de nuevo.");
+  }
+  if (String(_productoMixtoSnapshot.producto_id) !== String(targetId)) {
+    throw new Error("El inventario cargado pertenece a otro producto. Cierra esta ventana y vuelve a abrir la configuración desde Inventario.");
   }
   if (!navigator.onLine) throw new Error("Necesitas conexión para guardar el inventario por sabores. No se aplicó ningún cambio.");
   const toggle = document.getElementById("prod-inventario-mixto");
@@ -817,17 +847,17 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
     mostrarFeedbackAsignacionMixta(prepared.error, false);
     throw new Error(prepared.error);
   }
-  const result = await client.rpc("configurar_producto_inventario_mixto_con_asignaciones", {
+  const result = await rpcMixtoConReintento("configurar_producto_inventario_mixto_con_asignaciones", {
     p_producto_id: targetId,
     p_habilitar: true,
     p_variantes: variants,
     p_asignaciones: prepared.data
-  }).catch(error => ({ error }));
+  });
   if (result.error) throw result.error;
 
-  const verified = await client.rpc("bc_obtener_snapshot_conversion_mixta", {
+  const verified = await rpcMixtoConReintento("bc_obtener_snapshot_conversion_mixta", {
     p_producto_id: targetId
-  }).catch(error => ({ error }));
+  });
   if (verified.error) throw new Error("El servidor aceptó el guardado, pero no se pudo verificar la lectura posterior: " + explicarError(verified.error, "verificar inventario"));
   const snapshot = verified.data;
   if (!snapshot || String(snapshot.producto_id) !== String(targetId) || snapshot.inventario_mixto !== true) {
@@ -1165,21 +1195,21 @@ safeInit("form-producto", () => {
     }
     const productoIdReal = editandoId || resultado.data;
     if (needsMixedConfig && productoIdReal) {
-      const config = await client.rpc("configurar_producto_inventario_mixto_con_asignaciones", {
+      const config = await rpcMixtoConReintento("configurar_producto_inventario_mixto_con_asignaciones", {
         p_producto_id: productoIdReal,
         p_habilitar: mixedEnabled,
         p_variantes: mixedEnabled ? variants : [],
         p_asignaciones: mixedEnabled ? asignacionesMixtas : []
-      }).catch(error => ({ error }));
+      });
       if (config.error) {
         submitBtn.disabled = false;
         setMsg("msg-productos", "Los datos básicos del producto se guardaron, pero el inventario por sabores NO se aplicó. No se alteró la conversión ni el FIFO: " + explicarError(config.error, "configurar inventario mixto"), false);
         return;
       }
       if (mixedEnabled) {
-        const verify = await client.rpc("bc_obtener_snapshot_conversion_mixta", {
+        const verify = await rpcMixtoConReintento("bc_obtener_snapshot_conversion_mixta", {
           p_producto_id: productoIdReal
-        }).catch(error => ({ error }));
+        });
         if (verify.error || !verify.data || verify.data.inventario_mixto !== true) {
           submitBtn.disabled = false;
           setMsg("msg-productos", "No se pudo confirmar la configuración de sabores en la lectura posterior. No la damos por guardada.", false);
