@@ -1252,7 +1252,7 @@ body.bc-bajas-modal-open{overflow:hidden;overscroll-behavior:none}
 
 
 /* Android: keep the Bajas composer and every action inside the viewport. */
-.bc-bajas-multiple{box-sizing:border-box;width:min(100%,720px);max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
+.bc-bajas-multiple{box-sizing:border-box;width:100%;max-width:100%;max-height:none;overflow:visible;overscroll-behavior:auto;padding:0 0 calc(12px + env(safe-area-inset-bottom))}
 .bc-bajas-multiple *{box-sizing:border-box;min-width:0}
 .bc-bajas-multiple .bc-bajas-lines{display:flex;flex-direction:column;gap:7px;overflow:visible;max-height:none}
 .bc-bajas-multiple .bc-baja-line{min-width:0;grid-template-columns:minmax(0,1fr) 78px 32px;gap:5px}
