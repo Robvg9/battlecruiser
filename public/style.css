@@ -1251,6 +1251,15 @@ body.bc-bajas-modal-open{overflow:hidden;overscroll-behavior:none}
 }
 
 
+/* Android: keep the Bajas composer and every action inside the viewport. */
+.bc-bajas-multiple{box-sizing:border-box;width:min(100%,720px);max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);overflow-y:auto;overscroll-behavior:contain;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
+.bc-bajas-multiple *{box-sizing:border-box;min-width:0}
+.bc-bajas-multiple .bc-bajas-lines{display:flex;flex-direction:column;gap:7px;overflow:visible;max-height:none}
+.bc-bajas-multiple .bc-baja-line{min-width:0;grid-template-columns:minmax(0,1fr) 78px 32px;gap:5px}
+.bc-bajas-multiple .bc-baja-line-product,.bc-bajas-multiple .bc-baja-line-qty{min-width:0;width:100%;max-width:100%}
+.bc-bajas-multiple .bc-bajas-actions{position:static;display:flex;flex-wrap:wrap;gap:8px;width:100%;padding:10px 0 calc(8px + env(safe-area-inset-bottom));background:transparent}
+.bc-bajas-multiple .bc-bajas-actions button{position:static;flex:1 1 100%;min-width:0;max-width:100%;white-space:normal}
+.bc-bajas-multiple .bc-bajas-message{overflow-wrap:anywhere;word-break:break-word}
 /* PWA: show a controlled update action instead of silently replacing the active screen. */
 .bc-pwa-update-notice{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:100900;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:620px;margin:0 auto;padding:10px 12px;border:1px solid rgba(212,176,92,.5);border-radius:12px;background:rgba(9,25,21,.98);color:var(--mist);box-shadow:0 12px 36px rgba(0,0,0,.45);font-size:12px}
 .bc-pwa-update-notice button{flex:0 0 auto;min-height:38px;padding:7px 12px;border:0;border-radius:8px;background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;font-weight:700}
