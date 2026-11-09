@@ -72,7 +72,8 @@
       button.setAttribute('data-bc-product-value', option.value); button.textContent = option.textContent.trim(); results.appendChild(button);
     });
     const plural = activeKind === 'warehouse' ? 'almacenes' : activeKind === 'product' ? 'productos' : 'opciones';
-    status.textContent = matches.length ? matches.length + ' ' + plural : 'No hay ' + plural + ' que coincidan.';
+    const singular = activeKind === 'warehouse' ? 'almacén' : activeKind === 'product' ? 'producto' : 'opción';
+    status.textContent = matches.length ? matches.length + ' ' + (matches.length === 1 ? singular : plural) : 'No hay ' + plural + ' que coincidan.';
   }
   function open(select, kind) {
     active = select; activeKind = kind || select.dataset.bcPickerKind || 'product'; ensureModal();
@@ -94,7 +95,7 @@
     select.classList.add('bc-product-picker-native-select'); select.parentNode.insertBefore(field, select); field.append(button, select); update(select);
     select.addEventListener('change', () => update(select));
     new MutationObserver(() => { update(select); if (active === select && modal && !modal.hidden) render(); })
-      .observe(select, { childList: true, subtree: true, characterData: true });
+      .observe(select, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled'] });
   }
   function scan(root) {
     if (!root) return;
@@ -102,6 +103,9 @@
     if (root.querySelectorAll) root.querySelectorAll('select').forEach(attach);
   }
   function refresh(root) { scan(root || document.body); }
+  document.addEventListener('change', event => {
+    if (event.target && event.target.tagName === 'SELECT') document.querySelectorAll('select[data-bc-select-picker="1"]').forEach(update);
+  });
   if (document.body) {
     refresh(document.body);
     new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => { if (node.nodeType === 1) refresh(node); })))
