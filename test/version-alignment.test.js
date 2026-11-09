@@ -118,9 +118,9 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'), 'the finance operations form must refresh');
   assert.ok(app.includes('["aprobaciones-admin.js","20261108.5"]'), 'the approval form must refresh');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=71"), 'the offline shell must precache the updated minimum editor');
-  assert.ok(index.includes('js/productos.js?v=20261109.1'), 'the product view must refresh its category subscriber');
+  assert.ok(index.includes('js/productos.js?v=20261109.2'), 'the product view must refresh its category subscriber');
   assert.ok(index.includes('js/almacenes.js?v=20261109.1'), 'the warehouse view must refresh its tab subscriber');
-  assert.ok(sw.includes("./js/productos.js?v=20261109.1"), 'the product view must refresh offline');
+  assert.ok(sw.includes("./js/productos.js?v=20261109.2"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
@@ -131,8 +131,8 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(productos.includes("bcNotificarCambioDatos(estabaEditando ?"), "direct catalog saves must publish product changes");
   assert.ok(sw.includes("./js/compra-multiple.js?v=27.15"), "the purchase module's reactive listener must be available offline");
   assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
-  assert.ok(index.includes('js/transferencias.js?v=20261106.1'), "transfer history must load its reactive subscriber");
-  assert.ok(sw.includes('./js/transferencias.js?v=20261106.1'), "transfer history must be cached with its reactive subscriber");
+  assert.ok(index.includes('js/transferencias.js?v=20261109.1'), "transfer history must load its reactive subscriber");
+  assert.ok(sw.includes('./js/transferencias.js?v=20261109.1'), "transfer history must be cached with its reactive subscriber");
 });
 
 // PWA 9.5.87 uses warehouse-specific movement summary windows and aligns release cache keys.
