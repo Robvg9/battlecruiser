@@ -14,9 +14,196 @@ function row(title,detail,buttons){const d=document.createElement('div');d.class
 async function load(){if(!canAdmin()||!(await hasLiveSession()))return;const el=listEl();if(!el)return;if(!navigator.onLine){el.innerHTML='<p class="lista-estado">⚪ Sin conexión. Las aprobaciones requieren conexión.</p>';return}el.innerHTML='<p class="lista-estado">Cargando aprobaciones…</p>';try{const jobs=[];if(can('entregas_caja','editar_any')){jobs.push(rpc('listar_entregas_caja',{p_ciclo_id:null,p_almacen_id:null,p_estado:null}).then(e=>({k:'e',d:Array.isArray(e)?e:[]})));jobs.push(rpc('listar_cuadres',{p_limite:50,p_offset:0}).then(c=>({k:'c',d:Array.isArray(c)?c:[]})))}if(canAdmin())jobs.push(rpc('listar_aprobaciones_admin').then(a=>({k:'o',d:Array.isArray(a)?a:[]})));const rs=await Promise.all(jobs),rows=[];for(const r of rs){if(r.k==='e')r.d.filter(x=>['DECLARADA','CONTADA'].includes(x.estado)).forEach(x=>rows.push({rank:x.estado==='DECLARADA'?0:1,node:renderEntrega(x)}));if(r.k==='c')r.d.filter(x=>['CON_DIFERENCIA','EN_REVISION'].includes(x.estado)).forEach(x=>rows.push({rank:2,node:renderCuadre(x)}));if(r.k==='o')r.d.forEach(x=>rows.push({rank:3,node:renderOperativa(x)}))}rows.sort((a,b)=>a.rank-b.rank);if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(rows.length);if(!rows.length){el.innerHTML='<p class="lista-estado">✓ No hay aprobaciones pendientes.</p>';return}el.innerHTML='';rows.forEach(r=>el.appendChild(r.node))}catch(e){el.innerHTML='<p class="lista-estado">No se pudieron cargar las aprobaciones: '+esc(e.message||e)+'</p>'}}
 function renderEntrega(x){const estado=x.estado==='DECLARADA'?'DECLARADA — falta contar':'CONTADA — falta aprobar';const dif=x.diferencia==null?'':' · Diferencia $'+money(x.diferencia);return row('💵 Entrega de caja',(x.declarado_nombre||'Usuario')+' · '+(x.almacen_nombre||'Almacén')+' · '+estado+' · Declarado $'+money(x.monto_declarado)+dif,x.estado==='DECLARADA'?[{text:'Contar dinero',fn:()=>contarEntrega(x.id)}]:[{text:'Aprobar',fn:()=>revisarEntrega(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarEntrega(x.id,'rechazar')}])}
 function renderCuadre(x){const dif=Number(x.diferencia||0),s=dif<0?'Faltante $'+money(Math.abs(dif)):dif>0?'Sobrante $'+money(dif):'Exacto';return row('🧾 Cuadre pendiente','Esperado $'+money(x.dinero_esperado)+' · Declarado $'+money(x.dinero_declarado)+' · '+s,[{text:'Aprobar',fn:()=>revisarCuadre(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarCuadre(x.id,'rechazar')}])}
-function renderOperativa(x){let d=x.usuario_nombre||'Usuario';if(x.almacen_nombre)d+=' · '+x.almacen_nombre;if(x.producto_nombre)d+=' · '+x.producto_nombre;if(x.monto!=null)d+=' · $'+money(x.monto);if(x.cantidad!=null)d+=' · Cant. '+x.cantidad;d+=' · '+(x.motivo||x.resumen||'');const t=x.tipo==='gasto'?'💸 Gasto pendiente':x.tipo==='merma'?'📉 Merma pendiente':'📉 Baja pendiente';return row(t,d,[{text:'Revisar / aprobar',fn:()=>abrirRevision(x)},{text:'Rechazar',fn:()=>resolver(x,'RECHAZAR')}])}
-function abrirRevision(x){const host=document.getElementById('admin-aprobacion-detalle');if(!host)return;const esG=x.tipo==='gasto',v=esG?x.monto:x.cantidad;host.innerHTML='<div class="cc-bloque"><h4>Revisión: '+esc(x.tipo)+'</h4><div class="field"><label>'+ (esG?'Monto real':'Cantidad real')+'</label><input id="adm-real" type="number" min="0.01" step="0.01" value="'+esc(v)+'"></div><div class="field"><label>Comentario</label><input id="adm-comentario" placeholder="Opcional al aprobar; obligatorio al rechazar"></div><div class="btn-row"><button type="button" id="adm-aprobar-real">Aceptar y aprobar</button><button type="button" id="adm-cancelar-real">Cancelar</button></div><p class="msg" id="adm-real-msg"></p></div>';document.getElementById('adm-aprobar-real').onclick=async()=>{const real=Number(document.getElementById('adm-real').value);const c=document.getElementById('adm-comentario').value.trim();if(!Number.isFinite(real)||real<=0){document.getElementById('adm-real-msg').textContent='Valor real inválido.';return}await resolver(x,'APROBAR',real,c)};document.getElementById('adm-cancelar-real').onclick=()=>host.innerHTML=''}
-async function resolver(x,decision,real=null,comentario=null){if(decision==='RECHAZAR'){comentario=comentario??prompt('Motivo obligatorio del rechazo:');if(!comentario||!comentario.trim())return}try{await rpc('resolver_aprobacion_operativa',{p_tipo:x.tipo,p_id:x.id,p_decision:decision,p_comentario:comentario||null,p_cantidad_real:x.tipo==='gasto'?null:real,p_monto_real:x.tipo==='gasto'?real:null});const d=document.getElementById('admin-aprobacion-detalle');if(d)d.innerHTML='';await load();if(typeof refrescarCentroControl==='function')await refrescarCentroControl()}catch(e){const m=document.getElementById('adm-real-msg');if(m)m.textContent='No se pudo resolver: '+(e.message||e);else alert('No se pudo resolver: '+(e.message||e))}}
+function renderOperativa(x){
+  let detail=x.usuario_nombre||'Usuario';
+  if(x.almacen_nombre)detail+=' · '+x.almacen_nombre;
+  if(x.tipo==='baja_lista'){
+    detail+=' · '+(x.producto_nombre||'Lista de bajas');
+    if(x.cantidad!=null)detail+=' · Total '+x.cantidad+' u';
+    if(x.motivo)detail+=' · '+x.motivo;
+  }else{
+    if(x.producto_nombre)detail+=' · '+x.producto_nombre;
+    if(x.monto!=null)detail+=' · $'+money(x.monto);
+    if(x.cantidad!=null)detail+=' · Cant. '+x.cantidad;
+    if(x.motivo||x.resumen)detail+=' · '+(x.motivo||x.resumen);
+  }
+  const title=x.tipo==='gasto'?'💸 Gasto pendiente'
+    :x.tipo==='merma'?'📉 Merma pendiente'
+    :x.tipo==='baja_lista'?'📋 Lista de bajas pendiente':'📉 Baja pendiente';
+  return row(title,detail,[{text:'Ver detalles y revisar',fn:()=>abrirRevision(x)}]);
+}
+let approvalFocusReturn=null;
+function ensureApprovalModal(){
+  let modal=document.getElementById('admin-aprobacion-modal');
+  if(modal)return modal;
+  modal=document.createElement('div');
+  modal.id='admin-aprobacion-modal';
+  modal.className='bc-admin-approval-modal';
+  modal.hidden=true;
+  modal.innerHTML=
+    '<div class="bc-admin-approval-backdrop" data-bc-admin-close></div>'+
+    '<section class="bc-admin-approval-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-approval-title" tabindex="-1">'+
+      '<header class="bc-admin-approval-head"><div><h2 id="admin-approval-title">Revisión administrativa</h2><p id="admin-approval-subtitle"></p></div>'+
+      '<button type="button" class="bc-admin-approval-close" data-bc-admin-close aria-label="Cerrar">×</button></header>'+
+      '<div class="bc-admin-approval-body" id="admin-approval-body"></div>'+
+      '<footer class="bc-admin-approval-footer" id="admin-approval-footer">'+
+        '<button type="button" class="cc-accion bc-admin-approval-reject" id="admin-approval-reject">Rechazar</button>'+
+        '<button type="button" class="cc-accion bc-admin-approval-accept" id="admin-approval-accept">Aceptar y aprobar</button>'+
+      '</footer>'+
+    '</section>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click',event=>{
+    if(event.target.closest('[data-bc-admin-close]'))closeApprovalModal();
+  });
+  modal.querySelector('#admin-approval-reject').addEventListener('click',()=>resolverDesdeModal('RECHAZAR'));
+  modal.querySelector('#admin-approval-accept').addEventListener('click',()=>resolverDesdeModal('APROBAR'));
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&!modal.hidden)closeApprovalModal();
+  });
+  return modal;
+}
+function closeApprovalModal(){
+  const modal=document.getElementById('admin-aprobacion-modal');
+  if(!modal)return;
+  modal.hidden=true;
+  document.body.classList.remove('bc-admin-approval-open');
+  if(approvalFocusReturn&&approvalFocusReturn.isConnected){
+    try{approvalFocusReturn.focus({preventScroll:true})}catch(_){}
+  }
+  approvalFocusReturn=null;
+}
+function setApprovalMessage(value,isError){
+  const el=document.getElementById('admin-approval-message');
+  if(!el)return;
+  el.textContent=value||'';
+  el.className='bc-admin-approval-message'+(isError?' is-error':'');
+}
+function renderApprovalDetails(x,detail){
+  const modal=ensureApprovalModal();
+  const body=modal.querySelector('#admin-approval-body');
+  const subtitle=modal.querySelector('#admin-approval-subtitle');
+  const footer=modal.querySelector('#admin-approval-footer');
+  const isList=x.tipo==='baja_lista';
+  const isExpense=x.tipo==='gasto';
+  const isLegacyBaja=x.tipo==='baja';
+  const isStockChange=x.tipo==='merma'||isLegacyBaja;
+  const lines=isList?(Array.isArray(detail.lineas)?detail.lineas:[]):isLegacyBaja?[{
+    id:x.id,producto_nombre:x.producto_nombre,cantidad:x.cantidad,motivo:x.motivo,estado:x.estado
+  }]:[];
+  const title=isList?'Lista de bajas':isExpense?'Gasto pendiente':x.tipo==='merma'?'Merma pendiente':'Baja pendiente';
+  modal.querySelector('#admin-approval-title').textContent='Revisión administrativa · '+title;
+  subtitle.textContent=(detail.usuario_nombre||x.usuario_nombre||'Usuario')
+    +(detail.almacen_nombre||x.almacen_nombre?' · '+(detail.almacen_nombre||x.almacen_nombre):'')
+    +(detail.fecha||x.fecha?' · '+new Date(detail.fecha||x.fecha).toLocaleString():'');
+  modal.dataset.approvalType=x.tipo;
+  modal.dataset.approvalId=x.id;
+  let html='';
+  if(isList){
+    html+='<section class="bc-admin-approval-summary"><strong>'+esc(detail.motivo_general||x.motivo||'Motivo general no especificado')+'</strong>'+
+      '<span>'+lines.length+' productos en una sola solicitud. La aprobación se ejecuta como una operación atómica.</span></section>';
+    html+='<div class="bc-admin-approval-lines">';
+    lines.forEach(line=>{
+      html+='<article class="bc-admin-approval-line">'+
+        '<div class="bc-admin-approval-line-info"><strong>'+esc(line.producto_nombre||'Producto')+'</strong>'+
+        '<span>Motivo: '+esc(line.motivo||'—')+'</span>'+
+        (line.estado&&line.estado!=='PENDIENTE'?'<span class="bc-admin-approval-line-state">'+esc(line.estado)+'</span>':'')+
+        '</div>'+
+        '<label><span>Cantidad a aprobar</span><input type="number" min="0.0001" step="any" max="'+esc(line.cantidad)+'" value="'+esc(line.cantidad)+'" data-bc-approval-line-qty data-line-id="'+esc(line.id)+'" '+(line.estado==='PENDIENTE'?'':'disabled')+'></label>'+
+        '</article>';
+    });
+    html+='</div>';
+  }else if(isExpense){
+    html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||'Gasto')+'</strong>'+
+      '<span>'+esc(x.motivo||'Sin descripción adicional')+'</span></section>'+
+      '<label class="bc-admin-approval-field"><span>Monto a aprobar</span><input id="admin-approval-real" type="number" min="0.01" step="0.01" value="'+esc(x.monto)+'"></label>';
+  }else if(isStockChange){
+    html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.producto_nombre||'Producto')+'</strong>'+
+      '<span>Motivo: '+esc(x.motivo||'—')+'</span></section>'+
+      '<label class="bc-admin-approval-field"><span>Cantidad a aprobar</span><input id="admin-approval-real" type="number" min="0.0001" step="any" max="'+esc(x.cantidad)+'" value="'+esc(x.cantidad)+'"></label>';
+  }else{
+    html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||title)+'</strong>'+
+      '<span>'+esc(x.motivo||'Sin detalle adicional')+'</span></section>'+
+      '<label class="bc-admin-approval-field"><span>Valor real</span><input id="admin-approval-real" type="number" min="0.01" step="0.01" value="'+esc(isExpense?x.monto:x.cantidad||'')+'"></label>';
+  }
+  html+='<label class="bc-admin-approval-field"><span>Comentario administrativo</span><textarea id="admin-approval-comment" rows="2" placeholder="Obligatorio para rechazar; opcional para aprobar"></textarea></label>'+
+    '<p id="admin-approval-message" class="bc-admin-approval-message" role="status" aria-live="polite"></p>';
+  body.innerHTML=html;
+  modal.querySelector('#admin-approval-reject').textContent=isList?'Rechazar lista completa':'Rechazar';
+  modal.querySelector('#admin-approval-accept').textContent=isList?'Aceptar lista completa':'Aceptar y aprobar';
+  modal.hidden=false;
+  footer.hidden=false;
+  document.body.classList.add('bc-admin-approval-open');
+  modal.querySelector('.bc-admin-approval-dialog').focus({preventScroll:true});
+}
+async function abrirRevision(x){
+  const modal=ensureApprovalModal();
+  approvalFocusReturn=document.activeElement;
+  modal.hidden=false;
+  modal.querySelector('#admin-approval-title').textContent='Cargando detalle…';
+  modal.querySelector('#admin-approval-subtitle').textContent='';
+  modal.querySelector('#admin-approval-body').innerHTML='<p class="lista-estado">Recuperando los productos y motivos de la solicitud…</p>';
+  modal.querySelector('#admin-approval-footer').hidden=true;
+  document.body.classList.add('bc-admin-approval-open');
+  modal.querySelector('.bc-admin-approval-dialog').focus({preventScroll:true});
+  try{
+    let detail=x;
+    if(x.tipo==='baja_lista'){
+      detail=await rpc('obtener_detalle_solicitud_baja_admin',{p_solicitud_id:x.id});
+    }
+    renderApprovalDetails(x,detail||x);
+  }catch(error){
+    const body=modal.querySelector('#admin-approval-body');
+    body.innerHTML='<p class="bc-admin-approval-message is-error">No se pudo abrir el detalle: '+esc(error.message||error)+'</p>'+
+      '<button type="button" class="cc-accion" data-bc-admin-close>Cerrar</button>';
+  }
+}
+async function resolverDesdeModal(decision){
+  const modal=document.getElementById('admin-aprobacion-modal');
+  if(!modal||modal.hidden)return;
+  const type=modal.dataset.approvalType,id=modal.dataset.approvalId;
+  const comment=(modal.querySelector('#admin-approval-comment')?.value||'').trim();
+  if(decision==='RECHAZAR'&&!comment){
+    setApprovalMessage('Escribe el motivo obligatorio del rechazo.',true);
+    modal.querySelector('#admin-approval-comment')?.focus();
+    return;
+  }
+  const accept=modal.querySelector('#admin-approval-accept'),reject=modal.querySelector('#admin-approval-reject');
+  accept.disabled=true;reject.disabled=true;
+  setApprovalMessage(decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
+  try{
+    if(type==='baja_lista'){
+      const lineInputs=Array.from(modal.querySelectorAll('[data-bc-approval-line-qty]'));
+      const lines=lineInputs.map(input=>({id:input.dataset.lineId,cantidad_real:Number(input.value)}));
+      if(decision==='APROBAR'&&lines.some(line=>!Number.isFinite(line.cantidad_real)||line.cantidad_real<=0)){
+        throw new Error('Cada producto debe tener una cantidad real mayor que cero.');
+      }
+      await rpc('resolver_solicitud_bajas_admin',{
+        p_solicitud_id:id,
+        p_decision:decision,
+        p_comentario:comment||null,
+        p_lineas_reales:decision==='APROBAR'?lines:[]
+      });
+    }else{
+      const isExpense=type==='gasto';
+      const input=modal.querySelector('#admin-approval-real');
+      const real=input?Number(input.value):null;
+      if(decision==='APROBAR'&&input&&(!Number.isFinite(real)||real<=0)){
+        throw new Error('El valor real debe ser mayor que cero.');
+      }
+      await rpc('resolver_aprobacion_operativa',{
+        p_tipo:type,p_id:id,p_decision:decision,p_comentario:comment||null,
+        p_cantidad_real:isExpense?null:real,
+        p_monto_real:isExpense?real:null
+      });
+    }
+    closeApprovalModal();
+    await load();
+    if(typeof refrescarCentroControl==='function')await refrescarCentroControl();
+  }catch(error){
+    setApprovalMessage('No se pudo resolver: '+(error.message||error),true);
+    accept.disabled=false;reject.disabled=false;
+  }
+}
 async function contarEntrega(id){const raw=prompt('¿Cuánto dinero contaste realmente?');if(raw===null)return;const amount=Number(String(raw).replace(',','.'));if(!Number.isFinite(amount)||amount<0)return alert('Monto inválido.');try{await rpc('registrar_recepcion_entrega_caja',{p_entrega_id:id,p_monto_contado:amount,p_observacion_conteo:prompt('Observación (opcional):')||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
 async function revisarEntrega(id,decision){let c=decision==='rechazar'?prompt('Motivo obligatorio del rechazo:'):prompt('Comentario de aprobación (opcional):');if(decision==='rechazar'&&(!c||!c.trim()))return;try{await rpc('revisar_entrega_caja',{p_entrega_id:id,p_decision:decision,p_comentario:c||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
 async function revisarCuadre(id,decision){let c=prompt(decision==='rechazar'?'Motivo obligatorio del rechazo:':'Comentario de aprobación (opcional):');if(decision==='rechazar'&&(!c||!c.trim()))return;try{await rpc('revisar_cuadre',{p_cuadre_id:id,p_decision:decision,p_comentario:c||null,p_idempotency_key:key()});await load()}catch(e){alert(e.message||e)}}
