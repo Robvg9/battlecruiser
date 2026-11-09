@@ -129,7 +129,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(compra.includes("__BC_COMPRA_DATA_EVENTS__"), "the active purchase modal must refresh its dependent catalog after changes");
   assert.ok(compra.includes("bcNotificarCambioDatos('compra', false)"), "atomic multi-purchases must publish a stock change");
   assert.ok(productos.includes("bcNotificarCambioDatos(estabaEditando ?"), "direct catalog saves must publish product changes");
-  assert.ok(sw.includes("./js/compra-multiple.js?v=27.15"), "the purchase module's reactive listener must be available offline");
+  assert.ok(sw.includes("./js/compra-multiple.js?v=27.16"), "the purchase module's reactive listener must be available offline");
   assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
   assert.ok(index.includes('js/transferencias.js?v=20261109.1'), "transfer history must load its reactive subscriber");
   assert.ok(sw.includes('./js/transferencias.js?v=20261109.1'), "transfer history must be cached with its reactive subscriber");
