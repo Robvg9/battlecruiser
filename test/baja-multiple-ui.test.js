@@ -30,5 +30,9 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(module,/data-bc-bajas-close/);
  assert.match(css,/\.bc-bajas-multiple-modal\[hidden\]/);
  assert.match(css,/\.bc-bajas-modal-dialog/);
+ assert.match(module,/catalogLoadPromise/);
+ assert.match(module,/refreshPicker\(host\)/);
+ assert.match(css,/bc-baja-line-product\{grid-column:1\/-1/);
+ assert.match(css,/bc-baja-line-qty\{grid-column:1\/3/);
  assert.match(hub,/await window\.abrirBajasMultiple\(\)/);
 });
