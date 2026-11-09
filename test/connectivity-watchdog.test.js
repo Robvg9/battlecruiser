@@ -112,17 +112,17 @@ test("Auth health is the connectivity probe; the publishable key is not sent to 
   assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "response_ok");
   assert.equal(h.window.__BC_BACKEND_PROBE__.service, "auth");
   assert.equal(h.window.__TEST_CONNECTIVITY__, "online");
-  assert.equal([...h.timers.values()][0].delay, 30000);
+  assert.equal([...h.timers.values()][0].delay, 60000);
 
-  assert.equal(await h.advanceNextTimer(), 30000);
+  assert.equal(await h.advanceNextTimer(), 60000);
   assert.equal(h.requestCount(), 2);
   assert.equal(h.window.__BC_BACKEND_PROBE__.status, "degraded");
   assert.equal(h.window.__BC_BACKEND_PROBE__.reason, "server_http_error");
   assert.equal(h.window.__BC_BACKEND_PROBE__.consecutiveFailures, 1);
   assert.equal(h.window.__TEST_CONNECTIVITY__, "online", "One isolated failed probe must not flip the app offline.");
-  assert.equal([...h.timers.values()][0].delay, 3000);
+  assert.equal([...h.timers.values()][0].delay, 8000);
 
-  assert.equal(await h.advanceNextTimer(), 3000);
+  assert.equal(await h.advanceNextTimer(), 8000);
   assert.equal(h.requestCount(), 3);
   assert.equal(h.window.__BC_BACKEND_PROBE__.status, "online");
   assert.equal(h.window.__BC_BACKEND_RECOVERY_PENDING__, false);
@@ -139,7 +139,7 @@ test("heartbeat stops when hidden and resumes with an immediate Auth health prob
   assert.equal([...h.timers.values()][0].delay, 0, "Resume should trigger an immediate probe.");
   await h.advanceNextTimer();
   assert.equal(h.requestCount(), 1);
-  assert.equal([...h.timers.values()][0].delay, 30000);
+  assert.equal([...h.timers.values()][0].delay, 60000);
 
   h.setVisible(false);
   assert.equal(h.timers.size, 0, "Hiding the PWA cancels its foreground heartbeat.");
@@ -169,8 +169,8 @@ test("a known offline device fails immediately without issuing a probe", async (
 test("monitor documents foreground/background limits and queue recovery gating", () => {
   const offline = fs.readFileSync(path.join(__dirname, "..", "public", "js", "offline.js"), "utf8");
   const config = fs.readFileSync(path.join(__dirname, "..", "public", "js", "configuracion.js"), "utf8");
-  assert.match(source, /POLL_INTERVAL_MS = 30000/);
-  assert.match(source, /FIRST_RETRY_MS = 3000/);
+  assert.match(source, /POLL_INTERVAL_MS = 60000/);
+  assert.match(source, /FIRST_RETRY_MS = 8000/);
   assert.match(source, /visibilitychange/);
   assert.match(source, /pageshow/);
   assert.match(source, /bc:backend-reconnected/);
