@@ -1161,6 +1161,8 @@ body.bc-bajas-modal-open{overflow:hidden;overscroll-behavior:none}
 .bc-bajas-multiple .bc-baja-line-product,.bc-bajas-multiple .bc-baja-line-qty,.bc-bajas-multiple .bc-baja-line-reason,.bc-bajas-multiple .bc-baja-line-other{min-width:0;max-width:100%}
 .bc-bajas-multiple .bc-baja-line input,.bc-bajas-multiple .bc-baja-line select{max-width:100%;min-width:0;box-sizing:border-box}
 .bc-bajas-multiple .bc-bajas-message{overflow-wrap:anywhere}
+.bc-bajas-multiple .bc-bajas-lines{gap:6px;max-height:none;overflow:visible}
+.bc-bajas-multiple .bc-bajas-actions{position:static;inset:auto;flex:0 0 auto;z-index:auto}
 @media(max-width:480px){
  .bc-bajas-modal-head{padding:10px}
  .bc-bajas-modal-content{padding:9px}
