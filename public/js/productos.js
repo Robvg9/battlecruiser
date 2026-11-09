@@ -663,8 +663,10 @@ function renderPanelAsignacionMixtaProducto() {
       '<p class="bc-mixed-assignment-footnote">La conversión y sus capas FIFO se guardan en una sola transacción. Si una comprobación no coincide, nada se convierte.</p>' +
     '</div></details>' +
     html +
+    '<p class="bc-mixed-assignment-save-feedback" data-mixed-save-feedback role="status" aria-live="polite"></p>' +
     (needsConfirmation
-      ? '<label class="bc-mixed-assignment-confirm"><input type="checkbox" data-confirm-mixed-conversion> Confirmo que las cantidades introducidas corresponden al conteo real.</label>'
+      ? '<label class="bc-mixed-assignment-confirm"><input type="checkbox" data-confirm-mixed-conversion required aria-describedby="bc-mixed-conversion-help">' +
+          '<span><strong>Confirmación obligatoria</strong><small id="bc-mixed-conversion-help">Confirmo que las unidades indicadas son el conteo físico real. Esto autoriza a repartir el stock genérico y sus lotes FIFO entre los sabores.</small></span></label>'
       : '') +
     '<div class="bc-mixed-assignment-actions">' +
       '<button type="button" class="cc-accion" data-mixed-save-configuration>Guardar inventario por sabores</button>' +
@@ -698,11 +700,30 @@ function actualizarTotalesPanelAsignacionMixta() {
 
 function mostrarFeedbackAsignacionMixta(message, success) {
   const panel = document.getElementById("prod-variantes-asignacion");
-  const feedback = panel && panel.querySelector("[data-mixed-save-feedback]");
-  if (!feedback) return;
+  if (!panel) return;
+  let feedback = panel.querySelector("[data-mixed-save-feedback]");
+  if (!feedback) {
+    feedback = document.createElement("p");
+    feedback.className = "bc-mixed-assignment-save-feedback";
+    feedback.dataset.mixedSaveFeedback = "";
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+    const actions = panel.querySelector(".bc-mixed-assignment-actions");
+    if (actions) panel.insertBefore(feedback, actions);
+    else panel.appendChild(feedback);
+  }
   feedback.textContent = message || "";
   feedback.classList.toggle("is-error", !!message && !success);
   feedback.classList.toggle("is-success", !!message && !!success);
+  if (message && !success) {
+    const confirmation = panel.querySelector("[data-confirm-mixed-conversion]");
+    if (/confirma/i.test(message) && confirmation && !confirmation.checked) {
+      confirmation.focus({ preventScroll: true });
+      if (typeof confirmation.scrollIntoView === "function") confirmation.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } else if (typeof feedback.scrollIntoView === "function") {
+      feedback.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
 }
 
 safeInit("prod-variantes-asignacion", () => {

@@ -1,8 +1,8 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.3') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.3';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.4') return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.4';
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
   let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
@@ -13,6 +13,72 @@
     if (!el) return;
     el.textContent = value || '';
     el.className = 'bc-bajas-message' + (kind ? ' is-' + kind : '');
+  }
+  const PENDING_REQUEST_PREFIX = 'bc:bajas:pending:v1:';
+  function createSecureUuid() {
+    const cryptoApi = window.crypto;
+    if (!cryptoApi) throw new Error('Este navegador no ofrece generación segura de claves.');
+    if (typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
+    if (typeof cryptoApi.getRandomValues !== 'function') throw new Error('No se pudo generar una clave segura para esta solicitud.');
+    const bytes = new Uint8Array(16);
+    cryptoApi.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+    return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+hex.slice(16,20)+'-'+hex.slice(20);
+  }
+  async function persistentRequestKey(warehouse, lines) {
+    let storage;
+    try {
+      storage = window.localStorage;
+      const probe = PENDING_REQUEST_PREFIX + 'probe';
+      storage.setItem(probe, '1');
+      storage.removeItem(probe);
+    } catch (_) {
+      throw new Error('El navegador bloqueó el almacenamiento local de seguridad. No se envió la lista para evitar duplicados.');
+    }
+    const canonical = JSON.stringify({
+      warehouse: String(warehouse),
+      lines: lines.map(line => ({
+        almacen_id: String(line.almacen_id),
+        producto_id: String(line.producto_id),
+        cantidad: Number(line.cantidad),
+        motivo: String(line.motivo)
+      }))
+    });
+    let fingerprint;
+    try {
+      const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+      fingerprint = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
+    } catch (_) {
+      throw new Error('No se pudo calcular la huella segura de la lista. No se envió.');
+    }
+    const storageKey = PENDING_REQUEST_PREFIX + fingerprint;
+    let saved = null;
+    try { saved = JSON.parse(storage.getItem(storageKey) || 'null'); } catch (_) { saved = null; }
+    const key = saved && typeof saved.key === 'string' ? saved.key : createSecureUuid();
+    if (!saved || saved.key !== key) {
+      try { storage.setItem(storageKey, JSON.stringify({ key, createdAt: Date.now() })); }
+      catch (_) { throw new Error('No se pudo guardar la clave anti-duplicados. No se envió la lista.'); }
+    }
+    try {
+      const entries = [];
+      for (let i = 0; i < storage.length; i++) {
+        const name = storage.key(i);
+        if (!name || !name.startsWith(PENDING_REQUEST_PREFIX) || name === storageKey) continue;
+        let value = null;
+        try { value = JSON.parse(storage.getItem(name) || 'null'); } catch (_) {}
+        entries.push({ name, createdAt: Number(value && value.createdAt || 0) });
+      }
+      entries.sort((a, b) => a.createdAt - b.createdAt);
+      while (entries.length >= 20) storage.removeItem(entries.shift().name);
+    } catch (_) {}
+    return { key, storage, storageKey };
+  }
+  function updateModalViewportHeight(modal) {
+    const viewport = window.visualViewport;
+    const height = viewport && Number(viewport.height) > 0 ? viewport.height : window.innerHeight;
+    if (modal && modal.style && Number(height) > 0) modal.style.setProperty('--bc-bajas-vv-height', Math.round(height) + 'px');
   }
   function ensureModal() {
     let modal = document.getElementById('bc-bajas-multiple-modal');
@@ -29,6 +95,14 @@
         '<div class="bc-bajas-modal-content"></div>' +
       '</section>';
     document.body.appendChild(modal);
+    const syncViewport = () => updateModalViewportHeight(modal);
+    syncViewport();
+    window.addEventListener('resize', syncViewport, { passive: true });
+    window.addEventListener('orientationchange', syncViewport, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncViewport, { passive: true });
+      window.visualViewport.addEventListener('scroll', syncViewport, { passive: true });
+    }
     modal.addEventListener('click', event => {
       if (event.target.closest('[data-bc-bajas-close]')) closeListModal();
     });
@@ -219,17 +293,35 @@
     if (!api || !api.auth || typeof api.rpc !== 'function') {
       return message('No se pudo inicializar la sesión de Supabase. Recarga la aplicación; la lista se conserva.', 'error');
     }
-    pendingKey = pendingKey || (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : null);
-    if (!pendingKey) return message('No se pudo generar una clave segura para evitar duplicados. Recarga la aplicación.', 'error');
-    submitting = true;
-    const submitButton = form.querySelector('#bc-baja-submit'), addButton = form.querySelector('#bc-baja-add');
-    submitButton.disabled = true; submitButton.textContent = 'Enviando lista…'; addButton.disabled = true;
-    message('Enviando la lista completa en una sola transacción…', '');
+    let requestKey;
     try {
-      // Let Supabase manage normal token refresh. Only a real 401 triggers
-      // one refresh/retry, using the same idempotency key to prevent duplicates.
-      const params = { p_lineas: lines, p_idempotency_key: pendingKey };
-      let result = await api.rpc('crear_bajas_multiple', params);
+      requestKey = await persistentRequestKey(warehouse, lines);
+      if (submitting) return;
+      pendingKey = requestKey.key;
+    } catch (error) {
+      return message(String(error && (error.message || error) || 'No se pudo preparar la clave anti-duplicados.'), 'error');
+    }
+
+    submitting = true;
+    const submitButton = form.querySelector('#bc-baja-submit');
+    const controlStates = Array.from(form.querySelectorAll('button,input,select,textarea')).map(control => ({
+      control, disabled: control.disabled
+    }));
+    controlStates.forEach(state => { state.control.disabled = true; });
+    submitButton.textContent = 'Enviando lista…';
+    message('Enviando la lista completa en una sola transacción…', '');
+
+    const requestIdempotencyKey = pendingKey;
+    const callRpc = () => api.rpc('crear_bajas_multiple', {
+      p_lineas: lines,
+      p_idempotency_key: requestIdempotencyKey
+    });
+    const sendWithTimeout = () => typeof window.withNetworkTimeout === 'function'
+      ? window.withNetworkTimeout(callRpc, 20000, 'crear_bajas_multiple')
+      : callRpc();
+    let succeeded = false;
+    try {
+      let result = await sendWithTimeout();
       const tokenRejected = result && result.error && (
         Number(result.error.status) === 401 ||
         /jwt.*(expired|invalid)|missing.*authorization|no authorization header/i.test(
@@ -240,35 +332,53 @@
         const refreshed = await api.auth.refreshSession();
         const freshSession = refreshed && !refreshed.error && refreshed.data && refreshed.data.session;
         if (freshSession && freshSession.user && freshSession.access_token) {
-          result = await api.rpc('crear_bajas_multiple', params);
+          result = await sendWithTimeout();
         }
       }
-      if (result.error) throw result.error;
-      const created = result.data && Array.isArray(result.data.bajas) ? result.data.bajas : [];
-      const approved = created.length > 0 && created.every(item => item.estado === 'APROBADA');
+      if (result && result.error) throw result.error;
+      const created = result && result.data && Array.isArray(result.data.bajas) ? result.data.bajas : [];
+      if (created.length !== lines.length || created.some(item => !item || !item.id)) {
+        throw new Error('La respuesta no confirmó todas las líneas de la lista. La clave se conserva; reintenta esta misma lista sin cambiarla.');
+      }
+      try { requestKey.storage.removeItem(requestKey.storageKey); } catch (_) {}
       pendingKey = null;
       form.reset();
-      const defaultReason=document.getElementById('bc-bajas-default-reason');
-      if (defaultReason) defaultReason.value='';
-      const defaultOtherWrap=document.getElementById('bc-bajas-default-other-wrap');
-      if (defaultOtherWrap) defaultOtherWrap.hidden=true;
-      const defaultOther=document.getElementById('bc-bajas-default-other');
-      if (defaultOther) { defaultOther.value=''; defaultOther.required=false; }
+      const defaultReasonEl = document.getElementById('bc-bajas-default-reason');
+      if (defaultReasonEl) defaultReasonEl.value = '';
+      const defaultOtherWrap = document.getElementById('bc-bajas-default-other-wrap');
+      if (defaultOtherWrap) defaultOtherWrap.hidden = true;
+      const defaultOtherEl = document.getElementById('bc-bajas-default-other');
+      if (defaultOtherEl) { defaultOtherEl.value = ''; defaultOtherEl.required = false; }
       document.getElementById('bc-bajas-lines').innerHTML = '';
-      addRow();
+      const approved = created.every(item => item.estado === 'APROBADA');
       message(approved ? '✓ Lista registrada y aprobada. Stock y FIFO actualizados.'
         : '✓ Lista enviada a revisión administrativa. El stock no cambia hasta aprobar.', 'success');
-      if (typeof window.refrescarAprobacionesAdmin === 'function') await window.refrescarAprobacionesAdmin();
+      succeeded = true;
+      if (typeof window.refrescarAprobacionesAdmin === 'function') {
+        try { await window.refrescarAprobacionesAdmin(); }
+        catch (refreshError) {
+          message(approved
+            ? '✓ Lista registrada y aprobada. No se pudo actualizar el panel de revisión; recárgalo aparte.'
+            : '✓ Lista enviada a revisión. La solicitud sí se registró; no se pudo actualizar el panel de revisión.',
+            'success');
+          try { console.warn('[BattleCruiser] Bajas confirmada; falló el refresco del panel:', refreshError); } catch (_) {}
+        }
+      }
     } catch (error) {
       const detail = String(error && (error.message || error.details || error) || 'Error desconocido');
       const authFailure = Number(error && error.status) === 401 ||
         /permission denied for function crear_bajas_multiple|jwt.*(expired|invalid)|no hay sesión/i.test(detail);
-      message(authFailure ? 'La sesión perdió la autorización antes de enviar. Inicia sesión nuevamente y reintenta; la lista se conserva sin duplicarse.'
-        : 'No se pudo registrar la lista: ' + detail, 'error');
+      message(authFailure
+        ? 'La sesión no autorizó el envío. La lista se conserva y el próximo intento usará la misma clave anti-duplicados.'
+        : 'No se confirmó la respuesta del servidor: ' + detail + '. La lista y su clave quedan guardadas; reintenta sin cambiarla para no duplicar.',
+        'error');
     } finally {
       submitting = false;
-      submitButton.disabled = false; submitButton.textContent = 'Enviar lista a revisión';
-      addButton.disabled = false;
+      controlStates.forEach(state => {
+        if (state.control && state.control.isConnected) state.control.disabled = state.disabled;
+      });
+      submitButton.textContent = 'Enviar lista a revisión';
+      if (succeeded) addRow();
     }
   }
   function start(force) {
@@ -296,10 +406,9 @@
     modal.hidden = false;
     document.body.classList.add('bc-bajas-modal-open');
     await loadCatalogs(true);
-    const warehouse = document.getElementById('bc-bajas-warehouse');
-    const warehouseTrigger = warehouse && warehouse.parentElement && warehouse.parentElement.querySelector('.bc-product-picker-trigger');
-    if (warehouseTrigger) warehouseTrigger.focus({ preventScroll: true });
-    else { const dialog = modal.querySelector('.bc-bajas-modal-dialog'); if (dialog) dialog.focus({ preventScroll: true }); }
+    updateModalViewportHeight(modal);
+    const dialog = modal.querySelector('.bc-bajas-modal-dialog');
+    if (dialog) dialog.focus({ preventScroll: true });
     return true;
   };
   window.refrescarBajasMultiple = () => loadCatalogs(true);

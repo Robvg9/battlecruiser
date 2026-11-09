@@ -61,6 +61,28 @@
   window.crearErrorTimeout = crearErrorTimeout;
   window.esErrorTimeout = esErrorTimeout;
 
+  var connectivityMarkerBase = typeof window.marcarConectividadReal === "function" ? window.marcarConectividadReal : null;
+  var transientConnectivityFailures = 0;
+  if (connectivityMarkerBase && !connectivityMarkerBase.__bcHysteresis) {
+    var stableConnectivityMarker = function (state, confirmed) {
+      if (state === "offline" && typeof navigator !== "undefined" && navigator.onLine && confirmed !== true) {
+        transientConnectivityFailures += 1;
+        if (transientConnectivityFailures < 3) {
+          try { console.warn("[BattleCruiser] Falso offline ignorado; fallo transitorio " + transientConnectivityFailures + "/3"); } catch (e) {}
+          return;
+        }
+      } else if (state === "online") {
+        transientConnectivityFailures = 0;
+      } else if (state === "offline" && confirmed === true) {
+        transientConnectivityFailures = 3;
+      }
+      return connectivityMarkerBase(state);
+    };
+    stableConnectivityMarker.__bcHysteresis = true;
+    window.marcarConectividadReal = stableConnectivityMarker;
+    try { marcarConectividadReal = stableConnectivityMarker; } catch (e) {}
+  }
+
   var esErrorDeRedBase = typeof window.esErrorDeRed === "function" ? window.esErrorDeRed : null;
   window.esErrorDeRed = function (error) {
     if (esErrorTimeout(error)) return true;
@@ -401,10 +423,10 @@
             consecutiveFailures: fallosSondeoSeguidos,
             attemptedServices: "auth-health"
           });
-          // Ignore one missed probe while online; the watchdog retries quickly.
-          // Two consecutive failures are required before marking the backend offline.
-          if (fallosSondeoSeguidos >= 2 && typeof marcarConectividadReal === "function") {
-            marcarConectividadReal("offline");
+          // Android radio transitions and a single lost probe are common.
+          // Require three consecutive failed health checks before declaring a backend outage.
+          if (fallosSondeoSeguidos >= 3 && typeof marcarConectividadReal === "function") {
+            marcarConectividadReal("offline", true);
           }
           return false;
         }
@@ -428,7 +450,7 @@
     if (typeof window.sondearBackend !== "function") return;
     window.__BC_CONNECTIVITY_WATCHDOG_INSTALLED__ = true;
     var timer = null, failures = 0, checking = false;
-    var POLL_INTERVAL_MS = 30000, FIRST_RETRY_MS = 3000, MAX_RETRY_MS = 30000;
+    var POLL_INTERVAL_MS = 60000, FIRST_RETRY_MS = 8000, MAX_RETRY_MS = 60000;
 
     function isVisible() { return document.hidden !== true && document.visibilityState !== "hidden"; }
     function clearScheduledProbe() {

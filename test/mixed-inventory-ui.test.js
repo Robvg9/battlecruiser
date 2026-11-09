@@ -47,6 +47,10 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.ok(products.includes("bc_obtener_snapshot_conversion_mixta"));
   assert.ok(products.toLowerCase().includes("inventario por sabores guardado y verificado"));
   assert.match(products, /data-confirm-mixed-conversion/);
+  assert.match(products, /data-mixed-save-feedback/);
+  assert.match(products, /mostrarFeedbackAsignacionMixta/);
+  assert.match(products, /aria-describedby="bc-mixed-conversion-help"/);
+  assert.ok(read("public/style.css").includes("grid-template-columns:20px minmax(0,1fr)"));
   assert.ok(products.includes('<details class="bc-mixed-assignment-help">'));
   assert.ok(products.includes("Conservación de costos y FIFO"));
   assert.ok(products.includes("data-mixed-save-configuration"));
@@ -141,9 +145,9 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
-  assert.match(index, /productos\.js\?v=20261109\.2/);
+  assert.match(index, /productos\.js\?v=20261109\.3/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.87/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.87"/);
+  assert.match(index, /app\.js\?v=9\.5\.88/);
+  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.88"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.7"\]/);
 });
