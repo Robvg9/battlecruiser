@@ -82,10 +82,12 @@ test("A forced stock refresh bypasses withCache and updates the shared stock cac
 
 test("A committed purchase refresh error is reported as a refresh issue, not as a failed purchase", () => {
   assert.match(purchase, /registrar_compra_multiple/);
-  assert.equal((purchase.match(/if \(window\.__BC_STOCK_CONFIRMED__ === false\)/g) || []).length, 2);
+  assert.equal((purchase.match(/if \(window\.__BC_STOCK_CONFIRMED__ === false\)/g) || []).length, 1);
   assert.match(purchase, /No se pudo confirmar la lectura inmediata del inventario/);
   assert.match(purchase, /await refrescarStockYSelects\(\)/);
   assert.match(purchase, /bcNotificarCambioDatos\('compra', false\)/);
+  assert.match(purchase, /async function actualizarYMostrarResultado\(\)/);
+  assert.match(purchase, /await mostrarResultadoCompraRegistrada\(/);
 });
 
 test("Transfer stock uses a fresh authenticated RPC snapshot and avoids stock reads for unauthorized roles", () => {
