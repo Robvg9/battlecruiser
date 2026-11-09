@@ -5,6 +5,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  const module=read("public/js/bajas-multiple.js"),admin=read("public/js/aprobaciones-admin.js"),finance=read("public/js/operaciones-financieras.js");
  assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add"/);assert.match(module,/crear_bajas_multiple/);
  assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: requestIdempotencyKey/);
+ assert.match(module,/motivo_general: String\(line\.motivo_general \|\| ''\)/);assert.match(module,/motivo_general: generalReason/);
  assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
  assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
  assert.doesNotMatch(module,/auth\.getSession\(\)/);
@@ -49,4 +50,15 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(css,/overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch/);
  assert.match(css,/bc-pwa-update-notice/);
  assert.match(hub,/await window\.abrirBajasMultiple\(\)/);
+});
+
+test("batch RPC returns one parent request with all Baja child lines",()=>{
+ const sql=read("supabase/migrations/20261109210500_baja_approval_requests_and_modal.sql");
+ assert.match(sql,/INSERT INTO public\.bajas_solicitudes/);
+ assert.match(sql,/UPDATE public\.bajas[\s\S]*SET solicitud_id=v_solicitud_id/);
+ assert.match(sql,/jsonb_build_object\([\s\S]*'solicitud_id',v_solicitud_id/);
+ assert.match(sql,/md5\(auth\.uid\(\)::text/);
+ assert.match(sql,/payload_hash/);
+ assert.match(sql,/obtener_detalle_solicitud_baja_admin/);
+ assert.match(sql,/resolver_solicitud_bajas_admin/);
 });
