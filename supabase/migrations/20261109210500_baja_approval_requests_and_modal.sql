@@ -50,9 +50,9 @@ WITH grouped AS (
       ELSE 'Motivos específicos por producto'
     END AS motivo_general,
     CASE
-      WHEN bool_and(b.estado='APROBADA') THEN 'APROBADA'
-      WHEN bool_and(b.estado='RECHAZADA') THEN 'RECHAZADA'
-      ELSE 'PENDIENTE'
+      WHEN bool_or(b.estado='PENDIENTE') THEN 'PENDIENTE'
+      WHEN bool_or(b.estado='RECHAZADA') THEN 'RECHAZADA'
+      ELSE 'APROBADA'
     END AS estado,
     count(*)::integer AS total_lineas,
     sum(b.cantidad) AS cantidad_total,
