@@ -134,7 +134,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /inventario-detalle\.js","71"/);
   assert.match(app, /compra-multiple\.js","27\.15"/);
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
-  assert.match(index, /productos\.js\?v=20261109\.2/);
+  assert.match(index, /productos\.js\?v=20261109\.3/);
   assert.match(index, /style\.css\?v=9\.5\.88/);
   assert.match(index, /almacenes\.js\?v=20261109\.1/);
   assert.match(index, /app\.js\?v=9\.5\.88/);
@@ -148,7 +148,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "almacenes.js?v=20261109.1",
     "m53-inventario-centro.js?v=53.7",
     "movimiento-multiple.js?v=20261109.1",
-    "productos.js?v=20261109.2",
+    "productos.js?v=20261109.3",
     "compra-multiple.js?v=27.15"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
