@@ -170,7 +170,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
   assert.match(sw, /\.\/js\/m26-ui-integridad\.js\?v=26\.41/, "the unified commercial-options panel must be available offline");
-  assert.match(sw, /\.\/js\/catalogos\.js\?v=20261106\.1/, "the updated master catalog loader must be available offline");
+  assert.match(sw, /\.\/js\/catalogos\.js\?v=20261109\.1/, "the updated master catalog loader must be available offline");
   assert.ok(app.includes('["m27-5-ventas-precio-politica.js","27.5b7"]'));
   assert.ok(app.includes('["m27-6-ventas-presentaciones.js","27.6g"]'));
   assert.ok(sw.includes("./js/m27-5-ventas-precio-politica.js?v=27.5b7"));
@@ -180,15 +180,15 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(sw.includes("./js/m76-movimientos-operaciones.js?v=76.3"), "M76 must be precached for offline use");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.12/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
-  assert.match(index, /<script src="js\/productos\.js\?v=20261109\.1"><\/script>/);
-  assert.match(sw, /\.\/js\/productos\.js\?v=20261109\.1/, "the offline shell must precache the updated product module version");
+  assert.match(index, /<script src="js\/productos\.js\?v=20261109\.2"><\/script>/);
+  assert.match(sw, /\.\/js\/productos\.js\?v=20261109\.2/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.24"><\/script>/);
-  assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
+  assert.match(index, /<script src="js\/catalogos\.js\?v=20261109\.1"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
-  assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.1"><\/script>/);
-  assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.1/);
+  assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.2"><\/script>/);
+  assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.2/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
   assert.match(app, /v9\.5\.87 — Correcciones operativas: sabores, transferencias y selectores/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.87"><\/script>/);
@@ -294,5 +294,5 @@ test('Administration UI modules refresh their cache keys', () => {
   assert.match(app, /\["m75-productos-ui-compacto\.js","75\.12"\]/);
   assert.match(sw, /m26-ui-integridad\.js\?v=26\.41/);
   assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.12/);
-  assert.match(sw, /catalogos\.js\?v=20261106\.1/);
+  assert.match(sw, /catalogos\.js\?v=20261109\.1/);
 });
