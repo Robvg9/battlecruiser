@@ -45,10 +45,7 @@ WITH grouped AS (
     b.almacen_id,
     b.creado_en,
     max(b.creado_nombre) AS creado_nombre,
-    CASE
-      WHEN count(DISTINCT b.motivo)=1 THEN max(b.motivo)
-      ELSE 'Motivos específicos por producto'
-    END AS motivo_general,
+    'Solicitud histórica agrupada; el motivo general no quedó registrado. Consulte los motivos individuales por producto.' AS motivo_general,
     CASE
       WHEN bool_or(b.estado='PENDIENTE') THEN 'PENDIENTE'
       WHEN bool_or(b.estado='RECHAZADA') THEN 'RECHAZADA'
@@ -212,10 +209,9 @@ BEGIN
     SELECT nombre INTO v_creado_nombre
     FROM public.usuarios WHERE id=auth.uid();
 
-    SELECT coalesce(
+        SELECT coalesce(
       max(nullif(btrim(x.motivo_general),'')),
-      CASE WHEN count(DISTINCT x.motivo)=1 THEN max(x.motivo)
-           ELSE 'Motivos específicos por producto' END
+      'El motivo general no fue enviado; consulte los motivos individuales por producto.'
     )
     INTO v_motivo_general
     FROM jsonb_to_recordset(p_lineas) AS x(
@@ -228,7 +224,7 @@ BEGIN
         idempotency_key,payload_hash,total_lineas,cantidad_total
       )
       SELECT
-        (array_agg(x.almacen_id))[1],auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'Motivos específicos por producto'),
+        (array_agg(x.almacen_id))[1],auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'El motivo general no fue enviado; consulte los motivos individuales por producto.'),
         CASE
           WHEN bool_and(b.estado='APROBADA') THEN 'APROBADA'
           WHEN bool_and(b.estado='RECHAZADA') THEN 'RECHAZADA'
@@ -306,10 +302,9 @@ BEGIN
   SELECT nombre INTO v_creado_nombre
   FROM public.usuarios WHERE id=auth.uid();
 
-  SELECT coalesce(
+    SELECT coalesce(
     max(nullif(btrim(x.motivo_general),'')),
-    CASE WHEN count(DISTINCT x.motivo)=1 THEN max(x.motivo)
-         ELSE 'Motivos específicos por producto' END
+    'El motivo general no fue enviado; consulte los motivos individuales por producto.'
   )
   INTO v_motivo_general
   FROM jsonb_to_recordset(p_lineas) AS x(
@@ -321,7 +316,7 @@ BEGIN
     idempotency_key,payload_hash,total_lineas,cantidad_total
   )
   SELECT
-    (array_agg(x.almacen_id))[1],auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'Motivos específicos por producto'),
+    (array_agg(x.almacen_id))[1],auth.uid(),v_creado_nombre,coalesce(v_motivo_general,'El motivo general no fue enviado; consulte los motivos individuales por producto.'),
     'PENDIENTE',p_idempotency_key,v_payload_hash,v_count,sum(x.cantidad)
   FROM jsonb_to_recordset(p_lineas) AS x(
     almacen_id uuid,producto_id uuid,cantidad numeric,motivo text,motivo_general text
