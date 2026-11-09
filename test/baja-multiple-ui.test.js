@@ -4,7 +4,7 @@ const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,f
 test("Bajas use one multi-item form and require authenticated session",()=>{
  const module=read("public/js/bajas-multiple.js"),admin=read("public/js/aprobaciones-admin.js"),finance=read("public/js/operaciones-financieras.js");
  assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add"/);assert.match(module,/crear_bajas_multiple/);
- assert.match(module,/hasSession/);assert.match(module,/p_idempotency_key: pendingKey/);
+ assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: pendingKey/);
  assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
  assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
  assert.match(module,/Never force a refresh just because expiry is near/);
