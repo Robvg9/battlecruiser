@@ -180,30 +180,33 @@ safeInit("form-transferencia", () => {
       return;
     }
 
-    const refreshStock = window.__BC_TRANSFER_STOCK_REFRESH__;
-    if (typeof refreshStock !== "function" || !(await refreshStock())) {
-      const detail = window.__BC_TRANSFER_STOCK_ERROR__ ? " " + window.__BC_TRANSFER_STOCK_ERROR__ : "";
-      setMsg("msg-transferencias", "No se pudo confirmar el inventario actual desde Supabase. No se inició la transferencia." + detail, false);
-      actualizarStockTransferenciaUI();
-      return;
-    }
-    const stockInfo = stockDisponibleOrigen(producto_id, origen);
-    if (!stockInfo || stockInfo.cantidad < cantidad) {
-      const disp = fmtNumTransfer(stockInfo.cantidad);
-      setMsg("msg-transferencias", "Stock insuficiente en el almacén origen (disponible: " + disp +
-        (stockInfo.aproximado ? " · estimado con pendientes" : "") + ").", false);
-      return;
-    }
-
-    if (!window.confirm("¿Confirmar transferencia de " + cantidad + " unidades? Esto mueve stock real.")) {
-      return;
-    }
-
+    // Acquire the mutex BEFORE the asynchronous Supabase stock refresh.
+    // Otherwise two rapid submits can both pass the guard while the RPC is pending.
     _enviandoTransferencia = true;
-    var textoOriginal = submitBtn ? submitBtn.textContent : "";
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Procesando…"; }
+    const textoOriginal = submitBtn ? submitBtn.textContent : "";
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Comprobando existencias…"; }
 
     try {
+      const refreshStock = window.__BC_TRANSFER_STOCK_REFRESH__;
+      if (typeof refreshStock !== "function" || !(await refreshStock())) {
+        const detail = window.__BC_TRANSFER_STOCK_ERROR__ ? " " + window.__BC_TRANSFER_STOCK_ERROR__ : "";
+        setMsg("msg-transferencias", "No se pudo confirmar el inventario actual desde Supabase. No se inició la transferencia." + detail, false);
+        actualizarStockTransferenciaUI();
+        return;
+      }
+      const stockInfo = stockDisponibleOrigen(producto_id, origen);
+      if (!stockInfo || stockInfo.cantidad < cantidad) {
+        const disp = fmtNumTransfer(stockInfo ? stockInfo.cantidad : 0);
+        setMsg("msg-transferencias", "Stock insuficiente en el almacén origen (disponible: " + disp +
+          (stockInfo && stockInfo.aproximado ? " · estimado con pendientes" : "") + ").", false);
+        return;
+      }
+
+      if (!window.confirm("¿Confirmar transferencia de " + cantidad + " unidades? Esto mueve stock real.")) {
+        return;
+      }
+      if (submitBtn) submitBtn.textContent = "Procesando…";
+
       const resultado = await ejecutarOperacion("transferencia", {
         p_origen_id: origen,
         p_destino_id: destino,
@@ -236,7 +239,7 @@ safeInit("form-transferencia", () => {
         if (textoOriginal) submitBtn.textContent = textoOriginal;
       }
     }
-  });
+  });;
 });
 
 async function mostrarDetalleTransferencia(trfId) {
