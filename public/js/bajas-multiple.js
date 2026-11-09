@@ -266,6 +266,8 @@
   }
   async function submit(event) {
     event.preventDefault();
+    // Lock synchronously, before hashing or touching localStorage. This closes
+    // the Android double-tap window that previously allowed two different keys.
     if (submitting) return;
     if (!canCreate()) return message('Tu usuario no tiene permiso para registrar Bajas.', 'error');
     const form = document.getElementById('bc-bajas-multiple-form');
@@ -293,21 +295,31 @@
     if (!api || !api.auth || typeof api.rpc !== 'function') {
       return message('No se pudo inicializar la sesión de Supabase. Recarga la aplicación; la lista se conserva.', 'error');
     }
-    let requestKey;
-    try {
-      requestKey = await persistentRequestKey(warehouse, lines);
-      if (submitting) return;
-      pendingKey = requestKey.key;
-    } catch (error) {
-      return message(String(error && (error.message || error) || 'No se pudo preparar la clave anti-duplicados.'), 'error');
-    }
 
-    submitting = true;
     const submitButton = form.querySelector('#bc-baja-submit');
+    if (!submitButton) return message('No se encontró el botón de envío. La lista se conserva.', 'error');
     const controlStates = Array.from(form.querySelectorAll('button,input,select,textarea')).map(control => ({
       control, disabled: control.disabled
     }));
+    const originalSubmitText = submitButton.textContent || 'Enviar lista a revisión';
+    submitting = true;
     controlStates.forEach(state => { state.control.disabled = true; });
+    submitButton.textContent = 'Protegiendo lista…';
+    message('Protegiendo el envío para evitar solicitudes duplicadas…', '');
+
+    let requestKey;
+    try {
+      requestKey = await persistentRequestKey(warehouse, lines);
+      pendingKey = requestKey.key;
+    } catch (error) {
+      submitting = false;
+      controlStates.forEach(state => {
+        if (state.control && state.control.isConnected) state.control.disabled = state.disabled;
+      });
+      submitButton.textContent = originalSubmitText;
+      return message(String(error && (error.message || error) || 'No se pudo preparar la clave anti-duplicados.'), 'error');
+    }
+
     submitButton.textContent = 'Enviando lista…';
     message('Enviando la lista completa en una sola transacción…', '');
 
@@ -324,14 +336,15 @@
       let result = await sendWithTimeout();
       const tokenRejected = result && result.error && (
         Number(result.error.status) === 401 ||
-        /jwt.*(expired|invalid)|missing.*authorization|no authorization header/i.test(
+        /jwt.*(expired|invalid)|missing.*authorization|no authorization header|permission denied for function crear_bajas_multiple/i.test(
           String(result.error.message || result.error.details || '')
         )
       );
       if (tokenRejected && api.auth && typeof api.auth.refreshSession === 'function') {
-        const refreshed = await api.auth.refreshSession();
+        const refreshed = await api.auth.refreshSession().catch(refreshError => ({ error: refreshError }));
         const freshSession = refreshed && !refreshed.error && refreshed.data && refreshed.data.session;
         if (freshSession && freshSession.user && freshSession.access_token) {
+          // Reuse the exact same request and idempotency key after token refresh.
           result = await sendWithTimeout();
         }
       }
@@ -369,7 +382,7 @@
       const authFailure = Number(error && error.status) === 401 ||
         /permission denied for function crear_bajas_multiple|jwt.*(expired|invalid)|no hay sesión/i.test(detail);
       message(authFailure
-        ? 'La sesión no autorizó el envío. La lista se conserva y el próximo intento usará la misma clave anti-duplicados.'
+        ? 'La sesión no autorizó el envío. Vuelve a iniciar sesión; la lista y su clave anti-duplicados se conservan.'
         : 'No se confirmó la respuesta del servidor: ' + detail + '. La lista y su clave quedan guardadas; reintenta sin cambiarla para no duplicar.',
         'error');
     } finally {
@@ -377,7 +390,7 @@
       controlStates.forEach(state => {
         if (state.control && state.control.isConnected) state.control.disabled = state.disabled;
       });
-      submitButton.textContent = 'Enviar lista a revisión';
+      submitButton.textContent = originalSubmitText;
       if (succeeded) addRow();
     }
   }
