@@ -1,14 +1,36 @@
 // BattleCruiser — shared searchable chooser for operational products and warehouses.
 (function () {
   'use strict';
-  if (window.__BC_PRODUCT_SELECT_PICKER__ === '2.1') return;
-  window.__BC_PRODUCT_SELECT_PICKER__ = '2.1';
+  if (window.__BC_PRODUCT_SELECT_PICKER__ === '2.2') return;
+  window.__BC_PRODUCT_SELECT_PICKER__ = '2.2';
   const PRODUCT_KNOWN = new Set(['compra-producto','venta-producto','trf-producto','vale-producto','pp-producto-select','mov-multiple-producto']);
   const WAREHOUSE_KNOWN = new Set(['alm-selector','compra-multiple-almacen','trf-origen','trf-destino','vale-almacen','mov-multiple-origen','mov-multiple-destino','bc-bajas-warehouse','inv-filtro-almacen','op-g-alm','op-r-alm']);
   const PRODUCT_EXCLUDED = /categor[ií]|presentaci[oó]n|almac[eé]n|warehouse|motivo|estado|tipo|pago|prioridad|usuario/i;
   const WAREHOUSE_EXCLUDED = /categor[ií]|presentaci[oó]n|producto|product|motivo|estado|tipo|pago|prioridad|usuario/i;
   let active = null, activeKind = 'product', modal = null, search = null, results = null, status = null, title = null;
   const norm = value => String(value == null ? '' : value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().trim();
+  function syncPickerViewport() {
+    if (!modal || modal.hidden) return;
+    const viewport = window.visualViewport;
+    const top = viewport ? Number(viewport.offsetTop) || 0 : 0;
+    const left = viewport ? Number(viewport.offsetLeft) || 0 : 0;
+    const height = viewport ? Number(viewport.height) || window.innerHeight : window.innerHeight;
+    const width = viewport ? Number(viewport.width) || window.innerWidth : window.innerWidth;
+    modal.style.setProperty('--bc-picker-vv-top', top + 'px');
+    modal.style.setProperty('--bc-picker-vv-left', left + 'px');
+    modal.style.setProperty('--bc-picker-vv-height', Math.max(1, height) + 'px');
+    modal.style.setProperty('--bc-picker-vv-width', Math.max(1, width) + 'px');
+  }
+  function trackPickerViewport() {
+    if (!modal || modal.dataset.bcViewportTracking === '1') return;
+    modal.dataset.bcViewportTracking = '1';
+    const viewport = window.visualViewport;
+    if (viewport && typeof viewport.addEventListener === 'function') {
+      viewport.addEventListener('resize', syncPickerViewport, { passive: true });
+      viewport.addEventListener('scroll', syncPickerViewport, { passive: true });
+    }
+    window.addEventListener('resize', syncPickerViewport, { passive: true });
+  }
   function identity(select) {
     const label = select.closest('label');
     return [select.id,select.className,select.getAttribute('aria-label'),select.getAttribute('name'),label?label.textContent:''].join(' ');
@@ -33,6 +55,7 @@
       '<div id="bc-product-picker-results" class="bc-product-picker-results" role="listbox"></div>' +
       '<p class="bc-product-picker-status" role="status" aria-live="polite"></p></section>';
     document.body.appendChild(modal);
+    trackPickerViewport();
     search = modal.querySelector('#bc-product-picker-search'); results = modal.querySelector('#bc-product-picker-results');
     status = modal.querySelector('.bc-product-picker-status'); title = modal.querySelector('#bc-product-picker-title');
     modal.addEventListener('click', event => {
@@ -80,7 +103,8 @@
     const noun = select.dataset.bcPickerNoun || (activeKind === 'warehouse' ? 'almacén' : activeKind === 'product' ? 'producto' : 'opción');
     title.textContent = 'Elegir ' + noun; search.placeholder = 'Buscar ' + noun + '…'; search.setAttribute('aria-label', 'Buscar ' + noun);
     search.value = ''; render(); modal.hidden = false; document.body.classList.add('bc-product-picker-open');
-    window.setTimeout(() => search.focus(), 0);
+    syncPickerViewport();
+    window.setTimeout(() => { search.focus(); syncPickerViewport(); }, 0);
   }
   function close() { if (!modal) return; modal.hidden = true; document.body.classList.remove('bc-product-picker-open'); active = null; }
   function attach(select) {
