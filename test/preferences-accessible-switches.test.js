@@ -188,7 +188,7 @@ test("PWA deployment invalidates the cached switch script and keeps shell versio
   assert.ok(workerVersion, "service-worker version must be detectable");
   assert.match(appVersion[1], /^\d+\.\d+\.\d+$/);
   assert.equal(workerVersion[1], appVersion[1]);
-  assert.ok(indexHtml.includes("style.css?v=9.5.85"), "updated stylesheet uses the current asset cache key");
+  assert.ok(indexHtml.includes("style.css?v=9.5.86"), "updated stylesheet uses the current asset cache key");
   assert.ok(indexHtml.includes("app.js?v=" + appVersion[1]));
   assert.ok(indexHtml.includes("v" + appVersion[1] + " — BattleCruiser"));
 });
