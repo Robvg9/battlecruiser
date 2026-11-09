@@ -4,20 +4,22 @@ const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,f
 test("Bajas use one multi-item form and require authenticated session",()=>{
  const module=read("public/js/bajas-multiple.js"),admin=read("public/js/aprobaciones-admin.js"),finance=read("public/js/operaciones-financieras.js");
  assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add"/);assert.match(module,/crear_bajas_multiple/);
- assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: pendingKey/);
+ assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: requestIdempotencyKey/);
  assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
  assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
  assert.doesNotMatch(module,/auth\.getSession\(\)/);
  assert.doesNotMatch(module,/!await hasSession\(\)/);
  assert.match(module,/function ensureModal\(\)/);
  assert.match(module,/window\.abrirBajasMultiple = async function/);
- assert.match(module,/warehouseTrigger\.focus\(\{ preventScroll: true \}\)/);
+ assert.match(module,/dialog\.focus\(\{ preventScroll: true \}\)/);
  assert.doesNotMatch(module,/if \(warehouse\) warehouse\.focus/);
  assert.match(module,/modal\.hidden = false/);
  assert.match(module,/bc-bajas-modal-open/);
  assert.match(module,/api\.auth\.refreshSession\(\)/);
  assert.match(module,/tokenRejected/);
- assert.match(module,/const params = \{ p_lineas: lines, p_idempotency_key: pendingKey \}/);
+ assert.match(module,/const requestIdempotencyKey = pendingKey/);
+ assert.match(module,/persistentRequestKey\(warehouse, lines\)/);
+ assert.match(module,/PENDING_REQUEST_PREFIX/);
  assert.doesNotMatch(admin,/id='adm-baja-form'/);assert.doesNotMatch(finance,/form-salida-producto/);
  assert.doesNotMatch(finance,/setInterval\(\(\)=>\{start\(\)\},10000\)/);
 });
@@ -43,5 +45,8 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(css,/bc-baja-line-qty\{grid-column:1\/3/);
  assert.match(css,/bc-bajas-context-fields/);
  assert.match(css,/bc-bajas-list-heading/);
+ assert.match(css,/max-height:none;overflow:visible/);
+ assert.match(css,/overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch/);
+ assert.match(css,/bc-pwa-update-notice/);
  assert.match(hub,/await window\.abrirBajasMultiple\(\)/);
 });

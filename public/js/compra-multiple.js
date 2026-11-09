@@ -23,6 +23,37 @@
     el.textContent = text || '';
     el.className = ok ? 'msg success' : 'msg error';
   }
+  async function revisarMinimosPendientesCompra(almacenId, productosComprados){
+    if (!almacenId || !Array.isArray(productosComprados) || !productosComprados.length) return null;
+    try {
+      var api = window.client || (typeof client !== 'undefined' ? client : null);
+      if (!api || typeof api.from !== 'function') return null;
+      var ids = productosComprados.map(function(item){ return item.producto_id; }).filter(Boolean);
+      if (!ids.length) return null;
+      var check = await api.from('stock').select('producto_id,minimo').eq('almacen_id', almacenId).in('producto_id', ids);
+      if (!check || check.error) return null;
+      var minimoPorProducto = new Map((check.data || []).map(function(row){
+        return [String(row.producto_id), Number(row.minimo || 0)];
+      }));
+      return productosComprados.filter(function(item){
+        return !(minimoPorProducto.get(String(item.producto_id)) > 0);
+      }).map(function(item){ return item.nombre; });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function mostrarResultadoCompraRegistrada(almacenId, almacenNombre, productosComprados, refreshWarning){
+    var pendientes = await revisarMinimosPendientesCompra(almacenId, productosComprados);
+    var texto = '✓ Compra registrada. Stock actualizado.';
+    if (pendientes && pendientes.length) {
+      texto = '✓ Compra registrada. Ahora configura el stock mínimo en ' + almacenNombre + ' para: ' + pendientes.join(', ') + '.';
+    } else if (pendientes === null) {
+      texto += ' Los mínimos se configuran después desde Inventario → Mínimo pendiente.';
+    }
+    if (refreshWarning) texto += ' La compra quedó guardada; no se pudo confirmar la lectura inmediata del inventario: ' + refreshWarning;
+    msg(texto, true);
+  }
   function fmtNumCompra(v){ return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   function moneyLocal(v){
     return typeof money === 'function' ? money(v) : Number(v || 0).toFixed(2);
@@ -277,6 +308,27 @@
         p_fecha: fecha.value ? new Date(fecha.value).toISOString() : new Date().toISOString(),
         p_lineas: mapLineasPayload()
       };
+      var productosComprados = Array.from(new Map(lineas.map(function(item){
+        return [String(item.producto_id), { producto_id: item.producto_id, nombre: item.nombre }];
+      })).values());
+      var almacenNombre = almacen.selectedOptions && almacen.selectedOptions[0]
+        ? almacen.selectedOptions[0].textContent
+        : 'el almacén de destino';
+
+      async function actualizarYMostrarResultado(){
+        var refreshWarning = '';
+        if (typeof refrescarStockYSelects === 'function') {
+          try {
+            await refrescarStockYSelects();
+            if (window.__BC_STOCK_CONFIRMED__ === false) {
+              refreshWarning = 'la lectura de existencias sigue pendiente.';
+            }
+          } catch (refreshError) {
+            refreshWarning = String(refreshError && refreshError.message || refreshError);
+          }
+        }
+        await mostrarResultadoCompraRegistrada(payloadMultiple.p_almacen_id, almacenNombre, productosComprados, refreshWarning);
+      }
 
       try {
         // Preferir cola offline unificada si está mapeada compra_multiple
@@ -286,20 +338,10 @@
           lineas = [];
           render();
           if (r.offline) {
-            msg('✓ Compra guardada localmente — se sincronizará al recuperar conexión.', true);
+            msg('✓ Compra guardada localmente — se sincronizará al recuperar conexión. Los mínimos pendientes se configuran después desde Inventario.', true);
           } else {
-            msg('✓ Compra registrada. Stock actualizado.', true);
             if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
-            if (typeof refrescarStockYSelects === 'function') {
-              try {
-                await refrescarStockYSelects();
-                if (window.__BC_STOCK_CONFIRMED__ === false) {
-                  msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario. No inicies otra transferencia hasta que se actualice.', false);
-                }
-              } catch (refreshError) {
-                msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario: ' + (refreshError && refreshError.message || refreshError) + ' No inicies otra transferencia hasta actualizar el inventario.', false);
-              }
-            }
+            await actualizarYMostrarResultado();
           }
           return;
         }
@@ -320,18 +362,8 @@
           }
           lineas = [];
           render();
-          msg('✓ Compra registrada. Stock actualizado.', true);
           if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
-          if (typeof refrescarStockYSelects === 'function') {
-            try {
-              await refrescarStockYSelects();
-              if (window.__BC_STOCK_CONFIRMED__ === false) {
-                msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario. No inicies otra transferencia hasta que se actualice.', false);
-              }
-            } catch (refreshError) {
-              msg('✓ Compra registrada en Supabase. No se pudo confirmar la lectura inmediata del inventario: ' + (refreshError && refreshError.message || refreshError) + ' No inicies otra transferencia hasta actualizar el inventario.', false);
-            }
-          }
+          await actualizarYMostrarResultado();
           return;
         }
 
@@ -343,7 +375,6 @@
         confirmar.disabled = false;
       }
     }
-
     document.getElementById('compra-multiple-add').addEventListener('click', add);
     producto.addEventListener('change', cargarPresentaciones);
     presentacion.addEventListener('change', actualizarCamposPresentacion);

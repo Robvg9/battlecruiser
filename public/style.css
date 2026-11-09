@@ -1038,8 +1038,12 @@ textarea:focus-visible {
 .bc-mixed-assignment-total { margin-top:6px; color:var(--mist); font-size:10px; font-weight:600; }
 .bc-mixed-assignment-total.is-valid { color:#5bd39b; }
 .bc-mixed-assignment-total.is-invalid { color:#f0b66c; }
-.bc-mixed-assignment-confirm { display:flex; align-items:flex-start; gap:8px; padding:8px; border:1px solid rgba(212,176,92,.28); border-radius:7px; color:var(--mist); font-size:10px; line-height:1.35; }
-.bc-mixed-assignment-confirm input { flex:0 0 auto; margin-top:2px; }
+.bc-mixed-assignment-confirm { display:grid; grid-template-columns:20px minmax(0,1fr); align-items:start; gap:8px; width:100%; max-width:100%; min-width:0; box-sizing:border-box; padding:9px; border:1px solid rgba(212,176,92,.32); border-radius:7px; color:var(--mist); font-size:11px; line-height:1.4; overflow-wrap:anywhere; }
+.bc-mixed-assignment-confirm > span { display:block; min-width:0; max-width:100%; overflow-wrap:anywhere; white-space:normal; }
+.bc-mixed-assignment-confirm strong,.bc-mixed-assignment-confirm small { display:block; min-width:0; max-width:100%; overflow-wrap:anywhere; white-space:normal; }
+.bc-mixed-assignment-confirm strong { margin-bottom:3px; color:var(--gold,var(--mist)); }
+.bc-mixed-assignment-confirm small { font:inherit; font-size:10px; opacity:.92; }
+.bc-mixed-assignment-confirm input { width:18px; height:18px; min-width:18px; flex:0 0 18px; margin:2px 0 0; }
 .bc-mixed-assignment-error { margin:5px 0; padding:7px; border-left:3px solid #e2a65f; background:rgba(226,166,95,.09); color:var(--mist); font-size:10px; line-height:1.35; }
 .bc-mixed-assignment-loading { color:var(--mist); font-size:12px; }
 .bc-mixed-assignment-footnote { font-size:10px; opacity:.86; }
@@ -1143,15 +1147,27 @@ body.bc-product-picker-open{overflow:hidden}
 
 /* Batch Bajas open in one responsive modal from the Operations hub. */
 .bc-bajas-multiple-modal[hidden]{display:none!important}
-.bc-bajas-multiple-modal{position:fixed;inset:0;z-index:100700;display:grid;place-items:center;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.bc-bajas-multiple-modal{position:fixed;inset:0;z-index:100700;display:grid;place-items:center;overflow:hidden;box-sizing:border-box;padding:12px;padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
 .bc-bajas-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(5px)}
-.bc-bajas-modal-dialog{position:relative;display:flex;flex-direction:column;width:min(100%,620px);max-height:92dvh;overflow:auto;border:1px solid rgba(201,162,77,.28);border-radius:14px;background:linear-gradient(180deg,rgba(16,36,32,.99),rgba(10,24,20,.99));box-shadow:0 24px 70px rgba(0,0,0,.55)}
-.bc-bajas-modal-head{position:sticky;top:0;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(201,162,77,.16);background:rgba(14,30,26,.98)}
-.bc-bajas-modal-head h2{margin:0;color:var(--gold-bright);font-size:19px}
-.bc-bajas-modal-head p{margin:4px 0 0;color:var(--mist);font-size:11px;line-height:1.35}
+.bc-bajas-modal-dialog{position:relative;display:flex;flex-direction:column;width:min(100%,620px);min-width:0;min-height:0;max-height:min(92dvh,calc(var(--bc-bajas-vv-height,100dvh) - 24px));overflow:hidden;box-sizing:border-box;border:1px solid rgba(201,162,77,.28);border-radius:14px;background:linear-gradient(180deg,rgba(16,36,32,.99),rgba(10,24,20,.99));box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.bc-bajas-modal-head{position:relative;top:auto;z-index:2;display:flex;flex:0 0 auto;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0;padding:12px;border-bottom:1px solid rgba(201,162,77,.16);background:rgba(14,30,26,.98)}
+.bc-bajas-modal-head>div{min-width:0;flex:1 1 auto}
+.bc-bajas-modal-head h2{margin:0;color:var(--gold-bright);font-size:18px;overflow-wrap:anywhere}
+.bc-bajas-modal-head p{margin:4px 0 0;color:var(--mist);font-size:11px;line-height:1.35;overflow-wrap:anywhere}
 .bc-bajas-modal-close{width:36px;height:36px;min-height:36px;flex:0 0 36px;border:1px solid rgba(201,162,77,.25);border-radius:8px;background:transparent;color:var(--text);font-size:23px}
-.bc-bajas-modal-content{padding:14px;overflow:auto;overscroll-behavior:contain}
-body.bc-bajas-modal-open{overflow:hidden}
+.bc-bajas-modal-content{flex:1 1 auto;min-height:0;min-width:0;box-sizing:border-box;padding:12px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+body.bc-bajas-modal-open{overflow:hidden;overscroll-behavior:none}
+.bc-bajas-multiple,.bc-bajas-multiple form,.bc-bajas-multiple label,.bc-bajas-multiple .bc-baja-line{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.bc-bajas-multiple .bc-baja-line-product,.bc-bajas-multiple .bc-baja-line-qty,.bc-bajas-multiple .bc-baja-line-reason,.bc-bajas-multiple .bc-baja-line-other{min-width:0;max-width:100%}
+.bc-bajas-multiple .bc-baja-line input,.bc-bajas-multiple .bc-baja-line select{max-width:100%;min-width:0;box-sizing:border-box}
+.bc-bajas-multiple .bc-bajas-message{overflow-wrap:anywhere}
+.bc-bajas-multiple .bc-bajas-lines{gap:6px;max-height:none;overflow:visible}
+.bc-bajas-multiple .bc-bajas-actions{position:static;inset:auto;flex:0 0 auto;z-index:auto}
+@media(max-width:480px){
+ .bc-bajas-modal-head{padding:10px}
+ .bc-bajas-modal-content{padding:9px}
+ .bc-bajas-multiple .bc-bajas-actions button{flex:1 1 100%;min-width:0}
+}
 
 /* Dedicated, compact mode for configuring flavor inventory from Inventory. */
 #bc-product-modal #form-producto.bc-mixed-config-mode .bc-product-form-top,
@@ -1217,7 +1233,7 @@ body.bc-bajas-modal-open{overflow:hidden}
 .bc-bajas-context-fields input,.bc-bajas-context-fields select{box-sizing:border-box;width:100%;min-width:0;min-height:40px;padding:8px 10px;border:1px solid rgba(212,176,92,.28);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font:inherit;font-size:13px}
 .bc-bajas-list-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;font-size:11px;letter-spacing:.04em;color:var(--mist)}
 .bc-bajas-list-heading strong{color:var(--gold-bright)}
-.bc-bajas-multiple .bc-bajas-lines{gap:6px;max-height:38dvh;overflow:auto;padding:1px;overscroll-behavior:contain}
+.bc-bajas-multiple .bc-bajas-lines{gap:6px;max-height:none;overflow:visible;padding:1px;overscroll-behavior:contain}
 .bc-bajas-multiple .bc-baja-line{grid-template-columns:minmax(0,1fr) 104px 34px;gap:7px;padding:8px 9px;align-items:center}
 .bc-bajas-multiple .bc-baja-line-product{grid-column:1;grid-row:1;min-width:0}
 .bc-bajas-multiple .bc-baja-line-qty{grid-column:2;grid-row:1;min-width:0}
@@ -1226,10 +1242,25 @@ body.bc-bajas-modal-open{overflow:hidden}
 .bc-bajas-multiple .bc-baja-line-reason,.bc-bajas-multiple .bc-baja-line-other{grid-column:1/-1}
 .bc-bajas-multiple .bc-baja-line-reason[hidden],.bc-bajas-multiple .bc-baja-line-other[hidden]{display:none!important}
 .bc-bajas-multiple .bc-baja-line-reason select{min-height:34px}
-.bc-bajas-multiple .bc-bajas-actions{position:sticky;bottom:0;padding-top:8px;background:linear-gradient(180deg,transparent,rgba(10,24,20,.98) 25%)}
+.bc-bajas-multiple .bc-bajas-actions{position:static;bottom:auto;display:flex;flex-wrap:wrap;gap:8px;padding-top:10px;background:transparent}
 @media(max-width:480px){
  .bc-bajas-context-fields{grid-template-columns:1fr}
- .bc-bajas-multiple .bc-bajas-lines{max-height:34dvh}
+ .bc-bajas-multiple .bc-bajas-lines{max-height:none}
  .bc-bajas-multiple .bc-baja-line{grid-template-columns:minmax(0,1fr) 86px 32px;gap:6px;padding:7px}
  .bc-bajas-multiple .bc-baja-line-remove{width:32px;height:34px;min-height:34px}
 }
+
+
+/* Android: keep the Bajas composer and every action inside the viewport. */
+.bc-bajas-multiple{box-sizing:border-box;width:100%;max-width:100%;max-height:none;overflow:visible;overscroll-behavior:auto;padding:0 0 calc(12px + env(safe-area-inset-bottom))}
+.bc-bajas-multiple *{box-sizing:border-box;min-width:0}
+.bc-bajas-multiple .bc-bajas-lines{display:flex;flex-direction:column;gap:7px;overflow:visible;max-height:none}
+.bc-bajas-multiple .bc-baja-line{min-width:0;grid-template-columns:minmax(0,1fr) 78px 32px;gap:5px}
+.bc-bajas-multiple .bc-baja-line-product,.bc-bajas-multiple .bc-baja-line-qty{min-width:0;width:100%;max-width:100%}
+.bc-bajas-multiple .bc-bajas-actions{position:static;display:flex;flex-wrap:wrap;gap:8px;width:100%;padding:10px 0 calc(8px + env(safe-area-inset-bottom));background:transparent}
+.bc-bajas-multiple .bc-bajas-actions button{position:static;flex:1 1 100%;min-width:0;max-width:100%;white-space:normal}
+.bc-bajas-multiple .bc-bajas-message{overflow-wrap:anywhere;word-break:break-word}
+/* PWA: show a controlled update action instead of silently replacing the active screen. */
+.bc-pwa-update-notice{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:100900;display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:620px;margin:0 auto;padding:10px 12px;border:1px solid rgba(212,176,92,.5);border-radius:12px;background:rgba(9,25,21,.98);color:var(--mist);box-shadow:0 12px 36px rgba(0,0,0,.45);font-size:12px}
+.bc-pwa-update-notice button{flex:0 0 auto;min-height:38px;padding:7px 12px;border:0;border-radius:8px;background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;font-weight:700}
+@media(max-width:420px){.bc-pwa-update-notice{align-items:stretch;flex-direction:column;gap:7px}.bc-pwa-update-notice button{width:100%}}

@@ -24,11 +24,11 @@ test("flavor allocation stays in one readable column in compact editor mode",()=
  assert.match(css,/#form-producto\.bc-mixed-config-mode #prod-variantes-asignacion\{display:grid!important;grid-template-columns:minmax\(0,1fr\)!important/);
  assert.match(css,/bc-mixed-assignment-warehouse\{width:100%;min-width:0/);
 });
-test("Android picker tracks VisualViewport and Bajas focuses the visible trigger",()=>{
+test("Android picker tracks VisualViewport and Bajas focuses the visible dialog",()=>{
  const picker=read("public/js/product-select-search.js"),bajas=read("public/js/bajas-multiple.js"),css=read("public/style.css");
  assert.match(picker,/visualViewport\.addEventListener\('resize', syncViewport/);
  assert.match(picker,/visualViewport\.addEventListener\('scroll', syncViewport/);
  assert.match(css,/z-index:100800/);
  assert.match(css,/max-height:min\(calc\(var\(--bc-picker-viewport-height,100dvh\) - 28px\),720px\)/);
- assert.match(bajas,/warehouseTrigger\.focus\(\{ preventScroll: true \}\)/);
+ assert.match(bajas,/dialog\.focus\(\{ preventScroll: true \}\)/);
 });
