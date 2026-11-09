@@ -79,7 +79,7 @@ begin
 
   return v_transferencia_id;
 end;
-$function$
+$function$;
 
 REVOKE ALL ON FUNCTION public.registrar_transferencia(uuid, uuid, jsonb, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.registrar_transferencia(uuid, uuid, jsonb, uuid) TO authenticated, service_role;
