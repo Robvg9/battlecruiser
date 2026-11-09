@@ -62,7 +62,7 @@ test("probe checks the public Auth health endpoint without a privileged REST key
   assert.deepEqual(probe.connectivity, ["online"]);
 });
 
-test("a non-OK result records HTTP status and needs two consecutive failed probes to mark offline", async () => {
+test("a non-OK result records HTTP status and needs three consecutive failed probes to mark offline", async () => {
   const probe = createProbe(async function () { return { ok: false, status: 503 }; });
   assert.equal(await probe.window.sondearBackend(), false);
   assert.equal(probe.window.__BC_BACKEND_PROBE__.status, "degraded");
@@ -98,7 +98,7 @@ test("a rejected network request is degraded first and offline only after a repe
   assert.equal(probe.window.__BC_BACKEND_PROBE__.reason, "network_error");
   assert.deepEqual(probe.connectivity, []);
   await probe.window.sondearBackend();
-  assert.deepEqual(probe.connectivity, [], "Two runtime failures are not enough to call the backend offline.");
+  assert.deepEqual(probe.connectivity, [], "Two failed network probes are not enough to call the backend offline.");
   await probe.window.sondearBackend();
   assert.deepEqual(probe.connectivity, ["offline"]);
 });
