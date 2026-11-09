@@ -11,6 +11,7 @@ const migration = read("supabase/migrations/20261107130000_mixed_variant_warehou
 const conversionMigration = read("supabase/migrations/20261107211007_mixed_inventory_conversion_composite_minimum.sql");
 const purchaseMinimumMigration = read("supabase/migrations/20261109180500_defer_stock_minimum_for_purchases.sql");
 const detail = read("public/js/inventario-detalle.js");
+const purchase = read("public/js/compra-multiple.js");
 const inventory = read("public/js/m53-inventario-centro.js");
 const operations = read("public/js/ui-operaciones-hub.js");
 const approvals = read("public/js/aprobaciones-admin.js");
@@ -28,6 +29,9 @@ test("Purchases can add stock before a minimum is configured, then leave minimum
   const purchaseFunctions = purchaseMinimumMigration.slice(purchaseMinimumMigration.indexOf("CREATE OR REPLACE FUNCTION public.registrar_compra("));
   assert.doesNotMatch(purchaseFunctions, /INSERT INTO public\.stock/i);
   assert.match(purchaseFunctions, /PERFORM private\.bc_apply_stock_purchase_increment/);
+  assert.match(purchase, /async function revisarMinimosPendientesCompra/);
+  assert.match(purchase, /Ahora configura el stock mínimo en/);
+  assert.match(purchase, /await mostrarResultadoCompraRegistrada/);
 });
 test("Every stock row has a non-null minimum and existing nulls are safely initialized", () => {
   assert.match(migration, /UPDATE public\.stock SET minimo=0 WHERE minimo IS NULL/);
