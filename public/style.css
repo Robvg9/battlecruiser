@@ -1113,8 +1113,26 @@ body.bc-product-picker-open{overflow:hidden}
 #form-producto.bc-mixed-config-mode .bc-product-commercial-fields{display:flex!important;flex-direction:column!important}
 #form-producto.bc-mixed-config-mode .bc-product-commercial-fields>:not(#prod-inventario-mixto-settings){display:none!important}
 #form-producto.bc-mixed-config-mode #prod-inventario-mixto-settings{display:block!important;visibility:visible!important;margin:0}
-#form-producto.bc-mixed-config-mode #prod-variantes-editor,
-#form-producto.bc-mixed-config-mode #prod-variantes-asignacion{display:flex!important;visibility:visible!important}
+#form-producto.bc-mixed-config-mode #prod-variantes-editor{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  width:100%;
+  min-width:0;
+}
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-auto-flow:row!important;
+  align-content:start!important;
+  align-items:stretch!important;
+  gap:10px!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  visibility:visible!important;
+}
 #form-producto.bc-mixed-config-mode .bc-product-form-actions{display:none!important}
 .bc-mixed-assignment-error-wrap{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
 .bc-mixed-assignment-error-wrap .cc-accion{min-height:38px;white-space:normal}
@@ -1206,4 +1224,81 @@ body.bc-bajas-modal-open{overflow:hidden}
   #bc-product-modal #form-producto.bc-mixed-config-mode .bc-mixed-assignment-flavor > strong {grid-column:1/-1}
   #bc-product-modal #form-producto.bc-mixed-config-mode .prod-variante-row {grid-template-columns:minmax(0,1fr) auto}
   #bc-product-modal #form-producto.bc-mixed-config-mode .prod-variante-row button {max-width:86px}
+}
+
+
+/* 9.5.86 — Flavor cards must stack by warehouse, never flex-shrink into columns. */
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion>.bc-mixed-assignment-warehouse{
+  display:block!important;
+  grid-column:1/-1;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion .bc-mixed-assignment-flavors{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr);
+  gap:8px;
+  width:100%;
+  min-width:0;
+}
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion .bc-mixed-assignment-flavor{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:7px;
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion .bc-mixed-assignment-flavor>strong{
+  grid-column:1/-1;
+}
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion .bc-mixed-assignment-flavor label,
+#form-producto.bc-mixed-config-mode #prod-variantes-asignacion .bc-mixed-assignment-flavor input{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+
+/* Search chooser must sit above the Bajas modal and remain fixed while Android opens its keyboard. */
+.bc-product-picker-modal{z-index:100900!important}
+@media(max-width:560px){
+  .bc-product-picker-modal{
+    inset:auto!important;
+    top:var(--bc-picker-vv-top,0px)!important;
+    left:var(--bc-picker-vv-left,0px)!important;
+    display:flex!important;
+    align-items:flex-start!important;
+    justify-content:center!important;
+    width:var(--bc-picker-vv-width,100vw)!important;
+    height:var(--bc-picker-vv-height,100dvh)!important;
+    box-sizing:border-box!important;
+    overflow:hidden!important;
+    padding:max(8px,env(safe-area-inset-top)) 8px 8px!important;
+  }
+  .bc-product-picker-dialog{
+    display:flex;
+    flex:1 1 auto;
+    flex-direction:column;
+    width:100%;
+    height:100%;
+    max-height:none;
+    min-height:0;
+    min-width:0;
+    margin:0 auto;
+    overflow:hidden;
+    gap:8px;
+    padding:12px;
+    box-sizing:border-box;
+  }
+  .bc-product-picker-results{
+    flex:1 1 auto;
+    min-height:0;
+    max-height:none;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+  }
 }
