@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
 // v9.5.88 — Guardado visible de sabores, Bajas idempotentes y estabilidad PWA
 (function hotfixV9475(){
-  const VERSION="9.5.88";
+  const VERSION="9.5.89";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
