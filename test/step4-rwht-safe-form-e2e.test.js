@@ -779,7 +779,7 @@ test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
   form.dispatchEvent(new c.window.Event("submit", { bubbles: true, cancelable: true }));
 
-  assert.ok(await esperarHasta(() => c.calls.length === 1), "un único submit debe llegar al ejecutor simulado");
+  assert.ok(await esperarHasta(() => c.calls.length === 1), "un único submit debe llegar al ejecutor simulado; refreshCalls=" + c.stockRefreshCalls + "; confirmaciones=" + c.confirmations + "; mensaje=" + c.window.document.getElementById("msg-transferencias").textContent);
   assert.ok(await esperarHasta(() => /Transferencia registrada/i.test(c.window.document.getElementById("msg-transferencias").textContent)),
     "la respuesta correcta debe quedar reflejada en la interfaz");
   // Values originate inside the JSDOM realm; normalize to plain Node objects
@@ -800,9 +800,9 @@ test("Paso 4 RWHT: transferencia válida envía origen/destino/producto/cantidad
 
 test("Paso 4 RWHT: cantidad cero/negativa o superior al stock se bloquea sin confirmar ni ejecutar", async (t) => {
   for (const caso of [
-    { cantidad: "0", stock: 8, esperado: /cantidad debe ser mayor a 0/i },
-    { cantidad: "-1", stock: 8, esperado: /cantidad debe ser mayor a 0/i },
-    { cantidad: "9", stock: 8, esperado: /stock insuficiente/i }
+    { cantidad: "0", stock: 8, esperado: /cantidad debe ser mayor a 0/i, expectedRefreshCalls: 0 },
+    { cantidad: "-1", stock: 8, esperado: /cantidad debe ser mayor a 0/i, expectedRefreshCalls: 0 },
+    { cantidad: "9", stock: 8, esperado: /stock insuficiente/i, expectedRefreshCalls: 1 }
   ]) {
     const c = crearContextoTransferenciaFixture({ stock: caso.stock });
     t.after(() => c.dom.window.close());
@@ -814,7 +814,7 @@ test("Paso 4 RWHT: cantidad cero/negativa o superior al stock se bloquea sin con
       "debe mostrar el rechazo correcto para cantidad=" + caso.cantidad);
     assert.equal(c.calls.length, 0, "el dato inválido no debe llegar al ejecutor");
     assert.equal(c.confirmations, 0, "el dato inválido no debe pedir confirmación");
-    assert.equal(c.stockRefreshCalls, 1, "la validación de stock usa una lectura fresca antes de permitir el envío");
+    assert.equal(c.stockRefreshCalls, caso.expectedRefreshCalls, "solo las cantidades válidas deben provocar una lectura de stock fresca");
   }
 });
 
