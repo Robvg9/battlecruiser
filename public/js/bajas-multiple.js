@@ -141,19 +141,6 @@
     const host=document.getElementById('bc-bajas-lines'), count=document.getElementById('bc-bajas-line-count');
     if (count) { const n=host ? host.children.length : 0; count.textContent=n+' '+(n===1?'producto':'productos'); }
   }
-  async function hasSession() {
-    const api = apiClient();
-    if (!api || !api.auth || typeof api.auth.getSession !== 'function') return false;
-    try {
-      const result = await api.auth.getSession();
-      if (!result || result.error || !result.data || !result.data.session ||
-          !result.data.session.user || !result.data.session.access_token) return false;
-      // Never force a refresh just because expiry is near: parallel callers can
-      // race the rotating refresh token and provoke Supabase Auth 429 responses.
-      // The RPC below is authoritative; it refreshes once only after a real 401.
-      return true;
-    } catch (_) { return false; }
-  }
   async function loadCatalogs(force) {
     if (!canCreate()) return false;
     if (catalogLoadPromise) return catalogLoadPromise;
@@ -239,9 +226,8 @@
     submitButton.disabled = true; submitButton.textContent = 'Enviando lista…'; addButton.disabled = true;
     message('Enviando la lista completa en una sola transacción…', '');
     try {
-      // A 401 after the preflight session check means the access token may
-      // have expired between the session read and the RPC. Refresh once and
-      // retry with the exact same idempotency key; never create a second list.
+      // Let Supabase manage normal token refresh. Only a real 401 triggers
+      // one refresh/retry, using the same idempotency key to prevent duplicates.
       const params = { p_lineas: lines, p_idempotency_key: pendingKey };
       let result = await api.rpc('crear_bajas_multiple', params);
       const tokenRejected = result && result.error && (
