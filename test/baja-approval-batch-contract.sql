@@ -109,12 +109,12 @@ BEGIN
       ),
       jsonb_build_object(
         'almacen_id',v_store,'producto_id',v_product_b,'cantidad',4,
-        'motivo','Vencimiento','motivo_general','Retiro por control de qualidade'
+        'motivo','Vencimiento','motivo_general','Retiro por control de calidad'
       )
     ),
     'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0001'::uuid
   );
-  -- Fingerprints must match the exact first payload; retry with it below.
+  -- The same payload and key must return the original request and its original child rows.
   IF (v_retry->>'solicitud_id')::uuid<>v_request
      OR (v_retry->>'count')::integer<>2
      OR jsonb_array_length(v_retry->'bajas')<>2 THEN
@@ -137,7 +137,7 @@ BEGIN
 
   v_detail:=public.obtener_detalle_solicitud_baja_admin(v_request);
   IF jsonb_array_length(v_detail->'lineas')<>2
-     OR v_detail->>'motivo_general'<>'Retiro por control de qualidade'
+     OR v_detail->>'motivo_general'<>'Retiro por control de calidad'
      OR NOT EXISTS (
        SELECT 1 FROM jsonb_array_elements(v_detail->'lineas') line
        WHERE line->>'motivo'='Rotura'
