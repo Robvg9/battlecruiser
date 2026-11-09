@@ -172,18 +172,23 @@ BEGIN
     IF v_existing_hash IS NOT NULL AND v_existing_hash<>v_payload_hash THEN
       RAISE EXCEPTION 'La clave anti-duplicados ya pertenece a otra lista de Bajas.';
     END IF;
+    -- Rebuild the response from the same input ordinality used to derive
+    -- each child idempotency key. Retries must return the original line order.
     SELECT jsonb_build_object(
       'solicitud_id',v_solicitud_id,
       'count',count(*),
       'estado',max(s.estado),
       'bajas',coalesce(
-        jsonb_agg(jsonb_build_object('id',b.id,'estado',b.estado) ORDER BY b.creado_en,b.id),
+        jsonb_agg(jsonb_build_object('id',b.id,'estado',b.estado) ORDER BY item.ordinality),
         '[]'::jsonb
       )
     )
     INTO v_result
-    FROM public.bajas b
-    JOIN public.bajas_solicitudes s ON s.id=b.solicitud_id
+    FROM jsonb_array_elements(p_lineas) WITH ORDINALITY AS item(value,ordinality)
+    JOIN public.bajas b
+      ON b.creado_por=auth.uid()
+     AND b.idempotency_key=md5(auth.uid()::text||':'||p_idempotency_key::text||':'||item.ordinality::text)::uuid
+    JOIN public.bajas_solicitudes s ON s.id=v_solicitud_id
     WHERE b.solicitud_id=v_solicitud_id;
     RETURN v_result;
   END IF;
