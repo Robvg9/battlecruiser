@@ -63,11 +63,14 @@ test("Mixed inventory stays opt-in and flavor names are entered by the administr
   assert.match(read("public/style.css"), /bc-mixed-config-mode #prod-submit-btn/);
   assert.match(read("public/style.css"), /bc-mixed-config-mode \.prod-inventario-mixto-settings/);
   assert.ok(products.includes('submit.hidden = true'));
-  assert.ok(products.includes('cancel.textContent = "Volver a Inventario"'));
+  assert.match(products, /cancel\.textContent = _bcMixedConfigReturnTab === "inventario" \? "Volver a Inventario"/);
   const flavorOpen = products.indexOf("window.bcAbrirConfiguracionSabores = async function");
+  const modalOpen = products.indexOf("window.__BCM26_openProductModal()", flavorOpen);
   const safeExit = products.indexOf("cancel.hidden = false", flavorOpen);
   const editorWait = products.indexOf("await iniciarEdicionProducto(producto);", flavorOpen);
-  assert.ok(safeExit > flavorOpen && safeExit < editorWait, "return action must be visible before the snapshot wait");
+  assert.ok(modalOpen > flavorOpen && safeExit > modalOpen && safeExit < editorWait,
+    "the product modal must exist before the visible exit is shown, and the exit must precede async product loading");
+  assert.match(products, /if \(!_bcMixedConfigReturnTab \|\| !form\?\.classList\.contains\("bc-mixed-config-mode"\)\) return false/);
   assert.ok(products.includes("form.classList.remove(\"bc-mixed-config-mode\")"));
   assert.ok(products.includes("restaurarTabConfiguracionSabores();"));
   assert.ok(products.includes("if (!snapshotReady)"));
