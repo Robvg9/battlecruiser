@@ -385,9 +385,9 @@ function showApp(session) {
 }
 
 function showLogin() {
+  if (_bcMandatoryPasswordOverlay) bcCerrarFormularioCambioObligatorio();
   _bcMandatoryPasswordChange = false;
   _bcMandatoryPasswordDismissed = false;
-  if (_bcMandatoryPasswordOverlay) bcCerrarFormularioCambioObligatorio();
   _bcSesionActivaId = null;
   _bcPendingSession = null;
   _bcAuthBootResolved = true;
