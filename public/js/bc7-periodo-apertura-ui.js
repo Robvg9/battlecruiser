@@ -240,7 +240,8 @@
           const id=String(product.producto_id);
           const selected=id===String(row.producto_id)?' selected':'';
           const family=product.es_familia?' · total de familia':'';
-          options.push('<option value="'+esc(id)+'"'+selected+'>'+esc(product.nombre+family)+'</option>');
+          const stockRef=' · stock sistema (referencia): '+Number(product.stock_sistema||0);
+          options.push('<option value="'+esc(id)+'"'+selected+'>'+esc(product.nombre+family+stockRef)+'</option>');
         });
         if(row.omitir)options.push('<option value="__omit" selected>Omitir: 0 unidades</option>');
         const selector='<select data-bc7-period-map="'+index+'" aria-label="Relacionar '+esc(row.nombre)+'">'+options.join('')+'</select>';
@@ -259,6 +260,8 @@
           if(!parsed[index])return;
           parsed[index].producto_id=select.value&&select.value!=='__omit'?select.value:'';
           parsed[index].omitir=select.value==='__omit';
+          const statusCell=select.closest('tr')?.querySelector('td:last-child');
+          if(statusCell)statusCell.innerHTML=parsed[index].producto_id?'<span class="bc7-period-ok">Relacionado</span>':(parsed[index].omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
           updateConfirm();
           const pending=parsed.filter(row=>Number(row.cantidad)>0&&!row.producto_id).length;
           result.textContent=pending?pending+' productos con cantidad positiva necesitan relación.':'Relación completa. Revisa las transferencias antes de confirmar.';
