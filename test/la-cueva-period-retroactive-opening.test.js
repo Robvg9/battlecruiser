@@ -222,7 +222,7 @@ test("opening preview preserves manual mappings across repeated catalog refreshe
   assert.ok(ui.includes("sessionStorage.setItem(mappingStorageKey"));
   assert.ok(ui.includes("saved.manual"));
   assert.ok(ui.includes("Se restauraron"));
-  assert.doesNotMatch(ui,/parsed\\.forEach\\(row=>\\{\\s*const matches=productsByName\\.get\\(norm\\(row\\.nombre\\)\\)\\|\\|\\[\\];\\s*row\\.producto_id=/);
+  assert.equal(ui.includes("parsed.forEach(row=>{\\n        const matches=productsByName.get(norm(row.nombre))||[];"),false);
 });
 
 test("only missing positive-quantity products are created through the audited catalog RPC",()=>{
@@ -232,7 +232,7 @@ test("only missing positive-quantity products are created through the audited ca
   assert.ok(ui.includes("callRpc('bc_guardar_producto_catalogo'"));
   assert.ok(ui.includes("p_precio_normal:null"));
   assert.ok(ui.includes("p_categoria_id:null"));
-  assert.ok(ui.includes("p_unidad:'unidad'"));
+  assert.ok(ui.includes("p_unidad:null"));
   assert.ok(ui.includes("p_idempotency_key:key"));
   assert.ok(ui.includes("No se añadirá stock ni se abrirá la jornada"));
   assert.ok(ui.includes("fichas nuevas pendientes de completar y revisar"));
