@@ -26,7 +26,7 @@ test("retroactive opening is an admin-only atomic session creation with immutabl
 });
 
 test("period ranges and imported lines are validated before any session is created", () => {
-  assert.match(migration, /p_fecha_fin-p_fecha_inicio > 30/);
+  assert.ok(migration.includes('p_fecha_fin-p_fecha_inicio>30'));
   assert.match(migration, /p_inicio_real_at > now\(\)/);
   assert.match(migration, /v_expected=0 OR v_count<>v_expected OR v_distinct<>v_count/);
   assert.match(migration, /fecha BETWEEN p_fecha_inicio AND p_fecha_fin/);
@@ -37,14 +37,14 @@ test("period ranges and imported lines are validated before any session is creat
 test("existing transfers are linked by immutable reference, never recreated", () => {
   assert.match(migration, /turno_jornada_entradas_vinculadas/);
   assert.match(migration, /transferencia_id uuid NOT NULL REFERENCES public\.transferencias/);
-  assert.match(migration, /UNIQUE \(transferencia_id\)/);
+  assert.ok(migration.includes('UNIQUE(transferencia_id)'));
   assert.match(migration, /INSERT INTO public\.turno_jornada_entradas_vinculadas/);
   assert.doesNotMatch(migration, /INSERT\s+INTO\s+public\.transferencias\b/i);
 });
 
 test("multi-day close uses the period end date", () => {
   assert.match(migration, /fecha_fin date/);
-  assert.match(migration, /v_fecha_fin := coalesce\(v_programacion\.fecha_fin,v_programacion\.fecha\)/);
+  assert.ok(migration.includes('v_fecha_fin:=coalesce(v_programacion.fecha_fin,v_programacion.fecha)'));
   assert.match(migration, /v_local::date<>v_fecha_fin/);
 });
 
