@@ -100,3 +100,9 @@ test("programming trigger prevents warehouse and responsible overlap across a fu
   assert.ok(migration.includes("p.fecha<=v_fin AND coalesce(p.fecha_fin,p.fecha)>=NEW.fecha"));
   assert.ok(migration.includes("generate_series(NEW.fecha::timestamp,v_fin::timestamp"));
 });
+
+
+test("server-side responsible eligibility accepts existing singular and plural Dependienta role labels",()=>{
+  assert.ok(migration.includes("IN ('dependienta','dependientas','dueño','dueno')"));
+  assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.bc5_jornada_responsable_elegible"));
+});

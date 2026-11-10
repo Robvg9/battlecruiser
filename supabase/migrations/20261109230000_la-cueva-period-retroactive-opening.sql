@@ -91,6 +91,23 @@ CROSS JOIN (VALUES ('turnos','ver'),('gastos','crear'),('reinversiones','crear')
 WHERE lower(btrim(r.nombre))='dependienta' AND r.activo=true
 ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
 
+-- The UI and backend must accept both the singular and plural role label used in existing accounts.
+CREATE OR REPLACE FUNCTION public.bc5_jornada_responsable_elegible(p_usuario_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.usuarios u
+    JOIN public.roles r ON r.id=u.role_id
+    WHERE u.id=p_usuario_id AND u.activo=true
+      AND r.activo=true
+      AND lower(btrim(r.nombre)) IN ('dependienta','dependientas','dueño','dueno')
+  );
+$function$;
+
 -- The owner is the only role allowed to approve reinvestment requests.
 INSERT INTO public.permisos(role_id,seccion,accion,permitido)
 SELECT r.id,'reinversiones','editar_any',true
