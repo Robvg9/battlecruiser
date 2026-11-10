@@ -40,7 +40,7 @@
     }catch(e){}
     rows.forEach(row=>{
       const state=mappingState.get(mappingRowKey(row));if(!state)return;
-      row.producto_id=String(state.producto_id||'');row.omitir=!!state.omitir&&Number(row.cantidad)===0;
+      row.producto_id=String(state.producto_id||'');row.omitir=!!state.omitir&&Number(row.cantidad)===0&&!!state.manual;
       row.draftProduct=!!state.draftProduct&&!!row.producto_id;row.draftDone=!!state.draftDone;row.mappingManual=!!state.manual;restored++;
     });
     return restored;
@@ -66,12 +66,12 @@
           row.producto_id='';row.omitir=false;row.draftProduct=false;row.draftDone=false;row.mappingManual=true;
         }else{
           const matches=productsByName.get(norm(row.nombre))||[];
-          row.producto_id=matches.length===1?String(matches[0].producto_id):'';row.omitir=!row.producto_id&&Number(row.cantidad)===0;
+          row.producto_id=matches.length===1?String(matches[0].producto_id):'';row.omitir=false;
           row.draftProduct=false;row.draftDone=false;row.mappingManual=false;
         }
       }else{
         const matches=productsByName.get(norm(row.nombre))||[];
-        row.producto_id=matches.length===1?String(matches[0].producto_id):'';row.omitir=!row.producto_id&&Number(row.cantidad)===0;
+        row.producto_id=matches.length===1?String(matches[0].producto_id):'';row.omitir=false;
         row.draftProduct=false;row.draftDone=false;row.mappingManual=false;
       }
       saveRowMapping(row,row.mappingManual);
@@ -80,7 +80,7 @@
   function missingProductGroups(){
     const groups=new Map();
     (parsed||[]).forEach(row=>{
-      if(Number(row.cantidad)<=0||row.producto_id)return;
+      if(row.producto_id||(row.omitir&&row.mappingManual))return;
       const key=norm(row.nombre),matches=productsByName.get(key)||[];if(matches.length!==0)return;
       if(!groups.has(key))groups.set(key,{nombre:row.nombre,rows:[]});groups.get(key).rows.push(row);
     });
@@ -90,9 +90,9 @@
   function renderInventoryActions(){
     const host=$('bc7-period-inventory-actions');if(!host)return;
     const missing=missingProductGroups(),drafts=draftRows();
-    const ambiguous=(parsed||[]).filter(row=>Number(row.cantidad)>0&&!row.producto_id&&(productsByName.get(norm(row.nombre))||[]).length>1).length;
+    const ambiguous=(parsed||[]).filter(row=>!row.producto_id&&!(row.omitir&&row.mappingManual)&&(productsByName.get(norm(row.nombre))||[]).length>1).length;
     const allDraftsDone=drafts.length>0&&drafts.every(row=>row.draftDone);let html='';
-    if(missing.length)html+='<p class="bc7-period-error">'+missing.length+' productos distintos del Excel no existen en el catálogo. Puedes crear sus fichas básicas ahora; no se inventarán precios, categorías ni mínimos.</p><button type="button" class="primary" id="bc7-period-create-missing" '+(creatingMissing?'disabled':'')+'>Crear automáticamente '+missing.length+' productos faltantes</button>';
+    if(missing.length)html+='<p class="bc7-period-error">'+missing.length+' productos distintos del Excel no existen en el catálogo. Puedes crear sus fichas básicas ahora; también se incluyen las filas con cantidad cero y solo se omiten si lo eliges. No se inventarán precios, categorías ni mínimos.</p><button type="button" class="primary" id="bc7-period-create-missing" '+(creatingMissing?'disabled':'')+'>Crear automáticamente '+missing.length+' productos faltantes</button>';
     if(ambiguous)html+='<p class="bc7-period-muted">'+ambiguous+' filas tienen más de un producto con ese nombre normalizado. Selecciona manualmente el correcto; no se crearán duplicados.</p>';
     if(drafts.length)html+='<div class="bc7-period-box"><b>Fichas nuevas pendientes de completar</b><p class="bc7-period-muted">Estos productos ya están en el catálogo, pero se crearon como fichas básicas: unidad pendiente de definir, precio normal 0, sin precio mayorista, sin categoría y sin mínimos por almacén. No se ha añadido stock. Completa y revisa sus fichas desde Productos/Inventario antes de abrir la jornada o venderlos.</p><label class="bc7-period-field"><input id="bc7-period-drafts-complete" type="checkbox" '+(allDraftsDone?'checked':'')+'> Confirmo que completé y revisé los precios, la unidad/categoría correspondiente y los mínimos de cada producto nuevo.</label></div>';
     host.innerHTML=html;
@@ -315,11 +315,11 @@
   }
   function updateConfirm(){
     const btn=$('bc7-period-confirm');if(!btn)return;
-    const hasUnmappedPositive=!!parsed&&parsed.some(row=>Number(row.cantidad)>0&&!row.producto_id);
+    const hasUnmappedRows=!!parsed&&parsed.some(row=>!row.producto_id&&!(row.omitir&&row.mappingManual));
     const hasUnverifiedDrafts=draftRows().some(row=>!row.draftDone);
     const rootsReady=!!preview&&asArray(preview.productos).length>0;
     const start=$('bc7-period-start')?.value,end=$('bc7-period-end')?.value,started=$('bc7-period-started')?.value;
-    btn.disabled=!!creatingMissing||!(preview&&parsed&&parsed.length>0&&rootsReady&&!hasUnmappedPositive&&!hasUnverifiedDrafts&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
+    btn.disabled=!!creatingMissing||!(preview&&parsed&&parsed.length>0&&rootsReady&&!hasUnmappedRows&&!hasUnverifiedDrafts&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
   }
   async function previewOpening(){
     const result=$('bc7-period-result'),btn=$('bc7-period-preview');
@@ -336,7 +336,7 @@
       products.forEach(p=>{const key=norm(p.nombre);if(!productsByName.has(key))productsByName.set(key,[]);productsByName.get(key).push(p);});
       reconcileMappingsWithCatalog(parsed,products);
       const familyCount=products.filter(p=>p.es_familia===true).length;
-      const unmatched=parsed.filter(row=>Number(row.cantidad)>0&&!row.producto_id);
+      const unmatched=parsed.filter(row=>!row.producto_id&&!(row.omitir&&row.mappingManual));
       const tableRows=parsed.map((row,index)=>{
         const options=['<option value="">Selecciona producto/familia…</option>'];
         products.forEach(product=>{
@@ -344,9 +344,9 @@
           const family=product.es_familia?' · total de familia':'',stockRef=' · stock sistema (referencia): '+Number(product.stock_sistema||0);
           options.push('<option value="'+esc(id)+'"'+selected+'>'+esc(product.nombre+family+stockRef)+'</option>');
         });
-        if(row.omitir)options.push('<option value="__omit" selected>Omitir: 0 unidades</option>');
+        if(Number(row.cantidad)===0)options.push('<option value="__omit"'+(row.omitir?' selected':'')+'>Omitir: 0 unidades</option>');
         const selector='<select data-bc7-period-map="'+index+'" aria-label="Relacionar '+esc(row.nombre)+'">'+options.join('')+'</select>';
-        const status=row.producto_id?(row.draftProduct&&!row.draftDone?'<span class="bc7-period-error">Ficha pendiente</span>':'<span class="bc7-period-ok">Relacionado</span>'):(row.omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
+        const status=row.producto_id?(row.draftProduct&&!row.draftDone?'<span class="bc7-period-error">Ficha pendiente</span>':'<span class="bc7-period-ok">Relacionado</span>'):(row.omitir&&row.mappingManual?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
         return '<tr><td>'+esc(row.nombre)+'</td><td><b>'+esc(row.cantidad)+'</b></td><td>'+selector+'</td><td>'+status+'</td></tr>';
       }).join('');
       const total=parsed.reduce((sum,row)=>sum+Number(row.cantidad||0),0);
@@ -365,9 +365,9 @@
           if(row.producto_id!==previousId){row.draftProduct=false;row.draftDone=false;}
           row.mappingManual=true;saveRowMapping(row,true);
           const statusCell=select.closest('tr')?.querySelector('td:last-child');
-          if(statusCell)statusCell.innerHTML=row.producto_id?'<span class="bc7-period-ok">Relacionado</span>':(row.omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
+          if(statusCell)statusCell.innerHTML=row.producto_id?'<span class="bc7-period-ok">Relacionado</span>':(row.omitir&&row.mappingManual?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
           renderInventoryActions();updateConfirm();
-          const pending=parsed.filter(item=>Number(item.cantidad)>0&&!item.producto_id).length;
+          const pending=parsed.filter(item=>!item.producto_id&&!(item.omitir&&item.mappingManual)).length;
           result.textContent=pending?pending+' productos con cantidad positiva necesitan relación.':'Relación completa. Revisa las transferencias antes de confirmar.';
         });
       });
@@ -430,7 +430,7 @@
     const start=$('bc7-period-start').value,end=$('bc7-period-end').value;
     const started=$('bc7-period-started').value;
     const person=$('bc7-period-person').value,warehouse=$('bc7-period-warehouse').value;
-    if(!parsed||!preview||!person||!started||draftRows().some(row=>!row.draftDone)){result.textContent='Faltan datos o hay fichas nuevas pendientes de completar y revisar.';return;}
+    if(!parsed||!preview||!person||!started||parsed.some(row=>!row.producto_id&&!(row.omitir&&row.mappingManual))||draftRows().some(row=>!row.draftDone)){result.textContent='Faltan datos o hay fichas nuevas pendientes de completar y revisar.';return;}
     const totals=new Map(asArray(preview.productos).map(product=>[String(product.producto_id),0]));
     parsed.forEach(row=>{
       if(row.producto_id&&totals.has(String(row.producto_id))){

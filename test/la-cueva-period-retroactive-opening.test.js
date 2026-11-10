@@ -227,14 +227,17 @@ test("opening preview preserves manual mappings across repeated catalog refreshe
   assert.equal(preview.includes("row.producto_id=matches.length===1"),false);
 });
 
-test("only missing positive-quantity products are created through the audited catalog RPC",()=>{
+test("all missing Excel products, including zero-stock rows, are created through the audited catalog RPC",()=>{
   const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-periodo-apertura-ui.js"),"utf8");
   assert.ok(ui.includes("function missingProductGroups()"));
+  assert.ok(ui.includes("if(row.producto_id||(row.omitir&&row.mappingManual))return;"));
+  assert.ok(ui.includes("Number(row.cantidad)===0)options.push"));
   assert.ok(ui.includes("matches.length!==0"));
   assert.ok(ui.includes("callRpc('bc_guardar_producto_catalogo'"));
   assert.ok(ui.includes("p_precio_normal:null"));
   assert.ok(ui.includes("p_categoria_id:null"));
   assert.ok(ui.includes("p_unidad:null"));
+  assert.ok(ui.includes("row.omitir=false;"));
   assert.ok(ui.includes("p_idempotency_key:key"));
   assert.ok(ui.includes("No se añadirá stock ni se abrirá la jornada"));
   assert.ok(ui.includes("fichas nuevas pendientes de completar y revisar"));
