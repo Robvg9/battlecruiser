@@ -1,5 +1,5 @@
 // BattleCruiser — apertura administrativa de jornada ya iniciada
-// v1.6 — importación de la columna Fin, mapeo de familias y bloqueo de filas sin correspondencia.
+// v1.7 — importación de la columna Fin, mapeo de familias y bloqueo de filas sin correspondencia.
 (function(){
   'use strict';
   if(window.__BC7_PERIOD_OPENING__)return;
@@ -10,6 +10,99 @@
   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
   const asArray=v=>Array.isArray(v)?v:(v==null?[]:[v]);
   let preview=null,parsed=null,productsByName=new Map(),modal=null;
+  let mappingState=new Map(),mappingSignature='',mappingStorageKey='',creationKeys=new Map();
+  let transferSelectionState=new Map(),creatingMissing=false;
+  function mappingRowKey(row){
+    return String(Number(row&&row.fila)||0)+'|'+norm(row&&row.nombre)+'|'+String(Number(row&&row.cantidad)||0);
+  }
+  function mappingFingerprint(value){
+    let hash=2166136261;
+    for(let i=0;i<value.length;i++){hash^=value.charCodeAt(i);hash=Math.imul(hash,16777619);}
+    return (hash>>>0).toString(16);
+  }
+  function persistMappingState(){
+    if(!mappingStorageKey||!mappingSignature)return;
+    try{sessionStorage.setItem(mappingStorageKey,JSON.stringify({signature:mappingSignature,mappings:Array.from(mappingState.entries())}));}catch(e){}
+  }
+  function restoreMappingState(rows){
+    mappingState.clear();
+    mappingSignature=JSON.stringify(rows.map(row=>[Number(row.fila)||0,norm(row.nombre),Number(row.cantidad)||0]));
+    mappingStorageKey='bc7-period-opening-map-'+mappingFingerprint(mappingSignature);
+    let restored=0;
+    try{
+      const raw=sessionStorage.getItem(mappingStorageKey);
+      if(raw){
+        const saved=JSON.parse(raw);
+        if(saved&&saved.signature===mappingSignature&&Array.isArray(saved.mappings)){
+          saved.mappings.forEach(entry=>{if(Array.isArray(entry)&&entry.length===2&&entry[0]&&entry[1]&&typeof entry[1]==='object')mappingState.set(String(entry[0]),entry[1]);});
+        }
+      }
+    }catch(e){}
+    rows.forEach(row=>{
+      const state=mappingState.get(mappingRowKey(row));if(!state)return;
+      row.producto_id=String(state.producto_id||'');row.omitir=!!state.omitir&&Number(row.cantidad)===0;
+      row.draftProduct=!!state.draftProduct&&!!row.producto_id;row.draftDone=!!state.draftDone;row.mappingManual=!!state.manual;restored++;
+    });
+    return restored;
+  }
+  function saveRowMapping(row,manual){
+    if(!row)return;
+    const old=mappingState.get(mappingRowKey(row))||{};
+    mappingState.set(mappingRowKey(row),{producto_id:String(row.producto_id||''),omitir:!!row.omitir,
+      manual:manual==null?!!old.manual:!!manual,draftProduct:!!row.draftProduct,draftDone:!!row.draftDone});
+    persistMappingState();
+  }
+  function reconcileMappingsWithCatalog(rows,products){
+    const validIds=new Set(products.map(product=>String(product.producto_id)));
+    rows.forEach(row=>{
+      const saved=mappingState.get(mappingRowKey(row));
+      if(saved){
+        const savedId=String(saved.producto_id||'');
+        if(savedId&&validIds.has(savedId)){
+          row.producto_id=savedId;row.omitir=false;row.draftProduct=!!saved.draftProduct;row.draftDone=!!saved.draftDone;row.mappingManual=!!saved.manual;
+        }else if(saved.omitir&&Number(row.cantidad)===0){
+          row.producto_id='';row.omitir=true;row.draftProduct=false;row.draftDone=false;row.mappingManual=!!saved.manual;
+        }else if(saved.manual){
+          row.producto_id='';row.omitir=false;row.draftProduct=false;row.draftDone=false;row.mappingManual=true;
+        }else{
+          const matches=productsByName.get(norm(row.nombre))||[];
+          row.producto_id=matches.length===1?String(matches[0].producto_id):'';row.omitir=!row.producto_id&&Number(row.cantidad)===0;
+          row.draftProduct=false;row.draftDone=false;row.mappingManual=false;
+        }
+      }else{
+        const matches=productsByName.get(norm(row.nombre))||[];
+        row.producto_id=matches.length===1?String(matches[0].producto_id):'';row.omitir=!row.producto_id&&Number(row.cantidad)===0;
+        row.draftProduct=false;row.draftDone=false;row.mappingManual=false;
+      }
+      saveRowMapping(row,row.mappingManual);
+    });
+  }
+  function missingProductGroups(){
+    const groups=new Map();
+    (parsed||[]).forEach(row=>{
+      if(Number(row.cantidad)<=0||row.producto_id)return;
+      const key=norm(row.nombre),matches=productsByName.get(key)||[];if(matches.length!==0)return;
+      if(!groups.has(key))groups.set(key,{nombre:row.nombre,rows:[]});groups.get(key).rows.push(row);
+    });
+    return Array.from(groups.values());
+  }
+  function draftRows(){return (parsed||[]).filter(row=>row.producto_id&&row.draftProduct);}
+  function renderInventoryActions(){
+    const host=$('bc7-period-inventory-actions');if(!host)return;
+    const missing=missingProductGroups(),drafts=draftRows();
+    const ambiguous=(parsed||[]).filter(row=>Number(row.cantidad)>0&&!row.producto_id&&(productsByName.get(norm(row.nombre))||[]).length>1).length;
+    const allDraftsDone=drafts.length>0&&drafts.every(row=>row.draftDone);let html='';
+    if(missing.length)html+='<p class="bc7-period-error">'+missing.length+' productos distintos del Excel no existen en el catálogo. Puedes crear sus fichas básicas ahora; no se inventarán precios, categorías ni mínimos.</p><button type="button" class="primary" id="bc7-period-create-missing" '+(creatingMissing?'disabled':'')+'>Crear automáticamente '+missing.length+' productos faltantes</button>';
+    if(ambiguous)html+='<p class="bc7-period-muted">'+ambiguous+' filas tienen más de un producto con ese nombre normalizado. Selecciona manualmente el correcto; no se crearán duplicados.</p>';
+    if(drafts.length)html+='<div class="bc7-period-box"><b>Fichas nuevas pendientes de completar</b><p class="bc7-period-muted">Estos productos ya están en el catálogo, pero se crearon como fichas básicas: unidad «unidad», precio normal 0, sin precio mayorista, sin categoría y sin mínimos por almacén. No se ha añadido stock. Completa y revisa sus fichas desde Productos/Inventario antes de abrir la jornada o venderlos.</p><label class="bc7-period-field"><input id="bc7-period-drafts-complete" type="checkbox" '+(allDraftsDone?'checked':'')+'> Confirmo que completé y revisé los precios, la unidad/categoría correspondiente y los mínimos de cada producto nuevo.</label></div>';
+    host.innerHTML=html;
+    const create=$('bc7-period-create-missing');if(create)create.addEventListener('click',createMissingProducts);
+    const done=$('bc7-period-drafts-complete');
+    if(done)done.addEventListener('change',()=>{
+      parsed.forEach(row=>{if(!row.draftProduct)return;row.draftDone=done.checked;saveRowMapping(row);});
+      updateConfirm();$('bc7-period-result').textContent=done.checked?'Fichas nuevas marcadas como completadas. Revisa el inventario y las transferencias antes de confirmar.':'Falta completar y revisar las fichas nuevas.';
+    });
+  }
 
   function db(){
     if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
@@ -179,7 +272,7 @@
       '<label class="bc7-period-field">Fecha y hora real de inicio y conteo inicial (hora de Cuba)<input id="bc7-period-started" type="datetime-local" value="" required><small class="bc7-period-muted">Debe coincidir con el momento de referencia del inventario inicial; se usa para decidir qué entradas ocurrieron después.</small></label>'+
       '<label class="bc7-period-field">Inventario anterior (.xlsx o .csv)<input id="bc7-period-file" type="file" accept=".xlsx,.csv" required></label>'+
       '</div>'+
-      '<div class="bc7-period-box"><b>Inventario inicial heredado</b><div id="bc7-period-inventory-preview" class="bc7-period-muted">Selecciona el Excel de Adriana para revisar sus cantidades.</div></div>'+
+      '<div class="bc7-period-box"><b>Inventario inicial heredado</b><div id="bc7-period-inventory-preview" class="bc7-period-muted">Selecciona el Excel de Adriana para revisar sus cantidades.</div><div id="bc7-period-inventory-actions"></div></div>'+
       '<div class="bc7-period-box"><b>Entradas existentes en el período</b><p class="bc7-period-muted">Las entradas de 09:07 y 15:16 son posteriores al inventario heredado. La de 07:15 ya forma parte del cierre de Adriana y no se vinculará de nuevo.</p><div id="bc7-period-transfer-list" class="bc7-period-muted">Primero selecciona fechas para consultar las entradas.</div></div>'+
       '<label class="bc7-period-field">Observación administrativa<input id="bc7-period-note" maxlength="1000" value="Apertura retroactiva: inventario final de Adriana (7–8 nov. 2026) como inventario inicial de Sheyla (9–10 nov. 2026)."></label>'+
       '<p id="bc7-period-result" class="bc7-period-muted" role="status" aria-live="polite"></p>'+
@@ -187,12 +280,18 @@
       '</div>';
     document.body.appendChild(modal);
     modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('[data-bc7-period-cancel]'))closeModal();});
+    modal.addEventListener('change',e=>{
+      const checkbox=e.target&&e.target.closest?e.target.closest('[data-bc7-period-transfer]'):null;
+      if(checkbox)transferSelectionState.set(String(checkbox.value),!!checkbox.checked);
+    });
     $('bc7-period-file').addEventListener('change',async e=>{
-      parsed=null;
       const file=e.target.files&&e.target.files[0];if(!file)return;
-      const box=$('bc7-period-inventory-preview');box.textContent='Leyendo archivo…';
-      try{parsed=await parseInventoryFile(file);box.textContent=parsed.length+' productos leídos de la columna Fin. Pulsa «Revisar inventario y entradas» para relacionarlos con el catálogo.';}
-      catch(err){box.innerHTML='<span class="bc7-period-error">'+esc(err.message||err)+'</span>';}
+      parsed=null;preview=null;productsByName.clear();mappingState.clear();creationKeys.clear();mappingSignature='';mappingStorageKey='';
+      const box=$('bc7-period-inventory-preview');box.textContent='Leyendo archivo…';$('bc7-period-inventory-actions').innerHTML='';
+      try{
+        parsed=await parseInventoryFile(file);const restored=restoreMappingState(parsed);
+        box.textContent=parsed.length+' productos leídos de la columna Fin.'+(restored?' Se restauraron '+restored+' relaciones guardadas.':'')+' Pulsa «Revisar inventario y entradas»; las relaciones se conservarán al repetir la revisión.';
+      }catch(err){box.innerHTML='<span class="bc7-period-error">'+esc(err.message||err)+'</span>';}
       updateConfirm();
     });
     $('bc7-period-started').addEventListener('change',updateConfirm);
@@ -204,22 +303,24 @@
     $('bc7-period-warehouse').addEventListener('change',()=>{preview=null;updateConfirm();});
     updateConfirm();
   }
-  function closeModal(){modal?.remove();modal=null;preview=null;parsed=null;productsByName.clear();}
+  function closeModal(){modal?.remove();modal=null;preview=null;parsed=null;productsByName.clear();mappingState.clear();creationKeys.clear();transferSelectionState.clear();creatingMissing=false;}
   function selectedTransferIds(){
     return Array.from(modal.querySelectorAll('[data-bc7-period-transfer]:checked')).map(x=>x.value);
   }
   function updateConfirm(){
     const btn=$('bc7-period-confirm');if(!btn)return;
     const hasUnmappedPositive=!!parsed&&parsed.some(row=>Number(row.cantidad)>0&&!row.producto_id);
+    const hasUnverifiedDrafts=draftRows().some(row=>!row.draftDone);
     const rootsReady=!!preview&&asArray(preview.productos).length>0;
     const start=$('bc7-period-start')?.value,end=$('bc7-period-end')?.value,started=$('bc7-period-started')?.value;
-    btn.disabled=!(preview&&parsed&&parsed.length>0&&rootsReady&&!hasUnmappedPositive&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
+    btn.disabled=!!creatingMissing||!(preview&&parsed&&parsed.length>0&&rootsReady&&!hasUnmappedPositive&&!hasUnverifiedDrafts&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
   }
   async function previewOpening(){
-    const result=$('bc7-period-result');const btn=$('bc7-period-preview');
+    const result=$('bc7-period-result'),btn=$('bc7-period-preview');
     if(!parsed){result.textContent='Selecciona primero el Excel del inventario anterior.';return;}
     const warehouse=$('bc7-period-warehouse').value,start=$('bc7-period-start').value,end=$('bc7-period-end').value;
     if(!warehouse||!start||!end||end<start){result.textContent='Completa el almacén y un período válido.';return;}
+    if(modal)modal.querySelectorAll('[data-bc7-period-transfer]').forEach(check=>transferSelectionState.set(String(check.value),!!check.checked));
     btn.disabled=true;result.textContent='Consultando catálogo agrupado y transferencias…';
     try{
       preview=await callRpc('bc7_previsualizar_apertura_existente',{p_almacen_id:warehouse,p_fecha_inicio:start,p_fecha_fin:end});
@@ -227,50 +328,83 @@
       if(!products.length)throw new Error('El catálogo no devolvió productos/familias activos para este almacén.');
       productsByName=new Map();
       products.forEach(p=>{const key=norm(p.nombre);if(!productsByName.has(key))productsByName.set(key,[]);productsByName.get(key).push(p);});
-      parsed.forEach(row=>{
-        const matches=productsByName.get(norm(row.nombre))||[];
-        row.producto_id=matches.length===1?String(matches[0].producto_id):'';
-        row.omitir=!row.producto_id&&Number(row.cantidad)===0;
-      });
+      reconcileMappingsWithCatalog(parsed,products);
       const familyCount=products.filter(p=>p.es_familia===true).length;
       const unmatched=parsed.filter(row=>Number(row.cantidad)>0&&!row.producto_id);
       const tableRows=parsed.map((row,index)=>{
         const options=['<option value="">Selecciona producto/familia…</option>'];
         products.forEach(product=>{
-          const id=String(product.producto_id);
-          const selected=id===String(row.producto_id)?' selected':'';
-          const family=product.es_familia?' · total de familia':'';
-          const stockRef=' · stock sistema (referencia): '+Number(product.stock_sistema||0);
+          const id=String(product.producto_id),selected=id===String(row.producto_id)?' selected':'';
+          const family=product.es_familia?' · total de familia':'',stockRef=' · stock sistema (referencia): '+Number(product.stock_sistema||0);
           options.push('<option value="'+esc(id)+'"'+selected+'>'+esc(product.nombre+family+stockRef)+'</option>');
         });
         if(row.omitir)options.push('<option value="__omit" selected>Omitir: 0 unidades</option>');
         const selector='<select data-bc7-period-map="'+index+'" aria-label="Relacionar '+esc(row.nombre)+'">'+options.join('')+'</select>';
-        const status=row.producto_id?'<span class="bc7-period-ok">Relacionado</span>':(row.omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
+        const status=row.producto_id?(row.draftProduct&&!row.draftDone?'<span class="bc7-period-error">Ficha pendiente</span>':'<span class="bc7-period-ok">Relacionado</span>'):(row.omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
         return '<tr><td>'+esc(row.nombre)+'</td><td><b>'+esc(row.cantidad)+'</b></td><td>'+selector+'</td><td>'+status+'</td></tr>';
       }).join('');
       const total=parsed.reduce((sum,row)=>sum+Number(row.cantidad||0),0);
       $('bc7-period-inventory-preview').innerHTML=
         '<b>'+parsed.length+' filas del Excel · '+products.length+' productos/familias en catálogo</b>'+
         '<p class="bc7-period-muted">Total de la columna Fin: <b>'+esc(total)+'</b> unidades. '+familyCount+' familias tienen sabores y se contarán como un solo producto, sin repartir cantidades.</p>'+
-        (unmatched.length?'<p class="bc7-period-error">'+unmatched.length+' líneas con cantidad positiva necesitan relación con el catálogo. Si un producto no existe, habrá que darlo de alta antes de abrir la jornada.</p>':'<p class="bc7-period-ok">Todas las cantidades positivas están relacionadas.</p>')+
+        (unmatched.length?'<p class="bc7-period-error">'+unmatched.length+' líneas positivas necesitan relación. Los productos inexistentes se pueden crear como fichas básicas debajo de esta tabla.</p>':'<p class="bc7-period-ok">Todas las cantidades positivas están relacionadas.</p>')+
         '<div class="bc7-period-table-wrap"><table class="bc7-period-table"><thead><tr><th>Nombre del Excel</th><th>Fin</th><th>Producto de BattleCruiser</th><th>Estado</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>';
+      renderInventoryActions();
       modal.querySelectorAll('[data-bc7-period-map]').forEach(select=>{
         select.addEventListener('change',()=>{
-          const index=Number(select.getAttribute('data-bc7-period-map'));
-          if(!parsed[index])return;
-          parsed[index].producto_id=select.value&&select.value!=='__omit'?select.value:'';
-          parsed[index].omitir=select.value==='__omit';
+          const index=Number(select.getAttribute('data-bc7-period-map'));if(!parsed[index])return;
+          const row=parsed[index],previousId=String(row.producto_id||'');
+          row.producto_id=select.value&&select.value!=='__omit'?select.value:'';
+          row.omitir=select.value==='__omit';
+          if(row.producto_id!==previousId){row.draftProduct=false;row.draftDone=false;}
+          row.mappingManual=true;saveRowMapping(row,true);
           const statusCell=select.closest('tr')?.querySelector('td:last-child');
-          if(statusCell)statusCell.innerHTML=parsed[index].producto_id?'<span class="bc7-period-ok">Relacionado</span>':(parsed[index].omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
-          updateConfirm();
-          const pending=parsed.filter(row=>Number(row.cantidad)>0&&!row.producto_id).length;
+          if(statusCell)statusCell.innerHTML=row.producto_id?'<span class="bc7-period-ok">Relacionado</span>':(row.omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
+          renderInventoryActions();updateConfirm();
+          const pending=parsed.filter(item=>Number(item.cantidad)>0&&!item.producto_id).length;
           result.textContent=pending?pending+' productos con cantidad positiva necesitan relación.':'Relación completa. Revisa las transferencias antes de confirmar.';
         });
       });
       renderTransfers();
-      result.textContent=unmatched.length?'Revisa las relaciones pendientes y las transferencias.':'Previsualización lista. Revisa las transferencias.';
+      result.textContent=unmatched.length?'Revisa las relaciones pendientes, los productos faltantes y las transferencias.':'Previsualización lista. Las relaciones anteriores se conservaron; revisa las transferencias.';
     }catch(e){preview=null;result.textContent=e.message||'No se pudo cargar la previsualización.';}
     finally{btn.disabled=false;updateConfirm();}
+  }
+  async function createMissingProducts(){
+    if(creatingMissing)return;
+    creatingMissing=true;updateConfirm();
+    const result=$('bc7-period-result');
+    try{
+      await previewOpening();
+      if(!preview)throw new Error('No se pudo actualizar el catálogo. No se creó ningún producto.');
+      const groups=missingProductGroups();
+      if(!groups.length){result.textContent='No quedan productos inexistentes que crear. Revisa los nombres ambiguos en la tabla.';return;}
+      const names=groups.map(group=>group.nombre);
+      const approved=confirm('Se crearán '+groups.length+' fichas básicas de catálogo:\\n\\n'+names.join('\\n')+'\\n\\nCada ficha tendrá unidad base «unidad», precio normal 0, sin precio mayorista, sin categoría y sin mínimos. No se añadirá stock ni se abrirá la jornada. Después tendrás que completar y revisar sus datos. ¿Continuar?');
+      if(!approved)return;
+      let created=0;const failures=[];
+      for(const group of groups){
+        const normalized=norm(group.nombre);let key=creationKeys.get(normalized);
+        if(!key){key=crypto.randomUUID();creationKeys.set(normalized,key);}
+        try{
+          const id=await callRpc('bc_guardar_producto_catalogo',{
+            p_producto_id:null,p_nombre:group.nombre,p_categoria_id:null,p_unidad:'unidad',
+            p_precio_normal:null,p_precio_mayorista:null,p_presentacion_normal:'unidad',p_factor_normal:1,
+            p_presentacion_mayorista:null,p_factor_mayorista:null,p_idempotency_key:key
+          });
+          if(!id)throw new Error('El servidor no devolvió el ID del producto.');
+          group.rows.forEach(row=>{
+            row.producto_id=String(id);row.omitir=false;row.mappingManual=false;row.draftProduct=true;row.draftDone=false;
+            saveRowMapping(row,false);
+          });
+          created++;
+        }catch(error){failures.push(group.nombre+': '+(error.message||String(error)));}
+      }
+      await previewOpening();
+      const tail=failures.length?' Errores: '+failures.join(' | '):'';
+      result.textContent=created+' fichas básicas creadas y relacionadas. Completa sus precios, datos y mínimos; después marca la casilla de revisión para habilitar la apertura.'+tail;
+    }catch(error){result.textContent=error.message||'No se pudieron crear los productos faltantes.';}
+    finally{creatingMissing=false;renderInventoryActions();updateConfirm();}
   }
   function renderTransfers(){
     const host=$('bc7-period-transfer-list'),rows=asArray(preview&&preview.transferencias);
@@ -281,7 +415,8 @@
         return '<div class="bc7-period-transfer"><span><b>Entrada 07:15 · registro de jornada anterior</b><br>Ya incluida en el inventario final de Adriana (7–8 nov.); no se vinculará.</span><small>No sumar</small></div>';
       }
       const suggested=date==='2026-11-09'&&(time==='09:07'||time==='15:16');
-      return '<label class="bc7-period-transfer"><input type="checkbox" data-bc7-period-transfer value="'+esc(t.id)+'" '+(suggested?'checked':'')+'><span><b>'+esc(date)+' · '+esc(time)+'</b><br>'+esc(t.origen||'Almacén de origen')+' · '+esc(t.lineas||0)+' líneas</span><small>'+esc(t.unidades||0)+' unidades</small></label>';
+      const checked=transferSelectionState.has(String(t.id))?transferSelectionState.get(String(t.id)):suggested;
+      return '<label class="bc7-period-transfer"><input type="checkbox" data-bc7-period-transfer value="'+esc(t.id)+'" '+(checked?'checked':'')+'><span><b>'+esc(date)+' · '+esc(time)+'</b><br>'+esc(t.origen||'Almacén de origen')+' · '+esc(t.lineas||0)+' líneas</span><small>'+esc(t.unidades||0)+' unidades</small></label>';
     }).join('');
   }
   async function confirmOpening(){
@@ -289,7 +424,7 @@
     const start=$('bc7-period-start').value,end=$('bc7-period-end').value;
     const started=$('bc7-period-started').value;
     const person=$('bc7-period-person').value,warehouse=$('bc7-period-warehouse').value;
-    if(!parsed||!preview||!person||!started){result.textContent='Faltan datos para confirmar.';return;}
+    if(!parsed||!preview||!person||!started||draftRows().some(row=>!row.draftDone)){result.textContent='Faltan datos o hay fichas nuevas pendientes de completar y revisar.';return;}
     const totals=new Map(asArray(preview.productos).map(product=>[String(product.producto_id),0]));
     parsed.forEach(row=>{
       if(row.producto_id&&totals.has(String(row.producto_id))){
@@ -302,7 +437,8 @@
     const ids=selectedTransferIds();
     const label=peopleName(person);
     const sourceTotal=parsed.reduce((sum,row)=>sum+Number(row.cantidad||0),0);
-    if(!confirm('Vas a abrir la jornada '+start+' a '+end+' con responsable '+label+'.\nSe importarán '+parsed.length+' filas de la columna Fin ('+sourceTotal+' unidades), agrupadas en '+lines.length+' productos/familias. Se vincularán '+ids.length+' transferencias existentes. La entrada de 07:15 no se repetirá y el stock general no se modificará. ¿Confirmas?'))return;
+    const draftCount=new Set(draftRows().map(row=>norm(row.nombre))).size;
+    if(!confirm('Vas a abrir la jornada '+start+' a '+end+' con responsable '+label+'.\nSe importarán '+parsed.length+' filas de la columna Fin ('+sourceTotal+' unidades), agrupadas en '+lines.length+' productos/familias. Se vincularán '+ids.length+' transferencias existentes. '+(draftCount?'Has marcado '+draftCount+' fichas nuevas como completadas y revisadas. ':'')+'La entrada de 07:15 no se repetirá y el stock general no se modificará. ¿Confirmas?'))return;
     btn.disabled=true;result.textContent='Registrando apertura…';
     try{
       const data=await callRpc('bc7_admin_abrir_jornada_existente',{

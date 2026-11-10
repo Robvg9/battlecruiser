@@ -117,8 +117,8 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["ui-operaciones-hub.js","43.2"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'), 'the finance operations form must refresh');
   assert.ok(app.includes('["aprobaciones-admin.js","20261110.2"]'), 'the approval form must refresh');
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'), 'the retroactive Jornada opening form must load');
-  assert.ok(sw.includes('./js/bc7-periodo-apertura-ui.js?v=1.6'), 'the retroactive Jornada opening form must be precached');
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'), 'the retroactive Jornada opening form must load');
+  assert.ok(sw.includes('./js/bc7-periodo-apertura-ui.js?v=1.7'), 'the retroactive Jornada opening form must be precached');
   assert.ok(app.includes('["bajas-multiple.js","1.6"]'), 'Bajas list payload must be refreshed');
   assert.ok(sw.includes('./js/bajas-multiple.js?v=1.6'), 'the updated Bajas list module must be precached');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=71"), 'the offline shell must precache the updated minimum editor');
@@ -197,7 +197,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /v9\.5\.92 — Liquidación por inventario y entregas diarias/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.92"><\/script>/);
   for (const asset of [
-    'style.css?v=9.5.92',
+    'style.css?v=9.5.93',
     'js/centro-control.js?v=9.5.70',
     'js/navegacion.js?v=9.5.64',
     'js/mando.js?v=9.5.64',
@@ -237,7 +237,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.92"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.93"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -283,10 +283,10 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.92'));
-  assert.ok(index.includes('app.js?v=9.5.92'));
-  assert.ok(sw.includes('./style.css?v=9.5.92'));
-  assert.ok(sw.includes('./app.js?v=9.5.92'));
+  assert.ok(index.includes('style.css?v=9.5.93'));
+  assert.ok(index.includes('app.js?v=9.5.93'));
+  assert.ok(sw.includes('./style.css?v=9.5.93'));
+  assert.ok(sw.includes('./app.js?v=9.5.93'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });

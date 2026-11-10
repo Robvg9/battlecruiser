@@ -58,10 +58,10 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
   assert.match(ui, /stock general no se modificará/i);
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.6"));
-  assert.ok(app.includes('VERSION="9.5.92"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.92"'));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.7"));
+  assert.ok(app.includes('VERSION="9.5.93"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.93"'));
 });
 
 
@@ -191,11 +191,11 @@ test("opening confirmation unlocks when the real start time or responsible chang
   assert.match(ui, /\$\('bc7-period-person'\)\.addEventListener\('change',updateConfirm\)/);
 });
 
-test("period opening form version 1.6 is loaded dynamically and precached",()=>{
+test("period opening form version 1.7 is loaded dynamically and precached",()=>{
   const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.6"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.7"));
 });
 
 
@@ -211,4 +211,37 @@ test("permission grants keep Dependienta submission separate from Dueño approva
   const settlementContract=fs.readFileSync(path.join(__dirname,"la-cueva-period-settlement-contract.sql"),"utf8");
   assert.match(settlementContract,/Dependienta unexpectedly approved operation type/);
   assert.match(settlementContract,/Dependienta unexpectedly accessed the administrative approval queue/);
+});
+
+
+test("opening preview preserves manual mappings across repeated catalog refreshes",()=>{
+  const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-periodo-apertura-ui.js"),"utf8");
+  assert.ok(ui.includes("function reconcileMappingsWithCatalog(rows,products)"));
+  assert.ok(ui.includes("mappingState.set(mappingRowKey(row)"));
+  assert.ok(ui.includes("saveRowMapping(row,true)"));
+  assert.ok(ui.includes("sessionStorage.setItem(mappingStorageKey"));
+  assert.ok(ui.includes("saved.manual"));
+  assert.ok(ui.includes("Se restauraron"));
+  assert.doesNotMatch(ui,/parsed\\.forEach\\(row=>\\{\\s*const matches=productsByName\\.get\\(norm\\(row\\.nombre\\)\\)\\|\\|\\[\\];\\s*row\\.producto_id=/);
+});
+
+test("only missing positive-quantity products are created through the audited catalog RPC",()=>{
+  const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-periodo-apertura-ui.js"),"utf8");
+  assert.ok(ui.includes("function missingProductGroups()"));
+  assert.ok(ui.includes("matches.length!==0"));
+  assert.ok(ui.includes("callRpc('bc_guardar_producto_catalogo'"));
+  assert.ok(ui.includes("p_precio_normal:null"));
+  assert.ok(ui.includes("p_categoria_id:null"));
+  assert.ok(ui.includes("p_unidad:'unidad'"));
+  assert.ok(ui.includes("p_idempotency_key:key"));
+  assert.ok(ui.includes("No se añadirá stock ni se abrirá la jornada"));
+  assert.ok(ui.includes("fichas nuevas pendientes de completar y revisar"));
+  assert.ok(ui.includes("draftRows().some(row=>!row.draftDone)"));
+  assert.ok(ui.includes("no se crearán duplicados"));
+});
+
+test("repeated preview preserves transfer checkbox selection by transfer ID",()=>{
+  const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-periodo-apertura-ui.js"),"utf8");
+  assert.ok(ui.includes("transferSelectionState.set(String(checkbox.value),!!checkbox.checked)"));
+  assert.ok(ui.includes("transferSelectionState.has(String(t.id))"));
 });
