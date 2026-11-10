@@ -94,3 +94,9 @@ test("only the Dueño role receives reinvestment approval authority",()=>{
   assert.ok(migration.includes("lower(btrim(r.nombre))='dueño'"));
   assert.ok(migration.includes("'reinversiones','editar_any'"));
 });
+test("programming trigger prevents warehouse and responsible overlap across a full period",()=>{
+  assert.ok(migration.includes("CREATE TRIGGER bc5_jornada_no_overlap"));
+  assert.ok(migration.includes("fecha_fin,trabaja,responsable_id,estado"));
+  assert.ok(migration.includes("p.fecha<=v_fin AND coalesce(p.fecha_fin,p.fecha)>=NEW.fecha"));
+  assert.ok(migration.includes("generate_series(NEW.fecha::timestamp,v_fin::timestamp"));
+});

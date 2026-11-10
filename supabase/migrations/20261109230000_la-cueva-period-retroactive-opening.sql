@@ -2,6 +2,62 @@ BEGIN;
 
 ALTER TABLE public.turno_jornada_programacion ADD COLUMN IF NOT EXISTS fecha_fin date;
 UPDATE public.turno_jornada_programacion SET fecha_fin=fecha WHERE fecha_fin IS NULL;
+
+CREATE OR REPLACE FUNCTION public.bc5_guard_jornada_assignment_conflicts()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_fin date:=coalesce(NEW.fecha_fin,NEW.fecha);
+  v_dia date;
+BEGIN
+  IF NEW.estado='PROGRAMADA' AND NEW.trabaja AND NEW.responsable_id IS NOT NULL THEN
+    FOR v_dia IN
+      SELECT dia::date FROM generate_series(NEW.fecha::timestamp,v_fin::timestamp,interval '1 day') AS dias(dia)
+    LOOP
+      PERFORM pg_advisory_xact_lock(hashtextextended('bc5-responsable:'||NEW.responsable_id::text||':'||v_dia::text,0));
+      PERFORM pg_advisory_xact_lock(hashtextextended('bc5-almacen:'||NEW.almacen_id::text||':'||v_dia::text,0));
+    END LOOP;
+    IF EXISTS (
+      SELECT 1 FROM public.turno_jornada_programacion p
+      WHERE p.id IS DISTINCT FROM NEW.id AND p.responsable_id=NEW.responsable_id
+        AND p.fecha<=v_fin AND coalesce(p.fecha_fin,p.fecha)>=NEW.fecha
+        AND p.estado='PROGRAMADA' AND p.trabaja
+    ) THEN
+      RAISE EXCEPTION 'La persona ya tiene otra jornada programada que se solapa con este período.' USING ERRCODE='23505';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.turno_jornada_programacion p
+      WHERE p.id IS DISTINCT FROM NEW.id AND p.almacen_id=NEW.almacen_id
+        AND p.fecha<=v_fin AND coalesce(p.fecha_fin,p.fecha)>=NEW.fecha
+        AND p.estado='PROGRAMADA' AND p.trabaja
+    ) THEN
+      RAISE EXCEPTION 'El almacén ya tiene otra jornada programada que se solapa con este período.' USING ERRCODE='23505';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM public.turno_sesiones s
+      JOIN public.turno_asignaciones a ON a.turno_sesion_id=s.id
+      JOIN public.turnos t ON t.id=s.turno_id
+      WHERE s.fecha BETWEEN NEW.fecha AND v_fin
+        AND s.jornada_programacion_id IS NULL
+        AND s.estado NOT IN ('COMPLETADA','CANCELADA')
+        AND a.usuario_id=NEW.responsable_id AND a.retirado_at IS NULL
+        AND coalesce(t.estado_maestro,t.estado) NOT IN ('CERRADO','CANCELADO')
+    ) THEN
+      RAISE EXCEPTION 'La persona tiene una asignación legacy pendiente dentro del período; reconcíliela primero.' USING ERRCODE='23505';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS bc5_jornada_no_overlap ON public.turno_jornada_programacion;
+CREATE TRIGGER bc5_jornada_no_overlap
+BEFORE INSERT OR UPDATE OF almacen_id,fecha,fecha_fin,trabaja,responsable_id,estado
+ON public.turno_jornada_programacion
+FOR EACH ROW EXECUTE FUNCTION public.bc5_guard_jornada_assignment_conflicts();
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.turno_jornada_programacion'::regclass AND conname='turno_jornada_programacion_rango_fechas_chk') THEN
