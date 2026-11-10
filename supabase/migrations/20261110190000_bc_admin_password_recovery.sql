@@ -53,6 +53,8 @@ AS $function$
   FROM public.permisos p
   JOIN public.usuarios u ON u.role_id = p.role_id
   WHERE u.id = auth.uid()
+    AND u.activo = true
+    AND coalesce(u.archivado, false) = false
     AND p.permitido = true
     AND coalesce((auth.jwt()->'app_metadata'->>'bc_password_change_required')::boolean, false) = false;
 $function$;
@@ -70,6 +72,7 @@ AS $function$
       JOIN public.permisos p ON p.role_id = u.role_id
       WHERE u.id = auth.uid()
         AND u.activo = true
+        AND coalesce(u.archivado, false) = false
         AND p.seccion = p_seccion
         AND p.accion = p_accion
         AND coalesce((auth.jwt()->'app_metadata'->>'bc_password_change_required')::boolean, false) = false
