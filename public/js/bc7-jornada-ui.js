@@ -485,6 +485,76 @@
       '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(difference?esc(money(d.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
       '<p class="bc7-muted">Estado: '+esc(humanStatus(d.estado_aprobacion||'ESPERANDO_APROBACION'))+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
   }
+  function renderDailyCash(host,data){
+    if(!host)return;
+    const rows=arr(data&&data.entregas);
+    if(!rows.length){
+      host.innerHTML='<div class="bc7-jornada" id="bc7-daily-cash-summary"><h4>Dinero recogido diariamente</h4><p class="bc7-muted">Todavía no hay entregas diarias registradas.</p></div>';
+      return;
+    }
+    host.innerHTML='<div class="bc7-jornada" id="bc7-daily-cash-summary"><h4>Dinero recogido diariamente</h4>'+
+      '<div class="bc7-list">'+rows.map(function(item){
+        const status=String(item.estado||'PENDIENTE').toUpperCase();
+        const amount=status==='APROBADA'&&item.monto_aprobado!=null?item.monto_aprobado:item.monto_declarado;
+        return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(item.fecha))+' · '+esc(money(amount))+' CUP</strong>'+
+          '<p>'+esc(item.creado_nombre||'Responsable')+(item.revisado_nombre?' · revisó '+esc(item.revisado_nombre):'')+'</p></div>'+
+          '<span class="bc7-pill '+(status==='APROBADA'?'ok':status==='RECHAZADA'?'warn':'')+'">'+esc(humanStatus(status))+'</span></div>'+
+          (item.observacion?'<p>'+esc(item.observacion)+'</p>':'')+
+          (item.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(item.comentario_revision)+'</p>':'')+'</article>';
+      }).join('')+'</div></div>';
+  }
+  function renderInventorySettlement(host,result){
+    if(!host)return;
+    if(!result||result.aplica===false){
+      host.innerHTML='<div class="bc7-empty">'+esc(result&&result.motivo||'La liquidación por inventario no está disponible.')+'</div>';
+      return;
+    }
+    const pending=result.pendientes||{};
+    const calculable=result.calculable===true;
+    const summary=[
+      ['Venta comprobada',result.ventas_estimadas],
+      ['Salario calculado',result.salario_calculado],
+      ['Gastos aprobados',result.gastos_aprobados],
+      ['Reinversiones aprobadas',result.reinversiones_aprobadas],
+      ['Dinero recogido',result.dinero_recogido_total],
+      ['Efectivo esperado',result.efectivo_esperado_despues_de_gastos_reinversiones_salario],
+      ['Faltante / sobrante',result.diferencia]
+    ];
+    const cards='<div class="bc7-workspace-overview">'+summary.map(function(item){
+      const value=item[1]==null?'Pendiente':money(item[1])+' CUP';
+      return '<div class="bc7-overview-item"><small>'+esc(item[0])+'</small><b>'+esc(value)+'</b></div>';
+    }).join('')+'</div>';
+    const rows=arr(result.lineas);
+    const table=rows.length
+      ?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Familia</th><th>Inicial</th><th>Entradas</th><th>Salidas</th><th>Final</th><th>Vendidas</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+
+        rows.map(function(line){
+          const entries=Number(line.transferencias_entrada||0)+Number(line.compras||0)+Number(line.reinversiones_entrada||0);
+          const exits=Number(line.transferencias_salida||0)+Number(line.vales_salida||0)+Number(line.mermas_aprobadas||0)+Number(line.bajas_aprobadas||0);
+          return '<tr><td>'+esc(line.nombre||'Producto')+'</td>'+
+            '<td>'+esc(qty(line.inventario_inicial))+'</td><td>'+esc(qty(entries))+'</td>'+
+            '<td>'+esc(qty(exits))+'</td><td>'+esc(qty(line.inventario_final))+'</td>'+
+            '<td><b>'+esc(qty(line.unidades_vendidas))+'</b></td>'+
+            '<td>'+esc(line.precio_unitario==null?'Sin precio':money(line.precio_unitario))+'</td>'+
+            '<td>'+esc(line.importe_estimado==null?'—':money(line.importe_estimado))+'</td></tr>';
+        }).join('')+'</tbody></table></div>'
+      :'<div class="bc7-empty">El cálculo aparecerá cuando existan cortes de inventario confirmados.</div>';
+    const blockers=[];
+    if(result.faltan_cortes)blockers.push('Falta confirmar el inventario inicial o final.');
+    if(Number(result.familias_sin_precio||0)>0)blockers.push(Number(result.familias_sin_precio)+' familias no tienen un precio de venta único y válido.');
+    if(Number(result.familias_con_vendidas_negativas||0)>0)blockers.push(Number(result.familias_con_vendidas_negativas)+' familias presentan unidades vendidas negativas; revisa sus movimientos y conteos.');
+    if(result.salario_porcentaje==null)blockers.push('El Dueño debe configurar el porcentaje salarial.');
+    if(Number(pending.entregas_diarias||0)>0)blockers.push(Number(pending.entregas_diarias)+' entregas diarias pendientes de aprobación.');
+    if(Number(pending.gastos||0)>0)blockers.push(Number(pending.gastos)+' gastos pendientes de aprobación.');
+    if(Number(pending.reinversiones||0)>0)blockers.push(Number(pending.reinversiones)+' reinversiones pendientes de aprobación.');
+    if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas/mermas pendientes de aprobación.');
+    const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
+    host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
+      '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
+      '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
+      cards+table+
+      (blockers.length?'<div class="bc7-note"><b>Para cerrar la liquidación:</b><ul>'+blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'<p class="bc7-muted">No quedan aprobaciones ni validaciones pendientes.</p>')+
+      '</div>';
+  }
   function renderFinanceList(host,rows,type){
     if(!host)return;
     if(!rows.length){
