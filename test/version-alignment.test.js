@@ -116,7 +116,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["m53-inventario-centro.js","53.7"]'), 'M53 must refresh for pending minimum status');
   assert.ok(app.includes('["ui-operaciones-hub.js","43.2"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'), 'the finance operations form must refresh');
-  assert.ok(app.includes('["aprobaciones-admin.js","20261109.1"]'), 'the approval form must refresh');
+  assert.ok(app.includes('["aprobaciones-admin.js","20261110.1"]'), 'the approval form must refresh');
   assert.ok(app.includes('["bajas-multiple.js","1.6"]'), 'Bajas list payload must be refreshed');
   assert.ok(sw.includes('./js/bajas-multiple.js?v=1.6'), 'the updated Bajas list module must be precached');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=71"), 'the offline shell must precache the updated minimum editor');
