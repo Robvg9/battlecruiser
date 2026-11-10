@@ -170,7 +170,7 @@
     const whName=$('bc7-warehouse')?.selectedOptions?.[0]?.textContent||'La Cueva';
     modal.innerHTML='<div class="bc7-period-modal" role="dialog" aria-modal="true" aria-labelledby="bc7-period-title">'+
       '<h3 id="bc7-period-title">Registrar jornada ya iniciada</h3>'+
-      '<p class="bc7-period-muted">Se importará solo la columna <b>Fin</b> del inventario anterior. Las transferencias se vincularán por su ID y no se volverán a ejecutar.</p>'+
+      '<p class="bc7-period-muted"><b>Columna Fin del cuadre anterior:</b> se importará únicamente esta cantidad por producto/familia. Las transferencias se vincularán por su ID y no se volverán a ejecutar.</p>'+
       '<div class="bc7-period-grid">'+
       '<label class="bc7-period-field">Almacén<select id="bc7-period-warehouse"><option value="'+esc(warehouse)+'">'+esc(whName)+'</option></select></label>'+
       '<label class="bc7-period-field">Responsable<select id="bc7-period-person"><option value="">Selecciona una responsable</option>'+people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.nombre||p.nombre_usuario||p.email||p.id)+'</option>').join('')+'</select></label>'+
