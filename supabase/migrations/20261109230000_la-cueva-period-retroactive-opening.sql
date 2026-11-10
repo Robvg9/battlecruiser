@@ -149,16 +149,7 @@ CROSS JOIN (VALUES ('turnos','ver'),('gastos','crear'),('reinversiones','crear')
 WHERE lower(btrim(r.nombre))='dependienta' AND r.activo=true
 ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
 
-CREATE TABLE IF NOT EXISTS public.turno_jornada_entradas_vinculadas (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT,
-  transferencia_id uuid NOT NULL REFERENCES public.transferencias(id) ON DELETE RESTRICT,
-  vinculado_por uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
-  vinculado_en timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT turno_jornada_entrada_transferencia_unica UNIQUE(transferencia_id),
-  CONSTRAINT turno_jornada_entrada_sesion_transferencia_unica UNIQUE(turno_sesion_id,transferencia_id)
-);
-REVOKE ALL ON TABLE public.turno_jornada_entradas_vinculadas FROM PUBLIC,anon,authenticated;
+
 
 CREATE OR REPLACE FUNCTION public.bc7_previsualizar_apertura_existente(p_almacen_id uuid,p_fecha_inicio date,p_fecha_fin date)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public','pg_temp'
@@ -1527,6 +1518,7 @@ BEGIN
         AND c.tipo='FINAL' AND c.estado='CONFIRMADO'
       LIMIT 1
     ),
+    'entrega_compartida',public.bc7_estado_entrega_inventario_jornada(v_s.id),
     'tramo_activo',(
       SELECT jsonb_build_object('id',t.id,'usuario_id',t.usuario_id,'inicio_at',t.inicio_at)
       FROM public.turno_tramos t
@@ -1567,8 +1559,467 @@ END;
 $function$
 ;
 
--- Retail Jornada counts product families as a single line. No flavour quantities are inferred.
-COMMENT ON FUNCTION public.bc7_guardar_inventario_jornada(uuid,text,jsonb,text)
-IS 'Jornada inventory snapshot; minorista warehouses count product families as one line without distributing quantities across flavours.';
+
+-- La Cueva: liquidación por diferencias de inventario y entrega diaria de efectivo.
+-- The rate is deliberately NULL until the owner configures it; no historical rate is inferred.
+ALTER TABLE public.turno_jornada_configuracion
+  ADD COLUMN IF NOT EXISTS salario_porcentaje numeric(6,3),
+  ADD COLUMN IF NOT EXISTS salario_porcentaje_actualizado_por uuid REFERENCES auth.users(id),
+  ADD COLUMN IF NOT EXISTS salario_porcentaje_actualizado_en timestamptz;
+DO $salary_constraint$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.turno_jornada_configuracion'::regclass
+      AND conname='turno_jornada_salario_porcentaje_chk'
+  ) THEN
+    ALTER TABLE public.turno_jornada_configuracion
+      ADD CONSTRAINT turno_jornada_salario_porcentaje_chk
+      CHECK (salario_porcentaje IS NULL OR salario_porcentaje BETWEEN 0 AND 100);
+  END IF;
+END;
+$salary_constraint$;
+
+CREATE TABLE IF NOT EXISTS public.turno_jornada_entregas_diarias (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT,
+  turno_tramo_id uuid NOT NULL REFERENCES public.turno_tramos(id) ON DELETE RESTRICT,
+  almacen_id uuid NOT NULL REFERENCES public.almacenes(id) ON DELETE RESTRICT,
+  fecha date NOT NULL,
+  monto_declarado numeric(14,2) NOT NULL CHECK (monto_declarado>=0),
+  monto_aprobado numeric(14,2),
+  estado text NOT NULL DEFAULT 'PENDIENTE'
+    CHECK (estado IN ('PENDIENTE','APROBADA','RECHAZADA')),
+  observacion text,
+  creado_por uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  creado_nombre text,
+  creado_en timestamptz NOT NULL DEFAULT now(),
+  revisado_por uuid REFERENCES auth.users(id) ON DELETE RESTRICT,
+  revisado_nombre text,
+  comentario_revision text,
+  fecha_revision timestamptz,
+  idempotency_key uuid NOT NULL,
+  CONSTRAINT turno_jornada_entrega_diaria_fecha_unica UNIQUE(turno_sesion_id,fecha),
+  CONSTRAINT turno_jornada_entrega_diaria_actor_key UNIQUE(creado_por,idempotency_key),
+  CONSTRAINT turno_jornada_entrega_diaria_aprobado_chk
+    CHECK (monto_aprobado IS NULL OR monto_aprobado>=0)
+);
+CREATE INDEX IF NOT EXISTS turno_jornada_entregas_diarias_fecha_idx
+  ON public.turno_jornada_entregas_diarias(turno_sesion_id,fecha);
+ALTER TABLE public.turno_jornada_entregas_diarias ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.turno_jornada_entregas_diarias FROM PUBLIC,anon,authenticated;
+
+-- Only the Dueño role receives the new daily-cash approval permission.
+INSERT INTO public.permisos(role_id,seccion,accion,permitido)
+SELECT r.id,'entregas_caja','editar_any',true
+FROM public.roles r
+WHERE lower(btrim(r.nombre)) IN ('dueño','dueno') AND r.activo=true
+ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
+
+CREATE OR REPLACE FUNCTION public.bc7_configurar_salario_porcentaje_jornada(
+  p_almacen_id uuid,p_porcentaje numeric
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE v_old numeric;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN/Dueño puede configurar el porcentaje salarial.' USING ERRCODE='42501';
+  END IF;
+  IF p_almacen_id IS NULL OR p_porcentaje IS NULL OR p_porcentaje<0 OR p_porcentaje>100 THEN
+    RAISE EXCEPTION 'El porcentaje debe estar entre 0 y 100.' USING ERRCODE='22023';
+  END IF;
+  SELECT salario_porcentaje INTO v_old
+  FROM public.turno_jornada_configuracion
+  WHERE almacen_id=p_almacen_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No existe configuración de jornada para el almacén.' USING ERRCODE='23503'; END IF;
+  UPDATE public.turno_jornada_configuracion
+  SET salario_porcentaje=p_porcentaje,
+      salario_porcentaje_actualizado_por=auth.uid(),
+      salario_porcentaje_actualizado_en=now(),
+      actualizado_por=auth.uid(),
+      actualizado_en=now()
+  WHERE almacen_id=p_almacen_id;
+  INSERT INTO public.turno_jornada_eventos
+    (almacen_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES(p_almacen_id,auth.uid(),'SALARIO_PORCENTAJE_CONFIGURADO',
+    'Configuración del porcentaje de salario por ventas comprobadas.',
+    jsonb_build_object('salario_porcentaje',v_old),
+    jsonb_build_object('salario_porcentaje',p_porcentaje));
+  RETURN jsonb_build_object('ok',true,'almacen_id',p_almacen_id,'salario_porcentaje',p_porcentaje);
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.bc7_configurar_salario_porcentaje_jornada(uuid,numeric) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_configurar_salario_porcentaje_jornada(uuid,numeric) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.bc7_registrar_entrega_diaria_jornada(
+  p_turno_sesion_id uuid,p_fecha date,p_monto numeric,
+  p_observacion text DEFAULT NULL,p_idempotency_key uuid DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_t public.turno_tramos;
+  v_id uuid;
+  v_existing_session uuid;
+  v_existing_date date;
+  v_existing_amount numeric;
+  v_nombre text;
+  v_uid uuid:=auth.uid();
+  v_fecha_fin date;
+  v_hoy date;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501'; END IF;
+  IF p_fecha IS NULL OR p_monto IS NULL OR p_monto<0 OR p_idempotency_key IS NULL THEN
+    RAISE EXCEPTION 'Fecha, importe igual o mayor que cero y clave de idempotencia son obligatorios.' USING ERRCODE='22023';
+  END IF;
+  IF length(coalesce(p_observacion,''))>500 THEN
+    RAISE EXCEPTION 'La observación no puede superar 500 caracteres.' USING ERRCODE='22023';
+  END IF;
+  v_t:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No se encontró el período de esta jornada.' USING ERRCODE='23503'; END IF;
+  v_fecha_fin:=coalesce(v_p.fecha_fin,v_p.fecha);
+  v_hoy:=(now() AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'))::date;
+  IF p_fecha<v_p.fecha OR p_fecha>=v_fecha_fin OR p_fecha>v_hoy THEN
+    RAISE EXCEPTION 'La entrega diaria solo puede registrarse para una fecha trabajada anterior al último día de cierre y no futura.' USING ERRCODE='22023';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_s.almacen_id AND a.tipo='minorista') THEN
+    RAISE EXCEPTION 'La entrega diaria por este flujo está habilitada para almacenes minoristas.' USING ERRCODE='22023';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_uid::text||':'||p_idempotency_key::text,0));
+  SELECT id,turno_sesion_id,fecha,monto_declarado
+    INTO v_id,v_existing_session,v_existing_date,v_existing_amount
+  FROM public.turno_jornada_entregas_diarias
+  WHERE creado_por=v_uid AND idempotency_key=p_idempotency_key
+  LIMIT 1 FOR UPDATE;
+  IF v_id IS NOT NULL THEN
+    IF v_existing_session IS DISTINCT FROM v_s.id
+       OR v_existing_date IS DISTINCT FROM p_fecha
+       OR v_existing_amount IS DISTINCT FROM p_monto THEN
+      RAISE EXCEPTION 'La clave de idempotencia ya pertenece a otra entrega diaria.' USING ERRCODE='23505';
+    END IF;
+    RETURN v_id;
+  END IF;
+  SELECT nombre INTO v_nombre FROM public.usuarios WHERE id=v_uid;
+  INSERT INTO public.turno_jornada_entregas_diarias
+    (turno_sesion_id,turno_tramo_id,almacen_id,fecha,monto_declarado,observacion,
+     creado_por,creado_nombre,idempotency_key)
+  VALUES(v_s.id,v_t.id,v_s.almacen_id,p_fecha,p_monto,
+    nullif(btrim(coalesce(p_observacion,'')),''),v_uid,v_nombre,p_idempotency_key)
+  RETURNING id INTO v_id;
+  INSERT INTO public.turno_jornada_eventos
+    (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES(v_s.almacen_id,v_s.jornada_programacion_id,v_uid,'ENTREGA_DIARIA_DECLARADA',
+    nullif(btrim(coalesce(p_observacion,'')),''),
+    jsonb_build_object('sesion_id',v_s.id,'tramo_id',v_t.id,'fecha',p_fecha),
+    jsonb_build_object('entrega_id',v_id,'monto_declarado',p_monto,'estado','PENDIENTE'));
+  RETURN v_id;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.bc7_registrar_entrega_diaria_jornada(uuid,date,numeric,text,uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_registrar_entrega_diaria_jornada(uuid,date,numeric,text,uuid) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.bc7_entregas_diarias_jornada(p_turno_sesion_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE v_s public.turno_sesiones; v_p public.turno_jornada_programacion; v_result jsonb;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' THEN RAISE EXCEPTION 'Jornada no encontrada.' USING ERRCODE='23503'; END IF;
+  IF NOT public.bc_actor_is_admin() AND (
+    NOT public.tiene_permiso('turnos','ver')
+    OR NOT EXISTS(SELECT 1 FROM public.turno_asignaciones a
+      WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL)
+  ) THEN RAISE EXCEPTION 'Solo el responsable asignado o ADMIN puede consultar entregas diarias.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  SELECT jsonb_build_object(
+    'salario_porcentaje',(SELECT c.salario_porcentaje FROM public.turno_jornada_configuracion c WHERE c.almacen_id=v_s.almacen_id),
+    'fecha_inicio',v_p.fecha,
+    'fecha_fin',coalesce(v_p.fecha_fin,v_p.fecha),
+    'entregas',coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'id',e.id,'fecha',e.fecha,'monto_declarado',e.monto_declarado,
+        'monto_aprobado',e.monto_aprobado,'estado',e.estado,'observacion',e.observacion,
+        'creado_nombre',e.creado_nombre,'creado_en',e.creado_en,
+        'revisado_nombre',e.revisado_nombre,'comentario_revision',e.comentario_revision,
+        'fecha_revision',e.fecha_revision
+      ) ORDER BY e.fecha,e.creado_en)
+      FROM public.turno_jornada_entregas_diarias e WHERE e.turno_sesion_id=v_s.id
+    ),'[]'::jsonb)
+  ) INTO v_result;
+  RETURN v_result;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.bc7_entregas_diarias_jornada(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_entregas_diarias_jornada(uuid) TO authenticated;
+
+-- Read-only sale calculation: a product family is one inventory line, with no flavour split.
+CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada(p_turno_sesion_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_turno public.turnos;
+  v_initial public.turno_jornada_inventario_cortes;
+  v_final public.turno_jornada_inventario_cortes;
+  v_is_retail boolean:=false;
+  v_start_at timestamptz;
+  v_end_at timestamptz;
+  v_rate numeric;
+  v_lines jsonb:='[]'::jsonb;
+  v_total_units numeric:=0;
+  v_sales_total numeric;
+  v_priced_lines integer:=0;
+  v_total_lines integer:=0;
+  v_negative_lines integer:=0;
+  v_expenses numeric:=0;
+  v_reinvestments numeric:=0;
+  v_daily_cash numeric:=0;
+  v_daily_pending integer:=0;
+  v_pending_expenses integer:=0;
+  v_pending_reinvestments integer:=0;
+  v_pending_adjustments integer:=0;
+  v_final_declared numeric;
+  v_final_counted numeric;
+  v_final_cash_state text;
+  v_salary numeric;
+  v_expected_cash numeric;
+  v_cash_received numeric;
+  v_difference numeric;
+  v_complete boolean:=false;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La sesión no corresponde a una jornada registrada.' USING ERRCODE='23503';
+  END IF;
+  IF NOT public.bc_actor_is_admin() AND (
+    NOT public.tiene_permiso('turnos','ver')
+    OR NOT EXISTS(SELECT 1 FROM public.turno_asignaciones a
+      WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL)
+  ) THEN RAISE EXCEPTION 'Solo el responsable asignado o ADMIN puede consultar esta liquidación.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  SELECT * INTO v_turno FROM public.turnos WHERE id=v_s.turno_id;
+  SELECT (a.tipo='minorista') INTO v_is_retail FROM public.almacenes a WHERE a.id=v_s.almacen_id;
+  IF NOT v_is_retail THEN
+    RETURN jsonb_build_object('aplica',false,'motivo','La liquidación por diferencia de inventario está habilitada para almacenes minoristas.');
+  END IF;
+  SELECT * INTO v_initial FROM public.turno_jornada_inventario_cortes
+  WHERE turno_sesion_id=v_s.id AND tipo='INICIAL' AND estado='CONFIRMADO';
+  SELECT * INTO v_final FROM public.turno_jornada_inventario_cortes
+  WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO';
+  v_start_at:=coalesce(v_turno.apertura_real,v_initial.confirmado_en,v_initial.creado_en);
+  v_end_at:=coalesce(v_final.confirmado_en,v_final.creado_en,now());
+  v_rate:=(SELECT c.salario_porcentaje FROM public.turno_jornada_configuracion c WHERE c.almacen_id=v_s.almacen_id);
+
+  WITH initial_lines AS (
+    SELECT (x.value->>'producto_id')::uuid AS product_id,
+           (x.value->>'cantidad_contada')::numeric AS qty
+    FROM jsonb_array_elements(coalesce((SELECT c.lineas FROM public.turno_jornada_inventario_cortes c WHERE c.id=v_initial.id),'[]'::jsonb)) x(value)
+  ),
+  final_lines AS (
+    SELECT (x.value->>'producto_id')::uuid AS product_id,
+           (x.value->>'cantidad_contada')::numeric AS qty
+    FROM jsonb_array_elements(coalesce((SELECT c.lineas FROM public.turno_jornada_inventario_cortes c WHERE c.id=v_final.id),'[]'::jsonb)) x(value)
+  ),
+  movement_events AS (
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END product_id,
+           'TRANSFERENCIA_ENTRADA'::text kind,tl.cantidad::numeric qty
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+    JOIN public.productos p ON p.id=tl.producto_id
+    WHERE t.almacen_destino_id=v_s.almacen_id AND lower(t.estado)='completada'
+      AND t.fecha>v_start_at AND t.fecha<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'TRANSFERENCIA_SALIDA',tl.cantidad::numeric
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+    JOIN public.productos p ON p.id=tl.producto_id
+    WHERE t.almacen_origen_id=v_s.almacen_id AND lower(t.estado)='completada'
+      AND t.fecha>v_start_at AND t.fecha<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'COMPRA',lc.cantidad_inicial::numeric
+    FROM public.lotes_compra lc
+    JOIN public.productos p ON p.id=lc.producto_id
+    WHERE lc.almacen_id=v_s.almacen_id AND lower(lc.origen)='compra'
+      AND lc.fecha_compra>v_start_at AND lc.fecha_compra<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'REINVERSION',rl.cantidad_base::numeric
+    FROM public.reinversiones r
+    JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
+    JOIN public.productos p ON p.id=rl.producto_id
+    WHERE r.almacen_id=v_s.almacen_id AND r.turno_sesion_id=v_s.id
+      AND r.estado='APROBADA' AND r.fecha_revision IS NOT NULL
+      AND r.fecha_revision>v_start_at AND r.fecha_revision<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'VALE',vs.cantidad::numeric
+    FROM public.vales_salida vs
+    JOIN public.productos p ON p.id=vs.producto_id
+    WHERE vs.almacen_id=v_s.almacen_id
+      AND upper(coalesce(vs.estado,'REGISTRADO')) NOT IN ('PENDIENTE','RECHAZADO','CANCELADO','ANULADO')
+      AND vs.fecha>v_start_at AND vs.fecha<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'MERMA',m.cantidad::numeric
+    FROM public.mermas m
+    JOIN public.productos p ON p.id=m.producto_id
+    WHERE m.almacen_id=v_s.almacen_id AND m.estado='APROBADA'
+      AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>v_start_at
+      AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'BAJA',b.cantidad::numeric
+    FROM public.bajas b
+    JOIN public.productos p ON p.id=b.producto_id
+    WHERE b.almacen_id=v_s.almacen_id AND b.estado='APROBADA'
+      AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_start_at
+      AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)<=v_end_at
+  ),
+  movement_totals AS (
+    SELECT product_id,
+      coalesce(sum(qty) FILTER(WHERE kind='TRANSFERENCIA_ENTRADA'),0) transfer_in,
+      coalesce(sum(qty) FILTER(WHERE kind='COMPRA'),0) purchases_in,
+      coalesce(sum(qty) FILTER(WHERE kind='REINVERSION'),0) reinvestment_in,
+      coalesce(sum(qty) FILTER(WHERE kind='TRANSFERENCIA_SALIDA'),0) transfer_out,
+      coalesce(sum(qty) FILTER(WHERE kind='VALE'),0) vales_out,
+      coalesce(sum(qty) FILTER(WHERE kind='MERMA'),0) merma_out,
+      coalesce(sum(qty) FILTER(WHERE kind='BAJA'),0) bajas_out
+    FROM movement_events GROUP BY product_id
+  ),
+  price_info AS (
+    SELECT p.id product_id,p.nombre,p.unidad,
+      CASE
+        WHEN coalesce(p.precio_normal,0)>0 THEN p.precio_normal
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN min(ch.precio_normal)
+        ELSE NULL
+      END precio_unitario,
+      CASE
+        WHEN coalesce(p.precio_normal,0)>0 THEN 'PRECIO_FAMILIA'
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN 'PRECIO_VARIANTES_UNIFORME'
+        WHEN count(ch.id)>0 THEN 'PRECIO_VARIANTES_DIFERENTE_O_INCOMPLETO'
+        ELSE 'SIN_PRECIO'
+      END estado_precio
+    FROM public.productos p
+    LEFT JOIN public.productos ch ON ch.producto_padre_id=p.id AND ch.activo=true
+    WHERE p.activo=true AND p.producto_padre_id IS NULL
+    GROUP BY p.id,p.nombre,p.unidad,p.precio_normal
+  ),
+  calculated AS (
+    SELECT i.product_id,pi.nombre,pi.unidad,i.qty initial_qty,coalesce(f.qty,0) final_qty,
+      coalesce(mt.transfer_in,0) transfer_in,coalesce(mt.purchases_in,0) purchases_in,
+      coalesce(mt.reinvestment_in,0) reinvestment_in,coalesce(mt.transfer_out,0) transfer_out,
+      coalesce(mt.vales_out,0) vales_out,coalesce(mt.merma_out,0) merma_out,coalesce(mt.bajas_out,0) bajas_out,
+      (i.qty+coalesce(mt.transfer_in,0)+coalesce(mt.purchases_in,0)+coalesce(mt.reinvestment_in,0)
+        -coalesce(mt.transfer_out,0)-coalesce(mt.vales_out,0)-coalesce(mt.merma_out,0)-coalesce(mt.bajas_out,0)-coalesce(f.qty,0)) sold_qty,
+      pi.precio_unitario,pi.estado_precio
+    FROM initial_lines i
+    JOIN price_info pi ON pi.product_id=i.product_id
+    LEFT JOIN final_lines f ON f.product_id=i.product_id
+    LEFT JOIN movement_totals mt ON mt.product_id=i.product_id
+  )
+  SELECT count(*),count(*) FILTER(WHERE precio_unitario IS NOT NULL AND sold_qty>=0),
+         count(*) FILTER(WHERE sold_qty<0),coalesce(sum(sold_qty),0),
+         CASE WHEN count(*) FILTER(WHERE precio_unitario IS NULL OR sold_qty<0)>0 THEN NULL
+              ELSE round(sum(sold_qty*precio_unitario),2) END,
+         coalesce(jsonb_agg(jsonb_build_object(
+           'producto_id',product_id,'nombre',nombre,'unidad',unidad,
+           'inventario_inicial',initial_qty,'transferencias_entrada',transfer_in,
+           'compras',purchases_in,'reinversiones_entrada',reinvestment_in,
+           'transferencias_salida',transfer_out,'vales_salida',vales_out,
+           'mermas_aprobadas',merma_out,'bajas_aprobadas',bajas_out,
+           'inventario_final',final_qty,'unidades_vendidas',sold_qty,
+           'precio_unitario',precio_unitario,'estado_precio',estado_precio,
+           'importe_estimado',CASE WHEN precio_unitario IS NOT NULL AND sold_qty>=0 THEN round(sold_qty*precio_unitario,2) ELSE NULL END
+         ) ORDER BY nombre,product_id),'[]'::jsonb)
+    INTO v_total_lines,v_priced_lines,v_negative_lines,v_total_units,v_sales_total,v_lines
+  FROM calculated;
+
+  SELECT coalesce(sum(g.monto),0),count(*) FILTER(WHERE g.estado='PENDIENTE')
+    INTO v_expenses,v_pending_expenses
+  FROM public.gastos g WHERE g.turno_sesion_id=v_s.id AND g.estado IN ('APROBADO','PENDIENTE');
+  SELECT coalesce(sum(r.total),0),count(*) FILTER(WHERE r.estado='PENDIENTE')
+    INTO v_reinvestments,v_pending_reinvestments
+  FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado IN ('APROBADA','PENDIENTE');
+  SELECT count(*) INTO v_pending_adjustments
+  FROM (
+    SELECT 1 FROM public.mermas m WHERE m.turno_sesion_id=v_s.id AND m.estado='PENDIENTE'
+    UNION ALL
+    SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado='PENDIENTE'
+  ) pending;
+  SELECT coalesce(sum(e.monto_aprobado),0),count(*) FILTER(WHERE e.estado='PENDIENTE')
+    INTO v_daily_cash,v_daily_pending
+  FROM public.turno_jornada_entregas_diarias e WHERE e.turno_sesion_id=v_s.id;
+  SELECT d.monto,d.monto_contado,d.estado_aprobacion
+    INTO v_final_declared,v_final_counted,v_final_cash_state
+  FROM public.turno_declaraciones d
+  WHERE d.turno_sesion_id=v_s.id
+  ORDER BY d.declarado_at DESC NULLS LAST,d.created_at DESC NULLS LAST LIMIT 1;
+
+  v_salary:=CASE WHEN v_rate IS NOT NULL AND v_sales_total IS NOT NULL
+    THEN round(v_sales_total*v_rate/100,2) ELSE NULL END;
+  v_cash_received:=CASE WHEN v_final_counted IS NOT NULL AND v_final_cash_state='APROBADO'
+    THEN v_daily_cash+v_final_counted ELSE NULL END;
+  v_expected_cash:=CASE WHEN v_sales_total IS NOT NULL AND v_salary IS NOT NULL
+    THEN round(v_sales_total-v_expenses-v_reinvestments-v_salary,2) ELSE NULL END;
+  v_difference:=CASE WHEN v_cash_received IS NOT NULL AND v_expected_cash IS NOT NULL
+    THEN round(v_cash_received-v_expected_cash,2) ELSE NULL END;
+  v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
+    AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_negative_lines=0
+    AND v_rate IS NOT NULL AND v_daily_pending=0
+    AND v_pending_expenses=0 AND v_pending_reinvestments=0 AND v_pending_adjustments=0
+    AND v_cash_received IS NOT NULL;
+
+  RETURN jsonb_build_object(
+    'aplica',true,'calculable',v_complete,
+    'formula','Inicial + entradas (transferencias/compras/reinversiones) - salidas aprobadas (transferencias/vales/mermas/bajas) - final = unidades vendidas; valoradas al precio normal.',
+    'lineas',v_lines,'unidades_vendidas',v_total_units,
+    'ventas_estimadas',v_sales_total,'salario_porcentaje',v_rate,'salario_calculado',v_salary,
+    'gastos_aprobados',v_expenses,'reinversiones_aprobadas',v_reinvestments,
+    'entregas_diarias_aprobadas',v_daily_cash,'entregas_diarias_pendientes',v_daily_pending,
+    'dinero_final_declarado',v_final_declared,'dinero_final_contado',v_final_counted,
+    'estado_dinero_final',v_final_cash_state,'dinero_recogido_total',v_cash_received,
+    'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_expected_cash,
+    'diferencia',v_difference,
+    'faltan_cortes',NOT(v_initial.id IS NOT NULL AND v_final.id IS NOT NULL),
+    'familias_sin_precio',v_total_lines-v_priced_lines,
+    'familias_con_vendidas_negativas',v_negative_lines,
+    'pendientes',jsonb_build_object(
+      'gastos',v_pending_expenses,'reinversiones',v_pending_reinvestments,
+      'ajustes',v_pending_adjustments,'entregas_diarias',v_daily_pending
+    )
+  );
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.bc7_liquidacion_inventario_jornada(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_liquidacion_inventario_jornada(uuid) TO authenticated;
 
 COMMIT;
