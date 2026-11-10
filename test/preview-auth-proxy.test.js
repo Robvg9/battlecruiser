@@ -34,14 +34,20 @@ test("preview admin password recovery POST uses its own allowlisted Edge Functio
 
   const response = await worker.fetch(new Request(PREVIEW_ORIGIN + RECOVERY_PROXY_PATH, {
     method: "POST",
-    headers: { Origin: PREVIEW_ORIGIN, apikey: "sb_publishable_test_only", "content-type": "application/json" },
-    body: JSON.stringify({ action: "request", identifier: "sheyla" }),
+    headers: {
+      Origin: PREVIEW_ORIGIN,
+      apikey: "sb_publishable_test_only",
+      authorization: "Bearer fixture-owner-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ action: "list" }),
   }), { ASSETS: assetsBinding() });
 
   assert.equal(capturedUrl, RECOVERY_FUNCTION_URL);
   assert.equal(capturedInit.method, "POST");
   assert.equal(capturedInit.headers.get("Origin"), PRODUCTION_ORIGIN);
   assert.equal(capturedInit.headers.get("apikey"), "sb_publishable_test_only");
+  assert.equal(capturedInit.headers.get("authorization"), "Bearer fixture-owner-token");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { accepted: true });
 });
