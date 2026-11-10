@@ -1500,7 +1500,7 @@ BEGIN
       'numero_dia',v_s.numero_dia,'fecha',v_s.fecha,'fecha_fin',coalesce(v_p.fecha_fin,v_s.fecha),'bloque',v_s.bloque,
       'estado',v_s.estado,'hora_inicio_prevista',v_p.hora_inicio_prevista,
       'hora_fin_prevista',v_p.hora_fin_prevista,'zona_horaria',v_p.zona_horaria,
-      'responsable_id',v_p.responsable_id,'programacion_id',v_p.id
+      'responsable_id',v_p.responsable_id,'programacion_id',v_p.id,'es_minorista',v_agrupar
     ),
     'productos',CASE WHEN v_agrupar THEN coalesce((
       SELECT jsonb_agg(jsonb_build_object(
