@@ -10,6 +10,7 @@ on:
       - 'supabase/migrations/20261102020000_step4_jornada_cash_count_readback.sql'
       - 'supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql'
       - 'supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql'
+      # Keep this path aligned with the migration version already applied in Supabase LIVE.
       - 'supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql'
       - 'test/la-cueva-period-settlement-contract.sql'
       - 'test/step4-jornada-shared-inventory-contract.sql'
