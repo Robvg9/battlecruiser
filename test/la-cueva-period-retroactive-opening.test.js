@@ -54,7 +54,7 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /bc7_previsualizar_apertura_existente/);
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
-  assert.match(ui, /stock global no se modificará/i);
+  assert.match(ui, /stock general no se modificará/i);
   assert.match(app, /bc7-periodo-apertura-ui\\.js/);
   assert.match(sw, /bc7-periodo-apertura-ui\\.js/);
   assert.match(app, /VERSION="9\\.5\\.90"/);
