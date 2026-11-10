@@ -132,7 +132,7 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','reinversiones:editar_any,entregas_caja:editar_any',false);
-  PERFORM public.bc7_configurar_salario_porcentaje_jornada(v_warehouse,5);
+  PERFORM public.bc7_configurar_salario_porcentaje_jornada(v_session,5);
 
   -- One daily delivery is stored as pending and cannot be included until the Dueño approves it.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
