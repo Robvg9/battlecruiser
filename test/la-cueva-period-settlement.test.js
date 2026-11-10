@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const migration = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261109230000_la-cueva-period-retroactive-opening.sql"), "utf8");
+const migration = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql"), "utf8");
 const jornada = fs.readFileSync(path.join(__dirname, "../public/js/bc7-jornada-ui.js"), "utf8");
 const approvals = fs.readFileSync(path.join(__dirname, "../public/js/aprobaciones-admin.js"), "utf8");
 const postgresContract = fs.readFileSync(path.join(__dirname, "la-cueva-period-settlement-contract.sql"), "utf8");
