@@ -332,7 +332,7 @@ function bcUIReadyThen(fn) {
 }
 
 function showApp(session) {
-  if (!session || !session.user || _bcLegacyRecoveryRejected) return;
+  if (!session || !session.user || _bcLegacyRecoveryRejected || _bcRecoveryMode) return;
   _bcAuthSessionDiscovered = true;
 
   const metadata = session.user.app_metadata || {};
@@ -632,6 +632,11 @@ setTimeout(function () {
 }, 8000);
 
 client.auth.onAuthStateChange(function (event, session) {
+  // A recovery URL marker blocks the app even if Auth first emits SIGNED_IN.
+  if (session && _bcRecoveryMode) {
+    bcRechazarRecuperacionDirecta();
+    return;
+  }
   // Old direct password-recovery links are rejected; dependents must use owner approval.
   if (event === "PASSWORD_RECOVERY" && session) {
     _bcRecoveryMode = true;
