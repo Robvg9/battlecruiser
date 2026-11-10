@@ -170,6 +170,35 @@ BEGIN
     RAISE EXCEPTION 'FAIL: daily approved cash + final counted cash should reconcile at zero; result=%',v_result;
   END IF;
 
+  -- A rejected daily delivery can be corrected and resubmitted without creating a second row.
+  UPDATE public.turno_jornada_entregas_diarias
+  SET estado='PENDIENTE',monto_aprobado=NULL
+  WHERE id=v_daily_id;
+  PERFORM public.resolver_aprobacion_operativa(
+    'entrega_diaria',v_daily_id,'RECHAZAR','El importe declarado requiere corrección',NULL,NULL
+  );
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear',false);
+  v_daily_retry:=public.bc7_registrar_entrega_diaria_jornada(
+    v_session,v_today,21,'Entrega corregida','a6400000-0000-0000-0000-000000000002'
+  );
+  IF v_daily_retry IS DISTINCT FROM v_daily_id THEN
+    RAISE EXCEPTION 'FAIL: rejected delivery resubmission created a second row';
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  PERFORM set_config('test.perms','entregas_caja:editar_any',false);
+  PERFORM public.resolver_aprobacion_operativa(
+    'entrega_diaria',v_daily_id,'APROBAR','Importe corregido y comprobado',21,NULL
+  );
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF (v_result->>'calculable')::boolean IS DISTINCT FROM true
+     OR (v_result->>'dinero_recogido_total')::numeric<>34
+     OR (v_result->>'diferencia')::numeric<>1 THEN
+    RAISE EXCEPTION 'FAIL: corrected daily cash should keep the settlement auditable; result=%',v_result;
+  END IF;
+
   IF has_table_privilege('authenticated','public.turno_jornada_entregas_diarias','SELECT')
      OR has_table_privilege('authenticated','public.turno_jornada_entregas_diarias','INSERT')
      OR has_function_privilege('anon','public.bc7_liquidacion_inventario_jornada(uuid)','EXECUTE')
