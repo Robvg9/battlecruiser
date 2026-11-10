@@ -125,11 +125,13 @@
       addText(details, "small", "muted", "Usuario: " + (request.target_username || "—"));
       addText(details, "small", "muted", "Solicitada: " + formatDate(request.requested_at));
       addText(details, "small", "muted",
-        request.notification_status === "ENVIADA"
-          ? "Aviso enviado al correo maestro"
-          : request.notification_status === "FALLIDA"
-            ? "Aviso por correo no confirmado; solicitud visible aquí"
-            : "Aviso de correo pendiente");
+        request.status === "PROCESANDO"
+          ? "Proceso interrumpido; Administración puede reanudarlo tras el control de seguridad"
+          : request.notification_status === "ENVIADA"
+            ? "Aviso enviado al correo maestro"
+            : request.notification_status === "FALLIDA"
+              ? "Aviso por correo no confirmado; solicitud visible aquí"
+              : "Aviso de correo pendiente");
       card.appendChild(details);
 
       var form = document.createElement("div");
@@ -148,7 +150,7 @@
       approve.type = "button";
       approve.className = "cc-accion";
       approve.dataset.action = "approve";
-      approve.textContent = "Autorizar y establecer contraseña";
+      approve.textContent = request.status === "PROCESANDO" ? "Reanudar autorización" : "Autorizar y establecer contraseña";
       form.appendChild(approve);
 
       var reject = document.createElement("button");
