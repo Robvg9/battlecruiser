@@ -234,11 +234,21 @@ Deno.serve(async (req: Request) => {
 
       const { data: profile, error: profileError } = await admin
         .from("usuarios")
-        .select("id,nombre,username,activo,archivado")
+        .select("id,nombre,username,role_id,activo,archivado")
         .eq("id", targetAuth.id)
         .maybeSingle();
 
-      if (profileError || !profile || profile.activo !== true || profile.archivado === true) {
+      if (profileError || !profile || profile.activo !== true || profile.archivado === true || !profile.role_id) {
+        return reply({ accepted: true }, 200, origin);
+      }
+
+      const { data: role, error: roleError } = await admin
+        .from("roles")
+        .select("nombre")
+        .eq("id", profile.role_id)
+        .maybeSingle();
+
+      if (roleError || String(role?.nombre || "").trim().toLowerCase() !== "dependienta") {
         return reply({ accepted: true }, 200, origin);
       }
 
@@ -394,9 +404,9 @@ Deno.serve(async (req: Request) => {
     const now = new Date().toISOString();
     const { data, error } = await admin
       .from("bc_password_recovery_requests")
-      .select("id,target_user_id,target_username,target_name,status,requested_at,expires_at,notification_status")
-      .in("status", ["PENDIENTE", "PROCESANDO"])
-      .gt("expires_at", now)
+      .select("id,target_user_id,target_username,target_name,status,requested_at,expires_at,notification_status,approved_at")
+      .in("status", ["PENDIENTE", "PROCESANDO", "APROBADA"])
+      .or("status.eq.APROBADA,expires_at.gt." + now)
       .order("requested_at", { ascending: false })
       .limit(50);
     if (error) return reply({ error: "No se pudieron cargar las solicitudes." }, 500, origin);
@@ -429,8 +439,8 @@ Deno.serve(async (req: Request) => {
       .from("bc_password_recovery_requests")
       .select("id,target_user_id,target_name,status,expires_at,processing_by,processing_at")
       .eq("id", requestId)
-      .in("status", ["PENDIENTE", "PROCESANDO"])
-      .gt("expires_at", now)
+      .in("status", ["PENDIENTE", "PROCESANDO", "APROBADA"])
+      .or("status.eq.APROBADA,expires_at.gt." + now)
       .maybeSingle();
     if (requestError || !request) return reply({ error: "La solicitud ya no está pendiente o expiró." }, 409, origin);
 
@@ -445,7 +455,7 @@ Deno.serve(async (req: Request) => {
       }
       lockQuery = lockQuery.eq("status", "PROCESANDO").lt("processing_at", staleBefore);
     } else {
-      lockQuery = lockQuery.eq("status", "PENDIENTE");
+      lockQuery = lockQuery.eq("status", request.status);
     }
 
     const { data: lock, error: lockError } = await lockQuery.select("id").maybeSingle();
