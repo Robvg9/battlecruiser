@@ -76,3 +76,15 @@ test("Jornada reinvestments remain pending until admin approval applies stock an
   assert.match(resolve, /private\\.registrar_movimiento_caja/);
   assert.match(resolve, /'APROBADA' ELSE 'RECHAZADA'/);
 });
+
+
+test("dependienta can read only assigned jornada finance and reinvestment approval remains admin-gated",()=>{
+  const ui = fs.readFileSync(path.join(__dirname, "../public/js/bc7-jornada-ui.js"), "utf8");
+  const approvals = fs.readFileSync(path.join(__dirname, "../public/js/aprobaciones-admin.js"), "utf8");
+  assert.ok(ui.includes("const showReinvestments=state.admin||isAssigned;"));
+  assert.ok(ui.includes("canReadThisType=state.admin||can('turnos','ver')"));
+  assert.ok(ui.includes("no afecta stock ni caja hasta que la apruebes"));
+  assert.ok(approvals.includes("reinversiones','editar_any'"));
+  assert.ok(approvals.includes("🛒 Reinversión pendiente"));
+  assert.ok(approvals.includes("const isMoney=isExpense||type==='reinversion';"));
+});

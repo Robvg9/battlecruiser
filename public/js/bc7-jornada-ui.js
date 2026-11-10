@@ -407,8 +407,8 @@
   function financeFormHtml(detail,isAssigned,status){
     const sessionId=detail.sesion.id;
     const products=arr(detail.productos);
-    const showExpenses=state.admin||can('gastos','ver');
-    const showReinvestments=state.admin||can('reinversiones','ver');
+    const showExpenses=state.admin||isAssigned;
+    const showReinvestments=state.admin||isAssigned;
     const showSales=state.admin||can('ventas','ver');
     const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
     const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
@@ -417,9 +417,9 @@
     html+=cashDeclarationHtml(detail);
     if(showSales)html+='<div id="bc7-sales-list"><div class="bc7-empty">Consultando ventas vinculadas a esta jornada…</div></div>';
     if(showExpenses)html+='<div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div>';
-    else if(createExpenses)html+='<p class="bc7-muted">Puedes registrar un gasto. Para consultar su estado posterior necesitas autorización para ver los gastos.</p>';
+    
     if(showReinvestments)html+='<div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div>';
-    else if(createReinvestments)html+='<p class="bc7-muted">Puedes registrar una reinversión. Para consultar su historial necesitas autorización para ver las reinversiones.</p>';
+    
     if(createExpenses){
       html+='<form data-bc7-finance-form="gasto" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar gasto</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
@@ -435,7 +435,7 @@
         '<label class="bc7-field">Producto<select data-bc7-reinvestment-product required>'+options+'</select></label>'+
         '<div class="bc7-grid"><label class="bc7-field">Cantidad que entra al inventario<input data-bc7-reinvestment-quantity type="number" min="0.001" step="0.001" required inputmode="decimal"></label>'+
         '<label class="bc7-field">Costo total<input data-bc7-reinvestment-cost type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>'+
-        '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label>'+
+        '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
         '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>';
     }
     return html+'</section>';
@@ -465,8 +465,8 @@
       ).join('')+'</div>';
     }else{
       host.innerHTML='<h4>Reinversiones</h4><div class="bc7-list">'+rows.map(r=>
-        '<article class="bc7-jornada"><strong>'+esc(r.proveedor||'Reinversión')+' · '+esc(money(r.total))+'</strong><p>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.usuario_nombre||'Responsable')+'</p>'+
-        '<div class="bc7-muted">'+arr(r.lineas).map(l=>esc(l.producto||'Producto no identificado')+' · '+esc(qty(l.cantidad_base))+' · '+esc(money(l.costo_total))).join('<br>')+'</div></article>'
+        '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(r.proveedor||'Reinversión')+' · '+esc(money(r.total))+'</strong><p>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.usuario_nombre||'Responsable')+'</p></div><span class="bc7-pill '+(r.estado==='APROBADA'?'ok':r.estado==='RECHAZADA'?'warn':'')+'">'+esc(humanStatus(r.estado||'PENDIENTE'))+'</span></div>'+
+        '<div class="bc7-muted">'+arr(r.lineas).map(l=>esc(l.producto||'Producto no identificado')+' · '+esc(qty(l.cantidad_base))+' · '+esc(money(l.costo_total))).join('<br>')+'</div>'+(r.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(r.comentario_revision)+'</p>':'')+'</article>'
       ).join('')+'</div>';
     }
   }
@@ -493,8 +493,9 @@
       '<p class="bc7-muted">Este desglose informa los importes registrados por método de pago. No equivale al efectivo esperado ni sustituye la declaración y el conteo físico.</p>';
   }
   async function loadFinances(detail){
-    const hasExpenses=state.admin||can('gastos','ver');
-    const hasReinvestments=state.admin||can('reinversiones','ver');
+    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'');
+    const hasExpenses=state.admin||isAssigned;
+    const hasReinvestments=state.admin||isAssigned;
     const hasSales=state.admin||can('ventas','ver');
     const hasFinance=hasExpenses||hasReinvestments;
     if(!hasFinance&&!hasSales)return true;
@@ -560,7 +561,7 @@
       }else{
         throw new Error('Tipo de operación financiera desconocido.');
       }
-      const canReadThisType=state.admin||(type==='gasto'?can('gastos','ver'):can('reinversiones','ver'));
+      const canReadThisType=state.admin||can('turnos','ver');
       if(!canReadThisType){
         form.reset();keyField.value='';
         msg(message,'El servidor guardó la operación. No aparece en el historial de esta cuenta porque tu usuario no tiene permiso para consultarlo; los gastos siguen el proceso habitual de aprobación.','ok');
@@ -575,7 +576,7 @@
       }
       form.reset();
       keyField.value='';
-      msg(message,type==='gasto'?'Gasto guardado y releído. Su aprobación sigue pendiente.':'Reinversión registrada y releída en el expediente de la jornada.','ok');
+      msg(message,type==='gasto'?'Gasto enviado y visible en la jornada; queda pendiente de aprobación.':'Reinversión enviada y visible en la jornada; no afecta stock ni caja hasta que la apruebes.','ok');
       await loadCalendar();
       setStatus('Operación financiera registrada y leída desde el servidor.','ok');
     }catch(e){

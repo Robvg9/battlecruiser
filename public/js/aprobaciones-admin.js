@@ -5,7 +5,7 @@ const ID='admin-aprobaciones',TIMEOUT=20000;
 const esc=v=>typeof escHtml==='function'?escHtml(v):String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 const key=()=>crypto.randomUUID(),money=v=>typeof window.money==='function'?window.money(v):Number(v||0).toFixed(2),can=(s,a)=>typeof tienePermiso==='function'&&tienePermiso(s,a);
 const canAdmin=()=>can('entregas_caja','editar_any')||canViewOperationalQueue();
-const canViewOperationalQueue=()=>can('gastos','editar_any')||can('mermas','editar_any')||can('bajas','editar_any')||can('auditoria','editar_any');
+const canViewOperationalQueue=()=>can('gastos','editar_any')||can('mermas','editar_any')||can('bajas','editar_any')||can('reinversiones','editar_any')||can('auditoria','editar_any');
 async function hasLiveSession(){const api=window.client||(typeof client!=='undefined'?client:null);if(!api||!api.auth||typeof api.auth.getSession!=='function')return false;try{const pack=await api.auth.getSession();return !!(pack&&!pack.error&&pack.data&&pack.data.session&&pack.data.session.user&&pack.data.session.user.id)}catch(_){return false}}
 const productos=()=>Array.isArray(window._cache?.productos)?window._cache.productos:[],almacenes=()=>Array.isArray(window._cache?.almacenes)?window._cache.almacenes.filter(a=>a.activo!==false):[];
 async function rpc(name,params){if(!window.client)throw new Error('Backend no disponible');let timer;try{const p=client.rpc(name,params||{}),t=new Promise((_,rej)=>timer=setTimeout(()=>rej(new Error('Tiempo de espera agotado')),TIMEOUT)),r=await Promise.race([p,t]);if(r.error)throw r.error;return r.data}finally{clearTimeout(timer)}}
@@ -29,6 +29,7 @@ function renderOperativa(x){
     if(x.motivo||x.resumen)detail+=' · '+(x.motivo||x.resumen);
   }
   const title=x.tipo==='gasto'?'💸 Gasto pendiente'
+    :x.tipo==='reinversion'?'🛒 Reinversión pendiente'
     :x.tipo==='merma'?'📉 Merma pendiente'
     :x.tipo==='baja_lista'?'📋 Lista de bajas pendiente':'📉 Baja pendiente';
   return row(title,detail,[{text:'Ver detalles y revisar',fn:()=>abrirRevision(x)}]);
@@ -86,12 +87,14 @@ function renderApprovalDetails(x,detail){
   const footer=modal.querySelector('#admin-approval-footer');
   const isList=x.tipo==='baja_lista';
   const isExpense=x.tipo==='gasto';
+  const isReinvestment=x.tipo==='reinversion';
+  const isMoney=isExpense||isReinvestment;
   const isLegacyBaja=x.tipo==='baja';
   const isStockChange=x.tipo==='merma'||isLegacyBaja;
   const lines=isList?(Array.isArray(detail.lineas)?detail.lineas:[]):isLegacyBaja?[{
     id:x.id,producto_nombre:x.producto_nombre,cantidad:x.cantidad,motivo:x.motivo,estado:x.estado
   }]:[];
-  const title=isList?'Lista de bajas':isExpense?'Gasto pendiente':x.tipo==='merma'?'Merma pendiente':'Baja pendiente';
+  const title=isList?'Lista de bajas':isExpense?'Gasto pendiente':isReinvestment?'Reinversión pendiente':x.tipo==='merma'?'Merma pendiente':'Baja pendiente';
   modal.querySelector('#admin-approval-title').textContent='Revisión administrativa · '+title;
   subtitle.textContent=(detail.usuario_nombre||x.usuario_nombre||'Usuario')
     +(detail.almacen_nombre||x.almacen_nombre?' · '+(detail.almacen_nombre||x.almacen_nombre):'')
@@ -113,10 +116,10 @@ function renderApprovalDetails(x,detail){
         '</article>';
     });
     html+='</div>';
-  }else if(isExpense){
-    html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||'Gasto')+'</strong>'+
+  }else if(isMoney){
+    html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||(isReinvestment?'Reinversión':'Gasto'))+'</strong>'+
       '<span>'+esc(x.motivo||'Sin descripción adicional')+'</span></section>'+
-      '<label class="bc-admin-approval-field"><span>Monto a aprobar</span><input id="admin-approval-real" type="number" min="0.01" step="0.01" value="'+esc(x.monto)+'"></label>';
+      '<label class="bc-admin-approval-field"><span>Importe informado</span><input id="admin-approval-real" type="number" min="0.01" step="0.01" value="'+esc(x.monto)+'" '+(isReinvestment?'disabled':'')+'></label>'+(isReinvestment?'<p class="bc-admin-approval-message">La aprobación aplica al mismo tiempo la salida de caja y la entrada de inventario. Para cambiar el importe, rechaza y solicita una corrección.</p>':'');
   }else if(isStockChange){
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.producto_nombre||'Producto')+'</strong>'+
       '<span>Motivo: '+esc(x.motivo||'—')+'</span></section>'+
@@ -186,6 +189,7 @@ async function resolverDesdeModal(decision){
       });
     }else{
       const isExpense=type==='gasto';
+      const isMoney=isExpense||type==='reinversion';
       const input=modal.querySelector('#admin-approval-real');
       const real=input?Number(input.value):null;
       if(decision==='APROBAR'&&input&&(!Number.isFinite(real)||real<=0)){
@@ -193,8 +197,8 @@ async function resolverDesdeModal(decision){
       }
       await rpc('resolver_aprobacion_operativa',{
         p_tipo:type,p_id:id,p_decision:decision,p_comentario:comment||null,
-        p_cantidad_real:isExpense?null:real,
-        p_monto_real:isExpense?real:null
+        p_cantidad_real:isMoney?null:real,
+        p_monto_real:isMoney?real:null
       });
     }
     closeApprovalModal();
