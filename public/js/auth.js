@@ -498,6 +498,10 @@ function bcMostrarFormularioCambioObligatorio() {
     }
     const submit = form.querySelector("button[type='submit']");
     if (submit) submit.textContent = "Guardar mi contraseña";
+    const passNew = document.getElementById("pass-new");
+    const passConfirm = document.getElementById("pass-confirm");
+    if (passNew) passNew.minLength = 10;
+    if (passConfirm) passConfirm.minLength = 10;
     const cancel = document.getElementById("pass-cancel-btn");
     if (cancel) cancel.style.display = "none";
     const formMessage = document.getElementById("msg-pass");
@@ -547,6 +551,10 @@ function bcCerrarFormularioCambioObligatorio() {
     if (heading) heading.textContent = "Cambiar contraseña";
     const submit = panel.querySelector("button[type='submit']");
     if (submit) submit.textContent = "Guardar contraseña";
+    const passNew = document.getElementById("pass-new");
+    const passConfirm = document.getElementById("pass-confirm");
+    if (passNew) passNew.minLength = 6;
+    if (passConfirm) passConfirm.minLength = 6;
   }
   overlay.remove();
   _bcMandatoryPasswordOverlay = null;
@@ -554,12 +562,12 @@ function bcCerrarFormularioCambioObligatorio() {
   _bcMandatoryPasswordDismissed = true;
 }
 
-async function bcCompletarCambioObligatorio() {
-  const sessionPack = await client.auth.getSession();
-  const session = sessionPack && sessionPack.data && sessionPack.data.session;
-  if (!session || !session.access_token) return false;
-
+async function bcCompletarCambioObligatorio(nuevaPassword) {
   try {
+    const sessionPack = await client.auth.getSession();
+    const session = sessionPack && sessionPack.data && sessionPack.data.session;
+    if (!session || !session.access_token) return false;
+
     const response = await fetch(bcPasswordRecoveryEndpoint(), {
       method: "POST",
       headers: {
@@ -567,7 +575,7 @@ async function bcCompletarCambioObligatorio() {
         Authorization: "Bearer " + session.access_token,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ action: "complete" }),
+      body: JSON.stringify({ action: "complete", temporary_password: nuevaPassword }),
       cache: "no-store"
     });
     const result = await response.json().catch(function () { return {}; });
@@ -946,8 +954,11 @@ safeInit("cambiar-contraseña", () => {
       setMsg("msg-pass", "Las contraseñas no coinciden.", false);
       return;
     }
-    if (nueva.length < 6) {
-      setMsg("msg-pass", "La contraseña debe tener al menos 6 caracteres.", false);
+    const minimo = _bcMandatoryPasswordChange ? 10 : 6;
+    if (nueva.length < minimo) {
+      setMsg("msg-pass", _bcMandatoryPasswordChange
+        ? "Tu contraseña personal debe tener al menos 10 caracteres."
+        : "La contraseña debe tener al menos 6 caracteres.", false);
       return;
     }
 
@@ -972,9 +983,13 @@ safeInit("cambiar-contraseña", () => {
     }
     console.log("[Battlecruiser] Contraseña actualizada para:", data.user && data.user.email);
     if (_bcMandatoryPasswordChange) {
-      const finalized = await bcCompletarCambioObligatorio();
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Verificando contraseña…";
+      const finalized = await bcCompletarCambioObligatorio(nueva);
       if (!finalized) {
-        setMsg("msg-pass", "La contraseña se actualizó, pero todavía no pudimos confirmar el cierre del cambio obligatorio. Comprueba la conexión y vuelve a guardar; no cierres esta pantalla.", false);
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Guardar mi contraseña";
+        setMsg("msg-pass", "La contraseña se actualizó, pero no pudimos verificarla todavía. Comprueba la conexión y vuelve a guardar; no cierres esta pantalla.", false);
         return;
       }
       bcCerrarFormularioCambioObligatorio();
