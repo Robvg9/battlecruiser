@@ -711,6 +711,60 @@
     }finally{busy(btn,false);}
   }
 
+  async function submitDailyCash(form){
+    const sessionId=form.dataset.bc7DailyCashForm;
+    const date=form.querySelector('[data-bc7-daily-cash-date]')?.value;
+    const rawAmount=form.querySelector('[data-bc7-daily-cash-amount]')?.value;
+    const amount=Number(rawAmount);
+    const note=form.querySelector('[data-bc7-daily-cash-note]')?.value.trim()||null;
+    const keyField=form.querySelector('[data-bc7-daily-cash-key]');
+    const message=form.querySelector('[data-bc7-daily-cash-msg]');
+    if(!sessionId||!date||rawAmount===''||!Number.isFinite(amount)||amount<0){
+      msg(message,'Indica una fecha válida y un importe igual o mayor que cero.','error');return;
+    }
+    if(!keyField){msg(message,'Falta la referencia segura de esta entrega. Actualiza la jornada.','error');return;}
+    let key=keyField.value.trim();
+    try{if(!key){key=freshIdempotencyKey();keyField.value=key;}}
+    catch(e){msg(message,e.message||'No se pudo preparar la entrega.','error');return;}
+    const btn=form.querySelector('button[type="submit"]');
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_registrar_entrega_diaria_jornada',{
+        p_turno_sesion_id:sessionId,p_fecha:date,p_monto:amount,
+        p_observacion:note,p_idempotency_key:key
+      });
+      await loadFinances(state.detail);
+      form.reset();keyField.value='';
+      msg(message,'Entrega diaria registrada y visible. Queda pendiente de aprobación del Dueño.','ok');
+      setStatus('Dinero recogido guardado para '+fmtDateHuman(date)+'. No se modificó caja.','ok');
+    }catch(e){
+      msg(message,friendlyError(e,'create')+' La referencia se conserva para poder comprobar o reintentar sin duplicar.','error');
+    }finally{busy(btn,false);}
+  }
+  async function submitSalaryRate(form){
+    const sessionId=form.dataset.bc7SalaryRateForm;
+    const input=form.querySelector('[data-bc7-salary-percent]');
+    const message=form.querySelector('[data-bc7-salary-rate-msg]');
+    const raw=input?.value.trim();
+    const rate=Number(raw);
+    if(!sessionId||raw===''||!Number.isFinite(rate)||rate<0||rate>100){
+      msg(message,'Indica un porcentaje entre 0 y 100.','error');return;
+    }
+    if(!state.detail?.sesion?.almacen_id){msg(message,'No se pudo identificar el almacén de esta jornada.','error');return;}
+    if(!confirm('Se guardará un salario de '+qty(rate)+'% sobre las ventas calculadas por inventario para este almacén. ¿Confirmas?'))return;
+    const btn=form.querySelector('button[type="submit"]');
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_configurar_salario_porcentaje_jornada',{
+        p_almacen_id:state.detail.sesion.almacen_id,p_porcentaje:rate
+      });
+      await loadFinances(state.detail);
+      msg(message,'Porcentaje salarial guardado y aplicado a la liquidación.','ok');
+      setStatus('Porcentaje salarial de La Cueva actualizado.','ok');
+    }catch(e){
+      msg(message,friendlyError(e,'create')+' No se confirmó el cambio.','error');
+    }finally{busy(btn,false);}
+  }
   function cutHtml(cut,products,delivery){
     if(!cut)return '<div class="bc7-empty">Aún no hay conteo confirmado.</div>';
     const lines=arr(cut.lineas);
@@ -1261,6 +1315,8 @@
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
+    else if(f.matches('[data-bc7-daily-cash-form]')){e.preventDefault();await submitDailyCash(f);}
+    else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
   });
   document.addEventListener('change',function(e){
     const t=e.target;
