@@ -53,7 +53,7 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
 });
 
 test("batch RPC returns one parent request with all Baja child lines",()=>{
- const sql=read("supabase/migrations/20261109210500_baja_approval_requests_and_modal.sql");
+ const sql=read("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
  assert.match(sql,/INSERT INTO public\.bajas_solicitudes/);
  assert.match(sql,/UPDATE public\.bajas[\s\S]*SET solicitud_id=v_solicitud_id/);
  assert.match(sql,/jsonb_build_object\([\s\S]*'solicitud_id',v_solicitud_id/);

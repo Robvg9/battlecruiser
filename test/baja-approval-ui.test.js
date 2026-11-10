@@ -61,16 +61,16 @@ test("inventory detail has a direct route into the flavor and per-warehouse mini
   assert.match(css, /white-space: normal/);
 });
 
-test("PWA release and cache manifest are aligned at 9.5.89", () => {
+test("PWA release and cache manifest are aligned at 9.5.92", () => {
   const app = read("public/app.js");
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
-  assert.match(app, /VERSION="9\.5\.89"/);
-  assert.match(index, /app\.js\?v=9\.5\.89/);
-  assert.match(index, /style\.css\?v=9\.5\.89/);
-  assert.match(sw, /BC_SW_VERSION = "9.5.89"/);
+  assert.match(app, /VERSION="9\.5\.92"/);
+  assert.match(index, /app\.js\?v=9\.5\.92/);
+  assert.match(index, /style\.css\?v=9\.5\.92/);
+  assert.match(sw, /BC_SW_VERSION = "9.5.92"/);
   assert.match(sw, /inventario-detalle\.js\?v=71/);
-  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261109.1"));
+  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261110.2"));
   assert.ok(app.includes('["bajas-multiple.js","1.6"]'));
   assert.ok(sw.includes('./js/bajas-multiple.js?v=1.6'));
   assert.match(sw, /productos\.js\?v=20261109\.3/);
@@ -78,7 +78,7 @@ test("PWA release and cache manifest are aligned at 9.5.89", () => {
 
  
 test("multi-line Baja submissions stay one administrative request with per-line reasons", () => {
-  const sql = read("supabase/migrations/20261109210500_baja_approval_requests_and_modal.sql");
+  const sql = read("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
   assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.bajas_solicitudes/);
   assert.match(sql, /ADD COLUMN IF NOT EXISTS solicitud_id uuid/);
   assert.match(sql, /GROUP BY b\.creado_por,b\.almacen_id,b\.creado_en[\s\S]*HAVING count\(\*\) > 1/);

@@ -3,7 +3,7 @@
 
 CREATE TABLE public.productos(
   id uuid PRIMARY KEY,nombre text NOT NULL,unidad text NOT NULL DEFAULT 'ud',
-  activo boolean NOT NULL DEFAULT true
+  activo boolean NOT NULL DEFAULT true,producto_padre_id uuid,precio_normal numeric(14,2)
 );
 CREATE TABLE public.stock(
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),producto_id uuid NOT NULL REFERENCES public.productos(id),

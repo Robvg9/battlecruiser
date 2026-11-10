@@ -21,11 +21,11 @@ test("opening one jornada exposes four task tabs",()=>{
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9.5.89"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.13"\]/);
- assert.match(sw,/BC_SW_VERSION = "9.5.89"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.13/);
- assert.match(ui,/v7\.13 — inventario compartido entre jornadas, recepción y revisión del dueño/);
+ assert.match(app,/const VERSION="9.5.92"/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.16"\]/);
+ assert.match(sw,/BC_SW_VERSION = "9.5.92"/);
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.16/);
+ assert.match(ui,/v7\.16 — liquidación por inventario, entregas diarias y salario porcentual/);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
@@ -38,4 +38,8 @@ test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
 test("M33 dependent card release is version aligned",()=>{
  assert.match(app,/\["m33-turnos-final\.js","33\.21"\]/);
  assert.match(sw,/m33-turnos-final\.js\?v=33\.21/);
+});
+
+test("Jornada workspace title includes the full multi-day period",()=>{
+ assert.ok(ui.includes("fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')"));
 });

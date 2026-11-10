@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.13 — inventario compartido entre jornadas, recepción y revisión del dueño.
+// v7.16 — liquidación por inventario, entregas diarias y salario porcentual.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:''};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,inventorySettlement:null};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -389,7 +389,7 @@
     if(state.admin){
       reschedule='<details class="bc7-reschedule"><summary>Reprogramar responsable / descanso</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-check"><input type="checkbox" data-bc7-rework '+(!rest?'checked':'')+'> Jornada laborable</label><label class="bc7-field">Responsable<select data-bc7-reperson '+(rest||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Ausencia, sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reprogramación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
     }
-    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
+    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
   }
   async function loadCalendar(){
     const host=$('bc7-schedule-list');if(!host)return;
@@ -407,19 +407,53 @@
   function financeFormHtml(detail,isAssigned,status){
     const sessionId=detail.sesion.id;
     const products=arr(detail.productos);
-    const showExpenses=state.admin||can('gastos','ver');
-    const showReinvestments=state.admin||can('reinversiones','ver');
-    const showSales=state.admin||can('ventas','ver');
+    const isRetail=detail.sesion.es_minorista===true;
+    const isOwner=can('reinversiones','editar_any');
+    const showExpenses=state.admin||isAssigned;
+    const showReinvestments=state.admin||isAssigned;
+    const showSales=!isRetail&&(state.admin||can('ventas','ver'));
+    const showDailyCash=isRetail&&(state.admin||isAssigned);
+    const showSettlement=isRetail&&(state.admin||isAssigned);
     const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
     const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
-    if(!showExpenses&&!showReinvestments&&!showSales&&!createExpenses&&!createReinvestments)return '';
-    let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas de esta jornada</h4><p class="bc7-muted">Las ventas se muestran solo cuando están vinculadas al ID exacto de esta jornada. El método de pago queda guardado en cada venta nueva. El declarado, contado y diferencia del efectivo se muestran aparte; no se calcula un efectivo esperado a partir de ventas brutas ni de operaciones sin fuente de pago confirmada.</p>';
+    const lastDate=String(detail.sesion.fecha_fin||detail.sesion.fecha||'').slice(0,10);
+    const firstDate=String(detail.sesion.fecha||'').slice(0,10);
+    const dailyCashEnd=addDays(lastDate,-1);
+    const hasDailyDates=dailyCashEnd>=firstDate;
+    const today=dateHavana();
+    const defaultDailyDate=today<firstDate?firstDate:today>dailyCashEnd?dailyCashEnd:today;
+    const createDailyCash=isRetail&&hasDailyDates&&isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo;
+    const manageSalary=isRetail&&isOwner;
+    if(!showExpenses&&!showReinvestments&&!showSales&&!showDailyCash&&!showSettlement&&!createExpenses&&!createReinvestments&&!createDailyCash&&!manageSalary)return '';
+    let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
+    if(isRetail){
+      html+='<p class="bc7-muted">La Cueva calcula las unidades vendidas por diferencia entre inventarios y movimientos aprobados. No utiliza ventas individuales de POS ni reparte existencias por sabores.</p>';
+      if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
+      if(showDailyCash)html+='<div id="bc7-daily-cash-list"><div class="bc7-empty">Consultando entregas diarias…</div></div>';
+      if(createDailyCash){
+        html+='<form data-bc7-daily-cash-form="'+esc(sessionId)+'"><h4>Registrar dinero recogido del día</h4>'+
+          '<input type="hidden" data-bc7-daily-cash-key value="">'+
+          '<div class="bc7-grid"><label class="bc7-field">Fecha<input data-bc7-daily-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(dailyCashEnd)+'" value="'+esc(defaultDailyDate)+'" required></label>'+
+          '<label class="bc7-field">Dinero recogido (CUP)<input data-bc7-daily-cash-amount type="number" min="0" step="0.01" required inputmode="decimal" placeholder="0.00"></label></div>'+
+          '<label class="bc7-field">Observación (opcional)<input data-bc7-daily-cash-note maxlength="500" placeholder="Entrega, comprobantes o aclaración"></label>'+
+          '<p class="bc7-muted">La entrega queda pendiente hasta que el Dueño compruebe y apruebe el importe. No modifica caja mientras esté pendiente.</p>'+
+          '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar entrega diaria</button></div><p class="bc7-msg" data-bc7-daily-cash-msg></p></form>';
+      }else if(isRetail&&isAssigned&&status==='EN_CURSO'&&!hasDailyDates){
+        html+='<p class="bc7-muted">El período tiene una sola fecha. El dinero de ese día se declara en el cierre final de la jornada.</p>';
+      }
+      if(manageSalary){
+        html+='<form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
+          '<div class="bc7-grid"><label class="bc7-field">Porcentaje sobre venta comprobada<input data-bc7-salary-percent type="number" min="0" max="100" step="0.001" inputmode="decimal" placeholder="Configurar porcentaje"></label></div>'+
+          '<p class="bc7-muted">La tasa no se presupone a partir del reglamento histórico. Este valor queda registrado por el Dueño y se utiliza en la liquidación de esta tienda.</p>'+
+          '<div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar porcentaje</button></div><p class="bc7-msg" data-bc7-salary-rate-msg></p></form>';
+      }
+    }else{
+      html+='<p class="bc7-muted">Las ventas se muestran solo cuando están vinculadas al ID exacto de esta jornada. El efectivo declarado y contado se presenta por separado.</p>';
+    }
     html+=cashDeclarationHtml(detail);
     if(showSales)html+='<div id="bc7-sales-list"><div class="bc7-empty">Consultando ventas vinculadas a esta jornada…</div></div>';
     if(showExpenses)html+='<div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div>';
-    else if(createExpenses)html+='<p class="bc7-muted">Puedes registrar un gasto. Para consultar su estado posterior necesitas autorización para ver los gastos.</p>';
     if(showReinvestments)html+='<div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div>';
-    else if(createReinvestments)html+='<p class="bc7-muted">Puedes registrar una reinversión. Para consultar su historial necesitas autorización para ver las reinversiones.</p>';
     if(createExpenses){
       html+='<form data-bc7-finance-form="gasto" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar gasto</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
@@ -435,7 +469,7 @@
         '<label class="bc7-field">Producto<select data-bc7-reinvestment-product required>'+options+'</select></label>'+
         '<div class="bc7-grid"><label class="bc7-field">Cantidad que entra al inventario<input data-bc7-reinvestment-quantity type="number" min="0.001" step="0.001" required inputmode="decimal"></label>'+
         '<label class="bc7-field">Costo total<input data-bc7-reinvestment-cost type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>'+
-        '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label>'+
+        '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
         '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>';
     }
     return html+'</section>';
@@ -451,6 +485,77 @@
       '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(difference?esc(money(d.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
       '<p class="bc7-muted">Estado: '+esc(humanStatus(d.estado_aprobacion||'ESPERANDO_APROBACION'))+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
   }
+  function renderDailyCash(host,data){
+    if(!host)return;
+    const rows=arr(data&&data.entregas);
+    if(!rows.length){
+      host.innerHTML='<div class="bc7-jornada" id="bc7-daily-cash-summary"><h4>Dinero recogido diariamente</h4><p class="bc7-muted">Todavía no hay entregas diarias registradas.</p></div>';
+      return;
+    }
+    host.innerHTML='<div class="bc7-jornada" id="bc7-daily-cash-summary"><h4>Dinero recogido diariamente</h4>'+
+      '<div class="bc7-list">'+rows.map(function(item){
+        const status=String(item.estado||'PENDIENTE').toUpperCase();
+        const amount=status==='APROBADA'&&item.monto_aprobado!=null?item.monto_aprobado:item.monto_declarado;
+        return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(item.fecha))+' · '+esc(money(amount))+' CUP</strong>'+
+          '<p>'+esc(item.creado_nombre||'Responsable')+(item.revisado_nombre?' · revisó '+esc(item.revisado_nombre):'')+'</p></div>'+
+          '<span class="bc7-pill '+(status==='APROBADA'?'ok':status==='RECHAZADA'?'warn':'')+'">'+esc(humanStatus(status))+'</span></div>'+
+          (item.observacion?'<p>'+esc(item.observacion)+'</p>':'')+
+          (item.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(item.comentario_revision)+'</p>':'')+'</article>';
+      }).join('')+'</div></div>';
+  }
+  function renderInventorySettlement(host,result){
+    if(!host)return;
+    if(!result||result.aplica===false){
+      host.innerHTML='<div class="bc7-empty">'+esc(result&&result.motivo||'La liquidación por inventario no está disponible.')+'</div>';
+      return;
+    }
+    const pending=result.pendientes||{};
+    const calculable=result.calculable===true;
+    const summary=[
+      ['Venta comprobada',result.ventas_estimadas],
+      ['Salario calculado',result.salario_calculado],
+      ['Gastos aprobados',result.gastos_aprobados],
+      ['Reinversiones aprobadas',result.reinversiones_aprobadas],
+      ['Dinero recogido',result.dinero_recogido_total],
+      ['Efectivo esperado',result.efectivo_esperado_despues_de_gastos_reinversiones_salario],
+      ['Faltante / sobrante',result.diferencia]
+    ];
+    const cards='<div class="bc7-workspace-overview">'+summary.map(function(item){
+      const value=item[1]==null?'Pendiente':money(item[1])+' CUP';
+      return '<div class="bc7-overview-item"><small>'+esc(item[0])+'</small><b>'+esc(value)+'</b></div>';
+    }).join('')+'</div>';
+    const rows=arr(result.lineas);
+    const table=rows.length
+      ?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Familia</th><th>Inicial</th><th>Entradas</th><th>Salidas</th><th>Final</th><th>Vendidas</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+
+        rows.map(function(line){
+          const entries=Number(line.transferencias_entrada||0)+Number(line.compras||0)+Number(line.reinversiones_entrada||0);
+          const exits=Number(line.transferencias_salida||0)+Number(line.vales_salida||0)+Number(line.mermas_aprobadas||0)+Number(line.bajas_aprobadas||0);
+          return '<tr><td>'+esc(line.nombre||'Producto')+'</td>'+
+            '<td>'+esc(qty(line.inventario_inicial))+'</td><td>'+esc(qty(entries))+'</td>'+
+            '<td>'+esc(qty(exits))+'</td><td>'+esc(qty(line.inventario_final))+'</td>'+
+            '<td><b>'+esc(qty(line.unidades_vendidas))+'</b></td>'+
+            '<td>'+esc(line.precio_unitario==null?'Sin precio':money(line.precio_unitario))+'</td>'+
+            '<td>'+esc(line.importe_estimado==null?'—':money(line.importe_estimado))+'</td></tr>';
+        }).join('')+'</tbody></table></div>'
+      :'<div class="bc7-empty">El cálculo aparecerá cuando existan cortes de inventario confirmados.</div>';
+    const blockers=[];
+    if(result.faltan_cortes)blockers.push('Falta confirmar el inventario inicial o final.');
+    if(Number(result.familias_sin_precio||0)>0)blockers.push(Number(result.familias_sin_precio)+' familias no tienen un precio de venta único y válido.');
+    if(Number(result.familias_con_vendidas_negativas||0)>0)blockers.push(Number(result.familias_con_vendidas_negativas)+' familias presentan unidades vendidas negativas; revisa sus movimientos y conteos.');
+    if(result.salario_porcentaje==null)blockers.push('El Dueño debe configurar el porcentaje salarial.');
+    if(Number(pending.entregas_diarias||0)>0)blockers.push(Number(pending.entregas_diarias)+' entregas diarias pendientes de aprobación.');
+    if(Number(pending.entregas_diarias_faltantes||result.entregas_diarias_faltantes||0)>0)blockers.push(Number(pending.entregas_diarias_faltantes||result.entregas_diarias_faltantes)+' días sin entrega diaria aprobada.');
+    if(Number(pending.gastos||0)>0)blockers.push(Number(pending.gastos)+' gastos pendientes de aprobación.');
+    if(Number(pending.reinversiones||0)>0)blockers.push(Number(pending.reinversiones)+' reinversiones pendientes de aprobación.');
+    if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas/mermas pendientes de aprobación.');
+    const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
+    host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
+      '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
+      '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
+      cards+table+
+      (blockers.length?'<div class="bc7-note"><b>Para cerrar la liquidación:</b><ul>'+blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'<p class="bc7-muted">No quedan aprobaciones ni validaciones pendientes.</p>')+
+      '</div>';
+  }
   function renderFinanceList(host,rows,type){
     if(!host)return;
     if(!rows.length){
@@ -465,8 +570,8 @@
       ).join('')+'</div>';
     }else{
       host.innerHTML='<h4>Reinversiones</h4><div class="bc7-list">'+rows.map(r=>
-        '<article class="bc7-jornada"><strong>'+esc(r.proveedor||'Reinversión')+' · '+esc(money(r.total))+'</strong><p>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.usuario_nombre||'Responsable')+'</p>'+
-        '<div class="bc7-muted">'+arr(r.lineas).map(l=>esc(l.producto||'Producto no identificado')+' · '+esc(qty(l.cantidad_base))+' · '+esc(money(l.costo_total))).join('<br>')+'</div></article>'
+        '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(r.proveedor||'Reinversión')+' · '+esc(money(r.total))+'</strong><p>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.usuario_nombre||'Responsable')+'</p></div><span class="bc7-pill '+(r.estado==='APROBADA'?'ok':r.estado==='RECHAZADA'?'warn':'')+'">'+esc(humanStatus(r.estado||'PENDIENTE'))+'</span></div>'+
+        '<div class="bc7-muted">'+arr(r.lineas).map(l=>esc(l.producto||'Producto no identificado')+' · '+esc(qty(l.cantidad_base))+' · '+esc(money(l.costo_total))).join('<br>')+'</div>'+(r.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(r.comentario_revision)+'</p>':'')+'</article>'
       ).join('')+'</div>';
     }
   }
@@ -493,13 +598,17 @@
       '<p class="bc7-muted">Este desglose informa los importes registrados por método de pago. No equivale al efectivo esperado ni sustituye la declaración y el conteo físico.</p>';
   }
   async function loadFinances(detail){
-    const hasExpenses=state.admin||can('gastos','ver');
-    const hasReinvestments=state.admin||can('reinversiones','ver');
-    const hasSales=state.admin||can('ventas','ver');
+    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'');
+    const isRetail=detail.sesion.es_minorista===true;
+    const hasExpenses=state.admin||isAssigned;
+    const hasReinvestments=state.admin||isAssigned;
+    const hasDailyCash=isRetail&&(state.admin||isAssigned);
+    const hasSettlement=isRetail&&(state.admin||isAssigned);
+    const hasSales=!isRetail&&(state.admin||can('ventas','ver'));
     const hasFinance=hasExpenses||hasReinvestments;
-    if(!hasFinance&&!hasSales)return true;
+    if(!hasFinance&&!hasSales&&!hasDailyCash&&!hasSettlement)return true;
     const sessionId=detail.sesion.id;
-    let financeData={},salesData={};
+    let financeData={},salesData={},dailyData=null,settlement=null;
     if(hasFinance){
       try{financeData=await rpc('bc7_finanzas_jornada',{p_turno_sesion_id:sessionId})||{};}
       catch(e){
@@ -514,6 +623,26 @@
         renderSalesLedger($('bc7-sales-list'),salesData);
       }catch(e){
         if($('bc7-sales-list'))msg($('bc7-sales-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
+      }
+    }
+    if(hasDailyCash){
+      try{
+        dailyData=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
+        state.dailyCashData=dailyData;
+        renderDailyCash($('bc7-daily-cash-list'),dailyData);
+        const rateInput=document.querySelector('[data-bc7-salary-percent]');
+        if(rateInput&&document.activeElement!==rateInput)rateInput.value=dailyData.salario_porcentaje==null?'':String(dailyData.salario_porcentaje);
+      }catch(e){
+        if($('bc7-daily-cash-list'))msg($('bc7-daily-cash-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
+      }
+    }
+    if(hasSettlement){
+      try{
+        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})||{};
+        state.inventorySettlement=settlement;
+        renderInventorySettlement($('bc7-inventory-settlement'),settlement);
+      }catch(e){
+        if($('bc7-inventory-settlement'))msg($('bc7-inventory-settlement'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
       }
     }
     if(hasExpenses)renderFinanceList($('bc7-expenses-list'),arr(financeData.gastos),'gastos');
@@ -560,7 +689,7 @@
       }else{
         throw new Error('Tipo de operación financiera desconocido.');
       }
-      const canReadThisType=state.admin||(type==='gasto'?can('gastos','ver'):can('reinversiones','ver'));
+      const canReadThisType=state.admin||can('turnos','ver');
       if(!canReadThisType){
         form.reset();keyField.value='';
         msg(message,'El servidor guardó la operación. No aparece en el historial de esta cuenta porque tu usuario no tiene permiso para consultarlo; los gastos siguen el proceso habitual de aprobación.','ok');
@@ -575,7 +704,7 @@
       }
       form.reset();
       keyField.value='';
-      msg(message,type==='gasto'?'Gasto guardado y releído. Su aprobación sigue pendiente.':'Reinversión registrada y releída en el expediente de la jornada.','ok');
+      msg(message,type==='gasto'?'Gasto enviado y visible en la jornada; queda pendiente de aprobación.':'Reinversión enviada y visible en la jornada; no afecta stock ni caja hasta que la apruebes.','ok');
       await loadCalendar();
       setStatus('Operación financiera registrada y leída desde el servidor.','ok');
     }catch(e){
@@ -583,6 +712,60 @@
     }finally{busy(btn,false);}
   }
 
+  async function submitDailyCash(form){
+    const sessionId=form.dataset.bc7DailyCashForm;
+    const date=form.querySelector('[data-bc7-daily-cash-date]')?.value;
+    const rawAmount=form.querySelector('[data-bc7-daily-cash-amount]')?.value;
+    const amount=Number(rawAmount);
+    const note=form.querySelector('[data-bc7-daily-cash-note]')?.value.trim()||null;
+    const keyField=form.querySelector('[data-bc7-daily-cash-key]');
+    const message=form.querySelector('[data-bc7-daily-cash-msg]');
+    if(!sessionId||!date||rawAmount===''||!Number.isFinite(amount)||amount<0){
+      msg(message,'Indica una fecha válida y un importe igual o mayor que cero.','error');return;
+    }
+    if(!keyField){msg(message,'Falta la referencia segura de esta entrega. Actualiza la jornada.','error');return;}
+    let key=keyField.value.trim();
+    try{if(!key){key=freshIdempotencyKey();keyField.value=key;}}
+    catch(e){msg(message,e.message||'No se pudo preparar la entrega.','error');return;}
+    const btn=form.querySelector('button[type="submit"]');
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_registrar_entrega_diaria_jornada',{
+        p_turno_sesion_id:sessionId,p_fecha:date,p_monto:amount,
+        p_observacion:note,p_idempotency_key:key
+      });
+      await loadFinances(state.detail);
+      form.reset();keyField.value='';
+      msg(message,'Entrega diaria registrada y visible. Queda pendiente de aprobación del Dueño.','ok');
+      setStatus('Dinero recogido guardado para '+fmtDateHuman(date)+'. No se modificó caja.','ok');
+    }catch(e){
+      msg(message,friendlyError(e,'create')+' La referencia se conserva para poder comprobar o reintentar sin duplicar.','error');
+    }finally{busy(btn,false);}
+  }
+  async function submitSalaryRate(form){
+    const sessionId=form.dataset.bc7SalaryRateForm;
+    const input=form.querySelector('[data-bc7-salary-percent]');
+    const message=form.querySelector('[data-bc7-salary-rate-msg]');
+    const raw=input?.value.trim();
+    const rate=Number(raw);
+    if(!sessionId||raw===''||!Number.isFinite(rate)||rate<0||rate>100){
+      msg(message,'Indica un porcentaje entre 0 y 100.','error');return;
+    }
+    if(!state.detail?.sesion?.almacen_id){msg(message,'No se pudo identificar el almacén de esta jornada.','error');return;}
+    if(!confirm('Se guardará un salario de '+qty(rate)+'% sobre las ventas calculadas por inventario de esta jornada y quedará como predeterminado para futuras jornadas de La Cueva. ¿Confirmas?'))return;
+    const btn=form.querySelector('button[type="submit"]');
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_configurar_salario_porcentaje_jornada',{
+        p_turno_sesion_id:sessionId,p_porcentaje:rate
+      });
+      await loadFinances(state.detail);
+      msg(message,'Porcentaje salarial guardado y aplicado a la liquidación.','ok');
+      setStatus('Porcentaje salarial de La Cueva actualizado.','ok');
+    }catch(e){
+      msg(message,friendlyError(e,'create')+' No se confirmó el cambio.','error');
+    }finally{busy(btn,false);}
+  }
   function cutHtml(cut,products,delivery){
     if(!cut)return '<div class="bc7-empty">Aún no hay conteo confirmado.</div>';
     const lines=arr(cut.lineas);
@@ -717,7 +900,7 @@
     const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
     const fin=financeFormHtml(detail,isAssigned,status);
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
-    $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+' · '+warehouseName(s.almacen_id);
+    $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
     $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="finanzas" aria-selected="false">Finanzas</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="finanzas" hidden>'+fin+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
     $('bc7-workspace').hidden=false;setPageMode(true);$('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
     activateWorkspaceTab(state.workspaceTab);
@@ -1050,7 +1233,7 @@
     const d=state.detail;if(!d)return;
     const warehouse=$('mov-filtro-almacen');if(warehouse)warehouse.value=d.sesion.almacen_id;
     const from=$('mov-filtro-desde');if(from)from.value=String(d.sesion.fecha).slice(0,10);
-    const to=$('mov-filtro-hasta');if(to)to.value=String(d.sesion.fecha).slice(0,10);
+    const to=$('mov-filtro-hasta');if(to)to.value=String(d.sesion.fecha_fin||d.sesion.fecha).slice(0,10);
     navTo('movimientos');
     const refresh=$('mov-refrescar-btn')||$('movimientos-refrescar-btn');
     if(refresh)setTimeout(()=>refresh.click(),150);
@@ -1133,6 +1316,8 @@
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
+    else if(f.matches('[data-bc7-daily-cash-form]')){e.preventDefault();await submitDailyCash(f);}
+    else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
   });
   document.addEventListener('change',function(e){
     const t=e.target;
