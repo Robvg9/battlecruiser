@@ -583,9 +583,16 @@ async function bcCompletarCambioObligatorio(nuevaPassword) {
 
     const refreshed = await client.auth.refreshSession();
     if (refreshed.error || !refreshed.data || !refreshed.data.session) return false;
-    if (typeof cargarContextoUsuario === "function") {
-      await cargarContextoUsuario(refreshed.data.session);
+    if (typeof cargarContextoUsuario !== "function") return false;
+
+    var waitAttempts = 0;
+    while (_cargandoUsuario && waitAttempts++ < 30) {
+      await new Promise(function (resolve) { window.setTimeout(resolve, 100); });
     }
+    if (_cargandoUsuario) return false;
+
+    await cargarContextoUsuario(refreshed.data.session);
+    if (!_permisosCargaExitosa || !Object.keys(_permisosEfectivos || {}).length) return false;
     return true;
   } catch (_) {
     return false;
