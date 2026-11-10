@@ -35,6 +35,12 @@ CROSS JOIN (VALUES ('turnos','ver'),('gastos','crear'),('reinversiones','crear')
 WHERE lower(btrim(r.nombre))='dependienta' AND r.activo=true
 ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
 
+-- The owner is the only role allowed to approve reinvestment requests.
+INSERT INTO public.permisos(role_id,seccion,accion,permitido)
+SELECT r.id,'reinversiones','editar_any',true
+FROM public.roles r WHERE lower(btrim(r.nombre))='dueño' AND r.activo=true
+ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
+
 CREATE TABLE IF NOT EXISTS public.turno_jornada_entradas_vinculadas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT,

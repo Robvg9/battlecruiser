@@ -88,3 +88,9 @@ test("dependienta can read only assigned jornada finance and reinvestment approv
   assert.ok(approvals.includes("🛒 Reinversión pendiente"));
   assert.ok(approvals.includes("const isMoney=isExpense||type==='reinversion';"));
 });
+
+
+test("only the Dueño role receives reinvestment approval authority",()=>{
+  assert.ok(migration.includes("lower(btrim(r.nombre))='dueño'"));
+  assert.ok(migration.includes("'reinversiones','editar_any'"));
+});
