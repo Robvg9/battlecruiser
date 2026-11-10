@@ -41,4 +41,41 @@ GRANT ALL ON TABLE public.bc_password_recovery_requests TO service_role;
 COMMENT ON TABLE public.bc_password_recovery_requests IS
   'Solicitudes de recuperación de contraseña dirigidas a Administración. Acceso únicamente desde Edge Function con service_role; nunca contiene contraseñas.';
 
+-- A reset account remains authenticated but receives no operational
+-- permissions until its owner-set temporary password has been replaced.
+CREATE OR REPLACE FUNCTION public.permisos_usuario_actual()
+RETURNS TABLE(seccion text, accion text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT p.seccion, p.accion
+  FROM public.permisos p
+  JOIN public.usuarios u ON u.role_id = p.role_id
+  WHERE u.id = auth.uid()
+    AND p.permitido = true
+    AND coalesce((auth.jwt()->'app_metadata'->>'bc_password_change_required')::boolean, false) = false;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.tiene_permiso(p_seccion text, p_accion text)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT coalesce(
+    (
+      SELECT p.permitido
+      FROM public.usuarios u
+      JOIN public.permisos p ON p.role_id = u.role_id
+      WHERE u.id = auth.uid()
+        AND u.activo = true
+        AND p.seccion = p_seccion
+        AND p.accion = p_accion
+        AND coalesce((auth.jwt()->'app_metadata'->>'bc_password_change_required')::boolean, false) = false
+    ),
+    false
+  );
+$function$;
+
 COMMIT;
