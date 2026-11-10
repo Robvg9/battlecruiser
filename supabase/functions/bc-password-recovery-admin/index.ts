@@ -291,19 +291,25 @@ Deno.serve(async (req: Request) => {
         throw new Error("RECOVERY_QUEUE_INSERT_FAILED");
       }
 
-      const mailClient = createClient(url, publicKey, {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      const emailResult = await mailClient.auth.signInWithOtp({
-        email: MASTER_EMAIL,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: APP_ORIGIN + "/?bc_admin_recovery=" + encodeURIComponent(requestId),
-        },
-      });
+      let notificationErrorCode = "";
+      try {
+        const mailClient = createClient(url, publicKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        });
+        const emailResult = await mailClient.auth.signInWithOtp({
+          email: MASTER_EMAIL,
+          options: {
+            shouldCreateUser: false,
+            emailRedirectTo: APP_ORIGIN + "/?bc_admin_recovery=" + encodeURIComponent(requestId),
+          },
+        });
+        if (emailResult.error) notificationErrorCode = String(emailResult.error.code || "AUTH_EMAIL_ERROR");
+      } catch {
+        notificationErrorCode = "AUTH_EMAIL_NETWORK_ERROR";
+      }
 
-      if (emailResult.error) {
-        console.warn("[bc-password-recovery-admin] master notification not delivered:", emailResult.error.code || "AUTH_EMAIL_ERROR");
+      if (notificationErrorCode) {
+        console.warn("[bc-password-recovery-admin] master notification failed:", notificationErrorCode);
         await admin.from("bc_password_recovery_requests")
           .update({ notification_status: "FALLIDA" })
           .eq("id", requestId);
@@ -470,6 +476,25 @@ Deno.serve(async (req: Request) => {
     }
 
     const target = targetPack.user;
+    const { data: targetProfile, error: targetProfileError } = await admin
+      .from("usuarios")
+      .select("role_id,activo,archivado")
+      .eq("id", target.id)
+      .maybeSingle();
+    const { data: targetRole, error: targetRoleError } = targetProfile?.role_id
+      ? await admin.from("roles").select("nombre").eq("id", targetProfile.role_id).maybeSingle()
+      : { data: null, error: null };
+
+    if (targetProfileError || targetRoleError || !targetProfile ||
+        targetProfile.activo !== true || targetProfile.archivado === true ||
+        String(targetRole?.nombre || "").trim().toLowerCase() !== "dependienta") {
+      await admin.from("bc_password_recovery_requests")
+        .update({ status: "EXPIRADA", processing_by: null, processing_at: null })
+        .eq("id", requestId)
+        .eq("status", "PROCESANDO");
+      return reply({ error: "La cuenta ya no es una dependienta activa; no se modificó su contraseña." }, 409, origin);
+    }
+
     const saltBytes = new Uint8Array(16);
     crypto.getRandomValues(saltBytes);
     const saltEncoded = encodeBase64(saltBytes);
