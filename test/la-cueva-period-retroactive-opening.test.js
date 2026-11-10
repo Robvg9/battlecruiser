@@ -201,10 +201,9 @@ test("period opening form version 1.6 is loaded dynamically and precached",()=>{
 
 test("permission grants keep Dependienta submission separate from Dueño approvals and avoid duplicate DDL",()=>{
   const submissionSeed="CROSS JOIN (VALUES ('turnos','ver'),('gastos','crear'),('reinversiones','crear'))";
-  const reinvestmentStateDdl=`ALTER TABLE public.reinversiones
-  ADD COLUMN IF NOT EXISTS estado text;`;
+  const reinvestmentStateDdl=migration.match(/ALTER TABLE public\\.reinversiones\\s+ADD COLUMN IF NOT EXISTS estado text;/g)||[];
   assert.equal(migration.split(submissionSeed).length-1,1);
-  assert.equal(migration.split(reinvestmentStateDdl).length-1,1);
+  assert.equal(reinvestmentStateDdl.length,1);
   assert.ok(migration.includes("SELECT r.id,'reinversiones','editar_any',true"));
   assert.ok(migration.includes("WHERE lower(btrim(r.nombre))='dueño'"));
   assert.ok(migration.includes("SELECT r.id,'entregas_caja','editar_any',true"));
