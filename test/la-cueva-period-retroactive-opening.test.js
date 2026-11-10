@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const migration = fs.readFileSync(
-  path.join(__dirname, "../supabase/migrations/20261109230000_la_cueva_period_retroactive_opening.sql"),
+  path.join(__dirname, "../supabase/migrations/20261109230000_la-cueva-period-retroactive-opening.sql"),
   "utf8"
 );
 
