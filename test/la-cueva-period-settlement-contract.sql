@@ -125,7 +125,7 @@ BEGIN
     turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,
     declarado_at,estado_aprobacion,monto_contado,contado_por,contado_at,diferencia,aprobado_por,aprobado_at
   ) VALUES(
-    v_turn,v_session,v_tranche,v_worker,13,'CUP',v_end,'APROBADO',13,v_owner,v_end,0,v_owner,v_end
+    v_turn,v_session,v_tranche,v_worker,13,'CUP',v_end,'APROBADA',13,v_owner,v_end,0,v_owner,v_end
   );
 
   -- Rate configuration is an explicit owner action. Test uses 5%; production remains NULL until configured.
