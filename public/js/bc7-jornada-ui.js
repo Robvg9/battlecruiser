@@ -757,7 +757,7 @@
     if(!busy(btn,true))return;
     try{
       await rpc('bc7_configurar_salario_porcentaje_jornada',{
-        p_almacen_id:state.detail.sesion.almacen_id,p_porcentaje:rate
+        p_turno_sesion_id:sessionId,p_porcentaje:rate
       });
       await loadFinances(state.detail);
       msg(message,'Porcentaje salarial guardado y aplicado a la liquidación.','ok');
