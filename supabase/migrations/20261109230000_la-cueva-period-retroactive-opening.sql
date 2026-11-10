@@ -1876,14 +1876,14 @@ BEGIN
   v_rate:=(SELECT c.salario_porcentaje FROM public.turno_jornada_configuracion c WHERE c.almacen_id=v_s.almacen_id);
 
   WITH initial_lines AS (
-    SELECT (x.value->>'producto_id')::uuid AS product_id,
-           (x.value->>'cantidad_contada')::numeric AS qty
-    FROM jsonb_array_elements(coalesce((SELECT c.lineas FROM public.turno_jornada_inventario_cortes c WHERE c.id=v_initial.id),'[]'::jsonb)) x(value)
+    SELECT l.producto_id AS product_id,l.cantidad_contada::numeric AS qty
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id=v_initial.id
   ),
   final_lines AS (
-    SELECT (x.value->>'producto_id')::uuid AS product_id,
-           (x.value->>'cantidad_contada')::numeric AS qty
-    FROM jsonb_array_elements(coalesce((SELECT c.lineas FROM public.turno_jornada_inventario_cortes c WHERE c.id=v_final.id),'[]'::jsonb)) x(value)
+    SELECT l.producto_id AS product_id,l.cantidad_contada::numeric AS qty
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id=v_final.id
   ),
   movement_events AS (
     SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END product_id,
