@@ -137,6 +137,15 @@ BEGIN
      OR (SELECT salario_porcentaje FROM public.turno_jornada_configuracion WHERE almacen_id=v_warehouse)<>5 THEN
     RAISE EXCEPTION 'FAIL: salary rate must be snapshotted on the jornada and retained as store default';
   END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_configurar_salario_porcentaje_jornada(v_session,10);
+  EXCEPTION WHEN OTHERS THEN
+    v_error:=true;
+  END;
+  IF NOT v_error OR (SELECT salario_porcentaje FROM public.turno_jornada_programacion WHERE id=v_program)<>5 THEN
+    RAISE EXCEPTION 'FAIL: an assigned journey salary percentage must not be overwritten';
+  END IF;
 
   -- One daily delivery is stored as pending and cannot be included until the Dueño approves it.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
