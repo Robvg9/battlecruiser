@@ -145,7 +145,7 @@ test("approval modal is fixed to the viewport and only its body scrolls on Andro
 
 
 test("approval queue visibility matches backend permissions and does not query operational approvals for cash-only users", () => {
-  assert.match(UI, /const canViewOperationalQueue=\(\)=>can\('gastos','editar_any'\)\|\|can\('mermas','editar_any'\)\|\|can\('bajas','editar_any'\)\|\|can\('reinversiones','editar_any'\)\|\|can\('auditoria','editar_any'\)/);
+  assert.match(UI, /const canViewOperationalQueue=\(\)=>can\('gastos','editar_any'\)\|\|can\('mermas','editar_any'\)\|\|can\('bajas','editar_any'\)\|\|can\('reinversiones','editar_any'\)\|\|can\('entregas_caja','editar_any'\)\|\|can\('auditoria','editar_any'\)/);
   assert.match(UI, /if\(canViewOperationalQueue\(\)\)jobs\.push\(rpc\('listar_aprobaciones_admin'/);
 });
 
