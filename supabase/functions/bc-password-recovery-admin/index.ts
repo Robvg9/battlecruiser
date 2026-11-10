@@ -427,21 +427,29 @@ Deno.serve(async (req: Request) => {
     const now = new Date().toISOString();
     const { data: request, error: requestError } = await admin
       .from("bc_password_recovery_requests")
-      .select("id,target_user_id,target_name,status,expires_at")
+      .select("id,target_user_id,target_name,status,expires_at,processing_by,processing_at")
       .eq("id", requestId)
-      .eq("status", "PENDIENTE")
+      .in("status", ["PENDIENTE", "PROCESANDO"])
       .gt("expires_at", now)
       .maybeSingle();
     if (requestError || !request) return reply({ error: "La solicitud ya no está pendiente o expiró." }, 409, origin);
 
-    const { data: lock, error: lockError } = await admin
-      .from("bc_password_recovery_requests")
+    let lockQuery = admin.from("bc_password_recovery_requests")
       .update({ status: "PROCESANDO", processing_by: actor.authUser.id, processing_at: now })
-      .eq("id", requestId)
-      .eq("status", "PENDIENTE")
-      .select("id")
-      .maybeSingle();
-    if (lockError || !lock) return reply({ error: "Otro administrador ya está gestionando esta solicitud." }, 409, origin);
+      .eq("id", requestId);
+
+    if (request.status === "PROCESANDO") {
+      const staleBefore = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      if (!request.processing_at || new Date(request.processing_at).getTime() >= Date.now() - 2 * 60 * 1000) {
+        return reply({ error: "La solicitud todavía se está procesando. Vuelve a intentarlo en un par de minutos." }, 409, origin);
+      }
+      lockQuery = lockQuery.eq("status", "PROCESANDO").lt("processing_at", staleBefore);
+    } else {
+      lockQuery = lockQuery.eq("status", "PENDIENTE");
+    }
+
+    const { data: lock, error: lockError } = await lockQuery.select("id").maybeSingle();
+    if (lockError || !lock) return reply({ error: "Otro administrador acaba de tomar esta solicitud. Actualiza la lista." }, 409, origin);
 
     const { data: targetPack, error: targetError } = await admin.auth.admin.getUserById(request.target_user_id);
     if (targetError || !targetPack?.user || targetPack.user.deleted_at) {
