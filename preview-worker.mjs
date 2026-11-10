@@ -43,7 +43,7 @@ export default {
         status: 204,
         headers: {
           "Access-Control-Allow-Origin": PREVIEW_ORIGIN,
-          "Access-Control-Allow-Headers": "apikey, content-type",
+          "Access-Control-Allow-Headers": "apikey, x-client-info, content-type, authorization",
           "Access-Control-Allow-Methods": "POST, OPTIONS",
           "Access-Control-Max-Age": "600",
           "Cache-Control": "no-store",
@@ -70,8 +70,12 @@ export default {
     });
     const apiKey = request.headers.get("apikey");
     const contentType = request.headers.get("content-type");
+    const authorization = request.headers.get("authorization");
+    const clientInfo = request.headers.get("x-client-info");
     if (apiKey) headers.set("apikey", apiKey);
     if (contentType) headers.set("content-type", contentType);
+    if (authorization) headers.set("authorization", authorization);
+    if (clientInfo) headers.set("x-client-info", clientInfo);
 
     const init = {
       method: request.method,
