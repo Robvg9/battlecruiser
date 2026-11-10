@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS public.transferencias_lineas(
   producto_id uuid NOT NULL,
   cantidad numeric NOT NULL
 );
+ALTER TABLE public.transferencias ADD COLUMN IF NOT EXISTS estado text NOT NULL DEFAULT 'completada';
 CREATE TABLE IF NOT EXISTS public.vales_salida(
   id uuid PRIMARY KEY,
   producto_id uuid NOT NULL,
