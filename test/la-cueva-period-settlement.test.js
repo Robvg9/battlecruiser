@@ -36,12 +36,20 @@ test("daily cash is period-scoped, idempotent, pending by default, and owner-app
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.turno_jornada_entregas_diarias/);
   assert.match(migration, /UNIQUE\(turno_sesion_id,fecha\)/);
   assert.match(migration, /UNIQUE\(creado_por,idempotency_key\)/);
-  assert.match(migration, /'PENDIENTE'/);\n  assert.match(migration, /v_daily_missing:=greatest\\(0,v_daily_expected-v_daily_approved\\)/);\n  assert.match(migration, /v_daily_missing=0/);\n  assert.match(migration, /v_existing_state<>'RECHAZADA'/);\n  assert.match(migration, /entregas_diarias_faltantes/);
+  assert.match(migration, /'PENDIENTE'/);
+  assert.match(migration, /v_daily_missing:=greatest\(0,v_daily_expected-v_daily_approved\)/);
+  assert.match(migration, /v_daily_missing=0/);
+  assert.match(migration, /v_existing_state<>'RECHAZADA'/);
+  assert.match(migration, /entregas_diarias_faltantes/);
+  assert.match(migration, /v_rate:=v_p\.salario_porcentaje/);
+  assert.match(migration, /salario_porcentaje_jornada/);
+  assert.match(migration, /v_retroactive/);
+  assert.match(migration, /turno_jornada_entradas_vinculadas linked/);
   assert.match(migration, /p_fecha<v_p\.fecha OR p_fecha>=v_fecha_fin OR p_fecha>v_hoy/);
   assert.match(migration, /public\.tiene_permiso\('entregas_caja','editar_any'\)/);
   assert.match(migration, /p_tipo='entrega_diaria'/);
   assert.match(migration, /monto_aprobado=CASE WHEN p_decision='APROBAR'/);
-  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc7_configurar_salario_porcentaje_jornada/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc7_configurar_salario_porcentaje_jornada\(\s*p_turno_sesion_id uuid/);
   assert.match(migration, /salario_porcentaje BETWEEN 0 AND 100/);
 });
 
@@ -69,5 +77,5 @@ test("PostgreSQL contract verifies delta formula, pending approval, idempotent r
   assert.match(postgresContract, /salario_calculado/);
   assert.match(postgresContract, /efectivo_esperado_despues_de_gastos_reinversiones_salario/);
   assert.match(postgresContract, /diferencia/);
-  assert.match(postgresContract, /v_result->>'calculable'/);\n  assert.match(postgresContract, /already represented in the imported initial count/);\n  assert.match(postgresContract, /turno_jornada_entradas_vinculadas/);
+  assert.match(postgresContract, /v_result->>'calculable'/);\n  assert.match(postgresContract, /already represented in the imported initial count/);\n  assert.match(postgresContract, /turno_jornada_entradas_vinculadas/);\n  assert.match(postgresContract, /already represented in the imported initial count/);\n  assert.match(postgresContract, /turno_jornada_entradas_vinculadas/);
 });
