@@ -281,6 +281,22 @@ Deno.serve(async (req: Request) => {
       return reply({ completed: true }, 200, origin);
     }
 
+    const completionPassword = typeof body.temporary_password === "string" ? body.temporary_password : "";
+    if (completionPassword.length < 10 || completionPassword.length > 128 || !current.email) {
+      return reply({ error: "La nueva contraseña no pudo verificarse." }, 400, origin);
+    }
+
+    // Prove that the password has actually changed before clearing the mandatory gate.
+    // The verified sign-in session is intentionally never returned to the browser.
+    const verifier = createClient(url, publicKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const { error: proofError } = await verifier.auth.signInWithPassword({
+      email: current.email,
+      password: completionPassword,
+    });
+    if (proofError) return reply({ error: "La nueva contraseña no pudo verificarse." }, 400, origin);
+
     const { error } = await admin.auth.admin.updateUserById(current.id, {
       app_metadata: { ...(current.app_metadata || {}), bc_password_change_required: false },
     });
