@@ -6,12 +6,14 @@ CREATE TABLE IF NOT EXISTS public.bc_password_recovery_requests (
   target_username text NOT NULL,
   target_name text NOT NULL,
   status text NOT NULL DEFAULT 'PENDIENTE'
-    CHECK (status IN ('PENDIENTE','PROCESANDO','APROBADA','RECHAZADA','EXPIRADA')),
+    CHECK (status IN ('PENDIENTE','PROCESANDO','APROBADA','RECHAZADA','EXPIRADA','COMPLETADA')),
   requested_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
   notification_status text NOT NULL DEFAULT 'PENDIENTE'
     CHECK (notification_status IN ('PENDIENTE','ENVIADA','FALLIDA')),
   notification_sent_at timestamptz,
+  temporary_password_salt text,
+  temporary_password_hash text,
   processing_by uuid REFERENCES auth.users(id),
   processing_at timestamptz,
   approved_by uuid REFERENCES auth.users(id),
