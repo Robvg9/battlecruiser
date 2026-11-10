@@ -116,3 +116,13 @@ test("calendar and jornada workspace expose the complete period and movements fi
   assert.ok(jornada.includes("r.fecha_fin&&r.fecha_fin!==r.fecha"));
   assert.ok(jornada.includes("d.sesion.fecha_fin||d.sesion.fecha"));
 });
+
+
+test("opening preview shows every imported physical count and labels current stock only as a reference",()=>{
+  const ui = fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  assert.ok(ui.includes("Columna Fin del cuadre anterior"));
+  assert.ok(ui.includes("Stock actual (referencia)"));
+  assert.ok(ui.includes("tableRows"));
+  assert.ok(ui.includes("row.cantidad"));
+  assert.ok(ui.includes("product.stock_sistema"));
+});
