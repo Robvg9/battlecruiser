@@ -19,7 +19,7 @@ assert.doesNotMatch(edge, /resetPasswordForEmail/, "the dependent must not recei
 assert.match(auth, /bc_recovery/, "recovery URL marker must survive auth hash consumption");
 assert.match(auth, /bcMostrarFormularioRecuperacion\(\)/, "legacy recovery links must remain compatible");
 assert.match(auth, /bcMostrarFormularioCambioObligatorio\(\)/, "a reset dependent must be forced to choose a personal password");
-assert.match(auth, /bcCompletarCambioObligatorio\(\)/, "the server must clear the mandatory-change flag after success");
+assert.match(auth, /bcCompletarCambioObligatorio\(nueva\)/, "the server must verify the new password before clearing the mandatory-change flag");
 assert.match(auth, /Crea tu contraseña personal/, "the forced-change form must identify its purpose");
 assert.match(auth, /updateUser\(\{ password: nueva \}\)/, "password change must use Supabase Auth updateUser");
 assert.match(auth, /Contraseña actualizada/, "successful reset must confirm completion");
