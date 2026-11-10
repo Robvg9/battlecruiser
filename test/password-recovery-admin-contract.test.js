@@ -37,6 +37,9 @@ test("admin temporary password is stored only in Auth and never in request/audit
   assert.match(edge, /bc_password_change_required: true/);
   assert.match(edge, /signInWithPassword\(\{[\s\S]*?password: completionPassword/);
   assert.match(edge, /La nueva contraseña no pudo verificarse/);
+  assert.match(edge, /La contraseña personal debe ser distinta de la temporal/);
+  assert.match(edge, /deriveTemporaryPasswordHash/);
+  assert.match(migration, /temporary_password_hash text/);
   assert.doesNotMatch(edge, /temporary_password:\s*temporaryPassword\s*[,}]/);
   assert.doesNotMatch(edge, /console\.(log|error)\([^\n]*temporaryPassword/);
 });
