@@ -35,6 +35,7 @@ BEGIN
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES(v_warehouse,'La Cueva settlement fixture','minorista',true)
   ON CONFLICT(id) DO NOTHING;
+  UPDATE public.productos SET precio_normal=10 WHERE id IN (v_pan,v_juice);
   INSERT INTO public.turno_jornada_configuracion(almacen_id)
   VALUES(v_warehouse) ON CONFLICT(almacen_id) DO NOTHING;
 
