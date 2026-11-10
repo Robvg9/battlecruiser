@@ -36,8 +36,8 @@ test("daily cash is period-scoped, idempotent, pending by default, and owner-app
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.turno_jornada_entregas_diarias/);
   assert.match(migration, /UNIQUE\(turno_sesion_id,fecha\)/);
   assert.match(migration, /UNIQUE\(creado_por,idempotency_key\)/);
-  assert.match(migration, /'PENDIENTE'/);
-  assert.match(migration, /p_fecha>=v_p\.fecha OR p_fecha>=v_fecha_fin OR p_fecha>v_hoy/);
+  assert.match(migration, /'PENDIENTE'/);\n  assert.match(migration, /v_daily_missing:=greatest\\(0,v_daily_expected-v_daily_approved\\)/);\n  assert.match(migration, /v_daily_missing=0/);\n  assert.match(migration, /v_existing_state<>'RECHAZADA'/);
+  assert.match(migration, /p_fecha<v_p\.fecha OR p_fecha>=v_fecha_fin OR p_fecha>v_hoy/);
   assert.match(migration, /public\.tiene_permiso\('entregas_caja','editar_any'\)/);
   assert.match(migration, /p_tipo='entrega_diaria'/);
   assert.match(migration, /monto_aprobado=CASE WHEN p_decision='APROBAR'/);
