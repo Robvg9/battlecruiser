@@ -131,7 +131,7 @@
           : request.status === "PROCESANDO"
             ? "Proceso interrumpido; Administración puede reanudarlo tras el control de seguridad"
             : request.notification_status === "ENVIADA"
-              ? "Aviso enviado al correo maestro"
+              ? "Aviso aceptado por Auth; confirma la llegada a la bandeja del correo maestro"
               : request.notification_status === "FALLIDA"
                 ? "Aviso por correo no confirmado; solicitud visible aquí"
                 : "Aviso de correo pendiente");
