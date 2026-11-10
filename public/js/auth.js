@@ -212,9 +212,12 @@ function bcScheduleGetSessionRetry() {
       if (_bcAuthBootResolved || _bcAuthSessionDiscovered) return;
       var data = res && res.data;
       if (data && data.session) {
+        if (_bcRecoveryMode) {
+          bcRechazarRecuperacionDirecta();
+          return;
+        }
         bcAuthDiagnostic("SESSION_FOUND_AFTER_RETRY", false);
         bcResolverBootConSesion(data.session);
-        if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
         return;
       }
       if (res && res.error) {
@@ -264,7 +267,7 @@ let _bcRecoveryMode = (function () {
     return false;
   }
 })();
-let _bcRecoveryUiScheduled = false;
+let _bcLegacyRecoveryRejected = false;
 let _bcMandatoryPasswordChange = false;
 let _bcMandatoryPasswordDismissed = false;
 let _bcMandatoryPasswordOverlay = null;
@@ -329,7 +332,7 @@ function bcUIReadyThen(fn) {
 }
 
 function showApp(session) {
-  if (!session || !session.user) return;
+  if (!session || !session.user || _bcLegacyRecoveryRejected) return;
   _bcAuthSessionDiscovered = true;
 
   const metadata = session.user.app_metadata || {};
@@ -430,41 +433,40 @@ function bcResolverBootConSesion(session) {
 }
 
 // Recovery links land here with a valid Supabase recovery session.
-// Display the existing secure updateUser form immediately, without requiring Ajustes.
-function bcMostrarFormularioRecuperacion() {
-  if (_bcRecoveryUiScheduled) return;
-  _bcRecoveryUiScheduled = true;
-  let intentos = 0;
+// Display the existing secure updateUser form immediately, without requiring Ajustefunction bcRechazarRecuperacionDirecta() {
+  if (_bcLegacyRecoveryRejected) return;
+  _bcLegacyRecoveryRejected = true;
+  _bcRecoveryMode = false;
 
-  const intentar = () => {
-    const shell = document.getElementById("app-shell");
-    const panel = document.getElementById("pass-panel");
-    if (!shell || !panel) {
-      if (intentos++ < 120) window.setTimeout(intentar, 250);
-      return;
-    }
-    if (!shell.classList.contains("visible")) {
-      if (intentos++ < 120) window.setTimeout(intentar, 250);
-      return;
-    }
+  // Old links issued before owner approval must never allow a self-service reset.
+  // Sign out outside the Auth callback to avoid re-entering Supabase while its lock is held.
+  window.setTimeout(function () {
+    Promise.resolve(client.auth.signOut()).then(function (result) {
+      if (result && result.error) throw result.error;
+      try {
+        var cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("bc_recovery");
+        cleanUrl.hash = "";
+        window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+      } catch (_) {}
+      _bcLegacyRecoveryRejected = false;
+      showLogin();
+      var message = document.getElementById("password-recovery-msg");
+      if (message) {
+        message.className = "msg error";
+        message.textContent = "Los enlaces directos antiguos ya no permiten cambiar contraseñas. Escribe tu usuario y solicita la recuperación a Administración.";
+      }
+    }).catch(function () {
+      showLogin();
+      var message = document.getElementById("password-recovery-msg");
+      if (message) {
+        message.className = "msg error";
+        message.textContent = "Este enlace directo está deshabilitado. Vuelve al login y solicita la recuperación a Administración.";
+      }
+    });
+  }, 0);
+}
 
-    panel.classList.remove("hidden");
-    const heading = panel.querySelector("h3");
-    if (heading) heading.textContent = "Establecer nueva contraseña";
-    const message = document.getElementById("msg-pass");
-    if (message) {
-      message.className = "msg";
-      message.textContent = "Enlace de recuperación reconocido. Escribe la nueva contraseña dos veces y pulsa Guardar nueva contraseña.";
-    }
-    const form = document.getElementById("form-pass");
-    const submit = form && form.querySelector("button[type='submit']");
-    if (submit) submit.textContent = "Guardar nueva contraseña";
-    const input = document.getElementById("pass-new");
-    if (input) input.focus({ preventScroll: true });
-    panel.scrollIntoView({ block: "start", behavior: "auto" });
-  };
-
-  intentar();
 }
 
 function bcMostrarFormularioCambioObligatorio() {
@@ -602,9 +604,14 @@ async function bcCompletarCambioObligatorio(nuevaPassword) {
 client.auth.getSession().then(function (res) {
   var data = res && res.data;
   if (data && data.session) {
+    if (_bcRecoveryMode) {
+      bcRechazarRecuperacionDirecta();
+      return;
+    }
     bcAuthDiagnostic("SESSION_FOUND", false);
     bcResolverBootConSesion(data.session);
-    if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
+  } else if (_bcRecoveryMode) {
+    bcRechazarRecuperacionDirecta();
   } else if (!_bcAuthBootResolved) {
     if (res && res.error) {
       bcHandleGetSessionError(res.error);
@@ -628,13 +635,13 @@ setTimeout(function () {
 }, 8000);
 
 client.auth.onAuthStateChange(function (event, session) {
-  // PASSWORD_RECOVERY is the authoritative signal; open the reset form immediately.
+  // Old direct password-recovery links are rejected; dependents must use owner approval.
   if (event === "PASSWORD_RECOVERY" && session) {
     _bcRecoveryMode = true;
-    showApp(session);
-    bcMostrarFormularioRecuperacion();
+    bcRechazarRecuperacionDirecta();
     return;
   }
+  if (event === "SIGNED_IN" && session) _bcLegacyRecoveryRejected = false;
   // TOKEN_REFRESHED / INITIAL_SESSION con misma sesión: showApp es idempotente
   if (session) {
     if (event === "SIGNED_OUT") {
