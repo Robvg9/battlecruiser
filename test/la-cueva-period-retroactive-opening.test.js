@@ -27,7 +27,7 @@ test("retroactive opening is an admin-only atomic session creation with immutabl
 
 test("period ranges and imported lines are validated before any session is created", () => {
   assert.ok(migration.includes('p_fecha_fin-p_fecha_inicio>30'));
-  assert.match(migration, /p_inicio_real_at > now\(\)/);
+  assert.match(migration, /p_inicio_real_at\s*>\s*now\(\)/);
   assert.match(migration, /v_expected=0 OR v_count<>v_expected OR v_distinct<>v_count/);
   assert.match(migration, /fecha BETWEEN p_fecha_inicio AND p_fecha_fin/);
   assert.match(migration, /t\.fecha>p_inicio_real_at/);
