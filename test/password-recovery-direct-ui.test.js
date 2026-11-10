@@ -7,7 +7,7 @@ const auth = fs.readFileSync(path.join(__dirname, "../public/js/auth.js"), "utf8
 const html = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf8");
 const edge = fs.readFileSync(path.join(__dirname, "../supabase/functions/bc-password-recovery-admin/index.ts"), "utf8");
 
-assert.match(auth, /PASSWORD_RECOVERY/, "recovery auth event must be handled");
+assert.match(auth, /event === "PASSWORD_RECOVERY" && session[\s\S]*?bcRechazarRecuperacionDirecta\(\)/, "old PASSWORD_RECOVERY links must be rejected");
 assert.match(auth, /action: "request", identifier: identifier/, "recovery must request owner approval");
 assert.match(auth, /bcPasswordRecoveryEndpoint\(\)/, "recovery must use the administrator recovery endpoint");
 assert.match(auth, /Usuario o correo/, "the login and recovery field must clearly accept either identifier");
@@ -16,8 +16,8 @@ assert.ok(edge.includes('const MASTER_EMAIL = "robvg9@gmail.com"'), "recovery no
 assert.ok(edge.includes("signInWithOtp"), "admin notification must use a one-time owner sign-in link");
 assert.ok(edge.includes('emailRedirectTo: APP_ORIGIN + "/?bc_admin_recovery="'), "the admin email must deep-link to the pending request");
 assert.doesNotMatch(edge, /resetPasswordForEmail/, "the dependent must not receive a self-service reset link");
-assert.match(auth, /bc_recovery/, "recovery URL marker must survive auth hash consumption");
-assert.match(auth, /bcMostrarFormularioRecuperacion\(\)/, "legacy recovery links must remain compatible");
+assert.match(auth, /bc_recovery/, "old recovery links must be identified for rejection");
+assert.match(auth, /function bcRechazarRecuperacionDirecta\(\)/, "legacy direct recovery links must be rejected");
 assert.match(auth, /bcMostrarFormularioCambioObligatorio\(\)/, "a reset dependent must be forced to choose a personal password");
 assert.match(auth, /bcCompletarCambioObligatorio\(nueva\)/, "the server must verify the new password before clearing the mandatory-change flag");
 assert.match(auth, /Crea tu contraseña personal/, "the forced-change form must identify its purpose");
