@@ -197,3 +197,16 @@ test("period opening form version 1.6 is loaded dynamically and precached",()=>{
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'));
   assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.6"));
 });
+
+
+test("permission grants keep Dependienta submission separate from Dueño approvals and avoid duplicate DDL",()=>{
+  const submissionSeed=migration.match(/CROSS JOIN \\(VALUES \('turnos','ver'\\),\\('gastos','crear'\\),\\('reinversiones','crear'\\)\\)/g)||[];
+  const reinvestmentStateDdl=migration.match(/ALTER TABLE public\\.reinversiones\\s+ADD COLUMN IF NOT EXISTS estado text;/g)||[];
+  assert.equal(submissionSeed.length,1);
+  assert.equal(reinvestmentStateDdl.length,1);
+  assert.match(migration,/SELECT r\\.id,'reinversiones','editar_any',true[\\s\\S]*?WHERE lower\\(btrim\\(r\\.nombre\\)\\)='dueño'/);
+  assert.match(migration,/SELECT r\\.id,'entregas_caja','editar_any',true[\\s\\S]*?IN \\('dueño','dueno'\\)/);
+  const settlementContract=fs.readFileSync(path.join(__dirname,"la-cueva-period-settlement-contract.sql"),"utf8");
+  assert.match(settlementContract,/Dependienta unexpectedly approved operation type/);
+  assert.match(settlementContract,/Dependienta unexpectedly accessed the administrative approval queue/);
+});
