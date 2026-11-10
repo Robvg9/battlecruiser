@@ -62,7 +62,7 @@ test("approved handoff remains visible and can be reissued without persisting pl
   assert.ok(adminUi.includes("handoffPasswords"));
   assert.ok(adminUi.includes("copy-password"));
   assert.ok(adminUi.includes("Reemitir temporal"));
-  assert.ok(adminUi.includes("La nueva contraseña personal"));
+  assert.ok(adminUi.includes("Nueva temporal para reemitir"));
 });
 
 test("dependent password changes are mandatory and permissions refresh after completion", () => {
