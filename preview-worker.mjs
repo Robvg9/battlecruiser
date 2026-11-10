@@ -2,6 +2,8 @@ const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
+const RECOVERY_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-password-recovery-admin";
+const RECOVERY_PROXY_PATH = "/__bc_preview/functions/v1/bc-password-recovery-admin";
 
 function json(body, status) {
   return new Response(JSON.stringify(body), {
@@ -23,7 +25,12 @@ export default {
     if (url.origin !== PREVIEW_ORIGIN) {
       return env.ASSETS.fetch(request);
     }
-    if (url.pathname !== LOGIN_PROXY_PATH) {
+    const upstreamFunction = url.pathname === LOGIN_PROXY_PATH
+      ? LOGIN_FUNCTION_URL
+      : url.pathname === RECOVERY_PROXY_PATH
+        ? RECOVERY_FUNCTION_URL
+        : null;
+    if (!upstreamFunction) {
       return env.ASSETS.fetch(request);
     }
 
@@ -79,7 +86,7 @@ export default {
     }
 
     try {
-      const upstream = await fetch(LOGIN_FUNCTION_URL, init);
+      const upstream = await fetch(upstreamFunction, init);
       // The browser is calling this same-origin proxy, so the upstream CORS
       // header does not need to be rewritten. Preserve the Edge Function's
       // status/body and never cache authentication responses.
