@@ -68,14 +68,26 @@ BEGIN
 
   INSERT INTO public.turno_jornada_inventario_cortes(
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
-  ) VALUES
-    (v_initial_cut,v_session,'INICIAL','CONFIRMADO',v_worker,v_worker,v_start,v_start,'Initial physical count'),
-    (v_final_cut,v_session,'FINAL','CONFIRMADO',v_worker,v_worker,v_end,v_end,'Final physical count');
+  ) VALUES(v_initial_cut,v_session,'INICIAL','CONFIRMADO',v_worker,v_worker,v_start,v_start,'Initial physical count');
 
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
-  VALUES
-    (v_initial_cut,v_pan,10,10),(v_initial_cut,v_juice,5,5),
-    (v_final_cut,v_pan,7,7),(v_final_cut,v_juice,5,5);
+  VALUES(v_initial_cut,v_pan,10,10),(v_initial_cut,v_juice,5,5);
+
+  -- No final inventory yet: sales and salary must stay unavailable rather than treating final stock as zero.
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF v_result->>'ventas_estimadas' IS NOT NULL
+     OR v_result->>'salario_calculado' IS NOT NULL
+     OR jsonb_array_length(v_result->'lineas')<>0 THEN
+    RAISE EXCEPTION 'FAIL: sales and salary must remain pending until final inventory confirmation; result=%',v_result;
+  END IF;
+
+  INSERT INTO public.turno_jornada_inventario_cortes(
+    id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
+  ) VALUES(v_final_cut,v_session,'FINAL','CONFIRMADO',v_worker,v_worker,v_end,v_end,'Final physical count');
+  INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
+  VALUES(v_final_cut,v_pan,7,7),(v_final_cut,v_juice,5,5);
 
   UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_session;
   UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO' WHERE id=v_turn;
