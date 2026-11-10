@@ -131,7 +131,11 @@
     return new Date(naive-minutes*60000).toISOString();
   }
   function currentWarehouse(){
-    const select=$('bc7-warehouse');return select?select.value:'';
+    const select=$('bc7-warehouse');if(!select)return '';
+    if(select.value)return select.value;
+    const option=Array.from(select.options||[]).find(o=>norm(o.textContent).includes('la cueva'));
+    if(option){select.value=option.value;return select.value;}
+    return '';
   }
   async function loadPeople(){
     if(window.__BC7_JORNADA__&&typeof window.__BC7_JORNADA__.refreshResponsibleStaff==='function'){
@@ -192,8 +196,10 @@
   function updateConfirm(){
     const btn=$('bc7-period-confirm');if(!btn)return;
     const hasUnmatched=parsed&&parsed.some(row=>!row.producto_id);
+    const uniqueIds=parsed?new Set(parsed.map(row=>row.producto_id).filter(Boolean)).size:0;
+    const hasDuplicateProducts=!!parsed&&uniqueIds!==parsed.length;
     const start=$('bc7-period-start')?.value,end=$('bc7-period-end')?.value,started=$('bc7-period-started')?.value;
-    btn.disabled=!(preview&&parsed&&parsed.length===preview.productos.length&&!hasUnmatched&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value);
+    btn.disabled=!(preview&&parsed&&parsed.length===preview.productos.length&&!hasUnmatched&&!hasDuplicateProducts&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
   }
   async function previewOpening(){
     const result=$('bc7-period-result');const btn=$('bc7-period-preview');
@@ -266,6 +272,7 @@
   }
   async function open(){
     if(!navigator.onLine){notify('Conecta el dispositivo para registrar una apertura.','error');return;}
+    if(!currentWarehouse()){notify('Selecciona La Cueva en el almacén del panel administrativo antes de abrir el formulario.','error');return;}
     try{
       const people=await loadPeople();
       if(!people.length)throw new Error('No se pudo cargar la lista de dependientas activas.');
