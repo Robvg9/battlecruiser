@@ -408,7 +408,7 @@
     const sessionId=detail.sesion.id;
     const products=arr(detail.productos);
     const isRetail=detail.sesion.es_minorista===true;
-    const isOwner=state.admin||can('reinversiones','editar_any');
+    const isOwner=can('reinversiones','editar_any');
     const showExpenses=state.admin||isAssigned;
     const showReinvestments=state.admin||isAssigned;
     const showSales=!isRetail&&(state.admin||can('ventas','ver'));
@@ -752,7 +752,7 @@
       msg(message,'Indica un porcentaje entre 0 y 100.','error');return;
     }
     if(!state.detail?.sesion?.almacen_id){msg(message,'No se pudo identificar el almacén de esta jornada.','error');return;}
-    if(!confirm('Se guardará un salario de '+qty(rate)+'% sobre las ventas calculadas por inventario para este almacén. ¿Confirmas?'))return;
+    if(!confirm('Se guardará un salario de '+qty(rate)+'% sobre las ventas calculadas por inventario de esta jornada y quedará como predeterminado para futuras jornadas de La Cueva. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');
     if(!busy(btn,true))return;
     try{
