@@ -2,7 +2,22 @@ BEGIN;
 
 ALTER TABLE public.turno_jornada_programacion ADD COLUMN IF NOT EXISTS fecha_fin date;
 UPDATE public.turno_jornada_programacion SET fecha_fin=fecha WHERE fecha_fin IS NULL;
+DO $period_salary_constraint$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.turno_jornada_programacion'::regclass
+      AND conname='turno_jornada_programacion_salario_porcentaje_chk'
+  ) THEN
+    ALTER TABLE public.turno_jornada_programacion
+      ADD CONSTRAINT turno_jornada_programacion_salario_porcentaje_chk
+      CHECK (salario_porcentaje IS NULL OR salario_porcentaje BETWEEN 0 AND 100);
+  END IF;
+END;
+$period_salary_constraint$;
+
 ALTER TABLE public.turno_sesiones ADD COLUMN IF NOT EXISTS apertura_retroactiva boolean NOT NULL DEFAULT false;
+ALTER TABLE public.turno_jornada_programacion ADD COLUMN IF NOT EXISTS salario_porcentaje numeric(6,3);
 
 CREATE OR REPLACE FUNCTION public.bc5_guard_jornada_assignment_conflicts()
 RETURNS trigger
@@ -349,10 +364,10 @@ BEGIN
 
   INSERT INTO public.turno_jornada_programacion
     (turno_id,almacen_id,numero_dia,fecha,fecha_fin,trabaja,responsable_id,hora_inicio_prevista,
-     hora_fin_prevista,zona_horaria,patron_id,estado,motivo_ajuste,creado_por,actualizado_por)
+     hora_fin_prevista,zona_horaria,patron_id,estado,motivo_ajuste,creado_por,actualizado_por,salario_porcentaje)
   VALUES(v_turno.id,p_almacen_id,1,p_fecha_inicio,p_fecha_fin,true,p_responsable_id,
     v_hour_start,v_hour_end,v_timezone,NULL,'PROGRAMADA',
-    coalesce(nullif(btrim(p_observacion),''),'Registro administrativo de jornada ya iniciada.'),v_uid,v_uid)
+    coalesce(nullif(btrim(p_observacion),''),'Registro administrativo de jornada ya iniciada.'),v_uid,v_uid,v_cfg.salario_porcentaje)
   RETURNING * INTO v_programacion;
 
   INSERT INTO public.turno_sesiones(turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id)
@@ -1662,39 +1677,56 @@ WHERE lower(btrim(r.nombre)) IN ('dueño','dueno') AND r.activo=true
 ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
 
 CREATE OR REPLACE FUNCTION public.bc7_configurar_salario_porcentaje_jornada(
-  p_almacen_id uuid,p_porcentaje numeric
+  p_turno_sesion_id uuid,p_porcentaje numeric
 )
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public','pg_temp'
 AS $function$
-DECLARE v_old numeric;
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_old numeric;
+  v_store_old numeric;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.tiene_permiso('reinversiones','editar_any') THEN
     RAISE EXCEPTION 'Solo Dueño puede configurar el porcentaje salarial.' USING ERRCODE='42501';
   END IF;
-  IF p_almacen_id IS NULL OR p_porcentaje IS NULL OR p_porcentaje<0 OR p_porcentaje>100 THEN
+  IF p_turno_sesion_id IS NULL OR p_porcentaje IS NULL OR p_porcentaje<0 OR p_porcentaje>100 THEN
     RAISE EXCEPTION 'El porcentaje debe estar entre 0 y 100.' USING ERRCODE='22023';
   END IF;
-  SELECT salario_porcentaje INTO v_old
+  SELECT * INTO v_s FROM public.turno_sesiones
+  WHERE id=p_turno_sesion_id AND bloque='JORNADA';
+  IF NOT FOUND THEN RAISE EXCEPTION 'No existe la jornada indicada.' USING ERRCODE='23503'; END IF;
+  IF v_s.estado IN ('COMPLETADA','CERRADA','CANCELADA') THEN
+    RAISE EXCEPTION 'No se puede cambiar el porcentaje de una jornada cerrada o cancelada.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion
+  WHERE id=v_s.jornada_programacion_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No existe la programación de esta jornada.' USING ERRCODE='23503'; END IF;
+  v_old:=v_p.salario_porcentaje;
+  SELECT salario_porcentaje INTO v_store_old
   FROM public.turno_jornada_configuracion
-  WHERE almacen_id=p_almacen_id FOR UPDATE;
+  WHERE almacen_id=v_s.almacen_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'No existe configuración de jornada para el almacén.' USING ERRCODE='23503'; END IF;
+  UPDATE public.turno_jornada_programacion
+  SET salario_porcentaje=p_porcentaje,actualizado_por=auth.uid(),actualizado_en=now()
+  WHERE id=v_p.id;
   UPDATE public.turno_jornada_configuracion
   SET salario_porcentaje=p_porcentaje,
       salario_porcentaje_actualizado_por=auth.uid(),
       salario_porcentaje_actualizado_en=now(),
       actualizado_por=auth.uid(),
       actualizado_en=now()
-  WHERE almacen_id=p_almacen_id;
+  WHERE almacen_id=v_s.almacen_id;
   INSERT INTO public.turno_jornada_eventos
-    (almacen_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
-  VALUES(p_almacen_id,auth.uid(),'SALARIO_PORCENTAJE_CONFIGURADO',
-    'Configuración del porcentaje de salario por ventas comprobadas.',
-    jsonb_build_object('salario_porcentaje',v_old),
-    jsonb_build_object('salario_porcentaje',p_porcentaje));
-  RETURN jsonb_build_object('ok',true,'almacen_id',p_almacen_id,'salario_porcentaje',p_porcentaje);
+    (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES(v_s.almacen_id,v_p.id,auth.uid(),'SALARIO_PORCENTAJE_CONFIGURADO',
+    'Se fijó el porcentaje salarial de esta jornada; el valor queda congelado al cerrarla.',
+    jsonb_build_object('salario_porcentaje_jornada',v_old,'salario_porcentaje_predeterminado',v_store_old),
+    jsonb_build_object('salario_porcentaje_jornada',p_porcentaje,'salario_porcentaje_predeterminado',p_porcentaje));
+  RETURN jsonb_build_object('ok',true,'turno_sesion_id',v_s.id,'salario_porcentaje',p_porcentaje);
 END;
 $function$;
 REVOKE ALL ON FUNCTION public.bc7_configurar_salario_porcentaje_jornada(uuid,numeric) FROM PUBLIC,anon;
@@ -1817,7 +1849,7 @@ BEGIN
   ) THEN RAISE EXCEPTION 'Solo el responsable asignado o ADMIN puede consultar entregas diarias.' USING ERRCODE='42501'; END IF;
   SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
   SELECT jsonb_build_object(
-    'salario_porcentaje',(SELECT c.salario_porcentaje FROM public.turno_jornada_configuracion c WHERE c.almacen_id=v_s.almacen_id),
+    'salario_porcentaje',v_p.salario_porcentaje,
     'fecha_inicio',v_p.fecha,
     'fecha_fin',coalesce(v_p.fecha_fin,v_p.fecha),
     'entregas',coalesce((
@@ -1903,7 +1935,7 @@ BEGIN
   WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO';
   v_start_at:=coalesce(v_turno.apertura_real,v_initial.confirmado_en,v_initial.creado_en);
   v_end_at:=coalesce(v_final.confirmado_en,v_final.creado_en,now());
-  v_rate:=(SELECT c.salario_porcentaje FROM public.turno_jornada_configuracion c WHERE c.almacen_id=v_s.almacen_id);
+  v_rate:=v_p.salario_porcentaje;
 
   WITH initial_lines AS (
     SELECT l.producto_id AS product_id,l.cantidad_contada::numeric AS qty
