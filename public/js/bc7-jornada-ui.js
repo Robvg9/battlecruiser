@@ -598,13 +598,16 @@
   }
   async function loadFinances(detail){
     const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'');
+    const isRetail=detail.sesion.es_minorista===true;
     const hasExpenses=state.admin||isAssigned;
     const hasReinvestments=state.admin||isAssigned;
-    const hasSales=state.admin||can('ventas','ver');
+    const hasDailyCash=isRetail&&(state.admin||isAssigned);
+    const hasSettlement=isRetail&&(state.admin||isAssigned);
+    const hasSales=!isRetail&&(state.admin||can('ventas','ver'));
     const hasFinance=hasExpenses||hasReinvestments;
-    if(!hasFinance&&!hasSales)return true;
+    if(!hasFinance&&!hasSales&&!hasDailyCash&&!hasSettlement)return true;
     const sessionId=detail.sesion.id;
-    let financeData={},salesData={};
+    let financeData={},salesData={},dailyData=null,settlement=null;
     if(hasFinance){
       try{financeData=await rpc('bc7_finanzas_jornada',{p_turno_sesion_id:sessionId})||{};}
       catch(e){
@@ -619,6 +622,26 @@
         renderSalesLedger($('bc7-sales-list'),salesData);
       }catch(e){
         if($('bc7-sales-list'))msg($('bc7-sales-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
+      }
+    }
+    if(hasDailyCash){
+      try{
+        dailyData=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
+        state.dailyCashData=dailyData;
+        renderDailyCash($('bc7-daily-cash-list'),dailyData);
+        const rateInput=document.querySelector('[data-bc7-salary-percent]');
+        if(rateInput&&document.activeElement!==rateInput)rateInput.value=dailyData.salario_porcentaje==null?'':String(dailyData.salario_porcentaje);
+      }catch(e){
+        if($('bc7-daily-cash-list'))msg($('bc7-daily-cash-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
+      }
+    }
+    if(hasSettlement){
+      try{
+        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})||{};
+        state.inventorySettlement=settlement;
+        renderInventorySettlement($('bc7-inventory-settlement'),settlement);
+      }catch(e){
+        if($('bc7-inventory-settlement'))msg($('bc7-inventory-settlement'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
       }
     }
     if(hasExpenses)renderFinanceList($('bc7-expenses-list'),arr(financeData.gastos),'gastos');
