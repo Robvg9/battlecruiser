@@ -61,7 +61,7 @@ test("inventory detail has a direct route into the flavor and per-warehouse mini
   assert.match(css, /white-space: normal/);
 });
 
-test("PWA release and cache manifest are aligned at 9.5.91", () => {
+test("PWA release and cache manifest are aligned at 9.5.92", () => {
   const app = read("public/app.js");
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
