@@ -261,15 +261,17 @@ Deno.serve(async (req: Request) => {
 
       const { data: existing, error: existingError } = await admin
         .from("bc_password_recovery_requests")
-        .select("id")
+        .select("id,status,expires_at")
         .eq("target_user_id", targetAuth.id)
-        .in("status", ["PENDIENTE", "PROCESANDO"])
-        .gt("expires_at", now)
+        .in("status", ["PENDIENTE", "PROCESANDO", "APROBADA"])
         .maybeSingle();
 
       if (existingError) throw new Error("RECOVERY_QUEUE_READ_FAILED");
-      // Do not send repeated emails while an open request already exists.
-      if (existing) return reply({ accepted: true }, 200, origin);
+      // An approved request remains open until the dependent proves the personal password change.
+      // Never create a second request while one is pending, processing or approved.
+      if (existing && (existing.status === "APROBADA" || new Date(existing.expires_at).getTime() > Date.now())) {
+        return reply({ accepted: true }, 200, origin);
+      }
 
       const requestId = crypto.randomUUID();
       const username = String(profile.username || targetAuth.user_metadata?.battlecruiser_username || identifier).slice(0, 80);
