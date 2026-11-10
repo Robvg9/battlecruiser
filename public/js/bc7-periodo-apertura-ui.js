@@ -180,7 +180,7 @@
       '<label class="bc7-period-field">Inventario anterior (.xlsx o .csv)<input id="bc7-period-file" type="file" accept=".xlsx,.csv" required></label>'+
       '</div>'+
       '<div class="bc7-period-box"><b>Inventario inicial heredado</b><div id="bc7-period-inventory-preview" class="bc7-period-muted">Selecciona el Excel de Adriana para revisar sus cantidades.</div></div>'+
-      '<div class="bc7-period-box"><b>Entradas existentes en el período</b><p class="bc7-period-muted">Marca solo las transferencias posteriores al conteo físico inicial. Las de 09:07 y 15:16 aparecen sugeridas; revisa también la de 07:15 según la hora real del conteo.</p><div id="bc7-period-transfer-list" class="bc7-period-muted">Primero selecciona fechas para consultar las entradas.</div></div>'+
+      '<div class="bc7-period-box"><b>Entradas existentes en el período</b><p class="bc7-period-muted">Las entradas de 09:07 y 15:16 son posteriores al inventario heredado. La de 07:15 ya forma parte del cierre de Adriana y no se vinculará de nuevo.</p><div id="bc7-period-transfer-list" class="bc7-period-muted">Primero selecciona fechas para consultar las entradas.</div></div>'+
       '<label class="bc7-period-field">Observación administrativa<input id="bc7-period-note" maxlength="1000" value="Apertura retroactiva: inventario final de Adriana (7–8 nov. 2026) como inventario inicial de Sheyla (9–10 nov. 2026)."></label>'+
       '<p id="bc7-period-result" class="bc7-period-muted" role="status" aria-live="polite"></p>'+
       '<div class="bc7-period-actions"><button type="button" data-bc7-period-cancel>Cancelar</button><button type="button" class="primary" id="bc7-period-preview">Revisar inventario y entradas</button><button type="button" class="primary" id="bc7-period-confirm" disabled>Confirmar apertura</button></div>'+
@@ -210,44 +210,62 @@
   }
   function updateConfirm(){
     const btn=$('bc7-period-confirm');if(!btn)return;
-    const hasUnmatched=parsed&&parsed.some(row=>!row.producto_id);
-    const uniqueIds=parsed?new Set(parsed.map(row=>row.producto_id).filter(Boolean)).size:0;
-    const hasDuplicateProducts=!!parsed&&uniqueIds!==parsed.length;
+    const hasUnmappedPositive=!!parsed&&parsed.some(row=>Number(row.cantidad)>0&&!row.producto_id);
+    const rootsReady=!!preview&&asArray(preview.productos).length>0;
     const start=$('bc7-period-start')?.value,end=$('bc7-period-end')?.value,started=$('bc7-period-started')?.value;
-    btn.disabled=!(preview&&parsed&&parsed.length===preview.productos.length&&!hasUnmatched&&!hasDuplicateProducts&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
+    btn.disabled=!(preview&&parsed&&parsed.length>0&&rootsReady&&!hasUnmappedPositive&&start&&end&&end>=start&&started&&$('bc7-period-person')?.value&&$('bc7-period-warehouse')?.value);
   }
   async function previewOpening(){
     const result=$('bc7-period-result');const btn=$('bc7-period-preview');
     if(!parsed){result.textContent='Selecciona primero el Excel del inventario anterior.';return;}
     const warehouse=$('bc7-period-warehouse').value,start=$('bc7-period-start').value,end=$('bc7-period-end').value;
     if(!warehouse||!start||!end||end<start){result.textContent='Completa el almacén y un período válido.';return;}
-    btn.disabled=true;result.textContent='Consultando catálogo y transferencias…';
+    btn.disabled=true;result.textContent='Consultando catálogo agrupado y transferencias…';
     try{
       preview=await callRpc('bc7_previsualizar_apertura_existente',{p_almacen_id:warehouse,p_fecha_inicio:start,p_fecha_fin:end});
       const products=asArray(preview&&preview.productos);
-      const variantCount=products.filter(p=>p.producto_padre_id).length;
+      if(!products.length)throw new Error('El catálogo no devolvió productos/familias activos para este almacén.');
       productsByName=new Map();
       products.forEach(p=>{const key=norm(p.nombre);if(!productsByName.has(key))productsByName.set(key,[]);productsByName.get(key).push(p);});
-      let unmatched=[],duplicates=[],seen=new Set();
       parsed.forEach(row=>{
-        const key=norm(row.nombre),matches=productsByName.get(key)||[];
-        if(matches.length===1)row.producto_id=matches[0].producto_id;
-        else if(matches.length>1)duplicates.push(row.nombre);
-        else unmatched.push(row.nombre);
-        if(seen.has(key))duplicates.push(row.nombre);seen.add(key);
+        const matches=productsByName.get(norm(row.nombre))||[];
+        row.producto_id=matches.length===1?String(matches[0].producto_id):'';
+        row.omitir=!row.producto_id&&Number(row.cantidad)===0;
       });
-      const rows=parsed.filter(x=>x.producto_id);
-      const tableRows=parsed.map(row=>{
-        const product=products.find(p=>String(p.producto_id)===String(row.producto_id));
-        return '<tr><td>'+esc(row.nombre)+'</td><td><b>'+esc(row.cantidad)+'</b></td><td>'+esc(product&&product.stock_sistema!=null?product.stock_sistema:'—')+'</td></tr>';
+      const familyCount=products.filter(p=>p.es_familia===true).length;
+      const unmatched=parsed.filter(row=>Number(row.cantidad)>0&&!row.producto_id);
+      const tableRows=parsed.map((row,index)=>{
+        const options=['<option value="">Selecciona producto/familia…</option>'];
+        products.forEach(product=>{
+          const id=String(product.producto_id);
+          const selected=id===String(row.producto_id)?' selected':'';
+          const family=product.es_familia?' · total de familia':'';
+          options.push('<option value="'+esc(id)+'"'+selected+'>'+esc(product.nombre+family)+'</option>');
+        });
+        if(row.omitir)options.push('<option value="__omit" selected>Omitir: 0 unidades</option>');
+        const selector='<select data-bc7-period-map="'+index+'" aria-label="Relacionar '+esc(row.nombre)+'">'+options.join('')+'</select>';
+        const status=row.producto_id?'<span class="bc7-period-ok">Relacionado</span>':(row.omitir?'<span class="bc7-period-muted">Sin stock: omitido</span>':'<span class="bc7-period-error">Pendiente</span>');
+        return '<tr><td>'+esc(row.nombre)+'</td><td><b>'+esc(row.cantidad)+'</b></td><td>'+selector+'</td><td>'+status+'</td></tr>';
       }).join('');
-      $('bc7-period-inventory-preview').innerHTML='<b>'+rows.length+'/'+products.length+'</b> productos relacionados'+
-        (unmatched.length?'<p class="bc7-period-error">Sin coincidencia: '+esc(unmatched.slice(0,12).join(', '))+(unmatched.length>12?'…':'')+'</p>':'')+
-        (duplicates.length?'<p class="bc7-period-error">Nombres duplicados en el Excel o catálogo: '+esc(duplicates.slice(0,12).join(', '))+'</p>':'')+
-        '<p class="bc7-period-muted">Columna Fin del cuadre anterior: cantidades importadas como inventario inicial. «Stock actual» es solo una referencia y puede incluir las entradas que selecciones abajo.</p>'+(variantCount?'<p class="bc7-period-muted">El catálogo incluye '+variantCount+' variantes con stock independiente. Cada sabor debe tener su propia fila y cantidad en el Excel; no se reparte automáticamente un total entre sabores.</p>':'')+
-        '<div class="bc7-period-table-wrap"><table class="bc7-period-table"><thead><tr><th>Producto</th><th>Fin (conteo)</th><th>Stock actual (referencia)</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>';
+      const total=parsed.reduce((sum,row)=>sum+Number(row.cantidad||0),0);
+      $('bc7-period-inventory-preview').innerHTML=
+        '<b>'+parsed.length+' filas del Excel · '+products.length+' productos/familias en catálogo</b>'+
+        '<p class="bc7-period-muted">Total de la columna Fin: <b>'+esc(total)+'</b> unidades. '+familyCount+' familias tienen sabores y se contarán como un solo producto, sin repartir cantidades.</p>'+
+        (unmatched.length?'<p class="bc7-period-error">'+unmatched.length+' líneas con cantidad positiva necesitan relación con el catálogo. Si un producto no existe, habrá que darlo de alta antes de abrir la jornada.</p>':'<p class="bc7-period-ok">Todas las cantidades positivas están relacionadas.</p>')+
+        '<div class="bc7-period-table-wrap"><table class="bc7-period-table"><thead><tr><th>Nombre del Excel</th><th>Fin</th><th>Producto de BattleCruiser</th><th>Estado</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>';
+      modal.querySelectorAll('[data-bc7-period-map]').forEach(select=>{
+        select.addEventListener('change',()=>{
+          const index=Number(select.getAttribute('data-bc7-period-map'));
+          if(!parsed[index])return;
+          parsed[index].producto_id=select.value&&select.value!=='__omit'?select.value:'';
+          parsed[index].omitir=select.value==='__omit';
+          updateConfirm();
+          const pending=parsed.filter(row=>Number(row.cantidad)>0&&!row.producto_id).length;
+          result.textContent=pending?pending+' productos con cantidad positiva necesitan relación.':'Relación completa. Revisa las transferencias antes de confirmar.';
+        });
+      });
       renderTransfers();
-      result.textContent='Revisión lista. Comprueba las cantidades y selecciona las entradas correctas.';
+      result.textContent=unmatched.length?'Revisa las relaciones pendientes y las transferencias.':'Previsualización lista. Revisa las transferencias.';
     }catch(e){preview=null;result.textContent=e.message||'No se pudo cargar la previsualización.';}
     finally{btn.disabled=false;updateConfirm();}
   }
@@ -256,6 +274,9 @@
     if(!rows.length){host.textContent='No hay transferencias completadas hacia este almacén en las fechas elegidas.';return;}
     host.innerHTML=rows.map(t=>{
       const time=String(t.hora_local||'').slice(0,5),date=String(t.fecha_local||'').slice(0,10);
+      if(date==='2026-11-09'&&time==='07:15'){
+        return '<div class="bc7-period-transfer"><span><b>09 nov. · 07:15</b><br>Ya incluida en el inventario final de Adriana; no se vinculará.</span><small>No sumar</small></div>';
+      }
       const suggested=date==='2026-11-09'&&(time==='09:07'||time==='15:16');
       return '<label class="bc7-period-transfer"><input type="checkbox" data-bc7-period-transfer value="'+esc(t.id)+'" '+(suggested?'checked':'')+'><span><b>'+esc(date)+' · '+esc(time)+'</b><br>'+esc(t.origen||'Almacén de origen')+' · '+esc(t.lineas||0)+' líneas</span><small>'+esc(t.unidades||0)+' unidades</small></label>';
     }).join('');
@@ -266,10 +287,19 @@
     const started=$('bc7-period-started').value;
     const person=$('bc7-period-person').value,warehouse=$('bc7-period-warehouse').value;
     if(!parsed||!preview||!person||!started){result.textContent='Faltan datos para confirmar.';return;}
-    const lines=parsed.map(row=>({producto_id:row.producto_id,cantidad:row.cantidad}));
+    const totals=new Map(asArray(preview.productos).map(product=>[String(product.producto_id),0]));
+    parsed.forEach(row=>{
+      if(row.producto_id&&totals.has(String(row.producto_id))){
+        totals.set(String(row.producto_id),totals.get(String(row.producto_id))+Number(row.cantidad||0));
+      }
+    });
+    const lines=asArray(preview.productos).map(product=>({
+      producto_id:String(product.producto_id),cantidad:String(totals.get(String(product.producto_id))||0)
+    }));
     const ids=selectedTransferIds();
     const label=peopleName(person);
-    if(!confirm('Vas a abrir la jornada '+start+' a '+end+' con responsable '+label+'.\nSe guardarán '+lines.length+' cantidades iniciales y se vincularán '+ids.length+' transferencias existentes. El stock general no se modificará. ¿Confirmas?'))return;
+    const sourceTotal=parsed.reduce((sum,row)=>sum+Number(row.cantidad||0),0);
+    if(!confirm('Vas a abrir la jornada '+start+' a '+end+' con responsable '+label+'.\nSe importarán '+parsed.length+' filas de la columna Fin ('+sourceTotal+' unidades), agrupadas en '+lines.length+' productos/familias. Se vincularán '+ids.length+' transferencias existentes. La entrada de 07:15 no se repetirá y el stock general no se modificará. ¿Confirmas?'))return;
     btn.disabled=true;result.textContent='Registrando apertura…';
     try{
       const data=await callRpc('bc7_admin_abrir_jornada_existente',{
