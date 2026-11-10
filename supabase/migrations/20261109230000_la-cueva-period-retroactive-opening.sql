@@ -2084,6 +2084,16 @@ BEGIN
     INTO v_total_lines,v_priced_lines,v_negative_lines,v_total_units,v_sales_total,v_lines
   FROM calculated;
 
+  -- Do not present provisional sales or salary as if the missing final stock were zero.
+  IF v_initial.id IS NULL OR v_final.id IS NULL THEN
+    v_total_lines:=0;
+    v_priced_lines:=0;
+    v_negative_lines:=0;
+    v_total_units:=NULL;
+    v_sales_total:=NULL;
+    v_lines:='[]'::jsonb;
+  END IF;
+
   SELECT coalesce(sum(g.monto) FILTER(WHERE g.estado='APROBADO'),0),
          count(*) FILTER(WHERE g.estado='PENDIENTE')
     INTO v_expenses,v_pending_expenses
