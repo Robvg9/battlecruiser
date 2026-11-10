@@ -168,8 +168,8 @@ test("Paso 4 reset: missing session does not call updateUser", async (t) => {
   assert.equal(c.calls.length, 0);
 });
 
-test("Paso 4 reset: valid recovery session updates password, clears form and ends recovery mode", async (t) => {
-  const c = passwordDom({ recoveryMode: true });
+test("Paso 4 reset: valid authenticated user can change password from Mi Cuenta", async (t) => {
+  const c = passwordDom();
   t.after(() => c.dom.window.close());
   const form = c.window.document.getElementById("form-pass");
   const submit = form.querySelector("button[type='submit']");
@@ -182,7 +182,7 @@ test("Paso 4 reset: valid recovery session updates password, clears form and end
   assert.equal(c.window.document.getElementById("pass-new").value, "");
   assert.equal(c.window.document.getElementById("pass-confirm").value, "");
   assert.equal(c.window._bcRecoveryMode, false);
-  assert.equal(c.window.document.querySelector("#pass-panel h3").textContent, "Contraseña actualizada");
+  assert.equal(c.window.document.querySelector("#pass-panel h3").textContent, "Cambiar contraseña");
   assert.equal(submit.disabled, false);
 });
 
