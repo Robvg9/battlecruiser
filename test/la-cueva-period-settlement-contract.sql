@@ -106,10 +106,10 @@ BEGIN
 
   -- Approved expense is deducted from expected cash; pending items would block settlement.
   INSERT INTO public.gastos(
-    almacen_id,ciclo_id,sesion_id,turno_id,concepto,descripcion,monto,estado,
+    almacen_id,ciclo_id,sesion_id,concepto,descripcion,monto,estado,
     creado_por,creado_nombre,turno_sesion_id,turno_tramo_id
   ) VALUES(
-    v_warehouse,NULL,NULL,v_turn,'Gasto fixture','Gasto aprobado para el contrato',5,'APROBADO',
+    v_warehouse,NULL,NULL,'Gasto fixture','Gasto aprobado para el contrato',5,'APROBADO',
     v_worker,'Dependienta fixture',v_session,v_tranche
   );
 
