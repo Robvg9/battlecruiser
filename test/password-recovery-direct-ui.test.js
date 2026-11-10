@@ -24,7 +24,7 @@ assert.match(auth, /Crea tu contraseña personal/, "the forced-change form must 
 assert.match(auth, /updateUser\(\{ password: nueva \}\)/, "password change must use Supabase Auth updateUser");
 assert.match(auth, /Contraseña actualizada/, "successful reset must confirm completion");
 assert.match(html, /id="password-recovery-request-btn"/, "login must show the recovery-email button");
-assert.match(html, /usuario para enviar una solicitud al correo maestro/, "the login screen must explain that recovery goes through Administration");
+assert.match(html, /usuario para solicitar recuperación a Administración/, "the login screen must explain that recovery goes through Administration");
 assert.match(html, /id="password-recovery-msg"/, "login must display recovery request status");
 assert.match(html, /id="pass-panel"/, "the password form must exist in the app shell");
 assert.match(html, /id="pass-new"/, "new password field must exist");
