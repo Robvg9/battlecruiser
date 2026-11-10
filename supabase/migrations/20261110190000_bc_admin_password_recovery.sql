@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS bc_password_recovery_target_idx
 
 CREATE UNIQUE INDEX IF NOT EXISTS bc_password_recovery_one_open_request_uidx
   ON public.bc_password_recovery_requests (target_user_id)
-  WHERE status IN ('PENDIENTE','PROCESANDO');
+  WHERE status IN ('PENDIENTE','PROCESANDO','APROBADA');
 
 ALTER TABLE public.bc_password_recovery_requests ENABLE ROW LEVEL SECURITY;
 
