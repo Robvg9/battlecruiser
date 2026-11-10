@@ -1,5 +1,5 @@
 // BattleCruiser — apertura administrativa de jornada ya iniciada
-// v1.5 — omite filas resumen del Excel y conserva solo las filas de productos.
+// v1.6 — importación de la columna Fin, mapeo de familias y bloqueo de filas sin correspondencia.
 (function(){
   'use strict';
   if(window.__BC7_PERIOD_OPENING__)return;
