@@ -334,8 +334,24 @@ Deno.serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
 
-    if (approvedRequestError || !approvedRequest?.temporary_password_salt || !approvedRequest?.temporary_password_hash) {
+    if (approvedRequestError) return reply({ error: "No se pudo validar la autorización." }, 500, origin);
+    if (!approvedRequest) {
+      // An earlier completion can be retried with a still-cached JWT after server metadata
+      // was cleared; only a server-recorded COMPLETADA request permits this idempotent path.
+      const { data: completedRequest, error: completedError } = await admin
+        .from("bc_password_recovery_requests")
+        .select("id")
+        .eq("target_user_id", current.id)
+        .eq("status", "COMPLETADA")
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!completedError && completedRequest) return reply({ completed: true }, 200, origin);
       return reply({ error: "No existe una autorización de cambio pendiente para esta cuenta." }, 403, origin);
+    }
+    if (!approvedRequest.temporary_password_salt || !approvedRequest.temporary_password_hash) {
+      return reply({ error: "La autorización no tiene un verificador temporal válido." }, 403, origin);
     }
 
     // Reject the temporary password itself. Only a genuinely different password may clear the gate.
@@ -363,10 +379,11 @@ Deno.serve(async (req: Request) => {
     });
     if (error) return reply({ error: "No se pudo confirmar el cambio obligatorio." }, 500, origin);
 
-    await admin.from("bc_password_recovery_requests")
+    const { error: completionWriteError } = await admin.from("bc_password_recovery_requests")
       .update({ status: "COMPLETADA", completed_at: new Date().toISOString(), temporary_password_salt: null, temporary_password_hash: null })
       .eq("id", approvedRequest.id)
       .eq("status", "APROBADA");
+    if (completionWriteError) console.warn("[bc-password-recovery-admin] completion record update failed");
     return reply({ completed: true }, 200, origin);
   }
 
