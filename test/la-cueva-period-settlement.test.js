@@ -50,7 +50,7 @@ test("daily cash is date-scoped, idempotent, pending by default, and owner-appro
 
 test("salary percentage is an owner-configured per-jornada snapshot", () => {
   assert.match(migration, /salario_porcentaje numeric\(6,3\)/);
-  assert.match(migration, /salario_porcentaje=v_cfg\.salario_porcentaje/);
+  assert.match(migration, /v_cfg\\.salario_porcentaje/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc7_configurar_salario_porcentaje_jornada\(\s*p_turno_sesion_id uuid/);
   assert.match(migration, /v_rate:=v_p\.salario_porcentaje/);
   assert.match(migration, /salario_porcentaje_jornada/);
