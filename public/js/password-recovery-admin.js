@@ -275,7 +275,12 @@
         if (input) input.focus();
         return;
       }
-      if (!window.confirm("¿Autorizar el restablecimiento de esta cuenta? La dependienta deberá cambiar la contraseña en su próximo acceso.")) return;
+      var requestRecord = currentRequests.find(function (item) { return item.id === requestId; });
+      var isReissue = requestRecord && requestRecord.status === "APROBADA";
+      var confirmationText = isReissue
+        ? "¿Reemitir la contraseña temporal? La temporal anterior dejará de funcionar y deberás entregar esta nueva a la dependienta."
+        : "¿Autorizar el restablecimiento de esta cuenta? La dependienta deberá cambiar la contraseña en su próximo acceso.";
+      if (!window.confirm(confirmationText)) return;
       busy = true;
       button.disabled = true;
       button.textContent = "Autorizando…";
