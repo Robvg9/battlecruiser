@@ -53,6 +53,10 @@ jobs:
         shell: cmd
         run: deno check --config supabase/functions/deno.json supabase/functions/bc-bootstrap-admin/index.ts
 
+      - name: Type-check admin password recovery Edge Function
+        shell: cmd
+        run: deno check --config supabase/functions/deno.json supabase/functions/bc-password-recovery-admin/index.ts
+
       - name: Production JS integrity and syntax
         shell: cmd
         run: node test/ci-preflight.js
@@ -67,6 +71,7 @@ jobs:
           node --check public/app.js
           node --check public/service-worker.js
           node --check public/js/bootstrap.js
+          node --check public/js/password-recovery-admin.js
           node --check public/js/m33-turnos-final.js
           node --check public/js/bc7-jornada-ui.js
           node --check public/js/turnos-maestro.js

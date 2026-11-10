@@ -20,11 +20,12 @@ function recoveryDom(fetchImpl) {
   const { window } = dom;
   window.SUPABASE_URL = "https://supabase.example.invalid";
   window.SUPABASE_ANON_KEY = "test-anon-key";
+  window.bcPasswordRecoveryEndpoint = () => "https://supabase.example.invalid/functions/v1/bc-password-recovery-admin";
   window.fetch = fetchImpl;
   window.safeInit = (name, callback) => {
     if (name === "password-recovery-request") callback();
   };
-  const start = AUTH.indexOf("// Recuperación coherente con el login");
+  const start = AUTH.indexOf("// Recuperación dirigida a Administración");
   const end = AUTH.indexOf('\nsafeInit("logout", () => {', start);
   assert.ok(start >= 0 && end > start, "must find the production recovery handler");
   window.eval(AUTH.slice(start, end));
@@ -62,6 +63,7 @@ function passwordDom(options = {}) {
     if (name === "cambiar-contraseña") callback();
   };
   window._bcRecoveryMode = !!options.recoveryMode;
+  window._bcMandatoryPasswordChange = false;
   window.setMsg = (id, message, ok) => {
     const element = window.document.getElementById(id);
     element.textContent = message;
@@ -90,11 +92,11 @@ test("Paso 4 recovery: campo vacío no envía solicitud y enfoca identificador",
   t.after(() => c.dom.window.close());
   c.window.document.getElementById("email").value = "  ";
   c.window.document.getElementById("password-recovery-request-btn").click();
-  assert.match(c.window.document.getElementById("password-recovery-msg").textContent, /Escribe tu correo o nombre de usuario/i);
+  assert.match(c.window.document.getElementById("password-recovery-msg").textContent, /Escribe tu nombre de usuario/i);
   assert.equal(fetchCalls, 0, "invalid input must stop before fetch");
 });
 
-test("Paso 4 recovery: submits email/username through server-side resolver and shows generic success", async (t) => {
+test("Paso 4 recovery: submits identifier to admin queue and shows generic success", async (t) => {
   const calls = [];
   const c = recoveryDom(async (url, options) => {
     calls.push({ url, options });
@@ -104,20 +106,20 @@ test("Paso 4 recovery: submits email/username through server-side resolver and s
   c.window.document.getElementById("email").value = "  owner@example.invalid  ";
   const button = c.window.document.getElementById("password-recovery-request-btn");
   button.click();
-  assert.ok(await waitFor(() => /correo o nombre de usuario corresponde a una cuenta activa/i.test(
+  assert.ok(await waitFor(() => /Solicitud registrada/i.test(
     c.window.document.getElementById("password-recovery-msg").textContent
   )), "successful recovery response must show a non-enumerating generic result");
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, "https://supabase.example.invalid/functions/v1/bc-username-login");
+  assert.equal(calls[0].url, "https://supabase.example.invalid/functions/v1/bc-password-recovery-admin");
   assert.equal(calls[0].options.method, "POST");
   assert.equal(calls[0].options.cache, "no-store");
   assert.equal(calls[0].options.headers.apikey, "test-anon-key");
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    mode: "password-recovery",
-    username: "owner@example.invalid"
+    action: "request",
+    identifier: "owner@example.invalid"
   });
   assert.equal(button.disabled, false);
-  assert.equal(button.textContent, "Enviar correo de recuperación");
+  assert.equal(button.textContent, "Enviar solicitud a Administración");
 });
 
 test("Paso 4 recovery: rate limit is explicit and button is re-enabled", async (t) => {
@@ -125,7 +127,7 @@ test("Paso 4 recovery: rate limit is explicit and button is re-enabled", async (
   t.after(() => c.dom.window.close());
   c.window.document.getElementById("email").value = "owner";
   c.window.document.getElementById("password-recovery-request-btn").click();
-  assert.ok(await waitFor(() => /Demasiados intentos/i.test(c.window.document.getElementById("password-recovery-msg").textContent)));
+  assert.ok(await waitFor(() => /Demasiadas solicitudes/i.test(c.window.document.getElementById("password-recovery-msg").textContent)));
   assert.equal(c.window.document.getElementById("password-recovery-request-btn").disabled, false);
 });
 
@@ -134,7 +136,7 @@ test("Paso 4 recovery: network/server failure does not expose raw error and butt
   t.after(() => c.dom.window.close());
   c.window.document.getElementById("email").value = "owner";
   c.window.document.getElementById("password-recovery-request-btn").click();
-  assert.ok(await waitFor(() => /No se pudo completar la solicitud/i.test(c.window.document.getElementById("password-recovery-msg").textContent)));
+  assert.ok(await waitFor(() => /No se pudo registrar la solicitud/i.test(c.window.document.getElementById("password-recovery-msg").textContent)));
   assert.doesNotMatch(c.window.document.getElementById("password-recovery-msg").textContent, /secret raw transport detail/);
   assert.equal(c.window.document.getElementById("password-recovery-request-btn").disabled, false);
 });
@@ -166,8 +168,8 @@ test("Paso 4 reset: missing session does not call updateUser", async (t) => {
   assert.equal(c.calls.length, 0);
 });
 
-test("Paso 4 reset: valid recovery session updates password, clears form and ends recovery mode", async (t) => {
-  const c = passwordDom({ recoveryMode: true });
+test("Paso 4 reset: valid authenticated user can change password from Mi Cuenta", async (t) => {
+  const c = passwordDom();
   t.after(() => c.dom.window.close());
   const form = c.window.document.getElementById("form-pass");
   const submit = form.querySelector("button[type='submit']");
@@ -180,7 +182,7 @@ test("Paso 4 reset: valid recovery session updates password, clears form and end
   assert.equal(c.window.document.getElementById("pass-new").value, "");
   assert.equal(c.window.document.getElementById("pass-confirm").value, "");
   assert.equal(c.window._bcRecoveryMode, false);
-  assert.equal(c.window.document.querySelector("#pass-panel h3").textContent, "Contraseña actualizada");
+  assert.equal(c.window.document.querySelector("#pass-panel h3").textContent, "Cambiar contraseña");
   assert.equal(submit.disabled, false);
 });
 

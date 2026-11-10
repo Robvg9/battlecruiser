@@ -212,9 +212,12 @@ function bcScheduleGetSessionRetry() {
       if (_bcAuthBootResolved || _bcAuthSessionDiscovered) return;
       var data = res && res.data;
       if (data && data.session) {
+        if (_bcRecoveryMode) {
+          bcRechazarRecuperacionDirecta();
+          return;
+        }
         bcAuthDiagnostic("SESSION_FOUND_AFTER_RETRY", false);
         bcResolverBootConSesion(data.session);
-        if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
         return;
       }
       if (res && res.error) {
@@ -264,7 +267,11 @@ let _bcRecoveryMode = (function () {
     return false;
   }
 })();
-let _bcRecoveryUiScheduled = false;
+let _bcLegacyRecoveryRejected = false;
+let _bcMandatoryPasswordChange = false;
+let _bcMandatoryPasswordDismissed = false;
+let _bcMandatoryPasswordOverlay = null;
+
 
 function bcIntentarCargarContexto(session) {
   if (typeof cargarContextoUsuario !== "function") return false;
@@ -325,8 +332,16 @@ function bcUIReadyThen(fn) {
 }
 
 function showApp(session) {
-  if (!session || !session.user) return;
+  if (!session || !session.user || _bcLegacyRecoveryRejected || _bcRecoveryMode) return;
   _bcAuthSessionDiscovered = true;
+
+  const metadata = session.user.app_metadata || {};
+  if (metadata.bc_password_change_required === true && !_bcMandatoryPasswordDismissed) {
+    _bcMandatoryPasswordChange = true;
+    bcMostrarFormularioCambioObligatorio();
+  } else if (metadata.bc_password_change_required !== true && !_bcMandatoryPasswordChange) {
+    _bcMandatoryPasswordDismissed = false;
+  }
 
   // Nunca expongas el shell estático/legacy antes de que la cadena UI actual
   // termine. Esto elimina el pantallazo de menús/vistas retirados durante boot.
@@ -373,6 +388,9 @@ function showApp(session) {
 }
 
 function showLogin() {
+  if (_bcMandatoryPasswordOverlay) bcCerrarFormularioCambioObligatorio();
+  _bcMandatoryPasswordChange = false;
+  _bcMandatoryPasswordDismissed = false;
   _bcSesionActivaId = null;
   _bcPendingSession = null;
   _bcAuthBootResolved = true;
@@ -414,50 +432,183 @@ function bcResolverBootConSesion(session) {
   bcUIReadyThen(mostrar);
 }
 
-// Recovery links land here with a valid Supabase recovery session.
-// Display the existing secure updateUser form immediately, without requiring Ajustes.
-function bcMostrarFormularioRecuperacion() {
-  if (_bcRecoveryUiScheduled) return;
-  _bcRecoveryUiScheduled = true;
-  let intentos = 0;
+// Legacy direct recovery links are intentionally rejected after the owner-approval workflow.
+function bcRechazarRecuperacionDirecta() {
+  if (_bcLegacyRecoveryRejected) return;
+  _bcLegacyRecoveryRejected = true;
+  _bcRecoveryMode = false;
 
-  const intentar = () => {
+  // Sign out outside the Auth callback to avoid re-entering Supabase while its lock is held.
+  window.setTimeout(function () {
+    Promise.resolve(client.auth.signOut()).then(function (result) {
+      if (result && result.error) throw result.error;
+      try {
+        var cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("bc_recovery");
+        cleanUrl.hash = "";
+        window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+      } catch (_) {}
+      _bcLegacyRecoveryRejected = false;
+      showLogin();
+      var message = document.getElementById("password-recovery-msg");
+      if (message) {
+        message.className = "msg error";
+        message.textContent = "Los enlaces directos antiguos ya no permiten cambiar contraseñas. Escribe tu usuario y solicita la recuperación a Administración.";
+      }
+    }).catch(function () {
+      showLogin();
+      var message = document.getElementById("password-recovery-msg");
+      if (message) {
+        message.className = "msg error";
+        message.textContent = "Este enlace directo está deshabilitado. Vuelve al login y solicita la recuperación a Administración.";
+      }
+    });
+  }, 0);
+}
+
+function bcMostrarFormularioCambioObligatorio() {
+  if (_bcMandatoryPasswordOverlay) return;
+  let attempts = 0;
+
+  const tryOpen = () => {
     const shell = document.getElementById("app-shell");
     const panel = document.getElementById("pass-panel");
-    if (!shell || !panel) {
-      if (intentos++ < 120) window.setTimeout(intentar, 250);
+    const form = document.getElementById("form-pass");
+    if (!shell || !panel || !form || !shell.classList.contains("visible")) {
+      if (attempts++ < 120) window.setTimeout(tryOpen, 250);
       return;
     }
-    if (!shell.classList.contains("visible")) {
-      if (intentos++ < 120) window.setTimeout(intentar, 250);
-      return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "bc-password-change-gate";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "bc-password-change-title");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:1000000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(3,12,10,.96);";
+
+    const intro = document.createElement("p");
+    intro.id = "bc-password-change-intro";
+    intro.textContent = "Administración estableció una contraseña temporal para tu cuenta. Debes crear tu contraseña personal antes de continuar.";
+    intro.style.cssText = "margin:0 0 14px;line-height:1.5;color:var(--mist,#c6d0c9);";
+    const heading = panel.querySelector("h3");
+    if (heading) {
+      heading.id = "bc-password-change-title";
+      heading.textContent = "Crea tu contraseña personal";
+    }
+    const submit = form.querySelector("button[type='submit']");
+    if (submit) submit.textContent = "Guardar mi contraseña";
+    const passNew = document.getElementById("pass-new");
+    const passConfirm = document.getElementById("pass-confirm");
+    if (passNew) passNew.minLength = 10;
+    if (passConfirm) passConfirm.minLength = 10;
+    const cancel = document.getElementById("pass-cancel-btn");
+    if (cancel) cancel.style.display = "none";
+    const formMessage = document.getElementById("msg-pass");
+    if (formMessage) {
+      formMessage.className = "msg";
+      formMessage.textContent = "El cambio es obligatorio y esta pantalla no se puede cerrar hasta completar la actualización.";
     }
 
     panel.classList.remove("hidden");
-    const heading = panel.querySelector("h3");
-    if (heading) heading.textContent = "Establecer nueva contraseña";
-    const message = document.getElementById("msg-pass");
-    if (message) {
-      message.className = "msg";
-      message.textContent = "Enlace de recuperación reconocido. Escribe la nueva contraseña dos veces y pulsa Guardar nueva contraseña.";
-    }
-    const form = document.getElementById("form-pass");
-    const submit = form && form.querySelector("button[type='submit']");
-    if (submit) submit.textContent = "Guardar nueva contraseña";
+    panel.style.cssText = "display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;box-sizing:border-box!important;width:min(480px,calc(100vw - 28px))!important;max-width:480px!important;max-height:calc(100vh - 32px)!important;overflow:auto!important;margin:0!important;padding:22px!important;border-radius:16px!important;background:var(--stone,#17231f)!important;box-shadow:0 24px 90px rgba(0,0,0,.5)!important;";
+    panel.insertBefore(intro, form);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    _bcMandatoryPasswordOverlay = overlay;
+    _bcMandatoryPasswordOverlay.__panel = panel;
+    _bcMandatoryPasswordOverlay.__intro = intro;
+    _bcMandatoryPasswordOverlay.__cancel = cancel;
+    _bcMandatoryPasswordOverlay.__escape = function (event) {
+      if (_bcMandatoryPasswordChange && event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+    document.addEventListener("keydown", _bcMandatoryPasswordOverlay.__escape, true);
     const input = document.getElementById("pass-new");
     if (input) input.focus({ preventScroll: true });
-    panel.scrollIntoView({ block: "start", behavior: "auto" });
   };
 
-  intentar();
+  tryOpen();
+}
+
+function bcCerrarFormularioCambioObligatorio() {
+  const overlay = _bcMandatoryPasswordOverlay;
+  if (!overlay) return;
+  document.removeEventListener("keydown", overlay.__escape, true);
+  const panel = overlay.__panel || document.getElementById("pass-panel");
+  const main = document.querySelector("#app-shell .main-content") || document.querySelector(".main-content");
+  if (panel && main) {
+    panel.style.cssText = "";
+    panel.classList.add("hidden");
+    const intro = overlay.__intro;
+    if (intro && intro.parentNode) intro.parentNode.removeChild(intro);
+    main.insertBefore(panel, main.firstChild);
+    const cancel = overlay.__cancel;
+    if (cancel) cancel.style.display = "";
+    const heading = panel.querySelector("h3");
+    if (heading) heading.textContent = "Cambiar contraseña";
+    const submit = panel.querySelector("button[type='submit']");
+    if (submit) submit.textContent = "Guardar contraseña";
+    const passNew = document.getElementById("pass-new");
+    const passConfirm = document.getElementById("pass-confirm");
+    if (passNew) passNew.minLength = 6;
+    if (passConfirm) passConfirm.minLength = 6;
+  }
+  overlay.remove();
+  _bcMandatoryPasswordOverlay = null;
+  _bcMandatoryPasswordChange = false;
+  _bcMandatoryPasswordDismissed = true;
+}
+
+async function bcCompletarCambioObligatorio(nuevaPassword) {
+  try {
+    const sessionPack = await client.auth.getSession();
+    const session = sessionPack && sessionPack.data && sessionPack.data.session;
+    if (!session || !session.access_token) return false;
+
+    const response = await fetch(bcPasswordRecoveryEndpoint(), {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + session.access_token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ action: "complete", temporary_password: nuevaPassword }),
+      cache: "no-store"
+    });
+    const result = await response.json().catch(function () { return {}; });
+    if (!response.ok || result.completed !== true) return false;
+
+    const refreshed = await client.auth.refreshSession();
+    if (refreshed.error || !refreshed.data || !refreshed.data.session) return false;
+    if (typeof cargarContextoUsuario !== "function") return false;
+
+    var waitAttempts = 0;
+    while (_cargandoUsuario && waitAttempts++ < 30) {
+      await new Promise(function (resolve) { window.setTimeout(resolve, 100); });
+    }
+    if (_cargandoUsuario) return false;
+
+    await cargarContextoUsuario(refreshed.data.session);
+    if (!_permisosCargaExitosa || !Object.keys(_permisosEfectivos || {}).length) return false;
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 client.auth.getSession().then(function (res) {
   var data = res && res.data;
   if (data && data.session) {
+    if (_bcRecoveryMode) {
+      bcRechazarRecuperacionDirecta();
+      return;
+    }
     bcAuthDiagnostic("SESSION_FOUND", false);
     bcResolverBootConSesion(data.session);
-    if (_bcRecoveryMode) bcMostrarFormularioRecuperacion();
+  } else if (_bcRecoveryMode) {
+    bcRechazarRecuperacionDirecta();
   } else if (!_bcAuthBootResolved) {
     if (res && res.error) {
       bcHandleGetSessionError(res.error);
@@ -481,13 +632,18 @@ setTimeout(function () {
 }, 8000);
 
 client.auth.onAuthStateChange(function (event, session) {
-  // PASSWORD_RECOVERY is the authoritative signal; open the reset form immediately.
-  if (event === "PASSWORD_RECOVERY" && session) {
-    _bcRecoveryMode = true;
-    showApp(session);
-    bcMostrarFormularioRecuperacion();
+  // A recovery URL marker blocks the app even if Auth first emits SIGNED_IN.
+  if (session && _bcRecoveryMode) {
+    bcRechazarRecuperacionDirecta();
     return;
   }
+  // Old direct password-recovery links are rejected; dependents must use owner approval.
+  if (event === "PASSWORD_RECOVERY" && session) {
+    _bcRecoveryMode = true;
+    bcRechazarRecuperacionDirecta();
+    return;
+  }
+  if (event === "SIGNED_IN" && session) _bcLegacyRecoveryRejected = false;
   // TOKEN_REFRESHED / INITIAL_SESSION con misma sesión: showApp es idempotente
   if (session) {
     if (event === "SIGNED_OUT") {
@@ -511,6 +667,12 @@ function bcUsernameLoginEndpoint() {
   return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
     ? "/__bc_preview/functions/v1/bc-username-login"
     : SUPABASE_URL + "/functions/v1/bc-username-login";
+}
+
+function bcPasswordRecoveryEndpoint() {
+  return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
+    ? "/__bc_preview/functions/v1/bc-password-recovery-admin"
+    : SUPABASE_URL + "/functions/v1/bc-password-recovery-admin";
 }
 
 safeInit("login", () => {
@@ -588,7 +750,7 @@ safeInit("login", () => {
   });
 });
 
-// Recuperación coherente con el login: el servidor resuelve correo o nombre de usuario.
+// Recuperación dirigida a Administración: nunca se envía un enlace de cambio a la dependienta.
 safeInit("password-recovery-request", () => {
   const recoveryBtn = document.getElementById("password-recovery-request-btn");
   const recoveryMsg = document.getElementById("password-recovery-msg");
@@ -602,36 +764,36 @@ safeInit("password-recovery-request", () => {
 
     if (!identifier || identifier.length > 120) {
       recoveryMsg.className = "msg error";
-      recoveryMsg.textContent = "Escribe tu correo o nombre de usuario para recuperar el acceso.";
+      recoveryMsg.textContent = "Escribe tu nombre de usuario para solicitar la recuperación.";
       usuarioInput.focus();
       return;
     }
 
     recoveryBtn.disabled = true;
-    recoveryBtn.textContent = "Enviando correo…";
+    recoveryBtn.textContent = "Enviando solicitud…";
     try {
-      const response = await fetch(SUPABASE_URL + "/functions/v1/bc-username-login", {
+      const response = await fetch(bcPasswordRecoveryEndpoint(), {
         method: "POST",
         headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "password-recovery", username: identifier }),
+        body: JSON.stringify({ action: "request", identifier: identifier }),
         cache: "no-store",
       });
       if (response.status === 429) {
         recoveryMsg.className = "msg error";
-        recoveryMsg.textContent = "Demasiados intentos. Espera unos minutos y vuelve a probar.";
+        recoveryMsg.textContent = "Demasiadas solicitudes. Espera unos minutos y vuelve a probar.";
         return;
       }
       if (!response.ok) throw new Error("RECOVERY_REQUEST_FAILED");
 
       recoveryMsg.className = "msg";
-      recoveryMsg.textContent = "Si el correo o nombre de usuario corresponde a una cuenta activa, enviaremos un enlace al correo asociado. Revisa la bandeja de entrada y spam; usa el correo más reciente.";
+      recoveryMsg.textContent = "Solicitud registrada. Se intentará enviar un aviso al correo maestro y la solicitud quedará en la cola de Administración. La contraseña solo podrá restablecerse después de su autorización.";
     } catch (error) {
       recoveryMsg.className = "msg error";
-      recoveryMsg.textContent = "No se pudo completar la solicitud ahora mismo. Comprueba la conexión e inténtalo de nuevo.";
+      recoveryMsg.textContent = "No se pudo registrar la solicitud ahora mismo. Comprueba la conexión e inténtalo de nuevo.";
       console.error("[BattleCruiser] password recovery request failed");
     } finally {
       recoveryBtn.disabled = false;
-      recoveryBtn.textContent = "Enviar correo de recuperación";
+      recoveryBtn.textContent = "Enviar solicitud a Administración";
     }
   });
 });
@@ -815,8 +977,11 @@ safeInit("cambiar-contraseña", () => {
       setMsg("msg-pass", "Las contraseñas no coinciden.", false);
       return;
     }
-    if (nueva.length < 6) {
-      setMsg("msg-pass", "La contraseña debe tener al menos 6 caracteres.", false);
+    const minimo = _bcMandatoryPasswordChange ? 10 : 6;
+    if (nueva.length < minimo) {
+      setMsg("msg-pass", _bcMandatoryPasswordChange
+        ? "Tu contraseña personal debe tener al menos 10 caracteres."
+        : "La contraseña debe tener al menos 6 caracteres.", false);
       return;
     }
 
@@ -840,6 +1005,21 @@ safeInit("cambiar-contraseña", () => {
       return;
     }
     console.log("[Battlecruiser] Contraseña actualizada para:", data.user && data.user.email);
+    if (_bcMandatoryPasswordChange) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Verificando contraseña…";
+      const finalized = await bcCompletarCambioObligatorio(nueva);
+      if (!finalized) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Guardar mi contraseña";
+        setMsg("msg-pass", "La contraseña se actualizó, pero no pudimos verificarla todavía. Comprueba la conexión y vuelve a guardar; no cierres esta pantalla.", false);
+        return;
+      }
+      bcCerrarFormularioCambioObligatorio();
+      formPass.reset();
+      setMsg("msg-pass", "Contraseña personal guardada. Ya puedes continuar.", true);
+      return;
+    }
     setMsg("msg-pass", "Contraseña actualizada. Ya podés usarla la próxima vez que entres.", true);
     if (_bcRecoveryMode) {
       _bcRecoveryMode = false;

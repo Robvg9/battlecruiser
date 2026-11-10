@@ -95,9 +95,7 @@ Deno.serve(async (req: Request) => {
 
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  const mode = body.mode === "password-recovery" ? "password-recovery" : "login";
-  if (!username || username.length > 120 ||
-      (mode === "login" && (!password || password.length > 256))) {
+  if (!username || username.length > 120 || !password || password.length > 256) {
     return genericFailure(401);
   }
 
@@ -125,20 +123,6 @@ Deno.serve(async (req: Request) => {
     }
     if (typeof resolved.data === "string" && resolved.data.includes("@")) {
       email = resolved.data;
-    }
-
-    if (mode === "password-recovery") {
-      // Keep the response indistinguishable for known and unknown identifiers.
-      // Supabase Auth performs the actual email delivery; no address is returned to the PWA.
-      const recoveryEmail = email || "bc-rwht-nonexistent-user@internal.battlecruiser.local";
-      try {
-        await auth.auth.resetPasswordForEmail(recoveryEmail, {
-          redirectTo: APP_ORIGIN + "/?bc_recovery=1",
-        });
-      } catch {
-        // Do not expose whether an account/username exists through the public response.
-      }
-      return reply({ accepted: true }, 200);
     }
 
     // Use the same Auth password verifier for valid and unknown identifiers.
