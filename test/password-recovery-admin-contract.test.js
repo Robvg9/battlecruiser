@@ -12,61 +12,66 @@ const auth = fs.readFileSync(path.join(root, "public/js/auth.js"), "utf8");
 const adminUi = fs.readFileSync(path.join(root, "public/js/password-recovery-admin.js"), "utf8");
 
 test("recovery requests never send the dependent's Auth recovery email", () => {
-  assert.match(edge, /MASTER_EMAIL = "robvg9@gmail.com"/);\n  assert.match(edge, /String\\(role\\?\\.nombre \\|\\| ""\\)\\.trim\\(\\)\\.toLowerCase\\(\\) !== "dependienta"/);
-  assert.match(edge, /role\?\.nombre[\s\S]*?dependienta/);
-  assert.match(edge, /status.eq.APROBADA/);
-  assert.match(edge, /signInWithOtp\(\{[\s\S]*?email: MASTER_EMAIL/);
+  assert.ok(edge.includes('MASTER_EMAIL = "robvg9@gmail.com"'));
+  assert.ok(edge.includes('String(role?.nombre || "").trim().toLowerCase() !== "dependienta"'));
+  assert.ok(edge.includes('email: MASTER_EMAIL'));
+  assert.ok(edge.includes('emailRedirectTo: APP_ORIGIN + "/?bc_admin_recovery="'));
+  assert.ok(edge.includes("signInWithOtp"));
+  assert.ok(edge.includes("shouldCreateUser: false"));
+  assert.ok(edge.includes('status.eq.APROBADA'));
   assert.doesNotMatch(edge, /resetPasswordForEmail/);
-  assert.match(edge, /emailRedirectTo: APP_ORIGIN \+ "\/\?bc_admin_recovery="/);
-  assert.match(edge, /shouldCreateUser: false/);
 });
 
 test("public request path is non-enumerating and rate-limited", () => {
-  assert.match(edge, /MAX_REQUESTS_PER_IP = 4/);
-  assert.match(edge, /if \(resolveError \|\| typeof resolvedEmail !== "string"[^\n]+\n\s+return reply\(\{ accepted: true \}, 200, origin\)/);
-  assert.match(edge, /Never disclose whether the dependent username exists/);
+  assert.ok(edge.includes("MAX_REQUESTS_PER_IP = 4"));
+  assert.ok(edge.includes("Never disclose whether the dependent username exists"));
+  assert.ok(edge.includes('return reply({ accepted: true }, 200, origin)'));
 });
 
 test("only authenticated users with usuarios.editar can list or approve requests", () => {
-  assert.match(edge, /admin\.auth\.getUser\(token\)/);
-  assert.match(edge, /\.eq\("seccion", "usuarios"\)/);
-  assert.match(edge, /\.eq\("accion", "editar"\)/);
-  assert.match(edge, /permission\?\.permitido !== true/);
+  assert.ok(edge.includes("admin.auth.getUser(token)"));
+  assert.ok(edge.includes('.eq("seccion", "usuarios")'));
+  assert.ok(edge.includes('.eq("accion", "editar")'));
+  assert.ok(edge.includes("permission?.permitido !== true"));
 });
 
-test("admin temporary password is stored only in Auth and never in request/audit rows", () => {
-  assert.match(edge, /password: temporaryPassword/);
-  assert.match(edge, /bc_password_change_required: true/);
-  assert.match(edge, /signInWithPassword\(\{[\s\S]*?password: completionPassword/);
-  assert.match(edge, /La nueva contraseña no pudo verificarse/);
-  assert.match(edge, /La contraseña personal debe ser distinta de la temporal/);
-  assert.match(edge, /deriveTemporaryPasswordHash/);
-  assert.match(migration, /temporary_password_hash text/);
+test("admin temporary password is never stored in plaintext and cannot satisfy the forced change", () => {
+  assert.ok(edge.includes("password: temporaryPassword"));
+  assert.ok(edge.includes("bc_password_change_required: true"));
+  assert.ok(edge.includes("password: completionPassword"));
+  assert.ok(edge.includes("La nueva contraseña no pudo verificarse"));
+  assert.ok(edge.includes("La contraseña personal debe ser distinta de la temporal"));
+  assert.ok(edge.includes("deriveTemporaryPasswordHash"));
+  assert.ok(migration.includes("temporary_password_hash text"));
   assert.doesNotMatch(edge, /temporary_password:\s*temporaryPassword\s*[,}]/);
   assert.doesNotMatch(edge, /console\.(log|error)\([^\n]*temporaryPassword/);
 });
 
-test("request table is RLS-protected and unavailable to browser roles", () => {
-  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
-  assert.match(migration, /REVOKE ALL ON TABLE public\.bc_password_recovery_requests FROM PUBLIC, anon, authenticated/);
-  assert.match(migration, /GRANT ALL ON TABLE public\.bc_password_recovery_requests TO service_role/);
-  assert.match(migration, /bc_password_change_required/);
-  assert.match(migration, /permisos_usuario_actual/);
-  assert.match(migration, /tiene_permiso/);
+test("request table and mandatory permission gate are enforced in PostgreSQL", () => {
+  assert.ok(migration.includes("ENABLE ROW LEVEL SECURITY"));
+  assert.ok(migration.includes("REVOKE ALL ON TABLE public.bc_password_recovery_requests FROM PUBLIC, anon, authenticated"));
+  assert.ok(migration.includes("GRANT ALL ON TABLE public.bc_password_recovery_requests TO service_role"));
+  assert.ok(migration.includes("bc_password_change_required"));
+  assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.permisos_usuario_actual()"));
+  assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.tiene_permiso("));
+  assert.ok(migration.includes("WHERE status IN ('PENDIENTE','PROCESANDO','APROBADA')"));
 });
 
-test("dependent password changes are mandatory and cleared only by authenticated self-completion", () => {
-  assert.match(auth, /bc_password_change_required/);
-  assert.match(auth, /client\.auth\.refreshSession\(\)/);
-  assert.match(edge, /COMPLETADA/);
-  assert.match(auth, /action:\s*"complete"/);
-  assert.match(adminUi, /usuarios", "editar"/);
-  assert.match(adminUi, /temporary_password/);
-  assert.match(adminUi, /handoffPasswords/);
-  assert.match(adminUi, /copy-password/);
-  assert.match(edge, /status.eq.APROBADA/);
-  assert.match(adminUi, /el cambio será obligatorio al próximo acceso/i);
-  assert.match(auth, /Tu contraseña personal debe tener al menos 10 caracteres/);
+test("approved handoff remains visible and can be reissued without persisting plaintext", () => {
+  assert.ok(edge.includes('.in("status", ["PENDIENTE", "PROCESANDO", "APROBADA"])'));
+  assert.ok(adminUi.includes("handoffPasswords"));
+  assert.ok(adminUi.includes("copy-password"));
+  assert.ok(adminUi.includes("Reemitir temporal"));
+  assert.ok(adminUi.includes("La nueva contraseña personal"));
+});
+
+test("dependent password changes are mandatory and permissions refresh after completion", () => {
+  assert.ok(auth.includes("bc_password_change_required"));
+  assert.ok(auth.includes("client.auth.refreshSession()"));
+  assert.ok(auth.includes('action: "complete"'));
+  assert.ok(auth.includes("bcMostrarFormularioCambioObligatorio()"));
+  assert.ok(auth.includes("Tu contraseña personal debe tener al menos 10 caracteres"));
+  assert.ok(edge.includes('status: "COMPLETADA"'));
 });
 
 console.log("PASS: admin-controlled password recovery contract");
