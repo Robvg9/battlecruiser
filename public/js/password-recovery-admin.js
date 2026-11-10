@@ -69,6 +69,24 @@
     var panel = document.createElement("section");
     panel.id = ROOT_ID;
     panel.className = "cc-bloque bc-password-recovery-admin";
+    var style = document.getElementById("bc-password-recovery-admin-style");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "bc-password-recovery-admin-style";
+      style.textContent =
+        "#bc-password-recovery-admin{display:grid;gap:9px;margin:0 0 12px}" +
+        "#bc-password-recovery-admin .bc-recovery-admin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}" +
+        "#bc-password-recovery-admin h3{margin:0 0 4px;font-size:15px}" +
+        "#bc-password-recovery-admin p{margin:0;font-size:11px;line-height:1.4}" +
+        "#bc-password-recovery-admin .bc-recovery-request{display:grid;gap:9px;padding:10px;border:1px solid rgba(212,176,92,.2);border-radius:9px}" +
+        "#bc-password-recovery-admin .bc-recovery-request-details{display:grid;gap:3px}" +
+        "#bc-password-recovery-admin .bc-recovery-request-actions{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center}" +
+        "#bc-password-recovery-admin input{min-width:0;width:100%;height:36px;padding:6px 9px;border-radius:7px}" +
+        "#bc-password-recovery-admin button{min-height:34px;padding:6px 9px;font-size:10px}" +
+        "#bc-password-recovery-admin .bc-recovery-request-highlight{outline:2px solid var(--gold,#d4b05c);outline-offset:2px}" +
+        "@media(max-width:560px){#bc-password-recovery-admin .bc-recovery-request-actions{grid-template-columns:1fr 1fr}#bc-password-recovery-admin input{grid-column:1/-1}#bc-password-recovery-admin .bc-recovery-request-actions button:first-of-type{grid-column:1/-1}}";
+      document.head.appendChild(style);
+    }
     panel.innerHTML =
       '<div class="bc-recovery-admin-head">' +
         '<div><h3>Recuperación de contraseñas</h3>' +
@@ -248,6 +266,11 @@
   }
 
   function bootWhenReady(attempt) {
+    var contextReady = typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa === true;
+    if (!contextReady) {
+      if (attempt < 80) window.setTimeout(function () { bootWhenReady(attempt + 1); }, 250);
+      return;
+    }
     if (!isAdmin()) return;
     var panel = ensurePanel();
     if (panel) {
