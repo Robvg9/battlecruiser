@@ -9,12 +9,64 @@ const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
+const RECOVERY_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-password-recovery-admin";
+const RECOVERY_PROXY_PATH = "/__bc_preview/functions/v1/bc-password-recovery-admin";
 
 function assetsBinding() {
   return {
     fetch: async () => new Response("static asset", { status: 200 }),
   };
 }
+
+test("preview admin password recovery POST uses its own allowlisted Edge Function route", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let capturedUrl = null;
+  let capturedInit = null;
+  globalThis.fetch = async (url, init) => {
+    capturedUrl = String(url);
+    capturedInit = init;
+    return new Response(JSON.stringify({ accepted: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": PRODUCTION_ORIGIN },
+    });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request(PREVIEW_ORIGIN + RECOVERY_PROXY_PATH, {
+    method: "POST",
+    headers: { Origin: PREVIEW_ORIGIN, apikey: "sb_publishable_test_only", "content-type": "application/json" },
+    body: JSON.stringify({ action: "request", identifier: "sheyla" }),
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(capturedUrl, RECOVERY_FUNCTION_URL);
+  assert.equal(capturedInit.method, "POST");
+  assert.equal(capturedInit.headers.get("Origin"), PRODUCTION_ORIGIN);
+  assert.equal(capturedInit.headers.get("apikey"), "sb_publishable_test_only");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { accepted: true });
+});
+
+test("preview admin recovery proxy rejects missing and foreign origins", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response("unexpected", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  for (const origin of [null, "https://attacker.example"]) {
+    const headers = { apikey: "sb_publishable_test_only", "content-type": "application/json" };
+    if (origin) headers.Origin = origin;
+    const response = await worker.fetch(new Request(PREVIEW_ORIGIN + RECOVERY_PROXY_PATH, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ action: "request", identifier: "sheyla" }),
+    }), { ASSETS: assetsBinding() });
+    assert.equal(response.status, 403);
+  }
+  assert.equal(upstreamCalls, 0);
+});
 
 test("preview login POST is forwarded to the existing Edge Function with the allowlisted production Origin", async (t) => {
   const originalFetch = globalThis.fetch;
@@ -115,6 +167,8 @@ test("frontend uses the exact preview-only same-origin login endpoint and keeps 
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
   assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 2,
     "only login must use the preview endpoint selector");
-  assert.match(authSource, /const response = await fetch\(SUPABASE_URL \+ "\/functions\/v1\/bc-username-login",/,
-    "password recovery must preserve its existing direct Edge Function endpoint");
+  assert.match(authSource, /bc-password-recovery-admin/);
+  assert.match(authSource, /function bcPasswordRecoveryEndpoint\(\)/);
+  assert.equal((authSource.match(/bcPasswordRecoveryEndpoint\(\)/g) || []).length, 3,
+    "request and mandatory-change completion must route through the preview endpoint selector");
 });
