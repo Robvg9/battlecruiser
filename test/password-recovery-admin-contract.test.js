@@ -48,10 +48,15 @@ test("request table is RLS-protected and unavailable to browser roles", () => {
   assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
   assert.match(migration, /REVOKE ALL ON TABLE public\.bc_password_recovery_requests FROM PUBLIC, anon, authenticated/);
   assert.match(migration, /GRANT ALL ON TABLE public\.bc_password_recovery_requests TO service_role/);
+  assert.match(migration, /bc_password_change_required/);
+  assert.match(migration, /permisos_usuario_actual/);
+  assert.match(migration, /tiene_permiso/);
 });
 
 test("dependent password changes are mandatory and cleared only by authenticated self-completion", () => {
   assert.match(auth, /bc_password_change_required/);
+  assert.match(auth, /client\.auth\.refreshSession\(\)/);
+  assert.match(edge, /COMPLETADA/);
   assert.match(auth, /action:\s*"complete"/);
   assert.match(adminUi, /usuarios", "editar"/);
   assert.match(adminUi, /temporary_password/);
