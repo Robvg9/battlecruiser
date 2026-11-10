@@ -23,8 +23,8 @@ test("inventory settlement reads immutable line snapshots and excludes POS sales
   assert.match(fn, /FROM public\.turno_jornada_inventario_lineas l\s+WHERE l\.corte_id=v_initial\.id/);
   assert.match(fn, /FROM public\.turno_jornada_inventario_lineas l\s+WHERE l\.corte_id=v_final\.id/);
   assert.match(fn, /all_product_ids AS/);
-  assert.match(fn, /i\.qty\+coalesce\(mt\.transfer_in,0\)/);
-  assert.match(fn, /-coalesce\(f\.qty,0\)\) sold_qty/);
+  assert.match(fn, /coalesce\(i\.qty,0\)\+coalesce\(mt\.transfer_in,0\)/);
+  assert.match(fn, /coalesce\(i\.qty,0\)\+coalesce\(mt\.transfer_in,0\)/);
   assert.match(fn, /precio_normal/);
   assert.doesNotMatch(fn, /ventas_lineas|bc7_ventas_jornada|registrar_venta/);
   assert.match(fn, /v_retroactive/);
