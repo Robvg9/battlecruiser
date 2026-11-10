@@ -278,7 +278,7 @@
     host.innerHTML=rows.map(t=>{
       const time=String(t.hora_local||'').slice(0,5),date=String(t.fecha_local||'').slice(0,10);
       if(date==='2026-11-09'&&time==='07:15'){
-        return '<div class="bc7-period-transfer"><span><b>09 nov. · 07:15</b><br>Ya incluida en el inventario final de Adriana; no se vinculará.</span><small>No sumar</small></div>';
+        return '<div class="bc7-period-transfer"><span><b>Entrada 07:15 · registro de jornada anterior</b><br>Ya incluida en el inventario final de Adriana (7–8 nov.); no se vinculará.</span><small>No sumar</small></div>';
       }
       const suggested=date==='2026-11-09'&&(time==='09:07'||time==='15:16');
       return '<label class="bc7-period-transfer"><input type="checkbox" data-bc7-period-transfer value="'+esc(t.id)+'" '+(suggested?'checked':'')+'><span><b>'+esc(date)+' · '+esc(time)+'</b><br>'+esc(t.origen||'Almacén de origen')+' · '+esc(t.lineas||0)+' líneas</span><small>'+esc(t.unidades||0)+' unidades</small></label>';
