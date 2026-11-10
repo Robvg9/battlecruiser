@@ -35,6 +35,8 @@ test("only authenticated users with usuarios.editar can list or approve requests
 test("admin temporary password is stored only in Auth and never in request/audit rows", () => {
   assert.match(edge, /password: temporaryPassword/);
   assert.match(edge, /bc_password_change_required: true/);
+  assert.match(edge, /signInWithPassword\(\{[\s\S]*?password: completionPassword/);
+  assert.match(edge, /La nueva contraseña no pudo verificarse/);
   assert.doesNotMatch(edge, /temporary_password:\s*temporaryPassword\s*[,}]/);
   assert.doesNotMatch(edge, /console\.(log|error)\([^\n]*temporaryPassword/);
 });
@@ -50,7 +52,8 @@ test("dependent password changes are mandatory and cleared only by authenticated
   assert.match(auth, /action:\s*"complete"/);
   assert.match(adminUi, /usuarios", "editar"/);
   assert.match(adminUi, /temporary_password/);
-  assert.match(adminUi, /El cambio será obligatorio al próximo acceso/);
+  assert.match(adminUi, /el cambio será obligatorio al próximo acceso/i);
+  assert.match(auth, /Tu contraseña personal debe tener al menos 10 caracteres/);
 });
 
 console.log("PASS: admin-controlled password recovery contract");
