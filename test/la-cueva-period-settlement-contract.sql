@@ -59,8 +59,8 @@ BEGIN
   );
 
   INSERT INTO public.turno_sesiones(
-    id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id
-  ) VALUES(v_session,v_turn,v_warehouse,1,'JORNADA',v_today,'PROGRAMADA',v_program);
+    id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id,apertura_retroactiva
+  ) VALUES(v_session,v_turn,v_warehouse,1,'JORNADA',v_today,'PROGRAMADA',v_program,true);
 
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
   VALUES(v_session,v_turn,v_worker,v_owner);
@@ -85,13 +85,20 @@ BEGIN
   -- Existing operational movements: +2 transfer, +1 purchase, -1 transfer, -1 vale.
   INSERT INTO public.transferencias(id,almacen_origen_id,almacen_destino_id,fecha,creado_por,estado)
   VALUES
+    -- This inbound transfer is already represented in the imported initial count and is intentionally unlinked.
+    ('a6000000-0000-0000-0000-000000000003',v_other_warehouse,v_warehouse,v_start+interval '5 minutes',v_owner,'completada'),
+    -- This inbound transfer happened after the initial count and is linked by its exact ID.
     ('a6000000-0000-0000-0000-000000000001',v_other_warehouse,v_warehouse,v_start+interval '10 minutes',v_owner,'completada'),
     ('a6000000-0000-0000-0000-000000000002',v_warehouse,v_other_warehouse,v_start+interval '30 minutes',v_owner,'completada');
 
   INSERT INTO public.transferencias_lineas(id,transferencia_id,producto_id,cantidad)
   VALUES
+    ('a6100000-0000-0000-0000-000000000003','a6000000-0000-0000-0000-000000000003',v_pan,99),
     ('a6100000-0000-0000-0000-000000000001','a6000000-0000-0000-0000-000000000001',v_pan,2),
     ('a6100000-0000-0000-0000-000000000002','a6000000-0000-0000-0000-000000000002',v_pan,1);
+
+  INSERT INTO public.turno_jornada_entradas_vinculadas(turno_sesion_id,transferencia_id,vinculado_por)
+  VALUES(v_session,'a6000000-0000-0000-0000-000000000001',v_owner);
 
   INSERT INTO public.lotes_compra(
     id,producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,
