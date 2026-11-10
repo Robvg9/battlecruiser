@@ -260,9 +260,9 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
   dom.window.close();
 });
 
-test("app shell, application and Service Worker share 9.5.89 and load refreshed navigation modules", () => {
+test("app shell, application and Service Worker share 9.5.90 and load refreshed navigation modules", () => {
   assert.match(app, /const VERSION="9\.5\.90"/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9.5.89"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9.5.90"/);
   assert.match(index, /href="style\.css\?v=9\.5\.90"/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.90"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.7"\]/);
