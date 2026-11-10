@@ -170,6 +170,12 @@ test("opening timestamp is explicitly tied to the initial inventory reference an
   assert.ok(ui.includes("Selecciona una responsable"));
 });
 
+test("opening confirmation unlocks when the real start time or responsible changes",()=>{
+  const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  assert.match(ui, /\$\('bc7-period-started'\)\.addEventListener\('change',updateConfirm\)/);
+  assert.match(ui, /\$\('bc7-period-person'\)\.addEventListener\('change',updateConfirm\)/);
+});
+
 test("period opening form version 1.4 is loaded dynamically and precached",()=>{
   const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");

@@ -192,6 +192,8 @@
       catch(err){box.innerHTML='<span class="bc7-period-error">'+esc(err.message||err)+'</span>';}
       updateConfirm();
     });
+    $('bc7-period-started').addEventListener('change',updateConfirm);
+    $('bc7-period-person').addEventListener('change',updateConfirm);
     $('bc7-period-preview').addEventListener('click',previewOpening);
     $('bc7-period-confirm').addEventListener('click',confirmOpening);
     $('bc7-period-start').addEventListener('change',()=>{preview=null;updateConfirm();});
