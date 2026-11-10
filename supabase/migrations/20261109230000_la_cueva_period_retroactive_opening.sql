@@ -753,4 +753,67 @@ END;
 $function$
 ;
 
+
+CREATE OR REPLACE FUNCTION public.bc7_previsualizar_apertura_existente(
+  p_almacen_id uuid,
+  p_fecha_inicio date,
+  p_fecha_fin date
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN puede previsualizar una apertura retroactiva.'
+      USING ERRCODE='42501';
+  END IF;
+  IF p_almacen_id IS NULL OR p_fecha_inicio IS NULL OR p_fecha_fin IS NULL
+     OR p_fecha_fin<p_fecha_inicio OR p_fecha_fin-p_fecha_inicio>30 THEN
+    RAISE EXCEPTION 'Período inválido: debe abarcar entre 1 y 31 días.'
+      USING ERRCODE='22023';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.almacenes WHERE id=p_almacen_id AND activo=true) THEN
+    RAISE EXCEPTION 'Almacén inexistente o inactivo.' USING ERRCODE='23503';
+  END IF;
+
+  SELECT jsonb_build_object(
+    'productos',coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'producto_id',p.id,'nombre',p.nombre,'unidad',p.unidad,
+        'stock_sistema',s.cantidad
+      ) ORDER BY p.nombre,p.id)
+      FROM public.stock s
+      JOIN public.productos p ON p.id=s.producto_id
+      WHERE s.almacen_id=p_almacen_id AND p.activo=true
+    ),'[]'::jsonb),
+    'transferencias',coalesce((
+      SELECT jsonb_agg(jsonb_build_object(
+        'id',t.id,'fecha',t.fecha,
+        'hora_local',to_char(t.fecha AT TIME ZONE 'America/Havana','HH24:MI'),
+        'fecha_local',(t.fecha AT TIME ZONE 'America/Havana')::date,
+        'origen',ao.nombre,
+        'lineas',count(tl.id),
+        'unidades',coalesce(sum(tl.cantidad),0)
+      ) ORDER BY t.fecha)
+      FROM public.transferencias t
+      JOIN public.almacenes ao ON ao.id=t.almacen_origen_id
+      LEFT JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+      WHERE t.almacen_destino_id=p_almacen_id
+        AND t.estado='completada'
+        AND (t.fecha AT TIME ZONE 'America/Havana')::date BETWEEN p_fecha_inicio AND p_fecha_fin
+      GROUP BY t.id,t.fecha,ao.nombre
+    ),'[]'::jsonb)
+  ) INTO v_result;
+  RETURN v_result;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.bc7_previsualizar_apertura_existente(uuid,date,date) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_previsualizar_apertura_existente(uuid,date,date) TO authenticated;
+
+
 COMMIT;
