@@ -432,13 +432,12 @@ function bcResolverBootConSesion(session) {
   bcUIReadyThen(mostrar);
 }
 
-// Recovery links land here with a valid Supabase recovery session.
-// Display the existing secure updateUser form immediately, without requiring Ajustefunction bcRechazarRecuperacionDirecta() {
+// Legacy direct recovery links are intentionally rejected after the owner-approval workflow.
+function bcRechazarRecuperacionDirecta() {
   if (_bcLegacyRecoveryRejected) return;
   _bcLegacyRecoveryRejected = true;
   _bcRecoveryMode = false;
 
-  // Old links issued before owner approval must never allow a self-service reset.
   // Sign out outside the Auth callback to avoid re-entering Supabase while its lock is held.
   window.setTimeout(function () {
     Promise.resolve(client.auth.signOut()).then(function (result) {
@@ -465,8 +464,6 @@ function bcResolverBootConSesion(session) {
       }
     });
   }, 0);
-}
-
 }
 
 function bcMostrarFormularioCambioObligatorio() {
