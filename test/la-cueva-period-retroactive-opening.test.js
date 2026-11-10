@@ -58,8 +58,8 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
   assert.match(ui, /stock general no se modificará/i);
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.5"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.5"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.6"));
   assert.ok(app.includes('VERSION="9.5.91"'));
   assert.ok(sw.includes('BC_SW_VERSION = "9.5.91"'));
 });
@@ -139,21 +139,27 @@ test("opening preview shows every imported physical count and labels current sto
 });
 
 
-test("transfer selection copy does not presume an unverified physical count time",()=>{
+test("known 07:15 delivery is already part of Adriana's closing count; only 09:07 and 15:16 are selectable",()=>{
   const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
-  assert.ok(ui.includes("Las de 09:07 y 15:16 aparecen sugeridas"));
-  assert.ok(ui.includes("revisa también la de 07:15 según la hora real del conteo"));
-  assert.equal(ui.includes("la de 07:15 ya está incluida en el cierre anterior"), false);
+  assert.ok(ui.includes("09:07 y 15:16"));
+  assert.ok(ui.includes("Ya incluida en el inventario final de Adriana"));
+  assert.ok(ui.includes("no se vinculará"));
+  const transferUI=ui.slice(ui.indexOf("function renderTransfers"),ui.indexOf("async function confirmOpening"));
+  assert.ok(transferUI.includes("time==='09:07'||time==='15:16'"));
+  assert.ok(transferUI.includes("No sumar"));
 });
 
 
-test("inventory preview identifies independent flavor variants and refuses implicit parent-stock distribution",()=>{
-  const migrationHasVariant= migration.includes("'producto_padre_id',p.producto_padre_id");
+test("minorista Jornada snapshots group flavour variants by parent family without inventing a split",()=>{
   const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
-  assert.ok(migrationHasVariant);
-  assert.ok(ui.includes("const variantCount=products.filter(p=>p.producto_padre_id).length"));
-  assert.ok(ui.includes("Cada sabor debe tener su propia fila y cantidad en el Excel"));
-  assert.ok(ui.includes("no se reparte automáticamente un total entre sabores"));
+  assert.ok(migration.includes("a.tipo='minorista'"));
+  assert.ok(migration.includes("'es_familia',EXISTS("));
+  assert.ok(migration.includes("sp.producto_padre_id=p.id"));
+  assert.ok(migration.includes("v_grouped AND p.producto_padre_id IS NOT NULL"));
+  assert.ok(ui.includes("sin repartir cantidades"));
+  assert.ok(ui.includes("· total de familia"));
+  assert.ok(ui.includes("data-bc7-period-map"));
+  assert.equal(ui.includes("Cada sabor debe tener su propia fila y cantidad en el Excel"),false);
 });
 
 test("CSV import supports comma, semicolon and tab delimiters",()=>{
@@ -184,9 +190,9 @@ test("opening confirmation unlocks when the real start time or responsible chang
   assert.match(ui, /\$\('bc7-period-person'\)\.addEventListener\('change',updateConfirm\)/);
 });
 
-test("period opening form version 1.5 is loaded dynamically and precached",()=>{
+test("period opening form version 1.6 is loaded dynamically and precached",()=>{
   const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.5"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.5"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.6"));
 });
