@@ -19,7 +19,10 @@ test("retroactive opening is an admin-only atomic session creation with immutabl
   assert.match(migration, /stock_global_modificado',false/);
   assert.match(migration, /REVOKE ALL ON FUNCTION public\.bc7_admin_abrir_jornada_existente/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.bc7_admin_abrir_jornada_existente[\s\S]*TO authenticated/);
-  assert.doesNotMatch(migration, /\bUPDATE\s+public\.stock\b|\bINSERT\s+INTO\s+public\.stock\b|\bDELETE\s+FROM\s+public\.stock\b/i);
+  const opening = migration.slice(migration.indexOf("FUNCTION public.bc7_admin_abrir_jornada_existente"), migration.indexOf("FUNCTION public.bc5_cerrar_jornada"));
+  assert.doesNotMatch(opening, /\bUPDATE\s+public\.stock\b|\bINSERT\s+INTO\s+public\.stock\b|\bDELETE\s+FROM\s+public\.stock\b/i);
+  assert.match(opening, /s\.cantidad-coalesce\(\(/);
+  assert.match(opening, /stock_sistema_reconstruido_descontando_entradas_vinculadas/);
 });
 
 test("period ranges and imported lines are validated before any session is created", () => {
@@ -59,4 +62,17 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(sw, /bc7-periodo-apertura-ui\\.js/);
   assert.match(app, /VERSION="9\\.5\\.90"/);
   assert.match(sw, /BC_SW_VERSION = "9\\.5\\.90"/);
+});
+
+
+test("Jornada reinvestments remain pending until admin approval applies stock and cash",()=>{
+  const create = migration.slice(migration.indexOf("FUNCTION public.bc7_registrar_reinversion_jornada"), migration.indexOf("FUNCTION public.listar_aprobaciones_admin"));
+  const resolve = migration.slice(migration.indexOf("FUNCTION public.resolver_aprobacion_operativa"));
+  assert.match(create, /'PENDIENTE'/);
+  assert.doesNotMatch(create, /INSERT INTO public\\.stock|lotes_compra|registrar_movimiento_caja/);
+  assert.match(migration, /'reinversion'::text/);
+  assert.match(resolve, /v_reinversion\\.estado<>'PENDIENTE'/);
+  assert.match(resolve, /INSERT INTO public\\.stock/);
+  assert.match(resolve, /private\\.registrar_movimiento_caja/);
+  assert.match(resolve, /'APROBADA' ELSE 'RECHAZADA'/);
 });
