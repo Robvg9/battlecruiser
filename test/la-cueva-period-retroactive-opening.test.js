@@ -106,3 +106,13 @@ test("server-side responsible eligibility accepts existing singular and plural D
   assert.ok(migration.includes("IN ('dependienta','dependientas','dueño','dueno')"));
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.bc5_jornada_responsable_elegible"));
 });
+
+
+test("calendar and jornada workspace expose the complete period and movements filter through period end",()=>{
+  const jornada = fs.readFileSync(path.join(__dirname, "../public/js/bc7-jornada-ui.js"), "utf8");
+  assert.ok(migration.includes("'fecha_fin',coalesce(p.fecha_fin,p.fecha)"));
+  assert.ok(migration.includes("p.fecha<=p_fecha_fin AND coalesce(p.fecha_fin,p.fecha)>=p_fecha_inicio"));
+  assert.ok(migration.includes("'fecha_fin',coalesce(v_p.fecha_fin,v_s.fecha)"));
+  assert.ok(jornada.includes("r.fecha_fin&&r.fecha_fin!==r.fecha"));
+  assert.ok(jornada.includes("d.sesion.fecha_fin||d.sesion.fecha"));
+});
