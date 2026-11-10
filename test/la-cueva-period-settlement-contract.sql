@@ -22,6 +22,7 @@ DECLARE
   v_daily_retry uuid;
   v_result jsonb;
   v_error boolean;
+  v_operation text;
   v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
   v_start timestamptz:=now()-interval '2 hours';
   v_mid timestamptz:=now()-interval '90 minutes';
@@ -172,6 +173,35 @@ BEGIN
   );
   IF v_daily_id IS DISTINCT FROM v_daily_retry THEN
     RAISE EXCEPTION 'FAIL: daily cash retry created a duplicate record';
+  END IF;
+
+  -- Dependienta can submit expenses/reinvestments, but every approval lane is owner/admin-only.
+  IF NOT public.tiene_permiso('gastos','crear')
+     OR NOT public.tiene_permiso('reinversiones','crear') THEN
+    RAISE EXCEPTION 'FAIL: Dependienta must be able to submit expenses and reinvestments';
+  END IF;
+  FOREACH v_operation IN ARRAY ARRAY['gasto','merma','baja','reinversion','entrega_diaria']
+  LOOP
+    v_error:=false;
+    BEGIN
+      PERFORM public.resolver_aprobacion_operativa(
+        v_operation,gen_random_uuid(),'APROBAR','worker cannot approve',NULL,NULL
+      );
+    EXCEPTION WHEN SQLSTATE '42501' THEN
+      v_error:=true;
+    END;
+    IF NOT v_error THEN
+      RAISE EXCEPTION 'FAIL: Dependienta unexpectedly approved operation type %',v_operation;
+    END IF;
+  END LOOP;
+  v_error:=false;
+  BEGIN
+    PERFORM * FROM public.listar_aprobaciones_admin();
+  EXCEPTION WHEN SQLSTATE '42501' THEN
+    v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: Dependienta unexpectedly accessed the administrative approval queue';
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
