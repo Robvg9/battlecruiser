@@ -54,6 +54,8 @@ test("request table and mandatory permission gate are enforced in PostgreSQL", (
   assert.ok(migration.includes("REVOKE ALL ON TABLE public.bc_password_recovery_requests FROM PUBLIC, anon, authenticated"));
   assert.ok(migration.includes("GRANT ALL ON TABLE public.bc_password_recovery_requests TO service_role"));
   assert.ok(migration.includes("bc_password_change_required"));
+  assert.ok(migration.includes("u.activo = true"));
+  assert.ok(migration.includes("coalesce(u.archivado, false) = false"));
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.permisos_usuario_actual()"));
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.tiene_permiso("));
   assert.ok(migration.includes("WHERE status IN ('PENDIENTE','PROCESANDO','APROBADA')"));
