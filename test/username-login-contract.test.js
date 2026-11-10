@@ -232,12 +232,11 @@ test("identifier resolver accepts either email or username and preserves active-
   assert.ok(identifierMigration.includes("GRANT EXECUTE ON FUNCTION public.obtener_email_login_por_nombre(text) TO service_role"));
 });
 
-test("username recovery uses the server-side resolver, direct recovery redirect, and a generic response", () => {
-  assert.ok(edge.includes('body.mode === "password-recovery"'));
-  assert.ok(edge.includes('auth.auth.resetPasswordForEmail(recoveryEmail, {'));
-  assert.ok(edge.includes('redirectTo: APP_ORIGIN + "/?bc_recovery=1"'));
-  assert.ok(edge.includes("return reply({ accepted: true }, 200)"));
-  assert.ok(!edge.includes("reply({ email"));
+test("legacy username login bridge cannot send dependent recovery email", () => {
+  assert.doesNotMatch(edge, /body\.mode === "password-recovery"/);
+  assert.doesNotMatch(edge, /resetPasswordForEmail/);
+  assert.ok(edge.includes('const password = typeof body.password === "string" ? body.password : ""'));
+  assert.ok(edge.includes("if (!username || username.length > 120 || !password || password.length > 256)"));
 });
 
 test("login bridge handles preflight before enforcing the production origin and never opens POST to other origins", () => {
