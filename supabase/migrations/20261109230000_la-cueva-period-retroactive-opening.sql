@@ -141,31 +141,6 @@ CREATE TABLE IF NOT EXISTS public.turno_jornada_entradas_vinculadas (
 );
 REVOKE ALL ON TABLE public.turno_jornada_entradas_vinculadas FROM PUBLIC,anon,authenticated;
 
-ALTER TABLE public.reinversiones
-  ADD COLUMN IF NOT EXISTS estado text;
-UPDATE public.reinversiones SET estado='APROBADA' WHERE estado IS NULL;
-ALTER TABLE public.reinversiones ALTER COLUMN estado SET DEFAULT 'APROBADA';
-ALTER TABLE public.reinversiones ALTER COLUMN estado SET NOT NULL;
-ALTER TABLE public.reinversiones
-  ADD COLUMN IF NOT EXISTS revisado_por uuid REFERENCES auth.users(id),
-  ADD COLUMN IF NOT EXISTS revisado_nombre text,
-  ADD COLUMN IF NOT EXISTS comentario_revision text,
-  ADD COLUMN IF NOT EXISTS fecha_revision timestamptz;
-DO $$
-BEGIN
-  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.reinversiones'::regclass AND conname='reinversiones_estado_chk') THEN
-    ALTER TABLE public.reinversiones ADD CONSTRAINT reinversiones_estado_chk CHECK (estado IN ('PENDIENTE','APROBADA','RECHAZADA'));
-  END IF;
-END $$;
-
-INSERT INTO public.permisos(role_id,seccion,accion,permitido)
-SELECT r.id,p.seccion,p.accion,true
-FROM public.roles r
-CROSS JOIN (VALUES ('turnos','ver'),('gastos','crear'),('reinversiones','crear')) AS p(seccion,accion)
-WHERE lower(btrim(r.nombre))='dependienta' AND r.activo=true
-ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
-
-
 
 CREATE OR REPLACE FUNCTION public.bc7_previsualizar_apertura_existente(p_almacen_id uuid,p_fecha_inicio date,p_fecha_fin date)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public','pg_temp'
