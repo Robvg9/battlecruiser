@@ -139,7 +139,7 @@ async function deriveTemporaryPasswordHash(password: string, salt: Uint8Array): 
   );
   const bits = await crypto.subtle.deriveBits({
     name: "PBKDF2",
-    salt,
+    salt: new Uint8Array(salt).buffer as ArrayBuffer,
     iterations: 150000,
     hash: "SHA-256",
   }, key, 256);
@@ -452,7 +452,7 @@ Deno.serve(async (req: Request) => {
     if (lockError || !lock) return reply({ error: "Otro administrador acaba de tomar esta solicitud. Actualiza la lista." }, 409, origin);
 
     const { data: targetPack, error: targetError } = await admin.auth.admin.getUserById(request.target_user_id);
-    if (targetError || !targetPack?.user || targetPack.user.deleted_at) {
+    if (targetError || !targetPack?.user) {
       await admin.from("bc_password_recovery_requests").update({ status: "PENDIENTE", processing_by: null, processing_at: null }).eq("id", requestId);
       return reply({ error: "La cuenta dependienta ya no está disponible." }, 404, origin);
     }
