@@ -12,7 +12,7 @@ const auth = fs.readFileSync(path.join(root, "public/js/auth.js"), "utf8");
 const adminUi = fs.readFileSync(path.join(root, "public/js/password-recovery-admin.js"), "utf8");
 
 test("recovery requests never send the dependent's Auth recovery email", () => {
-  assert.match(edge, /MASTER_EMAIL = "robvg9@gmail.com"/);\n  assert.match(edge, /role\\?\\.nombre[\\s\\S]*?dependienta/);
+  assert.match(edge, /MASTER_EMAIL = "robvg9@gmail.com"/);\n  assert.match(edge, /String\\(role\\?\\.nombre \\|\\| ""\\)\\.trim\\(\\)\\.toLowerCase\\(\\) !== "dependienta"/);
   assert.match(edge, /role\?\.nombre[\s\S]*?dependienta/);
   assert.match(edge, /status.eq.APROBADA/);
   assert.match(edge, /signInWithOtp\(\{[\s\S]*?email: MASTER_EMAIL/);
