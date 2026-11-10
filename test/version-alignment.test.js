@@ -169,7 +169,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.64"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.64/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.15"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.16"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
@@ -197,7 +197,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /v9\.5\.91 — Apertura de jornadas por período/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.91"><\/script>/);
   for (const asset of [
-    'style.css?v=9.5.91',
+    'style.css?v=9.5.92',
     'js/centro-control.js?v=9.5.70',
     'js/navegacion.js?v=9.5.64',
     'js/mando.js?v=9.5.64',
@@ -213,7 +213,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.15/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.16/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
@@ -283,10 +283,10 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.91'));
-  assert.ok(index.includes('app.js?v=9.5.91'));
-  assert.ok(sw.includes('./style.css?v=9.5.91'));
-  assert.ok(sw.includes('./app.js?v=9.5.91'));
+  assert.ok(index.includes('style.css?v=9.5.92'));
+  assert.ok(index.includes('app.js?v=9.5.92'));
+  assert.ok(sw.includes('./style.css?v=9.5.92'));
+  assert.ok(sw.includes('./app.js?v=9.5.92'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
