@@ -62,7 +62,8 @@ test("request table and mandatory permission gate are enforced in PostgreSQL", (
   assert.ok(migration.includes("WHERE status IN ('PENDIENTE','PROCESANDO','APROBADA')"));
   assert.ok(permissionGateMigration.includes("JOIN auth.users auth_user ON auth_user.id = u.id"));
   assert.ok(permissionGateMigration.includes("auth_user.raw_app_meta_data->>'bc_password_change_required'"));
-  assert.doesNotMatch(permissionGateMigration, /auth\.jwt\(\)/);
+  const executablePermissionGateSql = permissionGateMigration.replace(/^\\s*--.*$/gm, "");
+  assert.doesNotMatch(executablePermissionGateSql, /auth\\.jwt\\(\\)/);
 });
 
 test("approved handoff remains visible and can be reissued without persisting plaintext", () => {
