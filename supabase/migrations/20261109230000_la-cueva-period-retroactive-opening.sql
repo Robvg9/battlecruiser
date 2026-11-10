@@ -991,6 +991,7 @@ BEGIN
     OR public.tiene_permiso('mermas','editar_any')
     OR public.tiene_permiso('bajas','editar_any')
     OR public.tiene_permiso('reinversiones','editar_any')
+    OR public.tiene_permiso('entregas_caja','editar_any')
   ) THEN
     RAISE EXCEPTION 'Sin permiso para ver aprobaciones administrativas' USING ERRCODE='42501';
   END IF;
@@ -1065,6 +1066,16 @@ BEGIN
       AND r.turno_sesion_id IS NOT NULL
       AND public.tiene_permiso('reinversiones','editar_any')
 
+    UNION ALL
+
+    SELECT 'entrega_diaria'::text,e.id,e.creado_en,e.creado_nombre,a.nombre,
+           NULL::text,('Entrega diaria de efectivo · '||e.fecha::text)::text,
+           e.monto_declarado,NULL::numeric,e.estado,e.observacion
+    FROM public.turno_jornada_entregas_diarias e
+    JOIN public.almacenes a ON a.id=e.almacen_id
+    WHERE e.estado='PENDIENTE'
+      AND public.tiene_permiso('entregas_caja','editar_any')
+
     ORDER BY 3 DESC;
 END;
 $function$
@@ -1085,6 +1096,7 @@ DECLARE
   v_monto numeric;
   v_estado text;
   v_reinversion public.reinversiones;
+  v_entrega public.turno_jornada_entregas_diarias;
   v_line record;
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -1108,6 +1120,10 @@ BEGIN
   ELSIF p_tipo='reinversion' THEN
     IF NOT public.tiene_permiso('reinversiones','editar_any') THEN
       RAISE EXCEPTION 'Sin permiso para revisar reinversiones.' USING ERRCODE='42501';
+    END IF;
+  ELSIF p_tipo='entrega_diaria' THEN
+    IF NOT public.tiene_permiso('entregas_caja','editar_any') THEN
+      RAISE EXCEPTION 'Solo Dueño puede revisar entregas diarias de efectivo.' USING ERRCODE='42501';
     END IF;
   ELSE
     RAISE EXCEPTION 'Tipo de aprobación desconocido.';
@@ -1239,6 +1255,34 @@ BEGIN
           'stock_y_caja_aplicados',p_decision='APROBAR')
       FROM public.turno_sesiones s WHERE s.id=v_reinversion.turno_sesion_id;
     END IF;
+  ELSIF p_tipo='entrega_diaria' THEN
+    SELECT * INTO v_entrega
+    FROM public.turno_jornada_entregas_diarias
+    WHERE id=p_id FOR UPDATE;
+    IF NOT FOUND OR v_entrega.estado<>'PENDIENTE' THEN
+      RAISE EXCEPTION 'La entrega diaria no está pendiente o no existe.' USING ERRCODE='23514';
+    END IF;
+    IF p_decision='APROBAR' AND p_monto_real IS NOT NULL AND p_monto_real<0 THEN
+      RAISE EXCEPTION 'El importe contado no puede ser negativo.' USING ERRCODE='22023';
+    END IF;
+    UPDATE public.turno_jornada_entregas_diarias
+    SET estado=CASE WHEN p_decision='APROBAR' THEN 'APROBADA' ELSE 'RECHAZADA' END,
+        monto_aprobado=CASE WHEN p_decision='APROBAR' THEN coalesce(p_monto_real,monto_declarado) ELSE NULL END,
+        revisado_por=auth.uid(),revisado_nombre=v_nombre,
+        comentario_revision=NULLIF(btrim(p_comentario),''),
+        fecha_revision=now()
+    WHERE id=p_id;
+    INSERT INTO public.turno_jornada_eventos
+      (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+    SELECT e.almacen_id,s.jornada_programacion_id,auth.uid(),
+      CASE WHEN p_decision='APROBAR' THEN 'ENTREGA_DIARIA_APROBADA' ELSE 'ENTREGA_DIARIA_RECHAZADA' END,
+      NULLIF(btrim(p_comentario),''),
+      jsonb_build_object('entrega_id',p_id,'fecha',e.fecha,'monto_declarado',e.monto_declarado,'estado','PENDIENTE'),
+      jsonb_build_object('entrega_id',p_id,'monto_aprobado',CASE WHEN p_decision='APROBAR' THEN coalesce(p_monto_real,e.monto_declarado) ELSE NULL END,
+        'estado',CASE WHEN p_decision='APROBAR' THEN 'APROBADA' ELSE 'RECHAZADA' END)
+    FROM public.turno_jornada_entregas_diarias e
+    JOIN public.turno_sesiones s ON s.id=e.turno_sesion_id
+    WHERE e.id=p_id;
   END IF;
 
   RETURN jsonb_build_object('ok',true,'tipo',p_tipo,'id',p_id,'decision',p_decision,'revisado_por',v_nombre);
@@ -1626,8 +1670,8 @@ SET search_path TO 'public','pg_temp'
 AS $function$
 DECLARE v_old numeric;
 BEGIN
-  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
-    RAISE EXCEPTION 'Solo ADMIN/Dueño puede configurar el porcentaje salarial.' USING ERRCODE='42501';
+  IF auth.uid() IS NULL OR NOT public.tiene_permiso('reinversiones','editar_any') THEN
+    RAISE EXCEPTION 'Solo Dueño puede configurar el porcentaje salarial.' USING ERRCODE='42501';
   END IF;
   IF p_almacen_id IS NULL OR p_porcentaje IS NULL OR p_porcentaje<0 OR p_porcentaje>100 THEN
     RAISE EXCEPTION 'El porcentaje debe estar entre 0 y 100.' USING ERRCODE='22023';
