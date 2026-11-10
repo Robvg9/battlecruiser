@@ -133,6 +133,10 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','reinversiones:editar_any,entregas_caja:editar_any',false);
   PERFORM public.bc7_configurar_salario_porcentaje_jornada(v_session,5);
+  IF (SELECT salario_porcentaje FROM public.turno_jornada_programacion WHERE id=v_program)<>5
+     OR (SELECT salario_porcentaje FROM public.turno_jornada_configuracion WHERE almacen_id=v_warehouse)<>5 THEN
+    RAISE EXCEPTION 'FAIL: salary rate must be snapshotted on the jornada and retained as store default';
+  END IF;
 
   -- One daily delivery is stored as pending and cannot be included until the Dueño approves it.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
@@ -204,6 +208,14 @@ BEGIN
      OR (v_result->>'dinero_recogido_total')::numeric<>34
      OR (v_result->>'diferencia')::numeric<>1 THEN
     RAISE EXCEPTION 'FAIL: corrected daily cash should keep the settlement auditable; result=%',v_result;
+  END IF;
+
+  -- A change to the store default must not rewrite the rate fixed on this jornada.
+  UPDATE public.turno_jornada_configuracion SET salario_porcentaje=10 WHERE almacen_id=v_warehouse;
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF (v_result->>'salario_calculado')::numeric<>2
+     OR (SELECT salario_porcentaje FROM public.turno_jornada_programacion WHERE id=v_program)<>5 THEN
+    RAISE EXCEPTION 'FAIL: historical jornada salary must remain tied to its snapshotted 5 percent rate; result=%',v_result;
   END IF;
 
   IF has_table_privilege('authenticated','public.turno_jornada_entregas_diarias','SELECT')
