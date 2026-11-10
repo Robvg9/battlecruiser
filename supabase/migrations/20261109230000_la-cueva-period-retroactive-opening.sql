@@ -2081,10 +2081,12 @@ BEGIN
     INTO v_total_lines,v_priced_lines,v_negative_lines,v_total_units,v_sales_total,v_lines
   FROM calculated;
 
-  SELECT coalesce(sum(g.monto),0),count(*) FILTER(WHERE g.estado='PENDIENTE')
+  SELECT coalesce(sum(g.monto) FILTER(WHERE g.estado='APROBADO'),0),
+         count(*) FILTER(WHERE g.estado='PENDIENTE')
     INTO v_expenses,v_pending_expenses
   FROM public.gastos g WHERE g.turno_sesion_id=v_s.id AND g.estado IN ('APROBADO','PENDIENTE');
-  SELECT coalesce(sum(r.total),0),count(*) FILTER(WHERE r.estado='PENDIENTE')
+  SELECT coalesce(sum(r.total) FILTER(WHERE r.estado='APROBADA'),0),
+         count(*) FILTER(WHERE r.estado='PENDIENTE')
     INTO v_reinvestments,v_pending_reinvestments
   FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado IN ('APROBADA','PENDIENTE');
   SELECT count(*) INTO v_pending_adjustments
