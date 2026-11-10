@@ -1716,6 +1716,7 @@ DECLARE
   v_existing_session uuid;
   v_existing_date date;
   v_existing_amount numeric;
+  v_existing_state text;
   v_nombre text;
   v_uid uuid:=auth.uid();
   v_fecha_fin date;
@@ -1756,6 +1757,29 @@ BEGIN
     RETURN v_id;
   END IF;
   SELECT nombre INTO v_nombre FROM public.usuarios WHERE id=v_uid;
+  SELECT id,estado,monto_declarado
+    INTO v_id,v_existing_state,v_existing_amount
+  FROM public.turno_jornada_entregas_diarias
+  WHERE turno_sesion_id=v_s.id AND fecha=p_fecha
+  LIMIT 1 FOR UPDATE;
+  IF v_id IS NOT NULL THEN
+    IF v_existing_state<>'RECHAZADA' THEN
+      RAISE EXCEPTION 'Ya existe una entrega diaria para esta fecha. Consulta su estado antes de reenviar.' USING ERRCODE='23505';
+    END IF;
+    UPDATE public.turno_jornada_entregas_diarias
+    SET turno_tramo_id=v_t.id,monto_declarado=p_monto,monto_aprobado=NULL,
+        estado='PENDIENTE',observacion=nullif(btrim(coalesce(p_observacion,'')),''),
+        creado_por=v_uid,creado_nombre=v_nombre,creado_en=now(),idempotency_key=p_idempotency_key,
+        revisado_por=NULL,revisado_nombre=NULL,comentario_revision=NULL,fecha_revision=NULL
+    WHERE id=v_id;
+    INSERT INTO public.turno_jornada_eventos
+      (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+    VALUES(v_s.almacen_id,v_s.jornada_programacion_id,v_uid,'ENTREGA_DIARIA_REENVIADA',
+      nullif(btrim(coalesce(p_observacion,'')),''),
+      jsonb_build_object('entrega_id',v_id,'fecha',p_fecha,'monto_declarado',v_existing_amount,'estado','RECHAZADA'),
+      jsonb_build_object('entrega_id',v_id,'monto_declarado',p_monto,'estado','PENDIENTE'));
+    RETURN v_id;
+  END IF;
   INSERT INTO public.turno_jornada_entregas_diarias
     (turno_sesion_id,turno_tramo_id,almacen_id,fecha,monto_declarado,observacion,
      creado_por,creado_nombre,idempotency_key)
@@ -1839,6 +1863,9 @@ DECLARE
   v_reinvestments numeric:=0;
   v_daily_cash numeric:=0;
   v_daily_pending integer:=0;
+  v_daily_expected integer:=0;
+  v_daily_approved integer:=0;
+  v_daily_missing integer:=0;
   v_pending_expenses integer:=0;
   v_pending_reinvestments integer:=0;
   v_pending_adjustments integer:=0;
@@ -2019,9 +2046,13 @@ BEGIN
     UNION ALL
     SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado='PENDIENTE'
   ) pending;
-  SELECT coalesce(sum(e.monto_aprobado),0),count(*) FILTER(WHERE e.estado='PENDIENTE')
-    INTO v_daily_cash,v_daily_pending
+  v_daily_expected:=greatest(0,(coalesce(v_p.fecha_fin,v_p.fecha)-v_p.fecha)::integer);
+  SELECT coalesce(sum(e.monto_aprobado) FILTER(WHERE e.estado='APROBADA'),0),
+         count(*) FILTER(WHERE e.estado='PENDIENTE'),
+         count(*) FILTER(WHERE e.estado='APROBADA')
+    INTO v_daily_cash,v_daily_pending,v_daily_approved
   FROM public.turno_jornada_entregas_diarias e WHERE e.turno_sesion_id=v_s.id;
+  v_daily_missing:=greatest(0,v_daily_expected-v_daily_approved);
   SELECT d.monto,d.monto_contado,d.estado_aprobacion
     INTO v_final_declared,v_final_counted,v_final_cash_state
   FROM public.turno_declaraciones d
@@ -2038,7 +2069,7 @@ BEGIN
     THEN round(v_cash_received-v_expected_cash,2) ELSE NULL END;
   v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
     AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_negative_lines=0
-    AND v_rate IS NOT NULL AND v_daily_pending=0
+    AND v_rate IS NOT NULL AND v_daily_pending=0 AND v_daily_missing=0
     AND v_pending_expenses=0 AND v_pending_reinvestments=0 AND v_pending_adjustments=0
     AND v_cash_received IS NOT NULL;
 
@@ -2048,7 +2079,7 @@ BEGIN
     'lineas',v_lines,'unidades_vendidas',v_total_units,
     'ventas_estimadas',v_sales_total,'salario_porcentaje',v_rate,'salario_calculado',v_salary,
     'gastos_aprobados',v_expenses,'reinversiones_aprobadas',v_reinvestments,
-    'entregas_diarias_aprobadas',v_daily_cash,'entregas_diarias_pendientes',v_daily_pending,
+    'entregas_diarias_aprobadas',v_daily_cash,'entregas_diarias_pendientes',v_daily_pending,'entregas_diarias_faltantes',v_daily_missing,
     'dinero_final_declarado',v_final_declared,'dinero_final_contado',v_final_counted,
     'estado_dinero_final',v_final_cash_state,'dinero_recogido_total',v_cash_received,
     'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_expected_cash,
@@ -2058,7 +2089,7 @@ BEGIN
     'familias_con_vendidas_negativas',v_negative_lines,
     'pendientes',jsonb_build_object(
       'gastos',v_pending_expenses,'reinversiones',v_pending_reinvestments,
-      'ajustes',v_pending_adjustments,'entregas_diarias',v_daily_pending
+      'ajustes',v_pending_adjustments,'entregas_diarias',v_daily_pending,'entregas_diarias_faltantes',v_daily_missing
     )
   );
 END;
