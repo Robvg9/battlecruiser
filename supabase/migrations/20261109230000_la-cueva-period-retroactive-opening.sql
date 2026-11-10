@@ -1706,6 +1706,9 @@ BEGIN
   WHERE id=v_s.jornada_programacion_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'No existe la programación de esta jornada.' USING ERRCODE='23503'; END IF;
   v_old:=v_p.salario_porcentaje;
+  IF v_old IS NOT NULL AND v_old IS DISTINCT FROM p_porcentaje THEN
+    RAISE EXCEPTION 'El porcentaje salarial de esta jornada ya quedó fijado; solo puede cambiarse antes de asignarlo.' USING ERRCODE='23514';
+  END IF;
   SELECT salario_porcentaje INTO v_store_old
   FROM public.turno_jornada_configuracion
   WHERE almacen_id=v_s.almacen_id FOR UPDATE;
