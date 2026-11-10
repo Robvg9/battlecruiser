@@ -13,6 +13,8 @@ const adminUi = fs.readFileSync(path.join(root, "public/js/password-recovery-adm
 
 test("recovery requests never send the dependent's Auth recovery email", () => {
   assert.match(edge, /MASTER_EMAIL = "robvg9@gmail.com"/);
+  assert.match(edge, /role\?\.nombre[\s\S]*?dependienta/);
+  assert.match(edge, /status.eq.APROBADA/);
   assert.match(edge, /signInWithOtp\(\{[\s\S]*?email: MASTER_EMAIL/);
   assert.doesNotMatch(edge, /resetPasswordForEmail/);
   assert.match(edge, /emailRedirectTo: APP_ORIGIN \+ "\/\?bc_admin_recovery="/);
@@ -60,6 +62,9 @@ test("dependent password changes are mandatory and cleared only by authenticated
   assert.match(auth, /action:\s*"complete"/);
   assert.match(adminUi, /usuarios", "editar"/);
   assert.match(adminUi, /temporary_password/);
+  assert.match(adminUi, /handoffPasswords/);
+  assert.match(adminUi, /copy-password/);
+  assert.match(edge, /status.eq.APROBADA/);
   assert.match(adminUi, /el cambio será obligatorio al próximo acceso/i);
   assert.match(auth, /Tu contraseña personal debe tener al menos 10 caracteres/);
 });
