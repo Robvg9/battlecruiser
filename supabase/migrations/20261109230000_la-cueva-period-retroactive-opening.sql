@@ -2,6 +2,7 @@ BEGIN;
 
 ALTER TABLE public.turno_jornada_programacion ADD COLUMN IF NOT EXISTS fecha_fin date;
 UPDATE public.turno_jornada_programacion SET fecha_fin=fecha WHERE fecha_fin IS NULL;
+ALTER TABLE public.turno_sesiones ADD COLUMN IF NOT EXISTS apertura_retroactiva boolean NOT NULL DEFAULT false;
 
 CREATE OR REPLACE FUNCTION public.bc5_guard_jornada_assignment_conflicts()
 RETURNS trigger
@@ -406,7 +407,7 @@ BEGIN
   VALUES(v_sesion.id,v_turno.id,p_responsable_id,'NORMAL','ACTIVO',p_inicio_real_at)
   RETURNING * INTO v_tramo;
 
-  UPDATE public.turno_sesiones SET estado='EN_CURSO',updated_at=now() WHERE id=v_sesion.id;
+  UPDATE public.turno_sesiones SET estado='EN_CURSO',updated_at=now(),apertura_retroactiva=true WHERE id=v_sesion.id;
   UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',apertura_real=p_inicio_real_at,actualizado_en=now() WHERE id=v_turno.id;
 
   INSERT INTO public.turno_jornada_entradas_vinculadas(turno_sesion_id,transferencia_id,vinculado_por)
@@ -1850,6 +1851,7 @@ DECLARE
   v_initial public.turno_jornada_inventario_cortes;
   v_final public.turno_jornada_inventario_cortes;
   v_is_retail boolean:=false;
+  v_retroactive boolean:=false;
   v_start_at timestamptz;
   v_end_at timestamptz;
   v_rate numeric;
@@ -1890,6 +1892,7 @@ BEGIN
   ) THEN RAISE EXCEPTION 'Solo el responsable asignado o ADMIN puede consultar esta liquidación.' USING ERRCODE='42501'; END IF;
   SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
   SELECT * INTO v_turno FROM public.turnos WHERE id=v_s.turno_id;
+  v_retroactive:=coalesce(v_s.apertura_retroactiva,false);
   SELECT (a.tipo='minorista') INTO v_is_retail FROM public.almacenes a WHERE a.id=v_s.almacen_id;
   IF NOT v_is_retail THEN
     RETURN jsonb_build_object('aplica',false,'motivo','La liquidación por diferencia de inventario está habilitada para almacenes minoristas.');
@@ -1920,6 +1923,10 @@ BEGIN
     JOIN public.productos p ON p.id=tl.producto_id
     WHERE t.almacen_destino_id=v_s.almacen_id AND lower(t.estado)='completada'
       AND t.fecha>v_start_at AND t.fecha<=v_end_at
+      AND (NOT v_retroactive
+        OR (t.fecha AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'))::date>v_p.fecha
+        OR EXISTS(SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
+          WHERE linked.turno_sesion_id=v_s.id AND linked.transferencia_id=t.id))
     UNION ALL
     SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
            'TRANSFERENCIA_SALIDA',tl.cantidad::numeric
@@ -2004,18 +2011,26 @@ BEGIN
     WHERE p.activo=true AND p.producto_padre_id IS NULL
     GROUP BY p.id,p.nombre,p.unidad,p.precio_normal
   ),
+  all_product_ids AS (
+    SELECT product_id FROM initial_lines
+    UNION SELECT product_id FROM final_lines
+    UNION SELECT product_id FROM movement_totals
+  ),
   calculated AS (
-    SELECT i.product_id,pi.nombre,pi.unidad,i.qty initial_qty,coalesce(f.qty,0) final_qty,
+    SELECT ids.product_id,coalesce(pi.nombre,p.nombre) nombre,coalesce(pi.unidad,p.unidad) unidad,
+      coalesce(i.qty,0) initial_qty,coalesce(f.qty,0) final_qty,
       coalesce(mt.transfer_in,0) transfer_in,coalesce(mt.purchases_in,0) purchases_in,
       coalesce(mt.reinvestment_in,0) reinvestment_in,coalesce(mt.transfer_out,0) transfer_out,
       coalesce(mt.vales_out,0) vales_out,coalesce(mt.merma_out,0) merma_out,coalesce(mt.bajas_out,0) bajas_out,
       (i.qty+coalesce(mt.transfer_in,0)+coalesce(mt.purchases_in,0)+coalesce(mt.reinvestment_in,0)
         -coalesce(mt.transfer_out,0)-coalesce(mt.vales_out,0)-coalesce(mt.merma_out,0)-coalesce(mt.bajas_out,0)-coalesce(f.qty,0)) sold_qty,
       pi.precio_unitario,pi.estado_precio
-    FROM initial_lines i
-    JOIN price_info pi ON pi.product_id=i.product_id
-    LEFT JOIN final_lines f ON f.product_id=i.product_id
-    LEFT JOIN movement_totals mt ON mt.product_id=i.product_id
+    FROM all_product_ids ids
+    JOIN public.productos p ON p.id=ids.product_id
+    LEFT JOIN price_info pi ON pi.product_id=ids.product_id
+    LEFT JOIN initial_lines i ON i.product_id=ids.product_id
+    LEFT JOIN final_lines f ON f.product_id=ids.product_id
+    LEFT JOIN movement_totals mt ON mt.product_id=ids.product_id
   )
   SELECT count(*),count(*) FILTER(WHERE precio_unitario IS NOT NULL AND sold_qty>=0),
          count(*) FILTER(WHERE sold_qty<0),coalesce(sum(sold_qty),0),
