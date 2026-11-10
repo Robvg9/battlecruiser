@@ -9,6 +9,7 @@
     : SUPABASE_URL + "/functions/v1/bc-password-recovery-admin";
   var ROOT_ID = "bc-password-recovery-admin";
   var currentRequests = [];
+  var handoffPasswords = Object.create(null);
   var busy = false;
 
   function isAdmin() {
@@ -125,13 +126,15 @@
       addText(details, "small", "muted", "Usuario: " + (request.target_username || "—"));
       addText(details, "small", "muted", "Solicitada: " + formatDate(request.requested_at));
       addText(details, "small", "muted",
-        request.status === "PROCESANDO"
-          ? "Proceso interrumpido; Administración puede reanudarlo tras el control de seguridad"
-          : request.notification_status === "ENVIADA"
-            ? "Aviso enviado al correo maestro"
-            : request.notification_status === "FALLIDA"
-              ? "Aviso por correo no confirmado; solicitud visible aquí"
-              : "Aviso de correo pendiente");
+        request.status === "APROBADA"
+          ? "Autorizada " + formatDate(request.approved_at) + " · Entrega pendiente; usa Reemitir si la temporal se perdió"
+          : request.status === "PROCESANDO"
+            ? "Proceso interrumpido; Administración puede reanudarlo tras el control de seguridad"
+            : request.notification_status === "ENVIADA"
+              ? "Aviso enviado al correo maestro"
+              : request.notification_status === "FALLIDA"
+                ? "Aviso por correo no confirmado; solicitud visible aquí"
+                : "Aviso de correo pendiente");
       card.appendChild(details);
 
       var form = document.createElement("div");
@@ -141,24 +144,49 @@
       password.autocomplete = "new-password";
       password.minLength = 10;
       password.maxLength = 128;
-      password.placeholder = "Contraseña temporal (mín. 10)";
+      password.placeholder = request.status === "APROBADA"
+        ? "Nueva temporal para reemitir (mín. 10)"
+        : "Contraseña temporal (mín. 10)";
       password.setAttribute("aria-label", "Contraseña temporal para " + (request.target_username || "dependienta"));
       password.dataset.role = "temporary-password";
+      password.value = handoffPasswords[request.id] || "";
       form.appendChild(password);
 
       var approve = document.createElement("button");
       approve.type = "button";
       approve.className = "cc-accion";
       approve.dataset.action = "approve";
-      approve.textContent = request.status === "PROCESANDO" ? "Reanudar autorización" : "Autorizar y establecer contraseña";
+      approve.textContent = request.status === "APROBADA"
+        ? "Reemitir temporal"
+        : request.status === "PROCESANDO"
+          ? "Reanudar autorización"
+          : "Autorizar y establecer contraseña";
       form.appendChild(approve);
 
-      var reject = document.createElement("button");
-      reject.type = "button";
-      reject.className = "cc-accion";
-      reject.dataset.action = "reject";
-      reject.textContent = "Rechazar";
-      form.appendChild(reject);
+      if (request.status === "APROBADA" && handoffPasswords[request.id]) {
+        var reveal = document.createElement("button");
+        reveal.type = "button";
+        reveal.className = "cc-accion";
+        reveal.dataset.action = "toggle-password";
+        reveal.textContent = "Mostrar";
+        form.appendChild(reveal);
+
+        var copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "cc-accion";
+        copy.dataset.action = "copy-password";
+        copy.textContent = "Copiar";
+        form.appendChild(copy);
+      }
+
+      if (request.status !== "APROBADA") {
+        var reject = document.createElement("button");
+        reject.type = "button";
+        reject.className = "cc-accion";
+        reject.dataset.action = "reject";
+        reject.textContent = "Rechazar";
+        form.appendChild(reject);
+      }
       card.appendChild(form);
 
       if (new URLSearchParams(window.location.search).get("bc_admin_recovery") === request.id) {
@@ -216,6 +244,28 @@
     var card = button.closest("[data-request-id]");
     if (!card) return;
     var requestId = card.dataset.requestId;
+    if (action === "toggle-password") {
+      var secretInput = card.querySelector('[data-role="temporary-password"]');
+      if (secretInput) {
+        secretInput.type = secretInput.type === "password" ? "text" : "password";
+        button.textContent = secretInput.type === "password" ? "Mostrar" : "Ocultar";
+      }
+      return;
+    }
+    if (action === "copy-password") {
+      var copyInput = card.querySelector('[data-role="temporary-password"]');
+      if (!copyInput || !copyInput.value) {
+        setMessage("No hay contraseña temporal disponible en esta sesión. Reemítela para entregar una nueva.", false);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(copyInput.value);
+        setMessage("Contraseña temporal copiada. Entrégala directamente a la dependienta; no la envíes por un canal compartido.", true);
+      } catch (_) {
+        setMessage("No se pudo copiar. Pulsa Mostrar y copia la contraseña manualmente.", false);
+      }
+      return;
+    }
 
     if (action === "approve") {
       var input = card.querySelector('[data-role="temporary-password"]');
@@ -231,8 +281,8 @@
       button.textContent = "Autorizando…";
       try {
         await callApi("approve", { request_id: requestId, temporary_password: temporaryPassword });
-        if (input) input.value = "";
-        setMessage("Contraseña temporal establecida. Entrégala directamente a la dependienta; el cambio será obligatorio al próximo acceso.", true);
+        handoffPasswords[requestId] = temporaryPassword;
+        setMessage("Contraseña temporal lista para entregar. Usa Mostrar o Copiar; solo permanece en esta pantalla y no se guarda en el servidor.", true);
         await refreshAfterMutation();
       } catch (error) {
         setMessage(error.message || "No se pudo autorizar la solicitud.", false);
