@@ -7,7 +7,7 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "..");
 const edge = fs.readFileSync(path.join(root, "supabase/functions/bc-password-recovery-admin/index.ts"), "utf8");
-const migration = fs.readFileSync(path.join(root, "supabase/migrations/20261110190000_bc_admin_password_recovery.sql"), "utf8");
+const migration = fs.readFileSync(path.join(root, "supabase/migrations/20261110233845_bc_admin_password_recovery.sql"), "utf8");
 const auth = fs.readFileSync(path.join(root, "public/js/auth.js"), "utf8");
 const adminUi = fs.readFileSync(path.join(root, "public/js/password-recovery-admin.js"), "utf8");
 
