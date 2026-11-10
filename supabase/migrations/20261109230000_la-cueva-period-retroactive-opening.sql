@@ -1112,7 +1112,7 @@ DECLARE
   v_monto numeric;
   v_estado text;
   v_reinversion public.reinversiones;
-  v_entrega public.turno_jornada_entregas_diarias;
+  v_entrega record;
   v_line record;
 BEGIN
   IF auth.uid() IS NULL THEN
