@@ -127,3 +127,11 @@ test("opening preview shows every imported physical count and labels current sto
   assert.ok(ui.includes("row.cantidad"));
   assert.ok(ui.includes("product.stock_sistema"));
 });
+
+
+test("transfer selection copy does not presume an unverified physical count time",()=>{
+  const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  assert.ok(ui.includes("Las de 09:07 y 15:16 aparecen sugeridas"));
+  assert.ok(ui.includes("revisa también la de 07:15 según la hora real del conteo"));
+  assert.equal(ui.includes("la de 07:15 ya está incluida en el cierre anterior"), false);
+});
