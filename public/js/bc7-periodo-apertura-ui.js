@@ -1,5 +1,5 @@
 // BattleCruiser — apertura administrativa de jornada ya iniciada
-// v1.3 — previsualización por producto y variante de sabor.
+// v1.4 — previsualización por producto y variante de sabor.
 (function(){
   'use strict';
   if(window.__BC7_PERIOD_OPENING__)return;

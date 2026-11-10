@@ -39,3 +39,7 @@ test("M33 dependent card release is version aligned",()=>{
  assert.match(app,/\["m33-turnos-final\.js","33\.21"\]/);
  assert.match(sw,/m33-turnos-final\.js\?v=33\.21/);
 });
+
+test("Jornada workspace title includes the full multi-day period",()=>{
+ assert.ok(ui.includes("fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')"));
+});

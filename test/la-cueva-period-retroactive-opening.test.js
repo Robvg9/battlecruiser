@@ -58,8 +58,8 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
   assert.match(ui, /stock general no se modificará/i);
-  assert.ok(app.includes("bc7-periodo-apertura-ui.js"));
-  assert.ok(sw.includes("bc7-periodo-apertura-ui.js"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.4"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.4"));
   assert.ok(app.includes('VERSION="9.5.90"'));
   assert.ok(sw.includes('BC_SW_VERSION = "9.5.90"'));
 });
@@ -158,4 +158,11 @@ test("opening timestamp is explicitly tied to the initial inventory reference an
   assert.ok(ui.includes("Fecha y hora real de inicio y conteo inicial"));
   assert.ok(ui.includes("Debe coincidir con el momento de referencia del inventario inicial"));
   assert.ok(ui.includes("Selecciona una responsable"));
+});
+
+test("period opening form version 1.4 is loaded dynamically and precached",()=>{
+  const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
+  const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.4"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.4"));
 });
