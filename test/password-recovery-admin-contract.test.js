@@ -17,6 +17,8 @@ test("recovery requests never send the dependent's Auth recovery email", () => {
   assert.ok(edge.includes('email: MASTER_EMAIL'));
   assert.ok(edge.includes('emailRedirectTo: APP_ORIGIN + "/?bc_admin_recovery="'));
   assert.ok(edge.includes("signInWithOtp"));
+  assert.ok(edge.includes("AUTH_EMAIL_NETWORK_ERROR"));
+  assert.ok(edge.includes("La cuenta ya no es una dependienta activa"));
   assert.ok(edge.includes("shouldCreateUser: false"));
   assert.ok(edge.includes('status.eq.APROBADA'));
   assert.doesNotMatch(edge, /resetPasswordForEmail/);
@@ -62,6 +64,7 @@ test("approved handoff remains visible and can be reissued without persisting pl
   assert.ok(adminUi.includes("handoffPasswords"));
   assert.ok(adminUi.includes("copy-password"));
   assert.ok(adminUi.includes("Reemitir temporal"));
+  assert.ok(adminUi.includes("La temporal anterior dejará de funcionar"));
   assert.ok(adminUi.includes("Nueva temporal para reemitir"));
 });
 
