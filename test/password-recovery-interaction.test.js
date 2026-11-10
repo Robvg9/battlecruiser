@@ -63,6 +63,7 @@ function passwordDom(options = {}) {
     if (name === "cambiar-contraseña") callback();
   };
   window._bcRecoveryMode = !!options.recoveryMode;
+  window._bcMandatoryPasswordChange = false;
   window.setMsg = (id, message, ok) => {
     const element = window.document.getElementById(id);
     element.textContent = message;
