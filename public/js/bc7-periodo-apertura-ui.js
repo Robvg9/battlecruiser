@@ -41,12 +41,21 @@
     if(first)panel.insertBefore(card,first);else panel.appendChild(card);
   }
   function csvMatrix(text){
+    const firstLine=String(text||'').split(/\r?\n/).find(line=>line.trim())||'';
+    const counts={',':0,';':0,'\t':0};let probeQuoted=false;
+    for(let i=0;i<firstLine.length;i++){
+      const ch=firstLine[i];
+      if(ch==='"'&&firstLine[i+1]==='"'){i++;continue;}
+      if(ch==='"'){probeQuoted=!probeQuoted;continue;}
+      if(!probeQuoted&&Object.prototype.hasOwnProperty.call(counts,ch))counts[ch]++;
+    }
+    const delimiter=Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
     const rows=[];let row=[],cell='',quoted=false;
     for(let i=0;i<text.length;i++){
       const ch=text[i];
       if(quoted){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++;}else if(ch==='"')quoted=false;else cell+=ch;}
       else if(ch==='"')quoted=true;
-      else if(ch===','){row.push(cell);cell='';}
+      else if(ch===delimiter){row.push(cell);cell='';}
       else if(ch==='\n'){row.push(cell);rows.push(row);row=[];cell='';}
       else if(ch!=='\r')cell+=ch;
     }
@@ -161,10 +170,10 @@
       '<p class="bc7-period-muted">Se importará solo la columna <b>Fin</b> del inventario anterior. Las transferencias se vincularán por su ID y no se volverán a ejecutar.</p>'+
       '<div class="bc7-period-grid">'+
       '<label class="bc7-period-field">Almacén<select id="bc7-period-warehouse"><option value="'+esc(warehouse)+'">'+esc(whName)+'</option></select></label>'+
-      '<label class="bc7-period-field">Responsable<select id="bc7-period-person">'+people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.nombre||p.nombre_usuario||p.email||p.id)+'</option>').join('')+'</select></label>'+
+      '<label class="bc7-period-field">Responsable<select id="bc7-period-person"><option value="">Selecciona una responsable</option>'+people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.nombre||p.nombre_usuario||p.email||p.id)+'</option>').join('')+'</select></label>'+
       '<label class="bc7-period-field">Inicio del período<input id="bc7-period-start" type="date" value="2026-11-09" required></label>'+
       '<label class="bc7-period-field">Final del período<input id="bc7-period-end" type="date" value="2026-11-10" required></label>'+
-      '<label class="bc7-period-field">Fecha y hora real de inicio (hora de Cuba)<input id="bc7-period-started" type="datetime-local" value="" required></label>'+
+      '<label class="bc7-period-field">Fecha y hora real de inicio y conteo inicial (hora de Cuba)<input id="bc7-period-started" type="datetime-local" value="" required><small class="bc7-period-muted">Debe coincidir con el momento de referencia del inventario inicial; se usa para decidir qué entradas ocurrieron después.</small></label>'+
       '<label class="bc7-period-field">Inventario anterior (.xlsx o .csv)<input id="bc7-period-file" type="file" accept=".xlsx,.csv" required></label>'+
       '</div>'+
       '<div class="bc7-period-box"><b>Inventario inicial heredado</b><div id="bc7-period-inventory-preview" class="bc7-period-muted">Selecciona el Excel de Adriana para revisar sus cantidades.</div></div>'+

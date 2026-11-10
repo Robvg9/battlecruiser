@@ -145,3 +145,16 @@ test("inventory preview identifies independent flavor variants and refuses impli
   assert.ok(ui.includes("Cada sabor debe tener su propia fila y cantidad en el Excel"));
   assert.ok(ui.includes("no se reparte automáticamente un total entre sabores"));
 });
+
+test("CSV import supports comma, semicolon and tab delimiters",()=>{
+  const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  assert.ok(ui.includes("const counts={',':0,';':0,'\\\\t':0}"));
+  assert.ok(ui.includes("const delimiter=Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0]"));
+});
+
+test("opening timestamp is explicitly tied to the initial inventory reference and responsible must be selected",()=>{
+  const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  assert.ok(ui.includes("Fecha y hora real de inicio y conteo inicial"));
+  assert.ok(ui.includes("Debe coincidir con el momento de referencia del inventario inicial"));
+  assert.ok(ui.includes("Selecciona una responsable"));
+});
