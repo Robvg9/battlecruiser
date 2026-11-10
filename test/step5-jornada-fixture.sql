@@ -17,7 +17,8 @@ CREATE TABLE public.almacenes (
   id uuid PRIMARY KEY, nombre text NOT NULL, tipo text,
   created_at timestamptz NOT NULL DEFAULT now(), activo boolean NOT NULL DEFAULT true
 );
-CREATE TABLE public.roles (id uuid PRIMARY KEY, nombre text NOT NULL, activo boolean NOT NULL DEFAULT true);\nCREATE TABLE public.permisos (role_id uuid NOT NULL REFERENCES public.roles(id), seccion text NOT NULL, accion text NOT NULL, permitido boolean NOT NULL DEFAULT true, PRIMARY KEY(role_id,seccion,accion));
+CREATE TABLE public.roles (id uuid PRIMARY KEY, nombre text NOT NULL, activo boolean NOT NULL DEFAULT true);
+CREATE TABLE public.permisos (role_id uuid NOT NULL REFERENCES public.roles(id), seccion text NOT NULL, accion text NOT NULL, permitido boolean NOT NULL DEFAULT true, PRIMARY KEY(role_id,seccion,accion));
 CREATE TABLE public.usuarios (
   id uuid PRIMARY KEY REFERENCES auth.users(id), activo boolean NOT NULL DEFAULT true,
   role_id uuid NOT NULL REFERENCES public.roles(id)
