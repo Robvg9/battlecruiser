@@ -76,6 +76,8 @@ test("dependent password changes are mandatory and permissions refresh after com
   assert.ok(auth.includes('action: "complete"'));
   assert.ok(auth.includes("bcMostrarFormularioCambioObligatorio()"));
   assert.ok(auth.includes("bcRechazarRecuperacionDirecta()"));
+  assert.match(auth, /function showApp\(session\) \{[\s\S]*?_bcRecoveryMode\) return/);
+  assert.match(auth, /if \(session && _bcRecoveryMode\) \{[\s\S]*?bcRechazarRecuperacionDirecta\(\)/);
   assert.doesNotMatch(auth, /bcMostrarFormularioRecuperacion/);
   assert.ok(auth.includes("Tu contraseña personal debe tener al menos 10 caracteres"));
   assert.ok(edge.includes('status: "COMPLETADA"'));
