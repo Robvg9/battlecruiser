@@ -102,8 +102,9 @@ test("programming trigger prevents warehouse and responsible overlap across a fu
 });
 
 
-test("server-side responsible eligibility accepts existing singular and plural Dependienta role labels",()=>{
+test("server-side role and permission rules accept the existing plural Dependientas role",()=>{
   assert.ok(migration.includes("IN ('dependienta','dependientas','dueño','dueno')"));
+  assert.ok(migration.includes("WHERE lower(btrim(r.nombre)) IN ('dependienta','dependientas') AND r.activo=true"));
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.bc5_jornada_responsable_elegible"));
 });
 

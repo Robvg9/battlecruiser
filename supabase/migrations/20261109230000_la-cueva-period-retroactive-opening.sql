@@ -88,7 +88,7 @@ INSERT INTO public.permisos(role_id,seccion,accion,permitido)
 SELECT r.id,p.seccion,p.accion,true
 FROM public.roles r
 CROSS JOIN (VALUES ('turnos','ver'),('gastos','crear'),('reinversiones','crear')) AS p(seccion,accion)
-WHERE lower(btrim(r.nombre))='dependienta' AND r.activo=true
+WHERE lower(btrim(r.nombre)) IN ('dependienta','dependientas') AND r.activo=true
 ON CONFLICT(role_id,seccion,accion) DO UPDATE SET permitido=EXCLUDED.permitido;
 
 -- The UI and backend must accept both the singular and plural role label used in existing accounts.
