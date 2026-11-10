@@ -306,7 +306,10 @@ function applySql(file) {
 
     log("\\r\\n=== 15/15 Verify shared receipt, owner decision, retry, next-day reuse, legacy recovery and ACL ===");
     applySql("test/step4-jornada-shared-inventory-contract.sql");
-    log("\\r\\nPASS Step 7 inventory + finance + Jornada POS sales provenance/payment/idempotency + owner cash count readback + carry-forward + cash handover + authenticated RLS + legacy reconciliation + overdue-session guard + Step 4 shared inventory receipt/approval/recount/legacy recovery + ACL contracts.");
+    log("\\r\\n=== La Cueva period migration and inventory-delta settlement contract ===");
+    applySql("supabase/migrations/20261109230000_la-cueva-period-retroactive-opening.sql");
+    applySql("test/la-cueva-period-settlement-contract.sql");
+    log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
