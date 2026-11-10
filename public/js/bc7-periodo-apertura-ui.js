@@ -138,10 +138,11 @@
     return '';
   }
   async function loadPeople(){
+    let people=[];
     if(window.__BC7_JORNADA__&&typeof window.__BC7_JORNADA__.refreshResponsibleStaff==='function'){
-      await window.__BC7_JORNADA__.refreshResponsibleStaff();
+      people=asArray(await window.__BC7_JORNADA__.refreshResponsibleStaff());
     }
-    let people=asArray(window.__BC_M29_STAFF_CACHE__);
+    if(!people.length)people=asArray(window.__BC_M29_STAFF_CACHE__);
     if(!people.length&&window.__BC_M29_STAFF_CACHE_LOADED__!==true)people=asArray(window._cache&&window._cache.usuarios);
     return people.filter(u=>{
       if(!u||!u.id||u.activo===false||u.archivado===true)return false;
