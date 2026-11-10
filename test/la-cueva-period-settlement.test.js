@@ -53,6 +53,7 @@ test("salary percentage is an owner-configured per-jornada snapshot", () => {
   assert.match(migration, /v_cfg\.salario_porcentaje/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc7_configurar_salario_porcentaje_jornada\(\s*p_turno_sesion_id uuid/);
   assert.match(migration, /v_rate:=v_p\.salario_porcentaje/);
+  assert.match(migration, /v_old IS NOT NULL AND v_old IS DISTINCT FROM p_porcentaje/);
   assert.match(migration, /salario_porcentaje_jornada/);
   assert.match(migration, /v_s\.estado IN \('COMPLETADA','CERRADA','CANCELADA'\)/);
 });
