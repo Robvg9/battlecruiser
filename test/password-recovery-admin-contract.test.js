@@ -8,6 +8,7 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const edge = fs.readFileSync(path.join(root, "supabase/functions/bc-password-recovery-admin/index.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20261110233845_bc_admin_password_recovery.sql"), "utf8");
+const permissionGateMigration = fs.readFileSync(path.join(root, "supabase/migrations/20261110234541_bc_recovery_permission_gate_fresh_app_metadata.sql"), "utf8");
 const auth = fs.readFileSync(path.join(root, "public/js/auth.js"), "utf8");
 const adminUi = fs.readFileSync(path.join(root, "public/js/password-recovery-admin.js"), "utf8");
 
@@ -59,6 +60,9 @@ test("request table and mandatory permission gate are enforced in PostgreSQL", (
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.permisos_usuario_actual()"));
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.tiene_permiso("));
   assert.ok(migration.includes("WHERE status IN ('PENDIENTE','PROCESANDO','APROBADA')"));
+  assert.ok(permissionGateMigration.includes("JOIN auth.users auth_user ON auth_user.id = u.id"));
+  assert.ok(permissionGateMigration.includes("auth_user.raw_app_meta_data->>'bc_password_change_required'"));
+  assert.doesNotMatch(permissionGateMigration, /auth\.jwt\(\)/);
 });
 
 test("approved handoff remains visible and can be reissued without persisting plaintext", () => {
