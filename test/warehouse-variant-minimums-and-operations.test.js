@@ -130,31 +130,31 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
 });
 
 test("Release cache keys and Service Worker precache match the modified inventory and Operations modules", () => {
-  assert.match(app, /const VERSION="9\.5\.89"/);
+  assert.match(app, /const VERSION="9\.5\.90"/);
   assert.match(app, /m53-inventario-centro\.js","53\.7/);
   assert.match(app, /ui-operaciones-hub\.js","43\.2/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
-  assert.ok(app.includes('["aprobaciones-admin.js","20261109.1"]'));
+  assert.ok(app.includes('["aprobaciones-admin.js","20261110.1"]'));
   assert.match(app, /inventario-detalle\.js","71"/);
   assert.match(app, /compra-multiple\.js","27\.16"/);
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
   assert.match(index, /productos\.js\?v=20261109\.3/);
-  assert.match(index, /style\.css\?v=9\.5\.89/);
+  assert.match(index, /style\.css\?v=9\.5\.90/);
   assert.match(index, /almacenes\.js\?v=20261109\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.89/);
-  assert.match(index, /v9\.5\.89 — BattleCruiser/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.89"/);
+  assert.match(index, /app\.js\?v=9\.5\.90/);
+  assert.match(index, /v9\.5\.90 — BattleCruiser/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.90"/);
   for (const asset of [
     "inventario-detalle.js?v=71",
     "operaciones-financieras.js?v=20261108.5",
-    "aprobaciones-admin.js?v=20261109.1",
+    "aprobaciones-admin.js?v=20261110.1",
     "ui-operaciones-hub.js?v=43.2",
     "almacenes.js?v=20261109.1",
     "m53-inventario-centro.js?v=53.7",
     "movimiento-multiple.js?v=20261109.1",
     "productos.js?v=20261109.3",
     "compra-multiple.js?v=27.16",
-    "aprobaciones-admin.js?v=20261109.1",
+    "aprobaciones-admin.js?v=20261110.1",
     "bajas-multiple.js?v=1.6"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
