@@ -44,3 +44,19 @@ test("multi-day close uses the period end date", () => {
   assert.match(migration, /v_fecha_fin := coalesce\(v_programacion\.fecha_fin,v_programacion\.fecha\)/);
   assert.match(migration, /v_local::date<>v_fecha_fin/);
 });
+
+
+test("admin UI exposes the retroactive period opening workflow and only confirms after preview",()=>{
+  const ui = fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  const app = fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
+  const sw = fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
+  assert.match(ui, /Registrar jornada ya iniciada/);
+  assert.match(ui, /bc7_previsualizar_apertura_existente/);
+  assert.match(ui, /bc7_admin_abrir_jornada_existente/);
+  assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
+  assert.match(ui, /stock global no se modificará/i);
+  assert.match(app, /bc7-periodo-apertura-ui\\.js/);
+  assert.match(sw, /bc7-periodo-apertura-ui\\.js/);
+  assert.match(app, /VERSION="9\\.5\\.90"/);
+  assert.match(sw, /BC_SW_VERSION = "9\\.5\\.90"/);
+});

@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
 // v9.5.89 — Solicitudes de Bajas agrupadas y revisión administrativa flotante
 (function hotfixV9475(){
-  const VERSION="9.5.89";
+  const VERSION="9.5.90";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -30,7 +30,7 @@
 })();
 (function cargarModulosDinamicos(){
   const modules=[
-    ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.8"],["bc7-jornada-ui.js","7.13"],
+    ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.8"],["bc7-jornada-ui.js","7.13"],["bc7-periodo-apertura-ui.js","1.0"],
     ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.2"],["permisos-navegacion.js","67.7"],["fix-permisos-rol.js","60.2"],["m12-fe5-hide-vales.js","60.1"],
     ["configuracion.js","20261104.1"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js","20261108.5"],["aprobaciones-admin.js","20261109.1"],
     ["m26-ui-integridad.js","26.41"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.7"],
