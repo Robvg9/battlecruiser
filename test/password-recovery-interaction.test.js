@@ -95,7 +95,7 @@ test("Paso 4 recovery: campo vacío no envía solicitud y enfoca identificador",
   assert.equal(fetchCalls, 0, "invalid input must stop before fetch");
 });
 
-test("Paso 4 recovery: submits email/username through server-side resolver and shows generic success", async (t) => {
+test("Paso 4 recovery: submits identifier to admin queue and shows generic success", async (t) => {
   const calls = [];
   const c = recoveryDom(async (url, options) => {
     calls.push({ url, options });
