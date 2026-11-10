@@ -2113,7 +2113,7 @@ BEGIN
 
   v_salary:=CASE WHEN v_rate IS NOT NULL AND v_sales_total IS NOT NULL
     THEN round(v_sales_total*v_rate/100,2) ELSE NULL END;
-  v_cash_received:=CASE WHEN v_final_counted IS NOT NULL AND v_final_cash_state='APROBADO'
+  v_cash_received:=CASE WHEN v_final_counted IS NOT NULL AND v_final_cash_state='APROBADA'
     THEN v_daily_cash+v_final_counted ELSE NULL END;
   v_expected_cash:=CASE WHEN v_sales_total IS NOT NULL AND v_salary IS NOT NULL
     THEN round(v_sales_total-v_expenses-v_reinvestments-v_salary,2) ELSE NULL END;
