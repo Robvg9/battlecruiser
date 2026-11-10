@@ -24,6 +24,7 @@ test("inventory settlement reads immutable line snapshots and excludes POS sales
   assert.match(fn, /FROM public\.turno_jornada_inventario_lineas l\s+WHERE l\.corte_id=v_final\.id/);
   assert.match(fn, /all_product_ids AS/);
   assert.match(fn, /coalesce\(i\.qty,0\)\+coalesce\(mt\.transfer_in,0\)/);
+  assert.match(fn, /IF v_initial\.id IS NULL OR v_final\.id IS NULL THEN/);
   assert.match(fn, /coalesce\(i\.qty,0\)\+coalesce\(mt\.transfer_in,0\)/);
   assert.match(fn, /precio_normal/);
   assert.doesNotMatch(fn, /ventas_lineas|bc7_ventas_jornada|registrar_venta/);
@@ -86,4 +87,5 @@ test("PostgreSQL contract covers no-double-count transfers, retries, reconciliat
   assert.match(postgresContract, /efectivo_esperado_despues_de_gastos_reinversiones_salario/);
   assert.match(postgresContract, /diferencia/);
   assert.match(postgresContract, /store default must not rewrite the rate fixed/);
+  assert.match(postgresContract, /sales and salary must remain pending until final inventory confirmation/);
 });
