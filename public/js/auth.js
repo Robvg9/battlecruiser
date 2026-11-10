@@ -777,7 +777,7 @@ safeInit("password-recovery-request", () => {
       if (!response.ok) throw new Error("RECOVERY_REQUEST_FAILED");
 
       recoveryMsg.className = "msg";
-      recoveryMsg.textContent = "Solicitud registrada. Si la cuenta está activa, Administración recibirá el aviso en el correo maestro. La contraseña solo podrá restablecerse después de su autorización.";
+      recoveryMsg.textContent = "Solicitud registrada. Se intentará enviar un aviso al correo maestro y la solicitud quedará en la cola de Administración. La contraseña solo podrá restablecerse después de su autorización.";
     } catch (error) {
       recoveryMsg.className = "msg error";
       recoveryMsg.textContent = "No se pudo registrar la solicitud ahora mismo. Comprueba la conexión e inténtalo de nuevo.";
