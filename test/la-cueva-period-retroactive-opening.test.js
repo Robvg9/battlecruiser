@@ -129,13 +129,14 @@ test("calendar and jornada workspace expose the complete period and movements fi
 });
 
 
-test("opening preview shows every imported physical count and labels current stock only as a reference",()=>{
+test("opening preview imports the selected Excel quantities and exposes family mapping plus system-stock reference",()=>{
   const ui = fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
-  assert.ok(ui.includes("Columna Fin del cuadre anterior"));
-  assert.ok(ui.includes("Stock actual (referencia)"));
-  assert.ok(ui.includes("tableRows"));
+  assert.ok(ui.includes("Columna Fin"));
+  assert.ok(ui.includes("stock sistema (referencia)"));
+  assert.ok(ui.includes("const tableRows=parsed.map"));
   assert.ok(ui.includes("row.cantidad"));
   assert.ok(ui.includes("product.stock_sistema"));
+  assert.ok(ui.includes("data-bc7-period-map"));
 });
 
 
