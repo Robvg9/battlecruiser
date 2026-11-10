@@ -58,10 +58,10 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
   assert.match(ui, /stock general no se modificará/i);
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.4"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.4"));
-  assert.ok(app.includes('VERSION="9.5.90"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.90"'));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.5"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.5"));
+  assert.ok(app.includes('VERSION="9.5.91"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.91"'));
 });
 
 
@@ -170,15 +170,23 @@ test("opening timestamp is explicitly tied to the initial inventory reference an
   assert.ok(ui.includes("Selecciona una responsable"));
 });
 
+test("Excel import stops at the first summary row after the product table",()=>{
+  const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  const parser=ui.slice(ui.indexOf("async function parseInventoryFile"), ui.indexOf("function havanaTimestamp"));
+  assert.match(parser, /summaryRows=new Set\(\['ganancias','ingreso','cantidad','calculos','totales'\]\)/);
+  assert.match(parser, /if\(summaryRows\.has\(norm\(name\)\)\)break/);
+  assert.match(parser, /Cantidad final inválida/);
+});
+
 test("opening confirmation unlocks when the real start time or responsible changes",()=>{
   const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
   assert.match(ui, /\$\('bc7-period-started'\)\.addEventListener\('change',updateConfirm\)/);
   assert.match(ui, /\$\('bc7-period-person'\)\.addEventListener\('change',updateConfirm\)/);
 });
 
-test("period opening form version 1.4 is loaded dynamically and precached",()=>{
+test("period opening form version 1.5 is loaded dynamically and precached",()=>{
   const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.4"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.4"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.5"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.5"));
 });

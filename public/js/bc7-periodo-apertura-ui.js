@@ -1,5 +1,5 @@
 // BattleCruiser — apertura administrativa de jornada ya iniciada
-// v1.4 — previsualización por producto y variante de sabor.
+// v1.5 — omite filas resumen del Excel y conserva solo las filas de productos.
 (function(){
   'use strict';
   if(window.__BC7_PERIOD_OPENING__)return;
@@ -120,12 +120,15 @@
     }
     if(header<0)throw new Error('No encontré las columnas Productos y Fin en la hoja INV.');
     const rows=[];
-    matrix.slice(header+1).forEach((row,index)=>{
-      const name=String(row[productCol]||'').trim();if(!name)return;
+    const summaryRows=new Set(['ganancias','ingreso','cantidad','calculos','totales']);
+    for(let index=0;index<matrix.length-header-1;index++){
+      const row=matrix[header+index+1]||[];
+      const name=String(row[productCol]||'').trim();if(!name)continue;
+      if(summaryRows.has(norm(name)))break;
       const quantity=parseQuantity(row[finalCol]);
       if(!Number.isFinite(quantity))throw new Error('Cantidad final inválida en la fila '+(header+index+2)+': '+name);
       rows.push({nombre:name,cantidad:quantity,fila:header+index+2});
-    });
+    }
     if(!rows.length)throw new Error('La hoja INV no contiene productos debajo de los encabezados.');
     return rows;
   }
