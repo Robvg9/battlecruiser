@@ -579,7 +579,14 @@ async function bcCompletarCambioObligatorio(nuevaPassword) {
       cache: "no-store"
     });
     const result = await response.json().catch(function () { return {}; });
-    return response.ok && result.completed === true;
+    if (!response.ok || result.completed !== true) return false;
+
+    const refreshed = await client.auth.refreshSession();
+    if (refreshed.error || !refreshed.data || !refreshed.data.session) return false;
+    if (typeof cargarContextoUsuario === "function") {
+      await cargarContextoUsuario(refreshed.data.session);
+    }
+    return true;
   } catch (_) {
     return false;
   }
