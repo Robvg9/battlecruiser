@@ -60,8 +60,8 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /stock general no se modificará/i);
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.6"]'));
   assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.6"));
-  assert.ok(app.includes('VERSION="9.5.91"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.91"'));
+  assert.ok(app.includes('VERSION="9.5.92"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.92"'));
 });
 
 
@@ -86,7 +86,7 @@ test("dependienta can read only assigned jornada finance and reinvestment approv
   assert.ok(ui.includes("no afecta stock ni caja hasta que la apruebes"));
   assert.ok(approvals.includes("reinversiones','editar_any'"));
   assert.ok(approvals.includes("🛒 Reinversión pendiente"));
-  assert.ok(approvals.includes("const isMoney=isExpense||type==='reinversion';"));
+  assert.ok(approvals.includes("const isMoney=isExpense||type==='reinversion'||isDailyCash;"));
 });
 
 
