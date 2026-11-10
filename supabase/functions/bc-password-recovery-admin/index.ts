@@ -119,6 +119,44 @@ async function authenticatedAdmin(admin: any, authorization: string | null): Pro
   return { authUser: authData.user, profile };
 }
 
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const value of bytes) binary += String.fromCharCode(value);
+  return btoa(binary);
+}
+
+function decodeBase64(value: string): Uint8Array {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+async function deriveTemporaryPasswordHash(password: string, salt: Uint8Array): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits({
+    name: "PBKDF2",
+    salt,
+    iterations: 150000,
+    hash: "SHA-256",
+  }, key, 256);
+  return encodeBase64(new Uint8Array(bits));
+}
+
+function constantTimeBase64Equal(left: string, right: string): boolean {
+  try {
+    const a = decodeBase64(left);
+    const b = decodeBase64(right);
+    if (a.length !== b.length) return false;
+    let difference = 0;
+    for (let index = 0; index < a.length; index++) difference |= a[index] ^ b[index];
+    return difference === 0;
+  } catch { return false; }
+}
+
 async function logApproval(admin: any, actor: any, targetName: string, requestId: string): Promise<void> {
   const now = new Date().toISOString();
   const { error } = await admin.from("auditoria_operaciones").insert({
@@ -286,7 +324,30 @@ Deno.serve(async (req: Request) => {
       return reply({ error: "La nueva contraseña no pudo verificarse." }, 400, origin);
     }
 
-    // Prove that the password has actually changed before clearing the mandatory gate.
+    const { data: approvedRequest, error: approvedRequestError } = await admin
+      .from("bc_password_recovery_requests")
+      .select("id,temporary_password_salt,temporary_password_hash")
+      .eq("target_user_id", current.id)
+      .eq("status", "APROBADA")
+      .is("completed_at", null)
+      .order("approved_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (approvedRequestError || !approvedRequest?.temporary_password_salt || !approvedRequest?.temporary_password_hash) {
+      return reply({ error: "No existe una autorización de cambio pendiente para esta cuenta." }, 403, origin);
+    }
+
+    // Reject the temporary password itself. Only a genuinely different password may clear the gate.
+    const candidateHash = await deriveTemporaryPasswordHash(
+      completionPassword,
+      decodeBase64(approvedRequest.temporary_password_salt),
+    );
+    if (constantTimeBase64Equal(candidateHash, approvedRequest.temporary_password_hash)) {
+      return reply({ error: "La contraseña personal debe ser distinta de la temporal entregada por Administración." }, 400, origin);
+    }
+
+    // Prove that the new password really works before clearing the mandatory gate.
     // The verified sign-in session is intentionally never returned to the browser.
     const verifier = createClient(url, publicKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -301,6 +362,11 @@ Deno.serve(async (req: Request) => {
       app_metadata: { ...(current.app_metadata || {}), bc_password_change_required: false },
     });
     if (error) return reply({ error: "No se pudo confirmar el cambio obligatorio." }, 500, origin);
+
+    await admin.from("bc_password_recovery_requests")
+      .update({ status: "COMPLETADA", completed_at: new Date().toISOString(), temporary_password_salt: null, temporary_password_hash: null })
+      .eq("id", approvedRequest.id)
+      .eq("status", "APROBADA");
     return reply({ completed: true }, 200, origin);
   }
 
@@ -367,6 +433,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const target = targetPack.user;
+    const saltBytes = new Uint8Array(16);
+    crypto.getRandomValues(saltBytes);
+    const saltEncoded = encodeBase64(saltBytes);
+    const temporaryPasswordHash = await deriveTemporaryPasswordHash(temporaryPassword, saltBytes);
+
     const { error: passwordError } = await admin.auth.admin.updateUserById(target.id, {
       password: temporaryPassword,
       app_metadata: { ...(target.app_metadata || {}), bc_password_change_required: true },
@@ -378,7 +449,13 @@ Deno.serve(async (req: Request) => {
 
     const approvedAt = new Date().toISOString();
     const { error: finishError } = await admin.from("bc_password_recovery_requests")
-      .update({ status: "APROBADA", approved_by: actor.authUser.id, approved_at: approvedAt })
+      .update({
+        status: "APROBADA",
+        approved_by: actor.authUser.id,
+        approved_at: approvedAt,
+        temporary_password_salt: saltEncoded,
+        temporary_password_hash: temporaryPasswordHash,
+      })
       .eq("id", requestId)
       .eq("status", "PROCESANDO");
 
