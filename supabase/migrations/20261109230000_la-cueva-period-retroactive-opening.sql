@@ -1,6 +1,8 @@
 BEGIN;
 
-ALTER TABLE public.turno_jornada_programacion ADD COLUMN IF NOT EXISTS fecha_fin date;
+ALTER TABLE public.turno_jornada_programacion
+  ADD COLUMN IF NOT EXISTS fecha_fin date,
+  ADD COLUMN IF NOT EXISTS salario_porcentaje numeric(6,3);
 UPDATE public.turno_jornada_programacion SET fecha_fin=fecha WHERE fecha_fin IS NULL;
 DO $period_salary_constraint$
 BEGIN
@@ -17,8 +19,6 @@ END;
 $period_salary_constraint$;
 
 ALTER TABLE public.turno_sesiones ADD COLUMN IF NOT EXISTS apertura_retroactiva boolean NOT NULL DEFAULT false;
-ALTER TABLE public.turno_jornada_programacion ADD COLUMN IF NOT EXISTS salario_porcentaje numeric(6,3);
-
 CREATE OR REPLACE FUNCTION public.bc5_guard_jornada_assignment_conflicts()
 RETURNS trigger
 LANGUAGE plpgsql
