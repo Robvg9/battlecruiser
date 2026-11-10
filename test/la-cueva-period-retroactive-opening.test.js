@@ -93,6 +93,16 @@ test("dependienta can read only assigned jornada finance and reinvestment approv
 test("only the Dueño role receives reinvestment approval authority",()=>{
   assert.ok(migration.includes("r.nombre))='dueño'"));
   assert.ok(migration.includes("'reinversiones','editar_any'"));
+  const approvalStart=migration.indexOf("ELSIF p_tipo='reinversion'");
+  const approvalEnd=migration.indexOf("ELSE",approvalStart);
+  const approvalBranch=migration.slice(approvalStart,approvalEnd);
+  assert.ok(approvalBranch.includes("public.tiene_permiso('reinversiones','editar_any')"));
+  assert.equal(approvalBranch.includes("public.tiene_permiso('auditoria','editar_any')"),false);
+  const queueStart=migration.indexOf("'reinversion'::text");
+  const queueEnd=migration.indexOf("ORDER BY 3 DESC",queueStart);
+  const queueBranch=migration.slice(queueStart,queueEnd);
+  assert.ok(queueBranch.includes("public.tiene_permiso('reinversiones','editar_any')"));
+  assert.equal(queueBranch.includes("public.tiene_permiso('auditoria','editar_any')"),false);
 });
 test("programming trigger prevents warehouse and responsible overlap across a full period",()=>{
   assert.ok(migration.includes("CREATE TRIGGER bc5_jornada_no_overlap"));

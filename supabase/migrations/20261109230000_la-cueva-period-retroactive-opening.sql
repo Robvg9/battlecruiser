@@ -1025,7 +1025,7 @@ BEGIN
     JOIN public.almacenes a ON a.id=r.almacen_id
     WHERE r.estado='PENDIENTE'
       AND r.turno_sesion_id IS NOT NULL
-      AND (public.tiene_permiso('reinversiones','editar_any') OR public.tiene_permiso('auditoria','editar_any'))
+      AND public.tiene_permiso('reinversiones','editar_any')
 
     ORDER BY 3 DESC;
 END;
@@ -1068,7 +1068,7 @@ BEGIN
       RAISE EXCEPTION 'Sin permiso para revisar bajas.' USING ERRCODE='42501';
     END IF;
   ELSIF p_tipo='reinversion' THEN
-    IF NOT (public.tiene_permiso('auditoria','editar_any') OR public.tiene_permiso('reinversiones','editar_any')) THEN
+    IF NOT public.tiene_permiso('reinversiones','editar_any') THEN
       RAISE EXCEPTION 'Sin permiso para revisar reinversiones.' USING ERRCODE='42501';
     END IF;
   ELSE
