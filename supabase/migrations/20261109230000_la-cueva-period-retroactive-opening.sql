@@ -177,7 +177,7 @@ BEGIN
   END IF;
   SELECT jsonb_build_object(
     'productos',coalesce((
-      SELECT jsonb_agg(jsonb_build_object('producto_id',p.id,'nombre',p.nombre,'unidad',p.unidad,'stock_sistema',s.cantidad) ORDER BY p.nombre,p.id)
+      SELECT jsonb_agg(jsonb_build_object('producto_id',p.id,'nombre',p.nombre,'unidad',p.unidad,'producto_padre_id',p.producto_padre_id,'stock_sistema',s.cantidad) ORDER BY p.nombre,p.id)
       FROM public.stock s JOIN public.productos p ON p.id=s.producto_id
       WHERE s.almacen_id=p_almacen_id AND p.activo=true
     ),'[]'::jsonb),

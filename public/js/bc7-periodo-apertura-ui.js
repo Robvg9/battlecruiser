@@ -1,5 +1,5 @@
 // BattleCruiser — apertura administrativa de jornada ya iniciada
-// v1.1 — previsualización verificable de cantidades y stock actual.
+// v1.3 — previsualización por producto y variante de sabor.
 (function(){
   'use strict';
   if(window.__BC7_PERIOD_OPENING__)return;
@@ -211,6 +211,7 @@
     try{
       preview=await callRpc('bc7_previsualizar_apertura_existente',{p_almacen_id:warehouse,p_fecha_inicio:start,p_fecha_fin:end});
       const products=asArray(preview&&preview.productos);
+      const variantCount=products.filter(p=>p.producto_padre_id).length;
       productsByName=new Map();
       products.forEach(p=>{const key=norm(p.nombre);if(!productsByName.has(key))productsByName.set(key,[]);productsByName.get(key).push(p);});
       let unmatched=[],duplicates=[],seen=new Set();
@@ -229,7 +230,7 @@
       $('bc7-period-inventory-preview').innerHTML='<b>'+rows.length+'/'+products.length+'</b> productos relacionados'+
         (unmatched.length?'<p class="bc7-period-error">Sin coincidencia: '+esc(unmatched.slice(0,12).join(', '))+(unmatched.length>12?'…':'')+'</p>':'')+
         (duplicates.length?'<p class="bc7-period-error">Nombres duplicados en el Excel o catálogo: '+esc(duplicates.slice(0,12).join(', '))+'</p>':'')+
-        '<p class="bc7-period-muted">Columna Fin del cuadre anterior: cantidades importadas como conteo físico inicial. «Stock actual» es solo una referencia y puede incluir las entradas que selecciones abajo.</p>'+
+        '<p class="bc7-period-muted">Columna Fin del cuadre anterior: cantidades importadas como inventario inicial. «Stock actual» es solo una referencia y puede incluir las entradas que selecciones abajo.</p>'+(variantCount?'<p class="bc7-period-muted">El catálogo incluye '+variantCount+' variantes con stock independiente. Cada sabor debe tener su propia fila y cantidad en el Excel; no se reparte automáticamente un total entre sabores.</p>':'')+
         '<div class="bc7-period-table-wrap"><table class="bc7-period-table"><thead><tr><th>Producto</th><th>Fin (conteo)</th><th>Stock actual (referencia)</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>';
       renderTransfers();
       result.textContent='Revisión lista. Comprueba las cantidades y selecciona las entradas correctas.';

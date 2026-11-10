@@ -135,3 +135,13 @@ test("transfer selection copy does not presume an unverified physical count time
   assert.ok(ui.includes("revisa también la de 07:15 según la hora real del conteo"));
   assert.equal(ui.includes("la de 07:15 ya está incluida en el cierre anterior"), false);
 });
+
+
+test("inventory preview identifies independent flavor variants and refuses implicit parent-stock distribution",()=>{
+  const migrationHasVariant= migration.includes("'producto_padre_id',p.producto_padre_id");
+  const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
+  assert.ok(migrationHasVariant);
+  assert.ok(ui.includes("const variantCount=products.filter(p=>p.producto_padre_id).length"));
+  assert.ok(ui.includes("Cada sabor debe tener su propia fila y cantidad en el Excel"));
+  assert.ok(ui.includes("no se reparte automáticamente un total entre sabores"));
+});
