@@ -386,7 +386,7 @@
       const groups=missingProductGroups();
       if(!groups.length){result.textContent='No quedan productos inexistentes que crear. Revisa los nombres ambiguos en la tabla.';return;}
       const names=groups.map(group=>group.nombre);
-      const approved=confirm('Se crearán '+groups.length+' fichas básicas de catálogo:\\n\\n'+names.join('\\n')+'\\n\\nCada ficha tendrá unidad pendiente de definir, precio normal 0, sin precio mayorista, sin categoría y sin mínimos. No se añadirá stock ni se abrirá la jornada. Después tendrás que completar y revisar sus datos. ¿Continuar?');
+      const approved=confirm('Se crearán '+groups.length+' fichas básicas de catálogo:\n\n'+names.join('\n')+'\n\nCada ficha tendrá unidad pendiente de definir, precio normal 0, sin precio mayorista, sin categoría y sin mínimos. No se añadirá stock ni se abrirá la jornada. Después tendrás que completar y revisar sus datos. ¿Continuar?');
       if(!approved)return;
       let created=0;const failures=[];
       for(const group of groups){

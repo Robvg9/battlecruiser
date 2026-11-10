@@ -222,7 +222,9 @@ test("opening preview preserves manual mappings across repeated catalog refreshe
   assert.ok(ui.includes("sessionStorage.setItem(mappingStorageKey"));
   assert.ok(ui.includes("saved.manual"));
   assert.ok(ui.includes("Se restauraron"));
-  assert.equal(ui.includes("parsed.forEach(row=>{\\n        const matches=productsByName.get(norm(row.nombre))||[];"),false);
+  const preview=ui.slice(ui.indexOf("async function previewOpening"),ui.indexOf("async function createMissingProducts"));
+  assert.ok(preview.includes("reconcileMappingsWithCatalog(parsed,products)"));
+  assert.equal(preview.includes("row.producto_id=matches.length===1"),false);
 });
 
 test("only missing positive-quantity products are created through the audited catalog RPC",()=>{
