@@ -44,6 +44,7 @@ test("product editor explains the retail base-unit and wholesale-presentation ru
 test("warehouse detail reads jornada-projected balances without changing the raw transaction cache", () => {
   assert.match(warehouses, /client\.rpc\("inventario_enriquecido"/);
   assert.match(warehouses, /client\.rpc\("inventario_mixto_enriquecido"/);
+  assert.match(warehouses, /bcConTimeoutLocal\(Promise\.all/);
   assert.match(warehouses, /_cache\.stock_visual/);
   assert.match(warehouses, /\|\| s\.producto \|\| "—"/);
   assert.match(warehouses, /const unidad = s\.unidad \|\| \(p && p\.unidad\) \|\| "unidad"/);
