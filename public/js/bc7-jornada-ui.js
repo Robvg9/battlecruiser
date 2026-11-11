@@ -270,7 +270,7 @@
     if(history)history.hidden=true;
     if(workspace)workspace.hidden=true;
     setPageMode(false);
-    if(calendar){calendar.hidden=false;calendar.scrollIntoView({behavior:'smooth',block:'start');}
+    if(calendar){calendar.hidden=false;calendar.scrollIntoView({behavior:'smooth',block:'start'});}
     window.__BC_M29_VIEW='home';
   }
   async function openClosedHistory(){
