@@ -6,7 +6,7 @@
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '43';
+  var HUB_VER = '44';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
@@ -81,10 +81,13 @@
       '.op-hero{margin-bottom:16px}',
       '.op-hero h2{margin:0;font-family:Cormorant Garamond,serif;font-size:1.75rem;font-weight:600;color:var(--text)}',
       '.op-hero p{margin:6px 0 0;font-size:13px;color:var(--mist);max-width:520px;line-height:1.45}',
-      '.op-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}',
-      '@media(min-width:560px){.op-grid{grid-template-columns:1fr 1fr}}',
-      '@media(min-width:900px){.op-grid{grid-template-columns:1fr 1fr 1fr}}',
-      '.op-card{display:flex;flex-direction:column;gap:10px;padding:18px 16px;border-radius:14px;border:1px solid rgba(201,162,77,.16);background:rgba(12,28,24,.55);cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease;text-align:left;min-height:150px}',
+      '.op-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0 12px}',
+      '@media(min-width:760px){.op-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}',
+      '.op-card{display:flex;flex-direction:row;align-items:center;gap:9px;padding:10px 11px;border-radius:10px;border:1px solid rgba(201,162,77,.18);background:rgba(12,28,24,.62);cursor:pointer;transition:border-color .15s ease,background .15s ease;text-align:left;min-height:58px;min-width:0}',
+      '.op-card-quick .op-card-icon{width:32px;height:32px;min-width:32px;border-radius:9px;font-size:17px}',
+      '.op-card-quick .op-card-title{font-size:12px;line-height:1.2;font-weight:700;color:var(--text)}',
+      '.op-card-quick p,.op-card-quick .op-go{display:none!important}',
+      '.op-card-quick:hover{transform:none;border-color:rgba(201,162,77,.45);background:rgba(201,162,77,.08)}',
       '.op-card:hover{transform:translateY(-2px);border-color:rgba(201,162,77,.35);box-shadow:0 10px 28px rgba(0,0,0,.25)}',
       '.op-card-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(201,162,77,.1)}',
       '.op-card h3{margin:0;font-family:Cormorant Garamond,serif;font-size:1.2rem;font-weight:600;color:var(--text)}',
@@ -403,27 +406,20 @@
     if (fi) fi.style.display = 'none';
   }
 
-  /** Construye la lista de cards según permisos reales actuales. */
+  /** Cuatro accesos directos diarios, visibles solo con el permiso efectivo de escritura. */
   function buildCardsList() {
     var cards = [];
     if (can('gastos', 'ver') && can('gastos', 'crear')) {
-      cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
+      cards.push({ tone: 'gold', icon: '💸', title: 'Agregar gasto', desc: 'Registrar un gasto', fn: openGasto });
     }
     if (can('bajas', 'ver') && can('bajas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Registra varios productos y cantidades en una sola lista.', go: 'Registrar baja', fn: openBaja });
+      cards.push({ tone: 'red', icon: '📦', title: 'Agregar baja', desc: 'Registrar productos dados de baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
-      cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
-    }
-    // Backend: responsabilidades.crear / incidencias.crear (no turnos.crear)
-    if (can('responsabilidades', 'ver') && can('responsabilidades', 'crear')) {
-      cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
+      cards.push({ tone: 'green', icon: '🔄', title: 'Agregar reinversión', desc: 'Registrar productos reinvertidos', fn: openReinversion });
     }
     if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
-      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
-    }
-    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
-      cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, baja y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
+      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Registrar un evento o incidencia', fn: openIncidencia });
     }
     return cards;
   }
@@ -436,11 +432,11 @@
     cards.forEach(function (c) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'op-card tone-' + c.tone;
+      btn.className = 'op-card op-card-quick tone-' + c.tone;
+      btn.setAttribute('aria-label', c.title + '. ' + c.desc);
       btn.innerHTML =
-        '<div class="op-card-icon" aria-hidden="true">' + c.icon + '</div>' +
-        '<h3>' + esc(c.title) + '</h3><p>' + esc(c.desc) + '</p>' +
-        '<span class="op-go">' + esc(c.go) + ' →</span>';
+        '<span class="op-card-icon" aria-hidden="true">' + c.icon + '</span>' +
+        '<strong class="op-card-title">' + esc(c.title) + '</strong>';
       btn.onclick = c.fn;
       grid.appendChild(btn);
     });
@@ -464,7 +460,7 @@
     hub.id = HUB_ID;
     hub.setAttribute('data-ver', HUB_VER);
     hub.innerHTML =
-      '<div class="op-hero"><h2>Operaciones</h2><p>Gestioná movimientos de caja, inventario y tareas. Elegí una acción para comenzar.</p></div>' +
+      '<div class="op-hero"><h2>Operaciones</h2><p>Acciones frecuentes del negocio.</p></div>' +
       '<div class="op-grid" id="op-card-grid"></div>' +
       '<p class="op-hint">Hacé clic en una tarjeta para abrir su formulario</p>';
     tab.insertBefore(hub, tab.firstChild);
