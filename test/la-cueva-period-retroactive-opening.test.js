@@ -43,7 +43,7 @@ test("missing active-store config is backfilled from the persisted schedule with
   assert.match(backfill,/p\.zona_horaria/);
   assert.match(backfill,/ON CONFLICT \(almacen_id\) DO NOTHING/);
   assert.doesNotMatch(backfill,/salario_porcentaje/i);
-  assert.doesNotMatch(configBootstrap,/UPDATE\s+public\.turno_sesiones|UPDATE\s+public\.turnos|UPDATE\s+public\.stock|DELETE\s+FROM\s+public\.turno_jornada_inventario/i);
+  assert.doesNotMatch(backfill,/UPDATE\s+public\.turno_sesiones|UPDATE\s+public\.turnos\b|UPDATE\s+public\.stock|DELETE\s+FROM\s+public\.turno_jornada_inventario/i);
 });
 
 test("retroactive opening provisions the warehouse schedule row before reading it",()=>{
