@@ -69,8 +69,8 @@ test("salary RPC creates only the missing store schedule and stores the owner-se
   assert.match(salary,/v_p\.zona_horaria/);
   assert.match(salary,/ON CONFLICT \(almacen_id\) DO NOTHING/);
   assert.match(salary,/SET salario_porcentaje=p_porcentaje/);
-  assert.match(salary,/REVOKE ALL ON FUNCTION public\.bc7_configurar_salario_porcentaje_jornada[\s\S]*FROM PUBLIC,anon/);
-  assert.match(salary,/GRANT EXECUTE ON FUNCTION public\.bc7_configurar_salario_porcentaje_jornada[\s\S]*TO authenticated/);
+  assert.match(configBootstrap,/REVOKE ALL ON FUNCTION public\.bc7_configurar_salario_porcentaje_jornada[\s\S]*FROM PUBLIC,anon/);
+  assert.match(configBootstrap,/GRANT EXECUTE ON FUNCTION public\.bc7_configurar_salario_porcentaje_jornada[\s\S]*TO authenticated/);
   assert.doesNotMatch(salary,/salario_porcentaje\s*=\s*(?:5|10|20|25|30|50)(?:\D|$)/);
 });
 
