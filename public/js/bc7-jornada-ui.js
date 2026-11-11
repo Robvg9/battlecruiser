@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.16 — liquidación por inventario, entregas diarias y salario porcentual.
+// v7.17 — liquidación por inventario, entregas diarias y salario porcentual.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;

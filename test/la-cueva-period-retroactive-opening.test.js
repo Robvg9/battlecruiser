@@ -48,7 +48,7 @@ test("missing active-store config is backfilled from the persisted schedule with
 
 test("retroactive opening provisions the warehouse schedule row before reading it",()=>{
   const start=configBootstrap.indexOf("FUNCTION public.bc7_admin_abrir_jornada_existente");
-  const end=configBootstrap.indexOf("FUNCTION public.bc5_cerrar_jornada",start);
+  const end=configBootstrap.indexOf("REVOKE ALL ON FUNCTION public.bc7_admin_abrir_jornada_existente",start);
   assert.ok(start>=0&&end>start);
   const opening=configBootstrap.slice(start,end);
   const insert=opening.indexOf("INSERT INTO public.turno_jornada_configuracion (almacen_id)");
@@ -60,7 +60,7 @@ test("retroactive opening provisions the warehouse schedule row before reading i
 
 test("salary RPC creates only the missing store schedule and stores the owner-selected rate",()=>{
   const start=configBootstrap.indexOf("FUNCTION public.bc7_configurar_salario_porcentaje_jornada");
-  const end=configBootstrap.indexOf("FUNCTION public.bc7_registrar_entrega_diaria_jornada",start);
+  const end=configBootstrap.indexOf("REVOKE ALL ON FUNCTION public.bc7_configurar_salario_porcentaje_jornada",start);
   assert.ok(start>=0&&end>start);
   const salary=configBootstrap.slice(start,end);
   assert.match(salary,/INSERT INTO public\.turno_jornada_configuracion/);
