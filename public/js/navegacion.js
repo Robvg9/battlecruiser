@@ -17,10 +17,7 @@ document.addEventListener("click", function (event) {
 
 function irATab(tab) {
   if (!tab) return;
-  if (tab === "turnos") {
-    var ciclosBtn = document.querySelector('.tab-btn[data-tab="ciclos"]');
-    if (ciclosBtn) tab = "ciclos";
-  }
+  if (tab === "turnos" || tab === "ciclos") tab = "jornada";
   var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
   var shell = document.getElementById("app-shell");
   var permisosCargados = shell && shell.getAttribute("data-bc-permisos-cargados") === "1";
