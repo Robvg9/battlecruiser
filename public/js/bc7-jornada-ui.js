@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.16 — liquidación por inventario, entregas diarias y salario porcentual.
+// v7.17 — historial legacy integrado en la ruta canónica Jornada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -225,6 +225,7 @@
     document.head.appendChild(style);
   }
   function ensureShell(){
+    const legacyHistoryRoot=document.getElementById('ciclos-m18-root');
     let button=document.querySelector('.tab-btn[data-tab="jornada"]');
     const oldTurnos=document.querySelector('.tab-btn[data-tab="turnos"]');
     if(!button&&oldTurnos){button=document.createElement('button');button.type='button';button.className=oldTurnos.className||'tab-btn';button.dataset.tab='jornada';button.textContent='Jornada e inventario';oldTurnos.insertAdjacentElement('afterend',button);}
@@ -244,9 +245,17 @@
        '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="1" max="31" value="7" required></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+
       '</section></details>'+
-      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><h3>Calendario</h3><span class="bc7-muted">Jornadas asignadas</span></div><div class="bc7-calendar-controls"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
+      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><h3>Calendario</h3><span class="bc7-muted">Jornadas asignadas</span><button type="button" class="bc7-btn" data-bc7-history-open hidden>Historial cerrado</button></div><div class="bc7-calendar-controls"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
       '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
+      '<section id="bc7-history-section" class="bc7-card" hidden><div id="bc7-history-root"></div></section>'+
       '</div>';
+    const historyHost=$('bc7-history-root');
+    if(historyHost){
+      if(legacyHistoryRoot)historyHost.appendChild(legacyHistoryRoot);
+      else {const root=document.createElement('div');root.id='ciclos-m18-root';historyHost.appendChild(root);}
+    }
+    const legacyPanel=$('tab-ciclos');
+    if(legacyPanel){legacyPanel.hidden=true;legacyPanel.classList.remove('visible');}
     return tab;
   }
   function setPageMode(workspace){
@@ -257,9 +266,28 @@
     if(panel)panel.hidden=!workspace;
   }
   function returnToCalendar(){
+    const history=$('bc7-history-section'),calendar=$('bc7-calendar-section'),workspace=$('bc7-workspace');
+    if(history)history.hidden=true;
+    if(workspace)workspace.hidden=true;
     setPageMode(false);
-    const calendar=$('bc7-calendar-section');
-    if(calendar)calendar.scrollIntoView({behavior:'smooth',block:'start'});
+    if(calendar){calendar.hidden=false;calendar.scrollIntoView({behavior:'smooth',block:'start');}
+    window.__BC_M29_VIEW='home';
+  }
+  async function openClosedHistory(){
+    if(!state.admin)return false;
+    const history=$('bc7-history-section'),calendar=$('bc7-calendar-section'),workspace=$('bc7-workspace'),root=$('ciclos-m18-root');
+    if(!history||!root)return false;
+    if(calendar)calendar.hidden=true;
+    if(workspace)workspace.hidden=true;
+    history.hidden=false;
+    history.scrollIntoView({behavior:'smooth',block:'start'});
+    const legacy=window.__BC_M29__;
+    if(!legacy||typeof legacy.openClosedHistory!=='function'){
+      root.innerHTML='<div class="bc7-empty">El historial cerrado no está disponible todavía. Actualiza la PWA y vuelve a intentarlo.</div>';
+      return false;
+    }
+    await legacy.openClosedHistory({onBack:returnToCalendar});
+    return true;
   }
   function activateWorkspaceTab(name){
     const allowed=['inventario','operacion','finanzas','movimientos'];
@@ -1252,6 +1280,9 @@
     if(state.admin){try{await ensureResponsibleCatalog(true);}catch(_){}}
     if($('bc7-admin-panel'))$('bc7-admin-panel').hidden=false;
     if($('bc7-admin-details'))$('bc7-admin-details').hidden=!state.admin;
+    const historyBtn=document.querySelector('[data-bc7-history-open]');if(historyBtn)historyBtn.hidden=!state.admin;
+    const duplicateTurnos=document.querySelector('.tab-btn[data-tab="turnos"]');if(duplicateTurnos){duplicateTurnos.hidden=true;duplicateTurnos.style.display='none';}
+    const duplicateCiclos=document.querySelector('.tab-btn[data-tab="ciclos"]');if(duplicateCiclos){duplicateCiclos.hidden=true;duplicateCiclos.style.display='none';}
     const btn=document.querySelector('.tab-btn[data-tab="jornada"]');if(btn&&state.admin)btn.textContent='Jornada e inventario · Admin';
     if(state.admin)setStatus(navigator.onLine?'Acceso administrativo verificado.':'Sin conexión: solo lectura local, no se permiten escrituras.','ok');
     else setStatus(navigator.onLine?'Acceso limitado al calendario propio.':'Sin conexión. Reconnecta para actualizar el calendario.','');
@@ -1276,10 +1307,15 @@
     const tab=e.target&&e.target.closest?e.target.closest('[data-bc7-workspace-tab]'):null;
     if(tab){e.preventDefault();activateWorkspaceTab(tab.getAttribute('data-bc7-workspace-tab'));return;}
     const back=e.target&&e.target.closest?e.target.closest('[data-bc7-back-calendar]'):null;
-    if(back){e.preventDefault();returnToCalendar();}
+    if(back){e.preventDefault();returnToCalendar();return;}
+    const historyButton=e.target&&e.target.closest?e.target.closest('[data-bc7-history-open]'):null;
+    if(historyButton){e.preventDefault();await openClosedHistory();return;}
   });
   window.__BC7_JORNADA__ = {
     openWorkspace: openWorkspace,
+    openClosedHistory: openClosedHistory,
+    closeClosedHistory: returnToCalendar,
+    refreshCalendar: loadCalendar,
     refreshResponsibleStaff: async function(){try{return await ensureResponsibleCatalog(true);}catch(_){return []; }},
     openForSession: async function(sessionId) {
       if (!sessionId) return false;
