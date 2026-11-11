@@ -44,6 +44,13 @@ function mismoIdAlmacen(a, b) {
 
 function stockDelAlmacen(almacenId) {
   if (!almacenId) return [];
+  return (_cache.stock || []).filter(function (s) {
+    return s && mismoIdAlmacen(s.almacen_id, almacenId);
+  });
+}
+
+function stockVisualDelAlmacen(almacenId) {
+  if (!almacenId) return [];
   return (_cache.stock_visual || []).filter(function (s) {
     return s && mismoIdAlmacen(s.almacen_id, almacenId);
   });
@@ -262,7 +269,7 @@ function renderPanelAlmacenSeleccionado() {
     return;
   }
 
-  const stock = stockDelAlmacen(id);
+  const stock = stockVisualDelAlmacen(id);
   const productosCount = stock.filter((row) => !row.__bc_sin_producto).length;
   let unidades = 0;
   let bajoMin = 0;
@@ -328,7 +335,7 @@ function renderProductosDelAlmacen(almacen_id) {
     return;
   }
 
-  const stock = stockDelAlmacen(almacen_id);
+  const stock = stockVisualDelAlmacen(almacen_id);
   if (stock.length === 0) {
     lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos ni saldos de jornada registrados.</p>';
     return;
