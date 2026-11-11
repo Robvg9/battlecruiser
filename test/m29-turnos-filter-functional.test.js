@@ -140,14 +140,16 @@ test("Paso 4: el historial M29 consulta turnos maestros cerrados y los abre en s
   assert.deepEqual(Object.keys(openedOptions[0] || {}).sort(), ["readOnly"], "el historial no debe pasar opciones editables adicionales");
 });
 
-test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
-  assert.match(SOURCE, /var VERSION = '29\.21';/);
-  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.21"\]/);
+test("Paso 4: el archivo M29 filtra expedientes y no permite crear turnos paralelos", async (t) => {
+  assert.match(SOURCE, /var VERSION = '29\.22';/);
+  assert.match(SOURCE, /LEGACY_CREATION_ENABLED = false/);
+  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.22"\]/);
   const { window, getListCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
 
-  assert.ok(root.querySelector("#m29-btn-refrescar"), "la vista visible Turnos debe tener un botón de refresco");
+  assert.equal(root.querySelector("#m29-btn-crear"), null, "M29 debe conservar consulta e historial, no crear jornadas nuevas");
+  assert.ok(root.querySelector("#m29-btn-refrescar"), "el archivo heredado debe tener un botón de refresco");
   assert.ok(root.querySelector("#m29-filtro-estado"), "el filtro de estado debe estar en la vista visible Turnos");
   assert.ok(root.querySelector("#m29-filtro-almacen"), "el filtro de almacén debe estar en la vista visible Turnos");
   assert.equal(root.querySelectorAll(".m29-card").length, 3, "se muestran los turnos activos, programados o pendientes de aprobación");
