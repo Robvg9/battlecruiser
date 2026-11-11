@@ -148,11 +148,11 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
     "aprobaciones-admin.js?v=20261110.2",
-    "ui-operaciones-hub.js?v=43.2",
+    "ui-operaciones-hub.js?v=43.3",
     "almacenes.js?v=20261111.1",
-    "m53-inventario-centro.js?v=53.8",
+    "m53-inventario-centro.js?v=53.9",
     "movimiento-multiple.js?v=20261109.1",
-    "productos.js?v=20261109.3",
+    "productos.js?v=20261111.2",
     "compra-multiple.js?v=27.16",
     "aprobaciones-admin.js?v=20261110.2",
     "bajas-multiple.js?v=1.6"
@@ -161,7 +161,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
 
 test("Baja card opens the shared batch form with predefined reasons and required Otro detail", () => {
   const bajas = read("public/js/bajas-multiple.js");
-  assert.match(operations, /title: 'Registrar baja'/);
+  assert.match(operations, /title: 'Agregar baja'/);
   assert.match(operations, /window\.abrirBajasMultiple/);
   assert.match(operations, /can\('bajas', 'ver'\) && can\('bajas', 'crear'\)/);
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {

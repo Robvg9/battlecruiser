@@ -1,4 +1,4 @@
-// BattleCruiser — M53.8: Centro profesional de control de inventario
+// BattleCruiser — M53.9: Centro profesional de control de inventario
 // Única autoridad visual de #tab-inventario. Reutiliza RPC inventario_enriquecido.
 // Mantiene inventario-detalle.js (modal) y mision-d-stock-reposicion.js (stock bajo).
 (function () {

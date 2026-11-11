@@ -921,7 +921,7 @@ async function iniciarEdicionProducto(p) {
   const cachedParent = cachedProducts.find(row => String(row.id) === productId) || p;
   let product = Object.assign({}, cachedParent, p);
   let currentVariants = cachedProducts.filter(v =>
-    String(v.producto_padre_id) === productId && v.activo !== false
+    String(v.producto_padre_id) === String(p.id) && v.activo !== false
   );
   let serverReadSucceeded = false;
 

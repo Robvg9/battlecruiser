@@ -145,7 +145,7 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
-  assert.match(index, /productos\.js\?v=20261109\.3/);
+  assert.match(index, /productos\.js\?v=20261111\.2/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
   assert.match(index, /app\.js\?v=9\.5\.94/);
   assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.94"/);

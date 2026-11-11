@@ -86,8 +86,8 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
   assert.ok(app.includes('["turno-api.js","9.4.8"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
   assert.ok(app.includes('["m33-turnos-final.js","33.21"]'), 'the turn detail modal cache key must load the audited recovery action');
-  assert.ok(app.includes('["m29-turnos-organizacion.js","29.21"]'), 'M29 full-day default flow must be loaded dynamically');
-  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.21"), 'M29 full-day default flow must be available offline');
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.22"]'), 'M29 full-day default flow must be loaded dynamically');
+  assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.22"), 'M29 full-day default flow must be available offline');
   assert.equal((app.match(/\["hotfix-turno-forceclose-20260902\.js","20261030\.1"\]/g) || []).length, 1, 'the audited recovery module must load exactly once');
   assert.ok(sw.includes("./js/m74-pos-archive-retail.js?v=74.6"), 'M74 must be precached for offline startup');
   assert.ok(m74.includes("function hasActiveSalesSession()"), 'the session hint supports retail and wholesale');
@@ -248,8 +248,9 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   const assets = [
     "./js/turno-api.js?v=9.4.8",
     "./js/turnos-maestro.js?v=9.4.8",
-    "./js/m29-turnos-organizacion.js?v=29.21",
+    "./js/m29-turnos-organizacion.js?v=29.22",
     "./js/m33-turnos-final.js?v=33.21",
+    "./js/bc7-legacy-history.js?v=1.0",
     "./js/m22-sesiones-en-m21.js?v=25.5",
     "./js/m49-turnos-layout-definitivo.js?v=49.6",
     "./js/hotfix-regresiones-20260902.js?v=20261101.1",
@@ -262,8 +263,9 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   for (const key of [
     '["turno-api.js","9.4.8"]',
     '["turnos-maestro.js","9.4.8"]',
-    '["m29-turnos-organizacion.js","29.21"]',
+    '["m29-turnos-organizacion.js","29.22"]',
     '["m33-turnos-final.js","33.21"]',
+    '["bc7-legacy-history.js","1.0"]',
     '["m22-sesiones-en-m21.js","25.5"]',
     '["m49-turnos-layout-definitivo.js","49.6"]',
     '["hotfix-regresiones-20260902.js","20261101.1"]',

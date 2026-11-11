@@ -13,11 +13,20 @@ const inventory = read("public/js/m53-inventario-centro.js");
 const inventoryDetail = read("public/js/inventario-detalle.js");
 const operations = read("public/js/ui-operaciones-hub.js");
 const quickActions = read("public/js/bc-owner-quick-actions.js");
+const legacyHistory = read("public/js/bc7-legacy-history.js");
+const legacyTurns = read("public/js/m29-turnos-organizacion.js");
 
 test("Jornada e inventario is the only visible route for current and historical journey aliases", () => {
   assert.match(permissions, /turnos:\s*true[\s\S]*ciclos:\s*true/);
   assert.match(permissions, /"resumen",\s*"jornada",\s*"comunicacion"/);
   assert.match(navigation, /tab === "turnos" \|\| tab === "ciclos"[\s\S]*tab = "jornada"/);
+  assert.match(permissions, /ciclos:\s*true/);
+  assert.match(legacyHistory, /document\.getElementById\('ciclos-m18-root'\)/);
+  assert.match(legacyHistory, /host\.appendChild\(legacyRoot\)/);
+  assert.match(legacyHistory, /Historial y expedientes anteriores/);
+  assert.match(legacyTurns, /LEGACY_CREATION_ENABLED = false/);
+  assert.match(legacyTurns, /var btnHtml = ''/);
+  assert.match(legacyTurns, /if \(!state\.isAdmin \|\| !LEGACY_CREATION_ENABLED\) return false/);
 });
 
 test("M53 resolves warehouse UUIDs on mixed-family rows before enabling variant minimum edits", () => {
