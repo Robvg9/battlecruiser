@@ -341,8 +341,7 @@ function renderProductosDelAlmacen(almacen_id) {
     if (btn && !btn.dataset.bound) {
       btn.dataset.bound = "1";
       btn.addEventListener("click", function () {
-        if (almacenPanelVisible()) cargarStockVisualAlmacenes(true);
-    else invalidarStockVisualAlmacenes();
+        cargarStockVisualAlmacenes(true);
       });
     }
     return;
@@ -428,7 +427,8 @@ function cargarStockAlmacenes(force, internalForcedRetry) {
   if (force) {
     _cache.stock = [];
     window.__BC_STOCK_CONFIRMED__ = false;
-    cargarStockVisualAlmacenes(true);
+    if (almacenPanelVisible()) cargarStockVisualAlmacenes(true);
+    else invalidarStockVisualAlmacenes();
   }
   _stockCargaEstado = "loading";
   _stockCargaError = null;
