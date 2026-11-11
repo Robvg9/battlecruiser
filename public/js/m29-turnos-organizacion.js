@@ -10,7 +10,7 @@
   window.__BC_TURNOS_HOME_OWNER = 'm29';
   window.__BC_M29_VIEW = 'home';
   var ROOT_ID = 'ciclos-m18-root';
-  var VERSION = '29.21';
+  var VERSION = '29.22';
   var HOME_MARK = 'data-m29-home';
 
   function API() { return window.BattleCruiserTurnoAPI; }
@@ -340,7 +340,8 @@
     }
   }
 
-  async function openClosedHistory() {
+  async function openClosedHistory(options) {
+    var backTo = options && typeof options.onBack === 'function' ? options.onBack : renderHome;
     var el = root();
     var api = API();
     if (!el) return;
@@ -348,13 +349,13 @@
     if (offlineNow()) {
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty">El historial cerrado requiere conexión al servidor.</div></div>';
       var offlineBack = el.querySelector('#m29-btn-history-back');
-      if (offlineBack) offlineBack.addEventListener('click', function () { renderHome(); });
+      if (offlineBack) offlineBack.addEventListener('click', function () { backTo(); });
       return;
     }
     if (!api || typeof api.listarTurnosMaestros !== 'function') {
       el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">API de turnos no disponible.</div></div>';
       var unavailableBack = el.querySelector('#m29-btn-history-back');
-      if (unavailableBack) unavailableBack.addEventListener('click', function () { renderHome(); });
+      if (unavailableBack) unavailableBack.addEventListener('click', function () { backTo(); });
       return;
     }
     el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Los turnos cerrados conservan su expediente. Esta vista no crea ni modifica registros.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty">Consultando el historial…</div></div>';
@@ -410,7 +411,7 @@
         esc(error && error.message ? error.message : error) + '</div></div>';
     }
     var back = el.querySelector('#m29-btn-history-back');
-    if (back) back.addEventListener('click', function () { renderHome(); });
+    if (back) back.addEventListener('click', function () { backTo(); });
   }
 
   function openDetalle(id, isLegacy, readOnly) {
@@ -686,10 +687,21 @@
     window.BattleCruiserTurnosMaestro.version = VERSION;
   }
   function relabelTabs() {
-    var tab = document.querySelector('.tab-btn[data-tab="ciclos"]');
-    if (tab) tab.textContent = 'Turnos';
-    var old = document.querySelector('.tab-btn[data-tab="turnos"]');
-    if (old) { old.style.display = 'none'; old.classList.add('hidden'); }
+    ['turnos', 'ciclos'].forEach(function (key) {
+      var legacy = document.querySelector('.tab-btn[data-tab="' + key + '"]');
+      if (legacy) {
+        legacy.hidden = true;
+        legacy.setAttribute('aria-hidden', 'true');
+        legacy.classList.add('hidden', 'bc-legacy-journey-tab');
+        legacy.style.display = 'none';
+      }
+    });
+    var legacyPanel = document.getElementById('tab-ciclos');
+    if (legacyPanel) {
+      legacyPanel.hidden = true;
+      legacyPanel.classList.remove('visible');
+      legacyPanel.setAttribute('aria-hidden', 'true');
+    }
   }
   function hookNavigation() {
     var tabs = document.getElementById('tabs');
@@ -727,6 +739,7 @@
     version: VERSION,
     renderHome: renderHome,
     openDetalle: openDetalle,
+    openClosedHistory: openClosedHistory,
     claimHomeOwnership: claimHomeOwnership,
     loadResponsibleStaff: ensureEligibleStaff,
     eligibleStaff: eligibleStaff,
