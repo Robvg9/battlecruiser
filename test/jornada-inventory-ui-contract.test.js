@@ -15,8 +15,8 @@ const migration = fs.readFileSync("supabase/migrations/20261111031000_bc_jornada
 test("M53 9.5.94 loads and is cached with one shared build key", () => {
   assert.match(app, /const VERSION="9\.5\.94"/);
   assert.match(sw, /BC_SW_VERSION = "9\.5\.94"/);
-  assert.match(app, /\["m53-inventario-centro\.js","53\.8"\]/);
-  assert.match(sw, /\.\/js\/m53-inventario-centro\.js\?v=53\.8/);
+  assert.match(app, /\["m53-inventario-centro\.js","53\.9"\]/);
+  assert.match(sw, /\.\/js\/m53-inventario-centro\.js\?v=53\.9/);
   assert.match(m53, /M53\.8/);
 });
 
