@@ -743,15 +743,18 @@
         return Object.assign({}, row, { almacen_id: resolvedId });
       });
       const mixedVariantIds = new Set();
+      const mixedParentIds = new Set();
       mixedRows.forEach(function (row) {
+        if (row && row.producto_id) mixedParentIds.add(String(row.producto_id));
         (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
           if (variant && variant.producto_id) mixedVariantIds.add(String(variant.producto_id));
         });
       });
-      // Replace child SKU rows with one parent summary; their real product IDs
-      // remain in the expandable details and in every transactional table.
+      // Mixed families are already rendered as a parent summary, including
+      // any generic opening balance that has not been assigned to a flavour.
       const ordinaryVisibleRows = ordinaryRowsWithWarehouseIds.filter(function (row) {
-        return !mixedVariantIds.has(String(row.producto_id));
+        const productId = String(row.producto_id);
+        return !mixedVariantIds.has(productId) && !mixedParentIds.has(productId);
       });
       const visibleProductIds = new Set(
         ordinaryVisibleRows.map(function (row) { return String(row.producto_id); })
