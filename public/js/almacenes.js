@@ -365,7 +365,7 @@ function renderProductosDelAlmacen(almacen_id) {
       const cantidadTexto = (typeof window.numberFmt === "function" ? window.numberFmt(cant) : money(cant)) + " " + unidad;
       const bajo = s.minimo != null && Number(s.minimo) > 0 && cant <= Number(s.minimo);
       const sinMinimo = s.estado === "sin_minimo" || (!s.__bc_sin_producto && (s.minimo == null || Number(s.minimo) <= 0));
-      const estadoStock = cant <= 0 ? "Agotado" : bajo ? "Bajo mínimo" : sinMinimo ? "Sin mínimo" : "";
+      const estadoStock = sinMinimo ? "Sin mínimo" : cant <= 0 ? "Agotado" : bajo ? "Bajo mínimo" : "";
       const div = document.createElement("div");
       div.className = "lista-item alm-producto-item" + (cant <= 0 ? " lista-item-inactivo" : "");
       div.innerHTML =
