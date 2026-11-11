@@ -168,6 +168,21 @@ test("Step 7 exposes a retry after staff lookup failure and preserves a selected
   );
 });
 
+test("Step 7 normalizes one requested day to the minimum two-day journey", async (t) => {
+  const { window } = setup(t, async (name) => {
+    if (name === "bc_actor_is_admin") return { data: true, error: null };
+    if (name === "listar_usuarios_admin") return { data: activeStaff, error: null };
+    if (name === "bc5_mis_jornadas") return { data: [], error: null };
+    throw new Error("Unexpected RPC: " + name);
+  });
+  await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
+  window.document.getElementById("bc7-days-count").value = "1";
+  window.document.querySelector("[data-bc7-build]").click();
+  assert.equal(window.document.getElementById("bc7-days-count").min, "2");
+  assert.equal(window.document.getElementById("bc7-days-count").value, "2");
+  assert.equal(window.document.querySelectorAll("#bc7-day-rows .bc7-day-row").length, 2);
+});
+
 test("Step 7 day cards show a readable full date and mobile-safe stacked layout", async (t) => {
   const { window } = setup(t, async (name) => {
     if (name === "bc_actor_is_admin") return { data: true, error: null };
@@ -181,7 +196,7 @@ test("Step 7 day cards show a readable full date and mobile-safe stacked layout"
   window.document.getElementById("bc7-plan-mode").value = "explicit";
   window.document.getElementById("bc7-anchor").value = "2026-05-20";
   window.document.getElementById("bc7-start-date").value = "2026-05-31";
-  window.document.getElementById("bc7-days-count").value = "1";
+  window.document.getElementById("bc7-days-count").value = "2";
   window.document.querySelector("[data-bc7-build]").click();
   const row = window.document.querySelector("#bc7-day-rows .bc7-day-row");
   assert.ok(row);
@@ -198,7 +213,7 @@ test("Step 7 scheduling success is shown in plain language without IDs or JSON",
     if (name === "bc_actor_is_admin") return { data: true, error: null };
     if (name === "listar_usuarios_admin") return { data: activeStaff, error: null };
     if (name === "bc5_mis_jornadas") return { data: [], error: null };
-    if (name === "bc5_crear_jornada_unica") return { data: { turno_id: "7a2e8f5a-1234-4567-8910-abcdef123456", dias_total: 1, dias_laborables: 1, dias_descanso: 0 }, error: null };
+    if (name === "bc5_crear_jornada_unica") return { data: { turno_id: "7a2e8f5a-1234-4567-8910-abcdef123456", dias_total: 2, dias_laborables: 1, dias_descanso: 1 }, error: null };
     throw new Error("Unexpected RPC: " + name);
   });
   await waitFor(() => /Acceso administrativo verificado/.test(window.document.getElementById("bc7-status")?.textContent || ""));
@@ -210,15 +225,18 @@ test("Step 7 scheduling success is shown in plain language without IDs or JSON",
   window.document.getElementById("bc7-plan-mode").value = "explicit";
   window.document.getElementById("bc7-anchor").value = "2099-01-01";
   window.document.getElementById("bc7-start-date").value = "2099-01-01";
-  window.document.getElementById("bc7-days-count").value = "1";
+  window.document.getElementById("bc7-days-count").value = "2";
   window.document.querySelector("[data-bc7-build]").click();
   const person = window.document.querySelector("#bc7-day-rows [data-bc7-person]");
   assert.ok(person && !person.disabled, "the responsible list must be verified before assigning a person");
   assert.equal(person.options.length, 3);
   person.value = "dep-2";
   assert.equal(person.value, "dep-2");
+  const secondDay = window.document.querySelectorAll("#bc7-day-rows .bc7-day-row")[1];
+  secondDay.querySelector("[data-bc7-works]").click();
+  assert.equal(secondDay.querySelector("[data-bc7-person]").disabled, true);
   window.document.querySelector("[data-bc7-create]").click();
-  const done = await waitFor(() => /Se programó 1 día: 1 de trabajo y 0 de descanso/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
+  const done = await waitFor(() => /Se programaron 2 días: 1 de trabajo y 1 de descanso/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
   assert.ok(done, "show human confirmation after the server confirms creation");
   const message = window.document.getElementById("bc7-create-msg").textContent;
   assert.doesNotMatch(message, /turno_id|[0-9a-f]{8}-[0-9a-f-]{27,}|\{|\}/i);
@@ -242,12 +260,14 @@ test("Step 7 known scheduling conflicts are translated into human guidance", asy
   window.document.getElementById("bc7-plan-mode").value = "explicit";
   window.document.getElementById("bc7-anchor").value = "2099-01-01";
   window.document.getElementById("bc7-start-date").value = "2099-01-01";
-  window.document.getElementById("bc7-days-count").value = "1";
+  window.document.getElementById("bc7-days-count").value = "2";
   window.document.querySelector("[data-bc7-build]").click();
   const person = window.document.querySelector("#bc7-day-rows [data-bc7-person]");
   assert.ok(person && !person.disabled);
   person.value = "dep-2";
   assert.equal(person.value, "dep-2");
+  const secondDay = window.document.querySelectorAll("#bc7-day-rows .bc7-day-row")[1];
+  secondDay.querySelector("[data-bc7-works]").click();
   window.document.querySelector("[data-bc7-create]").click();
   const failed = await waitFor(() => /Ya hay una jornada programada/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
   assert.ok(failed, "the duplicate date should explain what needs correction");
@@ -318,7 +338,7 @@ test("Step 7 resolves responsible names from the authoritative M29 staff cache i
   warehouse.value = "warehouse-1";
   window.document.getElementById("bc7-plan-mode").value = "pattern";
   window.document.getElementById("bc7-start-date").value = "2099-01-01";
-  window.document.getElementById("bc7-days-count").value = "1";
+  window.document.getElementById("bc7-days-count").value = "2";
   window.document.querySelector("[data-bc7-preview]").click();
 
   const loaded = await waitFor(() => window.document.getElementById("bc7-preview")?.textContent.includes("Beatriz"));

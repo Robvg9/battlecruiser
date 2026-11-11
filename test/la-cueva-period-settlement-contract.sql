@@ -37,8 +37,8 @@ BEGIN
   VALUES(v_warehouse,'La Cueva settlement fixture','minorista',true)
   ON CONFLICT(id) DO NOTHING;
   UPDATE public.productos SET precio_normal=10 WHERE id IN (v_pan,v_juice);
-  INSERT INTO public.turno_jornada_configuracion(almacen_id)
-  VALUES(v_warehouse) ON CONFLICT(almacen_id) DO NOTHING;
+  -- No jornada configuration row yet: the retroactive-opening and owner salary RPCs
+  -- must provision it from the persisted schedule without inventing a salary rate.
 
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
   VALUES(v_pan,v_warehouse,100,0),(v_juice,v_warehouse,100,0)
@@ -146,10 +146,17 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','reinversiones:editar_any,entregas_caja:editar_any',false);
+  IF EXISTS(SELECT 1 FROM public.turno_jornada_configuracion WHERE almacen_id=v_warehouse) THEN
+    RAISE EXCEPTION 'FAIL: the fixture unexpectedly created the store config before the explicit owner action';
+  END IF;
   PERFORM public.bc7_configurar_salario_porcentaje_jornada(v_session,5);
-  IF (SELECT salario_porcentaje FROM public.turno_jornada_programacion WHERE id=v_program)<>5
-     OR (SELECT salario_porcentaje FROM public.turno_jornada_configuracion WHERE almacen_id=v_warehouse)<>5 THEN
-    RAISE EXCEPTION 'FAIL: salary rate must be snapshotted on the jornada and retained as store default';
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_jornada_configuracion
+    WHERE almacen_id=v_warehouse
+      AND hora_inicio=TIME '07:00' AND hora_fin=TIME '23:00'
+      AND zona_horaria='America/Havana' AND salario_porcentaje=5
+  ) OR (SELECT salario_porcentaje FROM public.turno_jornada_programacion WHERE id=v_program)<>5 THEN
+    RAISE EXCEPTION 'FAIL: salary RPC must bootstrap the missing store schedule from the saved Jornada and snapshot the explicit owner rate';
   END IF;
   v_error:=false;
   BEGIN

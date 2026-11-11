@@ -21,7 +21,8 @@ test("Jornada e inventario is the only visible route for current and historical 
   assert.match(permissions, /"resumen",\s*"jornada",\s*"comunicacion"/);
   assert.match(navigation, /tab === "turnos" \|\| tab === "ciclos"[\s\S]*tab = "jornada"/);
   assert.match(permissions, /ciclos:\s*true/);
-  assert.match(legacyHistory, /document\.getElementById\('ciclos-m18-root'\)/);
+  assert.match(legacyHistory, /const ROOT_ID = 'ciclos-m18-root'/);
+  assert.match(legacyHistory, /document\.getElementById\(ROOT_ID\)/);
   assert.match(legacyHistory, /host\.appendChild\(legacyRoot\)/);
   assert.match(legacyHistory, /Historial y expedientes anteriores/);
   assert.match(legacyTurns, /LEGACY_CREATION_ENABLED = false/);

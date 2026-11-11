@@ -308,6 +308,7 @@ function applySql(file) {
     applySql("test/step4-jornada-shared-inventory-contract.sql");
     log("\\r\\n=== La Cueva period migration and inventory-delta settlement contract ===");
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
+    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
   } catch (error) {

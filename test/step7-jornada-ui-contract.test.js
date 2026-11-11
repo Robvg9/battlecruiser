@@ -48,6 +48,13 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
 });
 
 
+test("canonical Jornada planner applies the database two-day minimum in input and save paths",()=>{
+  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31"/);
+  assert.match(ui,/function scheduleDayCount\(\)/);
+  assert.match(ui,/const n=scheduleDayCount\(\)/);
+  assert.match(ui,/bc5_crear_jornada_unica/);
+});
+
 test("Jornada POS UI separates payment methods and cash declaration from gross sales",()=>{
   assert.match(ui,/cashDeclarationHtml\(detail\)/);
   assert.match(ui,/renderSalesLedger\(host,data\)/);
