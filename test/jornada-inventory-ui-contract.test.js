@@ -45,6 +45,8 @@ test("warehouse detail reads jornada-projected balances without changing the raw
   assert.match(warehouses, /client\.rpc\("inventario_enriquecido"/);
   assert.match(warehouses, /client\.rpc\("inventario_mixto_enriquecido"/);
   assert.match(warehouses, /_cache\.stock_visual/);
+  assert.match(warehouses, /\|\| s\.producto \|\| "—"/);
+  assert.match(warehouses, /\|\| a\.producto \|\| ""/);
   assert.match(warehouses, /function stockDelAlmacen\(almacenId\)[\s\S]*_cache\.stock_visual/);
   assert.match(warehouses, /client\.from\("stock"\)\.select\("producto_id, almacen_id, cantidad, minimo"\)/);
   assert.match(warehouses, /_cache\.stock = Array\.isArray\(stock\)/);
