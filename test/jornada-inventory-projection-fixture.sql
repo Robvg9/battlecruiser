@@ -48,6 +48,7 @@ CREATE TABLE public.turnos (
 CREATE TABLE public.turno_jornada_programacion (
   id uuid PRIMARY KEY,
   fecha date NOT NULL,
+  hora_inicio_prevista time NOT NULL DEFAULT '07:00',
   zona_horaria text NOT NULL DEFAULT 'America/Havana'
 );
 CREATE TABLE public.turno_sesiones (
