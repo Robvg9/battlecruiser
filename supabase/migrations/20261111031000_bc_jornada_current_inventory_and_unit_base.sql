@@ -59,6 +59,7 @@ BEGIN
     s.almacen_id,
     s.jornada_programacion_id,
     jp.fecha AS fecha_programada,
+    jp.hora_inicio_prevista,
     jp.zona_horaria,
     t.apertura_real,
     a.tipo AS almacen_tipo
@@ -93,7 +94,16 @@ BEGIN
     RAISE EXCEPTION 'La jornada activa no tiene un corte inicial confirmado; se bloquea el saldo global incompleto';
   END IF;
 
-  v_start_at := COALESCE(v_session.apertura_real, v_initial.confirmado_en, v_initial.creado_en);
+  IF COALESCE(v_session.apertura_retroactiva, false)
+     AND v_session.hora_inicio_prevista IS NOT NULL THEN
+    -- For retroactively opened jornadas, the programmed start defines the
+    -- inventory period. A transfer before the administrative backfill/open
+    -- timestamp still belongs to the shift when it happened after schedule start.
+    v_start_at := (v_session.fecha_programada + v_session.hora_inicio_prevista)
+      AT TIME ZONE COALESCE(NULLIF(v_session.zona_horaria, ''), 'America/Havana');
+  ELSE
+    v_start_at := COALESCE(v_session.apertura_real, v_initial.confirmado_en, v_initial.creado_en);
+  END IF;
 
   IF v_start_at IS NULL THEN
     RAISE EXCEPTION 'No se pudo determinar la hora de apertura de la jornada';
@@ -118,16 +128,6 @@ BEGIN
       AND LOWER(t.estado) = 'completada'
       AND t.fecha > v_start_at
       AND t.fecha <= v_end_at
-      AND (
-        NOT COALESCE(v_session.apertura_retroactiva, false)
-        OR (t.fecha AT TIME ZONE COALESCE(NULLIF(v_session.zona_horaria, ''), 'America/Havana'))::date > v_session.fecha_programada
-        OR EXISTS (
-          SELECT 1
-          FROM public.turno_jornada_entradas_vinculadas x
-          WHERE x.turno_sesion_id = p_turno_sesion_id
-            AND x.transferencia_id = t.id
-        )
-      )
 
     UNION ALL
 
