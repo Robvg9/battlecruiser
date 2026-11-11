@@ -24,6 +24,9 @@ test("Jornada e inventario is the only visible route for current and historical 
   assert.match(legacyHistory, /const ROOT_ID = 'ciclos-m18-root'/);
   assert.match(legacyHistory, /document\.getElementById\(ROOT_ID\)/);
   assert.match(legacyHistory, /host\.appendChild\(legacyRoot\)/);
+  assert.match(legacyHistory, /legacyApi\.renderHome\(\)/);
+  assert.match(legacyHistory, /__BC7_LEGACY_ARCHIVE_ONLY__ = true/);
+  assert.match(legacyTurns, /__BC7_LEGACY_ARCHIVE_ONLY__ === true/);
   assert.match(legacyHistory, /Historial y expedientes anteriores/);
   assert.match(legacyTurns, /LEGACY_CREATION_ENABLED = false/);
   assert.match(legacyTurns, /var btnHtml = ''/);

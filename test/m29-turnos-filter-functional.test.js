@@ -14,6 +14,11 @@ const APP_SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "app.js"),
   "utf8"
 );
+const LEGACY_HISTORY_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "bc7-legacy-history.js"),
+  "utf8"
+);
+
 
 async function waitFor(predicate, timeout = 1000) {
   const deadline = Date.now() + timeout;
@@ -138,6 +143,60 @@ test("Paso 4: el historial M29 consulta turnos maestros cerrados y los abre en s
   assert.equal(openedOptions.length, 1, "el historial debe abrir exactamente una vez");
   assert.equal(openedOptions[0]?.readOnly, true, "el historial debe abrir en modo solo lectura");
   assert.deepEqual(Object.keys(openedOptions[0] || {}).sort(), ["readOnly"], "el historial no debe pasar opciones editables adicionales");
+});
+
+test("Paso 4: el archivo M29 se inicializa dentro de Jornada y solo expone expedientes cerrados", async (t) => {
+  const dom = new JSDOM(
+    "<!doctype html><html lang='es'><head></head><body>" +
+      "<div id='tabs'><button class='tab-btn' data-tab='resumen'>Resumen</button>" +
+      "<button class='tab-btn' data-tab='jornada'>Jornada e inventario</button>" +
+      "<button class='tab-btn' data-tab='ciclos'>Ciclos Operativos</button></div>" +
+      "<section id='tab-resumen' class='tab-panel'></section>" +
+      "<section id='tab-jornada' class='tab-panel visible'><div class='bc7-wrap'><section id='bc7-workspace'></section><section id='bc7-calendar-section'></section></div></section>" +
+      "<section id='tab-ciclos' class='tab-panel'><div id='ciclos-m18-root'></div></section>" +
+    "</body></html>",
+    { url: "https://battlecruiser-jornada-archive.test/", runScripts: "outside-only", pretendToBeVisual: true }
+  );
+  const { window } = dom;
+  Object.defineProperty(window.document, "readyState", { value: "complete", configurable: true });
+  window._cache = { almacenes: [{ id: "alm-1", nombre: "Principal", activo: true }] };
+  window.__bcUser = { rol: "dueño" };
+  window.tienePermiso = () => true;
+  const turns = [
+    { id:"active",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"EN_CURSO",fecha_inicio:"2026-11-09" },
+    { id:"scheduled",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"PROGRAMADO",fecha_inicio:"2026-11-12" },
+    { id:"pending",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"PENDIENTE_APROBACION",fecha_inicio:"2026-11-08" },
+    { id:"closed",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"CERRADO",fecha_inicio:"2026-11-01",fecha_fin:"2026-11-02" },
+    { id:"validated",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"VALIDADO",fecha_inicio:"2026-10-20",fecha_fin:"2026-10-21" }
+  ];
+  window.BattleCruiserTurnoAPI = {
+    actorIsAdmin: async () => true,
+    listarTurnosMaestros: async () => turns.map(row => ({...row})),
+    labelEstado: value => String(value || "")
+  };
+  const opened = [];
+  window.__BC_M33 = { open:(id,options)=>opened.push({id,options}) };
+  window.eval(SOURCE);
+  assert.ok(window.__BC_M29__, "the M29 module must expose its API before the archive wrapper loads");
+  window.eval(LEGACY_HISTORY_SOURCE);
+
+  const root=window.document.getElementById("ciclos-m18-root");
+  const details=window.document.getElementById("bc7-legacy-history");
+  assert.ok(details && details.contains(root), "the existing M29 root must be moved under the canonical Jornada archive");
+  assert.equal(window.__BC7_LEGACY_ARCHIVE_ONLY__,true);
+  const loaded=await waitFor(() =>
+    root.querySelector('[data-m29-closed-open="closed"]') &&
+    root.querySelector('[data-m29-closed-open="validated"]')
+  );
+  assert.ok(loaded,"mounting the legacy helper must actively initialize M29's archive");
+  assert.equal(root.querySelectorAll(".m29-card").length,0,"active/programmed journeys must not appear beside BC7");
+  assert.equal(root.querySelectorAll("[data-m29-closed-open]").length,2,"only closed and validated records are shown");
+  assert.equal(root.querySelector("#m29-btn-crear"),null,"the historical archive has no parallel creator");
+  root.querySelector('[data-m29-closed-open="closed"]').click();
+  assert.deepEqual(opened,[{id:"closed",options:{readOnly:true}}],"historical expedientes open read-only");
+  root.querySelector("#m29-btn-history-back").click();
+  assert.equal(details.open,false,"Cerrar historial collapses the archive instead of opening a second operational list");
+  t.after(()=>window.close());
 });
 
 test("Paso 4: el archivo M29 filtra expedientes y no permite crear turnos paralelos", async (t) => {

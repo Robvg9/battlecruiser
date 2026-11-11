@@ -56,12 +56,21 @@
     const tab = document.getElementById('tab-jornada');
     const wrapper = tab && tab.querySelector('.bc7-wrap');
     const legacyRoot = document.getElementById(ROOT_ID);
-    if (!tab || !wrapper || !legacyRoot || !allowed()) return false;
+    const legacyApi = window.__BC_M29__;
+    if (!tab || !wrapper || !legacyRoot || !allowed() || !legacyApi || typeof legacyApi.renderHome !== 'function') return false;
     const details = ensureDetails(wrapper);
     const host = details.querySelector('#' + HOST_ID);
     if (!host) return false;
+    window.__BC7_LEGACY_ARCHIVE_ONLY__ = true;
     if (legacyRoot.parentNode !== host) host.appendChild(legacyRoot);
     details.hidden = false;
+    if (!legacyRoot.dataset.bc7ArchiveInitialized) {
+      legacyRoot.dataset.bc7ArchiveInitialized = '1';
+      Promise.resolve(legacyApi.renderHome()).catch(function (error) {
+        legacyRoot.dataset.bc7ArchiveInitialized = '';
+        console.error('[BC7] No se pudo inicializar el historial heredado:', error);
+      });
+    }
     return true;
   }
 
@@ -91,6 +100,8 @@
       expanded: !!(details && details.open),
       legacyRootInsideCanonicalRoute: !!(details && root && details.contains(root)),
       createTurnButtonCount: details ? details.querySelectorAll('#m29-btn-crear').length : null,
+      archiveOnly: window.__BC7_LEGACY_ARCHIVE_ONLY__ === true,
+      initialized: !!(root && root.dataset.bc7ArchiveInitialized),
       summary: details ? details.querySelector('summary')?.textContent || '' : ''
     };
   };

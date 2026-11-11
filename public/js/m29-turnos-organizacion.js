@@ -297,6 +297,11 @@
   async function renderHome() {
     var el = root();
     if (!el || window.__BC_M29_RENDERING) return;
+    if (window.__BC7_LEGACY_ARCHIVE_ONLY__ === true) {
+      window.__BC_M29_VIEW = 'closed-history';
+      await openClosedHistory();
+      return;
+    }
     window.__BC_M29_RENDERING = true;
     try {
       claimHomeOwnership();
@@ -341,24 +346,36 @@
     }
   }
 
+  function historyBackLabel() {
+    return window.__BC7_LEGACY_ARCHIVE_ONLY__ === true ? 'Cerrar historial' : 'Volver a Turnos';
+  }
+  function historyBack() {
+    if (window.__BC7_LEGACY_ARCHIVE_ONLY__ === true) {
+      var details = document.getElementById('bc7-legacy-history');
+      if (details) details.open = false;
+      return;
+    }
+    renderHome();
+  }
+
   async function openClosedHistory() {
     var el = root();
     var api = API();
     if (!el) return;
     window.__BC_M29_VIEW = 'closed-history';
     if (offlineNow()) {
-      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty">El historial cerrado requiere conexión al servidor.</div></div>';
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">' + historyBackLabel() + '</button></div><div class="m29-empty">El historial cerrado requiere conexión al servidor.</div></div>';
       var offlineBack = el.querySelector('#m29-btn-history-back');
-      if (offlineBack) offlineBack.addEventListener('click', function () { renderHome(); });
+      if (offlineBack) offlineBack.addEventListener('click', function () { historyBack(); });
       return;
     }
     if (!api || typeof api.listarTurnosMaestros !== 'function') {
-      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">API de turnos no disponible.</div></div>';
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">' + historyBackLabel() + '</button></div><div class="m29-empty error">API de turnos no disponible.</div></div>';
       var unavailableBack = el.querySelector('#m29-btn-history-back');
-      if (unavailableBack) unavailableBack.addEventListener('click', function () { renderHome(); });
+      if (unavailableBack) unavailableBack.addEventListener('click', function () { historyBack(); });
       return;
     }
-    el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Los turnos cerrados conservan su expediente. Esta vista no crea ni modifica registros.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty">Consultando el historial…</div></div>';
+    el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Los turnos cerrados conservan su expediente. Esta vista no crea ni modifica registros.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">' + historyBackLabel() + '</button></div><div class="m29-empty">Consultando el historial…</div></div>';
     try {
       var all = [];
       var seen = Object.create(null);
@@ -400,18 +417,18 @@
           '</small></div><button type="button" data-m29-closed-open="' + esc(id) + '">Abrir expediente</button></article>';
       }).join('');
       var empty = '<div class="m29-empty">No hay turnos cerrados visibles para este usuario.</div>';
-      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura; los movimientos permanecen vinculados al turno original.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div>' +
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2><p>Consulta de solo lectura; los movimientos permanecen vinculados al turno original.</p></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">' + historyBackLabel() + '</button></div>' +
         (all.length ? '<div class="m29-archive-list">' + cards + '</div>' : empty) +
         (truncated ? '<p class="m29-archive-note" role="status">Se alcanzó el límite de lectura segura; contacta al administrador para consultar el resto.</p>' : '') + '</div>';
       el.querySelectorAll('[data-m29-closed-open]').forEach(function (button) {
         button.addEventListener('click', function () { openDetalle(button.dataset.m29ClosedOpen, false, true); });
       });
     } catch (error) {
-      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">Volver a Turnos</button></div><div class="m29-empty error">No se pudo cargar el historial: ' +
+      el.innerHTML = '<div class="m29-wrap"><div class="m29-hero"><div><h2>Historial de turnos</h2></div><button type="button" class="m29-btn-refresh" id="m29-btn-history-back">' + historyBackLabel() + '</button></div><div class="m29-empty error">No se pudo cargar el historial: ' +
         esc(error && error.message ? error.message : error) + '</div></div>';
     }
     var back = el.querySelector('#m29-btn-history-back');
-    if (back) back.addEventListener('click', function () { renderHome(); });
+    if (back) back.addEventListener('click', function () { historyBack(); });
   }
 
   function openDetalle(id, isLegacy, readOnly) {
