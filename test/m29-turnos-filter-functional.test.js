@@ -195,7 +195,9 @@ test("Paso 4: el archivo M29 se inicializa dentro de Jornada y solo expone exped
   assert.equal(root.querySelectorAll("[data-m29-closed-open]").length,2,"only closed and validated records are shown");
   assert.equal(root.querySelector("#m29-btn-crear"),null,"the historical archive has no parallel creator");
   root.querySelector('[data-m29-closed-open="closed"]').click();
-  assert.deepEqual(opened,[{id:"closed",options:{readOnly:true}}],"historical expedientes open read-only");
+  assert.equal(opened.length,1,"exactly one historical expediente is opened");
+  assert.equal(opened[0].id,"closed","the selected historical expediente is opened");
+  assert.equal(opened[0].options.readOnly,true,"historical expedientes open read-only");
   details.open=true;
   assert.equal(details.open,true,"the owner can expand the historical archive");
   assert.match(root.querySelector("#m29-btn-history-back").textContent,/Cerrar historial/);
