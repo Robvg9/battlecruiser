@@ -9,6 +9,7 @@ const sw = fs.readFileSync("public/service-worker.js", "utf8");
 const index = fs.readFileSync("public/index.html", "utf8");
 const m53 = fs.readFileSync("public/js/m53-inventario-centro.js", "utf8");
 const detail = fs.readFileSync("public/js/inventario-detalle.js", "utf8");
+const migration = fs.readFileSync("supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql", "utf8");
 
 test("M53 9.5.94 loads and is cached with one shared build key", () => {
   assert.match(app, /const VERSION="9\.5\.94"/);
@@ -23,10 +24,11 @@ test("mixed family parent summary replaces both family and child ordinary rows",
   assert.match(m53, /mixedParentIds\.add\(String\(row\.producto_id\)\)/);
   assert.match(m53, /!mixedVariantIds\.has\(productId\) && !mixedParentIds\.has\(productId\)/);
   assert.match(detail, /variantId && warehouseId && getClient\(\)/);
+  assert.match(detail, /esc\(variant\.nombre/);
 });
 
 test("undistributed opening inventory is visible as a generic family row without an editable variant", () => {
-  assert.match(detail, /Inventario inicial sin distribuir/);
+  assert.match(migration, /Inventario inicial sin distribuir/);
   assert.match(detail, /const variantId = variant\.producto_id \|\| ''/);
   assert.match(detail, /variantId && warehouseId && getClient\(\)/);
 });
