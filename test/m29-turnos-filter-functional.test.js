@@ -183,6 +183,8 @@ test("Paso 4: el archivo M29 se inicializa dentro de Jornada y solo expone exped
   const root=window.document.getElementById("ciclos-m18-root");
   const details=window.document.getElementById("bc7-legacy-history");
   assert.ok(details && details.contains(root), "the existing M29 root must be moved under the canonical Jornada archive");
+  assert.equal(details.hidden,false,"the archive wrapper must remain available in the canonical Jornada route");
+  assert.equal(root.dataset.bc7ArchiveInitialized,"1","the legacy history is actively initialized");
   assert.equal(window.__BC7_LEGACY_ARCHIVE_ONLY__,true);
   const loaded=await waitFor(() =>
     root.querySelector('[data-m29-closed-open="closed"]') &&
@@ -194,6 +196,9 @@ test("Paso 4: el archivo M29 se inicializa dentro de Jornada y solo expone exped
   assert.equal(root.querySelector("#m29-btn-crear"),null,"the historical archive has no parallel creator");
   root.querySelector('[data-m29-closed-open="closed"]').click();
   assert.deepEqual(opened,[{id:"closed",options:{readOnly:true}}],"historical expedientes open read-only");
+  details.open=true;
+  assert.equal(details.open,true,"the owner can expand the historical archive");
+  assert.match(root.querySelector("#m29-btn-history-back").textContent,/Cerrar historial/);
   root.querySelector("#m29-btn-history-back").click();
   assert.equal(details.open,false,"Cerrar historial collapses the archive instead of opening a second operational list");
   t.after(()=>window.close());
