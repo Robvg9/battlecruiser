@@ -104,11 +104,11 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 
 
 test('movement operations load multi-product transfer before the compact modal', () => {
-  const multiAt = app.indexOf('["movimiento-multiple.js","20261111.1"]');
+  const multiAt = app.indexOf('["movimiento-multiple.js","20261109.1"]');
   const modalAt = app.indexOf('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"]');
   assert.notEqual(multiAt, -1, 'the multi-transfer module must load dynamically');
   assert.ok(multiAt < modalAt, 'the multi-transfer module must load before the modal');
-  assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261111.1'));
+  assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261109.1'));
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.13'));
   assert.ok(app.includes('["m51-movimientos-centro.js","51.10"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.10"), 'the offline shell must precache the refreshed movement listener');
@@ -135,8 +135,8 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(productos.includes("bcNotificarCambioDatos(estabaEditando ?"), "direct catalog saves must publish product changes");
   assert.ok(sw.includes("./js/compra-multiple.js?v=27.16"), "the purchase module's reactive listener must be available offline");
   assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
-  assert.ok(index.includes('js/transferencias.js?v=20261111.1'), "transfer history must load its reactive subscriber");
-  assert.ok(sw.includes('./js/transferencias.js?v=20261111.1'), "transfer history must be cached with its reactive subscriber");
+  assert.ok(index.includes('js/transferencias.js?v=20261109.1'), "transfer history must load its reactive subscriber");
+  assert.ok(sw.includes('./js/transferencias.js?v=20261109.1'), "transfer history must be cached with its reactive subscriber");
 });
 
 // PWA 9.5.88 uses warehouse-specific movement summary windows and aligns release cache keys.
