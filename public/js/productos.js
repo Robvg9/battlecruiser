@@ -970,6 +970,7 @@ async function iniciarEdicionProducto(p) {
     // Existing families may only be modified in the explicit flavour editor.
     mixedToggle.disabled = familyConfigured;
     mixedToggle.dataset.bcSavedMixed = familyConfigured ? "1" : "0";
+    mixedToggle.dataset.bcVariantsReady = currentVariants.length ? "1" : "0";
     mixedToggle.title = familyConfigured
       ? "Familia ya configurada. Usa «Editar sabores» para modificar sus variantes."
       : "";
@@ -1087,6 +1088,10 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
   if (!_bcMixedConfigReturnTab || !form?.classList.contains("bc-mixed-config-mode")) return false;
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
+  if (toggle && toggle.dataset.bcSavedMixed === "1" && toggle.dataset.bcVariantsReady !== "1") {
+    setMsg("msg-productos", "La familia ya está configurada, pero no se pudieron cargar sus sabores guardados. No se abrirá un editor vacío ni se permitirá sobrescribirla. Actualiza y reintenta.", false);
+    return false;
+  }
   if (toggle && !toggle.checked) toggle.checked = true;
   if (list && !list.querySelector(".prod-variante-row")) agregarFilaVarianteProducto("", "");
   sincronizarEditorVariantesProducto();
@@ -1135,6 +1140,7 @@ function cancelarEdicionProducto() {
     mixedToggle.checked = false;
     mixedToggle.disabled = false;
     delete mixedToggle.dataset.bcSavedMixed;
+    delete mixedToggle.dataset.bcVariantsReady;
     mixedToggle.removeAttribute("title");
   }
   renderEditorVariantesProducto([]);

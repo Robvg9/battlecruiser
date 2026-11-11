@@ -126,7 +126,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(sw.includes("./js/bc-owner-quick-actions.js?v=1.0"), 'the Control Center shortcuts must be available offline');
   assert.ok(index.includes('js/productos.js?v=20261111.2'), 'the product editor must refresh saved mixed-family state');
   assert.ok(index.includes('js/almacenes.js?v=20261111.1'), 'the warehouse view must refresh its tab subscriber');
-  assert.ok(sw.includes("./js/productos.js?v=20261109.3"), 'the product view must refresh offline');
+  assert.ok(sw.includes("./js/productos.js?v=20261111.2"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
   assert.ok(m68.includes("__BC_M68_DATA_CHANGE_BOUND__"), "the sales POS listener must initialize only once");
@@ -186,8 +186,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(sw.includes("./js/m76-movimientos-operaciones.js?v=76.3"), "M76 must be precached for offline use");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.12/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
-  assert.match(index, /<script src="js\/productos\.js\?v=20261109\.3"><\/script>/);
-  assert.match(sw, /\.\/js\/productos\.js\?v=20261109\.3/, "the offline shell must precache the updated product module version");
+  assert.match(index, /<script src="js\/productos\.js\?v=20261111\.2"><\/script>/);
+  assert.match(sw, /\.\/js\/productos\.js\?v=20261111\.2/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.24"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
@@ -201,14 +201,14 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   for (const asset of [
     'style.css?v=9.5.94',
     'js/centro-control.js?v=9.5.70',
-    'js/navegacion.js?v=9.5.64',
+    'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.64',
     'js/operacion-humana.js?v=9.5.64',
     'js/comunicacion.js?v=9.5.64',
   ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
   for (const asset of [
     './js/centro-control.js?v=9.5.70',
-    './js/navegacion.js?v=9.5.64',
+    './js/navegacion.js?v=9.5.65',
     './js/mando.js?v=9.5.64',
     './js/operacion-humana.js?v=9.5.64',
     './js/comunicacion.js?v=9.5.64',
