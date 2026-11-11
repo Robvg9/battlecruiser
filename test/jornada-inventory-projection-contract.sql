@@ -77,6 +77,7 @@ DECLARE
   v_family_qty numeric;
   v_variants jsonb;
   v_unit text;
+  v_state text;
 BEGIN
   SELECT cantidad_actual INTO v_qty
   FROM public.bc7_jornada_saldos_operativos('60000000-0000-4000-8000-000000000001')
@@ -92,11 +93,14 @@ BEGIN
     RAISE EXCEPTION 'RPC de almacén no proyecta saldo 118; obtenido %', v_store_qty;
   END IF;
 
-  SELECT cantidad INTO v_store_qty
+  SELECT cantidad, estado INTO v_store_qty, v_state
   FROM public.inventario_enriquecido('10000000-0000-4000-8000-000000000001')
   WHERE producto_id = '20000000-0000-4000-8000-000000000004';
   IF v_store_qty IS DISTINCT FROM 23::numeric THEN
     RAISE EXCEPTION 'No se incluyó el producto del corte sin fila stock; obtenido %', v_store_qty;
+  END IF;
+  IF v_state IS DISTINCT FROM 'sin_minimo' THEN
+    RAISE EXCEPTION 'El producto sin asignación debe mostrarse sin mínimo; estado recibido %', v_state;
   END IF;
 
   SELECT cantidad INTO v_store_qty
