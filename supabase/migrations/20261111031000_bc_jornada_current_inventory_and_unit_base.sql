@@ -352,8 +352,9 @@ BEGIN
     r.cantidad,
     r.minimo,
     CASE
+      WHEN r.minimo IS NULL OR r.minimo <= 0 THEN 'sin_minimo'
       WHEN r.cantidad <= 0 THEN 'agotado'
-      WHEN r.minimo IS NOT NULL AND r.minimo > 0 AND r.cantidad <= r.minimo THEN 'bajo'
+      WHEN r.cantidad <= r.minimo THEN 'bajo'
       ELSE 'normal'
     END::text AS estado,
     r.costo_promedio,
