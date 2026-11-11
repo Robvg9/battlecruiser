@@ -349,13 +349,13 @@ function renderProductosDelAlmacen(almacen_id) {
     .sort((a, b) => {
       const pa = productosById[String(a.producto_id)];
       const pb = productosById[String(b.producto_id)];
-      const na = (a.productos && a.productos.nombre) || (pa && pa.nombre) || "";
-      const nb = (b.productos && b.productos.nombre) || (pb && pb.nombre) || "";
+      const na = (a.productos && a.productos.nombre) || (pa && pa.nombre) || a.producto || "";
+      const nb = (b.productos && b.productos.nombre) || (pb && pb.nombre) || b.producto || "";
       return na.localeCompare(nb, "es");
     })
     .forEach((s) => {
       const p = productosById[String(s.producto_id)];
-      const nombre = (s.productos && s.productos.nombre) || (p && p.nombre) || "—";
+      const nombre = (s.productos && s.productos.nombre) || (p && p.nombre) || s.producto || "—";
       const cat = p && p.categorias && p.categorias.nombre ? p.categorias.nombre : "";
       const imagen = p && p.imagen_url
         ? '<img src="' + escHtml(p.imagen_url) + '" alt="" class="producto-thumb" loading="lazy">'
