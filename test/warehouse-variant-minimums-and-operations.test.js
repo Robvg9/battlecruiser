@@ -131,28 +131,28 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
 
 test("Release cache keys and Service Worker precache match the modified inventory and Operations modules", () => {
   assert.match(app, /const VERSION="9\.5\.94"/);
-  assert.match(app, /m53-inventario-centro\.js","53\.8/);
-  assert.match(app, /ui-operaciones-hub\.js","43\.2/);
+  assert.match(app, /m53-inventario-centro\.js","53\.9/);
+  assert.match(app, /ui-operaciones-hub\.js","43\.3/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
   assert.ok(app.includes('["aprobaciones-admin.js","20261110.2"]'));
-  assert.match(app, /inventario-detalle\.js","71"/);
+  assert.match(app, /inventario-detalle\.js","72"/);
   assert.match(app, /compra-multiple\.js","27\.16"/);
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
-  assert.match(index, /productos\.js\?v=20261109\.3/);
+  assert.match(index, /productos\.js\?v=20261111\.2/);
   assert.match(index, /style\.css\?v=9\.5\.94/);
   assert.match(index, /almacenes\.js\?v=20261111\.1/);
   assert.match(index, /app\.js\?v=9\.5\.94/);
   assert.match(index, /v9\.5\.94 — BattleCruiser/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.94"/);
   for (const asset of [
-    "inventario-detalle.js?v=71",
+    "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
     "aprobaciones-admin.js?v=20261110.2",
-    "ui-operaciones-hub.js?v=43.2",
+    "ui-operaciones-hub.js?v=43.3",
     "almacenes.js?v=20261111.1",
-    "m53-inventario-centro.js?v=53.8",
+    "m53-inventario-centro.js?v=53.9",
     "movimiento-multiple.js?v=20261109.1",
-    "productos.js?v=20261109.3",
+    "productos.js?v=20261111.2",
     "compra-multiple.js?v=27.16",
     "aprobaciones-admin.js?v=20261110.2",
     "bajas-multiple.js?v=1.6"
@@ -161,7 +161,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
 
 test("Baja card opens the shared batch form with predefined reasons and required Otro detail", () => {
   const bajas = read("public/js/bajas-multiple.js");
-  assert.match(operations, /title: 'Registrar baja'/);
+  assert.match(operations, /title: 'Agregar baja'/);
   assert.match(operations, /window\.abrirBajasMultiple/);
   assert.match(operations, /can\('bajas', 'ver'\) && can\('bajas', 'crear'\)/);
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {

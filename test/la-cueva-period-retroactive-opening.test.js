@@ -8,6 +8,10 @@ const migration = fs.readFileSync(
   path.join(__dirname, "../supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql"),
   "utf8"
 );
+const configBootstrap = fs.readFileSync(
+  path.join(__dirname, "../supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql"),
+  "utf8"
+);
 
 test("retroactive opening is an admin-only atomic session creation with immutable opening inventory", () => {
   assert.match(migration, /bc7_admin_abrir_jornada_existente/);
@@ -23,6 +27,51 @@ test("retroactive opening is an admin-only atomic session creation with immutabl
   assert.doesNotMatch(opening, /\bUPDATE\s+public\.stock\b|\bINSERT\s+INTO\s+public\.stock\b|\bDELETE\s+FROM\s+public\.stock\b/i);
   assert.match(opening, /s\.cantidad-coalesce\(\(/);
   assert.match(opening, /stock_sistema_reconstruido_descontando_entradas_vinculadas/);
+});
+
+test("missing active-store config is backfilled from the persisted schedule without salary or operational rewrites",()=>{
+  const backfillStart=configBootstrap.indexOf("INSERT INTO public.turno_jornada_configuracion");
+  const openingStart=configBootstrap.indexOf("FUNCTION public.bc7_admin_abrir_jornada_existente");
+  const salaryStart=configBootstrap.indexOf("FUNCTION public.bc7_configurar_salario_porcentaje_jornada");
+  assert.ok(backfillStart>=0&&openingStart>backfillStart&&salaryStart>openingStart);
+  const backfill=configBootstrap.slice(backfillStart,openingStart);
+  assert.match(backfill,/FROM public\.turno_sesiones s/);
+  assert.match(backfill,/JOIN public\.turno_jornada_programacion p ON p\.id=s\.jornada_programacion_id/);
+  assert.match(backfill,/WHERE s\.estado='EN_CURSO'/);
+  assert.match(backfill,/p\.hora_inicio_prevista/);
+  assert.match(backfill,/p\.hora_fin_prevista/);
+  assert.match(backfill,/p\.zona_horaria/);
+  assert.match(backfill,/ON CONFLICT \(almacen_id\) DO NOTHING/);
+  assert.doesNotMatch(backfill,/salario_porcentaje/i);
+  assert.doesNotMatch(backfill,/UPDATE\s+public\.turno_sesiones|UPDATE\s+public\.turnos\b|UPDATE\s+public\.stock|DELETE\s+FROM\s+public\.turno_jornada_inventario/i);
+});
+
+test("retroactive opening provisions the warehouse schedule row before reading it",()=>{
+  const start=configBootstrap.indexOf("FUNCTION public.bc7_admin_abrir_jornada_existente");
+  const end=configBootstrap.indexOf("REVOKE ALL ON FUNCTION public.bc7_admin_abrir_jornada_existente",start);
+  assert.ok(start>=0&&end>start);
+  const opening=configBootstrap.slice(start,end);
+  const insert=opening.indexOf("INSERT INTO public.turno_jornada_configuracion (almacen_id)");
+  const lookup=opening.indexOf("SELECT * INTO v_cfg FROM public.turno_jornada_configuracion");
+  assert.ok(insert>=0&&lookup>insert);
+  assert.match(opening,/ON CONFLICT \(almacen_id\) DO NOTHING/);
+  assert.doesNotMatch(opening,/SET\s+salario_porcentaje\s*=/i);
+});
+
+test("salary RPC creates only the missing store schedule and stores the owner-selected rate",()=>{
+  const start=configBootstrap.indexOf("FUNCTION public.bc7_configurar_salario_porcentaje_jornada");
+  const end=configBootstrap.indexOf("REVOKE ALL ON FUNCTION public.bc7_configurar_salario_porcentaje_jornada",start);
+  assert.ok(start>=0&&end>start);
+  const salary=configBootstrap.slice(start,end);
+  assert.match(salary,/INSERT INTO public\.turno_jornada_configuracion/);
+  assert.match(salary,/v_p\.hora_inicio_prevista/);
+  assert.match(salary,/v_p\.hora_fin_prevista/);
+  assert.match(salary,/v_p\.zona_horaria/);
+  assert.match(salary,/ON CONFLICT \(almacen_id\) DO NOTHING/);
+  assert.match(salary,/SET salario_porcentaje=p_porcentaje/);
+  assert.match(configBootstrap,/REVOKE ALL ON FUNCTION public\.bc7_configurar_salario_porcentaje_jornada[\s\S]*FROM PUBLIC,anon/);
+  assert.match(configBootstrap,/GRANT EXECUTE ON FUNCTION public\.bc7_configurar_salario_porcentaje_jornada[\s\S]*TO authenticated/);
+  assert.doesNotMatch(salary,/salario_porcentaje\s*=\s*(?:5|10|20|25|30|50)(?:\D|$)/);
 });
 
 test("period ranges and imported lines are validated before any session is created", () => {

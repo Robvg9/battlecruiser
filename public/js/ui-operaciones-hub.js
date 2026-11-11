@@ -6,7 +6,7 @@
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '43';
+  var HUB_VER = '44';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
@@ -96,6 +96,16 @@
       '.op-card.tone-blue .op-go{background:rgba(50,90,160,.9);color:#fff}',
       '.op-card.tone-purple .op-go{background:rgba(100,60,160,.9);color:#fff}',
       '.op-hint{text-align:center;font-size:12.5px;color:var(--mist);margin:0 0 8px}',
+      '.op-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;margin-bottom:8px!important}',
+      '@media(min-width:760px){.op-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}',
+      '.op-card.op-action-button{display:flex!important;flex-direction:row!important;align-items:center!important;gap:9px!important;min-height:52px!important;padding:8px 10px!important;border-radius:10px!important}',
+      '.op-card.op-action-button .op-card-icon{width:30px!important;height:30px!important;min-width:30px!important;border-radius:8px!important;font-size:16px!important}',
+      '.op-card.op-action-button .op-action-label{font-family:inherit;font-size:.8rem!important;line-height:1.15;font-weight:700;color:var(--text)}',
+      '.op-card.op-action-button p,.op-card.op-action-button .op-go{display:none!important}',
+      '.op-secondary-details{margin:4px 0 12px;border-top:1px solid rgba(201,162,77,.14);padding-top:7px}',
+      '.op-secondary-details>summary{font-size:11px;color:var(--mist);cursor:pointer}',
+      '#op-secondary-grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}',
+      '.op-secondary-action{min-height:32px;padding:6px 10px;border:1px solid rgba(201,162,77,.2);border-radius:8px;background:rgba(255,255,255,.025);color:var(--mist);font-size:11px;font-weight:600}',
       '#' + MODAL_ID + '-backdrop{position:fixed;inset:0;background:rgba(4,12,10,.72);z-index:9000;display:flex;align-items:flex-end;justify-content:center;padding:12px}',
       '@media(min-width:640px){#' + MODAL_ID + '-backdrop{align-items:center;padding:24px}}',
       '#' + MODAL_ID + '{width:100%;max-width:480px;max-height:90vh;overflow:auto;background:linear-gradient(180deg,rgba(16,36,32,.98),rgba(10,24,20,.98));border:1px solid rgba(201,162,77,.22);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.45)}',
@@ -403,45 +413,62 @@
     if (fi) fi.style.display = 'none';
   }
 
-  /** Construye la lista de cards según permisos reales actuales. */
+  /** Cuatro acciones principales y compactas; resto de utilidades en "Más opciones". */
   function buildCardsList() {
     var cards = [];
     if (can('gastos', 'ver') && can('gastos', 'crear')) {
-      cards.push({ tone: 'gold', icon: '💸', title: 'Registrar gasto', desc: 'Registra un nuevo gasto de tu negocio.', go: 'Registrar gasto', fn: openGasto });
+      cards.push({ tone: 'gold', icon: '💸', title: 'Agregar gasto', fn: openGasto });
     }
     if (can('bajas', 'ver') && can('bajas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Registrar baja', desc: 'Registra varios productos y cantidades en una sola lista.', go: 'Registrar baja', fn: openBaja });
+      cards.push({ tone: 'red', icon: '📦', title: 'Agregar baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
-      cards.push({ tone: 'green', icon: '🔄', title: 'Registrar reinversión', desc: 'Productos reinvertidos: inventario ↑ y caja ↓.', go: 'Registrar reinversión', fn: openReinversion });
-    }
-    // Backend: responsabilidades.crear / incidencias.crear (no turnos.crear)
-    if (can('responsabilidades', 'ver') && can('responsabilidades', 'crear')) {
-      cards.push({ tone: 'blue', icon: '📋', title: 'Nueva responsabilidad', desc: 'Creá tareas y revisá las ya asignadas.', go: 'Abrir', fn: openResponsabilidad });
+      cards.push({ tone: 'green', icon: '🔄', title: 'Agregar reinversión', fn: openReinversion });
     }
     if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
-      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', desc: 'Reportá eventos y consultá los creados.', go: 'Abrir', fn: openIncidencia });
-    }
-    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
-      cards.push({ tone: 'purple', icon: '🔐', title: 'Ver aprobaciones', desc: 'Revisá pendientes de gasto, baja y caja.', go: 'Ir a aprobaciones', fn: goAprobaciones });
+      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', fn: openIncidencia });
     }
     return cards;
   }
 
-  /** Rellena (o rellena de nuevo) el grid de cards según permisos actuales. */
+  function buildSecondaryActions() {
+    var actions = [];
+    if (can('responsabilidades', 'ver') && can('responsabilidades', 'crear')) {
+      actions.push({ label: 'Responsabilidades', fn: openResponsabilidad });
+    }
+    if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
+      actions.push({ label: 'Aprobaciones', fn: goAprobaciones });
+    }
+    return actions;
+  }
+
   function fillCardsGrid(grid) {
     if (!grid) return;
     grid.innerHTML = '';
-    var cards = buildCardsList();
-    cards.forEach(function (c) {
+    buildCardsList().forEach(function (card) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'op-card tone-' + c.tone;
-      btn.innerHTML =
-        '<div class="op-card-icon" aria-hidden="true">' + c.icon + '</div>' +
-        '<h3>' + esc(c.title) + '</h3><p>' + esc(c.desc) + '</p>' +
-        '<span class="op-go">' + esc(c.go) + ' →</span>';
-      btn.onclick = c.fn;
+      btn.className = 'op-card op-action-button tone-' + card.tone;
+      btn.setAttribute('aria-label', card.title);
+      btn.innerHTML = '<span class="op-card-icon" aria-hidden="true">' + card.icon + '</span><span class="op-action-label">' + esc(card.title) + '</span>';
+      btn.onclick = card.fn;
+      grid.appendChild(btn);
+    });
+  }
+
+  function fillSecondaryActions(container) {
+    if (!container) return;
+    var actions = buildSecondaryActions();
+    container.hidden = !actions.length;
+    var grid = container.querySelector('#op-secondary-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    actions.forEach(function (action) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'op-secondary-action';
+      btn.textContent = action.label;
+      btn.onclick = action.fn;
       grid.appendChild(btn);
     });
   }
@@ -456,6 +483,7 @@
       // Hub ya presente: solo refrescar cards según permisos actuales (corrige carrera de carga)
       var grid = existing.querySelector('#op-card-grid');
       fillCardsGrid(grid);
+      fillSecondaryActions(existing.querySelector('#op-secondary-actions'));
       return;
     }
     if (existing) existing.remove();
@@ -466,10 +494,11 @@
     hub.innerHTML =
       '<div class="op-hero"><h2>Operaciones</h2><p>Gestioná movimientos de caja, inventario y tareas. Elegí una acción para comenzar.</p></div>' +
       '<div class="op-grid" id="op-card-grid"></div>' +
-      '<p class="op-hint">Hacé clic en una tarjeta para abrir su formulario</p>';
+      '<details class="op-secondary-details" id="op-secondary-actions" hidden><summary>Más opciones</summary><div id="op-secondary-grid"></div></details>';
     tab.insertBefore(hub, tab.firstChild);
 
     fillCardsGrid(hub.querySelector('#op-card-grid'));
+    fillSecondaryActions(hub.querySelector('#op-secondary-actions'));
   }
 
   function run() { injectCss(); buildHub(); hideLegacy(); }

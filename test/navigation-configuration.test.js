@@ -22,15 +22,15 @@ const sectionScope = fs.readFileSync("public/js/section-scope-fix.js", "utf8");
 const finalLoader = fs.readFileSync("public/js/hotfix-17-final-loader-20260903.js", "utf8");
 
 
-test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidden-route aliases preserved", () => {
+test("RWHT navigation contract: 20 logical routes, 16 visible destinations, hidden-route aliases preserved", () => {
   const routeIds = [...index.matchAll(/<button\b[^>]*\bdata-tab="([^"]+)"/g)].map(match => match[1]);
   const panelIds = [...index.matchAll(/<section\b[^>]*\bid="tab-([^"]+)"/g)].map(match => match[1]);
   const expectedVisible = [
     "resumen", "jornada", "productos", "ventas", "almacenes", "pendientes", "reportes",
-    "inventario", "movimientos", "ciclos", "operacion", "comunicacion",
+    "inventario", "movimientos", "operacion", "comunicacion",
     "mando", "usuarios", "config", "conectividad", "preferencias",
   ];
-  const expectedHidden = ["transferencias", "vales", "turnos"];
+  const expectedHidden = ["transferencias", "vales", "turnos", "ciclos"];
 
   assert.equal(routeIds.length, 20, "the source declares 20 logical navigation buttons");
   assert.equal(new Set(routeIds).size, 20, "logical navigation IDs must be unique");
@@ -43,7 +43,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   assert.deepEqual(
     routeIds.filter(id => !expectedHidden.includes(id)).sort(),
     expectedVisible.slice().sort(),
-    "the visible route contract must be the documented 17 destinations"
+    "the visible route contract must be the documented 16 destinations"
   );
 
   for (const id of expectedHidden) {
@@ -67,7 +67,7 @@ test("RWHT navigation contract: 20 logical routes, 17 visible destinations, hidd
   assert.match(sectionScope, /data-bc-permisos-cargados/);
   assert.match(sectionScope, /target\.getAttribute\('data-bc-permiso'\) === '1'/);
   assert.match(sectionVisibility, /LABELS = \{ config: "Administración", ciclos: "Turnos" \}/);
-  assert.match(navigation, /if \(tab === "turnos"\) \{\s*var ciclosBtn = document\.querySelector\('\.tab-btn\[data-tab="ciclos"\]'\);\s*if \(ciclosBtn\) tab = "ciclos";\s*\}/);
+  assert.match(navigation, /if \(tab === "turnos" \|\| tab === "ciclos"\) \{[\s\S]*tab = "jornada";\s*\}/);
   assert.match(app, /m12-fe5-hide-vales\.js/);
   assert.match(hideVales, /removeChild\(panel\)/, "Vales panel is deliberately removed by the loaded module");
 });
@@ -173,8 +173,8 @@ test("la Dependienta ve solo módulos concedidos y conserva las excepciones pers
   window.eval(permissions);
   window.aplicarPermisosAInterfaz();
 
-  const allowed = ["jornada", "ciclos", "operacion", "comunicacion", "conectividad", "preferencias"];
-  const denied = ["resumen", "productos", "ventas", "almacenes", "pendientes", "reportes", "inventario", "movimientos", "mando", "usuarios", "config", "transferencias", "turnos"];
+  const allowed = ["jornada", "operacion", "comunicacion", "conectividad", "preferencias"];
+  const denied = ["resumen", "productos", "ventas", "almacenes", "pendientes", "reportes", "inventario", "movimientos", "mando", "usuarios", "config", "transferencias", "turnos", "ciclos"];
   for (const name of allowed) {
     const btn = document.querySelector('#tabs .tab-btn[data-tab="' + name + '"]');
     assert.equal(btn.getAttribute("data-bc-permiso"), "1", "debe permitir " + name);
@@ -265,9 +265,15 @@ test("app shell, application and Service Worker share 9.5.94 and load refreshed 
   assert.match(serviceWorker, /BC_SW_VERSION = "9.5.94"/);
   assert.match(index, /href="style\.css\?v=9\.5\.94"/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.94"><\/script>/);
-  assert.match(app, /\["permisos-navegacion\.js","67\.7"\]/);
-  assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.7/, "Service Worker debe precargar la misma versión de app.js");
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.16"\]/);
+  assert.match(app, /\["permisos-navegacion\.js","67\.8"\]/);
+  assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.8/, "Service Worker debe precargar la misma versión de app.js");
+  assert.ok(index.includes("js/navegacion.js?v=9.5.65"));
+  assert.ok(serviceWorker.includes("js/navegacion.js?v=9.5.65"));
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.22"]'));
+  assert.ok(app.includes('["bc7-legacy-history.js","1.0"]'));
+  assert.ok(serviceWorker.includes("js/m29-turnos-organizacion.js?v=29.22"));
+  assert.ok(serviceWorker.includes("js/bc7-legacy-history.js?v=1.0"));
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.17"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261101\.1"\]/);
   assert.match(app, /\["hotfix-secciones-visibles-20260903\.js","20261030\.1"\]/);

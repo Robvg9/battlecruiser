@@ -9,15 +9,17 @@ const sw = fs.readFileSync("public/service-worker.js", "utf8");
 const index = fs.readFileSync("public/index.html", "utf8");
 const m53 = fs.readFileSync("public/js/m53-inventario-centro.js", "utf8");
 const detail = fs.readFileSync("public/js/inventario-detalle.js", "utf8");
+const legacyHistory = fs.readFileSync("public/js/bc7-legacy-history.js", "utf8");
+const legacyTurns = fs.readFileSync("public/js/m29-turnos-organizacion.js", "utf8");
 const warehouses = fs.readFileSync("public/js/almacenes.js", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql", "utf8");
 
 test("M53 9.5.94 loads and is cached with one shared build key", () => {
   assert.match(app, /const VERSION="9\.5\.94"/);
   assert.match(sw, /BC_SW_VERSION = "9\.5\.94"/);
-  assert.match(app, /\["m53-inventario-centro\.js","53\.8"\]/);
-  assert.match(sw, /\.\/js\/m53-inventario-centro\.js\?v=53\.8/);
-  assert.match(m53, /M53\.8/);
+  assert.match(app, /\["m53-inventario-centro\.js","53\.9"\]/);
+  assert.match(sw, /\.\/js\/m53-inventario-centro\.js\?v=53\.9/);
+  assert.match(m53, /M53\.9/);
 });
 
 test("mixed family parent summary replaces both family and child ordinary rows", () => {
@@ -40,6 +42,15 @@ test("product editor explains the retail base-unit and wholesale-presentation ru
   assert.match(index, /presentaciones con factor de conversión/);
 });
 
+
+test("legacy history remains nested in canonical Jornada while legacy turn creation is disabled", () => {
+  assert.match(app, /\["bc7-legacy-history\.js","1\.0"\]/);
+  assert.match(sw, /bc7-legacy-history\.js\?v=1\.0/);
+  assert.match(legacyHistory, /Historial y expedientes anteriores/);
+  assert.match(legacyHistory, /host\.appendChild\(legacyRoot\)/);
+  assert.match(legacyTurns, /LEGACY_CREATION_ENABLED = false/);
+  assert.match(legacyTurns, /var btnHtml = ''/);
+});
 
 test("warehouse detail reads jornada-projected balances without changing the raw transaction cache", () => {
   assert.match(warehouses, /client\.rpc\("inventario_enriquecido"/);

@@ -14,6 +14,11 @@ const APP_SOURCE = fs.readFileSync(
   path.join(__dirname, "..", "public", "app.js"),
   "utf8"
 );
+const LEGACY_HISTORY_SOURCE = fs.readFileSync(
+  path.join(__dirname, "..", "public", "js", "bc7-legacy-history.js"),
+  "utf8"
+);
+
 
 async function waitFor(predicate, timeout = 1000) {
   const deadline = Date.now() + timeout;
@@ -140,14 +145,77 @@ test("Paso 4: el historial M29 consulta turnos maestros cerrados y los abre en s
   assert.deepEqual(Object.keys(openedOptions[0] || {}).sort(), ["readOnly"], "el historial no debe pasar opciones editables adicionales");
 });
 
-test("Paso 4: la vista visible M29 permite filtrar turnos por estado y almacén", async (t) => {
-  assert.match(SOURCE, /var VERSION = '29\.21';/);
-  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.21"\]/);
+test("Paso 4: el archivo M29 se inicializa dentro de Jornada y solo expone expedientes cerrados", async (t) => {
+  const dom = new JSDOM(
+    "<!doctype html><html lang='es'><head></head><body>" +
+      "<div id='tabs'><button class='tab-btn' data-tab='resumen'>Resumen</button>" +
+      "<button class='tab-btn' data-tab='jornada'>Jornada e inventario</button>" +
+      "<button class='tab-btn' data-tab='ciclos'>Ciclos Operativos</button></div>" +
+      "<section id='tab-resumen' class='tab-panel'></section>" +
+      "<section id='tab-jornada' class='tab-panel visible'><div class='bc7-wrap'><section id='bc7-workspace'></section><section id='bc7-calendar-section'></section></div></section>" +
+      "<section id='tab-ciclos' class='tab-panel'><div id='ciclos-m18-root'></div></section>" +
+    "</body></html>",
+    { url: "https://battlecruiser-jornada-archive.test/", runScripts: "outside-only", pretendToBeVisual: true }
+  );
+  const { window } = dom;
+  Object.defineProperty(window.document, "readyState", { value: "complete", configurable: true });
+  window._cache = { almacenes: [{ id: "alm-1", nombre: "Principal", activo: true }] };
+  window.__bcUser = { rol: "dueño" };
+  window.tienePermiso = () => true;
+  const turns = [
+    { id:"active",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"EN_CURSO",fecha_inicio:"2026-11-09" },
+    { id:"scheduled",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"PROGRAMADO",fecha_inicio:"2026-11-12" },
+    { id:"pending",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"PENDIENTE_APROBACION",fecha_inicio:"2026-11-08" },
+    { id:"closed",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"CERRADO",fecha_inicio:"2026-11-01",fecha_fin:"2026-11-02" },
+    { id:"validated",almacen_id:"alm-1",almacen_nombre:"Principal",estado_maestro:"VALIDADO",fecha_inicio:"2026-10-20",fecha_fin:"2026-10-21" }
+  ];
+  window.BattleCruiserTurnoAPI = {
+    actorIsAdmin: async () => true,
+    listarTurnosMaestros: async () => turns.map(row => ({...row})),
+    labelEstado: value => String(value || "")
+  };
+  const opened = [];
+  window.__BC_M33 = { open:(id,options)=>opened.push({id,options}) };
+  window.eval(SOURCE);
+  assert.ok(window.__BC_M29__, "the M29 module must expose its API before the archive wrapper loads");
+  window.eval(LEGACY_HISTORY_SOURCE);
+
+  const root=window.document.getElementById("ciclos-m18-root");
+  const details=window.document.getElementById("bc7-legacy-history");
+  assert.ok(details && details.contains(root), "the existing M29 root must be moved under the canonical Jornada archive");
+  assert.equal(details.hidden,false,"the archive wrapper must remain available in the canonical Jornada route");
+  assert.equal(root.dataset.bc7ArchiveInitialized,"1","the legacy history is actively initialized");
+  assert.equal(window.__BC7_LEGACY_ARCHIVE_ONLY__,true);
+  const loaded=await waitFor(() =>
+    root.querySelector('[data-m29-closed-open="closed"]') &&
+    root.querySelector('[data-m29-closed-open="validated"]')
+  );
+  assert.ok(loaded,"mounting the legacy helper must actively initialize M29's archive");
+  assert.equal(root.querySelectorAll(".m29-card").length,0,"active/programmed journeys must not appear beside BC7");
+  assert.equal(root.querySelectorAll("[data-m29-closed-open]").length,2,"only closed and validated records are shown");
+  assert.equal(root.querySelector("#m29-btn-crear"),null,"the historical archive has no parallel creator");
+  root.querySelector('[data-m29-closed-open="closed"]').click();
+  assert.equal(opened.length,1,"exactly one historical expediente is opened");
+  assert.equal(opened[0].id,"closed","the selected historical expediente is opened");
+  assert.equal(opened[0].options.readOnly,true,"historical expedientes open read-only");
+  details.open=true;
+  assert.equal(details.open,true,"the owner can expand the historical archive");
+  assert.match(root.querySelector("#m29-btn-history-back").textContent,/Cerrar historial/);
+  root.querySelector("#m29-btn-history-back").click();
+  assert.equal(details.open,false,"Cerrar historial collapses the archive instead of opening a second operational list");
+  t.after(()=>window.close());
+});
+
+test("Paso 4: el archivo M29 filtra expedientes y no permite crear turnos paralelos", async (t) => {
+  assert.match(SOURCE, /var VERSION = '29\.22';/);
+  assert.match(SOURCE, /LEGACY_CREATION_ENABLED = false/);
+  assert.match(APP_SOURCE, /\["m29-turnos-organizacion\.js","29\.22"\]/);
   const { window, getListCalls } = setup(t);
   await window.__BC_M29__.renderHome();
   const root = window.document.getElementById("ciclos-m18-root");
 
-  assert.ok(root.querySelector("#m29-btn-refrescar"), "la vista visible Turnos debe tener un botón de refresco");
+  assert.equal(root.querySelector("#m29-btn-crear"), null, "M29 debe conservar consulta e historial, no crear jornadas nuevas");
+  assert.ok(root.querySelector("#m29-btn-refrescar"), "el archivo heredado debe tener un botón de refresco");
   assert.ok(root.querySelector("#m29-filtro-estado"), "el filtro de estado debe estar en la vista visible Turnos");
   assert.ok(root.querySelector("#m29-filtro-almacen"), "el filtro de almacén debe estar en la vista visible Turnos");
   assert.equal(root.querySelectorAll(".m29-card").length, 3, "se muestran los turnos activos, programados o pendientes de aprobación");
