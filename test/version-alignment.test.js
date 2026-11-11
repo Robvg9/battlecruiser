@@ -104,11 +104,11 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
 
 
 test('movement operations load multi-product transfer before the compact modal', () => {
-  const multiAt = app.indexOf('["movimiento-multiple.js","20261109.1"]');
+  const multiAt = app.indexOf('["movimiento-multiple.js","20261111.1"]');
   const modalAt = app.indexOf('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"]');
   assert.notEqual(multiAt, -1, 'the multi-transfer module must load dynamically');
   assert.ok(multiAt < modalAt, 'the multi-transfer module must load before the modal');
-  assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261109.1'));
+  assert.ok(sw.includes('./js/movimiento-multiple.js?v=20261111.1'));
   assert.ok(sw.includes('./js/hotfix-16-5-movimientos-operaciones-flotantes-20260902.js?v=16.13'));
   assert.ok(app.includes('["m51-movimientos-centro.js","51.10"]'), 'M51 must load the refreshed data-change listener');
   assert.ok(sw.includes("./js/m51-movimientos-centro.js?v=51.10"), 'the offline shell must precache the refreshed movement listener');
@@ -123,7 +123,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(sw.includes('./js/bajas-multiple.js?v=1.6'), 'the updated Bajas list module must be precached');
   assert.ok(sw.includes("./js/inventario-detalle.js?v=71"), 'the offline shell must precache the updated minimum editor');
   assert.ok(index.includes('js/productos.js?v=20261109.3'), 'the product view must refresh its category subscriber');
-  assert.ok(index.includes('js/almacenes.js?v=20261109.1'), 'the warehouse view must refresh its tab subscriber');
+  assert.ok(index.includes('js/almacenes.js?v=20261111.1'), 'the warehouse view must refresh its tab subscriber');
   assert.ok(sw.includes("./js/productos.js?v=20261109.3"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
@@ -135,8 +135,8 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(productos.includes("bcNotificarCambioDatos(estabaEditando ?"), "direct catalog saves must publish product changes");
   assert.ok(sw.includes("./js/compra-multiple.js?v=27.16"), "the purchase module's reactive listener must be available offline");
   assert.ok(transferencias.includes("bc:data-changed"), "transfer and voucher history must refresh after relevant operations");
-  assert.ok(index.includes('js/transferencias.js?v=20261109.1'), "transfer history must load its reactive subscriber");
-  assert.ok(sw.includes('./js/transferencias.js?v=20261109.1'), "transfer history must be cached with its reactive subscriber");
+  assert.ok(index.includes('js/transferencias.js?v=20261111.1'), "transfer history must load its reactive subscriber");
+  assert.ok(sw.includes('./js/transferencias.js?v=20261111.1'), "transfer history must be cached with its reactive subscriber");
 });
 
 // PWA 9.5.88 uses warehouse-specific movement summary windows and aligns release cache keys.
