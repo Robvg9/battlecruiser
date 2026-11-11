@@ -742,9 +742,23 @@
         const resolvedId = warehouseIdByName.get(key) || (almacen || null);
         return Object.assign({}, row, { almacen_id: resolvedId });
       });
+      // The mixed-inventory RPC returns a warehouse label but not its UUID.
+      // Resolve it using the same catalog index as ordinary rows so flavor
+      // minimums can save against the exact product + warehouse pair.
+      const mixedRowsWithWarehouseIds = mixedRows.map(function (row) {
+        if (row && row.almacen_id) return row;
+        const key = String(row && row.almacen || '').trim().toLocaleLowerCase('es');
+        const resolvedId = warehouseIdByName.get(key) || (almacen || null);
+        return Object.assign({}, row, {
+          almacen_id: resolvedId,
+          variantes: (Array.isArray(row && row.variantes) ? row.variantes : []).map(function (variant) {
+            return Object.assign({}, variant, { almacen_id: resolvedId });
+          })
+        });
+      });
       const mixedVariantIds = new Set();
       const mixedParentIds = new Set();
-      mixedRows.forEach(function (row) {
+      mixedRowsWithWarehouseIds.forEach(function (row) {
         if (row && row.producto_id) mixedParentIds.add(String(row.producto_id));
         (Array.isArray(row.variantes) ? row.variantes : []).forEach(function (variant) {
           if (variant && variant.producto_id) mixedVariantIds.add(String(variant.producto_id));
@@ -758,7 +772,7 @@
       });
       const visibleProductIds = new Set(
         ordinaryVisibleRows.map(function (row) { return String(row.producto_id); })
-          .concat(mixedRows.map(function (row) { return String(row.producto_id); }))
+          .concat(mixedRowsWithWarehouseIds.map(function (row) { return String(row.producto_id); }))
       );
       let productCatalog = [];
       try {
@@ -796,7 +810,7 @@
           __bc_sin_asignacion: true
         };
       }) : [];
-      _allRows = ordinaryVisibleRows.concat(mixedRows, unassignedProductRows);
+      _allRows = ordinaryVisibleRows.concat(mixedRowsWithWarehouseIds, unassignedProductRows);
       window._invFilas = _allRows;
       _page = 0;
       _loading = false;
@@ -815,6 +829,14 @@
 
   function installHooks() {
     window.refrescarInventario = function () { return cargarInventario(); };
+    window.__BC_M53_SET_FILTER__ = function (filter) {
+      const allowed = ['todos', 'sin_minimo', 'bajo', 'agotado', 'normal'];
+      _estado = allowed.includes(String(filter || '')) ? String(filter) : 'todos';
+      _page = 0;
+      syncEstadoSelect();
+      paint();
+      return _estado;
+    };
     if (!window.__BC_M53_DATA_CHANGE_BOUND__) {
       window.__BC_M53_DATA_CHANGE_BOUND__ = true;
       let refreshTimer = null;
