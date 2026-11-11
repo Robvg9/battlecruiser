@@ -56,6 +56,18 @@ function stockVisualDelAlmacen(almacenId) {
   });
 }
 
+function almacenPanelVisible() {
+  const tab = document.getElementById("tab-almacenes");
+  return !!(tab && tab.classList.contains("visible"));
+}
+
+function invalidarStockVisualAlmacenes() {
+  _stockVistaRequestId++;
+  _stockVistaCargaEstado = "idle";
+  _stockVistaCargaError = null;
+  _stockVistaCargaPromise = null;
+}
+
 function cargarStockVisualAlmacenes(force) {
   if (_stockVistaCargaPromise && !force) return _stockVistaCargaPromise;
   if (_stockVistaCargaEstado === "ok" && !force) {
@@ -316,7 +328,7 @@ function renderProductosDelAlmacen(almacen_id) {
 
   if (_stockVistaCargaEstado === "idle" || _stockVistaCargaEstado === "loading") {
     lista.innerHTML = '<p class="lista-estado">Calculando saldo actual de la jornada…</p>';
-    if (_stockVistaCargaEstado === "idle") cargarStockVisualAlmacenes(false);
+    if (_stockVistaCargaEstado === "idle" && almacenPanelVisible()) cargarStockVisualAlmacenes(false);
     return;
   }
   if (_stockVistaCargaEstado === "error") {
@@ -329,7 +341,8 @@ function renderProductosDelAlmacen(almacen_id) {
     if (btn && !btn.dataset.bound) {
       btn.dataset.bound = "1";
       btn.addEventListener("click", function () {
-        cargarStockVisualAlmacenes(true);
+        if (almacenPanelVisible()) cargarStockVisualAlmacenes(true);
+    else invalidarStockVisualAlmacenes();
       });
     }
     return;
@@ -409,7 +422,7 @@ function cargarStockAlmacenes(force, internalForcedRetry) {
   }
   if (_stockCargaEstado === "ok" && !force) {
     renderPanelAlmacenSeleccionado();
-    if (_stockVistaCargaEstado !== "ok") cargarStockVisualAlmacenes(false);
+    if (_stockVistaCargaEstado !== "ok" && almacenPanelVisible()) cargarStockVisualAlmacenes(false);
     return Promise.resolve(_cache.stock || []);
   }
   if (force) {
@@ -474,7 +487,7 @@ function cargarStockAlmacenes(force, internalForcedRetry) {
     } finally {
       clearTimeout(safetyTimer);
       _stockCargaPromise = null;
-      if (!force) cargarStockVisualAlmacenes(false);
+      if (!force && almacenPanelVisible()) cargarStockVisualAlmacenes(false);
       renderPanelAlmacenSeleccionado();
     }
   })();
