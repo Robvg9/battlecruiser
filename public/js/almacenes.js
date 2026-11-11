@@ -1,6 +1,7 @@
 // ==== Battlecruiser · js/almacenes.js ====
 // Selector y gestión de almacenes + stock del panel.
 // M26.6-FE: estados explícitos de carga de stock (nunca "Cargando…" infinito).
+// El panel visual usa proyección de jornada; _cache.stock queda reservado a validación transaccional.
 // Query stock sin embeds + safety timeout.
 // Bloque 6/7 + DAP-1: tipos UI almacenamiento|minorista|mayorista → RPC venta|mayorista|almacenamiento.
 
@@ -270,9 +271,10 @@ function renderPanelAlmacenSeleccionado() {
   stock.forEach((row) => {
     const cant = Number(row.cantidad) || 0;
     unidades += cant;
-    if (!row.__bc_sin_producto && (row.estado === "sin_minimo" || row.minimo == null || Number(row.minimo) <= 0)) sinMinimo++;
-    if (cant <= 0) agotados++;
-    else if (row.minimo != null && Number(row.minimo) > 0 && cant <= Number(row.minimo)) bajoMin++;
+    if (row.__bc_sin_producto) return;
+    if (row.estado === "sin_minimo" || row.minimo == null || Number(row.minimo) <= 0) sinMinimo++;
+    else if (cant <= 0) agotados++;
+    else if (cant <= Number(row.minimo)) bajoMin++;
   });
   const activo = a.activo !== false;
   const fmtQty = (v) => typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v);
