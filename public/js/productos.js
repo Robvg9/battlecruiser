@@ -453,14 +453,20 @@ safeInit("productos-buscar", () => {
   });
 });
 
-function renderEditorVariantesProducto(variantes) {
+function renderEditorVariantesProducto(variantes, readOnly) {
   const list = document.getElementById("prod-variantes-lista");
   if (!list) return;
   list.innerHTML = "";
-  (Array.isArray(variantes) ? variantes : []).forEach((variant) => agregarFilaVarianteProducto(variant.id || "", variant.variante_nombre || variant.nombre || ""));
+  (Array.isArray(variantes) ? variantes : []).forEach((variant) => agregarFilaVarianteProducto(
+    variant.id || "",
+    variant.variante_nombre || variant.nombre || "",
+    readOnly === true
+  ));
+  const add = document.getElementById("prod-variante-agregar");
+  if (add) add.hidden = readOnly === true;
 }
 
-function agregarFilaVarianteProducto(id, nombre) {
+function agregarFilaVarianteProducto(id, nombre, readOnly) {
   const list = document.getElementById("prod-variantes-lista");
   if (!list) return;
   const row = document.createElement("div");
@@ -473,11 +479,14 @@ function agregarFilaVarianteProducto(id, nombre) {
   input.required = true;
   input.placeholder = "Nombre del sabor (ej. Manzana)";
   input.value = nombre || "";
+  input.disabled = readOnly === true;
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "cc-accion prod-variante-quitar";
   remove.textContent = "Quitar";
   remove.setAttribute("aria-label", "Quitar esta variante");
+  remove.disabled = readOnly === true;
+  remove.hidden = readOnly === true;
   row.append(input, remove);
   list.appendChild(row);
 }
@@ -522,6 +531,7 @@ function obtenerVariantesFormularioProducto() {
 
 let _productoMixtoSnapshot = null;
 let _bcMixedConfigReturnTab = null;
+let _bcMixedConfigurationMode = false;
 
 async function cargarSnapshotAsignacionMixtaProducto(productoId) {
   const panel = document.getElementById("prod-variantes-asignacion");
@@ -915,16 +925,61 @@ window.bcGuardarConfiguracionSabores = async function (productId) {
 };
 
 async function iniciarEdicionProducto(p) {
+  const productId = String(p && p.id || "");
+  if (!productId) return false;
+  const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
+  let currentVariants = cachedProducts.filter((v) =>
+    String(v.producto_padre_id) === productId && v.activo !== false
+  );
+  const cachedVariantCount = currentVariants.length;
+  const mixedFlag = p.inventario_mixto === true;
+  const api = window.client || (typeof client !== "undefined" ? client : null);
+  if (navigator.onLine && api && typeof api.from === "function") {
+    try {
+      const result = await api.from("productos")
+        .select("id,nombre,variante_nombre,producto_padre_id,activo")
+        .eq("producto_padre_id", productId)
+        .eq("activo", true)
+        .order("variante_nombre", { ascending: true });
+      if (!result || result.error) throw (result && result.error) || new Error("No se pudieron leer las variantes.");
+      currentVariants = Array.isArray(result.data) ? result.data : [];
+      if (typeof _cache !== "undefined" && Array.isArray(_cache.productos)) {
+        _cache.productos = _cache.productos
+          .filter((row) => String(row.producto_padre_id || "") !== productId)
+          .concat(currentVariants);
+      }
+    } catch (error) {
+      if (mixedFlag || cachedVariantCount > 0) {
+        setMsg("msg-productos", "No se pudo confirmar la configuración de sabores en el servidor. No se abrió una lista vacía ni se permite reconfigurar esta familia.", false);
+        return false;
+      }
+      console.warn("[BattleCruiser] No se pudieron comprobar variantes del producto:", error);
+    }
+  }
+  const mixedActive = mixedFlag || currentVariants.length > 0;
+  if (mixedActive && currentVariants.length === 0) {
+    setMsg("msg-productos", "Este producto figura como inventario por sabores, pero no fue posible cargar sus variantes. No se habilitó una edición vacía para proteger el inventario.", false);
+    return false;
+  }
   document.getElementById("prod-editando-id").value = p.id;
   document.getElementById("prod-nombre").value = p.nombre || "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
-  if (mixedToggle) mixedToggle.checked = !!p.inventario_mixto;
-  const cachedProducts = typeof _cache !== "undefined" && Array.isArray(_cache.productos) ? _cache.productos : [];
-  const currentVariants = cachedProducts.filter((v) =>
-    String(v.producto_padre_id) === String(p.id) && v.activo !== false
-  );
-  renderEditorVariantesProducto(currentVariants);
+  if (mixedToggle) {
+    mixedToggle.checked = mixedActive;
+    mixedToggle.disabled = mixedActive;
+  }
+  const readOnlyMixed = mixedActive && !_bcMixedConfigurationMode;
+  renderEditorVariantesProducto(currentVariants, readOnlyMixed);
   sincronizarEditorVariantesProducto();
+  const readOnlyNote = document.getElementById("prod-variantes-readonly-note");
+  if (readOnlyNote) readOnlyNote.hidden = !readOnlyMixed;
+  const assignmentPanel = document.getElementById("prod-variantes-asignacion");
+  if (readOnlyMixed && assignmentPanel) {
+    assignmentPanel.hidden = true;
+    assignmentPanel.classList.add("hidden");
+    assignmentPanel.innerHTML = "";
+    _productoMixtoSnapshot = null;
+  }
   document.getElementById("prod-unidad").value = p.unidad || "unidad";
   document.getElementById("prod-precio-normal").value = p.precio_normal != null ? p.precio_normal : "";
   document.getElementById("prod-precio-mayorista").value = p.precio_mayorista != null ? p.precio_mayorista : "";
@@ -974,9 +1029,10 @@ async function iniciarEdicionProducto(p) {
     wrap.classList.add("hidden");
   }
   setMsg("msg-prod-imagen", "", true);
-  if (mixedToggle && mixedToggle.checked) await cargarSnapshotAsignacionMixtaProducto(p.id);
-  else { _productoMixtoSnapshot = null; renderPanelAsignacionMixtaProducto(); }
+  if (mixedToggle && mixedToggle.checked && !readOnlyMixed) await cargarSnapshotAsignacionMixtaProducto(p.id);
+  else if (!readOnlyMixed) { _productoMixtoSnapshot = null; renderPanelAsignacionMixtaProducto(); }
   document.getElementById("form-producto").scrollIntoView({ behavior: "smooth", block: "center" });
+  return true;
 }
 
 window.bcAbrirConfiguracionSabores = async function (productId, options) {
@@ -984,6 +1040,7 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
     || document.querySelector(".tab-panel.visible")?.id?.replace(/^tab-/, "")
     || "productos";
   _bcMixedConfigReturnTab = options && options.returnTo ? String(options.returnTo) : activeTab;
+  _bcMixedConfigurationMode = true;
   const form = document.getElementById("form-producto");
   if (form) form.classList.add("bc-mixed-config-mode");
   const productTab = document.querySelector('.tab-btn[data-tab="productos"]');
@@ -992,6 +1049,7 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
 
   const producto = (_cache.productos || []).find((p) => String(p.id) === String(productId));
   if (!producto) {
+    _bcMixedConfigurationMode = false;
     if (form && _bcMixedConfigReturnTab) form.classList.remove("bc-mixed-config-mode");
     setMsg("msg-productos", "No se encontró el producto en el catálogo. Actualiza Inventario e inténtalo de nuevo.", false);
     restaurarTabConfiguracionSabores();
@@ -1014,7 +1072,8 @@ window.bcAbrirConfiguracionSabores = async function (productId, options) {
       cancel.textContent = _bcMixedConfigReturnTab === "inventario" ? "Volver a Inventario" : "Cerrar configuración";
     }
   }
-  await iniciarEdicionProducto(producto);
+  const editorReady = await iniciarEdicionProducto(producto);
+  if (!editorReady) return false;
   if (!_bcMixedConfigReturnTab || !form?.classList.contains("bc-mixed-config-mode")) return false;
   const toggle = document.getElementById("prod-inventario-mixto");
   const list = document.getElementById("prod-variantes-lista");
@@ -1062,7 +1121,10 @@ function cancelarEdicionProducto() {
   if (formatoNameInput) formatoNameInput.value = "";
   if (formatoFactorInput) formatoFactorInput.value = "";
   const mixedToggle = document.getElementById("prod-inventario-mixto");
-  if (mixedToggle) mixedToggle.checked = false;
+  if (mixedToggle) { mixedToggle.checked = false; mixedToggle.disabled = false; }
+  _bcMixedConfigurationMode = false;
+  const readOnlyNote = document.getElementById("prod-variantes-readonly-note");
+  if (readOnlyNote) readOnlyNote.hidden = true;
   renderEditorVariantesProducto([]);
   _productoMixtoSnapshot = null;
   renderPanelAsignacionMixtaProducto();
@@ -1134,7 +1196,11 @@ safeInit("form-producto", () => {
     const previousProduct = editandoId
       ? cachedProducts.find((p) => String(p.id) === String(editandoId))
       : null;
-    const needsMixedConfig = mixedEnabled || !!(previousProduct && previousProduct.inventario_mixto);
+    const hasExistingMixedFamily = !!(previousProduct && previousProduct.inventario_mixto) ||
+      cachedProducts.some((row) => String(row.producto_padre_id || "") === String(editandoId || "") && row.activo !== false);
+    // An ordinary product edit can preserve an existing family, but only the
+    // dedicated "Configurar sabores" workflow can rewrite its child variants.
+    const needsMixedConfig = _bcMixedConfigurationMode && (mixedEnabled || hasExistingMixedFamily);
     if (mixedEnabled) {
       const names = variants.map((v) => v.nombre.toLocaleLowerCase());
       if (!variants.length || variants.some((v) => !v.nombre || v.nombre.length > 80)
