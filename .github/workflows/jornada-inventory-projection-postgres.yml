@@ -1,0 +1,53 @@
+name: Jornada current inventory projection — PostgreSQL 17
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql'
+      - 'test/jornada-inventory-projection-fixture.sql'
+      - 'test/jornada-inventory-projection-contract.sql'
+      - '.github/workflows/jornada-inventory-projection-postgres.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql'
+      - 'test/jornada-inventory-projection-fixture.sql'
+      - 'test/jornada-inventory-projection-contract.sql'
+      - '.github/workflows/jornada-inventory-projection-postgres.yml'
+
+jobs:
+  postgres-17:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: battlecruiser_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d battlecruiser_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Create minimal operational schema
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d battlecruiser_test -v ON_ERROR_STOP=1 -f test/jornada-inventory-projection-fixture.sql
+      - name: Apply production migration
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d battlecruiser_test -v ON_ERROR_STOP=1 -f supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql
+      - name: Verify opening balance, movement sources, mixed stock and unit policy
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d battlecruiser_test -v ON_ERROR_STOP=1 -f test/jornada-inventory-projection-contract.sql
