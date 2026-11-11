@@ -267,12 +267,12 @@ test("app shell, application and Service Worker share 9.5.94 and load refreshed 
   assert.match(index, /<script src="app\.js\?v=9\.5\.94"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.8"\]/);
   assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.8/, "Service Worker debe precargar la misma versión de app.js");
-  assert.match(index, /js\\/navegacion\\.js\\?v=9\\.5\\.65/);
-  assert.match(serviceWorker, /js\\/navegacion\\.js\\?v=9\\.5\\.65/);
-  assert.match(app, /\\["m29-turnos-organizacion\\.js","29\\.22"\\]/);
-  assert.match(app, /\\["bc7-legacy-history\\.js","1\\.0"\\]/);
-  assert.match(serviceWorker, /js\\/m29-turnos-organizacion\\.js\\?v=29\\.22/);
-  assert.match(serviceWorker, /js\\/bc7-legacy-history\\.js\\?v=1\\.0/);
+  assert.ok(index.includes("js/navegacion.js?v=9.5.65"));
+  assert.ok(serviceWorker.includes("js/navegacion.js?v=9.5.65"));
+  assert.ok(app.includes('["m29-turnos-organizacion.js","29.22"]'));
+  assert.ok(app.includes('["bc7-legacy-history.js","1.0"]'));
+  assert.ok(serviceWorker.includes("js/m29-turnos-organizacion.js?v=29.22"));
+  assert.ok(serviceWorker.includes("js/bc7-legacy-history.js?v=1.0"));
   assert.match(app, /\["bc7-jornada-ui\.js","7\.16"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.match(app, /\["hotfix-regresiones-20260902\.js","20261101\.1"\]/);
