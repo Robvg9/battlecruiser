@@ -34,7 +34,7 @@ INSERT INTO public.turno_jornada_inventario_lineas(id,corte_id,producto_id,canti
 
 -- Same-day transfer before the programmed 07:00 start: excluded.
 INSERT INTO public.transferencias(id,almacen_origen_id,almacen_destino_id,estado,fecha) VALUES
-('80000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','completada','2026-11-09 11:45:00+00'),
+('80000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','completada','2026-11-09 10:45:00+00'),
 -- Same-day transfer at 07:15, before the administrative 08:00 opening: included.
 ('80000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','completada','2026-11-09 12:15:00+00'),
 -- Same-day linked transfer after the programmed start: included.
