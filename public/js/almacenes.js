@@ -330,14 +330,7 @@ function renderProductosDelAlmacen(almacen_id) {
 
   const stock = stockDelAlmacen(almacen_id);
   if (stock.length === 0) {
-    if (_stockCargaEstado === "ok") {
-      lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos con stock registrado.</p>';
-    } else if (_stockCargaEstado === "idle") {
-      lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
-      cargarStockAlmacenes(false);
-    } else {
-      lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
-    }
+    lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos ni saldos de jornada registrados.</p>';
     return;
   }
 
@@ -361,6 +354,8 @@ function renderProductosDelAlmacen(almacen_id) {
         ? '<img src="' + escHtml(p.imagen_url) + '" alt="" class="producto-thumb" loading="lazy">'
         : '<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>';
       const cant = Number(s.cantidad) || 0;
+      const unidad = s.unidad || (p && p.unidad) || "unidad";
+      const cantidadTexto = (typeof window.numberFmt === "function" ? window.numberFmt(cant) : money(cant)) + " " + unidad;
       const bajo = s.minimo != null && Number(s.minimo) > 0 && cant <= Number(s.minimo);
       const sinMinimo = s.estado === "sin_minimo" || (!s.__bc_sin_producto && (s.minimo == null || Number(s.minimo) <= 0));
       const estadoStock = cant <= 0 ? "Agotado" : bajo ? "Bajo mínimo" : sinMinimo ? "Sin mínimo" : "";
@@ -372,7 +367,7 @@ function renderProductosDelAlmacen(almacen_id) {
         (cat ? '<span class="muted"> · ' + escHtml(cat) + "</span>" : "") +
         "</span>" +
         '<span class="muted alm-prod-cant"' + (bajo || cant <= 0 ? ' style="color:var(--wine)"' : "") + ">" +
-        money(cant) + (estadoStock ? " · " + estadoStock : "") +
+        cantidadTexto + (estadoStock ? " · " + estadoStock : "") +
         "</span>";
       lista.appendChild(div);
     });
