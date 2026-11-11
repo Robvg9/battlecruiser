@@ -84,10 +84,10 @@ function cargarStockVisualAlmacenes(force) {
       if (!client || typeof client.rpc !== "function") {
         throw new Error("Cliente de inventario no disponible.");
       }
-      var pair = await Promise.all([
+      var pair = await bcConTimeoutLocal(Promise.all([
         client.rpc("inventario_enriquecido", { p_almacen_id: null }),
         client.rpc("inventario_mixto_enriquecido", { p_almacen_id: null })
-      ]);
+      ]), BC_STOCK_TIMEOUT_MS, "inventario visual");
       var ordinaryResult = pair[0];
       var mixedResult = pair[1];
       if (!ordinaryResult || ordinaryResult.error) {
