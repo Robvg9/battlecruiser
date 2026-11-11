@@ -9,6 +9,7 @@ const sw = fs.readFileSync("public/service-worker.js", "utf8");
 const index = fs.readFileSync("public/index.html", "utf8");
 const m53 = fs.readFileSync("public/js/m53-inventario-centro.js", "utf8");
 const detail = fs.readFileSync("public/js/inventario-detalle.js", "utf8");
+const warehouses = fs.readFileSync("public/js/almacenes.js", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql", "utf8");
 
 test("M53 9.5.94 loads and is cached with one shared build key", () => {
@@ -37,4 +38,17 @@ test("product editor explains the retail base-unit and wholesale-presentation ru
   assert.match(index, /id="bc-unidad-base-note"/);
   assert.match(index, /almacenes minoristas siempre controlan existencias por unidades/);
   assert.match(index, /presentaciones con factor de conversión/);
+});
+
+
+test("warehouse detail reads jornada-projected balances without changing the raw transaction cache", () => {
+  assert.match(warehouses, /client\.rpc\("inventario_enriquecido"/);
+  assert.match(warehouses, /client\.rpc\("inventario_mixto_enriquecido"/);
+  assert.match(warehouses, /_cache\.stock_visual/);
+  assert.match(warehouses, /function stockDelAlmacen\(almacenId\)[\s\S]*_cache\.stock_visual/);
+  assert.match(warehouses, /client\.from\("stock"\)\.select\("producto_id, almacen_id, cantidad, minimo"\)/);
+  assert.match(warehouses, /_cache\.stock = Array\.isArray\(stock\)/);
+  assert.match(warehouses, /return _cache\.stock \|\| \[\]/);
+  assert.match(index, /js\/almacenes\.js\?v=20261111\.1/);
+  assert.match(sw, /js\/almacenes\.js\?v=20261111\.1/);
 });
