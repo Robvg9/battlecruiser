@@ -348,6 +348,31 @@ safeInit("centro-control-acciones", () => {
   const cont = document.getElementById("tab-resumen");
   if (!cont) return;
   cont.addEventListener("click", async (e) => {
+    const quickAction = e.target.closest("[data-cc-quick]");
+    if (quickAction) {
+      e.preventDefault();
+      e.stopPropagation();
+      const action = quickAction.getAttribute("data-cc-quick");
+      if (action === "compras" || action === "transferencias") {
+        if (typeof window.__BC165_open === "function") {
+          window.__BC165_open(action);
+        } else if (typeof window.irATab === "function") {
+          window.irATab("movimientos");
+        }
+        return;
+      }
+      if (action === "stock-bajo") {
+        if (typeof window.irATab === "function") window.irATab("inventario");
+        window.setTimeout(() => {
+          if (typeof window.__BC_M53_SET_FILTER__ === "function") window.__BC_M53_SET_FILTER__("bajo");
+        }, 180);
+        return;
+      }
+      if (action === "jornada") {
+        if (typeof window.irATab === "function") window.irATab("jornada");
+        return;
+      }
+    }
     const ver = e.target.closest(".cc-ver-btn");
     if (ver) {
       e.stopPropagation();
