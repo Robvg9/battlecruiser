@@ -9,6 +9,10 @@ let _almacenSeleccionadoId = null;
 let _stockCargaEstado = "idle";
 let _stockCargaError = null;
 let _stockCargaPromise = null;
+let _stockVistaCargaEstado = "idle";
+let _stockVistaCargaError = null;
+let _stockVistaCargaPromise = null;
+let _stockVistaRequestId = 0;
 
 var BC_STOCK_TIMEOUT_MS = 12000;
 
@@ -39,9 +43,123 @@ function mismoIdAlmacen(a, b) {
 
 function stockDelAlmacen(almacenId) {
   if (!almacenId) return [];
-  return (_cache.stock || []).filter(function (s) {
+  return (_cache.stock_visual || []).filter(function (s) {
     return s && mismoIdAlmacen(s.almacen_id, almacenId);
   });
+}
+
+function cargarStockVisualAlmacenes(force) {
+  if (_stockVistaCargaPromise && !force) return _stockVistaCargaPromise;
+  if (_stockVistaCargaEstado === "ok" && !force) {
+    return Promise.resolve(_cache.stock_visual || []);
+  }
+
+  var requestId = ++_stockVistaRequestId;
+  _stockVistaCargaEstado = "loading";
+  _stockVistaCargaError = null;
+  renderPanelAlmacenSeleccionado();
+
+  var pending = (async function () {
+    try {
+      if (!client || typeof client.rpc !== "function") {
+        throw new Error("Cliente de inventario no disponible.");
+      }
+      var pair = await Promise.all([
+        client.rpc("inventario_enriquecido", { p_almacen_id: null }),
+        client.rpc("inventario_mixto_enriquecido", { p_almacen_id: null })
+      ]);
+      var ordinaryResult = pair[0];
+      var mixedResult = pair[1];
+      if (!ordinaryResult || ordinaryResult.error) {
+        throw new Error(ordinaryResult && ordinaryResult.error && (ordinaryResult.error.message || ordinaryResult.error.details) || "No se pudo leer el inventario por almacén.");
+      }
+      if (!mixedResult || mixedResult.error) {
+        throw new Error(mixedResult && mixedResult.error && (mixedResult.error.message || mixedResult.error.details) || "No se pudo leer el inventario mixto por almacén.");
+      }
+
+      var warehouseIdByName = new Map();
+      (_cache.almacenes || []).forEach(function (warehouse) {
+        if (!warehouse || !warehouse.id) return;
+        var key = String(warehouse.nombre || "").trim().toLocaleLowerCase("es");
+        if (!key) return;
+        if (warehouseIdByName.has(key)) warehouseIdByName.set(key, null);
+        else warehouseIdByName.set(key, warehouse.id);
+      });
+      function resolveWarehouseId(row) {
+        if (row && row.almacen_id) return row.almacen_id;
+        var key = String(row && row.almacen || "").trim().toLocaleLowerCase("es");
+        return warehouseIdByName.get(key) || null;
+      }
+
+      var mixedRows = Array.isArray(mixedResult.data) ? mixedResult.data : [];
+      var mixedParentIds = new Set();
+      var mixedVariantIds = new Set();
+      mixedRows.forEach(function (row) {
+        if (row && row.producto_id) mixedParentIds.add(String(row.producto_id));
+        (Array.isArray(row && row.variantes) ? row.variantes : []).forEach(function (variant) {
+          if (variant && variant.producto_id) mixedVariantIds.add(String(variant.producto_id));
+        });
+      });
+
+      var productById = new Map();
+      (_cache.productos || []).forEach(function (product) {
+        if (product && product.id) productById.set(String(product.id), product);
+      });
+      var ordinaryRows = (Array.isArray(ordinaryResult.data) ? ordinaryResult.data : [])
+        .filter(function (row) {
+          var id = String(row && row.producto_id || "");
+          return id && !mixedParentIds.has(id) && !mixedVariantIds.has(id);
+        })
+        .map(function (row) {
+          var product = productById.get(String(row.producto_id));
+          return Object.assign({}, row, {
+            almacen_id: resolveWarehouseId(row),
+            unidad: (product && product.unidad) || row.unidad || "unidad"
+          });
+        });
+
+      var mixedViewRows = [];
+      mixedRows.forEach(function (row) {
+        var warehouseId = resolveWarehouseId(row);
+        (Array.isArray(row && row.variantes) ? row.variantes : []).forEach(function (variant) {
+          var variantId = variant && variant.producto_id || null;
+          mixedViewRows.push({
+            producto_id: variantId,
+            producto: variant && variant.nombre || row.producto || "Inventario inicial sin distribuir",
+            almacen: row.almacen,
+            almacen_id: warehouseId,
+            cantidad: Number(variant && variant.cantidad) || 0,
+            minimo: variant && variant.minimo != null ? variant.minimo : null,
+            estado: variant && variant.estado || (variantId ? "sin_minimo" : "sin_minimo"),
+            unidad: variant && variant.unidad || row.unidad || "unidad",
+            __bc_sin_producto: !variantId
+          });
+        });
+      });
+
+      var projectedRows = ordinaryRows.concat(mixedViewRows);
+      if (requestId !== _stockVistaRequestId) return _cache.stock_visual || [];
+      _cache.stock_visual = projectedRows;
+      _stockVistaCargaEstado = "ok";
+      _stockVistaCargaError = null;
+      return projectedRows;
+    } catch (error) {
+      if (requestId === _stockVistaRequestId) {
+        _cache.stock_visual = [];
+        _stockVistaCargaEstado = "error";
+        _stockVistaCargaError = error && error.message ? error.message : "Error de lectura";
+      }
+      return [];
+    } finally {
+      if (requestId === _stockVistaRequestId) {
+        _stockVistaCargaPromise = null;
+        renderPanelAlmacenSeleccionado();
+      }
+    }
+  })();
+
+  _stockVistaCargaPromise = pending;
+  return pending;
 }
 
 function bcConTimeoutLocal(promesa, ms, etiqueta) {
@@ -126,16 +244,35 @@ function renderPanelAlmacenSeleccionado() {
     renderProductosDelAlmacen(null);
     return;
   }
+  if (_stockVistaCargaEstado !== "ok") {
+    const active = a.activo !== false;
+    const message = _stockVistaCargaEstado === "error"
+      ? "No se pudo confirmar el saldo actual del almacén."
+      : "Calculando saldo actual de la jornada…";
+    panel.innerHTML =
+      '<div class="alm-info-grid">' +
+        '<div class="alm-info-item"><span class="alm-info-label">Nombre</span><span class="alm-info-valor">' + escHtml(a.nombre) + "</span></div>" +
+        '<div class="alm-info-item"><span class="alm-info-label">Tipo</span><span class="alm-info-valor">' + escHtml(etiquetaTipoAlmacen(a.tipo)) + "</span></div>" +
+        '<div class="alm-info-item"><span class="alm-info-label">Estado</span><span class="alm-info-valor ' + (active ? "alm-estado-activo" : "alm-estado-inactivo") + '">' + (active ? "Activo" : "Inactivo") + "</span></div>" +
+        '<div class="alm-info-item"><span class="alm-info-label">Inventario</span><span class="alm-info-valor">' + escHtml(message) + "</span></div>" +
+      "</div>";
+    renderProductosDelAlmacen(id);
+    actualizarBotonesAccionesAlmacen();
+    return;
+  }
+
   const stock = stockDelAlmacen(id);
-  const productosCount = stock.length;
+  const productosCount = stock.filter((row) => !row.__bc_sin_producto).length;
   let unidades = 0;
   let bajoMin = 0;
   let agotados = 0;
-  stock.forEach((s) => {
-    const cant = Number(s.cantidad) || 0;
+  let sinMinimo = 0;
+  stock.forEach((row) => {
+    const cant = Number(row.cantidad) || 0;
     unidades += cant;
+    if (!row.__bc_sin_producto && (row.estado === "sin_minimo" || row.minimo == null || Number(row.minimo) <= 0)) sinMinimo++;
     if (cant <= 0) agotados++;
-    else if (s.minimo != null && cant <= Number(s.minimo)) bajoMin++;
+    else if (row.minimo != null && Number(row.minimo) > 0 && cant <= Number(row.minimo)) bajoMin++;
   });
   const activo = a.activo !== false;
   const fmtQty = (v) => typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v);
@@ -147,8 +284,12 @@ function renderPanelAlmacenSeleccionado() {
       '<div class="alm-info-item"><span class="alm-info-label">Productos</span><span class="alm-info-valor">' + productosCount + "</span></div>" +
       '<div class="alm-info-item"><span class="alm-info-label">Unidades</span><span class="alm-info-valor">' + fmtQty(unidades) + "</span></div>" +
       '<div class="alm-info-item"><span class="alm-info-label">Alertas</span><span class="alm-info-valor">' +
-        (bajoMin + agotados > 0
-          ? (agotados ? fmtQty(agotados) + " agotado(s)" : "") + (agotados && bajoMin ? " · " : "") + (bajoMin ? fmtQty(bajoMin) + " bajo mínimo" : "")
+        (bajoMin + agotados + sinMinimo > 0
+          ? (agotados ? fmtQty(agotados) + " agotado(s)" : "") +
+            (agotados && (bajoMin || sinMinimo) ? " · " : "") +
+            (bajoMin ? fmtQty(bajoMin) + " bajo mínimo" : "") +
+            (bajoMin && sinMinimo ? " · " : "") +
+            (sinMinimo ? fmtQty(sinMinimo) + " sin mínimo" : "")
           : "Sin alertas") +
       "</span></div>" +
     "</div>";
@@ -164,21 +305,22 @@ function renderProductosDelAlmacen(almacen_id) {
     return;
   }
 
-  if (_stockCargaEstado === "loading") {
-    lista.innerHTML = '<p class="lista-estado">Cargando productos del almacén…</p>';
+  if (_stockVistaCargaEstado === "idle" || _stockVistaCargaEstado === "loading") {
+    lista.innerHTML = '<p class="lista-estado">Calculando saldo actual de la jornada…</p>';
+    if (_stockVistaCargaEstado === "idle") cargarStockVisualAlmacenes(false);
     return;
   }
-  if (_stockCargaEstado === "error") {
+  if (_stockVistaCargaEstado === "error") {
     lista.innerHTML =
-      '<p class="lista-estado">No se pudo cargar el stock' +
-      (_stockCargaError ? ": " + escHtml(String(_stockCargaError).slice(0, 120)) : ".") +
+      '<p class="lista-estado">No se pudo confirmar el inventario actual' +
+      (_stockVistaCargaError ? ": " + escHtml(String(_stockVistaCargaError).slice(0, 120)) : ".") +
       "</p>" +
       '<button type="button" class="cc-accion" id="bc-alm-stock-reintentar">Reintentar</button>';
     var btn = document.getElementById("bc-alm-stock-reintentar");
     if (btn && !btn.dataset.bound) {
       btn.dataset.bound = "1";
       btn.addEventListener("click", function () {
-        cargarStockAlmacenes(true);
+        cargarStockVisualAlmacenes(true);
       });
     }
     return;
@@ -217,7 +359,9 @@ function renderProductosDelAlmacen(almacen_id) {
         ? '<img src="' + escHtml(p.imagen_url) + '" alt="" class="producto-thumb" loading="lazy">'
         : '<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>';
       const cant = Number(s.cantidad) || 0;
-      const bajo = s.minimo != null && cant <= Number(s.minimo);
+      const bajo = s.minimo != null && Number(s.minimo) > 0 && cant <= Number(s.minimo);
+      const sinMinimo = s.estado === "sin_minimo" || (!s.__bc_sin_producto && (s.minimo == null || Number(s.minimo) <= 0));
+      const estadoStock = cant <= 0 ? "Agotado" : bajo ? "Bajo mínimo" : sinMinimo ? "Sin mínimo" : "";
       const div = document.createElement("div");
       div.className = "lista-item alm-producto-item" + (cant <= 0 ? " lista-item-inactivo" : "");
       div.innerHTML =
@@ -226,7 +370,7 @@ function renderProductosDelAlmacen(almacen_id) {
         (cat ? '<span class="muted"> · ' + escHtml(cat) + "</span>" : "") +
         "</span>" +
         '<span class="muted alm-prod-cant"' + (bajo || cant <= 0 ? ' style="color:var(--wine)"' : "") + ">" +
-        money(cant) + (cant <= 0 ? " · Agotado" : bajo ? " · Bajo mínimo" : "") +
+        money(cant) + (estadoStock ? " · " + estadoStock : "") +
         "</span>";
       lista.appendChild(div);
     });
@@ -261,6 +405,7 @@ function cargarStockAlmacenes(force, internalForcedRetry) {
   }
   if (_stockCargaEstado === "ok" && !force) {
     renderPanelAlmacenSeleccionado();
+    if (_stockVistaCargaEstado !== "ok") cargarStockVisualAlmacenes(false);
     return Promise.resolve(_cache.stock || []);
   }
   if (force) {
@@ -324,6 +469,7 @@ function cargarStockAlmacenes(force, internalForcedRetry) {
     } finally {
       clearTimeout(safetyTimer);
       _stockCargaPromise = null;
+      if (!force) cargarStockVisualAlmacenes(false);
       renderPanelAlmacenSeleccionado();
     }
   })();
