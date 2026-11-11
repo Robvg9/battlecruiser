@@ -411,6 +411,7 @@ function cargarStockAlmacenes(force, internalForcedRetry) {
   if (force) {
     _cache.stock = [];
     window.__BC_STOCK_CONFIRMED__ = false;
+    cargarStockVisualAlmacenes(true);
   }
   _stockCargaEstado = "loading";
   _stockCargaError = null;
