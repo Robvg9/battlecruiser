@@ -204,7 +204,7 @@
     const mixed = !!(meta && meta.inventario_mixto) ||
       stores.some(warehouse => Array.isArray(warehouse.variantes) && warehouse.variantes.length > 0);
     const productId = fila.producto_id || fila.id || '';
-    const canConfigureFlavors = !!productId && !mixed &&
+    const canEditFlavors = !!productId &&
       typeof window.tienePermiso === 'function' &&
       (window.tienePermiso('productos', 'editar') || window.tienePermiso('productos', 'editar_any'));
     const warehouseCatalog = Array.isArray(window._cache && window._cache.almacenes)
@@ -223,8 +223,10 @@
         '<span>' + (stores.length
           ? 'existencias totales · ' + esc(qtyFmt(stores.length)) + ' almacenes'
           : 'Sin almacenes asignados · define un mínimo para comenzar') + '</span>' +
-        (canConfigureFlavors
-          ? '<div class="bc-inv-flavors-setup"><details><summary>¿Controlar por sabores?</summary><p>Define el stock real y el mínimo independiente de cada sabor en cada almacén.</p></details><button type="button" class="cc-accion" data-bc-configure-flavors data-product-id="' + esc(productId) + '">Configurar sabores y mínimos</button></div>'
+        (canEditFlavors
+          ? (mixed
+            ? '<div class="bc-inv-flavors-setup"><button type="button" class="cc-accion" data-bc-configure-flavors data-product-id="' + esc(productId) + '">Editar sabores y mínimos</button></div>'
+            : '<div class="bc-inv-flavors-setup"><details><summary>¿Controlar por sabores?</summary><p>Define el stock real y el mínimo independiente de cada sabor en cada almacén.</p></details><button type="button" class="cc-accion" data-bc-configure-flavors data-product-id="' + esc(productId) + '">Configurar sabores y mínimos</button></div>')
           : '') +
       '</div>' +
       '<section class="bc-inv-product-meta" aria-label="Datos del producto">' +

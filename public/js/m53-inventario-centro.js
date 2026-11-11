@@ -742,6 +742,14 @@
         const resolvedId = warehouseIdByName.get(key) || (almacen || null);
         return Object.assign({}, row, { almacen_id: resolvedId });
       });
+      // La RPC mixta entrega el nombre del almacén, no el UUID necesario para guardar mínimos.
+      // Resolverlo con el mismo catálogo que se usa para las filas normales.
+      const mixedRowsWithWarehouseIds = mixedRows.map(function (row) {
+        if (row && row.almacen_id) return row;
+        const key = String(row && row.almacen || '').trim().toLocaleLowerCase('es');
+        const resolvedId = warehouseIdByName.get(key) || (almacen || null);
+        return Object.assign({}, row, { almacen_id: resolvedId });
+      });
       const mixedVariantIds = new Set();
       const mixedParentIds = new Set();
       mixedRows.forEach(function (row) {
@@ -796,7 +804,7 @@
           __bc_sin_asignacion: true
         };
       }) : [];
-      _allRows = ordinaryVisibleRows.concat(mixedRows, unassignedProductRows);
+      _allRows = ordinaryVisibleRows.concat(mixedRowsWithWarehouseIds, unassignedProductRows);
       window._invFilas = _allRows;
       _page = 0;
       _loading = false;

@@ -47,14 +47,15 @@
   var RUTAS_SIEMPRE_OCULTAS = {
     transferencias: true, // El historial se consulta en Movimientos.
     vales: true,          // Ruta heredada retirada del menú.
-    turnos: true          // Alias heredado de Ciclos Operativos.
+    turnos: true,         // Alias heredado: toda la gestión de jornadas entra por BC7.
+    ciclos: true          // Ruta M18 conservada como legado, no como acceso independiente.
   };
   var RUTAS_PERSONALES = { conectividad: true, preferencias: true };
   var PERMISOS_OPERACION = ["gastos", "mermas", "bajas", "reinversiones", "responsabilidades", "incidencias"];
   // El Centro de Control es la entrada por defecto cuando el rol tiene acceso.
   // Jornada queda como fallback natural para perfiles sin permiso de reportes.
   var ORDEN_HOME = [
-    "resumen", "jornada", "ciclos", "comunicacion", "productos", "almacenes",
+    "resumen", "jornada", "comunicacion", "productos", "almacenes",
     "movimientos", "inventario", "reportes", "ventas", "operacion", "pendientes",
     "mando", "usuarios", "config", "conectividad", "preferencias"
   ];
