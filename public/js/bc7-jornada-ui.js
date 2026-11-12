@@ -1291,8 +1291,8 @@
     }
     finally{busy(btn,false);}
   }
-  async function saveCashDeclaration(form){
-    if(!form)return;
+  async function saveCashDeclaration(form,skipConfirm,alreadyBusy){
+    if(!form)return false;
     const sessionId=form.dataset.bc7CloseForm;
     const tramo=state.detail&&state.detail.tramo_activo;
     const tramoId=tramo&&tramo.id;
@@ -1300,33 +1300,35 @@
     const raw=input?input.value.trim():'';
     const amount=Number(raw);
     const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    const message=form.querySelector('[data-bc7-close-msg]');
-    if(saved){msg(message,'El dinero ya está guardado. Puedes finalizar cuando el inventario final esté confirmado.','ok');return;}
-    if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return;}
-    if(raw===''||!Number.isFinite(amount)||amount<0){msg(message,'Introduce el importe real entregado, igual o mayor que cero.','error');return;}
-    if(!confirm('Se guardará la declaración de efectivo de esta jornada, pero la jornada seguirá abierta. El administrador lo contará después del cierre. ¿Confirmas?'))return;
-    const btn=form.querySelector('[data-bc7-save-cash]');
-    if(!busy(btn,true))return;
+    const message=form.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg');
+    if(saved){msg(message,'El dinero del último día ya está guardado.','ok');return true;}
+    if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return false;}
+    if(raw===''||!Number.isFinite(amount)||amount<0){msg(message,'Introduce el importe real entregado del último día, igual o mayor que cero.','error');return false;}
+    if(!skipConfirm&&!confirm('Se guardará la declaración de efectivo del último día. La jornada seguirá abierta hasta confirmar el inventario final. ¿Confirmas?'))return false;
+    const btn=form.querySelector('[data-bc7-save-cash]')||form.querySelector('[data-bc7-save-cash-days]');
+    if(!alreadyBusy&&!busy(btn,true))return false;
     try{
       await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:amount});
       const reread=await openWorkspace(sessionId);
-      if(!reread||!state.detail?.declaracion_dinero||String(state.detail.declaracion_dinero.turno_tramo_id)!==String(tramoId)){
-        throw new Error('El servidor no confirmó la declaración al volver a consultar. No repitas el envío todavía.');
+      if(!reread||!state.detail?.declaracion_dinero||String(state.detail.declaracion_dinero.turno_tramo_id)!==String(tramoId)||Number(state.detail.declaracion_dinero.monto)!==amount){
+        throw new Error('El servidor no confirmó la declaración del último día al volver a consultar. No repitas el envío todavía.');
       }
-      setStatus('Dinero entregado guardado. La jornada sigue abierta hasta confirmar el inventario final.','ok');
-      msg(document.querySelector('[data-bc7-close-msg]'),'Declaración guardada. El Dueño podrá contar el efectivo después.','ok');
+      setStatus('Dinero del último día guardado. La jornada sigue abierta hasta confirmar el inventario final.','ok');
+      msg(document.querySelector('[data-bc7-close-msg]')||document.querySelector('#bc7-cash-days-msg'),'Declaración del último día guardada. El Dueño podrá contar el efectivo después.','ok');
+      return true;
     }catch(e){
       try{
         const reread=await openWorkspace(sessionId);
-        if(reread&&state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)){
-          setStatus('Declaración confirmada al volver a consultar. No se repitió la escritura.','ok');
-          msg(document.querySelector('[data-bc7-close-msg]'),'El importe quedó guardado correctamente.','ok');
-          return;
+        if(reread&&state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&Number(state.detail.declaracion_dinero.monto)===amount){
+          setStatus('Declaración del último día confirmada al volver a consultar. No se repitió la escritura.','ok');
+          msg(document.querySelector('[data-bc7-close-msg]')||document.querySelector('#bc7-cash-days-msg'),'El importe del último día quedó guardado correctamente.','ok');
+          return true;
         }
       }catch(_){}
-      msg(document.querySelector('[data-bc7-close-msg]')||message,friendlyError(e,'create')+' No repitas el envío hasta comprobar el estado.','error');
-      setStatus('No se pudo confirmar la declaración de dinero.','error');
-    }finally{busy(btn,false);}
+      msg(document.querySelector('[data-bc7-close-msg]')||document.querySelector('#bc7-cash-days-msg')||message,friendlyError(e,'create')+' No repitas el envío hasta comprobar el estado.','error');
+      setStatus('No se pudo confirmar la declaración del último día.','error');
+      return false;
+    }finally{if(!alreadyBusy)busy(btn,false);}
   }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
