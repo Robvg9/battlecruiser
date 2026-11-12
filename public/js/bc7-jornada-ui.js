@@ -275,8 +275,8 @@
     if(calendar)calendar.scrollIntoView({behavior:'smooth',block:'start'});
   }
   function activateWorkspaceTab(name){
-    const allowed=['inventario','operacion','finanzas','movimientos'];
-    const tab=allowed.includes(name)?name:'inventario';
+    const allowed=['inventario','operacion','movimientos'];
+    const tab=allowed.includes(name)?name:(name==='finanzas'?'operacion':'inventario');
     state.workspaceTab=tab;
     const body=$('bc7-workspace-body');if(!body)return;
     body.querySelectorAll('[data-bc7-workspace-tab]').forEach(button=>{
@@ -285,8 +285,10 @@
       button.classList.toggle('active',active);
     });
     body.querySelectorAll('[data-bc7-workspace-panel]').forEach(panel=>{panel.hidden=panel.getAttribute('data-bc7-workspace-panel')!==tab;});
-    if(tab==='operacion'&&state.detail)loadCashDaysWorkspace(state.detail);
-    if(tab==='finanzas'&&state.detail)loadFinances(state.detail);
+    if(tab==='operacion'&&state.detail){
+      loadCashDaysWorkspace(state.detail);
+      loadFinances(state.detail);
+    }
     if(tab==='movimientos'&&state.detail)loadMovements(state.detail);
   }
   function fillWarehouses(){
@@ -1065,15 +1067,20 @@
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos);
-      const adjustmentStorageType=can('bajas','crear')?'baja':'merma';
-      adjustment='<details class="bc7-detail"><summary><span>Registrar baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'"><div class="bc7-grid"><label class="bc7-field">Causa de la baja<select data-bc7-ajust-cause required><option value="">Selecciona una causa</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar baja a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
+      const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
+      const adjustmentStorageType=canCreateBaja?'baja':'merma';
+      const adjustmentTitle=canCreateBaja&&canCreateMerma?'Registrar baja o merma':(canCreateBaja?'Registrar baja':'Registrar merma');
+      const adjustmentTypeField=canCreateBaja&&canCreateMerma
+        ?'<label class="bc7-field">Tipo de ajuste<select data-bc7-ajust-type required><option value="baja">Baja de inventario</option><option value="merma">Merma</option></select></label>'
+        :'<input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'">';
+      adjustment='<details class="bc7-detail"><summary><span>'+adjustmentTitle+'</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'">'+adjustmentTypeField+'<div class="bc7-grid"><label class="bc7-field">Motivo<select data-bc7-ajust-cause required><option value="">Selecciona un motivo</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar ajuste a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
-    const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
     const fin=financeFormHtml(detail,isAssigned,status);
+    const op='<div class="bc7-panel-stack">'+actionArea+fin+adjustment+'</div>';
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
     $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
-    $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="finanzas" aria-selected="false">Finanzas</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="finanzas" hidden>'+fin+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
+    $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
     $('bc7-workspace').hidden=false;setPageMode(true);$('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
     activateWorkspaceTab(state.workspaceTab);
   }
@@ -1392,16 +1399,17 @@
     const quantity=form.querySelector('[data-bc7-ajust-qty]').value;
     const msgEl=form.querySelector('[data-bc7-ajust-msg]');
     if(!cause||!product||!Number.isFinite(Number(quantity))||Number(quantity)<=0||(cause==='Otra causa'&&!detail)){
-      msg(msgEl,'Selecciona la causa y el producto, introduce una cantidad positiva y describe la otra causa cuando corresponda.','error');return;
+      msg(msgEl,'Selecciona el motivo y el producto, introduce una cantidad positiva y describe la otra causa cuando corresponda.','error');return;
     }
+    const operationLabel=storageType==='baja'?'baja':'merma';
     const reason=cause+(detail?' — '+detail:'');
-    if(!confirm('Se enviará una solicitud de BAJA por "'+cause+'" a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
+    if(!confirm('Se enviará una solicitud de '+operationLabel+' por "'+cause+'" a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
       await rpc('bc7_registrar_ajuste_jornada',{p_turno_sesion_id:sessionId,p_tipo:storageType,p_producto_id:product,p_cantidad:Number(quantity),p_motivo:reason,p_idempotency_key:crypto.randomUUID()});
-      msg(msgEl,'Solicitud de baja guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
+      msg(msgEl,'Solicitud de '+operationLabel+' guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
       form.reset();await openWorkspace(sessionId);
-    }catch(e){msg(msgEl,'No se registró la baja. '+friendlyError(e,'create'),'error');}
+    }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
   async function saveHours(form){
