@@ -1,0 +1,64 @@
+name: ARIA BattleCruiser Sandbox
+
+on:
+  push:
+    branches:
+      - 'aria/self-development/battlecruiser/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    if: startsWith(github.ref, 'refs/heads/aria/self-development/battlecruiser/')
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 35
+
+    steps:
+      - name: Sandbox guard
+        shell: powershell
+        run: |
+          if ('${{ github.ref }}' -eq 'refs/heads/main') {
+            throw 'ARIA sandbox refuses to run on main.'
+          }
+          if (-not '${{ github.ref }}'.StartsWith('refs/heads/aria/self-development/battlecruiser/')) {
+            throw 'ARIA sandbox branch policy violation.'
+          }
+          Write-Host "ARIA sandbox branch: ${{ github.ref }}"
+
+      - name: Checkout via git
+        shell: powershell
+        env:
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+          TOKEN: ${{ github.token }}
+        run: |
+          if (Test-Path .\aria-bc-worktree) { Remove-Item -Recurse -Force .\aria-bc-worktree }
+          git clone --depth 1 --branch "$env:REF" "https://x-access-token:$env:TOKEN@github.com/$env:REPO.git" aria-bc-worktree
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Set-Location aria-bc-worktree
+          git rev-parse --verify HEAD
+
+      - name: Setup Node
+        shell: powershell
+        run: |
+          node --version
+          npm --version
+
+      - name: Install dependencies
+        shell: powershell
+        working-directory: aria-bc-worktree
+        run: npm ci
+
+      - name: Syntax checks
+        shell: powershell
+        working-directory: aria-bc-worktree
+        run: |
+          node --check public/app.js
+          node --check public/service-worker.js
+
+      - name: Full automated suite
+        shell: powershell
+        working-directory: aria-bc-worktree
+        run: npm test
