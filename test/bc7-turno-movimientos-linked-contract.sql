@@ -37,7 +37,7 @@ BEGIN
     '99500000-0000-0000-0000-000000000001',
     '99700000-0000-0000-0000-000000000001'
   );
-  IF v_adjustments<>2 THEN
+  IF v_adjustments<>5 THEN
     RAISE EXCEPTION 'Approved session-linked Merma/Baja must remain in the original Jornada after later ADMIN review; rows=%',v_adjustments;
   END IF;
 
@@ -66,7 +66,10 @@ BEGIN
     '97200000-0000-0000-0000-000000000001',
     '97200000-0000-0000-0000-000000000002',
     '99200000-0000-0000-0000-000000000001',
-    '99300000-0000-0000-0000-000000000001'
+    '99300000-0000-0000-0000-000000000001',
+    '99400000-0000-0000-0000-000000000001',
+    '99500000-0000-0000-0000-000000000001',
+    '99700000-0000-0000-0000-000000000001'
   );
   IF v_cross_session<>0 THEN
     RAISE EXCEPTION 'Explicit Jornada links must never leak into another session.';
