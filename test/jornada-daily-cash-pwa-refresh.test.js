@@ -36,7 +36,7 @@ test("PWA update notice creates its action button before binding the click", () 
 test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
   assert.match(UI, /const activeSessionId=String\(state\.currentSession\?\.turno_sesion_id\|\|''\);/);
   assert.match(UI, /activeSessionId===String\(detail\.sesion\.id\|\|''\)/);
-  assert.match(UI, /if\(tab==='operacion'&&state\.detail\)loadCashDaysWorkspace\(state\.detail\)/);
+  assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}/);
 });
 
 test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {
@@ -92,7 +92,11 @@ test("closing requires every date and confirms the final day before closing the 
   assert.ok(start >= 0 && end > start, "closeSession exists");
   const block = UI.slice(start, end);
   assert.match(block, /saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
-  assert.match(block, /Faltan importes de estos días/);
+  const cashSaveStart=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const cashSaveEnd=UI.indexOf("function cashDeclarationHtml(detail){",cashSaveStart);
+  assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
+  const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
+  assert.match(cashSave,/Faltan importes de estos días/);
   assert.match(block, /bc_declarar_dinero/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
