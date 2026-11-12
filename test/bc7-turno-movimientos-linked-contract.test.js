@@ -27,5 +27,6 @@ test("approved adjustments follow their explicit source session even when ADMIN 
   assert.match(MIGRATION, /b\.turno_sesion_id\s*=\s*v_s\.id/);
   assert.match(FIXTURE, /99200000-0000-0000-0000-000000000001/);
   assert.match(FIXTURE, /99300000-0000-0000-0000-000000000001/);
+  assert.match(FIXTURE, /turno_tramo_id/);
   assert.match(CONTRACT, /approved session-linked merma\/baja must remain/);
 });
