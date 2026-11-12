@@ -303,12 +303,15 @@ function applySql(file) {
     applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
     log("\\r\\n=== Apply La Cueva finance and reinvestment request rules before Day 2 cash handover ===");
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
-    log("\\r\\n=== Verify explicit linked Jornada transfers and owner-approved adjustment attribution ===");
+    applySql("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
+    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
+    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
+    applySql("supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql");
+    log("\\\\r\\\\n=== Verify all exact-session movement sources and the final-cash admin queue ===");
     applySql("test/bc7-turno-movimientos-linked-fixture.sql");
     applySql("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
     applySql("test/bc7-turno-movimientos-linked-contract.sql");
-    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
-    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
+    applySql("test/jornada-final-cash-admin-queue-contract.sql");
     log("\\r\\n=== Create and approve the disposable Day 2 finance records before the owner cash-count contract ===");
     applySql("test/step7-jornada-finanzas-contract.sql");
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation and overdue-start guard ===");
