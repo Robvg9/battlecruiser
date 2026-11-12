@@ -297,6 +297,10 @@ function applySql(file) {
     applySql("supabase/migrations/20261101044403_allow_overdue_next_legacy_session_20261101.sql");
     log("\\r\\n=== Apply shared inventory read helpers needed by the Jornada finance workspace ===");
     applySql("supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql");
+    log("\\r\\n=== Verify explicit linked Jornada transfers and owner-approved adjustment attribution ===");
+    applySql("test/bc7-turno-movimientos-linked-fixture.sql");
+    applySql("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
+    applySql("test/bc7-turno-movimientos-linked-contract.sql");
     applySql("supabase/migrations/20261112133200_jornada_handover_after_period_end.sql");
     applySql("supabase/migrations/20261112133300_jornada_turn_master_approval.sql");
     applySql("supabase/migrations/20261112133400_jornada_owner_turn_approval_source.sql");
