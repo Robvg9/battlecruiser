@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.19 — dinero diario unificado dentro del cierre de jornada.
+// v7.20 — efectivo, gastos, reinversiones y ajustes en un solo panel.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
