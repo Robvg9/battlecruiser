@@ -4,6 +4,8 @@ BEGIN;
 -- Final owner cash count may happen after handover, but operational inputs and stock must reconcile first.
 -- Keep the generic legacy close RPC for MANANA/TARDE, but forbid it from
 -- bypassing the protected Jornada settlement gate.
+-- Preserve the legacy close contract for MANANA/TARDE. A Jornada must
+-- pass through bc5_cerrar_jornada, which validates its full daily settlement.
 CREATE OR REPLACE FUNCTION public.bc_cerrar_turno_sesion(p_turno_sesion_id uuid)
 RETURNS public.turno_sesiones
 LANGUAGE plpgsql
@@ -13,48 +15,74 @@ AS $function$
 DECLARE
   v_sesion public.turno_sesiones;
   v_tramo public.turno_tramos;
+  v_declarado integer;
   v_result public.turno_sesiones;
 BEGIN
   IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE='42501';
+    RAISE EXCEPTION 'No hay sesión activa.' USING ERRCODE='42501';
   END IF;
-  SELECT * INTO v_sesion FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Sesión no encontrada.' USING ERRCODE='23503';
+
+  SELECT * INTO v_sesion
+  FROM public.turno_sesiones
+  WHERE id=p_turno_sesion_id
+  FOR UPDATE;
+
+  IF v_sesion.id IS NULL THEN
+    RAISE EXCEPTION 'Sesión no encontrada.';
   END IF;
   IF v_sesion.bloque='JORNADA' THEN
-    RAISE EXCEPTION 'Las jornadas deben cerrarse mediante bc5_cerrar_jornada para validar inventario, dinero y liquidación.' USING ERRCODE='42501';
+    RAISE EXCEPTION 'Las jornadas deben cerrarse mediante bc5_cerrar_jornada para validar inventario, dinero y liquidación.'
+      USING ERRCODE='42501';
   END IF;
-  IF NOT EXISTS(
+  IF NOT EXISTS (
     SELECT 1 FROM public.turno_asignaciones a
-    WHERE a.turno_sesion_id=v_sesion.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
+    WHERE a.turno_sesion_id=v_sesion.id
+      AND a.usuario_id=auth.uid()
+      AND a.retirado_at IS NULL
   ) THEN
-    RAISE EXCEPTION 'Solo la persona asignada a esta sesión puede cerrarla.' USING ERRCODE='42501';
+    RAISE EXCEPTION 'Solo una persona asignada a esta sesión puede cerrarla.';
   END IF;
   IF v_sesion.estado<>'EN_CURSO' THEN
-    RAISE EXCEPTION 'La sesión no está en curso.' USING ERRCODE='P0001';
+    RAISE EXCEPTION 'La sesión no está en curso.';
   END IF;
-  SELECT * INTO v_tramo FROM public.turno_tramos
-  WHERE turno_sesion_id=v_sesion.id AND estado='ACTIVO'
-  ORDER BY inicio_at DESC NULLS LAST,created_at DESC NULLS LAST
-  LIMIT 1 FOR UPDATE;
+
+  SELECT * INTO v_tramo
+  FROM public.turno_tramos
+  WHERE turno_sesion_id=v_sesion.id
+    AND estado='ACTIVO'
+  ORDER BY inicio_at DESC NULLS LAST, created_at DESC NULLS LAST
+  LIMIT 1
+  FOR UPDATE;
+
   IF v_tramo.id IS NULL THEN
-    RAISE EXCEPTION 'La sesión EN_CURSO no tiene un tramo activo.' USING ERRCODE='P0001';
+    RAISE EXCEPTION 'La sesión EN_CURSO no tiene un tramo activo.';
   END IF;
-  IF NOT EXISTS(
-    SELECT 1 FROM public.turno_declaraciones d
-    WHERE d.turno_tramo_id=v_tramo.id AND d.usuario_id=auth.uid()
-  ) THEN
-    RAISE EXCEPTION 'Antes de cerrar la sesión debés declarar el dinero entregado.' USING ERRCODE='23514';
+
+  SELECT count(DISTINCT d.turno_tramo_id)
+    INTO v_declarado
+  FROM public.turno_declaraciones d
+  WHERE d.turno_sesion_id=v_sesion.id;
+
+  IF v_declarado=0 THEN
+    RAISE EXCEPTION 'No se puede cerrar: el tramo debe declarar el dinero entregado.';
   END IF;
-  UPDATE public.turno_tramos SET estado='COMPLETADO',fin_at=now() WHERE id=v_tramo.id;
-  UPDATE public.turno_sesiones SET estado='COMPLETADA',updated_at=now()
-  WHERE id=v_sesion.id RETURNING * INTO v_result;
-  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',
-    cierre_real=NULL,actualizado_en=now()
-  WHERE id=v_sesion.turno_id;
+
+  UPDATE public.turno_tramos
+  SET estado='COMPLETADO',fin_at=now()
+  WHERE id=v_tramo.id;
+
+  UPDATE public.turno_sesiones
+  SET estado='COMPLETADA',updated_at=now()
+  WHERE id=v_sesion.id
+  RETURNING * INTO v_result;
+
+  UPDATE public.turnos
+  SET estado='CERRADO',cierre_real=now(),actualizado_en=now()
+  WHERE id=v_sesion.turno_id AND estado='ABIERTO';
+
   INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo)
   VALUES(v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),'SESION_CERRADA');
+
   RETURN v_result;
 END;
 $function$;
@@ -153,9 +181,8 @@ BEGIN
   UPDATE public.turno_tramos SET estado='COMPLETADO',fin_at=now() WHERE id=v_tramo.id;
   UPDATE public.turno_sesiones SET estado='COMPLETADA',updated_at=now()
   WHERE id=v_sesion.id RETURNING * INTO v_result;
-  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',
-    cierre_real=NULL,actualizado_en=now()
-  WHERE id=v_sesion.turno_id;
+  UPDATE public.turnos SET estado='CERRADO',cierre_real=now(),actualizado_en=now()
+  WHERE id=v_sesion.turno_id AND estado='ABIERTO';
   INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo)
   VALUES(v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),'SESION_CERRADA');
 
