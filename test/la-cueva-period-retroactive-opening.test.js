@@ -135,7 +135,7 @@ test("dependienta can read only assigned jornada finance and reinvestment approv
   assert.ok(ui.includes("no afecta stock ni caja hasta que la apruebes"));
   assert.ok(approvals.includes("reinversiones','editar_any'"));
   assert.ok(approvals.includes("🛒 Reinversión pendiente"));
-  assert.ok(approvals.includes("const isMoney=isExpense||type==='reinversion'||isDailyCash;"));
+  assert.ok(approvals.includes("const isMoney=isExpense||type==='reinversion'||isDailyCash||isFinalCash;"));
 });
 
 
