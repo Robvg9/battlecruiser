@@ -110,7 +110,7 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'));
   assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.7"));
   assert.ok(app.includes('VERSION="9.5.96"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.95"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.96"'));
 });
 
 
