@@ -129,7 +129,7 @@ test("Cash declaration can be saved before the final inventory unlocks jornada c
   assert.match(ui,/async function saveCashDeclaration\(form/);
   assert.match(ui,/data-bc7-save-cash/);
   assert.match(ui,/data-bc7-save-cash-days/);
-  assert.match(ui,/saveCashDaysWorkspace\(form,true/);
+  assert.match(ui,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
   assert.match(ui,/rpc\('bc_declarar_dinero'/);
   assert.match(ui,/El cierre se habilitará al confirmar el inventario final/);
   assert.match(ui,/Finalizar jornada/);
