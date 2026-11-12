@@ -1524,3 +1524,59 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
+
+/* 9.5.97 follow-up — Jornada forms and movement ledger stay inside the viewport. */
+#tab-jornada .bc7-panel-stack,
+#tab-jornada .bc7-workspace-panel,
+#tab-jornada .bc7-card,
+#tab-jornada .bc7-note,
+#tab-jornada .bc7-detail,
+#tab-jornada .bc7-detail-body,
+#tab-jornada form {
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+#tab-jornada .bc7-panel-stack{display:grid;gap:10px;align-content:start}
+#tab-jornada .bc7-note{padding:12px;overflow-wrap:anywhere}
+#tab-jornada .bc7-note>p{margin:7px 0;line-height:1.45}
+#tab-jornada .bc7-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:9px}
+#tab-jornada .bc7-field{display:grid;gap:5px;width:100%;min-width:0;max-width:100%}
+#tab-jornada .bc7-field input,
+#tab-jornada .bc7-field select,
+#tab-jornada .bc7-field textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%}
+#tab-jornada .bc7-detail-body{padding:12px;overflow:hidden}
+#tab-jornada .bc7-actions{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+#tab-jornada .bc7-actions>*{min-width:0;max-width:100%}
+#tab-jornada .bc7-actions .bc7-btn{flex:1 1 180px;white-space:normal;overflow-wrap:anywhere}
+#tab-jornada .bc7-table-wrap{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+#tab-jornada .bc7-movements-table{min-width:760px}
+@media(max-width:759px){
+  #app-shell.visible > .app-header{
+    grid-template-columns:minmax(0,1fr) auto auto !important;
+    grid-template-areas:"brand account logout" "status status status" "user user queue" !important;
+  }
+  #app-shell.visible > .app-header #mi-cuenta-btn{
+    grid-area:account !important;justify-self:end !important;min-width:0;max-width:none
+  }
+  #app-shell.visible > .app-header #logout-btn{
+    grid-area:logout !important;justify-self:end !important
+  }
+  #app-shell.visible > .app-header #user-email{
+    grid-area:user !important;justify-self:start !important;max-width:100% !important;
+    width:100%;min-width:0;text-align:left !important;white-space:normal;overflow-wrap:anywhere
+  }
+  #app-shell.visible > .app-header #cola-pendientes-badge{grid-area:queue !important;justify-self:end !important}
+  #tab-jornada .bc7-note{padding:10px}
+  #tab-jornada .bc7-detail-body{padding:9px}
+  #tab-jornada .bc7-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  #tab-jornada .bc7-actions .bc7-btn{flex:1 1 100%;width:100%}
+  #tab-jornada .bc7-movements-table{min-width:760px}
+}
+@media(max-width:380px){
+  #tab-jornada .bc7-grid{grid-template-columns:minmax(0,1fr)}
+  #app-shell.visible > .app-header{column-gap:6px !important}
+  #app-shell.visible > .app-header #mi-cuenta-btn,
+  #app-shell.visible > .app-header #logout-btn{padding:6px 7px;font-size:10.5px}
+}
