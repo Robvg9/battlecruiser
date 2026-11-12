@@ -5,7 +5,7 @@
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,inventorySettlement:null};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,inventorySettlement:null,currentSession:null};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -170,6 +170,17 @@
       '#tab-jornada{max-width:1080px;margin:0 auto;padding-bottom:28px}',
       '#tab-jornada .bc7-wrap{max-width:100%;margin:0 auto}',
       '#tab-jornada .bc7-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 0 14px;padding:4px 0 13px;border-bottom:1px solid var(--gold-dim)}',
+      '#tab-jornada .bc7-current-session{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid var(--gold-dim);border-left:3px solid var(--sage);border-radius:8px;background:rgba(159,196,173,.06)}',
+      '#tab-jornada .bc7-current-session-copy{min-width:0}',
+      '#tab-jornada .bc7-current-session-copy strong{display:block;font-size:13px;color:var(--text)}',
+      '#tab-jornada .bc7-current-session-copy p{margin:3px 0 0;font-size:11px;color:var(--mist)}',
+      '#tab-jornada .bc7-current-session[hidden]{display:none!important}',
+      '#tab-jornada .bc7-current-session-actions{display:flex;flex-wrap:wrap;gap:6px}',
+      '#tab-jornada .bc7-table-wrap{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}',
+      '#tab-jornada .bc7-table{width:100%;min-width:720px;border-collapse:collapse;font-size:12px;table-layout:auto}',
+      '#tab-jornada .bc7-table.bc7-table-wide{min-width:980px}',
+      '#tab-jornada .bc7-table-scroll-hint{display:none;margin:4px 0;color:var(--mist);font-size:10px}',
+      '@media(max-width:650px){#tab-jornada .bc7-current-session{align-items:stretch;flex-direction:column}#tab-jornada .bc7-current-session-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#tab-jornada .bc7-table-scroll-hint{display:block}}',
       '#tab-jornada .bc7-hero h2{font-family:"Cormorant Garamond",serif;font-size:29px;line-height:1.1;margin:0;color:var(--text)}',
       '#tab-jornada .bc7-hero p{font-size:12px;color:var(--mist);margin:6px 0 0;max-width:640px}',
       '#tab-jornada .bc7-status{font-size:12px;color:var(--mist);min-height:18px;text-align:right;max-width:190px}',
@@ -199,8 +210,9 @@
       '#tab-jornada .bc7-pill{display:inline-block;padding:4px 7px;border:1px solid var(--gold-dim);border-radius:999px;font-size:10px;color:var(--mist);white-space:nowrap}',
       '#tab-jornada .bc7-pill.ok{color:#9fd7ad;border-color:#4b8860}',
       '#tab-jornada .bc7-pill.warn{color:#ebcf7e;border-color:#a9873c}',
-      '#tab-jornada .bc7-table-wrap{width:100%;overflow:auto}',
-      '#tab-jornada .bc7-table{width:100%;border-collapse:collapse;font-size:12px}',
+      '#tab-jornada .bc7-table-wrap{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}',
+      '#tab-jornada .bc7-table{width:100%;min-width:720px;border-collapse:collapse;font-size:12px;table-layout:auto}',
+      '#tab-jornada .bc7-table.bc7-table-wide{min-width:980px}',
       '#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:9px 7px;text-align:left;border-bottom:1px solid var(--gold-dim);white-space:nowrap}',
       '#tab-jornada .bc7-table th{color:var(--mist);font-weight:600}',
       '#tab-jornada .bc7-table input{width:96px;max-width:100%;box-sizing:border-box;padding:8px;background:var(--void);color:var(--text);border:1px solid var(--gold-dim);border-radius:5px}',
@@ -236,6 +248,7 @@
     if(!tab)return null;
     tab.innerHTML='<div class="bc7-wrap">'+
       '<header class="bc7-hero"><div><h2>Jornada e inventario</h2></div><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></header>'+
+      '<section id="bc7-current-session-card" class="bc7-card" hidden aria-live="polite"></section>'+
       '<details id="bc7-help-details" class="bc7-help"><summary>¿Para qué sirve esta sección? · Guía rápida</summary><div class="bc7-purpose"><p class="bc7-muted">Aquí organizas quién trabaja cada día. Después, cada responsable abre su jornada, cuenta el inventario físico inicial y final para saber con qué existencias empieza y termina, y registra su actividad.</p><ol class="bc7-muted"><li>Abre la jornada asignada.</li><li>Confirma el inventario inicial con conteo físico.</li><li>Registra las operaciones en sus secciones habituales.</li><li>Al terminar, confirma inventario final y dinero declarado para solicitar el cierre.</li></ol><p class="bc7-muted">Aquí aparecen las operaciones que se pueden relacionar con esta jornada. Esta sección no es el historial general de movimientos; para consultar todos los movimientos, entra en Movimientos → Historial.</p></div></details>'+
       '<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Organizar jornadas · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">'+
        '<h3>Crear y organizar jornadas</h3><p class="bc7-muted">Elige el almacén, la fecha y quién trabaja cada día. Puedes asignar las personas una por una o repetir una rotación que hayas guardado.</p>'+
@@ -411,6 +424,36 @@
       host.innerHTML=data.map(rowHtml).join('');
     }catch(e){host.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');}
   }
+  function renderCurrentSession(current){
+    state.currentSession=current&&current.turno_sesion_id?current:null;
+    const host=$('bc7-current-session-card');
+    if(!host)return;
+    if(!state.currentSession){host.hidden=true;host.innerHTML='';return;}
+    const active=state.currentSession;
+    host.hidden=false;
+    host.innerHTML='<div class="bc7-current-session"><div class="bc7-current-session-copy"><strong>Mi jornada actual</strong><p>En curso · '+esc(fmtDateHuman(active.fecha))+' · '+esc(warehouseName(active.almacen_id))+'</p></div><div class="bc7-current-session-actions"><button class="bc7-btn primary" type="button" data-bc7-current-open>Continuar jornada</button><button class="bc7-btn" type="button" data-bc7-current-finance>Finanzas</button></div></div>';
+  }
+  async function loadCurrentSession(){
+    try{
+      const current=await rpc('turno_actual_usuario',{});
+      renderCurrentSession(current);
+      return state.currentSession;
+    }catch(_){
+      renderCurrentSession(null);
+      return null;
+    }
+  }
+  async function openCurrentSession(finance){
+    const sessionId=state.currentSession&&state.currentSession.turno_sesion_id;
+    if(!sessionId)return false;
+    const opened=await openWorkspace(sessionId);
+    if(opened&&finance){
+      activateWorkspaceTab('finanzas');
+      const target=$('bc7-daily-cash-list')||$('bc7-finance-section');
+      if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+    return opened;
+  }
   function financeFormHtml(detail,isAssigned,status){
     const sessionId=detail.sesion.id;
     const products=arr(detail.productos);
@@ -438,7 +481,8 @@
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
       if(showDailyCash)html+='<div id="bc7-daily-cash-list"><div class="bc7-empty">Consultando entregas diarias…</div></div>';
       if(createDailyCash){
-        html+='<form data-bc7-daily-cash-form="'+esc(sessionId)+'"><h4>Registrar dinero recogido del día</h4>'+
+        html+='<p class="bc7-muted">En jornadas de varios días, registra aquí el dinero de cada día anterior al último. El importe del último día se declara en Operación → Dinero entregado.</p>'+
+          '<form data-bc7-daily-cash-form="'+esc(sessionId)+'"><h4>Registrar dinero recogido del día</h4>'+
           '<input type="hidden" data-bc7-daily-cash-key value="">'+
           '<div class="bc7-grid"><label class="bc7-field">Fecha<input data-bc7-daily-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(dailyCashEnd)+'" value="'+esc(defaultDailyDate)+'" required></label>'+
           '<label class="bc7-field">Dinero recogido (CUP)<input data-bc7-daily-cash-amount type="number" min="0" step="0.01" required inputmode="decimal" placeholder="0.00"></label></div>'+
@@ -533,7 +577,7 @@
     }).join('')+'</div>';
     const rows=arr(result.lineas);
     const table=rows.length
-      ?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Familia</th><th>Inicial</th><th>Entradas</th><th>Salidas</th><th>Final</th><th>Vendidas</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+
+      ?'<div class="bc7-table-wrap"><table class="bc7-table bc7-table-wide"><thead><tr><th>Familia</th><th>Inicial</th><th>Entradas</th><th>Salidas</th><th>Final</th><th>Vendidas</th><th>Precio</th><th>Importe</th></tr></thead><tbody>'+
         rows.map(function(line){
           const entries=Number(line.transferencias_entrada||0)+Number(line.compras||0)+Number(line.reinversiones_entrada||0);
           const exits=Number(line.transferencias_salida||0)+Number(line.vales_salida||0)+Number(line.mermas_aprobadas||0)+Number(line.bajas_aprobadas||0);
@@ -814,7 +858,7 @@
 
   function legacyInitialFormHtml(detail){
     const products=arr(detail.productos);
-    const table=products.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Stock del sistema (referencia)</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>'<tr><td>'+esc(p.nombre)+'</td><td>'+esc(qty(p.stock_actual))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-legacy-count="'+esc(p.producto_id)+'" aria-label="Regularizar conteo físico de '+esc(p.nombre)+'" placeholder="Contar físicamente"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">Almacén sin productos activos con stock registrado.</div>';
+    const table=products.length?'<p class="bc7-table-scroll-hint">En móvil, desliza horizontalmente para ver todas las columnas.</p><div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Stock del sistema (referencia)</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>'<tr><td>'+esc(p.nombre)+'</td><td>'+esc(qty(p.stock_actual))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-legacy-count="'+esc(p.producto_id)+'" aria-label="Regularizar conteo físico de '+esc(p.nombre)+'" placeholder="Contar físicamente"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">Almacén sin productos activos con stock registrado.</div>';
     return '<div class="bc7-note"><b>Regularización legacy — excepción del dueño</b><p class="bc7-muted">La jornada ya está abierta y no tiene inventario inicial. Solo el dueño puede registrar ahora un conteo físico completo y explicar la excepción. No se copiará el stock del sistema ni se modificará el saldo global.</p></div>'+
       '<form data-bc7-legacy-initial-form="'+esc(detail.sesion.id)+'">'+table+
       '<label class="bc7-field">Motivo obligatorio de regularización<input data-bc7-legacy-reason required maxlength="1000" placeholder="Explica por qué falta el inventario inicial"></label>'+
@@ -864,7 +908,7 @@
       ?(opening?'<p class="bc7-note">Corte final anterior del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se muestran las cantidades efectivas compartidas como referencia. Debes revisar y volver a contar físicamente cada producto antes de confirmar la recepción; una diferencia queda pendiente de decisión del dueño.</p>'
         :'<p class="bc7-note">No hay un inventario final confirmado del día inmediatamente anterior. Define el saldo inicial mediante conteo físico completo; no se copiará automáticamente el stock del sistema.</p>')
       :'';
-    const table=products.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
+    const table=products.length?'<p class="bc7-table-scroll-hint">En móvil, desliza horizontalmente para ver todas las columnas.</p><div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
       const prior=openingLines.get(String(p.producto_id));
       return '<tr><td>'+esc(p.nombre)+'</td><td>'+esc(p.unidad||'ud')+'</td><td>'+esc(qty(p.stock_actual))+'</td><td>'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
     }).join('')+'</tbody></table></div>':'<div class="bc7-empty">Este almacén no tiene productos activos con fila de stock registrada. Si se trata realmente de un almacén vacío, puedes confirmar el conteo de cero productos.</div>';
@@ -888,13 +932,16 @@
   function renderWorkspace(detail){
     state.detail=detail;
     const s=detail.sesion,cuts=detail.cortes||{},initial=!!cuts.INICIAL,final=!!cuts.FINAL;
-    const status=String(s.estado||'').toUpperCase(),isAssigned=String(currentUser()?.id||'')===String(s.responsable_id||'');
+    const status=String(s.estado||'').toUpperCase();
+    const currentUserId=String(currentUser()?.id||'');
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const isAssigned=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
     let actionArea='';
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'){
       const tramo=detail.tramo_activo,saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
-      actionArea='<div class="bc7-note"><b>Finalizar jornada.</b> Registra el dinero que realmente entregas al dueño; el conteo físico del dueño se hará después del cierre. El cierre exige inventario final.<form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de excepción<input id="bc7-close-reason" maxlength="1000" placeholder="Solo si aplica"></label></div><div class="bc7-actions"><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar con entrega guardada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Bloqueado: falta confirmar inventario final.</p>')+'</form></div>';
+      actionArea='<div class="bc7-note"><b>Dinero entregado y cierre.</b><p>Registra el importe real que entregas al Dueño. Puedes guardar el dinero ahora; la jornada seguirá abierta hasta confirmar el inventario final.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
     }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
     else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     let adjustment='';
@@ -1083,6 +1130,43 @@
     }
     finally{busy(btn,false);}
   }
+  async function saveCashDeclaration(form){
+    if(!form)return;
+    const sessionId=form.dataset.bc7CloseForm;
+    const tramo=state.detail&&state.detail.tramo_activo;
+    const tramoId=tramo&&tramo.id;
+    const input=$('bc7-cash');
+    const raw=input?input.value.trim():'';
+    const amount=Number(raw);
+    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+    const message=form.querySelector('[data-bc7-close-msg]');
+    if(saved){msg(message,'El dinero ya está guardado. Puedes finalizar cuando el inventario final esté confirmado.','ok');return;}
+    if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return;}
+    if(raw===''||!Number.isFinite(amount)||amount<0){msg(message,'Introduce el importe real entregado, igual o mayor que cero.','error');return;}
+    if(!confirm('Se guardará la declaración de efectivo de esta jornada, pero la jornada seguirá abierta. El Dueño podrá contar el importe después. ¿Confirmas?'))return;
+    const btn=form.querySelector('[data-bc7-save-cash]');
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:amount});
+      const reread=await openWorkspace(sessionId);
+      if(!reread||!state.detail?.declaracion_dinero||String(state.detail.declaracion_dinero.turno_tramo_id)!==String(tramoId)){
+        throw new Error('El servidor no confirmó la declaración al volver a consultar. No repitas el envío todavía.');
+      }
+      setStatus('Dinero entregado guardado. La jornada sigue abierta hasta confirmar el inventario final.','ok');
+      msg(document.querySelector('[data-bc7-close-msg]'),'Declaración guardada. El Dueño podrá contar el efectivo después.','ok');
+    }catch(e){
+      try{
+        const reread=await openWorkspace(sessionId);
+        if(reread&&state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)){
+          setStatus('Declaración confirmada al volver a consultar. No se repitió la escritura.','ok');
+          msg(document.querySelector('[data-bc7-close-msg]'),'El importe quedó guardado correctamente.','ok');
+          return;
+        }
+      }catch(_){}
+      msg(document.querySelector('[data-bc7-close-msg]')||message,friendlyError(e,'create')+' No repitas el envío hasta comprobar el estado.','error');
+      setStatus('No se pudo confirmar la declaración de dinero.','error');
+    }finally{busy(btn,false);}
+  }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
     let amount=$('bc7-cash')?.value.trim();
@@ -1093,12 +1177,14 @@
     if(saved){amount=String(state.detail.declaracion_dinero.monto);}
     if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
-    if(!confirm('Se registrará el importe que entregas al dueño. El administrador lo contará después del cierre. ¿Confirmas el importe real entregado?'))return;
+    const confirmation=saved?'La declaración de dinero ya está guardada. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador contará el efectivo después. ¿Confirmas?';
+    if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
       if(!saved) await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:Number(amount)});
       await rpc('bc5_cerrar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:$('bc7-close-reason')?.value||null});
       await loadCalendar();
+      await loadCurrentSession();
       const reread=await openWorkspace(sessionId);
       if(!reread){
         setStatus('La solicitud de cierre fue aceptada, pero no se pudo releer el resumen. Actualiza antes de repetir cualquier operación.','error');
@@ -1250,7 +1336,8 @@
     const today=dateHavana();
     if($('bc7-anchor'))$('bc7-anchor').value=today;
     if($('bc7-start-date'))$('bc7-start-date').value=today;
-    if($('bc7-list-from'))$('bc7-list-from').value=today;
+    if($('bc7-list-from'))$('bc7-list-from').value=addDays(today,-7);
+    if($('bc7-list-days'))$('bc7-list-days').value='31';
     state.staffLoaded=eligibleStaff().length>0;
     fillWarehouses();buildDayRows();
     ensureWarehouseCatalog();
@@ -1275,6 +1362,7 @@
     const staffRetry=$('bc7-staff-retry');
     if(staffRetry)staffRetry.addEventListener('click',async()=>{try{await ensureResponsibleCatalog(true);}catch(_){}});
     const listFrom=$('bc7-list-from');if(listFrom)listFrom.addEventListener('change',()=>{state.lastPreview=null;});
+    await loadCurrentSession();
     await loadCalendar();
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
@@ -1301,6 +1389,9 @@
   });
   document.addEventListener('click',async function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
+    if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
+    if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
+    if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-preview')){await previewPattern(t);return;}
