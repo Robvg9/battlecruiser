@@ -7,6 +7,7 @@ on:
       - 'supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql'
       - 'supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql'
       - 'supabase/migrations/20261112133100_jornada_close_gate_integral.sql'
+      - 'supabase/migrations/20261112133200_jornada_handover_after_period_end.sql'
       - 'supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql'
       - 'supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql'
       - 'supabase/migrations/20261102020000_step4_jornada_cash_count_readback.sql'
