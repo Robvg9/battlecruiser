@@ -181,8 +181,8 @@ BEGIN
   UPDATE public.turno_tramos SET estado='COMPLETADO',fin_at=now() WHERE id=v_tramo.id;
   UPDATE public.turno_sesiones SET estado='COMPLETADA',updated_at=now()
   WHERE id=v_sesion.id RETURNING * INTO v_result;
-  UPDATE public.turnos SET estado='CERRADO',cierre_real=now(),actualizado_en=now()
-  WHERE id=v_sesion.turno_id AND estado='ABIERTO';
+  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',cierre_real=NULL,actualizado_en=now()
+  WHERE id=v_sesion.turno_id;
   INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo)
   VALUES(v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),'SESION_CERRADA');
 
