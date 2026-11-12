@@ -666,7 +666,7 @@
         renderCashDaysWorkspace(state.detail);
       }
       msg($('bc7-cash-days-msg')||message,'Importes guardados y confirmados desde el servidor. Cada día conserva su registro y estado de revisión.','ok');
-      setStatus('Dinero diario actualizado para '+dailySubmitted.length+' día(s).','ok');
+      setStatus('Dinero diario actualizado para '+operations.length+' día(s).','ok');
       return true;
     }catch(e){
       msg($('bc7-cash-days-msg')||message,friendlyError(e,'create')+' '+String(e&&e.message||'')+' Las claves de idempotencia se conservaron para evitar duplicados.','error');
