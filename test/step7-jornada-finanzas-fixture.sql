@@ -133,6 +133,51 @@ CREATE TABLE public.lotes_compra (
   compra_id uuid
 );
 
+-- Same FIFO stock-out helper used by the live operational approval function.
+-- It is required by merma/baja approval, not by request creation.
+CREATE OR REPLACE FUNCTION public._aplicar_salida_aprobada(
+  p_almacen_id uuid,p_producto_id uuid,p_cantidad numeric
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path='public','pg_temp'
+AS $fn$
+DECLARE
+  v_stock numeric;
+  v_restante numeric;
+  v_l record;
+  v_tomar numeric;
+BEGIN
+  SELECT cantidad INTO v_stock
+  FROM public.stock
+  WHERE almacen_id=p_almacen_id AND producto_id=p_producto_id
+  FOR UPDATE;
+  IF v_stock IS NULL OR v_stock<p_cantidad THEN
+    RAISE EXCEPTION 'Stock insuficiente al aprobar la salida';
+  END IF;
+  v_restante:=p_cantidad;
+  FOR v_l IN
+    SELECT id,cantidad_restante FROM public.lotes_compra
+    WHERE almacen_id=p_almacen_id AND producto_id=p_producto_id AND cantidad_restante>0
+    ORDER BY fecha_compra ASC
+    FOR UPDATE
+  LOOP
+    EXIT WHEN v_restante<=0;
+    v_tomar:=LEAST(v_l.cantidad_restante,v_restante);
+    UPDATE public.lotes_compra SET cantidad_restante=cantidad_restante-v_tomar WHERE id=v_l.id;
+    v_restante:=v_restante-v_tomar;
+  END LOOP;
+  IF v_restante>0 THEN
+    RAISE EXCEPTION 'No existe trazabilidad FIFO suficiente para aprobar la salida';
+  END IF;
+  UPDATE public.stock SET cantidad=cantidad-p_cantidad,updated_at=now()
+  WHERE almacen_id=p_almacen_id AND producto_id=p_producto_id;
+END;
+$fn$;
+
+REVOKE ALL ON FUNCTION public._aplicar_salida_aprobada(uuid,uuid,numeric) FROM PUBLIC,anon,authenticated;
+
+
 CREATE TABLE public.movimientos_caja_fixture (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   almacen_id uuid NOT NULL,
