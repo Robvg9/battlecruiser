@@ -66,7 +66,11 @@ test("La Cueva UI renders daily cash and inventory settlement and does not show 
   assert.match(jornada, /bc7_registrar_entrega_diaria_jornada/);
   assert.match(jornada, /bc7_configurar_salario_porcentaje_jornada/);
   assert.match(jornada, /bc7_liquidacion_inventario_jornada/);
-  assert.match(jornada, /data-bc7-daily-cash-form/);
+  assert.match(jornada, /id="bc7-cash-days-manager"/);
+  assert.match(jornada, /data-bc7-cash-mode="daily"/);
+  assert.match(jornada, /data-bc7-cash-day-amount/);
+  assert.match(jornada, /data-bc7-close-form=/);
+  assert.doesNotMatch(jornada, /data-bc7-daily-cash-form/);
   assert.match(jornada, /data-bc7-salary-rate-form/);
   assert.match(jornada, /entregas_diarias_faltantes/);
 });
