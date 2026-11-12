@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.20 — dinero diario unificado dentro del cierre de jornada.
+// v7.21 — revisión móvil compacta, conteos físicos y archivo financiero por jornada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1087,7 +1087,10 @@
     const date=String(session&&session.fecha||'').slice(0,10);
     const heading='<h4>Día '+esc(day||'—')+' · '+esc(date||'fecha no disponible')+'</h4>';
     if(!rows.length)return heading+'<div class="bc7-empty">No hay movimientos vinculados de forma verificable a esta sesión y a su tramo horario. Las operaciones que no puedan asociarse con seguridad siguen en Movimientos → Historial general; no se asignan solo por compartir fecha.</div>';
-    return heading+'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Hora</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Usuario</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(String(r.fecha||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(r.tipo||'—')+'</td><td>'+esc(r.producto||'—')+'</td><td>'+esc(qty(r.cantidad))+'</td><td>'+esc(r.usuario||'—')+'</td></tr>').join('')+'</tbody></table></div>';
+    const labels={compra:'Compra',venta:'Venta',transferencia_salida:'Transferencia de salida',transferencia_entrada:'Transferencia de entrada',vale:'Vale de salida',merma:'Merma aprobada',merma_pendiente:'Merma pendiente',merma_rechazada:'Merma rechazada',baja:'Baja aprobada',baja_pendiente:'Baja pendiente',baja_rechazada:'Baja rechazada',gasto:'Gasto aprobado',gasto_pendiente:'Gasto pendiente',gasto_rechazado:'Gasto rechazado',reinversion:'Reinversión aprobada',reinversion_pendiente:'Reinversión pendiente',reinversion_rechazada:'Reinversión rechazada',entrega_diaria:'Efectivo diario aprobado',entrega_diaria_pendiente:'Efectivo diario pendiente',entrega_diaria_rechazada:'Efectivo diario rechazado',dinero_declarado_final:'Dinero final declarado',dinero_contado_final:'Dinero final contado por Dueño'};
+    const financeTypes=/^(gasto|reinversion|entrega_diaria|dinero_)/;
+    const value=r=>r.costo_unitario==null?'—':esc(money(r.costo_unitario))+' CUP'+(financeTypes.test(String(r.tipo||''))?'':'/u');
+    return heading+'<div class="bc7-table-wrap"><table class="bc7-table bc7-movements-table"><thead><tr><th>Hora</th><th>Tipo</th><th>Producto / concepto</th><th>Cantidad</th><th>Valor</th><th>Usuario</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(String(r.fecha||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(labels[r.tipo]||r.tipo||'—')+'</td><td>'+esc(r.producto||'—')+'</td><td>'+esc(r.cantidad==null?'—':qty(r.cantidad))+'</td><td>'+value(r)+'</td><td>'+esc(r.usuario||'—')+'</td></tr>').join('')+'</tbody></table></div>';
   }
   async function loadMovements(detail){
     const host=$('bc7-movements');if(!host)return;
