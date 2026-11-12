@@ -276,6 +276,19 @@ BEGIN
     RAISE EXCEPTION 'FAIL: backend allowed the jornada to close while daily cash/expense/reinvestment/merma/baja approvals were pending';
   END IF;
 
+  -- The generic authenticated legacy helper must not bypass the Jornada close gate either.
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc_cerrar_turno_sesion(v_session);
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_error:=true;
+  END;
+  IF NOT v_error
+     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_session)<>'EN_CURSO' THEN
+    RAISE EXCEPTION 'FAIL: direct legacy close helper bypassed the protected Jornada close RPC';
+  END IF;
+
+
   -- Owner approves each operation. Only these approved records affect the final stock/cash reconciliation.
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
@@ -375,8 +388,9 @@ BEGIN
   v_closed:=public.bc5_cerrar_jornada(v_session,'Cierre de contrato PostgreSQL fuera del horario programado');
   IF v_closed.estado<>'COMPLETADA'
      OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='COMPLETADO')
+     OR (SELECT estado FROM public.turnos WHERE id=v_turn)<>'CERRADO'
      OR (public.bc7_liquidacion_inventario_jornada(v_session)->>'calculable')::boolean IS DISTINCT FROM true THEN
-    RAISE EXCEPTION 'FAIL: the jornada did not close with a reconciled daily cash/expense/reinvestment/merma/baja ledger';
+    RAISE EXCEPTION 'FAIL: the jornada/master turn did not close with a reconciled daily cash/expense/reinvestment/merma/baja ledger';
   END IF;
 
   RAISE NOTICE 'PASS La Cueva: all daily cash, approved expense/reinvestment/merma/baja, stock and cash reconciliation, close transition, ACL.';
