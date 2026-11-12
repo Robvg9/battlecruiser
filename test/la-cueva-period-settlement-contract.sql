@@ -111,7 +111,7 @@ BEGIN
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
   ) VALUES(v_final_cut,v_session,'FINAL','CONFIRMADO',v_worker,v_worker,v_end,v_end,'Final physical count');
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
-  VALUES(v_final_cut,v_pan,7,7),(v_final_cut,v_juice,4,4);
+  VALUES(v_final_cut,v_pan,8,8),(v_final_cut,v_juice,4,4);
   -- Force the deferred final-cut trigger now, so the handover points to the scheduled day after fecha_fin.
   SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada IMMEDIATE;
   SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada DEFERRED;
@@ -463,7 +463,7 @@ BEGIN
   v_result:=public.bc7_recibir_entrega_jornada(
     v_next_session,
     jsonb_build_array(
-      jsonb_build_object('producto_id',v_pan,'cantidad',7),
+      jsonb_build_object('producto_id',v_pan,'cantidad',8),
       jsonb_build_object('producto_id',v_juice,'cantidad',4)
     ),
     'Recepción física exacta del inventario del período anterior',
