@@ -216,7 +216,7 @@ async function resolverDesdeModal(decision){
       if(isFinalCash){
         if(decision!=='APROBAR')throw new Error('La declaración final se resuelve con conteo físico, no con rechazo.');
         if(String(modal.dataset.sessionState||'').toUpperCase()!=='COMPLETADA')throw new Error('Primero debe completarse la Jornada.');
-        if(!confirm('Declarado por la responsable: '+money(x.monto)+' CUP.\nConteo físico real: '+money(real)+' CUP.\n\nEl servidor aprobará solo si ambos importes coinciden. ¿Confirmas el conteo?'))return;
+        if(!confirm('Declarado por la responsable: '+money(x.monto)+' CUP.\nConteo físico real: '+money(real)+' CUP.\n\nEl servidor aprobará solo si ambos importes coinciden. ¿Confirmas el conteo?')){accept.disabled=false;reject.disabled=false;return;}
         await rpc('bc5_contar_dinero_entregado',{
           p_declaracion_id:id,p_monto_contado:real,p_observacion:comment||null
         });
