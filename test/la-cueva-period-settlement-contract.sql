@@ -248,11 +248,11 @@ BEGIN
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  IF (v_result->>'ventas_estimadas')::numeric<>40 THEN
-    RAISE EXCEPTION 'FAIL: expected inventory-delta sales CUP40; result=%',v_result;
+  IF (v_result->>'ventas_estimadas')::numeric<>50 THEN
+    RAISE EXCEPTION 'FAIL: pending adjustments are not applied until approval; expected inventory-delta sales CUP50; result=%',v_result;
   END IF;
-  IF (v_result->>'salario_calculado')::numeric<>2 THEN
-    RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP2; result=%',v_result;
+  IF (v_result->>'salario_calculado')::numeric<>2.5 THEN
+    RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP2.50 before pending adjustments are approved; result=%',v_result;
   END IF;
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
      OR (v_result->'pendientes'->>'gastos')::integer<>1
@@ -359,7 +359,7 @@ BEGIN
   );
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM true
-     OR (v_result->>'dinero_recogido_total')::numeric<>34
+     OR (v_result->>'dinero_recogido_total')::numeric<>40.5
      OR (v_result->>'diferencia')::numeric<>1 THEN
     RAISE EXCEPTION 'FAIL: corrected daily cash should keep the settlement auditable; result=%',v_result;
   END IF;
@@ -367,7 +367,7 @@ BEGIN
   -- A change to the store default must not rewrite the rate fixed on this jornada.
   UPDATE public.turno_jornada_configuracion SET salario_porcentaje=10 WHERE almacen_id=v_warehouse;
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  IF (v_result->>'salario_calculado')::numeric<>2
+  IF (v_result->>'salario_calculado')::numeric<>2.5
      OR (SELECT salario_porcentaje FROM public.turno_jornada_programacion WHERE id=v_program)<>5 THEN
     RAISE EXCEPTION 'FAIL: historical jornada salary must remain tied to its snapshotted 5 percent rate; result=%',v_result;
   END IF;
