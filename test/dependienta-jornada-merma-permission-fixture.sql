@@ -4,17 +4,15 @@ DO $fixture$
 DECLARE
   v_role uuid;
 BEGIN
-  INSERT INTO public.roles(nombre,activo)
-  VALUES('Dependientas',true)
-  ON CONFLICT (nombre) DO NOTHING;
-
   SELECT id INTO v_role
   FROM public.roles
   WHERE lower(btrim(nombre))='dependientas'
   LIMIT 1;
 
   IF v_role IS NULL THEN
-    RAISE EXCEPTION 'Could not prepare the Dependientas role fixture';
+    INSERT INTO public.roles(nombre,activo)
+    VALUES('Dependientas',true)
+    RETURNING id INTO v_role;
   END IF;
 
   IF NOT EXISTS (
