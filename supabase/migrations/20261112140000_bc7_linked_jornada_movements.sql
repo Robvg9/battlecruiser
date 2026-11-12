@@ -212,24 +212,32 @@ BEGIN
 
   SELECT
     COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en),
-    'merma'::text,
+    CASE m.estado WHEN 'APROBADA' THEN 'merma'
+      WHEN 'PENDIENTE' THEN 'merma_pendiente' ELSE 'merma_rechazada' END::text,
     p.nombre::text,
     a.nombre::text,
-    -m.cantidad,
+    CASE WHEN m.estado='APROBADA' THEN -m.cantidad ELSE m.cantidad END,
     NULL::numeric,
     COALESCE(m.revisado_nombre, m.creado_nombre, '')::text,
     m.id
   FROM public.mermas m
   JOIN public.productos p ON p.id = m.producto_id
   JOIN public.almacenes a ON a.id = m.almacen_id
-  WHERE m.estado = 'APROBADA'
+  WHERE m.estado IN ('PENDIENTE','APROBADA','RECHAZADA')
     AND m.almacen_id = v_s.almacen_id
     AND (
-      -- If the operation was created against this exact Jornada, keep it in
-      -- its source session even when ADMIN approves it after the employee's tranche.
-      m.turno_sesion_id = v_s.id
+      -- Explicit source-session + tranche links are authoritative for pending,
+      -- approved and rejected requests. Unlinked legacy records are only inferred
+      -- when ADMIN approval falls inside an exact worker tranche.
+      (m.turno_sesion_id = v_s.id AND EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.id=m.turno_tramo_id
+          AND tr.turno_sesion_id=v_s.id
+          AND tr.usuario_id=m.creado_por
+      ))
       OR (
-        (COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) AT TIME ZONE 'America/Havana')::date = v_s.fecha
+        m.estado='APROBADA'
+        AND (COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) AT TIME ZONE 'America/Havana')::date = v_s.fecha
         AND EXISTS (
           SELECT 1 FROM public.turno_tramos tr
           WHERE tr.turno_sesion_id = v_s.id
@@ -244,22 +252,29 @@ BEGIN
 
   SELECT
     COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en),
-    'baja'::text,
+    CASE b.estado WHEN 'APROBADA' THEN 'baja'
+      WHEN 'PENDIENTE' THEN 'baja_pendiente' ELSE 'baja_rechazada' END::text,
     p.nombre::text,
     a.nombre::text,
-    -b.cantidad,
+    CASE WHEN b.estado='APROBADA' THEN -b.cantidad ELSE b.cantidad END,
     NULL::numeric,
     COALESCE(b.revisado_nombre, b.creado_nombre, '')::text,
     b.id
   FROM public.bajas b
   JOIN public.productos p ON p.id = b.producto_id
   JOIN public.almacenes a ON a.id = b.almacen_id
-  WHERE b.estado = 'APROBADA'
+  WHERE b.estado IN ('PENDIENTE','APROBADA','RECHAZADA')
     AND b.almacen_id = v_s.almacen_id
     AND (
-      b.turno_sesion_id = v_s.id
+      (b.turno_sesion_id = v_s.id AND EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.id=b.turno_tramo_id
+          AND tr.turno_sesion_id=v_s.id
+          AND tr.usuario_id=b.creado_por
+      ))
       OR (
-        (COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) AT TIME ZONE 'America/Havana')::date = v_s.fecha
+        b.estado='APROBADA'
+        AND (COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) AT TIME ZONE 'America/Havana')::date = v_s.fecha
         AND EXISTS (
           SELECT 1 FROM public.turno_tramos tr
           WHERE tr.turno_sesion_id = v_s.id
