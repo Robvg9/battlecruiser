@@ -39,10 +39,16 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   const opEnd=ui.indexOf("const mov='<div class=\"bc7-panel-stack\">",opStart);
   assert.ok(opStart>=0&&opEnd>opStart,"one operation panel exists");
   const operationPanel=ui.slice(opStart,opEnd);
-  for(const control of ["actionArea+fin+adjustment","financeFormHtml(detail,isAssigned,status)","data-bc7-finance-form=\"gasto\"","data-bc7-finance-form=\"reinversion\"","data-bc7-adjust-form","bc7-inventory-settlement"]) {
-    assert.ok(operationPanel.includes(control),`Operation panel must include ${control}`);
-  }
+  assert.ok(operationPanel.includes("actionArea+fin+adjustment"),"cash, finance and adjustment content are composed into the same panel");
   assert.doesNotMatch(ui,/data-bc7-workspace-tab="finanzas"/,"finances are no longer a separate task tab");
+  const financeStart=ui.indexOf("function financeFormHtml(detail,isAssigned,status){");
+  const financeEnd=ui.indexOf("function cashDaysManagerShellHtml(detail,isAssigned,status){",financeStart);
+  assert.ok(financeStart>=0&&financeEnd>financeStart,"finance forms render in the unified operation panel");
+  const financeMarkup=ui.slice(financeStart,financeEnd);
+  for(const control of ["data-bc7-finance-form=\"gasto\"","data-bc7-finance-form=\"reinversion\"","bc7-inventory-settlement","Registrar gasto","Registrar reinversión"]) {
+    assert.ok(financeMarkup.includes(control),`finance content must include ${control}`);
+  }
+  assert.match(ui,/data-bc7-adjust-form/,"baja/merma form is composed in the same operation panel");
 
   assert.match(ui,/data-bc7-ajust-type/,"cuando el rol tiene ambos permisos se puede elegir baja o merma");
   for(const cause of ["Producto vencido","Producto roto o dañado","Consumo del dueño","Otra causa"]) assert.ok(ui.includes(cause),`falta el motivo ${cause}`);
