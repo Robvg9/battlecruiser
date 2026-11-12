@@ -43,8 +43,8 @@ test("Journey movement archive includes exact-session finance and cash records",
 
 test("Jornada operation forms and mobile header are constrained to the viewport",()=>{
   assert.ok(CSS.includes("#tab-jornada .bc7-panel-stack{display:grid;gap:10px"));
-  assert.ok(CSS.includes("#app-shell.visible>.app-header>.header-left"));
-  assert.ok(CSS.includes("#app-shell.visible>.app-header>.header-right"));
+  assert.ok(CSS.includes("#app-shell.visible > header.app-header.app-header > .header-left"));
+  assert.ok(CSS.includes("#app-shell.visible > header.app-header.app-header > .header-right"));
   assert.ok(CSS.includes("display:flex!important") || CSS.includes("display:flex"));
   assert.ok(contentHeaderOrder, "Mi Cuenta y Cerrar sesión deben permanecer juntos al extremo derecho");
   assert.ok(CSS.includes("#app-shell.visible > .app-header #user-email"));
