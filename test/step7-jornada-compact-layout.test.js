@@ -21,11 +21,11 @@ test("opening one jornada exposes four task tabs",()=>{
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9.5.94"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.17"\]/);
- assert.match(sw,/BC_SW_VERSION = "9.5.94"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.17/);
- assert.match(ui,/v7\.17 — liquidación por inventario, entregas diarias y salario porcentual/);
+ assert.match(app,/const VERSION="9.5.95"/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.18"\]/);
+ assert.match(sw,/BC_SW_VERSION = "9.5.95"/);
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.18/);
+ assert.match(ui,/v7\.18 — acceso a jornada activa, declaración de efectivo y UX de inventario/);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
