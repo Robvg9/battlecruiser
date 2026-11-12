@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.21 — revisión móvil compacta, conteos físicos y archivo financiero por jornada.
+// v7.22 — revisión móvil compacta, conteos físicos y archivo financiero por jornada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -475,34 +475,34 @@
       html+='<p class="bc7-muted">La Cueva calcula las unidades vendidas por diferencia entre inventarios y movimientos aprobados. No utiliza ventas individuales de POS ni reparte existencias por sabores.</p>';
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
       if(manageSalary){
-        html+='<form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
+        html+='<details class="bc7-finance-fold"><summary>Configurar porcentaje salarial</summary><form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
           '<div class="bc7-grid"><label class="bc7-field">Porcentaje sobre venta comprobada<input data-bc7-salary-percent type="number" min="0" max="100" step="0.001" inputmode="decimal" placeholder="Configurar porcentaje"></label></div>'+
           '<p class="bc7-muted">La tasa no se presupone a partir del reglamento histórico. Este valor queda registrado por el Dueño y se utiliza en la liquidación de esta tienda.</p>'+
-          '<div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar porcentaje</button></div><p class="bc7-msg" data-bc7-salary-rate-msg></p></form>';
+          '<div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar porcentaje</button></div><p class="bc7-msg" data-bc7-salary-rate-msg></p></form></details>';
       }
     }else{
       html+='<p class="bc7-muted">Las ventas se muestran solo cuando están vinculadas al ID exacto de esta jornada. El efectivo declarado y contado se presenta por separado.</p>';
     }
-    if(showSales)html+='<div id="bc7-sales-list"><div class="bc7-empty">Consultando ventas vinculadas a esta jornada…</div></div>';
-    if(showExpenses)html+='<div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div>';
-    if(showReinvestments)html+='<div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div>';
+    if(showSales)html+='<details class="bc7-finance-fold"><summary>Ventas vinculadas</summary><div id="bc7-sales-list"><div class="bc7-empty">Consultando ventas vinculadas a esta jornada…</div></div></details>';
+    if(showExpenses)html+='<details class="bc7-finance-fold"><summary>Gastos registrados y pendientes</summary><div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div></details>';
+    if(showReinvestments)html+='<details class="bc7-finance-fold"><summary>Reinversiones registradas y pendientes</summary><div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div></details>';
     if(createExpenses){
-      html+='<form data-bc7-finance-form="gasto" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar gasto</h4>'+
+      html+='<details class="bc7-finance-fold"><summary>Registrar gasto</summary><form data-bc7-finance-form="gasto" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar gasto</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
         '<label class="bc7-field">Concepto<input data-bc7-expense-concept maxlength="160" required placeholder="Motivo del gasto"></label>'+
         '<label class="bc7-field">Monto<input data-bc7-expense-amount type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="0.00"></label>'+
         '<label class="bc7-field">Descripción (opcional)<input data-bc7-expense-description maxlength="1000" placeholder="Detalle o referencia"></label>'+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar gasto a aprobación</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar gasto a aprobación</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
     }
     if(createReinvestments){
       const options='<option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('');
-      html+='<form data-bc7-finance-form="reinversion" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar reinversión</h4>'+
+      html+='<details class="bc7-finance-fold"><summary>Registrar reinversión</summary><form data-bc7-finance-form="reinversion" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar reinversión</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
         '<label class="bc7-field">Producto<select data-bc7-reinvestment-product required>'+options+'</select></label>'+
         '<div class="bc7-grid"><label class="bc7-field">Cantidad que entra al inventario<input data-bc7-reinvestment-quantity type="number" min="0.001" step="0.001" required inputmode="decimal"></label>'+
         '<label class="bc7-field">Costo total<input data-bc7-reinvestment-cost type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>'+
         '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
     }
     return html+'</section>';
   }
@@ -812,7 +812,7 @@
     host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
       '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
       '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
-      cards+table+
+      cards+(rows.length?'<details class="bc7-finance-fold"><summary>Desglose por producto</summary>'+table+'</details>':table)+
       (blockers.length?'<div class="bc7-note"><b>Para cerrar la liquidación:</b><ul>'+blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'<p class="bc7-muted">No quedan aprobaciones ni validaciones pendientes.</p>')+
       '</div>';
   }
@@ -1076,10 +1076,15 @@
       ?(opening?'<p class="bc7-note">Corte final anterior del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se muestran las cantidades efectivas compartidas como referencia. Debes revisar y volver a contar físicamente cada producto antes de confirmar la recepción; una diferencia queda pendiente de decisión del dueño.</p>'
         :'<p class="bc7-note">No hay un inventario final confirmado del día inmediatamente anterior. Define el saldo inicial mediante conteo físico completo; no se copiará automáticamente el stock del sistema.</p>')
       :'';
-    const table=products.length?'<p class="bc7-table-scroll-hint">En móvil cada producto aparece en una ficha legible; en escritorio se conserva la tabla completa.</p><div class="bc7-table-wrap"><table class="bc7-table bc7-count-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
-      const prior=openingLines.get(String(p.producto_id));
-      return '<tr><td data-label="Producto">'+esc(p.nombre)+'</td><td data-label="Unidad">'+esc(p.unidad||'ud')+'</td><td data-label="Stock actual">'+esc(qty(p.stock_actual))+'</td><td data-label="Referencia anterior">'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td data-label="Conteo físico actual"><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
-    }).join('')+'</tbody></table></div>':'<div class="bc7-empty">Este almacén no tiene productos activos con fila de stock registrada. Si se trata realmente de un almacén vacío, puedes confirmar el conteo de cero productos.</div>';
+    const empty='<div class="bc7-empty">Este almacén no tiene productos activos con fila de stock registrada. Si se trata realmente de un almacén vacío, puedes confirmar el conteo de cero productos.</div>';
+    const table=products.length
+      ?(type==='FINAL'
+        ?'<div class="bc7-final-count-list" role="group" aria-label="Conteo físico final">'+products.map(p=>'<label class="bc7-final-count-row"><span class="bc7-final-count-product">'+esc(p.nombre)+'</span><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Cantidad final de '+esc(p.nombre)+'" placeholder="Final"></label>').join('')+'</div>'
+        :'<p class="bc7-table-scroll-hint">En móvil cada producto aparece en una ficha legible; en escritorio se conserva la tabla completa.</p><div class="bc7-table-wrap"><table class="bc7-table bc7-count-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
+          const prior=openingLines.get(String(p.producto_id));
+          return '<tr><td data-label="Producto">'+esc(p.nombre)+'</td><td data-label="Unidad">'+esc(p.unidad||'ud')+'</td><td data-label="Stock actual">'+esc(qty(p.stock_actual))+'</td><td data-label="Referencia anterior">'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td data-label="Conteo físico actual"><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
+        }).join('')+'</tbody></table></div>')
+      :empty;
     return openingNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'">'+table+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
   function renderMovementRows(rows,session){

@@ -10,6 +10,8 @@ const QUEUE=read("supabase/migrations/20261112141000_bc7_jornada_final_cash_admi
 const MOVEMENTS=read("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
 const CSS=read("public/style.css");
+const INDEX=read("public/index.html");
+const contentHeaderOrder=/header-right[\s\S]*id="mi-cuenta-btn"[\s\S]*id="logout-btn"/.test(INDEX);
 
 test("Centro de Control includes pending final-cash declarations for JORNADA sessions",()=>{
   assert.ok(QUEUE.includes("'declaracion_jornada'::text"));
@@ -41,7 +43,10 @@ test("Journey movement archive includes exact-session finance and cash records",
 
 test("Jornada operation forms and mobile header are constrained to the viewport",()=>{
   assert.ok(CSS.includes("#tab-jornada .bc7-panel-stack{display:grid;gap:10px"));
-  assert.ok(CSS.includes('grid-template-areas:"brand account logout"'));
+  assert.ok(CSS.includes("#app-shell.visible > header.app-header.app-header > .header-left"));
+  assert.ok(CSS.includes("#app-shell.visible > header.app-header.app-header > .header-right"));
+  assert.ok(CSS.includes("display:flex!important") || CSS.includes("display:flex"));
+  assert.ok(contentHeaderOrder, "Mi Cuenta y Cerrar sesión deben permanecer juntos al extremo derecho");
   assert.ok(CSS.includes("#app-shell.visible > .app-header #user-email"));
   assert.ok(CSS.includes("min-width:0;max-width:100%"));
 });
