@@ -115,8 +115,8 @@ test("closing requires every date and confirms the final day before closing the 
 
 test("mobile Jornada uses labelled inventory cards and stable cash/header layouts", () => {
   assert.ok(CSS.includes(".bc7-final-count-list"));
-  const finalCountStart=UI.indexOf("?'<div class="bc7-final-count-list"");
-  const initialCountStart=UI.indexOf(":'<p class="bc7-table-scroll-hint"",finalCountStart);
+  const finalCountStart=UI.indexOf("?'<div class=\"bc7-final-count-list\"");
+  const initialCountStart=UI.indexOf(":'<p class=\"bc7-table-scroll-hint\"",finalCountStart);
   const finalCountTemplate=UI.slice(finalCountStart,initialCountStart);
   assert.ok(finalCountTemplate.includes("bc7-final-count-product"));
   assert.ok(finalCountTemplate.includes("data-bc7-count"));
