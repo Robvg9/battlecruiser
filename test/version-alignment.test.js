@@ -143,8 +143,8 @@ test('movement operations load multi-product transfer before the compact modal',
 
 // PWA 9.5.88 uses warehouse-specific movement summary windows and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.94["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.94["']/);
+  assert.match(app, /const VERSION=["']9\.5\.95["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.95["']/);
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
@@ -160,7 +160,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.94["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.95["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261105\.4/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.2/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -196,10 +196,10 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.94 — Liquidación por inventario y entregas diarias/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.94"><\/script>/);
+  assert.match(app, /v9\.5\.95 — Jornada actual, declaración de efectivo y UX de inventario/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.95"><\/script>/);
   for (const asset of [
-    'style.css?v=9.5.94',
+    'style.css?v=9.5.95',
     'js/centro-control.js?v=9.5.70',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.64',
@@ -281,16 +281,16 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.13"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.13/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.94["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.94["']/);
+  assert.match(app, /const VERSION=["']9\.5\.95["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.95["']/);
 });
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.94'));
-  assert.ok(index.includes('app.js?v=9.5.94'));
-  assert.ok(sw.includes('./style.css?v=9.5.94'));
-  assert.ok(sw.includes('./app.js?v=9.5.94'));
+  assert.ok(index.includes('style.css?v=9.5.95'));
+  assert.ok(index.includes('app.js?v=9.5.95'));
+  assert.ok(sw.includes('./style.css?v=9.5.95'));
+  assert.ok(sw.includes('./app.js?v=9.5.95'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
