@@ -808,7 +808,7 @@
     const hasSettlement=isRetail&&(state.admin||isAssigned);
     const hasSales=!isRetail&&(state.admin||can('ventas','ver'));
     const hasFinance=hasExpenses||hasReinvestments;
-    if(!hasFinance&&!hasSales&&!hasSettlementreturn true;
+    if(!hasFinance&&!hasSales&&!hasSettlement)return true;
     const sessionId=detail.sesion.id;
     let financeData={},salesData={},settlement=null;
     if(hasFinance){
