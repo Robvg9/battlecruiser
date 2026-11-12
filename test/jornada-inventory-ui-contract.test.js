@@ -15,8 +15,8 @@ const warehouses = fs.readFileSync("public/js/almacenes.js", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261111031000_bc_jornada_current_inventory_and_unit_base.sql", "utf8");
 
 test("M53 9.5.96 loads and is cached with one shared build key", () => {
-  assert.match(app, /const VERSION="9\\.5\\.96"/);
-  assert.match(sw, /BC_SW_VERSION = "9\\.5\\.96"/);
+  assert.match(app, /const VERSION="9\.5\.96"/);
+  assert.match(sw, /BC_SW_VERSION = "9\.5\.96"/);
   assert.match(app, /\["m53-inventario-centro\.js","53\.9"\]/);
   assert.match(sw, /\.\/js\/m53-inventario-centro\.js\?v=53\.9/);
   assert.match(m53, /M53\.9/);
