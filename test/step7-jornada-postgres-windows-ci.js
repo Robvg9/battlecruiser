@@ -295,6 +295,12 @@ function applySql(file) {
     applySql("supabase/migrations/20261101005329_fix_turno_admin_permission_boundary.sql");
     applySql("supabase/migrations/20261101041610_legacy_turno_jornada_reconciliation_20261101.sql");
     applySql("supabase/migrations/20261101044403_allow_overdue_next_legacy_session_20261101.sql");
+    log("\\r\\n=== Apply La Cueva finance and reinvestment request rules before Day 2 cash handover ===");
+    applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
+    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
+    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
+    log("\\r\\n=== Create and approve the disposable Day 2 finance records before the owner cash-count contract ===");
+    applySql("test/step7-jornada-finanzas-contract.sql");
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation and overdue-start guard ===");
     applySql("test/turno-cash-handover-contract.sql");
     applySql("test/legacy-session-overdue-contract.sql");
@@ -305,13 +311,8 @@ function applySql(file) {
 
     log("\\r\\n=== 15/15 Verify shared receipt, owner decision, retry, next-day reuse, legacy recovery and ACL ===");
     applySql("test/step4-jornada-shared-inventory-contract.sql");
-    log("\\r\\n=== La Cueva period migration and inventory-delta settlement contract ===");
-    applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
-    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
-    log("\\r\\n=== Apply final reinvestment approval gate after all Jornada approval migrations ===");
-    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
-    log("\\r\\n=== Verify idempotent finance writes and reinvestment approval effects ===");
-    applySql("test/step7-jornada-finanzas-contract.sql");
+    log("\\r\\n=== Enforce the final retail Jornada close gate and run full La Cueva settlement ===");
+    applySql("supabase/migrations/20261112133100_jornada_close_gate_integral.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
   } catch (error) {
