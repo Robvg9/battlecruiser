@@ -69,11 +69,28 @@ BEGIN
   -- Seed the persisted staff declaration in the disposable fixture. Production
   -- writes this row through bc_declarar_dinero; the Step 7 harness does not load
   -- that legacy RPC, so test the owner-count contract against its real row shape.
-  INSERT INTO public.turno_declaraciones(
-    turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,estado_aprobacion
-  )
-  VALUES(v_turno,v_day2,v_tramo2,v_owner,100::numeric,'CUP','PENDIENTE')
-  RETURNING id INTO v_decl2;
+  -- The finance contract may have already created the one-per-tranche cash declaration
+  -- to verify Jornada readback. Reuse that fixture row instead of violating the unique tranche key.
+  SELECT id INTO v_decl2
+  FROM public.turno_declaraciones
+  WHERE turno_tramo_id=v_tramo2
+  ORDER BY declarado_at DESC,created_at DESC
+  LIMIT 1;
+  IF v_decl2 IS NULL THEN
+    INSERT INTO public.turno_declaraciones(
+      turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,estado_aprobacion
+    )
+    VALUES(v_turno,v_day2,v_tramo2,v_owner,100::numeric,'CUP','PENDIENTE')
+    RETURNING id INTO v_decl2;
+  ELSE
+    DELETE FROM public.turno_diferencias WHERE declaracion_dinero_id=v_decl2;
+    UPDATE public.turno_declaraciones
+    SET monto=100::numeric,moneda='CUP',declarado_at=now(),
+        estado_aprobacion='PENDIENTE',aprobado_por=NULL,aprobado_at=NULL,
+        monto_contado=NULL,contado_por=NULL,contado_at=NULL,
+        observacion_conteo=NULL,diferencia=NULL
+    WHERE id=v_decl2;
+  END IF;
   BEGIN
     PERFORM public.bc5_contar_dinero_entregado(v_decl2,92::numeric,'Conteo antes del cierre');
   EXCEPTION WHEN check_violation THEN v_error:=true;

@@ -288,7 +288,6 @@ function applySql(file) {
     log("\r\n=== 8/9 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
     log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
-    applySql("test/step7-jornada-finanzas-contract.sql");
     log("\\r\\n=== 10/11 Verify cash handover fixture and authenticated RLS dependency ===");
     applySql("test/turno-cash-handover-fixture.sql");
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
@@ -296,19 +295,25 @@ function applySql(file) {
     applySql("supabase/migrations/20261101005329_fix_turno_admin_permission_boundary.sql");
     applySql("supabase/migrations/20261101041610_legacy_turno_jornada_reconciliation_20261101.sql");
     applySql("supabase/migrations/20261101044403_allow_overdue_next_legacy_session_20261101.sql");
+    log("\\r\\n=== Apply shared inventory read helpers needed by the Jornada finance workspace ===");
+    applySql("supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql");
+    applySql("supabase/migrations/20261112133200_jornada_handover_after_period_end.sql");
+    applySql("supabase/migrations/20261112133300_jornada_turn_master_approval.sql");
+    applySql("supabase/migrations/20261112133400_jornada_owner_turn_approval_source.sql");
+    applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
+    log("\\r\\n=== Apply La Cueva finance and reinvestment request rules before Day 2 cash handover ===");
+    applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
+    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
+    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
+    log("\\r\\n=== Create and approve the disposable Day 2 finance records before the owner cash-count contract ===");
+    applySql("test/step7-jornada-finanzas-contract.sql");
     log("\\r\\n=== 11/13 Apply audited legacy-session reconciliation and overdue-start guard ===");
     applySql("test/turno-cash-handover-contract.sql");
     applySql("test/legacy-session-overdue-contract.sql");
-    log("\\r\\n=== 13/15 Apply Step 4 shared inventory handover after legacy guards ===");
-    applySql("supabase/migrations/20261102144658_step4_shared_jornada_inventory_handover.sql");
-    log("\\r\\n=== 14/15 Apply Step 4 shared inventory foreign-key indexes ===");
-    applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
-
     log("\\r\\n=== 15/15 Verify shared receipt, owner decision, retry, next-day reuse, legacy recovery and ACL ===");
     applySql("test/step4-jornada-shared-inventory-contract.sql");
-    log("\\r\\n=== La Cueva period migration and inventory-delta settlement contract ===");
-    applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
-    applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
+    log("\\r\\n=== Enforce the final retail Jornada close gate and run full La Cueva settlement ===");
+    applySql("supabase/migrations/20261112133100_jornada_close_gate_integral.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
   } catch (error) {

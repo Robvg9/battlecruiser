@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.18 — acceso a jornada activa, declaración de efectivo y UX de inventario.
+// v7.20 — dinero diario unificado dentro del cierre de jornada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,inventorySettlement:null,currentSession:null};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -275,8 +275,8 @@
     if(calendar)calendar.scrollIntoView({behavior:'smooth',block:'start'});
   }
   function activateWorkspaceTab(name){
-    const allowed=['inventario','operacion','finanzas','movimientos'];
-    const tab=allowed.includes(name)?name:'inventario';
+    const allowed=['inventario','operacion','movimientos'];
+    const tab=allowed.includes(name)?name:(name==='finanzas'?'operacion':'inventario');
     state.workspaceTab=tab;
     const body=$('bc7-workspace-body');if(!body)return;
     body.querySelectorAll('[data-bc7-workspace-tab]').forEach(button=>{
@@ -285,7 +285,10 @@
       button.classList.toggle('active',active);
     });
     body.querySelectorAll('[data-bc7-workspace-panel]').forEach(panel=>{panel.hidden=panel.getAttribute('data-bc7-workspace-panel')!==tab;});
-    if(tab==='finanzas'&&state.detail)loadFinances(state.detail);
+    if(tab==='operacion'&&state.detail){
+      loadCashDaysWorkspace(state.detail);
+      loadFinances(state.detail);
+    }
     if(tab==='movimientos'&&state.detail)loadMovements(state.detail);
   }
   function fillWarehouses(){
@@ -449,7 +452,7 @@
     const opened=await openWorkspace(sessionId);
     if(opened&&finance){
       activateWorkspaceTab('finanzas');
-      const target=$('bc7-daily-cash-list')||document.querySelector('[data-bc7-workspace-panel="finanzas"]');
+      const target=document.querySelector('[data-bc7-workspace-panel="finanzas"]');
       if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
     }
     return opened;
@@ -462,36 +465,15 @@
     const showExpenses=state.admin||isAssigned;
     const showReinvestments=state.admin||isAssigned;
     const showSales=!isRetail&&(state.admin||can('ventas','ver'));
-    const showDailyCash=isRetail&&(state.admin||isAssigned);
     const showSettlement=isRetail&&(state.admin||isAssigned);
     const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
     const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
-    const lastDate=String(detail.sesion.fecha_fin||detail.sesion.fecha||'').slice(0,10);
-    const firstDate=String(detail.sesion.fecha||'').slice(0,10);
-    const dailyCashEnd=addDays(lastDate,-1);
-    const hasDailyDates=dailyCashEnd>=firstDate;
-    const today=dateHavana();
-    const defaultDailyDate=today<firstDate?firstDate:today>dailyCashEnd?dailyCashEnd:today;
-    const createDailyCash=isRetail&&hasDailyDates&&isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo;
     const manageSalary=isRetail&&isOwner;
-    if(!showExpenses&&!showReinvestments&&!showSales&&!showDailyCash&&!showSettlement&&!createExpenses&&!createReinvestments&&!createDailyCash&&!manageSalary)return '';
+    if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments&&!manageSalary)return '';
     let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
     if(isRetail){
       html+='<p class="bc7-muted">La Cueva calcula las unidades vendidas por diferencia entre inventarios y movimientos aprobados. No utiliza ventas individuales de POS ni reparte existencias por sabores.</p>';
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
-      if(showDailyCash)html+='<div id="bc7-daily-cash-list"><div class="bc7-empty">Consultando entregas diarias…</div></div>';
-      if(createDailyCash){
-        html+='<p class="bc7-muted">En jornadas de varios días, registra aquí el dinero de cada día anterior al último. El importe del último día se declara en Operación → Dinero entregado.</p>'+
-          '<form data-bc7-daily-cash-form="'+esc(sessionId)+'"><h4>Registrar dinero recogido del día</h4>'+
-          '<input type="hidden" data-bc7-daily-cash-key value="">'+
-          '<div class="bc7-grid"><label class="bc7-field">Fecha<input data-bc7-daily-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(dailyCashEnd)+'" value="'+esc(defaultDailyDate)+'" required></label>'+
-          '<label class="bc7-field">Dinero recogido (CUP)<input data-bc7-daily-cash-amount type="number" min="0" step="0.01" required inputmode="decimal" placeholder="0.00"></label></div>'+
-          '<label class="bc7-field">Observación (opcional)<input data-bc7-daily-cash-note maxlength="500" placeholder="Entrega, comprobantes o aclaración"></label>'+
-          '<p class="bc7-muted">La entrega queda pendiente hasta que el Dueño compruebe y apruebe el importe. No modifica caja mientras esté pendiente.</p>'+
-          '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar entrega diaria</button></div><p class="bc7-msg" data-bc7-daily-cash-msg></p></form>';
-      }else if(isRetail&&isAssigned&&status==='EN_CURSO'&&!hasDailyDates){
-        html+='<p class="bc7-muted">El período tiene una sola fecha. El dinero de ese día se declara en el cierre final de la jornada.</p>';
-      }
       if(manageSalary){
         html+='<form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
           '<div class="bc7-grid"><label class="bc7-field">Porcentaje sobre venta comprobada<input data-bc7-salary-percent type="number" min="0" max="100" step="0.001" inputmode="decimal" placeholder="Configurar porcentaje"></label></div>'+
@@ -501,7 +483,6 @@
     }else{
       html+='<p class="bc7-muted">Las ventas se muestran solo cuando están vinculadas al ID exacto de esta jornada. El efectivo declarado y contado se presenta por separado.</p>';
     }
-    html+=cashDeclarationHtml(detail);
     if(showSales)html+='<div id="bc7-sales-list"><div class="bc7-empty">Consultando ventas vinculadas a esta jornada…</div></div>';
     if(showExpenses)html+='<div id="bc7-expenses-list"><div class="bc7-empty">Consultando gastos…</div></div>';
     if(showReinvestments)html+='<div id="bc7-reinvestments-list"><div class="bc7-empty">Consultando reinversiones…</div></div>';
@@ -524,6 +505,178 @@
         '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>';
     }
     return html+'</section>';
+  }
+  function cashDaysManagerShellHtml(detail,isAssigned,status){
+    if(!detail||detail.sesion?.es_minorista!==true)return '';
+    return '<section class="bc7-jornada" id="bc7-cash-days-manager"><h4>Dinero recogido · todos los días</h4>'+
+      '<p class="bc7-muted">Registra aquí el dinero de cada fecha, incluido el último día. Escribe 0 cuando no se haya recogido efectivo. No necesitas salir de esta jornada.</p>'+
+      '<div id="bc7-cash-days-list"><div class="bc7-empty">Consultando los importes del período…</div></div>'+
+      '<p class="bc7-msg" id="bc7-cash-days-msg"></p></section>';
+  }
+  function renderCashDaysWorkspace(detail){
+    const host=$('bc7-cash-days-list');
+    if(!host||!detail||detail.sesion?.es_minorista!==true)return;
+    const sessionId=String(detail.sesion.id||'');
+    if(state.dailyCashSessionId!==sessionId||!state.dailyCashData){
+      host.innerHTML='<div class="bc7-empty">Consultando los importes del período…</div>';return;
+    }
+    const firstDate=String(detail.sesion.fecha||'').slice(0,10);
+    const lastDate=String(detail.sesion.fecha_fin||state.dailyCashData.fecha_fin||detail.sesion.fecha||'').slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(firstDate)||!/^\d{4}-\d{2}-\d{2}$/.test(lastDate)||lastDate<firstDate){
+      host.innerHTML='<div class="bc7-empty">No se pudo determinar el período de la jornada. Actualiza el detalle antes de registrar el dinero.</div>';return;
+    }
+    const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));
+    const editable=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO'&&!!detail.tramo_activo;
+    const rows=arr(state.dailyCashData.entregas);
+    const declaration=detail.declaracion_dinero||null;
+    const tramoId=detail.tramo_activo?.id;
+    const finalSaved=!!declaration&&(!tramoId||String(declaration.turno_tramo_id)===String(tramoId));
+    const today=dateHavana();
+    let html='<div class="bc7-list">';
+    for(let index=0;index<totalDays;index++){
+      const date=addDays(firstDate,index),isFinal=date===lastDate;
+      const row=rows.find(item=>String(item.fecha||'').slice(0,10)===date);
+      const rejected=!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
+      html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><div><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong></div>';
+      if(isFinal&&finalSaved){
+        html+='<span class="bc7-pill ok">Declarado</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Entregado</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(declaration.estado_aprobacion||'ESPERANDO_APROBACION'))+'</p>';
+      }else if(!isFinal&&row&&!rejected){
+        const status=String(row.estado||'PENDIENTE').toUpperCase();
+        const amount=status==='APROBADA'&&row.monto_aprobado!=null?row.monto_aprobado:row.monto_declarado;
+        html+='<span class="bc7-pill '+(status==='APROBADA'?'ok':'')+'">'+esc(humanStatus(status))+'</span></div><p><b>'+esc(money(amount))+' CUP</b>'+(row.creado_nombre?' · '+esc(row.creado_nombre):'')+'</p>'+(row.observacion?'<p class="bc7-muted">'+esc(row.observacion)+'</p>':'')+(row.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(row.comentario_revision)+'</p>':'');
+      }else if(editable&&(isFinal||date<=today)){
+        html+='<span class="bc7-pill '+(rejected?'warn':'')+'">'+(rejected?'Rechazada · corregir':'Pendiente')+'</span></div><div class="bc7-grid"><label class="bc7-field">Dinero recogido (CUP)<input '+(isFinal?'id="bc7-cash"':'data-bc7-cash-day-amount')+' type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="'+(rejected?esc(isFinal?declaration?.monto:row.monto_declarado):'')+'"></label>';
+        if(!isFinal)html+='<label class="bc7-field">Observación (opcional)<input data-bc7-cash-day-note maxlength="500" value="'+(rejected?esc(row.observacion||''):'')+'" placeholder="Aclaración de la entrega"></label><input type="hidden" data-bc7-cash-day-key value="">';
+        html+='</div>';
+      }else{
+        html+='<span class="bc7-pill">No registrado</span></div><p class="bc7-muted">'+(date>today?'Este día todavía no se puede declarar.':'No hay importe registrado para esta fecha.')+'</p>';
+      }
+      html+='</article>';
+    }
+    host.innerHTML=html;
+    const saveButton=document.querySelector('[data-bc7-save-cash-days]');
+    if(saveButton)saveButton.disabled=!editable;
+  }
+  async function loadCashDaysWorkspace(detail){
+    const host=$('bc7-cash-days-list');
+    if(!host||!detail||detail.sesion?.es_minorista!==true)return;
+    const sessionId=String(detail.sesion.id||'');
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    if(!state.admin&&!isAssigned){
+      host.innerHTML='<div class="bc7-empty">No tienes acceso a los importes de esta jornada.</div>';return;
+    }
+    host.innerHTML='<div class="bc7-empty">Consultando los importes del período…</div>';
+    try{
+      const data=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
+      state.dailyCashData=data;
+      state.dailyCashSessionId=sessionId;
+      renderCashDaysWorkspace(detail);
+    }catch(e){
+      host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún importe.</div>';
+    }
+  }
+  async function saveCashDaysWorkspace(form,options){
+    options=options||{};
+    if(!form||!state.detail)return false;
+    const detail=state.detail,sessionId=String(form.dataset.bc7CloseForm||detail.sesion?.id||'');
+    const message=form.querySelector('#bc7-cash-days-msg')||$('bc7-cash-days-msg');
+    const saveButton=form.querySelector('[data-bc7-save-cash-days]');
+    const firstDate=String(detail.sesion?.fecha||'').slice(0,10);
+    const lastDate=String(detail.sesion?.fecha_fin||state.dailyCashData?.fecha_fin||detail.sesion?.fecha||'').slice(0,10);
+    const entries=arr(state.dailyCashData?.entregas);
+    const declaration=detail.declaracion_dinero||null;
+    const trancheId=detail.tramo_activo?.id;
+    const finalSaved=!!declaration&&(!trancheId||String(declaration.turno_tramo_id)===String(trancheId));
+    const days=Array.from(form.querySelectorAll('[data-bc7-cash-day-row]'));
+    const operations=[],missing=[];
+    for(const day of days){
+      const date=String(day.dataset.bc7CashDate||'');
+      const isFinal=date===lastDate;
+      if(isFinal&&finalSaved)continue;
+      const old=entries.find(item=>String(item.fecha||'').slice(0,10)===date);
+      const oldRejected=old&&String(old.estado||'').toUpperCase()==='RECHAZADA';
+      if(!isFinal&&old&&!oldRejected)continue;
+      const amountInput=isFinal?day.querySelector('#bc7-cash'):day.querySelector('[data-bc7-cash-day-amount]');
+      const raw=amountInput?.value.trim()??'';
+      if(raw===''){
+        if(options.requireComplete)missing.push(fmtDateHuman(date));
+        continue;
+      }
+      const amount=Number(raw);
+      if(!Number.isFinite(amount)||amount<0){
+        msg(message,'Revisa los importes: todos deben ser números iguales o mayores que cero.','error');return false;
+      }
+      if(!isFinal&&date>dateHavana()){
+        msg(message,'No puedes declarar efectivo para una fecha futura.','error');return false;
+      }
+      operations.push({
+        date,isFinal,amount,
+        note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,
+        keyField:day.querySelector('[data-bc7-cash-day-key]')
+      });
+    }
+    if(options.requireComplete&&missing.length){
+      msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Escribe 0 cuando no se haya recogido dinero.','error');return false;
+    }
+    if(!operations.length){
+      if(options.requireComplete&&finalSaved&&days.every(day=>{
+        const date=String(day.dataset.bc7CashDate||'');
+        if(date===lastDate)return true;
+        const old=entries.find(item=>String(item.fecha||'').slice(0,10)===date);
+        return !!old&&String(old.estado||'').toUpperCase()!=='RECHAZADA';
+      })){
+        msg(message,'Todos los importes diarios ya están guardados y confirmados.','ok');return true;
+      }
+      if(options.requireComplete&&finalSaved)return true;
+      msg(message,'Introduce al menos un importe pendiente para guardar.','error');return false;
+    }
+    if(!navigator.onLine){
+      msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;
+    }
+    if(!options.skipConfirm&&!confirm('Se guardarán los importes introducidos para cada fecha. Las entregas quedarán registradas para revisión del Dueño y no modificarán caja automáticamente. ¿Confirmas?'))return false;
+    if(!busy(saveButton,true))return false;
+    const dailySubmitted=[];
+    try{
+      for(const operation of operations.filter(item=>!item.isFinal)){
+        let key=operation.keyField?.value.trim()||'';
+        if(!key){key=freshIdempotencyKey();if(operation.keyField)operation.keyField.value=key;}
+        const id=await rpc('bc7_registrar_entrega_diaria_jornada',{
+          p_turno_sesion_id:sessionId,p_fecha:operation.date,p_monto:operation.amount,
+          p_observacion:operation.note,p_idempotency_key:key
+        });
+        dailySubmitted.push({date:operation.date,amount:operation.amount,id:id?String(id):''});
+      }
+      if(dailySubmitted.length){
+        const reread=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
+        const readRows=arr(reread.entregas);
+        const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>
+          String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)
+        ));
+        if(missingRows.length)throw new Error('El servidor no confirmó la lectura de '+missingRows.map(x=>fmtDateHuman(x.date)).join(', ')+'. Conservé las claves para evitar duplicados.');
+        state.dailyCashData=reread;
+        state.dailyCashSessionId=sessionId;
+      }
+      const finalOperation=operations.find(item=>item.isFinal);
+      if(finalOperation){
+        const finalInput=form.querySelector('#bc7-cash');
+        if(finalInput)finalInput.value=String(finalOperation.amount);
+        const saved=await saveCashDeclaration(form,true,true);
+        if(!saved)throw new Error('No se confirmó la declaración del último día. Conservé los importes anteriores y no repetí la escritura.');
+        await loadCashDaysWorkspace(state.detail);
+      }else if(dailySubmitted.length){
+        renderCashDaysWorkspace(state.detail);
+      }
+      msg($('bc7-cash-days-msg')||message,'Importes guardados y confirmados desde el servidor. Cada día conserva su registro y estado de revisión.','ok');
+      setStatus('Dinero diario actualizado para '+operations.length+' día(s).','ok');
+      return true;
+    }catch(e){
+      msg($('bc7-cash-days-msg')||message,friendlyError(e,'create')+' '+String(e&&e.message||'')+' Las claves de idempotencia se conservaron para evitar duplicados.','error');
+      setStatus('No se pudo confirmar todos los importes diarios.','error');
+      return false;
+    }finally{
+      busy(saveButton,false);
+    }
   }
   function cashDeclarationHtml(detail){
     const d=detail&&detail.declaracion_dinero;
@@ -649,17 +802,17 @@
       '<p class="bc7-muted">Este desglose informa los importes registrados por método de pago. No equivale al efectivo esperado ni sustituye la declaración y el conteo físico.</p>';
   }
   async function loadFinances(detail){
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'');
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===String(detail.sesion.id||'');
     const isRetail=detail.sesion.es_minorista===true;
     const hasExpenses=state.admin||isAssigned;
     const hasReinvestments=state.admin||isAssigned;
-    const hasDailyCash=isRetail&&(state.admin||isAssigned);
     const hasSettlement=isRetail&&(state.admin||isAssigned);
     const hasSales=!isRetail&&(state.admin||can('ventas','ver'));
     const hasFinance=hasExpenses||hasReinvestments;
-    if(!hasFinance&&!hasSales&&!hasDailyCash&&!hasSettlement)return true;
+    if(!hasFinance&&!hasSales&&!hasSettlement)return true;
     const sessionId=detail.sesion.id;
-    let financeData={},salesData={},dailyData=null,settlement=null;
+    let financeData={},salesData={},settlement=null;
     if(hasFinance){
       try{financeData=await rpc('bc7_finanzas_jornada',{p_turno_sesion_id:sessionId})||{};}
       catch(e){
@@ -674,17 +827,6 @@
         renderSalesLedger($('bc7-sales-list'),salesData);
       }catch(e){
         if($('bc7-sales-list'))msg($('bc7-sales-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
-      }
-    }
-    if(hasDailyCash){
-      try{
-        dailyData=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
-        state.dailyCashData=dailyData;
-        renderDailyCash($('bc7-daily-cash-list'),dailyData);
-        const rateInput=document.querySelector('[data-bc7-salary-percent]');
-        if(rateInput&&document.activeElement!==rateInput)rateInput.value=dailyData.salario_porcentaje==null?'':String(dailyData.salario_porcentaje);
-      }catch(e){
-        if($('bc7-daily-cash-list'))msg($('bc7-daily-cash-list'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
       }
     }
     if(hasSettlement){
@@ -763,36 +905,6 @@
     }finally{busy(btn,false);}
   }
 
-  async function submitDailyCash(form){
-    const sessionId=form.dataset.bc7DailyCashForm;
-    const date=form.querySelector('[data-bc7-daily-cash-date]')?.value;
-    const rawAmount=form.querySelector('[data-bc7-daily-cash-amount]')?.value;
-    const amount=Number(rawAmount);
-    const note=form.querySelector('[data-bc7-daily-cash-note]')?.value.trim()||null;
-    const keyField=form.querySelector('[data-bc7-daily-cash-key]');
-    const message=form.querySelector('[data-bc7-daily-cash-msg]');
-    if(!sessionId||!date||rawAmount===''||!Number.isFinite(amount)||amount<0){
-      msg(message,'Indica una fecha válida y un importe igual o mayor que cero.','error');return;
-    }
-    if(!keyField){msg(message,'Falta la referencia segura de esta entrega. Actualiza la jornada.','error');return;}
-    let key=keyField.value.trim();
-    try{if(!key){key=freshIdempotencyKey();keyField.value=key;}}
-    catch(e){msg(message,e.message||'No se pudo preparar la entrega.','error');return;}
-    const btn=form.querySelector('button[type="submit"]');
-    if(!busy(btn,true))return;
-    try{
-      await rpc('bc7_registrar_entrega_diaria_jornada',{
-        p_turno_sesion_id:sessionId,p_fecha:date,p_monto:amount,
-        p_observacion:note,p_idempotency_key:key
-      });
-      await loadFinances(state.detail);
-      form.reset();keyField.value='';
-      msg(message,'Entrega diaria registrada y visible. Queda pendiente de aprobación del Dueño.','ok');
-      setStatus('Dinero recogido guardado para '+fmtDateHuman(date)+'. No se modificó caja.','ok');
-    }catch(e){
-      msg(message,friendlyError(e,'create')+' La referencia se conserva para poder comprobar o reintentar sin duplicar.','error');
-    }finally{busy(btn,false);}
-  }
   async function submitSalaryRate(form){
     const sessionId=form.dataset.bc7SalaryRateForm;
     const input=form.querySelector('[data-bc7-salary-percent]');
@@ -936,38 +1048,53 @@
     const currentUserId=String(currentUser()?.id||'');
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const isAssigned=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
+    const tramo=detail.tramo_activo;
     let actionArea='';
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
+    }else if(status==='EN_CURSO'&&s.es_minorista===true){
+      actionArea='<div class="bc7-note"><b>Dinero recogido y cierre de jornada.</b><p>Registra el importe de cada día en esta misma pantalla. Los días anteriores quedan como entregas diarias; el último día se guarda como declaración final. No tienes que cambiar de sección.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
+        cashDaysManagerShellHtml(detail,isAssigned,status)+
+        '<label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label>'+
+        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>Finalizar jornada</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
     }else if(status==='EN_CURSO'){
-      const tramo=detail.tramo_activo,saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
+      const saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
       actionArea='<div class="bc7-note"><b>Dinero entregado y cierre.</b><p>Registra el importe real que entregas al Dueño. Puedes guardar el dinero ahora; la jornada seguirá abierta hasta confirmar el inventario final. El administrador lo contará después del cierre.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
+    }else if(status==='COMPLETADA'&&s.es_minorista===true){
+      actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
     }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
     else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos);
-      const adjustmentStorageType=can('bajas','crear')?'baja':'merma';
-      adjustment='<details class="bc7-detail"><summary><span>Registrar baja</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'"><input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'"><div class="bc7-grid"><label class="bc7-field">Causa de la baja<select data-bc7-ajust-cause required><option value="">Selecciona una causa</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar baja a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
+      const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
+      const adjustmentStorageType=canCreateBaja?'baja':'merma';
+      const adjustmentTitle=canCreateBaja&&canCreateMerma?'Registrar baja o merma':(canCreateBaja?'Registrar baja':'Registrar merma');
+      const adjustmentTypeField=canCreateBaja&&canCreateMerma
+        ?'<label class="bc7-field">Tipo de ajuste<select data-bc7-ajust-type required><option value="baja">Baja de inventario</option><option value="merma">Merma</option></select></label>'
+        :'<input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'">';
+      adjustment='<details class="bc7-detail"><summary><span>'+adjustmentTitle+'</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'">'+adjustmentTypeField+'<div class="bc7-grid"><label class="bc7-field">Motivo<select data-bc7-ajust-cause required><option value="">Selecciona un motivo</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar ajuste a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
-    const op='<div class="bc7-panel-stack">'+actionArea+adjustment+'</div>';
     const fin=financeFormHtml(detail,isAssigned,status);
+    const op='<div class="bc7-panel-stack">'+actionArea+fin+adjustment+'</div>';
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
     $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
-    $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="finanzas" aria-selected="false">Finanzas</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="finanzas" hidden>'+fin+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
+    $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
     $('bc7-workspace').hidden=false;setPageMode(true);$('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
     activateWorkspaceTab(state.workspaceTab);
   }
   async function openWorkspace(sessionId){
     if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
-    if(String(state.selected||'')!==String(sessionId||''))state.workspaceTab='inventario';
+    const isNewSelection=String(state.selected||'')!==String(sessionId||'');
+    if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;}
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{
       const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
       detail.entrega_compartida=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
       detail.is_admin=!!state.admin;
+      if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
     }catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
   }
@@ -1131,8 +1258,8 @@
     }
     finally{busy(btn,false);}
   }
-  async function saveCashDeclaration(form){
-    if(!form)return;
+  async function saveCashDeclaration(form,skipConfirm,alreadyBusy){
+    if(!form)return false;
     const sessionId=form.dataset.bc7CloseForm;
     const tramo=state.detail&&state.detail.tramo_activo;
     const tramoId=tramo&&tramo.id;
@@ -1140,45 +1267,90 @@
     const raw=input?input.value.trim():'';
     const amount=Number(raw);
     const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    const message=form.querySelector('[data-bc7-close-msg]');
-    if(saved){msg(message,'El dinero ya está guardado. Puedes finalizar cuando el inventario final esté confirmado.','ok');return;}
-    if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return;}
-    if(raw===''||!Number.isFinite(amount)||amount<0){msg(message,'Introduce el importe real entregado, igual o mayor que cero.','error');return;}
-    if(!confirm('Se guardará la declaración de efectivo de esta jornada, pero la jornada seguirá abierta. El administrador lo contará después del cierre. ¿Confirmas?'))return;
-    const btn=form.querySelector('[data-bc7-save-cash]');
-    if(!busy(btn,true))return;
+    const message=form.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg');
+    if(saved){msg(message,'El dinero del último día ya está guardado.','ok');return true;}
+    if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return false;}
+    if(raw===''||!Number.isFinite(amount)||amount<0){msg(message,'Introduce el importe real entregado del último día, igual o mayor que cero.','error');return false;}
+    if(!skipConfirm&&!confirm('Se guardará la declaración de efectivo del último día. La jornada seguirá abierta hasta confirmar el inventario final. ¿Confirmas?'))return false;
+    const btn=form.querySelector('[data-bc7-save-cash]')||form.querySelector('[data-bc7-save-cash-days]');
+    if(!alreadyBusy&&!busy(btn,true))return false;
     try{
       await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:amount});
       const reread=await openWorkspace(sessionId);
-      if(!reread||!state.detail?.declaracion_dinero||String(state.detail.declaracion_dinero.turno_tramo_id)!==String(tramoId)){
-        throw new Error('El servidor no confirmó la declaración al volver a consultar. No repitas el envío todavía.');
+      if(!reread||!state.detail?.declaracion_dinero||String(state.detail.declaracion_dinero.turno_tramo_id)!==String(tramoId)||Number(state.detail.declaracion_dinero.monto)!==amount){
+        throw new Error('El servidor no confirmó la declaración del último día al volver a consultar. No repitas el envío todavía.');
       }
-      setStatus('Dinero entregado guardado. La jornada sigue abierta hasta confirmar el inventario final.','ok');
-      msg(document.querySelector('[data-bc7-close-msg]'),'Declaración guardada. El Dueño podrá contar el efectivo después.','ok');
+      setStatus('Dinero del último día guardado. La jornada sigue abierta hasta confirmar el inventario final.','ok');
+      msg(document.querySelector('[data-bc7-close-msg]')||document.querySelector('#bc7-cash-days-msg'),'Declaración del último día guardada. El Dueño podrá contar el efectivo después.','ok');
+      return true;
     }catch(e){
       try{
         const reread=await openWorkspace(sessionId);
-        if(reread&&state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)){
-          setStatus('Declaración confirmada al volver a consultar. No se repitió la escritura.','ok');
-          msg(document.querySelector('[data-bc7-close-msg]'),'El importe quedó guardado correctamente.','ok');
-          return;
+        if(reread&&state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&Number(state.detail.declaracion_dinero.monto)===amount){
+          setStatus('Declaración del último día confirmada al volver a consultar. No se repitió la escritura.','ok');
+          msg(document.querySelector('[data-bc7-close-msg]')||document.querySelector('#bc7-cash-days-msg'),'El importe del último día quedó guardado correctamente.','ok');
+          return true;
         }
       }catch(_){}
-      msg(document.querySelector('[data-bc7-close-msg]')||message,friendlyError(e,'create')+' No repitas el envío hasta comprobar el estado.','error');
-      setStatus('No se pudo confirmar la declaración de dinero.','error');
-    }finally{busy(btn,false);}
+      msg(document.querySelector('[data-bc7-close-msg]')||document.querySelector('#bc7-cash-days-msg')||message,friendlyError(e,'create')+' No repitas el envío hasta comprobar el estado.','error');
+      setStatus('No se pudo confirmar la declaración del último día.','error');
+      return false;
+    }finally{if(!alreadyBusy)busy(btn,false);}
   }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
     let amount=$('bc7-cash')?.value.trim();
-    const msgEl=form.querySelector('[data-bc7-close-msg]');
+    let msgEl=form.querySelector('[data-bc7-close-msg]');
+    const cashMode=form.dataset.bc7CashMode||'single';
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
+    if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
+    if(cashMode==='daily'){
+      const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true});
+      if(!savedAllDays)return;
+      form=document.querySelector('form[data-bc7-close-form]')||form;
+      msgEl=form.querySelector('[data-bc7-close-msg]')||msgEl;
+      if(!state.detail?.tramo_activo?.id){msg(msgEl,'No se encontró el tramo activo después de verificar los importes. La jornada no se ha cerrado.','error');return;}
+      const declaration=state.detail.declaracion_dinero;
+      if(!declaration||String(declaration.turno_tramo_id)!==String(state.detail.tramo_activo.id)){
+        msg(msgEl,'El importe del último día todavía no está confirmado por el servidor. La jornada no se ha cerrado.','error');return;
+      }
+      amount=String(declaration.monto);
+    }else{
+      amount=$('bc7-cash')?.value.trim();
+      const tramoId=state.detail.tramo_activo.id;
+      const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+      if(saved){amount=String(state.detail.declaracion_dinero.monto);}
+      if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
+    }
+    if(cashMode==='daily'){
+      let settlement;
+      try{
+        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId});
+      }catch(e){
+        msg(msgEl,'No se pudo verificar la liquidación antes del cierre. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
+        return;
+      }
+      const pending=settlement?.pendientes||{};
+      const blockers=[];
+      if(settlement?.aplica===false)blockers.push(settlement.motivo||'La liquidación no está disponible');
+      if(settlement?.faltan_cortes)blockers.push('falta confirmar el inventario final');
+      if(settlement?.salario_porcentaje==null)blockers.push('el Dueño debe configurar el porcentaje salarial');
+      if(Number(settlement?.familias_sin_precio||0)>0)blockers.push('hay productos sin precio válido');
+      if(Number(settlement?.familias_con_vendidas_negativas||0)>0)blockers.push('hay diferencias negativas de inventario por revisar');
+      if(Number(pending.gastos||0)>0)blockers.push('hay gastos pendientes de aprobación');
+      if(Number(pending.reinversiones||0)>0)blockers.push('hay reinversiones pendientes de aprobación');
+      if(Number(pending.ajustes||0)>0)blockers.push('hay mermas o bajas pendientes de aprobación');
+      if(Number(pending.entregas_diarias||0)>0)blockers.push('hay entregas diarias pendientes de aprobación');
+      if(Number(pending.entregas_diarias_faltantes||0)>0)blockers.push('faltan importes diarios');
+      if(blockers.length){
+        msg(msgEl,'No se puede finalizar todavía: '+blockers.join('; ')+'. La jornada sigue abierta.','error');
+        return;
+      }
+      // The Dueño may count and approve the final cash after the operational handover.
+    }
     const tramoId=state.detail.tramo_activo.id;
     const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    if(saved){amount=String(state.detail.declaracion_dinero.monto);}
-    if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
-    if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
-    const confirmation=saved?'La declaración de dinero ya está guardada. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador lo contará después del cierre. ¿Confirmas?';
+    const confirmation=saved?'Los importes de todos los días están guardados. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador lo contará después del cierre. ¿Confirmas?';
     if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
@@ -1227,16 +1399,17 @@
     const quantity=form.querySelector('[data-bc7-ajust-qty]').value;
     const msgEl=form.querySelector('[data-bc7-ajust-msg]');
     if(!cause||!product||!Number.isFinite(Number(quantity))||Number(quantity)<=0||(cause==='Otra causa'&&!detail)){
-      msg(msgEl,'Selecciona la causa y el producto, introduce una cantidad positiva y describe la otra causa cuando corresponda.','error');return;
+      msg(msgEl,'Selecciona el motivo y el producto, introduce una cantidad positiva y describe la otra causa cuando corresponda.','error');return;
     }
+    const operationLabel=storageType==='baja'?'baja':'merma';
     const reason=cause+(detail?' — '+detail:'');
-    if(!confirm('Se enviará una solicitud de BAJA por "'+cause+'" a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
+    if(!confirm('Se enviará una solicitud de '+operationLabel+' por "'+cause+'" a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
       await rpc('bc7_registrar_ajuste_jornada',{p_turno_sesion_id:sessionId,p_tipo:storageType,p_producto_id:product,p_cantidad:Number(quantity),p_motivo:reason,p_idempotency_key:crypto.randomUUID()});
-      msg(msgEl,'Solicitud de baja guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
+      msg(msgEl,'Solicitud de '+operationLabel+' guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
       form.reset();await openWorkspace(sessionId);
-    }catch(e){msg(msgEl,'No se registró la baja. '+friendlyError(e,'create'),'error');}
+    }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
   async function saveHours(form){
@@ -1392,6 +1565,7 @@
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
+    if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
@@ -1415,7 +1589,6 @@
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
-    else if(f.matches('[data-bc7-daily-cash-form]')){e.preventDefault();await submitDailyCash(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
   });
   document.addEventListener('change',function(e){

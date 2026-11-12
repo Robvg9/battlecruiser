@@ -35,7 +35,7 @@ DECLARE
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','gastos:crear,reinversiones:crear,gastos:ver,reinversiones:ver,ventas:crear,ventas:ver,turnos:ver',false);
+  PERFORM set_config('test.perms','gastos:crear,reinversiones:crear,reinversiones:editar_any,gastos:ver,reinversiones:ver,ventas:crear,ventas:ver,turnos:ver',false);
 
   -- Day 1 has already been physically counted and closed by step7-jornada-contract.sql.
   -- Move only the disposable fixture's historical date back one day, then create today's Day 2.
@@ -45,7 +45,7 @@ BEGIN
   IF v_final_id IS NULL THEN RAISE EXCEPTION 'FAIL: Day 1 final snapshot is missing'; END IF;
 
   UPDATE public.turnos SET dias_turno=2 WHERE id=v_turno;
-  UPDATE public.turno_jornada_programacion SET fecha=v_fecha_hoy-1 WHERE id=v_prog1;
+  UPDATE public.turno_jornada_programacion SET fecha=v_fecha_hoy-1,fecha_fin=v_fecha_hoy-1 WHERE id=v_prog1;
   UPDATE public.turno_sesiones SET fecha=v_fecha_hoy-1 WHERE id=v_day1;
 
   INSERT INTO public.turno_jornada_programacion(
@@ -211,7 +211,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: expense is not pending or carries incorrect jornada/legacy provenance';
   END IF;
 
-  -- Reinvestment reuses the established stock/FIFO/cash function and retains provider + master turn.
+  -- Reinvestment must remain pending: registration cannot touch stock, FIFO or cash.
   v_reinvestment:=public.bc7_registrar_reinversion_jornada(
     v_day2,
     jsonb_build_array(jsonb_build_object(
@@ -238,23 +238,54 @@ BEGIN
   IF v_count<>1 THEN RAISE EXCEPTION 'FAIL: duplicate reinvestment was created for one idempotency key'; END IF;
   IF NOT EXISTS(
     SELECT 1 FROM public.reinversiones
-    WHERE id=v_reinvestment AND proveedor='Proveedor de prueba'
+    WHERE id=v_reinvestment AND proveedor='Proveedor de prueba' AND estado='PENDIENTE'
       AND turno_id=v_turno AND turno_sesion_id=v_day2 AND turno_tramo_id=v_tramo
       AND sesion_id IS NULL AND ciclo_id IS NULL AND almacen_id=v_almacen
   ) THEN
-    RAISE EXCEPTION 'FAIL: reinvestment lost provider or correct session/tranche/master provenance';
+    RAISE EXCEPTION 'FAIL: reinvestment must be pending and retain provider/session/tranche/master provenance';
   END IF;
   IF (SELECT count(*) FROM public.reinversiones_lineas WHERE reinversion_id=v_reinvestment)<>1 THEN
     RAISE EXCEPTION 'FAIL: reinvestment detail line not persisted';
   END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_reinversion_jornada(
+      v_day2,
+      jsonb_build_array(jsonb_build_object(
+        'producto_id',v_jugo,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+        'cantidad_base',2,'costo_total',10
+      )),
+      '95000000-0000-0000-0000-000000000002',
+      'Proveedor de prueba'
+    );
+  EXCEPTION WHEN unique_violation THEN v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: reinvestment idempotency key was accepted with a different product payload';
+  END IF;
+
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen)<>v_before_pan THEN
+    RAISE EXCEPTION 'FAIL: registering a pending reinvestment changed stock before owner approval';
+  END IF;
+  IF (SELECT count(*) FROM public.lotes_compra WHERE usuario_id=v_owner AND origen='reinversion')<>0
+     OR (SELECT count(*) FROM public.movimientos_caja_fixture WHERE referencia_id=v_reinvestment)<>0 THEN
+    RAISE EXCEPTION 'FAIL: pending reinvestment created FIFO lots or a cash movement before owner approval';
+  END IF;
+
+  PERFORM public.resolver_aprobacion_operativa(
+    'reinversion',v_reinvestment,'APROBAR','Reinversión revisada y aprobada',NULL,NULL
+  );
+  IF NOT EXISTS(SELECT 1 FROM public.reinversiones WHERE id=v_reinvestment AND estado='APROBADA') THEN
+    RAISE EXCEPTION 'FAIL: owner approval did not mark the reinvestment as approved';
+  END IF;
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen)<>v_before_pan+2 THEN
-    RAISE EXCEPTION 'FAIL: reinvestment did not add stock exactly once';
+    RAISE EXCEPTION 'FAIL: approval did not add reinvestment stock exactly once';
   END IF;
   IF (SELECT count(*) FROM public.lotes_compra WHERE usuario_id=v_owner AND origen='reinversion')<>1 THEN
-    RAISE EXCEPTION 'FAIL: FIFO purchase lot was not created exactly once';
+    RAISE EXCEPTION 'FAIL: owner approval did not create exactly one FIFO purchase lot';
   END IF;
   IF (SELECT count(*) FROM public.movimientos_caja_fixture WHERE referencia_id=v_reinvestment)<>1 THEN
-    RAISE EXCEPTION 'FAIL: cash ledger integration did not create exactly one movement';
+    RAISE EXCEPTION 'FAIL: owner approval did not create exactly one cash movement';
   END IF;
 
   -- The assigned worker still needs turnos.ver to read or save Jornada inventory.
@@ -373,6 +404,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: finance RPC ACL grants do not match authenticated-only policy';
   END IF;
 
-  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward + Jornada sales: idempotent expense/reinvestment/sale, provider, stock/FIFO/cash, payment-method provenance, assigned-session scoped reads and immutable previous-day provenance';
+  RAISE NOTICE 'PASS Step 7 Finance + Carry-forward + Jornada sales: idempotent expense/reinvestment/sale, pending reinvestment owner approval, single stock/FIFO/cash application, payment-method provenance, assigned-session scoped reads and immutable previous-day provenance';
 END
 $finance$;

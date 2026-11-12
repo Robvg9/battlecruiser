@@ -9,23 +9,26 @@ test("Step 7 folds help/admin and keeps first view to the calendar",()=>{
  assert.match(ui,/function setPageMode\(workspace\)/);
  assert.match(ui,/admin\.hidden=!!workspace\|\|!state\.admin/);
 });
-test("opening one jornada exposes four task tabs",()=>{
+test("opening one jornada exposes the three task tabs and unifies cash/finance in Operation",()=>{
  assert.match(ui,/data-bc7-back-calendar/);
- for(const tab of ["inventario","operacion","finanzas","movimientos"]){
+ for(const tab of ["inventario","operacion","movimientos"]){
   assert.ok(ui.includes('data-bc7-workspace-tab="'+tab+'"'));
   assert.ok(ui.includes('data-bc7-workspace-panel="'+tab+'"'));
  }
+ assert.doesNotMatch(ui,/data-bc7-workspace-tab="finanzas"/);
  assert.match(ui,/activateWorkspaceTab\(state\.workspaceTab\)/);
+ assert.match(ui,/if\(tab==='operacion'&&state\.detail\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);/);
  assert.match(ui,/if\(tab==='movimientos'&&state\.detail\)loadMovements\(state\.detail\)/);
- assert.match(ui,/if\(tab==='finanzas'&&state\.detail\)loadFinances\(state\.detail\)/);
+ assert.doesNotMatch(ui,/if\(tab==='finanzas'&&state\.detail\)loadFinances/);
+  assert.match(ui,/const op='<div class="bc7-panel-stack">'\+actionArea\+fin\+adjustment/);
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9.5.95"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.18"\]/);
- assert.match(sw,/BC_SW_VERSION = "9.5.95"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.18/);
- assert.match(ui,/v7\.18 — acceso a jornada activa, declaración de efectivo y UX de inventario/);
+ assert.match(app,/const VERSION="9.5.96"/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.20"\]/);
+ assert.match(sw,/BC_SW_VERSION = "9.5.96"/);
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.20/);
+ assert.match(ui,/v7\.20 — dinero diario unificado dentro del cierre de jornada/);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{

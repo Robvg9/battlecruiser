@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 -- Disposable PostgreSQL 17 acceptance contract for the Step 4 shared inventory handover.
 -- Runs after the Step 7 finance contract has created Day 2 and its open tranche.
+-- Any existing Day 2 -> Day 3 handover is physically received and accepted before Day 3 can open.
 DO $shared$
 DECLARE
   v_turno uuid:='90000000-0000-0000-0000-000000000007';
@@ -20,8 +21,13 @@ DECLARE
   v_prog6 uuid:='92000000-0000-0000-0000-000000000012';
   v_hoy date:=(now() AT TIME ZONE 'America/Havana')::date;
   v_entrega uuid;
+  v_entrega_anterior uuid;
   v_recepcion uuid;
   v_initial uuid;
+  v_initial_anterior uuid;
+  v_lineas_recibidas jsonb;
+  v_resultado_recepcion jsonb;
+  v_estado_entrega text;
   v_result jsonb;
   v_source jsonb;
   v_destination jsonb;
@@ -63,12 +69,61 @@ BEGIN
   SELECT cantidad INTO v_before_pan FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pan;
   SELECT cantidad INTO v_before_jugo FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_jugo;
 
-  -- Day 3 is a fresh source session; Day 2 already has a historical FINAL and must remain immutable.
-  v_result:=public.bc7_guardar_inventario_jornada(v_day3,'INICIAL',
-    jsonb_build_array(
-      jsonb_build_object('producto_id',v_pan,'cantidad',10),
-      jsonb_build_object('producto_id',v_jugo,'cantidad',5)
-    ),'Initial physical count for shared handover source');
+  -- Resolve any previous-day shared delivery into Day 3 before allowing its INITIAL cut.
+  -- The fixture may already contain a pending Day 2 -> Day 3 handover from the prior finance contract.
+  SELECT e.id,e.estado INTO v_entrega_anterior,v_estado_entrega
+  FROM public.turno_jornada_inventario_entregas e
+  WHERE e.destino_sesion_id=v_day3
+     OR (e.origen_sesion_id=v_day2 AND e.destino_sesion_id IS NULL
+         AND e.fecha_destino=v_hoy+1 AND e.estado='PENDIENTE_PROGRAMACION')
+  ORDER BY e.creado_en DESC
+  LIMIT 1
+  FOR UPDATE;
+  IF v_entrega_anterior IS NOT NULL THEN
+    IF v_estado_entrega='PENDIENTE_PROGRAMACION' THEN
+      PERFORM public.bc7_vincular_entrega_jornada(v_entrega_anterior,v_day3);
+      v_estado_entrega:='PENDIENTE_RECEPCION';
+    END IF;
+    IF v_estado_entrega NOT IN ('PENDIENTE_RECEPCION','REQUIERE_RECUENTO') THEN
+      RAISE EXCEPTION 'FAIL: previous-day handover has unexpected status %',v_estado_entrega;
+    END IF;
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+      'producto_id',l.producto_id,'cantidad',l.cantidad_declarada
+    ) ORDER BY l.producto_id),'[]'::jsonb)
+    INTO v_lineas_recibidas
+    FROM public.turno_jornada_inventario_entrega_lineas l
+    WHERE l.entrega_id=v_entrega_anterior;
+    IF jsonb_array_length(v_lineas_recibidas)=0 THEN
+      RAISE EXCEPTION 'FAIL: previous-day shared handover has no inventory lines';
+    END IF;
+    PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+    PERFORM set_config('test.bc_admin','false',false);
+    PERFORM set_config('test.perms','turnos:ver',false);
+    v_resultado_recepcion:=public.bc7_recibir_entrega_jornada(
+      v_day3,v_lineas_recibidas,'Physical receipt of the prior-day shared inventory',
+      '98000000-0000-0000-0000-000000000009'
+    );
+    IF v_resultado_recepcion->>'estado'<>'ACEPTADA' THEN
+      RAISE EXCEPTION 'FAIL: matching prior-day receipt was not accepted automatically; result=%',v_resultado_recepcion;
+    END IF;
+    v_initial_anterior:=nullif(v_resultado_recepcion->>'inventario_inicial_id','')::uuid;
+    IF v_initial_anterior IS NULL THEN
+      SELECT id INTO v_initial_anterior FROM public.turno_jornada_inventario_cortes
+      WHERE turno_sesion_id=v_day3 AND tipo='INICIAL' AND estado='CONFIRMADO';
+    END IF;
+    IF v_initial_anterior IS NULL THEN
+      RAISE EXCEPTION 'FAIL: accepted prior-day receipt did not materialize Day 3 INITIAL';
+    END IF;
+  ELSE
+    v_result:=public.bc7_guardar_inventario_jornada(v_day3,'INICIAL',
+      jsonb_build_array(
+        jsonb_build_object('producto_id',v_pan,'cantidad',10),
+        jsonb_build_object('producto_id',v_jugo,'cantidad',5)
+      ),'Initial physical count for shared handover source');
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','turnos:ver',false);
   UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_day3;
 
   -- Day 3 declares 20/6. Deferred trigger reuses the already scheduled Day 4.
