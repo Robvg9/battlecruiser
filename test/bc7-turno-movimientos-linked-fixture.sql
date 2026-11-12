@@ -12,6 +12,7 @@ DECLARE
   v_tranche uuid;
   v_start timestamptz;
   v_end timestamptz;
+  v_date date;
 BEGIN
   -- Normalize only this disposable tranche to a deterministic 09:00–10:00
   -- Havana interval so we can test an operation created inside it and
@@ -26,8 +27,8 @@ BEGIN
     AND sesion.bloque='JORNADA'
     AND sesion.estado='COMPLETADA';
 
-  SELECT tr.id,tr.inicio_at,tr.fin_at
-  INTO v_tranche,v_start,v_end
+  SELECT tr.id,tr.inicio_at,tr.fin_at,s.fecha
+  INTO v_tranche,v_start,v_end,v_date
   FROM public.turno_tramos tr
   JOIN public.turno_sesiones s ON s.id=tr.turno_sesion_id
   WHERE tr.turno_sesion_id=v_session
@@ -94,5 +95,51 @@ BEGIN
     v_end+interval '6 minutes',v_end+interval '6 minutes',v_worker,'ADMIN fixture',
     v_start+interval '3 minutes',v_session,v_tranche
   );
+  -- Approved expenses and reinvestments stay in the exact source Jornada even
+  -- when ADMIN reviews them after the employee's working tranche.
+  INSERT INTO public.gastos(
+    id,almacen_id,concepto,descripcion,monto,estado,creado_por,creado_nombre,
+    revisado_por,revisado_nombre,fecha_revision,idempotency_key,creado_en,actualizado_en,
+    turno_sesion_id,turno_tramo_id
+  ) VALUES(
+    '99400000-0000-0000-0000-000000000001',
+    v_warehouse,'Agua','Gasto operativo fixture',12.50,'APROBADO',
+    v_owner,'Responsable fixture',v_worker,'ADMIN fixture',
+    v_end+interval '8 minutes','99800000-0000-0000-0000-000000000001',
+    v_start+interval '4 minutes',v_end+interval '8 minutes',v_session,v_tranche
+  );
+
+  INSERT INTO public.reinversiones(
+    id,almacen_id,turno_id,proveedor,fecha,total,usuario_id,usuario_nombre,
+    idempotency_key,creado_en,turno_sesion_id,turno_tramo_id,estado,
+    revisado_por,revisado_nombre,fecha_revision
+  ) VALUES(
+    '99500000-0000-0000-0000-000000000001',
+    v_warehouse,'90000000-0000-0000-0000-000000000007','Proveedor fixture',
+    v_start+interval '6 minutes',36,v_owner,'Responsable fixture',
+    '99800000-0000-0000-0000-000000000002',v_start+interval '6 minutes',
+    v_session,v_tranche,'APROBADA',v_worker,'ADMIN fixture',v_end+interval '9 minutes'
+  );
+
+  INSERT INTO public.reinversiones_lineas(
+    id,reinversion_id,producto_id,cantidad_base,costo_total,costo_unitario
+  ) VALUES(
+    '99600000-0000-0000-0000-000000000001',
+    '99500000-0000-0000-0000-000000000001',
+    v_product,2,36,18
+  );
+
+  INSERT INTO public.turno_jornada_entregas_diarias(
+    id,turno_sesion_id,turno_tramo_id,almacen_id,fecha,monto_declarado,
+    monto_aprobado,estado,observacion,creado_por,creado_nombre,creado_en,
+    revisado_por,revisado_nombre,fecha_revision,idempotency_key
+  ) VALUES(
+    '99700000-0000-0000-0000-000000000001',
+    v_session,v_tranche,v_warehouse,v_date,100,100,'APROBADA','Entrega fixture',
+    v_owner,'Responsable fixture',v_start+interval '12 minutes',
+    v_worker,'ADMIN fixture',v_end+interval '10 minutes',
+    '99800000-0000-0000-0000-000000000003'
+  );
+
 END
 $fixture$;
