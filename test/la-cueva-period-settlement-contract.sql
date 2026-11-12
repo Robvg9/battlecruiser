@@ -31,7 +31,7 @@ DECLARE
   v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
   v_start timestamptz:=now()-interval '2 hours';
   v_mid timestamptz:=now()-interval '90 minutes';
-  v_end timestamptz:=now();
+  v_end timestamptz:=now()+interval '2 hours';
 BEGIN
   INSERT INTO auth.users(id) VALUES(v_worker) ON CONFLICT(id) DO NOTHING;
   INSERT INTO public.usuarios(id,activo,role_id,nombre)
@@ -93,7 +93,7 @@ BEGIN
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
   ) VALUES(v_final_cut,v_session,'FINAL','CONFIRMADO',v_worker,v_worker,v_end,v_end,'Final physical count');
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
-  VALUES(v_final_cut,v_pan,7,7),(v_final_cut,v_juice,5,5);
+  VALUES(v_final_cut,v_pan,7,7),(v_final_cut,v_juice,4,4);
 
   UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_session;
   UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO' WHERE id=v_turn;
