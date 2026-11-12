@@ -2,7 +2,7 @@
 BEGIN;
 SELECT set_config('test.bc_admin','true',false);
 SELECT set_config('test.perms','reportes:ver',false);
-SELECT set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000001',false);
+SELECT set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',false);
 
 DO $test$
 DECLARE
