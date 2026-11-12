@@ -139,23 +139,12 @@ BEGIN
   LEFT JOIN public.usuarios u ON u.id = t.creado_por
   WHERE t.almacen_origen_id = v_s.almacen_id
     AND (t.fecha AT TIME ZONE 'America/Havana')::date = v_s.fecha
-    AND (
-      -- Explicit Jornada links are authoritative even when ADMIN created the transfer
-      -- outside the employee's own tranche. Unlinked transfers still require the
-      -- original actor + exact tranche boundary.
-      EXISTS (
-        SELECT 1
-        FROM public.turno_jornada_entradas_vinculadas linked
-        WHERE linked.turno_sesion_id = v_s.id
-          AND linked.transferencia_id = t.id
-      )
-      OR EXISTS (
-        SELECT 1 FROM public.turno_tramos tr
-        WHERE tr.turno_sesion_id = v_s.id
-          AND tr.usuario_id = t.creado_por
-          AND t.fecha >= tr.inicio_at
-          AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
-      )
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = t.creado_por
+        AND t.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
     )
 
   UNION ALL
@@ -176,12 +165,22 @@ BEGIN
   LEFT JOIN public.usuarios u ON u.id = t.creado_por
   WHERE t.almacen_destino_id = v_s.almacen_id
     AND (t.fecha AT TIME ZONE 'America/Havana')::date = v_s.fecha
-    AND EXISTS (
-      SELECT 1 FROM public.turno_tramos tr
-      WHERE tr.turno_sesion_id = v_s.id
-        AND tr.usuario_id = t.creado_por
-        AND t.fecha >= tr.inicio_at
-        AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
+    AND (
+      -- The exact session link is authoritative even when ADMIN creates the transfer
+      -- outside the employee's tranche. Unlinked transfers retain actor/tranche rules.
+      EXISTS (
+        SELECT 1
+        FROM public.turno_jornada_entradas_vinculadas linked
+        WHERE linked.turno_sesion_id = v_s.id
+          AND linked.transferencia_id = t.id
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.turno_sesion_id = v_s.id
+          AND tr.usuario_id = t.creado_por
+          AND t.fecha >= tr.inicio_at
+          AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
+      )
     )
 
   UNION ALL
