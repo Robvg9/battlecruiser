@@ -247,6 +247,23 @@ BEGIN
   IF (SELECT count(*) FROM public.reinversiones_lineas WHERE reinversion_id=v_reinvestment)<>1 THEN
     RAISE EXCEPTION 'FAIL: reinvestment detail line not persisted';
   END IF;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_reinversion_jornada(
+      v_day2,
+      jsonb_build_array(jsonb_build_object(
+        'producto_id',v_jugo,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+        'cantidad_base',2,'costo_total',10
+      )),
+      '95000000-0000-0000-0000-000000000002',
+      'Proveedor de prueba'
+    );
+  EXCEPTION WHEN unique_violation THEN v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: reinvestment idempotency key was accepted with a different product payload';
+  END IF;
+
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_almacen)<>v_before_pan THEN
     RAISE EXCEPTION 'FAIL: registering a pending reinvestment changed stock before owner approval';
   END IF;
