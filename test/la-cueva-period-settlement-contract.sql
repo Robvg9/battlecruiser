@@ -128,7 +128,7 @@ BEGIN
   INSERT INTO public.transferencias(id,almacen_origen_id,almacen_destino_id,fecha,creado_por,estado)
   VALUES
     -- This inbound transfer is already represented in the imported initial count and is intentionally unlinked.
-    ('a6000000-0000-0000-0000-000000000003',v_other_warehouse,v_warehouse,v_start+interval '5 minutes',v_owner,'completada'),
+    ('a6000000-0000-0000-0000-000000000003',v_other_warehouse,v_warehouse,v_start-interval '5 minutes',v_owner,'completada'),
     -- This inbound transfer happened after the initial count and is linked by its exact ID.
     ('a6000000-0000-0000-0000-000000000001',v_other_warehouse,v_warehouse,v_start+interval '10 minutes',v_owner,'completada'),
     ('a6000000-0000-0000-0000-000000000002',v_warehouse,v_other_warehouse,v_start+interval '30 minutes',v_owner,'completada');
@@ -271,11 +271,11 @@ BEGIN
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  IF (v_result->>'ventas_estimadas')::numeric<>50 THEN
-    RAISE EXCEPTION 'FAIL: pending adjustments are not applied until approval; expected inventory-delta sales CUP50; result=%',v_result;
+  IF (v_result->>'ventas_estimadas')::numeric<>60 THEN
+    RAISE EXCEPTION 'FAIL: pending adjustments are not applied until approval; expected inventory-delta sales CUP60; result=%',v_result;
   END IF;
-  IF (v_result->>'salario_calculado')::numeric<>2.5 THEN
-    RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP2.50 before pending adjustments are approved; result=%',v_result;
+  IF (v_result->>'salario_calculado')::numeric<>3 THEN
+    RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP3.00 before pending adjustments are approved; result=%',v_result;
   END IF;
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
      OR (v_result->'pendientes'->>'gastos')::integer<>1
