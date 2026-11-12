@@ -76,8 +76,9 @@ BEGIN
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
   ) VALUES(v_initial_cut,v_session,'INICIAL','CONFIRMADO',v_worker,v_worker,v_start,v_start,'Initial physical count');
 
+  -- One Juice bottle is sold and one bottle is lost (0.5 merma + 0.5 baja): 6 initial - 1 approved loss - 4 final = 1 sold.
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
-  VALUES(v_initial_cut,v_pan,10,10),(v_initial_cut,v_juice,5,5);
+  VALUES(v_initial_cut,v_pan,10,10),(v_initial_cut,v_juice,6,6);
 
   -- No final inventory yet: sales and salary must stay unavailable rather than treating final stock as zero.
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
