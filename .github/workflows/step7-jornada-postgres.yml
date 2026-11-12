@@ -8,6 +8,7 @@ on:
       - 'supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql'
       - 'supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql'
       - 'supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql'
+      - 'supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql'
       - 'test/jornada-final-cash-admin-queue-contract.sql'
       - 'test/jornada-final-cash-approval-queue.test.js'
       - 'supabase/migrations/20261112133100_jornada_close_gate_integral.sql'
