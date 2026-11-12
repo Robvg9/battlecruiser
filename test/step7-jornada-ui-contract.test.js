@@ -99,3 +99,28 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const moduleVersion = app.slice(valueStart, end);
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
 });
+
+
+test("Dependienta can open her active jornada without searching a future-only calendar range",()=>{
+  assert.match(ui,/rpc\('turno_actual_usuario'/);
+  assert.match(ui,/id="bc7-current-session-card"/);
+  assert.match(ui,/data-bc7-current-open/);
+  assert.match(ui,/data-bc7-current-finance/);
+  assert.match(ui,/addDays\(today,-7\)/);
+  assert.match(ui,/state\.currentSession\?\.turno_sesion_id/);
+});
+
+test("Cash declaration can be saved before the final inventory unlocks jornada closure",()=>{
+  assert.match(ui,/async function saveCashDeclaration\(form\)/);
+  assert.match(ui,/data-bc7-save-cash/);
+  assert.match(ui,/rpc\('bc_declarar_dinero'/);
+  assert.match(ui,/El cierre se habilitará al confirmar el inventario final/);
+  assert.match(ui,/Finalizar jornada/);
+});
+
+test("Jornada inventory tables preserve readable columns on narrow screens",()=>{
+  assert.match(ui,/bc7-table-wrap\{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto/);
+  assert.match(ui,/bc7-table\{width:100%;min-width:720px/);
+  assert.match(ui,/bc7-table-wide\{min-width:980px/);
+  assert.match(ui,/bc7-table-scroll-hint/);
+});
