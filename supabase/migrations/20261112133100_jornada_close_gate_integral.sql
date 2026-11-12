@@ -2,6 +2,66 @@ BEGIN;
 
 -- Enforce the close gate on the server for retail Jornada sessions.
 -- Final owner cash count may happen after handover, but operational inputs and stock must reconcile first.
+-- Keep the generic legacy close RPC for MANANA/TARDE, but forbid it from
+-- bypassing the protected Jornada settlement gate.
+CREATE OR REPLACE FUNCTION public.bc_cerrar_turno_sesion(p_turno_sesion_id uuid)
+RETURNS public.turno_sesiones
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_sesion public.turno_sesiones;
+  v_tramo public.turno_tramos;
+  v_result public.turno_sesiones;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE='42501';
+  END IF;
+  SELECT * INTO v_sesion FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Sesión no encontrada.' USING ERRCODE='23503';
+  END IF;
+  IF v_sesion.bloque='JORNADA' THEN
+    RAISE EXCEPTION 'Las jornadas deben cerrarse mediante bc5_cerrar_jornada para validar inventario, dinero y liquidación.' USING ERRCODE='42501';
+  END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_asignaciones a
+    WHERE a.turno_sesion_id=v_sesion.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Solo la persona asignada a esta sesión puede cerrarla.' USING ERRCODE='42501';
+  END IF;
+  IF v_sesion.estado<>'EN_CURSO' THEN
+    RAISE EXCEPTION 'La sesión no está en curso.' USING ERRCODE='P0001';
+  END IF;
+  SELECT * INTO v_tramo FROM public.turno_tramos
+  WHERE turno_sesion_id=v_sesion.id AND estado='ACTIVO'
+  ORDER BY inicio_at DESC NULLS LAST,created_at DESC NULLS LAST
+  LIMIT 1 FOR UPDATE;
+  IF v_tramo.id IS NULL THEN
+    RAISE EXCEPTION 'La sesión EN_CURSO no tiene un tramo activo.' USING ERRCODE='P0001';
+  END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_declaraciones d
+    WHERE d.turno_tramo_id=v_tramo.id AND d.usuario_id=auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Antes de cerrar la sesión debés declarar el dinero entregado.' USING ERRCODE='23514';
+  END IF;
+  UPDATE public.turno_tramos SET estado='COMPLETADO',fin_at=now() WHERE id=v_tramo.id;
+  UPDATE public.turno_sesiones SET estado='COMPLETADA',updated_at=now()
+  WHERE id=v_sesion.id RETURNING * INTO v_result;
+  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',
+    cierre_real=NULL,actualizado_en=now()
+  WHERE id=v_sesion.turno_id;
+  INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo)
+  VALUES(v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),'SESION_CERRADA');
+  RETURN v_result;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.bc_cerrar_turno_sesion(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc_cerrar_turno_sesion(uuid) TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.bc5_cerrar_jornada(
   p_turno_sesion_id uuid,
   p_motivo_excepcion text DEFAULT NULL
@@ -18,6 +78,7 @@ DECLARE
   v_ahora_minuto time;
   v_fecha_fin date;
   v_result public.turno_sesiones;
+  v_tramo public.turno_tramos;
   v_liquidacion jsonb;
   v_pendientes jsonb;
 BEGIN
@@ -74,7 +135,30 @@ BEGIN
     RAISE EXCEPTION 'Cierre anticipado o tardío: debe registrar un motivo antes de cerrar.' USING ERRCODE='23514';
   END IF;
 
-  v_result:=public.bc_cerrar_turno_sesion(p_turno_sesion_id);
+  -- Complete the Jornada transition here; the public legacy helper now rejects
+  -- direct calls for block=JORNADA and remains available only to legacy blocks.
+  SELECT * INTO v_tramo FROM public.turno_tramos
+  WHERE turno_sesion_id=v_sesion.id AND estado='ACTIVO'
+  ORDER BY inicio_at DESC NULLS LAST,created_at DESC NULLS LAST
+  LIMIT 1 FOR UPDATE;
+  IF v_tramo.id IS NULL THEN
+    RAISE EXCEPTION 'La jornada EN_CURSO no tiene un tramo activo.' USING ERRCODE='23514';
+  END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_declaraciones d
+    WHERE d.turno_tramo_id=v_tramo.id AND d.usuario_id=auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Antes de cerrar la jornada debes declarar el dinero entregado.' USING ERRCODE='23514';
+  END IF;
+  UPDATE public.turno_tramos SET estado='COMPLETADO',fin_at=now() WHERE id=v_tramo.id;
+  UPDATE public.turno_sesiones SET estado='COMPLETADA',updated_at=now()
+  WHERE id=v_sesion.id RETURNING * INTO v_result;
+  UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO',
+    cierre_real=NULL,actualizado_en=now()
+  WHERE id=v_sesion.turno_id;
+  INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo)
+  VALUES(v_sesion.turno_id,v_sesion.id,v_tramo.id,auth.uid(),'SESION_CERRADA');
+
   INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,actor_user_id,tipo,payload)
   VALUES(v_sesion.turno_id,v_sesion.id,auth.uid(),
     CASE WHEN v_local::date=v_fecha_fin AND v_ahora_minuto=v_programacion.hora_fin_prevista THEN 'JORNADA_CERRADA' ELSE 'JORNADA_CERRADA_CON_EXCEPCION' END,
