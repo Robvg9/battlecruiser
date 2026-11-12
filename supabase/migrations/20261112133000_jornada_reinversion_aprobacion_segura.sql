@@ -23,6 +23,8 @@ DECLARE
   v_existing_provider text;
   v_existing_total numeric;
   v_existing_line_count integer;
+  v_existing_lines jsonb;
+  v_sorted_incoming_lines jsonb;
   v_product uuid;
   v_presentation uuid;
   v_presentation_qty numeric;
@@ -111,12 +113,29 @@ BEGIN
   IF v_id IS NOT NULL THEN
     SELECT count(*) INTO v_existing_line_count
     FROM public.reinversiones_lineas WHERE reinversion_id=v_id;
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+      'producto_id',rl.producto_id,
+      'presentacion_id',rl.presentacion_id,
+      'cantidad_presentacion',rl.cantidad_presentacion,
+      'cantidad_base',rl.cantidad_base,
+      'costo_total',rl.costo_total
+    ) ORDER BY rl.producto_id,rl.presentacion_id NULLS FIRST,
+      rl.cantidad_presentacion NULLS FIRST,rl.cantidad_base,rl.costo_total),'[]'::jsonb)
+      INTO v_existing_lines
+    FROM public.reinversiones_lineas rl WHERE rl.reinversion_id=v_id;
+    SELECT coalesce(jsonb_agg(item.value ORDER BY
+      item.value->>'producto_id',(item.value->>'presentacion_id') NULLS FIRST,
+      (item.value->>'cantidad_presentacion')::numeric NULLS FIRST,
+      (item.value->>'cantidad_base')::numeric,(item.value->>'costo_total')::numeric),'[]'::jsonb)
+      INTO v_sorted_incoming_lines
+    FROM jsonb_array_elements(v_normalized_lines) AS item(value);
     IF v_existing_session IS DISTINCT FROM v_s.id
        OR v_existing_tranche IS DISTINCT FROM v_t.id
        OR v_existing_warehouse IS DISTINCT FROM v_s.almacen_id
        OR v_existing_provider IS DISTINCT FROM nullif(btrim(coalesce(p_proveedor,'')),'')
        OR v_existing_total IS DISTINCT FROM v_total
-       OR v_existing_line_count IS DISTINCT FROM jsonb_array_length(v_normalized_lines) THEN
+       OR v_existing_line_count IS DISTINCT FROM jsonb_array_length(v_normalized_lines)
+       OR v_existing_lines IS DISTINCT FROM v_sorted_incoming_lines THEN
       RAISE EXCEPTION 'La clave de idempotencia ya pertenece a otra reinversión o a un contenido distinto.' USING ERRCODE='23505';
     END IF;
     RETURN v_id;
