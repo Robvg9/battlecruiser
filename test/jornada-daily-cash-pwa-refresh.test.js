@@ -14,9 +14,11 @@ const UI = read("public/js/bc7-jornada-ui.js");
 test("PWA shell pins one fresh 9.5.96 release across index, app and service worker", () => {
   assert.match(APP, /const VERSION="9\.5\.96";/);
   assert.match(INDEX, /app\.js\?v=9\.5\.96/);
+  assert.match(INDEX, /js\/offline\.js\?v=9\.5\.96/);
   assert.match(INDEX, /app-footer-version">v9\.5\.96 — BattleCruiser/);
   assert.match(SW, /BC_SW_VERSION = "9\.5\.96"/);
   assert.match(SW, /\.\/app\.js\?v=9\.5\.96/);
+  assert.match(SW, /\.\/js\/offline\.js\?v=9\.5\.96/);
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
