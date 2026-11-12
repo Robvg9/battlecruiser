@@ -449,8 +449,8 @@
     if(!sessionId)return false;
     const opened=await openWorkspace(sessionId);
     if(opened&&finance){
-      activateWorkspaceTab('operacion');
-      const target=$('bc7-cash-days-list')||document.querySelector('[data-bc7-workspace-panel="operacion"]');
+      activateWorkspaceTab('finanzas');
+      const target=document.querySelector('[data-bc7-workspace-panel="finanzas"]');
       if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
     }
     return opened;
@@ -1292,7 +1292,7 @@
   }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
-    let amount='';
+    let amount=$('bc7-cash')?.value.trim();
     let msgEl=form.querySelector('[data-bc7-close-msg]');
     const cashMode=form.dataset.bc7CashMode||'single';
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
