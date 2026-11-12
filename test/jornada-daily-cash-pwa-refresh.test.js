@@ -125,7 +125,7 @@ test("Owner can count the declared final cash only after session completion with
   assert.match(UI, /data-bc7-final-cash-amount/);
   assert.match(UI, /rpc\('bc5_contar_dinero_entregado'/);
   assert.match(UI, /p_declaracion_id:declarationId,p_monto_contado:amount/);
-  assert.match(UI, /state\.detail\?\.sesion\?\.estado\|\|''\)\)\.toUpperCase\(\)==='COMPLETADA'/);
+  assert.ok(UI.includes("String(state.detail?.sesion?.estado||'').toUpperCase()==='COMPLETADA'"));
   assert.match(UI, /declaration\.monto_contado==null/);
   assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
   assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
