@@ -125,7 +125,8 @@ test("mobile Jornada uses labelled inventory cards and stable cash/header layout
   assert.ok(CSS.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header>.header-right"));
-  assert.ok(CSS.includes("#mi-cuenta-btn,#app-shell.visible>.app-header #logout-btn"));
+  assert.ok(CSS.includes("#app-shell.visible>.app-header #mi-cuenta-btn"));
+  assert.ok(CSS.includes("#app-shell.visible>.app-header #logout-btn"));
 });
 test("Owner can count the declared final cash only after session completion without redeclaring it", () => {
   assert.match(UI, /data-bc7-final-cash-count/);
