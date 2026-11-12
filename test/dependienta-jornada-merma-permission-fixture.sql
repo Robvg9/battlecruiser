@@ -1,5 +1,5 @@
--- Disposable CI fixture: start the existing Dependienta role with
--- merma/create disabled, then verify the migration enables only that action.
+-- Disposable CI fixture: create the plural Dependientas role if the base
+-- fixture does not seed application roles, and start its merma/create disabled.
 DO $fixture$
 DECLARE
   v_role uuid;
@@ -11,12 +11,21 @@ BEGIN
   LIMIT 1;
 
   IF v_role IS NULL THEN
-    RAISE EXCEPTION 'The Step 5 disposable fixture must seed a Dependienta role';
+    INSERT INTO public.roles(nombre,activo)
+    VALUES('Dependientas',true)
+    RETURNING id INTO v_role;
   END IF;
 
-  INSERT INTO public.permisos(role_id,seccion,accion,permitido)
-  VALUES(v_role,'mermas','crear',false)
-  ON CONFLICT (role_id,seccion,accion)
-  DO UPDATE SET permitido=false;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.permisos
+    WHERE role_id=v_role AND seccion='mermas' AND accion='crear'
+  ) THEN
+    INSERT INTO public.permisos(role_id,seccion,accion,permitido)
+    VALUES(v_role,'mermas','crear',false);
+  ELSE
+    UPDATE public.permisos
+    SET permitido=false
+    WHERE role_id=v_role AND seccion='mermas' AND accion='crear';
+  END IF;
 END
 $fixture$;
