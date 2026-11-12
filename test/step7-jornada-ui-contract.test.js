@@ -135,9 +135,12 @@ test("Cash declaration can be saved before the final inventory unlocks jornada c
   assert.match(ui,/Finalizar jornada/);
 });
 
-test("Jornada inventory tables preserve readable columns on narrow screens",()=>{
+test("Jornada inventory count table exposes labelled cells for accessible mobile product cards",()=>{
   assert.match(ui,/bc7-table-wrap\{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto/);
   assert.match(ui,/bc7-table\{width:100%;min-width:720px/);
   assert.match(ui,/bc7-table-wide\{min-width:980px/);
   assert.match(ui,/bc7-table-scroll-hint/);
+  assert.match(ui,/bc7-count-table/);
+  assert.match(ui,/data-label="Conteo físico actual"/);
+  assert.match(ui,/data-bc7-count=/);
 });
