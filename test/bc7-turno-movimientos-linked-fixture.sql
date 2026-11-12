@@ -13,6 +13,19 @@ DECLARE
   v_start timestamptz;
   v_end timestamptz;
 BEGIN
+  -- Normalize only this disposable tranche to a deterministic 09:00–10:00
+  -- Havana interval so we can test an operation created inside it and
+  -- approved after its end, regardless of the CI runner's wall clock.
+  UPDATE public.turno_tramos tr
+  SET inicio_at=(sesion.fecha::timestamp+time '09:00') AT TIME ZONE 'America/Havana',
+      fin_at=(sesion.fecha::timestamp+time '10:00') AT TIME ZONE 'America/Havana'
+  FROM public.turno_sesiones sesion
+  WHERE tr.turno_sesion_id=v_session
+    AND tr.usuario_id=v_owner
+    AND sesion.id=tr.turno_sesion_id
+    AND sesion.bloque='JORNADA'
+    AND sesion.estado='COMPLETADA';
+
   SELECT tr.id,tr.inicio_at,tr.fin_at
   INTO v_tranche,v_start,v_end
   FROM public.turno_tramos tr
