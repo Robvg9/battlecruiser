@@ -1,15 +1,14 @@
 BEGIN;
 
--- Dependienta may register a merma against her active assigned Jornada.
--- This is request creation only: no approval, arbitrary stock edits, or access
--- to another worker's operations is granted. The Jornada RPC enforces session
--- ownership independently of this role-level permission.
-UPDATE public.permisos p
-SET permitido=true
+-- Dependienta may submit a merma request for her assigned Jornada.
+-- Insert the capability when a role/permission pair is missing (for example,
+-- fresh installations); preserve the rest of the role matrix and never grant
+-- review, arbitrary editing, deletion or approval.
+INSERT INTO public.permisos(role_id,seccion,accion,permitido)
+SELECT r.id,'mermas','crear',true
 FROM public.roles r
-WHERE p.role_id=r.id
-  AND lower(btrim(r.nombre)) IN ('dependienta','dependientas')
-  AND p.seccion='mermas'
-  AND p.accion='crear';
+WHERE lower(btrim(r.nombre)) IN ('dependienta','dependientas')
+ON CONFLICT (role_id,seccion,accion)
+DO UPDATE SET permitido=true;
 
 COMMIT;
