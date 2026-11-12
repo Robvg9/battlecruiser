@@ -20,6 +20,11 @@ DECLARE
   v_final_cut uuid:='a5000000-0000-0000-0000-000000000002';
   v_daily_id uuid;
   v_daily_retry uuid;
+  v_expense_id uuid;
+  v_reinvestment_id uuid;
+  v_merma_id uuid;
+  v_baja_id uuid;
+  v_closed public.turno_sesiones;
   v_result jsonb;
   v_error boolean;
   v_operation text;
@@ -125,21 +130,21 @@ BEGIN
   INSERT INTO public.vales_salida(id,producto_id,almacen_id,tipo,cantidad,estado,creado_por,fecha)
   VALUES('a6300000-0000-0000-0000-000000000001',v_pan,v_warehouse,'consumo',1,'REGISTRADO',v_worker,v_start+interval '40 minutes');
 
-  -- Approved expense is deducted from expected cash; pending items would block settlement.
+  -- This expense begins pending and enters the settlement only after owner approval.
   INSERT INTO public.gastos(
     almacen_id,ciclo_id,sesion_id,concepto,descripcion,monto,estado,
     creado_por,creado_nombre,turno_sesion_id,turno_tramo_id
   ) VALUES(
-    v_warehouse,NULL,NULL,'Gasto fixture','Gasto aprobado para el contrato',5,'APROBADO',
+    v_warehouse,NULL,NULL,'Gasto fixture','Gasto aprobado para el contrato',5,'PENDIENTE',
     v_worker,'Dependienta fixture',v_session,v_tranche
-  );
+  ) RETURNING id INTO v_expense_id;
 
   -- Closing-day amount uses the existing declared/count/owner-approval flow.
   INSERT INTO public.turno_declaraciones(
     turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,
     declarado_at,estado_aprobacion,monto_contado,contado_por,contado_at,diferencia,aprobado_por,aprobado_at
   ) VALUES(
-    v_turn,v_session,v_tranche,v_worker,13,'CUP',v_end,'APROBADA',13,v_owner,v_end,0,v_owner,v_end
+    v_turn,v_session,v_tranche,v_worker,19.5,'CUP',v_end,'APROBADA',19.5,v_owner,v_end,0,v_owner,v_end
   );
 
   -- Rate configuration is an explicit owner action. Test uses 5%; production remains NULL until configured.
@@ -171,7 +176,7 @@ BEGIN
   -- One daily delivery is stored as pending and cannot be included until the Dueño approves it.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
-  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear',false);
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear,mermas:crear,bajas:crear',false);
   v_daily_id:=public.bc7_registrar_entrega_diaria_jornada(
     v_session,v_today,20,'Entrega diaria de prueba','a6400000-0000-0000-0000-000000000001'
   );
@@ -182,10 +187,41 @@ BEGIN
     RAISE EXCEPTION 'FAIL: daily cash retry created a duplicate record';
   END IF;
 
-  -- Dependienta can submit expenses/reinvestments, but every approval lane is owner/admin-only.
+  -- Reinvestment, merma and baja are recorded in this same Jornada, pending owner review.
+  v_reinvestment_id:=public.bc7_registrar_reinversion_jornada(
+    v_session,
+    jsonb_build_array(jsonb_build_object(
+      'producto_id',v_pan,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+      'cantidad_base',1,'costo_total',3
+    )),
+    'a6400000-0000-0000-0000-000000000002',
+    'Proveedor settlement fixture'
+  );
+  v_merma_id:=public.bc7_registrar_ajuste_jornada(
+    v_session,'merma',v_juice,0.5,'Merma fixture de liquidación',
+    'a6400000-0000-0000-0000-000000000003'
+  );
+  v_baja_id:=public.bc7_registrar_ajuste_jornada(
+    v_session,'baja',v_juice,0.5,'Baja fixture de liquidación',
+    'a6400000-0000-0000-0000-000000000004'
+  );
+  IF NOT EXISTS(SELECT 1 FROM public.reinversiones WHERE id=v_reinvestment_id AND estado='PENDIENTE')
+     OR NOT EXISTS(SELECT 1 FROM public.mermas WHERE id=v_merma_id AND estado='PENDIENTE')
+     OR NOT EXISTS(SELECT 1 FROM public.bajas WHERE id=v_baja_id AND estado='PENDIENTE')
+     OR NOT EXISTS(SELECT 1 FROM public.gastos WHERE id=v_expense_id AND estado='PENDIENTE') THEN
+    RAISE EXCEPTION 'FAIL: expense, reinvestment, merma and baja must enter the owner approval queue';
+  END IF;
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>100
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>100 THEN
+    RAISE EXCEPTION 'FAIL: pending operations changed stock before owner approval';
+  END IF;
+
+  -- The assigned worker can submit all operation types, but cannot approve any of them.
   IF NOT public.tiene_permiso('gastos','crear')
-     OR NOT public.tiene_permiso('reinversiones','crear') THEN
-    RAISE EXCEPTION 'FAIL: Dependienta must be able to submit expenses and reinvestments';
+     OR NOT public.tiene_permiso('reinversiones','crear')
+     OR NOT public.tiene_permiso('mermas','crear')
+     OR NOT public.tiene_permiso('bajas','crear') THEN
+    RAISE EXCEPTION 'FAIL: Dependienta must be able to submit expenses, reinvestments, merma and baja';
   END IF;
   FOREACH v_operation IN ARRAY ARRAY['gasto','merma','baja','reinversion','entrega_diaria']
   LOOP
@@ -219,25 +255,58 @@ BEGIN
     RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP2; result=%',v_result;
   END IF;
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
-     OR (v_result->'pendientes'->>'entregas_diarias')::integer<>1 THEN
-    RAISE EXCEPTION 'FAIL: pending daily cash must block final settlement; result=%',v_result;
+     OR (v_result->'pendientes'->>'gastos')::integer<>1
+     OR (v_result->'pendientes'->>'reinversiones')::integer<>1
+     OR (v_result->'pendientes'->>'ajustes')::integer<>2
+     OR (v_result->'pendientes'->>'entregas_diarias')::integer<>1
+     OR (v_result->'pendientes'->>'entregas_diarias_faltantes')::integer<>1 THEN
+    RAISE EXCEPTION 'FAIL: pending cash, expense, reinvestment, merma and baja must block final settlement; result=%',v_result;
   END IF;
 
+  -- Owner approves each operation. Only these approved records affect the final stock/cash reconciliation.
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','entregas_caja:editar_any',false);
+  PERFORM set_config('test.perms',
+    'gastos:editar_any,reinversiones:editar_any,mermas:editar_any,bajas:editar_any,entregas_caja:editar_any',false);
+  PERFORM public.resolver_aprobacion_operativa('gasto',v_expense_id,'APROBAR','Gasto revisado',NULL,5);
+  PERFORM public.resolver_aprobacion_operativa('reinversion',v_reinvestment_id,'APROBAR','Reinversión revisada',NULL,NULL);
+  PERFORM public.resolver_aprobacion_operativa('merma',v_merma_id,'APROBAR','Merma comprobada',0.5,NULL);
+  PERFORM public.resolver_aprobacion_operativa('baja',v_baja_id,'APROBAR','Baja comprobada',0.5,NULL);
   PERFORM public.resolver_aprobacion_operativa('entrega_diaria',v_daily_id,'APROBAR','Conteo correcto',20,NULL);
+
+  IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>101
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99 THEN
+    RAISE EXCEPTION 'FAIL: approval must apply reinvestment, merma and baja stock effects exactly once';
+  END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'FAIL: complete approved inventory/cash data should be calculable; result=%',v_result;
   END IF;
-  IF (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones_salario')::numeric<>33 THEN
-    RAISE EXCEPTION 'FAIL: expected cash after expense and salary should be CUP33; result=%',v_result;
+  IF (v_result->>'ventas_estimadas')::numeric<>50
+     OR (v_result->>'salario_calculado')::numeric<>2.5
+     OR (v_result->>'gastos_aprobados')::numeric<>5
+     OR (v_result->>'reinversiones_aprobadas')::numeric<>3 THEN
+    RAISE EXCEPTION 'FAIL: approved sale/expense/reinvestment/merma/baja inputs were not included correctly; result=%',v_result;
   END IF;
-  IF (v_result->>'dinero_recogido_total')::numeric<>33
+  IF (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones_salario')::numeric<>39.5 THEN
+    RAISE EXCEPTION 'FAIL: expected cash after expense, reinvestment and salary should be CUP39.50; result=%',v_result;
+  END IF;
+  IF (v_result->>'dinero_recogido_total')::numeric<>39.5
      OR (v_result->>'diferencia')::numeric<>0 THEN
     RAISE EXCEPTION 'FAIL: daily approved cash + final counted cash should reconcile at zero; result=%',v_result;
+  END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM jsonb_array_elements(v_result->'lineas') line
+    WHERE line.value->>'producto_id'=v_pan::text
+      AND (line.value->>'reinversiones_entrada')::numeric=1
+  ) OR NOT EXISTS(
+    SELECT 1 FROM jsonb_array_elements(v_result->'lineas') line
+    WHERE line.value->>'producto_id'=v_juice::text
+      AND (line.value->>'mermas_aprobadas')::numeric=0.5
+      AND (line.value->>'bajas_aprobadas')::numeric=0.5
+  ) THEN
+    RAISE EXCEPTION 'FAIL: inventory-delta lines omitted approved reinvestment, merma or baja quantities; result=%',v_result;
   END IF;
 
   -- A rejected daily delivery can be corrected and resubmitted without creating a second row.
@@ -249,7 +318,7 @@ BEGIN
   );
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
-  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear',false);
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear,mermas:crear,bajas:crear',false);
   v_daily_retry:=public.bc7_registrar_entrega_diaria_jornada(
     v_session,v_today,21,'Entrega corregida','a6400000-0000-0000-0000-000000000002'
   );
@@ -286,6 +355,17 @@ BEGIN
     RAISE EXCEPTION 'FAIL: daily cash and settlement ACL boundary is incorrect';
   END IF;
 
-  RAISE NOTICE 'PASS La Cueva: inventory-delta settlement, family-safe price, owner-configured percentage, daily cash idempotency, approval gate, reconciliation, ACL.';
+  -- The operational session closes only after the complete approved reconciliation passes.
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','turnos:ver',false);
+  v_closed:=public.bc5_cerrar_jornada(v_session,'Cierre de contrato PostgreSQL fuera del horario programado');
+  IF v_closed.estado<>'COMPLETADA'
+     OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='COMPLETADO')
+     OR (public.bc7_liquidacion_inventario_jornada(v_session)->>'calculable')::boolean IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'FAIL: the jornada did not close with a reconciled daily cash/expense/reinvestment/merma/baja ledger';
+  END IF;
+
+  RAISE NOTICE 'PASS La Cueva: all daily cash, approved expense/reinvestment/merma/baja, stock and cash reconciliation, close transition, ACL.';
 END;
 $test$;
