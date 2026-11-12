@@ -6,13 +6,15 @@ ALTER TABLE public.mermas
   ADD COLUMN IF NOT EXISTS actualizado_en timestamptz NOT NULL DEFAULT now(),
   ADD COLUMN IF NOT EXISTS revisado_por uuid,
   ADD COLUMN IF NOT EXISTS revisado_nombre text,
-  ADD COLUMN IF NOT EXISTS turno_sesion_id uuid;
+  ADD COLUMN IF NOT EXISTS turno_sesion_id uuid,
+  ADD COLUMN IF NOT EXISTS turno_tramo_id uuid;
 ALTER TABLE public.bajas
   ADD COLUMN IF NOT EXISTS fecha_revision timestamptz,
   ADD COLUMN IF NOT EXISTS actualizado_en timestamptz NOT NULL DEFAULT now(),
   ADD COLUMN IF NOT EXISTS revisado_por uuid,
   ADD COLUMN IF NOT EXISTS revisado_nombre text,
-  ADD COLUMN IF NOT EXISTS turno_sesion_id uuid;
+  ADD COLUMN IF NOT EXISTS turno_sesion_id uuid,
+  ADD COLUMN IF NOT EXISTS turno_tramo_id uuid;
 
 CREATE TABLE IF NOT EXISTS public.lotes_compra(
   id uuid PRIMARY KEY,
