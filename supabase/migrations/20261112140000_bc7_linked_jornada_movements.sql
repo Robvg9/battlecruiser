@@ -1,0 +1,398 @@
+BEGIN;
+-- Correct explicit session attribution for linked inbound transfers and approved adjustments.
+-- Existing unlinked rows retain actor/tranche/time/warehouse attribution and stay read-only.
+-- Read-only daily movement archive for one explicitly identified turn session.
+-- Attribution uses the actor + actual turn-tramo time interval + warehouse + business date.
+-- Existing rows are not changed and events with no matching tramo remain in general History.
+CREATE OR REPLACE FUNCTION public.bc7_movimientos_sesion(p_turno_sesion_id uuid)
+RETURNS TABLE(
+  fecha timestamptz,
+  tipo text,
+  producto text,
+  almacen text,
+  cantidad numeric,
+  costo_unitario numeric,
+  usuario text,
+  operacion_id uuid
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT public.tiene_permiso('reportes', 'ver')
+     AND NOT public.tiene_permiso('turnos', 'ver') THEN
+    RAISE EXCEPTION 'No tienes permiso para consultar movimientos ni turnos.' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_s
+  FROM public.turno_sesiones
+  WHERE id = p_turno_sesion_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La sesión del turno no existe.' USING ERRCODE = '23503';
+  END IF;
+
+  IF NOT public.bc_actor_is_admin()
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turnos t
+       WHERE t.id = v_s.turno_id
+         AND t.usuario_id = v_uid
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turno_asignaciones a
+       WHERE a.turno_sesion_id = v_s.id
+         AND a.usuario_id = v_uid
+         AND a.retirado_at IS NULL
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turno_jornada_programacion p
+       WHERE p.id = v_s.jornada_programacion_id
+         AND p.responsable_id = v_uid
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turno_tramos tr
+       WHERE tr.turno_sesion_id = v_s.id
+         AND tr.usuario_id = v_uid
+     ) THEN
+    RAISE EXCEPTION 'Solo el responsable, participante asignado o administrador puede consultar este archivo.' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    lc.fecha_compra,
+    'compra'::text,
+    p.nombre::text,
+    a.nombre::text,
+    lc.cantidad_inicial,
+    lc.costo_unitario,
+    COALESCE(u.nombre, '')::text,
+    lc.id
+  FROM public.lotes_compra lc
+  JOIN public.productos p ON p.id = lc.producto_id
+  JOIN public.almacenes a ON a.id = lc.almacen_id
+  LEFT JOIN public.usuarios u ON u.id = lc.usuario_id
+  WHERE lc.origen = 'compra'
+    AND lc.almacen_id = v_s.almacen_id
+    AND (lc.fecha_compra AT TIME ZONE 'America/Havana')::date = v_s.fecha
+    AND EXISTS (
+      SELECT 1
+      FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = lc.usuario_id
+        AND lc.fecha_compra >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR lc.fecha_compra < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    v.fecha,
+    'venta'::text,
+    p.nombre::text,
+    a.nombre::text,
+    -vl.cantidad,
+    vl.costo_unitario_fifo,
+    COALESCE(u.nombre, '')::text,
+    v.id
+  FROM public.ventas_lineas vl
+  JOIN public.ventas v ON v.id = vl.venta_id
+  JOIN public.productos p ON p.id = vl.producto_id
+  JOIN public.almacenes a ON a.id = v.almacen_id
+  LEFT JOIN public.usuarios u ON u.id = v.creado_por
+  WHERE v.almacen_id = v_s.almacen_id
+    AND (v.fecha AT TIME ZONE 'America/Havana')::date = v_s.fecha
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = v.creado_por
+        AND v.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR v.fecha < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    t.fecha,
+    'transferencia_salida'::text,
+    p.nombre::text,
+    origen.nombre::text,
+    -tl.cantidad,
+    NULL::numeric,
+    COALESCE(u.nombre, '')::text,
+    t.id
+  FROM public.transferencias_lineas tl
+  JOIN public.transferencias t ON t.id = tl.transferencia_id
+  JOIN public.productos p ON p.id = tl.producto_id
+  JOIN public.almacenes origen ON origen.id = t.almacen_origen_id
+  LEFT JOIN public.usuarios u ON u.id = t.creado_por
+  WHERE t.almacen_origen_id = v_s.almacen_id
+    AND (t.fecha AT TIME ZONE 'America/Havana')::date = v_s.fecha
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = t.creado_por
+        AND t.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    t.fecha,
+    'transferencia_entrada'::text,
+    p.nombre::text,
+    destino.nombre::text,
+    tl.cantidad,
+    NULL::numeric,
+    COALESCE(u.nombre, '')::text,
+    t.id
+  FROM public.transferencias_lineas tl
+  JOIN public.transferencias t ON t.id = tl.transferencia_id
+  JOIN public.productos p ON p.id = tl.producto_id
+  JOIN public.almacenes destino ON destino.id = t.almacen_destino_id
+  LEFT JOIN public.usuarios u ON u.id = t.creado_por
+  WHERE t.almacen_destino_id = v_s.almacen_id
+    AND (t.fecha AT TIME ZONE 'America/Havana')::date = v_s.fecha
+    AND (
+      -- The exact session link is authoritative even when ADMIN creates the transfer
+      -- outside the employee's tranche. Unlinked transfers retain actor/tranche rules.
+      EXISTS (
+        SELECT 1
+        FROM public.turno_jornada_entradas_vinculadas linked
+        WHERE linked.turno_sesion_id = v_s.id
+          AND linked.transferencia_id = t.id
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.turno_sesion_id = v_s.id
+          AND tr.usuario_id = t.creado_por
+          AND t.fecha >= tr.inicio_at
+          AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
+      )
+    )
+
+  UNION ALL
+
+  SELECT
+    vs.fecha,
+    'vale'::text,
+    p.nombre::text,
+    a.nombre::text,
+    -vs.cantidad,
+    NULL::numeric,
+    COALESCE(u.nombre, '')::text,
+    vs.id
+  FROM public.vales_salida vs
+  JOIN public.productos p ON p.id = vs.producto_id
+  JOIN public.almacenes a ON a.id = vs.almacen_id
+  LEFT JOIN public.usuarios u ON u.id = vs.creado_por
+  WHERE vs.almacen_id = v_s.almacen_id
+    AND (vs.fecha AT TIME ZONE 'America/Havana')::date = v_s.fecha
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = vs.creado_por
+        AND vs.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR vs.fecha < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en),
+    CASE m.estado WHEN 'APROBADA' THEN 'merma'
+      WHEN 'PENDIENTE' THEN 'merma_pendiente' ELSE 'merma_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    CASE WHEN m.estado='APROBADA' THEN -m.cantidad ELSE m.cantidad END,
+    NULL::numeric,
+    COALESCE(m.revisado_nombre, m.creado_nombre, '')::text,
+    m.id
+  FROM public.mermas m
+  JOIN public.productos p ON p.id = m.producto_id
+  JOIN public.almacenes a ON a.id = m.almacen_id
+  WHERE m.estado IN ('PENDIENTE','APROBADA','RECHAZADA')
+    AND m.almacen_id = v_s.almacen_id
+    AND (
+      -- Explicit source-session + tranche links are authoritative for pending,
+      -- approved and rejected requests. Unlinked legacy records are only inferred
+      -- when ADMIN approval falls inside an exact worker tranche.
+      (m.turno_sesion_id = v_s.id AND EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.id=m.turno_tramo_id
+          AND tr.turno_sesion_id=v_s.id
+          AND tr.usuario_id=m.creado_por
+      ))
+      OR (
+        m.estado='APROBADA'
+        AND (COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) AT TIME ZONE 'America/Havana')::date = v_s.fecha
+        AND EXISTS (
+          SELECT 1 FROM public.turno_tramos tr
+          WHERE tr.turno_sesion_id = v_s.id
+            AND tr.usuario_id = COALESCE(m.revisado_por, m.creado_por)
+            AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) >= tr.inicio_at
+            AND (tr.fin_at IS NULL OR COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) < tr.fin_at)
+        )
+      )
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en),
+    CASE b.estado WHEN 'APROBADA' THEN 'baja'
+      WHEN 'PENDIENTE' THEN 'baja_pendiente' ELSE 'baja_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    CASE WHEN b.estado='APROBADA' THEN -b.cantidad ELSE b.cantidad END,
+    NULL::numeric,
+    COALESCE(b.revisado_nombre, b.creado_nombre, '')::text,
+    b.id
+  FROM public.bajas b
+  JOIN public.productos p ON p.id = b.producto_id
+  JOIN public.almacenes a ON a.id = b.almacen_id
+  WHERE b.estado IN ('PENDIENTE','APROBADA','RECHAZADA')
+    AND b.almacen_id = v_s.almacen_id
+    AND (
+      (b.turno_sesion_id = v_s.id AND EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.id=b.turno_tramo_id
+          AND tr.turno_sesion_id=v_s.id
+          AND tr.usuario_id=b.creado_por
+      ))
+      OR (
+        b.estado='APROBADA'
+        AND (COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) AT TIME ZONE 'America/Havana')::date = v_s.fecha
+        AND EXISTS (
+          SELECT 1 FROM public.turno_tramos tr
+          WHERE tr.turno_sesion_id = v_s.id
+            AND tr.usuario_id = COALESCE(b.revisado_por, b.creado_por)
+            AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) >= tr.inicio_at
+            AND (tr.fin_at IS NULL OR COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) < tr.fin_at)
+        )
+      )
+    )
+
+  UNION ALL
+
+  -- Finance events are part of the exact Jornada ledger, not only the global date history.
+  SELECT
+    COALESCE(g.fecha_revision,g.creado_en),
+    CASE g.estado WHEN 'APROBADO' THEN 'gasto'
+      WHEN 'PENDIENTE' THEN 'gasto_pendiente' ELSE 'gasto_rechazado' END::text,
+    g.concepto::text,
+    a.nombre::text,
+    NULL::numeric,
+    g.monto,
+    COALESCE(g.revisado_nombre,g.creado_nombre,'')::text,
+    g.id
+  FROM public.gastos g
+  JOIN public.almacenes a ON a.id=g.almacen_id
+  WHERE g.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=g.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=g.creado_por
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(r.fecha_revision,r.fecha),
+    CASE r.estado WHEN 'APROBADA' THEN 'reinversion'
+      WHEN 'PENDIENTE' THEN 'reinversion_pendiente' ELSE 'reinversion_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    rl.cantidad_base,
+    rl.costo_total,
+    COALESCE(r.revisado_nombre,r.usuario_nombre,'')::text,
+    r.id
+  FROM public.reinversiones r
+  JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
+  JOIN public.productos p ON p.id=rl.producto_id
+  JOIN public.almacenes a ON a.id=r.almacen_id
+  WHERE r.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=r.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=r.usuario_id
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(e.fecha_revision,e.creado_en),
+    CASE e.estado WHEN 'APROBADA' THEN 'entrega_diaria'
+      WHEN 'PENDIENTE' THEN 'entrega_diaria_pendiente' ELSE 'entrega_diaria_rechazada' END::text,
+    ('Efectivo recogido · '||e.fecha::text)::text,
+    a.nombre::text,
+    NULL::numeric,
+    COALESCE(e.monto_aprobado,e.monto_declarado),
+    COALESCE(e.revisado_nombre,e.creado_nombre,'')::text,
+    e.id
+  FROM public.turno_jornada_entregas_diarias e
+  JOIN public.almacenes a ON a.id=e.almacen_id
+  WHERE e.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=e.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=e.creado_por
+    )
+
+  UNION ALL
+
+  SELECT
+    d.declarado_at,
+    'dinero_declarado_final'::text,
+    'Declaración final de efectivo'::text,
+    a.nombre::text,
+    NULL::numeric,
+    d.monto,
+    COALESCE(u.nombre,'')::text,
+    d.id
+  FROM public.turno_declaraciones d
+  JOIN public.almacenes a ON a.id=v_s.almacen_id
+  LEFT JOIN public.usuarios u ON u.id=d.usuario_id
+  WHERE d.turno_sesion_id=v_s.id
+
+  UNION ALL
+
+  SELECT
+    d.contado_at,
+    'dinero_contado_final'::text,
+    'Conteo físico del Dueño'::text,
+    a.nombre::text,
+    NULL::numeric,
+    d.monto_contado,
+    COALESCE(contador.nombre,'ADMIN')::text,
+    d.id
+  FROM public.turno_declaraciones d
+  JOIN public.almacenes a ON a.id=v_s.almacen_id
+  LEFT JOIN public.usuarios contador ON contador.id=d.contado_por
+  WHERE d.turno_sesion_id=v_s.id
+    AND d.monto_contado IS NOT NULL
+
+  ORDER BY 1 DESC;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.bc7_movimientos_sesion(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bc7_movimientos_sesion(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.bc7_movimientos_sesion(uuid) TO authenticated;
+
+COMMIT;

@@ -78,7 +78,7 @@ test("La Cueva UI renders daily cash and inventory settlement and does not show 
 test("owner approval UI accepts daily cash and zero-value counts", () => {
   assert.match(approvals, /can\('entregas_caja','editar_any'\)/);
   assert.match(approvals, /entrega_diaria/);
-  assert.match(approvals, /isDailyCash\?real<0:real<=0/);
+  assert.match(approvals, /\(\(isDailyCash\|\|isFinalCash\)\?real<0:real<=0\)/);
   assert.match(approvals, /p_monto_real:isMoney\?real:null/);
 });
 

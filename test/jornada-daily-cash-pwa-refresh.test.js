@@ -10,19 +10,22 @@ const APP = read("public/app.js");
 const INDEX = read("public/index.html");
 const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
+const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.96 release and Jornada UI 7.20", () => {
-  assert.match(APP, /const VERSION="9\.5\.96";/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.96/);
-  assert.match(INDEX, /js\/offline\.js\?v=9\.5\.96/);
-  assert.match(INDEX, /app-footer-version">v9\.5\.96 — BattleCruiser/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.96"/);
-  assert.match(SW, /\.\/app\.js\?v=9\.5\.96/);
-  assert.match(SW, /\.\/js\/offline\.js\?v=9\.5\.96/);
-  assert.match(APP, /\["bc7-jornada-ui\.js","7\.20"\]/);
-  assert.match(SW, /\.\/js\/bc7-jornada-ui\.js\?v=7\.20/);
-  assert.match(APP, /\["aprobaciones-admin\.js","20261112\.1"\]/);
-  assert.match(SW, /\.\/js\/aprobaciones-admin\.js\?v=20261112\.1/);
+test("PWA shell pins one fresh 9.5.97 release and Jornada UI 7.21", () => {
+  assert.ok(APP.includes('const VERSION="9.5.97";'));
+  assert.ok(INDEX.includes('style.css?v=9.5.97'));
+  assert.ok(INDEX.includes('app.js?v=9.5.97'));
+  assert.ok(INDEX.includes('js/offline.js?v=9.5.97'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.97 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.97"'));
+  assert.ok(SW.includes('./app.js?v=9.5.97'));
+  assert.ok(SW.includes('./style.css?v=9.5.97'));
+  assert.ok(SW.includes('./js/offline.js?v=9.5.97'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.21"]'));
+  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.21'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261112.2"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261112.2'));
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
@@ -107,4 +110,23 @@ test("closing requires every date and confirms the final day before closing the 
   assert.match(block, /pending\.ajustes/);
   assert.match(block, /pending\.entregas_diarias_faltantes/);
   assert.match(block, /salario_porcentaje/);
+});
+
+
+test("mobile Jornada uses labelled inventory cards and stable cash/header layouts", () => {
+  assert.ok(CSS.includes(".bc7-table.bc7-count-table"));
+  assert.ok(CSS.includes("content: attr(data-label)"));
+  assert.ok(CSS.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]"));
+  assert.ok(CSS.includes("#app-shell.visible > .app-header"));
+  assert.ok(CSS.includes('"account user"'));
+});
+test("Owner can count the declared final cash only after session completion without redeclaring it", () => {
+  assert.match(UI, /data-bc7-final-cash-count/);
+  assert.match(UI, /data-bc7-final-cash-amount/);
+  assert.match(UI, /rpc\('bc5_contar_dinero_entregado'/);
+  assert.match(UI, /p_declaracion_id:declarationId,p_monto_contado:amount/);
+  assert.ok(UI.includes("String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'"));
+  assert.match(UI, /declaration\.monto_contado==null/);
+  assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
+  assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
 });
