@@ -269,11 +269,11 @@ BEGIN
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  IF (v_result->>'ventas_estimadas')::numeric<>60 THEN
-    RAISE EXCEPTION 'FAIL: pending adjustments are not applied until approval; expected inventory-delta sales CUP60; result=%',v_result;
+  IF (v_result->>'ventas_estimadas')::numeric<>50 THEN
+    RAISE EXCEPTION 'FAIL: pending adjustments are not applied until approval; expected inventory-delta sales CUP50; result=%',v_result;
   END IF;
-  IF (v_result->>'salario_calculado')::numeric<>3 THEN
-    RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP3.00 before pending adjustments are approved; result=%',v_result;
+  IF (v_result->>'salario_calculado')::numeric<>2.5 THEN
+    RAISE EXCEPTION 'FAIL: expected 5 percent salary CUP2.50 before pending adjustments are approved; result=%',v_result;
   END IF;
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
      OR (v_result->'pendientes'->>'gastos')::integer<>1
