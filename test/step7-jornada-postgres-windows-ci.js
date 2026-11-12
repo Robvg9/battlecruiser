@@ -272,7 +272,6 @@ function applySql(file) {
     applySql("test/step7-jornada-finanzas-fixture.sql");
     log("\\r\\n=== 5/9 Apply Step 7 finance/carry-forward migration ===");
     applySql("supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql");
-    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
     applySql("supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql");
     log("\\r\\n=== 5/10 Apply Jornada POS session, tranche and payment provenance ===");
     applySql("supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql");
@@ -289,7 +288,6 @@ function applySql(file) {
     log("\r\n=== 8/9 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
     log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
-    applySql("test/step7-jornada-finanzas-contract.sql");
     log("\\r\\n=== 10/11 Verify cash handover fixture and authenticated RLS dependency ===");
     applySql("test/turno-cash-handover-fixture.sql");
     applySql("supabase/migrations/20261031224227_turno_cash_handover_owner_reconciliation_20261031.sql");
@@ -310,6 +308,10 @@ function applySql(file) {
     log("\\r\\n=== La Cueva period migration and inventory-delta settlement contract ===");
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
     applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
+    log("\\r\\n=== Apply final reinvestment approval gate after all Jornada approval migrations ===");
+    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
+    log("\\r\\n=== Verify idempotent finance writes and reinvestment approval effects ===");
+    applySql("test/step7-jornada-finanzas-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
   } catch (error) {
