@@ -269,6 +269,109 @@ BEGIN
         )
       )
     )
+
+  UNION ALL
+
+  -- Finance events are part of the exact Jornada ledger, not only the global date history.
+  SELECT
+    COALESCE(g.fecha_revision,g.creado_en),
+    CASE g.estado WHEN 'APROBADO' THEN 'gasto'
+      WHEN 'PENDIENTE' THEN 'gasto_pendiente' ELSE 'gasto_rechazado' END::text,
+    g.concepto::text,
+    a.nombre::text,
+    NULL::numeric,
+    g.monto,
+    COALESCE(g.revisado_nombre,g.creado_nombre,'')::text,
+    g.id
+  FROM public.gastos g
+  JOIN public.almacenes a ON a.id=g.almacen_id
+  WHERE g.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=g.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=g.creado_por
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(r.fecha_revision,r.fecha),
+    CASE r.estado WHEN 'APROBADA' THEN 'reinversion'
+      WHEN 'PENDIENTE' THEN 'reinversion_pendiente' ELSE 'reinversion_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    rl.cantidad_base,
+    rl.costo_total,
+    COALESCE(r.revisado_nombre,r.usuario_nombre,'')::text,
+    r.id
+  FROM public.reinversiones r
+  JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
+  JOIN public.productos p ON p.id=rl.producto_id
+  JOIN public.almacenes a ON a.id=r.almacen_id
+  WHERE r.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=r.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=r.usuario_id
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(e.fecha_revision,e.creado_en),
+    CASE e.estado WHEN 'APROBADA' THEN 'entrega_diaria'
+      WHEN 'PENDIENTE' THEN 'entrega_diaria_pendiente' ELSE 'entrega_diaria_rechazada' END::text,
+    ('Efectivo recogido · '||e.fecha::text)::text,
+    a.nombre::text,
+    NULL::numeric,
+    COALESCE(e.monto_aprobado,e.monto_declarado),
+    COALESCE(e.revisado_nombre,e.creado_nombre,'')::text,
+    e.id
+  FROM public.turno_jornada_entregas_diarias e
+  JOIN public.almacenes a ON a.id=e.almacen_id
+  WHERE e.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=e.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=e.creado_por
+    )
+
+  UNION ALL
+
+  SELECT
+    d.declarado_at,
+    'dinero_declarado_final'::text,
+    'Declaración final de efectivo'::text,
+    a.nombre::text,
+    NULL::numeric,
+    d.monto,
+    COALESCE(u.nombre,'')::text,
+    d.id
+  FROM public.turno_declaraciones d
+  JOIN public.almacenes a ON a.id=v_s.almacen_id
+  LEFT JOIN public.usuarios u ON u.id=d.usuario_id
+  WHERE d.turno_sesion_id=v_s.id
+
+  UNION ALL
+
+  SELECT
+    d.contado_at,
+    'dinero_contado_final'::text,
+    'Conteo físico del Dueño'::text,
+    a.nombre::text,
+    NULL::numeric,
+    d.monto_contado,
+    COALESCE(contador.nombre,'ADMIN')::text,
+    d.id
+  FROM public.turno_declaraciones d
+  JOIN public.almacenes a ON a.id=v_s.almacen_id
+  LEFT JOIN public.usuarios contador ON contador.id=d.contado_por
+  WHERE d.turno_sesion_id=v_s.id
+    AND d.monto_contado IS NOT NULL
+
   ORDER BY 1 DESC;
 END;
 $function$;
