@@ -6,7 +6,7 @@ BEGIN
   SELECT p.permitido INTO v_allowed
   FROM public.permisos p
   JOIN public.roles r ON r.id=p.role_id
-  WHERE lower(btrim(r.nombre))='dependienta'
+  WHERE lower(btrim(r.nombre)) IN ('dependienta','dependientas')
     AND p.seccion='mermas'
     AND p.accion='crear';
   IF v_allowed IS DISTINCT FROM true THEN
@@ -16,7 +16,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.permisos p
     JOIN public.roles r ON r.id=p.role_id
-    WHERE lower(btrim(r.nombre))='dependienta'
+    WHERE lower(btrim(r.nombre)) IN ('dependienta','dependientas')
       AND p.seccion='mermas'
       AND p.accion IN ('editar','editar_any','borrar')
       AND p.permitido=true
