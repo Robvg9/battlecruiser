@@ -115,10 +115,15 @@ test("closing requires every date and confirms the final day before closing the 
 
 test("mobile Jornada uses labelled inventory cards and stable cash/header layouts", () => {
   assert.ok(CSS.includes(".bc7-final-count-list"));
-  assert.ok(!UI.includes("Referencia anterior"));
+  const finalCountStart=UI.indexOf("?'<div class="bc7-final-count-list"");
+  const initialCountStart=UI.indexOf(":'<p class="bc7-table-scroll-hint"",finalCountStart);
+  const finalCountTemplate=UI.slice(finalCountStart,initialCountStart);
+  assert.ok(finalCountTemplate.includes("bc7-final-count-product"));
+  assert.ok(finalCountTemplate.includes("data-bc7-count"));
+  assert.doesNotMatch(finalCountTemplate,/Referencia anterior|Stock actual|Restock actual/);
   assert.ok(CSS.includes(".bc7-final-count-row"));
   assert.match(UI, /data-bc7-count=/);
-  assert.doesNotMatch(UI, /data-label="Referencia anterior"|data-label="Stock actual"/);
+  assert.match(UI,/data-label="Referencia anterior"/); // solo inventario inicial: sigue siendo referencia histórica, nunca conteo final
   assert.match(UI, /<details class="bc7-finance-fold"><summary>Registrar gasto/);
   assert.match(UI, /<details class="bc7-finance-fold"><summary>Registrar reinversión/);
   assert.ok(CSS.includes("content: attr(data-label)"));
