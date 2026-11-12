@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.95 — Jornada actual, declaración de efectivo y UX de inventario
+// v9.5.96 — lectura financiera verificada y actualización PWA confiable
 (function hotfixV9475(){
-  const VERSION="9.5.95";
+  const VERSION="9.5.96";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -23,8 +23,14 @@
     notice.className = "bc-pwa-update-notice";
     notice.id = "bc-pwa-update-notice";
     notice.setAttribute("role", "status");
-    notice.innerHTML = '<span>Hay una versión nueva de BattleCruiser lista. Actualiza cuando termines lo que estás haciendo.</span><button type="button">Actualizar ahora</button>';
-    notice.querySelector("button").addEventListener("click", function(){ window.location.reload(); });
+    var message = document.createElement("span");
+    message.textContent = "Hay una versión nueva de BattleCruiser lista. Actualiza cuando termines lo que estás haciendo.";
+    var button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Actualizar ahora";
+    button.addEventListener("click", function(){ window.location.reload(); });
+    notice.appendChild(message);
+    notice.appendChild(button);
     document.body.appendChild(notice);
   });
 })();
