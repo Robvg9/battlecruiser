@@ -116,7 +116,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["m53-inventario-centro.js","53.9"]'), 'M53 must resolve warehouse IDs for mixed variants');
   assert.ok(app.includes('["ui-operaciones-hub.js","43.3"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'), 'the finance operations form must refresh');
-  assert.ok(app.includes('["aprobaciones-admin.js","20261112.2"]'), 'the approval form must refresh');
+  assert.ok(app.includes('["aprobaciones-admin.js","20261112.3"]'), 'the approval form must refresh');
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'), 'the retroactive Jornada opening form must load');
   assert.ok(sw.includes('./js/bc7-periodo-apertura-ui.js?v=1.7'), 'the retroactive Jornada opening form must be precached');
   assert.ok(app.includes('["bajas-multiple.js","1.6"]'), 'Bajas list payload must be refreshed');
@@ -199,7 +199,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /v9\.5\.97 — Jornada móvil y conteo de efectivo del Dueño y actualización PWA confiable/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.97"><\/script>/);
   for (const asset of [
-    'style.css?v=9.5.97',
+    'style.css?v=9.5.98',
     'js/centro-control.js?v=9.5.70',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.64',
@@ -229,7 +229,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.97');"));
+  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.98');"));
 });
 
 
@@ -239,7 +239,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.97"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.98"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -287,10 +287,10 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.97'));
-  assert.ok(index.includes('app.js?v=9.5.97'));
-  assert.ok(sw.includes('./style.css?v=9.5.97'));
-  assert.ok(sw.includes('./app.js?v=9.5.97'));
+  assert.ok(index.includes('style.css?v=9.5.98'));
+  assert.ok(index.includes('app.js?v=9.5.98'));
+  assert.ok(sw.includes('./style.css?v=9.5.98'));
+  assert.ok(sw.includes('./app.js?v=9.5.98'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
