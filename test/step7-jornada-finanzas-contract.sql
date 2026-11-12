@@ -45,7 +45,7 @@ BEGIN
   IF v_final_id IS NULL THEN RAISE EXCEPTION 'FAIL: Day 1 final snapshot is missing'; END IF;
 
   UPDATE public.turnos SET dias_turno=2 WHERE id=v_turno;
-  UPDATE public.turno_jornada_programacion SET fecha=v_fecha_hoy-1 WHERE id=v_prog1;
+  UPDATE public.turno_jornada_programacion SET fecha=v_fecha_hoy-1,fecha_fin=v_fecha_hoy-1 WHERE id=v_prog1;
   UPDATE public.turno_sesiones SET fecha=v_fecha_hoy-1 WHERE id=v_day1;
 
   INSERT INTO public.turno_jornada_programacion(
