@@ -10,6 +10,7 @@ on:
       - 'supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql'
       - 'supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql'
       - 'test/dependienta-jornada-merma-permission-contract.sql'
+      - 'test/dependienta-jornada-merma-permission-fixture.sql'
       - 'test/dependienta-jornada-merma-permission.test.js'
       - 'test/jornada-final-cash-admin-queue-contract.sql'
       - 'test/jornada-final-cash-approval-queue.test.js'
