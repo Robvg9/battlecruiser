@@ -39,6 +39,18 @@ test("finance and operation refresh recognize the authenticated active jornada a
   assert.match(UI, /if\(tab==='operacion'&&state\.detail\)loadCashDaysWorkspace\(state\.detail\)/);
 });
 
+test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {
+  const start = UI.indexOf("const op='<div class=\"bc7-panel-stack\">");
+  const end = UI.indexOf("const mov='<div class=\"bc7-panel-stack\">", start);
+  assert.ok(start >= 0 && end > start);
+  const panel = UI.slice(start, end);
+  for (const item of ["actionArea+fin+adjustment","financeFormHtml(detail,isAssigned,status)","data-bc7-finance-form=\"gasto\"","data-bc7-finance-form=\"reinversion\"","data-bc7-adjust-form","bc7-inventory-settlement"]) {
+    assert.ok(panel.includes(item), "missing in one-panel operation workspace: " + item);
+  }
+  assert.doesNotMatch(UI, /data-bc7-workspace-tab="finanzas"/);
+  assert.match(UI, /loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\)/);
+});
+
 test("retail cash entry and final-day declaration share the same operation/close form", () => {
   assert.match(UI, /data-bc7-cash-mode="daily"/);
   assert.match(UI, /cashDaysManagerShellHtml\(detail,isAssigned,status\)/);
