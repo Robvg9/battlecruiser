@@ -285,6 +285,7 @@
       button.classList.toggle('active',active);
     });
     body.querySelectorAll('[data-bc7-workspace-panel]').forEach(panel=>{panel.hidden=panel.getAttribute('data-bc7-workspace-panel')!==tab;});
+    if(tab==='operacion'&&state.detail)loadCashDaysWorkspace(state.detail);
     if(tab==='finanzas'&&state.detail)loadFinances(state.detail);
     if(tab==='movimientos'&&state.detail)loadMovements(state.detail);
   }
@@ -448,8 +449,8 @@
     if(!sessionId)return false;
     const opened=await openWorkspace(sessionId);
     if(opened&&finance){
-      activateWorkspaceTab('finanzas');
-      const target=$('bc7-daily-cash-list')||document.querySelector('[data-bc7-workspace-panel="finanzas"]');
+      activateWorkspaceTab('operacion');
+      const target=$('bc7-cash-days-list')||document.querySelector('[data-bc7-workspace-panel="operacion"]');
       if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
     }
     return opened;
@@ -1153,13 +1154,15 @@
   }
   async function openWorkspace(sessionId){
     if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
-    if(String(state.selected||'')!==String(sessionId||''))state.workspaceTab='inventario';
+    const isNewSelection=String(state.selected||'')!==String(sessionId||'');
+    if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;}
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{
       const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
       detail.entrega_compartida=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
       detail.is_admin=!!state.admin;
+      if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
     }catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
   }
