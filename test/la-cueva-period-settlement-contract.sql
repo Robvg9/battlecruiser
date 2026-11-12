@@ -15,6 +15,10 @@ DECLARE
   v_turn uuid:='a1000000-0000-0000-0000-000000000001';
   v_program uuid:='a2000000-0000-0000-0000-000000000001';
   v_session uuid:='a3000000-0000-0000-0000-000000000001';
+  v_next_program uuid:='a2000000-0000-0000-0000-000000000002';
+  v_next_session uuid:='a3000000-0000-0000-0000-000000000002';
+  v_next_tranche public.turno_tramos;
+  v_handover_id uuid;
   v_tranche uuid:='a4000000-0000-0000-0000-000000000001';
   v_initial_cut uuid:='a5000000-0000-0000-0000-000000000001';
   v_final_cut uuid:='a5000000-0000-0000-0000-000000000002';
@@ -28,7 +32,8 @@ DECLARE
   v_result jsonb;
   v_error boolean;
   v_operation text;
-  v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
+  -- The current jornada covers the two completed dates before today; the next one starts today.
+  v_today date:=(now() AT TIME ZONE 'America/Havana')::date-2;
   v_start timestamptz:=now()-interval '2 hours';
   v_mid timestamptz:=now()-interval '90 minutes';
   v_end timestamptz:=now()+interval '2 hours';
@@ -72,6 +77,20 @@ BEGIN
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
   VALUES(v_session,v_turn,v_worker,v_owner);
 
+  -- Next Jornada begins after the whole Nov 9–10-style period, not on its middle day.
+  INSERT INTO public.turno_jornada_programacion(
+    id,turno_id,almacen_id,numero_dia,fecha,fecha_fin,trabaja,responsable_id,
+    hora_inicio_prevista,hora_fin_prevista,zona_horaria,patron_id,estado,creado_por,actualizado_por
+  ) VALUES(
+    v_next_program,v_turn,v_warehouse,2,v_today+2,v_today+2,true,v_worker,
+    '07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner
+  );
+  INSERT INTO public.turno_sesiones(
+    id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id
+  ) VALUES(v_next_session,v_turn,v_warehouse,2,'JORNADA',v_today+2,'PROGRAMADA',v_next_program);
+  INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
+  VALUES(v_next_session,v_turn,v_worker,v_owner);
+
   INSERT INTO public.turno_jornada_inventario_cortes(
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
   ) VALUES(v_initial_cut,v_session,'INICIAL','CONFIRMADO',v_worker,v_worker,v_start,v_start,'Initial physical count');
@@ -95,6 +114,9 @@ BEGIN
   ) VALUES(v_final_cut,v_session,'FINAL','CONFIRMADO',v_worker,v_worker,v_end,v_end,'Final physical count');
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
   VALUES(v_final_cut,v_pan,7,7),(v_final_cut,v_juice,4,4);
+  -- Force the deferred final-cut trigger now, so the handover points to the scheduled day after fecha_fin.
+  SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada IMMEDIATE;
+  SET CONSTRAINTS bc7_preparar_entrega_inventario_jornada DEFERRED;
 
   UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_session;
   UPDATE public.turnos SET estado='ABIERTO',estado_maestro='EN_CURSO' WHERE id=v_turn;
@@ -389,11 +411,49 @@ BEGIN
   v_closed:=public.bc5_cerrar_jornada(v_session,'Cierre de contrato PostgreSQL fuera del horario programado');
   IF v_closed.estado<>'COMPLETADA'
      OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='COMPLETADO')
-     OR (SELECT estado FROM public.turnos WHERE id=v_turn)<>'CERRADO'
+     OR (SELECT estado FROM public.turnos WHERE id=v_turn)<>'ABIERTO'
+     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'EN_CURSO'
      OR (public.bc7_liquidacion_inventario_jornada(v_session)->>'calculable')::boolean IS DISTINCT FROM true THEN
-    RAISE EXCEPTION 'FAIL: the jornada/master turn did not close with a reconciled daily cash/expense/reinvestment/merma/baja ledger';
+    RAISE EXCEPTION 'FAIL: jornada close must complete the current session but preserve the master turn as open for the next programmed day';
   END IF;
 
-  RAISE NOTICE 'PASS La Cueva: all daily cash, approved expense/reinvestment/merma/baja, stock and cash reconciliation, close transition, ACL.';
+  SELECT id INTO v_handover_id
+  FROM public.turno_jornada_inventario_entregas
+  WHERE origen_sesion_id=v_session AND destino_sesion_id=v_next_session
+    AND fecha_destino=v_today+2 AND estado='PENDIENTE_RECEPCION';
+  IF v_handover_id IS NULL THEN
+    RAISE EXCEPTION 'FAIL: multi-day Jornada did not hand inventory to the next session after fecha_fin';
+  END IF;
+
+  -- The next worker physically receives the exact final count. Matching quantities
+  -- auto-accept and materialize INITIAL before bc5_iniciar_jornada is allowed to run.
+  v_result:=public.bc7_recibir_entrega_jornada(
+    v_next_session,
+    jsonb_build_array(
+      jsonb_build_object('producto_id',v_pan,'cantidad',7),
+      jsonb_build_object('producto_id',v_juice,'cantidad',4)
+    ),
+    'Recepción física exacta del inventario de la jornada anterior',
+    'a6400000-0000-0000-0000-000000000005'
+  );
+  IF v_result->>'estado'<>'ACEPTADA'
+     OR NOT EXISTS(
+       SELECT 1 FROM public.turno_jornada_inventario_cortes
+       WHERE turno_sesion_id=v_next_session AND tipo='INICIAL' AND estado='CONFIRMADO'
+     ) THEN
+    RAISE EXCEPTION 'FAIL: next Jornada did not receive and confirm the shared initial inventory';
+  END IF;
+
+  v_next_tranche:=public.bc5_iniciar_jornada(
+    v_next_session,'Apertura de la siguiente jornada tras completar el periodo anterior'
+  );
+  IF v_next_tranche.estado<>'ACTIVO'
+     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'EN_CURSO'
+     OR (SELECT estado FROM public.turnos WHERE id=v_turn)<>'ABIERTO'
+     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'EN_CURSO' THEN
+    RAISE EXCEPTION 'FAIL: next programmed Jornada could not open after the previous period was reconciled and closed';
+  END IF;
+
+  RAISE NOTICE 'PASS La Cueva: multi-day daily cash, approved expense/reinvestment/merma/baja, stock/cash reconciliation, protected close, next-period inventory handover/receipt, next Jornada open and ACL.';
 END;
 $test$;
