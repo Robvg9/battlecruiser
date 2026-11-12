@@ -1550,15 +1550,15 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
 #tab-jornada .bc7-finance-fold[open]>summary:after{content:"−"}
 #tab-jornada .bc7-finance-fold>form,#tab-jornada .bc7-finance-fold>div{padding:0 0 12px}
 @media(max-width:759px){
- #app-shell.visible>.app-header{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;flex-wrap:wrap!important}
- #app-shell.visible>.app-header>.header-left{display:flex!important;align-items:center!important;flex:1 1 auto!important;min-width:0!important}
- #app-shell.visible>.app-header>.header-right{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;flex:0 0 auto!important;flex-wrap:nowrap!important;min-width:0!important}
- #app-shell.visible>.app-header #mi-cuenta-btn,#app-shell.visible>.app-header #logout-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;order:initial!important;grid-area:auto!important;min-width:0!important;max-width:none!important;white-space:nowrap!important}
- #app-shell.visible>.app-header #mi-cuenta-btn{margin:0!important}
- #app-shell.visible>.app-header #logout-btn{margin:0!important}
- #app-shell.visible>.app-header #user-email{display:none!important}
- #app-shell.visible>.app-header #conn-status-app{display:none!important}
- #app-shell.visible>.app-header #cola-pendientes-badge{display:none!important}
+ #app-shell.visible > header.app-header.app-header{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;flex-wrap:nowrap!important}
+ #app-shell.visible > header.app-header.app-header > .header-left{display:flex!important;align-items:center!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;grid-area:auto!important}
+ #app-shell.visible > header.app-header.app-header > .header-right{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;flex:0 0 auto!important;flex-wrap:nowrap!important;min-width:0!important;grid-area:auto!important}
+ #app-shell.visible > header.app-header.app-header #mi-cuenta-btn,#app-shell.visible > header.app-header.app-header #logout-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;order:initial!important;grid-area:auto!important;min-width:0!important;max-width:none!important;white-space:nowrap!important}
+ #app-shell.visible > header.app-header.app-header #mi-cuenta-btn{margin:0!important}
+ #app-shell.visible > header.app-header.app-header #logout-btn{margin:0!important}
+ #app-shell.visible > header.app-header.app-header #user-email{display:none!important}
+ #app-shell.visible > header.app-header.app-header #conn-status-app{display:none!important}
+ #app-shell.visible > header.app-header.app-header #cola-pendientes-badge{display:none!important}
  #tab-jornada .bc7-note{padding:10px}
  #tab-jornada .bc7-detail-body{padding:9px}
  #tab-jornada .bc7-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
