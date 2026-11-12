@@ -11,16 +11,16 @@ const INDEX = read("public/index.html");
 const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 
-test("PWA shell pins one fresh 9.5.96 release and Jornada UI 7.20", () => {
-  assert.match(APP, /const VERSION="9\.5\.96";/);
-  assert.match(INDEX, /app\.js\?v=9\.5\.96/);
-  assert.match(INDEX, /js\/offline\.js\?v=9\.5\.96/);
-  assert.match(INDEX, /app-footer-version">v9\.5\.96 — BattleCruiser/);
-  assert.match(SW, /BC_SW_VERSION = "9\.5\.96"/);
-  assert.match(SW, /\.\/app\.js\?v=9\.5\.96/);
-  assert.match(SW, /\.\/js\/offline\.js\?v=9\.5\.96/);
-  assert.match(APP, /\["bc7-jornada-ui\.js","7\.20"\]/);
-  assert.match(SW, /\.\/js\/bc7-jornada-ui\.js\?v=7\.20/);
+test("PWA shell pins one fresh 9.5.97 release and Jornada UI 7.21", () => {
+  assert.match(APP, /const VERSION="9\\.5\\.97";/);
+  assert.match(INDEX, /app\.js\?v=9\\.5\\.97/);
+  assert.match(INDEX, /js\/offline\.js\?v=9\\.5\\.97/);
+  assert.match(INDEX, /app-footer-version">v9\\.5\\.97 — BattleCruiser/);
+  assert.match(SW, /BC_SW_VERSION = "9\\.5\\.97"/);
+  assert.match(SW, /\.\/app\.js\?v=9\\.5\\.97/);
+  assert.match(SW, /\.\/js\/offline\.js\?v=9\\.5\\.97/);
+  assert.match(APP, /\["bc7-jornada-ui\.js","7\\.21"\]/);
+  assert.match(SW, /\.\/js\/bc7-jornada-ui\.js\?v=7\\.21/);
   assert.match(APP, /\["aprobaciones-admin\.js","20261112\.1"\]/);
   assert.match(SW, /\.\/js\/aprobaciones-admin\.js\?v=20261112\.1/);
 });
@@ -107,4 +107,15 @@ test("closing requires every date and confirms the final day before closing the 
   assert.match(block, /pending\.ajustes/);
   assert.match(block, /pending\.entregas_diarias_faltantes/);
   assert.match(block, /salario_porcentaje/);
+});
+
+test("Owner can count the declared final cash only after session completion without redeclaring it", () => {
+  assert.match(UI, /data-bc7-final-cash-count/);
+  assert.match(UI, /data-bc7-final-cash-amount/);
+  assert.match(UI, /rpc\('bc5_contar_dinero_entregado'/);
+  assert.match(UI, /p_declaracion_id:declarationId,p_monto_contado:amount/);
+  assert.match(UI, /state\.detail\?\.sesion\?\.estado\|\|''\)\)\.toUpperCase\(\)==='COMPLETADA'/);
+  assert.match(UI, /declaration\.monto_contado==null/);
+  assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
+  assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
 });
