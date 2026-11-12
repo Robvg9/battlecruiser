@@ -481,7 +481,8 @@
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
       if(showDailyCash)html+='<div id="bc7-daily-cash-list"><div class="bc7-empty">Consultando entregas diarias…</div></div>';
       if(createDailyCash){
-        html+='<p class="bc7-muted">En jornadas de varios días, registra aquí el dinero de cada día anterior al último. El importe del último día se declara en Operación → Dinero entregado.</p>'+
+        const finalDayLabel=fmtDateHuman(lastDate);
+        html+='<div class="bc7-note"><b>Último día · '+esc(finalDayLabel)+'</b><p>Esta lista es solo para los días anteriores. El efectivo del último día ('+esc(finalDayLabel)+') se declara en «Dinero entregado y cierre» dentro de esta jornada.</p><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-open-final-cash>Ir a Dinero entregado</button></div></div>'+
           '<form data-bc7-daily-cash-form="'+esc(sessionId)+'"><h4>Registrar dinero recogido del día</h4>'+
           '<input type="hidden" data-bc7-daily-cash-key value="">'+
           '<div class="bc7-grid"><label class="bc7-field">Fecha<input data-bc7-daily-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(dailyCashEnd)+'" value="'+esc(defaultDailyDate)+'" required></label>'+
@@ -649,7 +650,8 @@
       '<p class="bc7-muted">Este desglose informa los importes registrados por método de pago. No equivale al efectivo esperado ni sustituye la declaración y el conteo físico.</p>';
   }
   async function loadFinances(detail){
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'');
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===String(detail.sesion.id||'');
     const isRetail=detail.sesion.es_minorista===true;
     const hasExpenses=state.admin||isAssigned;
     const hasReinvestments=state.admin||isAssigned;
@@ -781,13 +783,23 @@
     const btn=form.querySelector('button[type="submit"]');
     if(!busy(btn,true))return;
     try{
-      await rpc('bc7_registrar_entrega_diaria_jornada',{
+      const createdId=await rpc('bc7_registrar_entrega_diaria_jornada',{
         p_turno_sesion_id:sessionId,p_fecha:date,p_monto:amount,
         p_observacion:note,p_idempotency_key:key
       });
+      state.dailyCashData=null;
       await loadFinances(state.detail);
+      const confirmedRow=arr(state.dailyCashData?.entregas).find(function(item){
+        return String(item.fecha||'').slice(0,10)===date
+          && Number(item.monto_declarado)===amount
+          && (!createdId||String(item.id)===String(createdId));
+      });
+      if(!confirmedRow){
+        msg(message,'El servidor respondió, pero la lectura posterior no confirmó esta entrega. Conservé la referencia para evitar duplicados. Actualiza la jornada antes de volver a enviarla.','error');
+        return;
+      }
       form.reset();keyField.value='';
-      msg(message,'Entrega diaria registrada y visible. Queda pendiente de aprobación del Dueño.','ok');
+      msg(message,'Entrega diaria registrada y confirmada desde el servidor. Queda pendiente de aprobación del Dueño.','ok');
       setStatus('Dinero recogido guardado para '+fmtDateHuman(date)+'. No se modificó caja.','ok');
     }catch(e){
       msg(message,friendlyError(e,'create')+' La referencia se conserva para poder comprobar o reintentar sin duplicar.','error');
@@ -1393,6 +1405,15 @@
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
+    if(t.hasAttribute('data-bc7-open-final-cash')){
+      activateWorkspaceTab('inventario');
+      const target=document.querySelector('form[data-bc7-close-form]');
+      if(target){
+        target.scrollIntoView({behavior:'smooth',block:'center'});
+        const input=$('bc7-cash');if(input)input.focus();
+      }
+      return;
+    }
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-preview')){await previewPattern(t);return;}
