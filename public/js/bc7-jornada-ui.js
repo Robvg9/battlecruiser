@@ -449,7 +449,7 @@
     const opened=await openWorkspace(sessionId);
     if(opened&&finance){
       activateWorkspaceTab('finanzas');
-      const target=$('bc7-daily-cash-list')||$('bc7-finance-section');
+      const target=$('bc7-daily-cash-list')||document.querySelector('[data-bc7-workspace-panel="finanzas"]');
       if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
     }
     return opened;
@@ -1097,6 +1097,7 @@
       let archiveRefreshFailed=false;
       try{await refreshPosArchiveAfterSessionStart();}catch(e){archiveRefreshFailed=true;}
       await loadCalendar();
+      await loadCurrentSession();
       const reread=await openWorkspace(sessionId);
       if(!reread){
         setStatus('La solicitud de inicio fue aceptada, pero no se pudo releer el estado. Actualiza antes de repetir la operación.','error');
