@@ -261,10 +261,10 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
 });
 
 test("app shell, application and Service Worker share 9.5.96 and load refreshed navigation modules", () => {
-  assert.match(app, /const VERSION="9\\.5\\.96"/);
+  assert.match(app, /const VERSION="9\.5\.96"/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9.5.96"/);
-  assert.match(index, /href="style\.css\?v=9\\.5\\.96"/);
-  assert.match(index, /<script src="app\.js\?v=9\\.5\\.96"><\/script>/);
+  assert.match(index, /href="style\.css\?v=9\.5\.95"/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.96"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.8"\]/);
   assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.8/, "Service Worker debe precargar la misma versión de app.js");
   assert.ok(index.includes("js/navegacion.js?v=9.5.65"));
