@@ -272,6 +272,7 @@ function applySql(file) {
     applySql("test/step7-jornada-finanzas-fixture.sql");
     log("\\r\\n=== 5/9 Apply Step 7 finance/carry-forward migration ===");
     applySql("supabase/migrations/20261031010121_step7_jornada_finanzas_carryforward.sql");
+    applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
     applySql("supabase/migrations/20261101154629_step4_assigned_jornada_finance_read.sql");
     log("\\r\\n=== 5/10 Apply Jornada POS session, tranche and payment provenance ===");
     applySql("supabase/migrations/20261102010000_step4_jornada_sales_provenance.sql");
