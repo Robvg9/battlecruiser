@@ -115,12 +115,17 @@ test("closing requires every date and confirms the final day before closing the 
 
 test("mobile Jornada uses labelled inventory cards and stable cash/header layouts", () => {
   assert.ok(CSS.includes(".bc7-final-count-list"));
-  assert.ok(!JORNADA.includes("Referencia anterior"));
+  assert.ok(!UI.includes("Referencia anterior"));
   assert.ok(CSS.includes(".bc7-final-count-row"));
+  assert.match(UI, /data-bc7-count=/);
+  assert.doesNotMatch(UI, /data-label="Referencia anterior"|data-label="Stock actual"/);
+  assert.match(UI, /<details class="bc7-finance-fold"><summary>Registrar gasto/);
+  assert.match(UI, /<details class="bc7-finance-fold"><summary>Registrar reinversión/);
   assert.ok(CSS.includes("content: attr(data-label)"));
   assert.ok(CSS.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]"));
-  assert.ok(CSS.includes("#app-shell.visible > .app-header"));
-  assert.ok(CSS.includes('"account user"'));
+  assert.ok(CSS.includes("#app-shell.visible>.app-header"));
+  assert.ok(CSS.includes("#app-shell.visible>.app-header>.header-right"));
+  assert.ok(CSS.includes("#mi-cuenta-btn,#app-shell.visible>.app-header #logout-btn"));
 });
 test("Owner can count the declared final cash only after session completion without redeclaring it", () => {
   assert.match(UI, /data-bc7-final-cash-count/);
