@@ -107,6 +107,7 @@ function renderApprovalDetails(x,detail){
   modal.dataset.approvalType=x.tipo;
   modal.dataset.approvalId=x.id;
   modal.dataset.sessionState=String(x.motivo||'');
+  modal.dataset.declaredAmount=String(x.monto??'');
   let html='';
   if(isList){
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(detail.motivo_general||x.motivo||'Motivo general no especificado')+'</strong>'+
