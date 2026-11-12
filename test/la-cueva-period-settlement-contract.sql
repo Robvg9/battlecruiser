@@ -263,6 +263,19 @@ BEGIN
     RAISE EXCEPTION 'FAIL: pending cash, expense, reinvestment, merma and baja must block final settlement; result=%',v_result;
   END IF;
 
+  -- Direct RPC closure must enforce the same pending-operation gate as the workspace UI.
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc5_cerrar_jornada(v_session,'CI cierre anticipado para probar el bloqueo');
+  EXCEPTION WHEN check_violation THEN
+    v_error:=true;
+  END;
+  IF NOT v_error
+     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_session)<>'EN_CURSO'
+     OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='ACTIVO') THEN
+    RAISE EXCEPTION 'FAIL: backend allowed the jornada to close while daily cash/expense/reinvestment/merma/baja approvals were pending';
+  END IF;
+
   -- Owner approves each operation. Only these approved records affect the final stock/cash reconciliation.
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
