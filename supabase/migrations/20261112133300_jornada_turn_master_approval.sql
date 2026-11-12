@@ -84,7 +84,7 @@ BEGIN
     INSERT INTO public.turno_revisiones(turno_id,estado)
     VALUES(p_turno_id,'PENDIENTE')
     ON CONFLICT(turno_id) DO UPDATE
-      SET estado='PENDIENTE',revisado_por=NULL,revisado_at=NULL,comentario=NULL;
+      SET estado='PENDIENTE',revisado_por=NULL,revisado_at=NULL;
 
     INSERT INTO public.turno_eventos(turno_id,actor_user_id,tipo,payload)
     VALUES(p_turno_id,auth.uid(),'TURNO_ENVIADO_APROBACION',
