@@ -19,6 +19,8 @@ test("PWA shell pins one fresh 9.5.96 release across index, app and service work
   assert.match(SW, /BC_SW_VERSION = "9\.5\.96"/);
   assert.match(SW, /\.\/app\.js\?v=9\.5\.96/);
   assert.match(SW, /\.\/js\/offline\.js\?v=9\.5\.96/);
+  assert.match(APP, /\["aprobaciones-admin\.js","20261112\.1"\]/);
+  assert.match(SW, /\.\/js\/aprobaciones-admin\.js\?v=20261112\.1/);
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
