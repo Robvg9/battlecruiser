@@ -659,7 +659,7 @@
       if(finalOperation){
         const finalInput=form.querySelector('#bc7-cash');
         if(finalInput)finalInput.value=String(finalOperation.amount);
-        const saved=await saveCashDeclaration(form,true);
+        const saved=await saveCashDeclaration(form,true,true);
         if(!saved)throw new Error('No se confirmó la declaración del último día. Conservé los importes anteriores y no repetí la escritura.');
         await loadCashDaysWorkspace(state.detail);
       }else if(dailySubmitted.length){
@@ -903,46 +903,6 @@
     }finally{busy(btn,false);}
   }
 
-  async function submitDailyCash(form){
-    const sessionId=form.dataset.bc7DailyCashForm;
-    const date=form.querySelector('[data-bc7-daily-cash-date]')?.value;
-    const rawAmount=form.querySelector('[data-bc7-daily-cash-amount]')?.value;
-    const amount=Number(rawAmount);
-    const note=form.querySelector('[data-bc7-daily-cash-note]')?.value.trim()||null;
-    const keyField=form.querySelector('[data-bc7-daily-cash-key]');
-    const message=form.querySelector('[data-bc7-daily-cash-msg]');
-    if(!sessionId||!date||rawAmount===''||!Number.isFinite(amount)||amount<0){
-      msg(message,'Indica una fecha válida y un importe igual o mayor que cero.','error');return;
-    }
-    if(!keyField){msg(message,'Falta la referencia segura de esta entrega. Actualiza la jornada.','error');return;}
-    let key=keyField.value.trim();
-    try{if(!key){key=freshIdempotencyKey();keyField.value=key;}}
-    catch(e){msg(message,e.message||'No se pudo preparar la entrega.','error');return;}
-    const btn=form.querySelector('button[type="submit"]');
-    if(!busy(btn,true))return;
-    try{
-      const createdId=await rpc('bc7_registrar_entrega_diaria_jornada',{
-        p_turno_sesion_id:sessionId,p_fecha:date,p_monto:amount,
-        p_observacion:note,p_idempotency_key:key
-      });
-      state.dailyCashData=null;
-      await loadFinances(state.detail);
-      const confirmedRow=arr(state.dailyCashData?.entregas).find(function(item){
-        return String(item.fecha||'').slice(0,10)===date
-          && Number(item.monto_declarado)===amount
-          && (!createdId||String(item.id)===String(createdId));
-      });
-      if(!confirmedRow){
-        msg(message,'El servidor respondió, pero la lectura posterior no confirmó esta entrega. Conservé la referencia para evitar duplicados. Actualiza la jornada antes de volver a enviarla.','error');
-        return;
-      }
-      form.reset();keyField.value='';
-      msg(message,'Entrega diaria registrada y confirmada desde el servidor. Queda pendiente de aprobación del Dueño.','ok');
-      setStatus('Dinero recogido guardado para '+fmtDateHuman(date)+'. No se modificó caja.','ok');
-    }catch(e){
-      msg(message,friendlyError(e,'create')+' La referencia se conserva para poder comprobar o reintentar sin duplicar.','error');
-    }finally{busy(btn,false);}
-  }
   async function submitSalaryRate(form){
     const sessionId=form.dataset.bc7SalaryRateForm;
     const input=form.querySelector('[data-bc7-salary-percent]');
@@ -1332,15 +1292,32 @@
   }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
-    let amount=$('bc7-cash')?.value.trim();
-    const msgEl=form.querySelector('[data-bc7-close-msg]');
+    let amount='';
+    let msgEl=form.querySelector('[data-bc7-close-msg]');
+    const cashMode=form.dataset.bc7CashMode||'single';
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
+    if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
+    if(cashMode==='daily'){
+      const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true});
+      if(!savedAllDays)return;
+      form=document.querySelector('form[data-bc7-close-form]')||form;
+      msgEl=form.querySelector('[data-bc7-close-msg]')||msgEl;
+      if(!state.detail?.tramo_activo?.id){msg(msgEl,'No se encontró el tramo activo después de verificar los importes. La jornada no se ha cerrado.','error');return;}
+      const declaration=state.detail.declaracion_dinero;
+      if(!declaration||String(declaration.turno_tramo_id)!==String(state.detail.tramo_activo.id)){
+        msg(msgEl,'El importe del último día todavía no está confirmado por el servidor. La jornada no se ha cerrado.','error');return;
+      }
+      amount=String(declaration.monto);
+    }else{
+      amount=$('bc7-cash')?.value.trim();
+      const tramoId=state.detail.tramo_activo.id;
+      const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+      if(saved){amount=String(state.detail.declaracion_dinero.monto);}
+      if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
+    }
     const tramoId=state.detail.tramo_activo.id;
     const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    if(saved){amount=String(state.detail.declaracion_dinero.monto);}
-    if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
-    if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
-    const confirmation=saved?'La declaración de dinero ya está guardada. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador lo contará después del cierre. ¿Confirmas?';
+    const confirmation=saved?'Los importes de todos los días están guardados. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador lo contará después del cierre. ¿Confirmas?';
     if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
@@ -1554,16 +1531,8 @@
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
+    if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
-    if(t.hasAttribute('data-bc7-open-final-cash')){
-      activateWorkspaceTab('inventario');
-      const target=document.querySelector('form[data-bc7-close-form]');
-      if(target){
-        target.scrollIntoView({behavior:'smooth',block:'center'});
-        const input=$('bc7-cash');if(input)input.focus();
-      }
-      return;
-    }
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-preview')){await previewPattern(t);return;}
@@ -1586,7 +1555,6 @@
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
-    else if(f.matches('[data-bc7-daily-cash-form]')){e.preventDefault();await submitDailyCash(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
   });
   document.addEventListener('change',function(e){
