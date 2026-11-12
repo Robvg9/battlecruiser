@@ -65,6 +65,7 @@ test("previous days use daily RPC with idempotency and server readback before su
   assert.match(block, /Conservé las claves para evitar duplicados/);
   assert.match(block, /saveCashDeclaration\(form,true,true\)/);
   assert.ok(block.indexOf("missingRows.length") < block.indexOf("Importes guardados y confirmados"));
+  assert.match(block, /Dinero diario actualizado para '\+operations\.length\+'/);
 });
 
 test("closing requires every date and confirms the final day before closing the jornada", () => {
