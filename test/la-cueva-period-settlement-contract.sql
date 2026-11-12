@@ -56,6 +56,15 @@ BEGIN
   VALUES(v_pan,v_warehouse,100,0),(v_juice,v_warehouse,100,0)
   ON CONFLICT(producto_id,almacen_id) DO UPDATE SET cantidad=EXCLUDED.cantidad;
 
+  -- Approved merma and baja must consume a real FIFO lot exactly once.
+  INSERT INTO public.lotes_compra(
+    id,producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,
+    fecha_compra,origen,usuario_id,compra_id
+  ) VALUES(
+    'a6200000-0000-0000-0000-000000000002',v_juice,v_warehouse,100,100,1,
+    v_start-interval '1 day','compra',v_worker,NULL
+  );
+
   INSERT INTO public.turnos(
     id,usuario_id,usuario_nombre,almacen_id,fecha,estado,creado_por,created_by,
     estado_maestro,dias_turno,apertura_real
