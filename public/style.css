@@ -1555,7 +1555,7 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
 @media(max-width:759px){
   #app-shell.visible > .app-header{
     grid-template-columns:minmax(0,1fr) auto auto !important;
-    grid-template-areas:"brand account logout" "status status status" "user user queue" !important;
+    grid-template-areas:"brand account logout" "status status status" "user queue settings" !important;
   }
   #app-shell.visible > .app-header #mi-cuenta-btn{
     grid-area:account !important;justify-self:end !important;min-width:0;max-width:none
