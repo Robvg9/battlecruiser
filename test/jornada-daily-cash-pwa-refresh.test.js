@@ -129,7 +129,7 @@ test("mobile Jornada uses labelled inventory cards and stable cash/header layout
   assert.ok(CSS.includes("content: attr(data-label)"));
   assert.ok(CSS.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header"));
-  assert.ok(CSS.includes("#app-shell.visible>.app-header>.header-right"));
+  assert.ok(CSS.includes("#app-shell.visible > header.app-header.app-header > .header-right"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header #mi-cuenta-btn"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header #logout-btn"));
 });
