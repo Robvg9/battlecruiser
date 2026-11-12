@@ -39,7 +39,7 @@ INSERT INTO public.turno_jornada_entradas_vinculadas(
 -- but ADMIN reviewed them after the worker's tranche had ended.
 INSERT INTO public.mermas(
   id,almacen_id,producto_id,cantidad,motivo,estado,creado_por,creado_nombre,
-  fecha_revision,actualizado_en,revisado_por,revisado_nombre,creado_en,turno_sesion_id
+  fecha_revision,actualizado_en,revisado_por,revisado_nombre,creado_en,turno_sesion_id,turno_tramo_id
 ) VALUES (
   '99200000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000001',
@@ -49,12 +49,13 @@ INSERT INTO public.mermas(
   '2026-10-27 19:00:00+00','2026-10-27 19:00:00+00',
   '91000000-0000-0000-0000-000000000002','ADMIN fixture',
   '2026-10-27 15:45:00+00',
-  '93000000-0000-0000-0000-000000000001'
+  '93000000-0000-0000-0000-000000000001',
+  '94000000-0000-0000-0000-000000000001'
 );
 
 INSERT INTO public.bajas(
   id,almacen_id,producto_id,cantidad,motivo,estado,creado_por,creado_nombre,
-  fecha_revision,actualizado_en,revisado_por,revisado_nombre,creado_en,turno_sesion_id
+  fecha_revision,actualizado_en,revisado_por,revisado_nombre,creado_en,turno_sesion_id,turno_tramo_id
 ) VALUES (
   '99300000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000001',
@@ -64,5 +65,6 @@ INSERT INTO public.bajas(
   '2026-10-27 19:05:00+00','2026-10-27 19:05:00+00',
   '91000000-0000-0000-0000-000000000002','ADMIN fixture',
   '2026-10-27 15:46:00+00',
-  '93000000-0000-0000-0000-000000000001'
+  '93000000-0000-0000-0000-000000000001',
+  '94000000-0000-0000-0000-000000000001'
 );
