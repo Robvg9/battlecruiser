@@ -1,8 +1,8 @@
 BEGIN;
 
--- Surface the final cash declaration from a single-session JORNADA in the same
--- administrative queue as daily deliveries. The queue only exposes the action;
--- the physical count remains guarded by bc5_contar_dinero_entregado().
+-- Add final cash declarations for single-session JORNADA to the existing admin queue.
+-- The UI only enables count once the session is COMPLETADA. The RPC repeats the
+-- session-state/admin checks and stores the physical count exactly once.
 CREATE OR REPLACE FUNCTION public.listar_aprobaciones_admin()
 RETURNS TABLE(
   tipo text,
@@ -113,9 +113,6 @@ BEGIN
 
     UNION ALL
 
-    -- The declared final cash must remain visible while the Jornada is still open.
-    -- The UI only enables the physical-count action after estado='COMPLETADA';
-    -- the count RPC repeats that guard and never accepts the declared amount as counted.
     SELECT
       'declaracion_jornada'::text,
       d.id,
