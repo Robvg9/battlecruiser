@@ -539,7 +539,15 @@
       const rejected=!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
       html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><div><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong></div>';
       if(isFinal&&finalSaved){
-        html+='<span class="bc7-pill ok">Declarado</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Entregado</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(declaration.estado_aprobacion||'ESPERANDO_APROBACION'))+'</p>';
+        const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
+        html+='<span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(finalCashState))+'. El importe declarado no sustituye el conteo físico.</p>';
+        if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='COMPLETADA'&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
+          html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico del Dueño</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
+        }else if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()!=='COMPLETADA'&&declaration.monto_contado==null){
+          html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
+        }else if(declaration.monto_contado!=null){
+          html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
+        }
       }else if(!isFinal&&row&&!rejected){
         const status=String(row.estado||'PENDIENTE').toUpperCase();
         const amount=status==='APROBADA'&&row.monto_aprobado!=null?row.monto_aprobado:row.monto_declarado;
@@ -676,6 +684,54 @@
       return false;
     }finally{
       busy(saveButton,false);
+    }
+  }
+  async function countFinalCash(form){
+    const declarationId=String(form?.dataset?.bc7FinalCashCount||'');
+    const sessionId=String(form?.dataset?.bc7FinalCashSession||'');
+    const amountInput=form?.querySelector('[data-bc7-final-cash-amount]');
+    const amount=amountInput?Number(amountInput.value):NaN;
+    const note=form?.querySelector('[data-bc7-final-cash-note]')?.value.trim()||null;
+    const message=form?.querySelector('[data-bc7-final-cash-msg]');
+    const button=form?.querySelector('button[type="submit"]');
+    const declaration=state.detail?.declaracion_dinero;
+    if(!state.admin||!declarationId||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'){
+      msg(message,'El conteo solo está disponible para ADMIN después de completar esta jornada.','error');return false;
+    }
+    if(!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null){
+      msg(message,'La declaración cambió o ya tiene un conteo. Actualiza la jornada antes de continuar.','error');return false;
+    }
+    if(!Number.isFinite(amount)||amount<0){
+      msg(message,'Introduce el importe físico real, igual o mayor que cero.','error');return false;
+    }
+    if(!confirm('Declarado por la responsable: '+money(declaration.monto)+' CUP.\nConteo físico que estás registrando: '+money(amount)+' CUP.\n\nEl servidor aprobará automáticamente solo si ambos importes coinciden. ¿Confirmas este conteo real?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_contar_dinero_entregado',{
+        p_declaracion_id:declarationId,p_monto_contado:amount,p_observacion:note
+      });
+      const reread=await openWorkspace(sessionId);
+      const saved=state.detail?.declaracion_dinero;
+      if(!reread||!saved||String(saved.id)!==declarationId||Number(saved.monto_contado)!==amount){
+        throw new Error('El servidor recibió la solicitud, pero la lectura de comprobación no confirmó el mismo conteo. Actualiza antes de repetir.');
+      }
+      setStatus(Number(saved.diferencia||0)===0?'Conteo del Dueño guardado y efectivo aprobado.':'Conteo guardado; existe una diferencia que requiere revisión.','ok');
+      return true;
+    }catch(e){
+      // A timed-out response may have committed. Re-read before allowing any retry.
+      try{
+        const reread=await openWorkspace(sessionId);
+        const saved=state.detail?.declaracion_dinero;
+        if(reread&&saved&&String(saved.id)===declarationId&&Number(saved.monto_contado)===amount){
+          setStatus(Number(saved.diferencia||0)===0?'Conteo del Dueño confirmado al volver a consultar.':'Conteo confirmado; la diferencia requiere revisión.','ok');
+          return true;
+        }
+      }catch(_){}
+      msg(message,friendlyError(e,'create')+' No repitas el conteo con otro importe hasta actualizar y comprobar el estado.','error');
+      setStatus('No se pudo confirmar la lectura del conteo.','error');
+      return false;
+    }finally{
+      busy(button,false);
     }
   }
   function cashDeclarationHtml(detail){
@@ -1020,9 +1076,9 @@
       ?(opening?'<p class="bc7-note">Corte final anterior del Día '+esc(opening.numero_dia)+' ('+esc(fmtDate(opening.fecha))+'): se muestran las cantidades efectivas compartidas como referencia. Debes revisar y volver a contar físicamente cada producto antes de confirmar la recepción; una diferencia queda pendiente de decisión del dueño.</p>'
         :'<p class="bc7-note">No hay un inventario final confirmado del día inmediatamente anterior. Define el saldo inicial mediante conteo físico completo; no se copiará automáticamente el stock del sistema.</p>')
       :'';
-    const table=products.length?'<p class="bc7-table-scroll-hint">En móvil, desliza horizontalmente para ver todas las columnas.</p><div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
+    const table=products.length?'<p class="bc7-table-scroll-hint">En móvil cada producto aparece en una ficha legible; en escritorio se conserva la tabla completa.</p><div class="bc7-table-wrap"><table class="bc7-table bc7-count-table"><thead><tr><th>Producto</th><th>Unidad</th><th>Stock actual</th><th>Referencia anterior</th><th>Conteo físico actual</th></tr></thead><tbody>'+products.map(p=>{
       const prior=openingLines.get(String(p.producto_id));
-      return '<tr><td>'+esc(p.nombre)+'</td><td>'+esc(p.unidad||'ud')+'</td><td>'+esc(qty(p.stock_actual))+'</td><td>'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
+      return '<tr><td data-label="Producto">'+esc(p.nombre)+'</td><td data-label="Unidad">'+esc(p.unidad||'ud')+'</td><td data-label="Stock actual">'+esc(qty(p.stock_actual))+'</td><td data-label="Referencia anterior">'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td data-label="Conteo físico actual"><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
     }).join('')+'</tbody></table></div>':'<div class="bc7-empty">Este almacén no tiene productos activos con fila de stock registrada. Si se trata realmente de un almacén vacío, puedes confirmar el conteo de cero productos.</div>';
     return openingNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'">'+table+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
@@ -1590,6 +1646,7 @@
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
+    else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
   });
   document.addEventListener('change',function(e){
     const t=e.target;
