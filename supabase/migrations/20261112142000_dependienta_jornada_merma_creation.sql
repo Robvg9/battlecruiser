@@ -8,7 +8,7 @@ UPDATE public.permisos p
 SET permitido=true
 FROM public.roles r
 WHERE p.role_id=r.id
-  AND lower(btrim(r.nombre))='dependienta'
+  AND lower(btrim(r.nombre)) IN ('dependienta','dependientas')
   AND p.seccion='mermas'
   AND p.accion='crear';
 
