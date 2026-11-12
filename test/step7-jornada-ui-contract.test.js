@@ -33,11 +33,20 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/navigator\.onLine/);
   assert.match(ui,/data-tab="jornada"/);
   assert.match(ui,/window\.__BC7_JORNADA__\s*=\s*\{/);
-  assert.match(ui,/Registrar baja/,"la interfaz muestra una sola categoría de ajuste");
-  assert.match(ui,/data-bc7-ajust-cause/,"cada baja exige una causa explícita");
-  for(const cause of ["Producto vencido","Producto roto o dañado","Consumo del dueño","Otra causa"]) assert.ok(ui.includes(cause),`falta la causa ${cause}`);
-  assert.doesNotMatch(ui,/Solicitar merma o baja|<option value="merma">Merma<\/option>/,"la interfaz no debe presentar merma como categoría separada");
-  assert.match(ui,/can\('bajas','crear'\)\?'baja':'merma'/,"el backend conserva la estructura histórica autorizada según permisos");
+  assert.match(ui,/Registrar baja o merma|Registrar baja|Registrar merma/,"la interfaz ofrece los ajustes permitidos");
+  assert.match(ui,/data-bc7-ajust-cause/,"cada ajuste exige un motivo explícito");
+  const opStart=ui.indexOf("const op='<div class=\"bc7-panel-stack\">");
+  const opEnd=ui.indexOf("const mov='<div class=\"bc7-panel-stack\">",opStart);
+  assert.ok(opStart>=0&&opEnd>opStart,"one operation panel exists");
+  const operationPanel=ui.slice(opStart,opEnd);
+  for(const control of ["actionArea+fin+adjustment","financeFormHtml(detail,isAssigned,status)","data-bc7-finance-form=\"gasto\"","data-bc7-finance-form=\"reinversion\"","data-bc7-adjust-form","bc7-inventory-settlement"]) {
+    assert.ok(operationPanel.includes(control),`Operation panel must include ${control}`);
+  }
+  assert.doesNotMatch(ui,/data-bc7-workspace-tab="finanzas"/,"finances are no longer a separate task tab");
+
+  assert.match(ui,/data-bc7-ajust-type/,"cuando el rol tiene ambos permisos se puede elegir baja o merma");
+  for(const cause of ["Producto vencido","Producto roto o dañado","Consumo del dueño","Otra causa"]) assert.ok(ui.includes(cause),`falta el motivo ${cause}`);
+  assert.match(ui,/const adjustmentStorageType=canCreateBaja\?'baja':'merma'/,"el tipo predeterminado respeta los permisos disponibles");
   assert.match(ui,/openForSession:\s*async function\(sessionId\)/);
   assert.match(ui,/openWorkspace\(sessionId\)/);
   assert.match(nav,/jornada: "turnos"/, "jornada is mapped to the canonical turnos.ver permission");
