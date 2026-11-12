@@ -24,8 +24,8 @@ test("PWA shell pins one fresh 9.5.97 release and Jornada UI 7.21", () => {
   assert.ok(SW.includes('./js/offline.js?v=9.5.97'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.21"]'));
   assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.21'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261112.1"]'));
-  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261112.1'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261112.2"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261112.2'));
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
