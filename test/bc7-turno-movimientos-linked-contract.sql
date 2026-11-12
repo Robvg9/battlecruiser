@@ -8,7 +8,7 @@ DO $test$
 DECLARE
   v_linked integer;
   v_unlinked integer;
-  v_adjustments integer;
+  v_session_events integer;
   v_cross_session integer;
   v_finance_events integer;
   v_cash_events integer;
@@ -28,7 +28,7 @@ BEGIN
     RAISE EXCEPTION 'Unlinked transfer by an unrelated actor must not be inferred from date/warehouse alone.';
   END IF;
 
-  SELECT count(*) INTO v_adjustments
+  SELECT count(*) INTO v_session_events
   FROM public.bc7_movimientos_sesion('91000000-0000-0000-0000-000000000007')
   WHERE operacion_id IN (
     '99200000-0000-0000-0000-000000000001',
@@ -37,8 +37,8 @@ BEGIN
     '99500000-0000-0000-0000-000000000001',
     '99700000-0000-0000-0000-000000000001'
   );
-  IF v_adjustments<>5 THEN
-    RAISE EXCEPTION 'Approved session-linked Merma/Baja must remain in the original Jornada after later ADMIN review; rows=%',v_adjustments;
+  IF v_session_events<>5 THEN
+    RAISE EXCEPTION 'All linked operational events must remain in the original Jornada after later ADMIN review; rows=%',v_session_events;
   END IF;
 
 
