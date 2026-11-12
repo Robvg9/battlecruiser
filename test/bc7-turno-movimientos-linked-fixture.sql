@@ -41,6 +41,12 @@ BEGIN
     RAISE EXCEPTION 'Canonical Step 7 fixture must leave a completed JORNADA tranche for owner';
   END IF;
 
+  -- Make the second legacy session share the same date and warehouse. It must
+  -- still not inherit any operation that is explicitly linked to the JORNADA.
+  UPDATE public.turno_sesiones other_session
+  SET fecha=(SELECT fecha FROM public.turno_sesiones WHERE id=v_session)
+  WHERE other_session.id='93000000-0000-0000-0000-000000000002';
+
   INSERT INTO public.transferencias(
     id,almacen_origen_id,almacen_destino_id,fecha,creado_por,estado
   ) VALUES
