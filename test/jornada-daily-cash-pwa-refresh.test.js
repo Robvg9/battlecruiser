@@ -12,20 +12,20 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.97 release and Jornada UI 7.21", () => {
-  assert.ok(APP.includes('const VERSION="9.5.97";'));
-  assert.ok(INDEX.includes('style.css?v=9.5.97'));
-  assert.ok(INDEX.includes('app.js?v=9.5.97'));
-  assert.ok(INDEX.includes('js/offline.js?v=9.5.97'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.97 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.97"'));
-  assert.ok(SW.includes('./app.js?v=9.5.97'));
-  assert.ok(SW.includes('./style.css?v=9.5.97'));
-  assert.ok(SW.includes('./js/offline.js?v=9.5.97'));
-  assert.ok(APP.includes('["bc7-jornada-ui.js","7.21"]'));
-  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.21'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261112.2"]'));
-  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261112.2'));
+test("PWA shell pins one fresh 9.5.98 release and Jornada UI 7.22", () => {
+  assert.ok(APP.includes('const VERSION="9.5.98";'));
+  assert.ok(INDEX.includes('style.css?v=9.5.98'));
+  assert.ok(INDEX.includes('app.js?v=9.5.98'));
+  assert.ok(INDEX.includes('js/offline.js?v=9.5.98'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.98 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.98"'));
+  assert.ok(SW.includes('./app.js?v=9.5.98'));
+  assert.ok(SW.includes('./style.css?v=9.5.98'));
+  assert.ok(SW.includes('./js/offline.js?v=9.5.98'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.22"]'));
+  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.22'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261112.3"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261112.3'));
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
@@ -114,7 +114,9 @@ test("closing requires every date and confirms the final day before closing the 
 
 
 test("mobile Jornada uses labelled inventory cards and stable cash/header layouts", () => {
-  assert.ok(CSS.includes(".bc7-table.bc7-count-table"));
+  assert.ok(CSS.includes(".bc7-final-count-list"));
+  assert.ok(!JORNADA.includes("Referencia anterior"));
+  assert.ok(CSS.includes(".bc7-final-count-row"));
   assert.ok(CSS.includes("content: attr(data-label)"));
   assert.ok(CSS.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]"));
   assert.ok(CSS.includes("#app-shell.visible > .app-header"));
