@@ -1315,6 +1315,32 @@
       if(saved){amount=String(state.detail.declaracion_dinero.monto);}
       if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     }
+    if(cashMode==='daily'){
+      let settlement;
+      try{
+        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId});
+      }catch(e){
+        msg(msgEl,'No se pudo verificar la liquidación antes del cierre. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
+        return;
+      }
+      const pending=settlement?.pendientes||{};
+      const blockers=[];
+      if(settlement?.aplica===false)blockers.push(settlement.motivo||'La liquidación no está disponible');
+      if(settlement?.faltan_cortes)blockers.push('falta confirmar el inventario final');
+      if(settlement?.salario_porcentaje==null)blockers.push('el Dueño debe configurar el porcentaje salarial');
+      if(Number(settlement?.familias_sin_precio||0)>0)blockers.push('hay productos sin precio válido');
+      if(Number(settlement?.familias_con_vendidas_negativas||0)>0)blockers.push('hay diferencias negativas de inventario por revisar');
+      if(Number(pending.gastos||0)>0)blockers.push('hay gastos pendientes de aprobación');
+      if(Number(pending.reinversiones||0)>0)blockers.push('hay reinversiones pendientes de aprobación');
+      if(Number(pending.ajustes||0)>0)blockers.push('hay mermas o bajas pendientes de aprobación');
+      if(Number(pending.entregas_diarias||0)>0)blockers.push('hay entregas diarias pendientes de aprobación');
+      if(Number(pending.entregas_diarias_faltantes||0)>0)blockers.push('faltan importes diarios');
+      if(blockers.length){
+        msg(msgEl,'No se puede finalizar todavía: '+blockers.join('; ')+'. La jornada sigue abierta.','error');
+        return;
+      }
+      // The Dueño may count and approve the final cash after the operational handover.
+    }
     const tramoId=state.detail.tramo_activo.id;
     const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
     const confirmation=saved?'Los importes de todos los días están guardados. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador lo contará después del cierre. ¿Confirmas?';
