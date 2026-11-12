@@ -44,10 +44,16 @@ test("cash, expenses, reinvestments, adjustments and reconciliation share the sa
   const end = UI.indexOf("const mov='<div class=\"bc7-panel-stack\">", start);
   assert.ok(start >= 0 && end > start);
   const panel = UI.slice(start, end);
-  for (const item of ["actionArea+fin+adjustment","financeFormHtml(detail,isAssigned,status)","data-bc7-finance-form=\"gasto\"","data-bc7-finance-form=\"reinversion\"","data-bc7-adjust-form","bc7-inventory-settlement"]) {
-    assert.ok(panel.includes(item), "missing in one-panel operation workspace: " + item);
-  }
+  assert.ok(panel.includes("actionArea+fin+adjustment"));
   assert.doesNotMatch(UI, /data-bc7-workspace-tab="finanzas"/);
+  const financeStart=UI.indexOf("function financeFormHtml(detail,isAssigned,status){");
+  const financeEnd=UI.indexOf("function cashDaysManagerShellHtml(detail,isAssigned,status){",financeStart);
+  assert.ok(financeStart>=0&&financeEnd>financeStart);
+  const finance=UI.slice(financeStart,financeEnd);
+  for (const item of ["data-bc7-finance-form=\"gasto\"","data-bc7-finance-form=\"reinversion\"","bc7-inventory-settlement","Registrar gasto","Registrar reinversión"]) {
+    assert.ok(finance.includes(item), "missing in one-panel finance section: " + item);
+  }
+  assert.match(UI, /data-bc7-adjust-form/);
   assert.match(UI, /loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\)/);
 });
 
