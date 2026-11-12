@@ -139,7 +139,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /compra-multiple\.js","27\.16"/);
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
   assert.match(index, /productos\.js\?v=20261111\.2/);
-  assert.match(index, /style\.css\?v=9\.5\.94/);
+  assert.match(index, /style\.css\?v=9\.5\.95/);
   assert.match(index, /almacenes\.js\?v=20261111\.1/);
   assert.match(index, /app\.js\?v=9\.5\.95/);
   assert.match(index, /v9\.5\.95 — BattleCruiser/);
