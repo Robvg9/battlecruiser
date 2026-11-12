@@ -79,4 +79,10 @@ test("closing requires every date and confirms the final day before closing the 
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
+  assert.match(block, /rpc\('bc7_liquidacion_inventario_jornada'/);
+  assert.match(block, /pending\.gastos/);
+  assert.match(block, /pending\.reinversiones/);
+  assert.match(block, /pending\.ajustes/);
+  assert.match(block, /pending\.entregas_diarias_faltantes/);
+  assert.match(block, /salario_porcentaje/);
 });
