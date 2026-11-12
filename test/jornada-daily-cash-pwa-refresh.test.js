@@ -11,7 +11,7 @@ const INDEX = read("public/index.html");
 const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 
-test("PWA shell pins one fresh 9.5.96 release and Jornada UI 7.19", () => {
+test("PWA shell pins one fresh 9.5.96 release and Jornada UI 7.20", () => {
   assert.match(APP, /const VERSION="9\.5\.96";/);
   assert.match(INDEX, /app\.js\?v=9\.5\.96/);
   assert.match(INDEX, /js\/offline\.js\?v=9\.5\.96/);
@@ -19,8 +19,8 @@ test("PWA shell pins one fresh 9.5.96 release and Jornada UI 7.19", () => {
   assert.match(SW, /BC_SW_VERSION = "9\.5\.96"/);
   assert.match(SW, /\.\/app\.js\?v=9\.5\.96/);
   assert.match(SW, /\.\/js\/offline\.js\?v=9\.5\.96/);
-  assert.match(APP, /\["bc7-jornada-ui\.js","7\.19"\]/);
-  assert.match(SW, /\.\/js\/bc7-jornada-ui\.js\?v=7\.19/);
+  assert.match(APP, /\["bc7-jornada-ui\.js","7\.20"\]/);
+  assert.match(SW, /\.\/js\/bc7-jornada-ui\.js\?v=7\.20/);
   assert.match(APP, /\["aprobaciones-admin\.js","20261112\.1"\]/);
   assert.match(SW, /\.\/js\/aprobaciones-admin\.js\?v=20261112\.1/);
 });
