@@ -305,6 +305,7 @@ function applySql(file) {
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
     applySql("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
     applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
+    applySql("test/dependienta-jornada-merma-permission-fixture.sql");
     applySql("supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql");
     applySql("test/dependienta-jornada-merma-permission-contract.sql");
     applySql("supabase/migrations/20261112133000_jornada_reinversion_aprobacion_segura.sql");
