@@ -1,6 +1,23 @@
 -- Disposable-only baseline for Step 7 contract checks. Uses the Step 5 fixture; no LIVE rows.
 \i test/step5-jornada-fixture.sql
 
+-- Production owner-review ledger: one immutable review row per Turn master.
+CREATE TABLE public.turno_revisiones (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  turno_id uuid NOT NULL UNIQUE REFERENCES public.turnos(id) ON DELETE RESTRICT,
+  estado text NOT NULL DEFAULT 'PENDIENTE'
+    CHECK (estado IN ('PENDIENTE','APROBADO')),
+  revisado_por uuid REFERENCES auth.users(id) ON DELETE RESTRICT,
+  revisado_at timestamptz,
+  comentario text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT turno_revision_estado_chk CHECK (
+    (estado='PENDIENTE' AND revisado_por IS NULL AND revisado_at IS NULL)
+    OR
+    (estado='APROBADO' AND revisado_por IS NOT NULL AND revisado_at IS NOT NULL)
+  )
+);
+
 CREATE TABLE public.productos(
   id uuid PRIMARY KEY,nombre text NOT NULL,unidad text NOT NULL DEFAULT 'ud',
   activo boolean NOT NULL DEFAULT true,producto_padre_id uuid,precio_normal numeric(14,2)
