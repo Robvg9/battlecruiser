@@ -10,6 +10,8 @@ DECLARE
   v_unlinked integer;
   v_adjustments integer;
   v_cross_session integer;
+  v_finance_events integer;
+  v_cash_events integer;
 BEGIN
   SELECT count(*) INTO v_linked
   FROM public.bc7_movimientos_sesion('91000000-0000-0000-0000-000000000007')
@@ -30,10 +32,32 @@ BEGIN
   FROM public.bc7_movimientos_sesion('91000000-0000-0000-0000-000000000007')
   WHERE operacion_id IN (
     '99200000-0000-0000-0000-000000000001',
-    '99300000-0000-0000-0000-000000000001'
+    '99300000-0000-0000-0000-000000000001',
+    '99400000-0000-0000-0000-000000000001',
+    '99500000-0000-0000-0000-000000000001',
+    '99700000-0000-0000-0000-000000000001'
   );
   IF v_adjustments<>2 THEN
     RAISE EXCEPTION 'Approved session-linked Merma/Baja must remain in the original Jornada after later ADMIN review; rows=%',v_adjustments;
+  END IF;
+
+
+  SELECT count(*) INTO v_finance_events
+  FROM public.bc7_movimientos_sesion('91000000-0000-0000-0000-000000000007')
+  WHERE (operacion_id='99400000-0000-0000-0000-000000000001' AND tipo='gasto')
+     OR (operacion_id='99500000-0000-0000-0000-000000000001' AND tipo='reinversion');
+  IF v_finance_events<>2 THEN
+    RAISE EXCEPTION 'Approved expense and reinvestment must appear in the source Jornada; rows=%',v_finance_events;
+  END IF;
+
+  SELECT count(*) INTO v_cash_events
+  FROM public.bc7_movimientos_sesion('91000000-0000-0000-0000-000000000007')
+  WHERE (operacion_id='99700000-0000-0000-0000-000000000001' AND tipo='entrega_diaria')
+     OR (tipo='dinero_declarado_final' AND operacion_id IN (
+       SELECT id FROM public.turno_declaraciones WHERE turno_sesion_id='91000000-0000-0000-0000-000000000007'
+     ));
+  IF v_cash_events<>2 THEN
+    RAISE EXCEPTION 'Daily cash and final cash declaration must appear in the source Jornada; rows=%',v_cash_events;
   END IF;
 
   SELECT count(*) INTO v_cross_session
