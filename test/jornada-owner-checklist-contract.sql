@@ -19,9 +19,9 @@ FOR EACH ROW EXECUTE FUNCTION public.bc_test_positive_stock_minimum();
 
 DO $test$
 DECLARE
-  v_turno uuid:='90000000-0000-0000-0000-000000000008';
-  v_sesion uuid:='91000000-0000-0000-0000-000000000008';
-  v_prog uuid:='92000000-0000-0000-0000-000000000008';
+  v_turno uuid:=gen_random_uuid();
+  v_sesion uuid:=gen_random_uuid();
+  v_prog uuid:=gen_random_uuid();
   v_owner uuid:='20000000-0000-0000-0000-000000000001';
   v_almacen uuid:='10000000-0000-0000-0000-000000000004';
   v_pan uuid:='31000000-0000-0000-0000-000000000003';
