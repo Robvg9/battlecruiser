@@ -332,7 +332,10 @@ function applySql(file) {
     log("\\r\\n=== Apply the attendant checklist and owner cash-count phase, then verify its isolated end-to-end contract ===");
     applySql("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
     applySql("supabase/migrations/20261113180000_admin_show_pending_jornada_cash_declarations.sql");
-    applySql("supabase/migrations/20261113190000_jornada_bajas_use_operational_stock_and_handover.sql");
+    const operationalStockMigration = fs.existsSync(path.join(ROOT,"supabase/migrations/20261113203616_jornada_bajas_use_operational_stock_and_handover.sql"))
+      ? "supabase/migrations/20261113203616_jornada_bajas_use_operational_stock_and_handover.sql"
+      : "supabase/migrations/20261113190000_jornada_bajas_use_operational_stock_and_handover.sql";
+    applySql(operationalStockMigration);
     applySql("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
