@@ -450,6 +450,37 @@ BEGIN
     RAISE EXCEPTION 'FAIL: a Baja was accepted after Sheila marked the Baja checklist complete';
   END IF;
 
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_gasto_jornada(
+      v_session,'Gasto posterior al check',1,'Debe quedar bloqueado',
+      'a6400000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN check_violation THEN
+    v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: a new expense was accepted after Sheila marked the expense checklist complete';
+  END IF;
+
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_reinversion_jornada(
+      v_session,
+      jsonb_build_array(jsonb_build_object(
+        'producto_id',v_pan,'presentacion_id',NULL,'cantidad_presentacion',NULL,
+        'cantidad_base',1,'costo_total',3
+      )),
+      'a6400000-0000-0000-0000-000000000008',
+      'Debe quedar bloqueada'
+    );
+  EXCEPTION WHEN check_violation THEN
+    v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: a new reinvestment was accepted after Sheila marked the reinvestment checklist complete';
+  END IF;
+
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   v_cash_result:=public.bc7_estado_checklist_jornada(v_session);
