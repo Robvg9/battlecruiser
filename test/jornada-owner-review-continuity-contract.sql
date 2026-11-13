@@ -81,8 +81,27 @@ BEGIN
 
   SELECT pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure)
     INTO v_definition;
-  IF position('ANTES_CORTE' IN v_definition)=0 OR position('creado_en' IN v_definition)=0 THEN
-    RAISE EXCEPTION 'Settlement does not use recorded movement time and Owner cutoff classification';
+  IF position('ANTES_CORTE' IN v_definition)=0 OR position('creado_en' IN v_definition)=0
+     OR position('fecha_revision' IN v_definition)=0
+     OR position('v_pending_post=0' IN v_definition)=0
+     OR position('movimientos_posteriores_pendientes' IN v_definition)=0
+     OR position('v_lines:=''[]''::jsonb' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Settlement must use approval timestamps, cutoff classification, and suppress provisional estimates while movements remain unclassified';
   END IF;
-  RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, settlement provenance, and ACL contract';
+
+  SELECT pg_get_functiondef('public.bc7_clasificar_movimientos_fuera_corte(uuid,jsonb)'::regprocedure)
+    INTO v_definition;
+  IF position('coalesce(b.fecha_revision,b.creado_en)' IN v_definition)=0
+     OR position('coalesce(m.fecha_revision,m.creado_en)' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Owner classification must detect movements approved after the final cut, not only records created after it';
+  END IF;
+
+  SELECT pg_get_functiondef('public.bc7_resolver_revision_jornada(uuid,text,text)'::regprocedure)
+    INTO v_definition;
+  IF position('coalesce(b.fecha_revision,b.creado_en)' IN v_definition)=0
+     OR position('coalesce(m.fecha_revision,m.creado_en)' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Owner resolution must block approval while post-cutoff movements remain unclassified';
+  END IF;
+
+  RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, no-provisional-settlement, and ACL contract';
 END $$;
