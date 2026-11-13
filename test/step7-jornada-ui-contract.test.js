@@ -59,7 +59,9 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/p_motivo_general:reason/,"the list shares one administrative reason");
   assert.match(ui,/friendlyError\(e,'adjustment'\)/,"stock errors are reported as inventory errors, not schedule-creation errors");
   assert.match(ui,/data-stock=/,"each candidate product carries its current available stock into validation");
-  assert.match(ui,/products\.filter\(p=>Number\(p\.stock_actual\)>0\)/,"products without stock are excluded from the Baja/Merma picker");
+  assert.match(ui,/adjustmentAllProducts\.map\(p=>/,"the Baja/Merma search catalogue includes active products even when their stock is zero");
+  assert.match(ui,/const adjustmentProducts=adjustmentAllProducts\.filter\(p=>!p\.inventario_mixto&&Number\(p\.stock_actual\)>0\)/,"only positive-stock SKU variants are eligible for an actual Baja");
+  assert.match(ui,/p\.sin_stock_configurado\?' · Sin stock configurado':unavailable\?' · Agotado'/,"unavailable products explain why they cannot be selected");
   assert.match(ui,/new Set\(lines\.map\(line=>line\.producto_id\)\)/,"duplicate products in one list are blocked before submission");
   assert.match(ui,/data-bc7-reinvestment-unit-cost/,"reinvestment captures the unit cost");
   assert.match(ui,/Math\.round\(quantity\*unitCost\*100\)\/100/,"reinvestment total is derived from quantity multiplied by unit cost");
@@ -145,16 +147,26 @@ test("Dependienta can open her active jornada without searching a future-only ca
   assert.match(ui,/state\.currentSession\?\.turno_sesion_id/);
 });
 
-test("Cash declaration can be saved before the final inventory unlocks jornada closure",()=>{
+test("La Cueva cash declaration remains open until owner count, automatic settlement and final review",()=>{
   assert.match(ui,/async function saveCashDeclaration\(form/);
-  assert.match(ui,/data-bc7-save-cash/);
   assert.match(ui,/data-bc7-save-cash-days/);
-  assert.match(ui,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
   assert.match(ui,/rpc\('bc_declarar_dinero'/);
-  assert.match(ui,/El cierre se habilitará al confirmar el inventario final/);
-  assert.match(ui,/Finalizar jornada/);
+  assert.match(ui,/data-bc7-checklist-complete/);
+  assert.match(ui,/bc7_marcar_checklist_jornada/);
+  assert.match(ui,/bc7_estado_checklist_jornada/);
+  assert.match(ui,/puede_contar_efectivo/);
+  assert.match(ui,/bc5_contar_dinero_entregado/);
+  assert.match(ui,/bc7_finalizar_revision_jornada/);
+  assert.match(ui,/data-bc7-owner-final-review-form/);
+  assert.match(ui,/La jornada permanece abierta\. El Dueño realizará el conteo y la revisión final/);
+  const retailStart=ui.indexOf("status==='EN_CURSO'&&s.es_minorista===true");
+  const retailEnd=ui.indexOf("}else if(status==='EN_CURSO')",retailStart);
+  assert.ok(retailStart>=0&&retailEnd>retailStart,"the retail jornada uses its dedicated cash-declaration section");
+  const retailMarkup=ui.slice(retailStart,retailEnd);
+  assert.match(retailMarkup,/data-bc7-save-cash-days/);
+  assert.doesNotMatch(retailMarkup,/Finalizar jornada/,"the dependent cannot close the retail jornada");
 });
-
+ 
 test("Jornada inventory count table exposes labelled cells for accessible mobile product cards",()=>{
   assert.match(ui,/bc7-table-wrap\{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto/);
   assert.match(ui,/bc7-table\{width:100%;min-width:720px/);
