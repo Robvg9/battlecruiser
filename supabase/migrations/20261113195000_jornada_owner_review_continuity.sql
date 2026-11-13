@@ -971,7 +971,6 @@ BEGIN
       WHERE l.almacen_id=v_s.almacen_id
         AND coalesce(p.producto_padre_id,p.id)=(x.value->>'producto_id')::uuid
         AND l.fecha_compra<=coalesce(v_final.confirmado_en,now())
-        AND lower(coalesce(l.origen,''))='compra'
         AND coalesce(l.costo_unitario,0)>0
     ) c ON true;
     SELECT count(*) FILTER(WHERE x.value->>'estado_costo'<>'SIN_COSTO_COMPROBADO'),
