@@ -85,6 +85,9 @@ BEGIN
      OR position('fecha_revision' IN v_definition)=0
      OR position('v_pending_post=0' IN v_definition)=0
      OR position('movimientos_posteriores_pendientes' IN v_definition)=0
+     OR position('IF v_pending_post>0 THEN' IN v_definition)=0
+     OR position('v_sales_total:=NULL' IN v_definition)=0
+     OR position('v_salary:=NULL' IN v_definition)=0
      OR position('v_lines:=''[]''::jsonb' IN v_definition)=0 THEN
     RAISE EXCEPTION 'Settlement must use approval timestamps, cutoff classification, and suppress provisional estimates while movements remain unclassified';
   END IF;
