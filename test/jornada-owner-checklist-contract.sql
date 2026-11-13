@@ -117,8 +117,8 @@ BEGIN
   -- when public.stock remains an older lower snapshot.
   INSERT INTO public.transferencias(id,almacen_origen_id,almacen_destino_id,estado,creado_por,fecha)
   VALUES(v_transferencia,v_almacen_mayorista,v_almacen,'completada',v_owner,now()-interval '20 minutes');
-  INSERT INTO public.transferencias_lineas(transferencia_id,producto_id,cantidad)
-  VALUES(v_transferencia,v_producto_baja,4);
+  INSERT INTO public.transferencias_lineas(id,transferencia_id,producto_id,cantidad)
+  VALUES(gen_random_uuid(),v_transferencia,v_producto_baja,4);
 
   SELECT stock_actual INTO v_stock_disponible
   FROM public.bc7_productos_ajuste_jornada(v_sesion)
