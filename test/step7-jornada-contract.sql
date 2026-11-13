@@ -18,6 +18,7 @@ DECLARE
   v_solicitud uuid;
   v_list_count integer;
   v_error boolean;
+  v_error_message text;
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
@@ -131,9 +132,11 @@ BEGIN
       'Lista que debe fallar',
       '93000000-0000-0000-0000-000000000009'
     );
-  EXCEPTION WHEN OTHERS THEN v_error:=true;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_message=MESSAGE_TEXT;
+    v_error:=true;
   END;
-  IF NOT v_error OR EXISTS(
+  IF NOT v_error OR v_error_message NOT ILIKE '%Stock insuficiente%' OR EXISTS(
     SELECT 1 FROM public.bajas_solicitudes
     WHERE creado_por=v_owner AND idempotency_key='93000000-0000-0000-0000-000000000009'
   ) THEN
