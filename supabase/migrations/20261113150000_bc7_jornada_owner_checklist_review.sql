@@ -675,7 +675,12 @@ BEGIN
       d.monto,
       NULL::numeric,
       d.estado_aprobacion,
-      s.estado::text
+      CASE
+        WHEN s.estado='COMPLETADA'
+          OR coalesce((public.bc7_estado_checklist_jornada(s.id)->>'puede_contar_efectivo')::boolean,false)
+          THEN 'LISTO_PARA_CONTAR'
+        ELSE coalesce(public.bc7_estado_checklist_jornada(s.id)->>'bloqueo_efectivo',s.estado::text)
+      END::text
     FROM public.turno_declaraciones d
     JOIN public.turno_sesiones s ON s.id=d.turno_sesion_id
     JOIN public.almacenes a ON a.id=s.almacen_id
