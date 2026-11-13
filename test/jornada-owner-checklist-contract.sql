@@ -25,8 +25,8 @@ DECLARE
   v_owner uuid:='20000000-0000-0000-0000-000000000001';
   v_worker uuid:=gen_random_uuid();
   v_almacen uuid:=gen_random_uuid();
-  v_pan uuid:='31000000-0000-0000-0000-000000000003';
-  v_jugo uuid:='31000000-0000-0000-0000-000000000004';
+  v_pan uuid:='31000000-0000-0000-0000-000000000001';
+  v_jugo uuid:='31000000-0000-0000-0000-000000000002';
   v_pru uuid:='31000000-0000-0000-0000-000000000005';
   v_date date:=(now() AT TIME ZONE 'America/Havana')::date;
   v_tramo uuid;
@@ -48,11 +48,10 @@ BEGIN
 
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES(v_almacen,'Jornada checklist fixture','minorista',true);
+  UPDATE public.productos SET precio_normal=9000 WHERE id=v_pan;
+  UPDATE public.productos SET precio_normal=1000 WHERE id=v_jugo;
   INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
-  VALUES
-    (v_pan,'Pan fixture','ud',true,9000),
-    (v_jugo,'Jugo fixture','ud',true,1000),
-    (v_pru,'Pru fixture','ud',true,60);
+  VALUES(v_pru,'Pru fixture','ud',true,60);
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
   VALUES
     (v_pan,v_almacen,10,2),
@@ -83,8 +82,6 @@ BEGIN
   PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'INICIAL',
     jsonb_build_array(
-      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000001','cantidad',0),
-      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000002','cantidad',0),
       jsonb_build_object('producto_id',v_pan,'cantidad',9),
       jsonb_build_object('producto_id',v_jugo,'cantidad',5),
       jsonb_build_object('producto_id',v_pru,'cantidad',0)
@@ -146,8 +143,6 @@ BEGIN
   PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'FINAL',
     jsonb_build_array(
-      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000001','cantidad',0),
-      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000002','cantidad',0),
       jsonb_build_object('producto_id',v_pan,'cantidad',8),
       jsonb_build_object('producto_id',v_jugo,'cantidad',4),
       jsonb_build_object('producto_id',v_pru,'cantidad',120)
