@@ -775,7 +775,7 @@
     const approvalState=String(d.estado_aprobacion||'').toUpperCase();
     const statusLabel=sessionState==='COMPLETADA'
       ?((approvalState==='PENDIENTE'||approvalState==='ESPERANDO_APROBACION')?'Esperando aprobación':humanStatus(approvalState||'ESPERANDO_APROBACION'))
-      :'Esperando entrega';
+      :sessionState==='EN_CURSO'?'Esperando entrega':humanStatus(sessionState||approvalState||'ESPERANDO_ENTREGA');
     return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4>'+
       '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(d.monto))+' CUP</b></div>'+
       '<div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(counted?esc(money(d.monto_contado))+' CUP':'Pendiente')+'</b></div>'+
