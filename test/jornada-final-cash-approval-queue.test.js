@@ -93,6 +93,7 @@ test("final cash label follows the actual handover phase, not a generic pending 
   assert.ok(start>=0&&end>start);
   const block=JOURNEY.slice(start,end);
   assert.match(block,/sessionState==='COMPLETADA'/);
+  assert.match(block,/sessionState==='EN_CURSO'/);
   assert.match(block,/approvalState==='PENDIENTE'\|\|approvalState==='ESPERANDO_APROBACION'/);
   assert.match(block,/\?'Esperando aprobación'/);
   assert.match(block,/:'Esperando entrega'/);
