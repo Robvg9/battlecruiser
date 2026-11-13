@@ -65,8 +65,8 @@ test("The app shell loads the new owner review module and keeps cache versions a
 
 test("Unclassified post-cutoff Bajas and Mermas block provisional sales and salary",()=>{
   assert.match(MIG,/v_pending_post/);
-  assert.match(MIG,/coalesce\(b\.fecha_revision,b\.creado_en\)/);
-  assert.match(MIG,/coalesce\(m\.fecha_revision,m\.creado_en\)/);
+  assert.match(MIG,/coalesce\(b\.fecha_revision,b\.actualizado_en,b\.creado_en\)/);
+  assert.match(MIG,/coalesce\(m\.fecha_revision,m\.actualizado_en,m\.creado_en\)/);
   assert.match(MIG,/IF v_pending_post>0 THEN/);
   assert.match(MIG,/v_sales_total:=NULL/);
   assert.match(MIG,/v_salary:=NULL/);
