@@ -147,14 +147,14 @@ test("Release cache keys and Service Worker precache match the modified inventor
   for (const asset of [
     "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
-    "aprobaciones-admin.js?v=20261113.2",
+    "aprobaciones-admin.js?v=20261113.3",
     "ui-operaciones-hub.js?v=43.3",
     "almacenes.js?v=20261111.1",
     "m53-inventario-centro.js?v=53.9",
     "movimiento-multiple.js?v=20261109.1",
     "productos.js?v=20261111.2",
     "compra-multiple.js?v=27.16",
-    "aprobaciones-admin.js?v=20261113.2",
+    "aprobaciones-admin.js?v=20261113.3",
     "bajas-multiple.js?v=1.6"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
