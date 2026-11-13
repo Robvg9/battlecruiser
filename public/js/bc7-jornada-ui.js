@@ -143,7 +143,7 @@
   }
   function humanStatus(value){
     const key=String(value||'').toUpperCase();
-    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada'};
+    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada',ESPERANDO_ENTREGA:'Esperando entrega',ESPERANDO_APROBACION:'Esperando aprobación'};
     return labels[key]||'En revisión';
   }
   function friendlyTimezone(value){
@@ -645,8 +645,14 @@
       })){
         msg(message,'Todos los importes diarios ya están guardados y confirmados.','ok');return true;
       }
-      if(options.requireComplete&&finalSaved)return true;
-      msg(message,'Introduce al menos un importe pendiente para guardar.','error');return false;
+      // A normal Save click can be a no-op. Never report a false validation
+      // error when all existing declarations are already saved; closeSession
+      // still enforces requireComplete and missing dates above.
+      if(!options.requireComplete){
+        msg(message,'No hay importes nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');
+        return true;
+      }
+      msg(message,'No hay importes nuevos para guardar. No se modificó ningún dato.','error');return false;
     }
     if(!navigator.onLine){
       msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;
@@ -748,11 +754,16 @@
     if(!d)return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4><p class="bc7-muted">Todavía no hay una declaración de efectivo para esta jornada.</p></div>';
     const counted=d.monto_contado!=null;
     const difference=d.diferencia!=null;
+    const sessionState=String(detail?.sesion?.estado||'').toUpperCase();
+    const approvalState=String(d.estado_aprobacion||'').toUpperCase();
+    const statusLabel=sessionState==='COMPLETADA'
+      ?((approvalState==='PENDIENTE'||approvalState==='ESPERANDO_APROBACION')?'Esperando aprobación':humanStatus(approvalState||'ESPERANDO_APROBACION'))
+      :sessionState==='EN_CURSO'?'Esperando entrega':humanStatus(sessionState||approvalState||'ESPERANDO_ENTREGA');
     return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4>'+
       '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(d.monto))+' CUP</b></div>'+
       '<div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(counted?esc(money(d.monto_contado))+' CUP':'Pendiente')+'</b></div>'+
       '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(difference?esc(money(d.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
-      '<p class="bc7-muted">Estado: '+esc(humanStatus(d.estado_aprobacion||'ESPERANDO_APROBACION'))+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
+      '<p class="bc7-muted">Estado: '+esc(statusLabel)+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
   }
   function renderDailyCash(host,data){
     if(!host)return;
