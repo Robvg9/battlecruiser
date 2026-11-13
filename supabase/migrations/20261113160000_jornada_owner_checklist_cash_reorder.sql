@@ -491,7 +491,7 @@ BEGIN
 
   RETURN jsonb_build_object('ok',true,'tipo',p_tipo,'id',p_id,'decision',p_decision,'revisado_por',v_nombre);
 END;
-$function$
+$function$;
 
 REVOKE ALL ON FUNCTION public.resolver_aprobacion_operativa(text,uuid,text,text,numeric,numeric) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.resolver_aprobacion_operativa(text,uuid,text,text,numeric,numeric) TO authenticated,service_role;
@@ -632,7 +632,7 @@ BEGIN
     'idempotente',false
   );
 END;
-$function$
+$function$;
 
 REVOKE ALL ON FUNCTION public.bc5_contar_dinero_entregado(uuid,numeric,text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.bc5_contar_dinero_entregado(uuid,numeric,text) TO authenticated,service_role;
