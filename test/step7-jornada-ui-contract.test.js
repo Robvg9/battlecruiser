@@ -60,7 +60,8 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/friendlyError\(e,'adjustment'\)/,"stock errors are reported as inventory errors, not schedule-creation errors");
   assert.match(ui,/data-stock=/,"each candidate product carries its current available stock into validation");
   assert.match(ui,/detail\.productos_ajuste/,"the adjustment picker loads every active catalog product for the current warehouse");
-  assert.match(ui,/AGOTADO · stock 0/,"out-of-stock products remain visible but disabled in the picker");
+  assert.match(ui,/AGOTADO · stock 0/,"out-of-stock products remain visible and searchable in the picker");
+  assert.match(ui,/line\.stock<=0/,"the form refuses to submit a Baja when the selected product has no stock");
   assert.match(ui,/availableAdjustmentProducts=products\.filter\(p=>Number\(p\.stock_actual\)>0\)/,"only positive-stock products enable Baja/Merma submission");
   assert.match(ui,/bc7_productos_ajuste_jornada/,"the full catalog is loaded from a warehouse-scoped server RPC");
   assert.match(ui,/new Set\(lines\.map\(line=>line\.producto_id\)\)/,"duplicate products in one list are blocked before submission");
