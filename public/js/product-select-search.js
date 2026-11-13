@@ -77,13 +77,19 @@
   function render() {
     if (!active || !results) return;
     const term = norm(search.value);
-    const matches = Array.from(active.options).filter(option => option.value && !option.disabled && norm(option.textContent).includes(term));
+    // Keep unavailable products searchable so the user can see why an item is missing
+    // from the actionable stock list. Disabled options are informative only.
+    const matches = Array.from(active.options).filter(option => option.value && norm(option.textContent).includes(term));
     results.innerHTML = '';
     matches.forEach(option => {
+      const unavailable=!!option.disabled;
       const button = document.createElement('button'); button.type = 'button';
-      button.className = 'bc-product-picker-result' + (option.value === active.value ? ' is-selected' : '');
+      button.className = 'bc-product-picker-result' + (option.value === active.value ? ' is-selected' : '') + (unavailable ? ' is-unavailable' : '');
+      button.disabled=unavailable;
       button.setAttribute('role', 'option'); button.setAttribute('aria-selected', option.value === active.value ? 'true' : 'false');
-      button.setAttribute('data-bc-product-value', option.value); button.textContent = option.textContent.trim(); results.appendChild(button);
+      if(!unavailable)button.setAttribute('data-bc-product-value', option.value);
+      button.textContent = option.textContent.trim();
+      results.appendChild(button);
     });
     const plural = activeKind === 'warehouse' ? 'almacenes' : activeKind === 'product' ? 'productos' : 'opciones';
     const singular = activeKind === 'warehouse' ? 'almacén' : activeKind === 'product' ? 'producto' : 'opción';
