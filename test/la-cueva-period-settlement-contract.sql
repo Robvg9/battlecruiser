@@ -324,8 +324,10 @@ BEGIN
   PERFORM public.resolver_aprobacion_operativa('entrega_diaria',v_daily_id,'APROBAR','Conteo correcto',20,NULL);
 
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>101
-     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99 THEN
-    RAISE EXCEPTION 'FAIL: approval must apply reinvestment, merma and baja stock effects exactly once';
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>2
+     OR (SELECT minimo FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>1 THEN
+    RAISE EXCEPTION 'FAIL: approval must apply stock effects exactly once and preserve each existing warehouse minimum';
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
