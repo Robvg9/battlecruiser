@@ -115,14 +115,15 @@ BEGIN
     RAISE EXCEPTION 'FAIL: cash count was accepted before the final inventory and employee checks';
   END IF;
 
-  -- Reinvestment approval adds 120 Pru × 60 CUP to an existing stock row
-  -- without trying to INSERT minimo=0. The final count below includes those units.
+  -- The employee records the reinvestment before confirming the four checks.
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
   INSERT INTO public.reinversiones(
     almacen_id,ciclo_id,sesion_id,turno_id,proveedor,fecha,total,
     usuario_id,usuario_nombre,idempotency_key,turno_sesion_id,turno_tramo_id,estado
   ) VALUES(
     v_almacen,NULL,NULL,v_turno,'Fixture proveedor',now(),7200,
-    v_owner,'Dueño checklist fixture','93000000-0000-0000-0000-000000000010',
+    v_worker,'Dependienta checklist fixture','93000000-0000-0000-0000-000000000010',
     v_sesion,v_tramo,'PENDIENTE'
   ) RETURNING id INTO v_reinversion;
   INSERT INTO public.reinversiones_lineas(
