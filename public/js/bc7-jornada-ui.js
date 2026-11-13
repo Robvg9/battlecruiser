@@ -459,6 +459,12 @@
     }
     return opened;
   }
+  function checklistConfirmButtonHtml(detail,key,isAssigned){
+    if(!isAssigned)return '';
+    const done=detail?.checklist?.[key]?.completado===true;
+    const label=key==='gastos'?'gastos':key==='reinversiones'?'reinversiones':'bajas';
+    return '<div class="bc7-checklist-confirm"><p class="bc7-muted">'+(done?'Este bloque ya está confirmado. Si agregas otro registro, se reabrirá automáticamente.':'Cuando termines de registrar '+label+', confirma aquí que no falta nada.')+'</p><button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+key+'" data-completed="'+(done?'true':'false')+'">'+(done?'Reabrir bloque':'Sí, ya terminé de agregar '+label)+'</button></div>';
+  }
   function financeFormHtml(detail,isAssigned,status){
     const sessionId=detail.sesion.id;
     const products=arr(detail.productos);
@@ -494,7 +500,7 @@
         '<label class="bc7-field">Concepto<input data-bc7-expense-concept maxlength="160" required placeholder="Motivo del gasto"></label>'+
         '<label class="bc7-field">Monto<input data-bc7-expense-amount type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="0.00"></label>'+
         '<label class="bc7-field">Descripción (opcional)<input data-bc7-expense-description maxlength="1000" placeholder="Detalle o referencia"></label>'+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar gasto a aprobación</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar gasto a aprobación</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>'+checklistConfirmButtonHtml(detail,'gastos',isAssigned)+'</details>';
     }
     if(createReinvestments){
       const options='<option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('');
@@ -505,7 +511,7 @@
         '<label class="bc7-field">Costo unitario (CUP)<input data-bc7-reinvestment-unit-cost type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="Ej. 60.00"></label></div>'+
         '<p class="bc7-muted" data-bc7-reinvestment-estimate>Total calculado: introduce la cantidad y el costo unitario.</p>'+
         '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">El sistema multiplica cantidad × costo unitario y envía el costo total calculado. La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>'+checklistConfirmButtonHtml(detail,'reinversiones',isAssigned)+'</details>';
     }
     return html+'</section>';
   }
@@ -1124,7 +1130,7 @@
         '<span class="bc7-checklist-mark">'+(done?'✓':String(index+1))+'</span>'+
         '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+(done?'Confirmado · no tienes que registrar más en este bloque':item.question)+'</small></div>'+
         '<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>'+
-        '<button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+item.key+'" data-completed="'+(done?'true':'false')+'" '+(!isAssigned?'disabled':'')+'>'+(done?'Reabrir':'Sí, ya terminé')+'</button>'+
+        '<span class="bc7-checklist-state">'+(done?'✓ Confirmado':'Pendiente de confirmación')+'</span>'+
       '</div>';
     }).join('');
     const finalDone=checks.inventario_final?.completado===true;
@@ -1239,7 +1245,7 @@
         '<input type="hidden" data-bc7-adjust-key value="">'+
         '<p class="bc7-muted" data-bc7-adjustment-hint>'+(canCreateBaja?'Puedes incluir varios productos; Administración recibirá un único expediente para aprobar la lista completa.':'La merma se envía como una sola solicitud y no modifica stock hasta su aprobación.')+'</p>'+
         (availableAdjustmentProducts.length?'':'<p class="bc7-msg error">El catálogo está completo, pero no hay existencias positivas para registrar una baja o merma.</p>')+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!availableAdjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!availableAdjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form>'+(canCreateBaja?checklistConfirmButtonHtml(detail,'bajas',isAssigned):'')+'</div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const fin=financeFormHtml(detail,isAssigned,status);
@@ -1566,8 +1572,7 @@
       if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'center'});}
       else if(key==='gastos'||key==='reinversiones')document.getElementById(key==='gastos'?'bc7-expenses-list':'bc7-reinvestments-list')?.scrollIntoView({behavior:'smooth',block:'center'});
     };
-    if(key==='gastos'||key==='reinversiones')loadFinances(state.detail).finally(findTarget);
-    else findTarget();
+    findTarget();
   }
   async function toggleChecklistBlock(button){
     const sessionId=state.selected;
