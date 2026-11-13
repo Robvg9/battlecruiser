@@ -173,7 +173,7 @@ BEGIN
     'dias_descanso',v_descansos,'hora_inicio',v_cfg.hora_inicio,'hora_fin',v_cfg.hora_fin,
     'zona_horaria',v_cfg.zona_horaria,'estado','PROGRAMADO');
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.bc5_cerrar_jornada(p_turno_sesion_id uuid, p_motivo_excepcion text DEFAULT NULL::text)
  RETURNS turno_sesiones
@@ -292,7 +292,7 @@ BEGIN
       'fin_operativo_at',v_fin_operativo,'entregado_admin_at',now(),'registro_administrativo_tardio',v_tardia AND trim(coalesce(p_motivo_excepcion,''))=''));
   RETURN v_result;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.bc7_configurar_salario_porcentaje_jornada(p_turno_sesion_id uuid, p_porcentaje numeric)
  RETURNS jsonb
@@ -370,7 +370,7 @@ BEGIN
     jsonb_build_object('salario_porcentaje_jornada',p_porcentaje,'salario_porcentaje_predeterminado',CASE WHEN v_s.estado='COMPLETADA' THEN v_store_old ELSE p_porcentaje END));
   RETURN jsonb_build_object('ok',true,'turno_sesion_id',v_s.id,'salario_porcentaje',p_porcentaje);
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada(p_turno_sesion_id uuid)
  RETURNS jsonb
@@ -701,7 +701,7 @@ BEGIN
     )
   );
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.listar_aprobaciones_admin()
  RETURNS TABLE(tipo text, id uuid, fecha timestamp with time zone, usuario_nombre text, almacen_nombre text, producto_nombre text, resumen text, monto numeric, cantidad numeric, estado text, motivo text)
@@ -866,7 +866,7 @@ BEGIN
 
     ORDER BY 3 DESC;
 END;
-$function$
+$function$;
 
 
 
