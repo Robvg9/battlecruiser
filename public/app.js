@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.101 — Jornada con checklist de responsable y conteo previo del Dueño
+// v9.5.101 — Jornada móvil y conteo de efectivo del Dueño y actualización PWA confiable
 (function hotfixV9475(){
   const VERSION="9.5.101";
   window.__BC_VERSION__=VERSION;
