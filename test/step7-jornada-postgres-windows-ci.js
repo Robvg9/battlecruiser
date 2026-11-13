@@ -331,7 +331,9 @@ function applySql(file) {
     applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\n=== Apply the attendant checklist and owner cash-count phase, then verify its isolated end-to-end contract ===");
     applySql("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
+    applySql("supabase/migrations/20261113180000_admin_show_pending_jornada_cash_declarations.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
+    applySql("test/jornada-pending-cash-visibility-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist, pre-close physical cash count, automatic calculation, final Turn handover and reinvestment stock-minimum preservation.");
   } catch (error) {
     failure = error;
