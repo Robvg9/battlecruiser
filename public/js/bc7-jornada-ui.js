@@ -13,6 +13,22 @@
   const dateHavana=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Havana',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   function addDays(s,n){const d=new Date(String(s||dateHavana())+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+Number(n||0));return d.toISOString().slice(0,10);}
   function fmtDate(v){const s=String(v||'').slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:s||'—';}
+  function zonedDateTimeToIso(value,zone){
+    const match=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+    if(!match)throw new Error('Indica una fecha y hora válidas.');
+    const target=Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]),Number(match[4]),Number(match[5]));
+    let guess=target;
+    const partsFor=date=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
+      timeZone:zone||'America/Havana',year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+    }).formatToParts(date).filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+    for(let attempt=0;attempt<3;attempt++){
+      const parts=partsFor(new Date(guess));
+      const represented=Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day),Number(parts.hour),Number(parts.minute));
+      guess+=target-represented;
+    }
+    return new Date(guess).toISOString();
+  }
   function fmtDateHuman(v){const p=String(v||'').slice(0,10).split('-').map(Number);if(p.length!==3||!p[0]||!p[1]||!p[2])return fmtDate(v);return new Intl.DateTimeFormat('es-ES',{timeZone:'UTC',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(Date.UTC(p[0],p[1]-1,p[2],12)));}
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
   function money(v){return typeof window.money==='function'?window.money(Number(v||0)):Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -787,6 +803,7 @@
     }
     const pending=result.pendientes||{};
     const calculable=result.calculable===true;
+    const cutoffRows=arr(result.bajas_fuera_de_corte_detalle);
     const summary=[
       ['Venta comprobada',result.ventas_estimadas],
       ['Salario calculado',result.salario_calculado],
@@ -813,7 +830,16 @@
             '<td>'+esc(line.precio_unitario==null?'Sin precio':money(line.precio_unitario))+'</td>'+
             '<td>'+esc(line.importe_estimado==null?'—':money(line.importe_estimado))+'</td></tr>';
         }).join('')+'</tbody></table></div>'
-      :'<div class="bc7-empty">El cálculo aparecerá cuando existan cortes de inventario confirmados.</div>';
+      :(cutoffRows.length?'<div class="bc7-empty">El desglose y los importes estimados están ocultos hasta revisar las Bajas registradas después del corte final.</div>':'<div class="bc7-empty">El cálculo aparecerá cuando existan cortes de inventario confirmados.</div>');
+    const cutoffReview=cutoffRows.length
+      ?'<section class="bc7-note"><b>Bajas posteriores al corte final · revisión obligatoria</b><p>La fecha de aprobación no demuestra cuándo ocurrió físicamente la pérdida. El Dueño debe registrar la fecha/hora real y el motivo comprobable de cada Baja antes de liquidar.</p>'+
+        cutoffRows.map(item=>'<article class="bc7-jornada" data-bc7-baja-cutoff-row="'+esc(item.baja_id)+'"><strong>'+esc(item.producto||'Producto')+' · '+esc(qty(item.cantidad))+' u</strong>'+
+          '<p class="bc7-muted">Registrada: '+esc(item.fecha_revision||item.fecha_registro||'—')+'</p>'+
+          (state.admin?'<label class="bc7-field">Fecha y hora real de ocurrencia (America/Havana)<input type="datetime-local" data-bc7-baja-cutoff-time></label>'+
+            '<label class="bc7-field">Motivo / evidencia de la fecha real<textarea data-bc7-baja-cutoff-reason maxlength="500" rows="2" placeholder="Explica cómo se confirmó cuándo ocurrió la pérdida"></textarea></label>'+
+            '<button type="button" class="bc7-btn primary" data-bc7-baja-cutoff-review>Registrar revisión del Dueño</button>'
+            :'<p class="bc7-muted">Pendiente de revisión por el Dueño.</p>')+'</article>').join('')+'</section>'
+      :'';
     const blockers=[];
     if(result.faltan_cortes)blockers.push('Falta confirmar el inventario inicial o final.');
     if(Number(result.familias_sin_precio||0)>0)blockers.push(Number(result.familias_sin_precio)+' familias no tienen un precio de venta único y válido.');
@@ -824,13 +850,37 @@
     if(Number(pending.gastos||0)>0)blockers.push(Number(pending.gastos)+' gastos pendientes de aprobación.');
     if(Number(pending.reinversiones||0)>0)blockers.push(Number(pending.reinversiones)+' reinversiones pendientes de aprobación.');
     if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas/mermas pendientes de aprobación.');
+    if(Number(result.bajas_fuera_de_corte||pending.bajas_fuera_de_corte||0)>0)blockers.push(Number(result.bajas_fuera_de_corte||pending.bajas_fuera_de_corte)+' Bajas aprobadas después del corte final requieren atribución física por el Dueño.');
     const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
     host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
       '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
       '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
-      cards+(rows.length?'<details class="bc7-finance-fold"><summary>Desglose por producto</summary>'+table+'</details>':table)+
+      cards+cutoffReview+(rows.length?'<details class="bc7-finance-fold"><summary>Desglose por producto</summary>'+table+'</details>':table)+
       (blockers.length?'<div class="bc7-note"><b>Para cerrar la liquidación:</b><ul>'+blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'<p class="bc7-muted">No quedan aprobaciones ni validaciones pendientes.</p>')+
       '</div>';
+    host.querySelectorAll('[data-bc7-baja-cutoff-review]').forEach(button=>button.addEventListener('click',async()=>{
+      if(!state.admin){msg(host,'Solo el Dueño puede registrar esta revisión.','error');return;}
+      const row=button.closest('[data-bc7-baja-cutoff-row]');
+      const bajaId=row?.getAttribute('data-bc7-baja-cutoff-row')||'';
+      const localTime=row?.querySelector('[data-bc7-baja-cutoff-time]')?.value||'';
+      const reason=row?.querySelector('[data-bc7-baja-cutoff-reason]')?.value.trim()||'';
+      if(!bajaId||!localTime||reason.length<8){msg(host,'Completa la fecha/hora real y un motivo verificable de al menos 8 caracteres.','error');return;}
+      let occurrence;
+      try{occurrence=zonedDateTimeToIso(localTime,'America/Havana');}
+      catch(error){msg(host,error.message||'Fecha/hora inválida.','error');return;}
+      if(!confirm('Se registrará la fecha/hora física indicada como evidencia de revisión. No se cambiará la cantidad aprobada ni el inventario. ¿Confirmas?'))return;
+      button.disabled=true;
+      try{
+        await rpc('bc7_revisar_baja_fuera_corte',{p_baja_id:bajaId,p_fecha_ocurrencia:occurrence,p_motivo:reason});
+        const sessionId=String(state.detail?.sesion?.id||'');
+        if(!sessionId)throw new Error('No se pudo recuperar la jornada para verificar la revisión.');
+        await openWorkspace(sessionId);
+        setStatus('Revisión de Baja guardada y liquidación actualizada desde el servidor.','ok');
+      }catch(error){
+        button.disabled=false;
+        msg(host,friendlyError(error,'create')+' '+String(error&&error.message||''),'error');
+      }
+    }));
   }
   function renderFinanceList(host,rows,type){
     if(!host)return;
