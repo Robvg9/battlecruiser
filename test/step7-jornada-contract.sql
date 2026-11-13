@@ -145,12 +145,23 @@ BEGIN
 
   -- The admin queue exposes one item for the whole list, not one item per product.
   PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','bajas:crear,mermas:crear',false);
+  PERFORM set_config('test.perms','bajas:crear,bajas:editar_any,mermas:crear',false);
   SELECT count(*) INTO v_list_count
   FROM public.listar_aprobaciones_admin() q
   WHERE q.tipo='baja_lista' AND q.id=v_solicitud;
   IF v_list_count<>1 THEN
     RAISE EXCEPTION 'FAIL: Administration must receive exactly one approval item for a multi-product Baja';
+  END IF;
+
+  -- One administrative decision resolves the parent list and every child line together.
+  v_result:=public.resolver_solicitud_bajas_admin(
+    v_solicitud,'RECHAZAR','Rechazo controlado del contrato aislado','[]'::jsonb
+  );
+  IF v_result->>'ok'<>'true'
+     OR (v_result->>'lineas_resueltas')::integer<>2
+     OR (SELECT estado FROM public.bajas_solicitudes WHERE id=v_solicitud)<>'RECHAZADA'
+     OR (SELECT count(*) FROM public.bajas WHERE solicitud_id=v_solicitud AND estado='RECHAZADA')<>2 THEN
+    RAISE EXCEPTION 'FAIL: one administrative decision must resolve the whole grouped Baja request';
   END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
