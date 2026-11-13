@@ -2,6 +2,21 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+DO $security$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE oid='public.bc7_jornada_saldos_operativos(uuid)'::regprocedure
+      AND prosecdef
+  ) THEN
+    RAISE EXCEPTION 'FAIL: operational balance helper must not be SECURITY DEFINER';
+  END IF;
+  IF has_function_privilege('authenticated','public.bc7_jornada_saldos_operativos(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: operational balance helper must not be directly executable by authenticated users';
+  END IF;
+END
+$security$;
+
 -- Simulate the production stock-minimum BEFORE INSERT guard for this disposable test.
 CREATE OR REPLACE FUNCTION public.bc_test_positive_stock_minimum()
 RETURNS trigger LANGUAGE plpgsql

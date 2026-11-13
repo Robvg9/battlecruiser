@@ -5,7 +5,7 @@ BEGIN;
 CREATE OR REPLACE FUNCTION public.bc7_jornada_saldos_operativos(p_turno_sesion_id uuid)
  RETURNS TABLE(producto_id uuid, inventario_inicial numeric, entradas numeric, salidas numeric, cantidad_actual numeric)
  LANGUAGE plpgsql
- STABLE SECURITY DEFINER
+ STABLE SECURITY INVOKER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
@@ -199,8 +199,8 @@ BEGIN
   LEFT JOIN movement_totals m ON m.producto_id = ids.producto_id;
 END;
 $function$;
-REVOKE ALL ON FUNCTION public.bc7_jornada_saldos_operativos(uuid) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.bc7_jornada_saldos_operativos(uuid) TO authenticated,service_role;
+REVOKE ALL ON FUNCTION public.bc7_jornada_saldos_operativos(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.bc7_jornada_saldos_operativos(uuid) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.bc7_productos_ajuste_jornada(p_turno_sesion_id uuid)
 RETURNS TABLE(
