@@ -351,19 +351,23 @@ BEGIN
   UPDATE public.turno_jornada_programacion
   SET salario_porcentaje=p_porcentaje,actualizado_por=auth.uid(),actualizado_en=now()
   WHERE id=v_p.id;
-  UPDATE public.turno_jornada_configuracion
-  SET salario_porcentaje=p_porcentaje,
-      salario_porcentaje_actualizado_por=auth.uid(),
-      salario_porcentaje_actualizado_en=now(),
-      actualizado_por=auth.uid(),
-      actualizado_en=now()
-  WHERE almacen_id=v_s.almacen_id;
+  -- A retroactive Owner setting for an already completed session must not
+  -- silently change the store-wide default used by future schedules.
+  IF v_s.estado<>'COMPLETADA' THEN
+    UPDATE public.turno_jornada_configuracion
+    SET salario_porcentaje=p_porcentaje,
+        salario_porcentaje_actualizado_por=auth.uid(),
+        salario_porcentaje_actualizado_en=now(),
+        actualizado_por=auth.uid(),
+        actualizado_en=now()
+    WHERE almacen_id=v_s.almacen_id;
+  END IF;
   INSERT INTO public.turno_jornada_eventos
     (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
   VALUES(v_s.almacen_id,v_p.id,auth.uid(),'SALARIO_PORCENTAJE_CONFIGURADO',
     'Se fijó el porcentaje salarial de esta jornada; el valor queda congelado al cerrarla.',
     jsonb_build_object('salario_porcentaje_jornada',v_old,'salario_porcentaje_predeterminado',v_store_old),
-    jsonb_build_object('salario_porcentaje_jornada',p_porcentaje,'salario_porcentaje_predeterminado',p_porcentaje));
+    jsonb_build_object('salario_porcentaje_jornada',p_porcentaje,'salario_porcentaje_predeterminado',CASE WHEN v_s.estado='COMPLETADA' THEN v_store_old ELSE p_porcentaje END));
   RETURN jsonb_build_object('ok',true,'turno_sesion_id',v_s.id,'salario_porcentaje',p_porcentaje);
 END;
 $function$
@@ -848,7 +852,7 @@ BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo el Dueño/Admin puede clasificar movimientos posteriores al corte.' USING ERRCODE='42501';
   END IF;
-  IF jsonb_typeof(p_decisiones)<>'array' OR jsonb_array_length(p_decisiones)=0 THEN
+  IF p_decisiones IS NULL OR jsonb_typeof(p_decisiones)<>'array' OR jsonb_array_length(p_decisiones)=0 THEN
     RAISE EXCEPTION 'Selecciona una clasificación para cada movimiento y escribe el motivo.' USING ERRCODE='22023';
   END IF;
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id AND bloque='JORNADA';
