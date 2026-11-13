@@ -160,7 +160,7 @@
   async function run(fn){
     busy=true;const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Guardando…';
     try{await fn();}catch(e){if(msg){msg.textContent=e.message||String(e);msg.className='bcjr-message bcjr-error';}}
-    finally{busy=false;}
+    finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   document.addEventListener('click',click);
   window.bcAbrirRevisionJornada=openReview;
