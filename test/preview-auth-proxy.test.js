@@ -4,6 +4,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const worker = require("../preview-worker.mjs").default;
 const authSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public", "js", "auth.js"), "utf8");
+const fs = require("node:fs");
+const path = require("node:path");
+const previewWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wrangler.preview.toml"), "utf8");
+const productionWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wrangler.toml"), "utf8");
 
 const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
@@ -17,6 +21,12 @@ function assetsBinding() {
     fetch: async () => new Response("static asset", { status: 200 }),
   };
 }
+
+
+test("preview Worker explicitly disables placement and leaves production Worker configuration untouched", () => {
+  assert.match(previewWranglerConfig, /^\\[placement\\]\\s*mode = "off"/m);
+  assert.doesNotMatch(productionWranglerConfig, /^\\[placement\\]/m);
+});
 
 test("preview admin password recovery POST uses its own allowlisted Edge Function route", async (t) => {
   const originalFetch = globalThis.fetch;
