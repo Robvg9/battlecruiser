@@ -5,6 +5,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const MIG=read("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
+const SQL_CONTRACT=read("test/jornada-owner-review-continuity-contract.sql");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
 const REVIEW=read("public/js/jornada-owner-review.js");
@@ -47,6 +48,9 @@ test("Salary percentage can be explicitly set after a completed session but befo
   assert.match(MIG,/bc7_configurar_salario_porcentaje_jornada/);
   assert.match(REVIEW,/bc7_configurar_salario_porcentaje_jornada/);
   assert.match(REVIEW,/Es una decisión del Dueño; no se aplica un valor predeterminado/);
+});
+test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC grants and queue wiring",()=>{
+  for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
   assert.match(APP,/VERSION="9\.5\.105"/);
