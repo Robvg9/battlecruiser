@@ -48,11 +48,11 @@ test("Jornada workspace title includes the full multi-day period",()=>{
 });
 
 test("Operation and finance containers stay full width; only daily cash cards use the compact grid",()=>{
-  assert.match(ui,/#tab-jornada \\.bc7-jornada\\{display:block;grid-template-columns:minmax\\(0,1fr\\);min-width:0;width:100%;max-width:100%;box-sizing:border-box;padding:7px!important\\}/);
-  assert.match(ui,/#tab-jornada \\.bc7-jornada\\[data-bc7-cash-day-row\\]\\{display:grid;grid-template-columns:minmax\\(0,1fr\\) auto auto/);
-  assert.match(ui,/#tab-jornada \\.bc7-jornada\\[data-bc7-cash-day-row\\] \\.bc7-jornada-top\\{display:contents!important\\}/);
-  assert.doesNotMatch(ui,/#tab-jornada \\.bc7-jornada-top\\{display:contents!important\\}/);
-  assert.match(ui,/data-bc7-cash-days-manager/);
-  assert.match(ui,/data-bc7-finance-form="gasto"/);
-  assert.match(ui,/data-bc7-finance-form="reinversion"/);
+  assert.ok(ui.includes("#tab-jornada .bc7-jornada{display:block;grid-template-columns:minmax(0,1fr);min-width:0;width:100%;max-width:100%;box-sizing:border-box;padding:7px!important}"));
+  assert.ok(ui.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px}"));
+  assert.ok(ui.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-jornada-top{display:contents!important}"));
+  assert.ok(!ui.includes("#tab-jornada .bc7-jornada-top{display:contents!important}"));
+  assert.ok(ui.includes('data-bc7-cash-days-manager'));
+  assert.ok(ui.includes('data-bc7-finance-form="gasto"'));
+  assert.ok(ui.includes('data-bc7-finance-form="reinversion"'));
 });
