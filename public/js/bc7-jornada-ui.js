@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.27 — catálogo completo para ajustes y checklist de cinco pasos.
+// v7.28 — catálogo completo para ajustes y checklist de cinco pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1606,9 +1606,9 @@
     root.setAttribute('aria-modal','true');
     root.setAttribute('aria-label',labels[key]);
     root.innerHTML='<div class="bc7-checklist-modal-panel">'+
-      '<header class="bc7-checklist-modal-head"><div><p>JORNADA · '+esc(labels[key].toUpperCase())+'</p><h3>'+esc(labels[key])+'</h3><small>Completa este apartado y envía su evidencia a Administración.</small></div><button type="button" class="bc7-btn" data-bc7-checklist-modal-close aria-label="Cerrar">Cerrar ✕</button></header>'+
+      '<header class="bc7-checklist-modal-head"><div><p>JORNADA · '+esc(labels[key].toUpperCase())+'</p><h3>'+esc(labels[key])+'</h3><small>'+(key==='bajas'?'Envía cada solicitud con «Enviar solicitud a revisión». El botón inferior solo confirma que no faltan más registros; no guarda productos incompletos.':'Completa este apartado y envía su evidencia a Administración.')+'</small></div><button type="button" class="bc7-btn" data-bc7-checklist-modal-close aria-label="Cerrar">Cerrar ✕</button></header>'+
       '<div class="bc7-checklist-modal-body" data-bc7-checklist-modal-body></div>'+
-      '<footer class="bc7-checklist-modal-foot"><span class="bc7-muted" data-bc7-checklist-modal-state>'+(completed?'Este apartado ya está confirmado.':'Los cambios se guardan en el servidor al enviarlos.')+'</span><button type="button" class="bc7-btn primary" data-bc7-checklist-modal-action '+(key==='inventario_final'&&completed?'disabled':'')+'>'+(key==='inventario_final'?'Confirmar inventario final y enviar evidencia':(completed?'Reabrir sección':'Enviar evidencia a Administración'))+'</button></footer>'+
+      '<footer class="bc7-checklist-modal-foot"><span class="bc7-muted" data-bc7-checklist-modal-state>'+(completed?'Este apartado ya está confirmado.':'Los cambios se guardan en el servidor al enviarlos.')+'</span><button type="button" class="bc7-btn primary" data-bc7-checklist-modal-action '+(key==='inventario_final'&&completed?'disabled':'')+'>'+(key==='inventario_final'?'Confirmar inventario final y enviar evidencia':(completed?'Reabrir sección':key==='bajas'?'Confirmar que no faltan más bajas':'Enviar evidencia a Administración'))+'</button></footer>'+
     '</div>';
     const host=document.getElementById('tab-jornada')||document.body;
     host.appendChild(root);
@@ -1627,6 +1627,19 @@
     root.addEventListener('click',e=>{if(e.target===root)closeChecklistModal({restore:true});});
     root.querySelector('[data-bc7-checklist-modal-action]').addEventListener('click',async()=>{
       if(!checklistModalContext||!navigator.onLine){setStatus('La subsección requiere conexión para enviar evidencia.','error');return;}
+      if(key==='bajas'){
+        const form=root.querySelector('[data-bc7-adjust-form]');
+        if(form){
+          const cause=form.querySelector('[data-bc7-ajust-cause]')?.value||'';
+          const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+          const hasUnsentInput=!!cause||rows.some(row=>!!row.querySelector('[data-bc7-ajust-product]')?.value||!!row.querySelector('[data-bc7-ajust-qty]')?.value);
+          if(hasUnsentInput){
+            setStatus('Hay bajas preparadas que todavía no se han enviado. Completa todas las filas y pulsa «Enviar solicitud a revisión». Después confirma que no faltan más bajas.','error');
+            form.querySelector('[data-bc7-ajust-cause]')?.focus();
+            return;
+          }
+        }
+      }
       const button=root.querySelector('[data-bc7-checklist-modal-action]');
       button.disabled=true;
       try{

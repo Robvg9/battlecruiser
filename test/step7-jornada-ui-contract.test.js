@@ -10,6 +10,8 @@ const app=fs.readFileSync(path.join(__dirname,"../public/app.js"),"utf8");
 const sw=fs.readFileSync(path.join(__dirname,"../public/service-worker.js"),"utf8");
 const nav=fs.readFileSync(path.join(__dirname,"../public/js/permisos-navegacion.js"),"utf8");
 const jornadaCss=fs.readFileSync(path.join(__dirname,"../public/bc7-jornada-inventory-mobile.css"),"utf8");
+const adminApprovals=fs.readFileSync(path.join(__dirname,"../public/js/aprobaciones-admin.js"),"utf8");
+const multiDayCashMigration=fs.readFileSync(path.join(__dirname,"../supabase/migrations/20261113230000_admin_label_final_cash_by_master_turno_day.sql"),"utf8");
 
 test("Step 7 has session-scoped, immutable inventory snapshots and gates start/close server-side",()=>{
   assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_inventario_cortes/);
@@ -50,6 +52,11 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
     assert.ok(financeMarkup.includes(control),`finance content must include ${control}`);
   }
   assert.match(ui,/data-bc7-adjust-form/,"baja/merma form is composed in the same operation panel");
+  assert.match(ui,/Hay bajas preparadas que todavía no se han enviado/,"checklist evidence cannot silently discard unsent Baja form input");
+  assert.match(ui,/Confirmar que no faltan más bajas/,"the checklist action is explicit that it only confirms no more requests remain");
+  assert.match(ui,/El botón inferior solo confirma que no faltan más registros/,"the modal explains that evidence confirmation does not save incomplete Baja rows");
+  assert.match(multiDayCashMigration,/COALESCE\(t\.dias_turno,s\.numero_dia\)::text/,"final cash declaration uses the final day of the master multi-day Turno");
+  assert.match(multiDayCashMigration,/JOIN public\.turnos t ON t\.id=s\.turno_id/,"the administrative queue resolves the master Turno day count");
 
   assert.match(ui,/data-bc7-adjustment-row/,"a baja request contains a repeatable list of product lines");
   assert.match(ui,/data-bc7-adjustment-add/,"the user can add multiple products to one baja request");
@@ -132,7 +139,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.27");
+  assert.equal(moduleVersion,"7.28");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assert.ok(app.includes('["aprobaciones-admin.js","20261113.3"]'));
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.3"));
