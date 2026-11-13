@@ -338,18 +338,8 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'No se encontró la jornada asociada a la declaración.' USING ERRCODE='23503';
   END IF;
-  IF v_s.estado NOT IN ('EN_CURSO','COMPLETADA') THEN
-    RAISE EXCEPTION 'La jornada debe estar en curso o completada para contar el efectivo.' USING ERRCODE='23514';
-  END IF;
-  IF v_s.estado='EN_CURSO' THEN
-    v_gate:=public.bc7_estado_checklist_jornada(v_s.id);
-    IF NOT coalesce((v_gate->>'puede_contar_efectivo')::boolean,false) THEN
-      RAISE EXCEPTION '%',coalesce(v_gate->>'bloqueo_efectivo','Completa los cuatro pasos operativos y resuelve las aprobaciones antes de contar el efectivo.')
-        USING ERRCODE='23514';
-    END IF;
-  END IF;
-
-  -- A retry with the exact same physical count is safe. A different amount cannot overwrite evidence.
+  -- A retry with the exact same physical count is safe. Check it before readiness:
+  -- after a successful count the checklist quite correctly stops advertising a pending count.
   IF v_d.monto_contado IS NOT NULL THEN
     IF round(v_d.monto_contado,2) IS DISTINCT FROM v_contado THEN
       RAISE EXCEPTION 'Esta entrega ya tiene un conteo confirmado. No se puede sobrescribir.' USING ERRCODE='23514';
@@ -360,16 +350,22 @@ BEGIN
     ORDER BY created_at DESC
     LIMIT 1;
     RETURN jsonb_build_object(
-      'declaracion_id',v_d.id,
-      'estado',v_d.estado_aprobacion,
-      'monto_declarado',v_d.monto,
-      'monto_contado',v_d.monto_contado,
-      'diferencia',v_d.diferencia,
-      'diferencia_id',v_diferencia_id,
-      'contado_por',v_d.contado_por,
-      'contado_at',v_d.contado_at,
-      'idempotente',true
+      'declaracion_id',v_d.id,'estado',v_d.estado_aprobacion,
+      'monto_declarado',v_d.monto,'monto_contado',v_d.monto_contado,
+      'diferencia',v_d.diferencia,'diferencia_id',v_diferencia_id,
+      'contado_por',v_d.contado_por,'contado_at',v_d.contado_at,'idempotente',true
     );
+  END IF;
+
+  IF v_s.estado NOT IN ('EN_CURSO','COMPLETADA') THEN
+    RAISE EXCEPTION 'La jornada debe estar en curso o completada para contar el efectivo.' USING ERRCODE='23514';
+  END IF;
+  IF v_s.estado='EN_CURSO' THEN
+    v_gate:=public.bc7_estado_checklist_jornada(v_s.id);
+    IF NOT coalesce((v_gate->>'puede_contar_efectivo')::boolean,false) THEN
+      RAISE EXCEPTION '%',coalesce(v_gate->>'bloqueo_efectivo','Completa los cuatro pasos operativos y resuelve las aprobaciones antes de contar el efectivo.')
+        USING ERRCODE='23514';
+    END IF;
   END IF;
 
   IF coalesce(v_d.estado_aprobacion,'') NOT IN ('PENDIENTE','ESPERANDO_APROBACION') THEN
