@@ -356,6 +356,55 @@ BEGIN
     RAISE EXCEPTION 'FAIL: inventory-delta lines omitted approved reinvestment, merma or baja quantities; result=%',v_result;
   END IF;
 
+  -- A Baja approved after the immutable final cut is not silently omitted or
+  -- guessed into the period. It blocks settlement until ADMIN records its
+  -- verified physical occurrence time and reason.
+  UPDATE public.turno_jornada_inventario_cortes
+  SET confirmado_en=now()-interval '1 minute',creado_en=now()-interval '1 minute'
+  WHERE id=v_final_cut;
+  UPDATE public.reinversiones SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_reinvestment_id;
+  UPDATE public.mermas SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_merma_id;
+  UPDATE public.bajas SET fecha_revision=now(),actualizado_en=now() WHERE id=v_baja_id;
+
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
+     OR (v_result->>'bajas_fuera_de_corte')::integer<>1
+     OR (v_result->'pendientes'->>'bajas_fuera_de_corte')::integer<>1
+     OR jsonb_array_length(v_result->'bajas_fuera_de_corte_detalle')<>1 THEN
+    RAISE EXCEPTION 'FAIL: post-cutoff approved Baja must block settlement and expose auditable detail; result=%',v_result;
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','turnos:ver,bajas:crear',false);
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_revisar_baja_fuera_corte(v_baja_id,v_mid,'Ocurrió durante el período fixture');
+  EXCEPTION WHEN SQLSTATE '42501' THEN
+    v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: attendant unexpectedly attributed an approved Baja after the final cut';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  PERFORM set_config('test.perms','bajas:editar_any,auditoria:editar_any',false);
+  PERFORM public.bc7_revisar_baja_fuera_corte(
+    v_baja_id,v_mid,'La responsable confirmó que la pérdida ocurrió durante el período.'
+  );
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF (v_result->>'calculable')::boolean IS DISTINCT FROM true
+     OR (v_result->>'bajas_fuera_de_corte')::integer<>0
+     OR NOT EXISTS(
+       SELECT 1 FROM jsonb_array_elements(v_result->'lineas') line
+       WHERE line.value->>'producto_id'=v_juice::text
+         AND (line.value->>'bajas_aprobadas')::numeric=0.5
+     ) THEN
+    RAISE EXCEPTION 'FAIL: verified in-period occurrence was not included exactly once in the settlement; result=%',v_result;
+  END IF;
+
+
   -- A rejected daily delivery can be corrected and resubmitted without creating a second row.
   UPDATE public.turno_jornada_entregas_diarias
   SET estado='PENDIENTE',monto_aprobado=NULL
@@ -398,7 +447,10 @@ BEGIN
      OR has_function_privilege('anon','public.bc7_liquidacion_inventario_jornada(uuid)','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.bc7_liquidacion_inventario_jornada(uuid)','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.bc7_registrar_entrega_diaria_jornada(uuid,date,numeric,text,uuid)','EXECUTE')
-     OR NOT has_function_privilege('authenticated','public.bc7_configurar_salario_porcentaje_jornada(uuid,numeric)','EXECUTE') THEN
+     OR NOT has_function_privilege('authenticated','public.bc7_configurar_salario_porcentaje_jornada(uuid,numeric)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_revisar_baja_fuera_corte(uuid,timestamptz,text)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.bc7_revisar_baja_fuera_corte(uuid,timestamptz,text)','EXECUTE')
+     OR has_table_privilege('authenticated','public.turno_jornada_bajas_corte_revision','SELECT') THEN
     RAISE EXCEPTION 'FAIL: daily cash and settlement ACL boundary is incorrect';
   END IF;
 
