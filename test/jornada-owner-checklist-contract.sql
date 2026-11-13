@@ -2,6 +2,21 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+-- Simulate the production stock-minimum BEFORE INSERT guard for this disposable test.
+CREATE OR REPLACE FUNCTION public.bc_test_positive_stock_minimum()
+RETURNS trigger LANGUAGE plpgsql
+AS $guard$
+BEGIN
+  IF NEW.minimo IS NULL OR NEW.minimo<=0 THEN
+    RAISE EXCEPTION 'Antes de agregar existencias, configure un stock mínimo mayor que cero.';
+  END IF;
+  RETURN NEW;
+END
+$guard$;
+CREATE TRIGGER bc_test_positive_stock_minimum
+BEFORE INSERT ON public.stock
+FOR EACH ROW EXECUTE FUNCTION public.bc_test_positive_stock_minimum();
+
 DO $test$
 DECLARE
   v_turno uuid:='90000000-0000-0000-0000-000000000008';
@@ -137,22 +152,6 @@ BEGIN
      OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turno)<>'EN_CURSO' THEN
     RAISE EXCEPTION 'FAIL: session handover must not close the master Turn before Owner approval';
   END IF;
-
-  -- Mimic the production BEFORE INSERT stock-minimum guard. A direct UPDATE
-  -- must add the reinvestment to the existing row while retaining minimum=20.
-  CREATE OR REPLACE FUNCTION public.bc_test_positive_stock_minimum()
-  RETURNS trigger LANGUAGE plpgsql
-  AS $guard$
-  BEGIN
-    IF NEW.minimo IS NULL OR NEW.minimo<=0 THEN
-      RAISE EXCEPTION 'Antes de agregar existencias, configure un stock mínimo mayor que cero.';
-    END IF;
-    RETURN NEW;
-  END
-  $guard$;
-  CREATE TRIGGER bc_test_positive_stock_minimum
-  BEFORE INSERT ON public.stock
-  FOR EACH ROW EXECUTE FUNCTION public.bc_test_positive_stock_minimum();
 
   INSERT INTO public.reinversiones(
     almacen_id,ciclo_id,sesion_id,turno_id,proveedor,fecha,total,
