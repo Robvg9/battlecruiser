@@ -1472,26 +1472,122 @@
     }
     finally{busy(btn,false);}
   }
+  function updateReinvestmentEstimate(form){
+    const output=form&&form.querySelector('[data-bc7-reinvestment-estimate]');
+    if(!output)return;
+    const quantity=Number(form.querySelector('[data-bc7-reinvestment-quantity]')?.value);
+    const unitCost=Number(form.querySelector('[data-bc7-reinvestment-unit-cost]')?.value);
+    if(!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitCost)||unitCost<=0){
+      output.textContent='Total calculado: introduce la cantidad y el costo unitario.';return;
+    }
+    const total=Math.round(quantity*unitCost*100)/100;
+    output.textContent=qty(quantity)+' × '+money(unitCost)+' CUP = '+money(total)+' CUP en total.';
+  }
+  function syncAdjustmentRows(form){
+    if(!form)return;
+    const type=form.querySelector('[data-bc7-ajust-type]')?.value||'baja';
+    const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+    const isList=type==='baja';
+    if(!isList&&rows.length>1)rows.slice(1).forEach(row=>row.remove());
+    const visibleRows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+    visibleRows.forEach(row=>{
+      const remove=row.querySelector('[data-bc7-adjustment-remove]');
+      if(remove)remove.hidden=!isList||visibleRows.length<2;
+    });
+    const add=form.querySelector('[data-bc7-adjustment-add]');
+    if(add)add.hidden=!isList;
+    const hint=form.querySelector('[data-bc7-adjustment-hint]');
+    if(hint)hint.textContent=isList?'Puedes incluir varios productos; Administración recibirá un único expediente para aprobar la lista completa.':'La merma se envía como una sola solicitud y no modifica stock hasta su aprobación.';
+  }
+  function addAdjustmentRow(form){
+    if((form.querySelector('[data-bc7-ajust-type]')?.value||'baja')!=='baja')return;
+    const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+    if(!rows.length||rows.length>=100){msg(form.querySelector('[data-bc7-ajust-msg]'),'La lista debe contener entre 1 y 100 productos.','error');return;}
+    const clone=rows[0].cloneNode(true);
+    const select=clone.querySelector('[data-bc7-ajust-product]');if(select)select.value='';
+    const quantity=clone.querySelector('[data-bc7-ajust-qty]');if(quantity){quantity.value='';quantity.removeAttribute('max');quantity.setCustomValidity('');}
+    const remove=clone.querySelector('[data-bc7-adjustment-remove]');if(remove)remove.hidden=false;
+    form.querySelector('[data-bc7-adjustment-rows]').appendChild(clone);
+    syncAdjustmentRows(form);
+  }
+  function removeAdjustmentRow(button){
+    const form=button.closest('[data-bc7-adjust-form]');
+    const rows=form?Array.from(form.querySelectorAll('[data-bc7-adjustment-row]')):[];
+    if(!form||rows.length<=1)return;
+    button.closest('[data-bc7-adjustment-row]')?.remove();syncAdjustmentRows(form);
+  }
+  function validateAdjustmentRow(row){
+    const select=row?.querySelector('[data-bc7-ajust-product]');
+    const quantity=row?.querySelector('[data-bc7-ajust-qty]');
+    if(!select||!quantity)return;
+    const option=select.options[select.selectedIndex];
+    const stock=Number(option?.dataset?.stock||0);
+    if(select.value&&Number.isFinite(stock)&&stock>0)quantity.max=String(stock);else quantity.removeAttribute('max');
+    const amount=Number(quantity.value);
+    if(select.value&&quantity.value!==''&&Number.isFinite(amount)&&amount>stock){
+      quantity.setCustomValidity('La cantidad supera el stock disponible ('+qty(stock)+').');
+    }else quantity.setCustomValidity('');
+  }
   async function submitAdjustment(form){
     const sessionId=form.dataset.bc7AdjustForm;
     const storageType=form.querySelector('[data-bc7-ajust-type]').value;
     const cause=form.querySelector('[data-bc7-ajust-cause]').value.trim();
     const detail=form.querySelector('[data-bc7-ajust-reason]').value.trim();
-    const product=form.querySelector('[data-bc7-ajust-product]').value;
-    const quantity=form.querySelector('[data-bc7-ajust-qty]').value;
     const msgEl=form.querySelector('[data-bc7-ajust-msg]');
-    if(!cause||!product||!Number.isFinite(Number(quantity))||Number(quantity)<=0||(cause==='Otra causa'&&!detail)){
-      msg(msgEl,'Selecciona el motivo y el producto, introduce una cantidad positiva y describe la otra causa cuando corresponda.','error');return;
+    const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+    const lines=rows.map(row=>{
+      const select=row.querySelector('[data-bc7-ajust-product]');
+      const quantityInput=row.querySelector('[data-bc7-ajust-qty]');
+      const option=select?.options?.[select.selectedIndex];
+      return {producto_id:select?.value||'',cantidad:Number(quantityInput?.value),stock:Number(option?.dataset?.stock||0),row};
+    });
+    if(!cause||!lines.length||(cause==='Otra causa'&&!detail)){
+      msg(msgEl,'Selecciona el motivo y completa el detalle cuando elijas «Otra causa».','error');return;
     }
-    const operationLabel=storageType==='baja'?'baja':'merma';
+    if(lines.some(line=>!line.producto_id||!Number.isFinite(line.cantidad)||line.cantidad<=0)){
+      msg(msgEl,'Selecciona un producto e introduce una cantidad positiva en cada fila.','error');return;
+    }
+    if(storageType!=='baja'&&lines.length!==1){
+      msg(msgEl,'Una merma corresponde a un solo producto. Para varios productos, selecciona «Baja de inventario».','error');return;
+    }
+    if(lines.some(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock)){
+      const bad=lines.find(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock);
+      const selected=bad?.row.querySelector('[data-bc7-ajust-product]');
+      const selectedName=selected?.options?.[selected.selectedIndex]?.textContent||'uno de los productos';
+      msg(msgEl,'Stock insuficiente para '+selectedName+'. La cantidad solicitada debe ser menor o igual al stock disponible.','error');return;
+    }
+    if(new Set(lines.map(line=>line.producto_id)).size!==lines.length){
+      msg(msgEl,'No repitas un producto en la lista. Suma sus cantidades en una sola fila.','error');return;
+    }
     const reason=cause+(detail?' — '+detail:'');
-    if(!confirm('Se enviará una solicitud de '+operationLabel+' por "'+cause+'" a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
+    const keyField=form.querySelector('[data-bc7-adjust-key]');
+    if(!keyField){msg(msgEl,'Falta la referencia segura de esta solicitud. Actualiza la Jornada antes de continuar.','error');return;}
+    let idempotencyKey=keyField.value.trim();
+    try{if(!idempotencyKey){idempotencyKey=freshIdempotencyKey();keyField.value=idempotencyKey;}}
+    catch(e){msg(msgEl,'No se pudo preparar la solicitud anti-duplicados. Actualiza la aplicación y vuelve a intentarlo.','error');return;}
+    if(!confirm(storageType==='baja'
+      ?'Se enviará una sola solicitud administrativa con '+lines.length+' producto(s). El inventario solo cambiará cuando se apruebe la lista completa. ¿Confirmas?'
+      :'Se enviará una solicitud de merma para un producto a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
-      await rpc('bc7_registrar_ajuste_jornada',{p_turno_sesion_id:sessionId,p_tipo:storageType,p_producto_id:product,p_cantidad:Number(quantity),p_motivo:reason,p_idempotency_key:crypto.randomUUID()});
-      msg(msgEl,'Solicitud de '+operationLabel+' guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
-      form.reset();await openWorkspace(sessionId);
-    }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'create'),'error');}
+      if(storageType==='baja'){
+        await rpc('bc7_registrar_bajas_multiple_jornada',{
+          p_turno_sesion_id:sessionId,
+          p_lineas:lines.map(line=>({producto_id:line.producto_id,cantidad:line.cantidad,motivo:reason})),
+          p_motivo_general:reason,p_idempotency_key:idempotencyKey
+        });
+      }else{
+        const line=lines[0];
+        await rpc('bc7_registrar_ajuste_jornada',{
+          p_turno_sesion_id:sessionId,p_tipo:'merma',p_producto_id:line.producto_id,
+          p_cantidad:line.cantidad,p_motivo:reason,p_idempotency_key:idempotencyKey
+        });
+      }
+      msg(msgEl,storageType==='baja'
+        ?'Lista de '+lines.length+' producto(s) enviada como un solo expediente. Está pendiente de aprobación; no se marcó como aprobada.'
+        :'Solicitud de merma guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
+      keyField.value='';form.reset();await openWorkspace(sessionId);
+    }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'adjustment')+' No repitas el envío con otra referencia hasta revisar el estado.','error');}
     finally{busy(btn,false);}
   }
   async function saveHours(form){
@@ -1645,6 +1741,8 @@
   });
   document.addEventListener('click',async function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
+    if(t.hasAttribute('data-bc7-adjustment-add')){const form=t.closest('[data-bc7-adjust-form]');if(form)addAdjustmentRow(form);return;}
+    if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
     if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
@@ -1677,6 +1775,14 @@
   document.addEventListener('change',function(e){
     const t=e.target;
     if(t&&t.matches('[data-bc7-rework]')){const s=t.closest('form')?.querySelector('[data-bc7-reperson]');if(s){s.disabled=!t.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!t.checked)s.value='';}}
+    if(t&&t.matches('[data-bc7-ajust-type]'))syncAdjustmentRows(t.closest('[data-bc7-adjust-form]'));
+    if(t&&t.matches('[data-bc7-ajust-product]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));
+  });
+  document.addEventListener('input',function(e){
+    const t=e.target;
+    const reinvestment=t&&t.closest&&t.closest('[data-bc7-finance-form="reinversion"]');
+    if(reinvestment&&t.matches('[data-bc7-reinvestment-quantity],[data-bc7-reinvestment-unit-cost]'))updateReinvestmentEstimate(reinvestment);
+    if(t&&t.matches('[data-bc7-ajust-qty]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));
   });
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>boot());else boot();
 })();
