@@ -83,6 +83,8 @@ BEGIN
   PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'INICIAL',
     jsonb_build_array(
+      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000001','cantidad',0),
+      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000002','cantidad',0),
       jsonb_build_object('producto_id',v_pan,'cantidad',9),
       jsonb_build_object('producto_id',v_jugo,'cantidad',5),
       jsonb_build_object('producto_id',v_pru,'cantidad',0)
@@ -131,6 +133,8 @@ BEGIN
   PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'FINAL',
     jsonb_build_array(
+      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000001','cantidad',0),
+      jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000002','cantidad',0),
       jsonb_build_object('producto_id',v_pan,'cantidad',8),
       jsonb_build_object('producto_id',v_jugo,'cantidad',4),
       jsonb_build_object('producto_id',v_pru,'cantidad',120)
