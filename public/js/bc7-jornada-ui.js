@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.27 — catálogo completo para ajustes y checklist de cinco pasos.
+// v7.28 — catálogo completo para ajustes y checklist de cinco pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
