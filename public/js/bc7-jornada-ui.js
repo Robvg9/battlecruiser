@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.24 — reinversión por costo unitario, bajas agrupadas y movimientos contenidos.
+// v7.25 — catálogo completo para ajustes y checklist de cinco pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
