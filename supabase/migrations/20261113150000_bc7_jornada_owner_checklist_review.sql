@@ -471,7 +471,17 @@ BEGIN
     WHERE e.programacion_id=v_s.jornada_programacion_id
       AND e.tipo='JORNADA_REVISION_DUENO_APROBADA'
   ) THEN
-    RETURN jsonb_build_object('ok',true,'idempotente',true,'turno_sesion_id',v_s.id,'estado','COMPLETADA');
+    RETURN jsonb_build_object(
+      'ok',true,'idempotente',true,'turno_sesion_id',v_s.id,'estado','COMPLETADA',
+      'turno_enviado_aprobacion',coalesce((
+        SELECT t.estado_maestro IN ('PENDIENTE_APROBACION','CERRADO')
+        FROM public.turnos t WHERE t.id=v_s.turno_id
+      ),false),
+      'turno_aprobado',coalesce((
+        SELECT t.estado_maestro='CERRADO'
+        FROM public.turnos t WHERE t.id=v_s.turno_id
+      ),false)
+    );
   END IF;
   IF v_s.estado<>'EN_CURSO' THEN
     RAISE EXCEPTION 'La jornada debe estar EN_CURSO antes de la revisión final del Dueño.' USING ERRCODE='23514';
