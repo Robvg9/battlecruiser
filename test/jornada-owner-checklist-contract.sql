@@ -157,7 +157,7 @@ BEGIN
      OR coalesce((v_result->'reinversiones'->>'completado')::boolean,false) IS NOT TRUE
      OR coalesce((v_result->'bajas'->>'completado')::boolean,false) IS NOT TRUE
      OR coalesce((v_result->'inventario_final'->>'completado')::boolean,false) IS NOT TRUE
-     OR v_result->>'fase'<>'PENDIENTE_CONTEO_DUENO' THEN
+     OR v_result->>'fase'<>'LISTA_PARA_ENTREGA' THEN
     RAISE EXCEPTION 'FAIL: the four employee confirmations did not unlock the Owner cash-count phase: %',v_result;
   END IF;
 
@@ -224,7 +224,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: automatic inventory/sales/cash calculation is not reproducible: %',v_result;
   END IF;
 
-  RAISE NOTICE 'PASS Jornada owner checklist: four employee checks, pre-close Owner cash approval, automatic calculation, open master Turn and reinvestment preserving minimum=20';
+  RAISE NOTICE 'PASS Jornada owner checklist: four employee checks, employee handover, post-handover Owner cash approval, automatic calculation, open master Turn and reinvestment preserving minimum=20';
 END
 $test$;
 
