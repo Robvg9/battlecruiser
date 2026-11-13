@@ -38,7 +38,7 @@ DECLARE
   v_today date:=(now() AT TIME ZONE 'America/Havana')::date-2;
   v_start timestamptz:=now()-interval '2 hours';
   v_mid timestamptz:=now()-interval '90 minutes';
-  v_end timestamptz:=now()+interval '2 hours';
+  v_end timestamptz:=now()-interval '1 minute';
 BEGIN
   INSERT INTO auth.users(id) VALUES(v_worker) ON CONFLICT(id) DO NOTHING;
   INSERT INTO public.usuarios(id,activo,role_id,nombre)
@@ -320,6 +320,11 @@ BEGIN
   PERFORM public.resolver_aprobacion_operativa('merma',v_merma_id,'APROBAR','Merma comprobada',0.5,NULL);
   PERFORM public.resolver_aprobacion_operativa('baja',v_baja_id,'APROBAR','Baja comprobada',0.5,NULL);
   PERFORM public.resolver_aprobacion_operativa('entrega_diaria',v_daily_id,'APROBAR','Conteo correcto',20,NULL);
+  -- The fixture's original approvals are explicitly placed inside the final
+  -- cut window; the next block moves only the Baja review time past the cut.
+  UPDATE public.reinversiones SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_reinvestment_id;
+  UPDATE public.mermas SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_merma_id;
+  UPDATE public.bajas SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_baja_id;
 
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>101
      OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99 THEN
@@ -359,11 +364,6 @@ BEGIN
   -- A Baja approved after the immutable final cut is not silently omitted or
   -- guessed into the period. It blocks settlement until ADMIN records its
   -- verified physical occurrence time and reason.
-  UPDATE public.turno_jornada_inventario_cortes
-  SET confirmado_en=now()-interval '1 minute',creado_en=now()-interval '1 minute'
-  WHERE id=v_final_cut;
-  UPDATE public.reinversiones SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_reinvestment_id;
-  UPDATE public.mermas SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_merma_id;
   UPDATE public.bajas SET fecha_revision=now(),actualizado_en=now() WHERE id=v_baja_id;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
