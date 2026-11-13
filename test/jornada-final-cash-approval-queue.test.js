@@ -85,3 +85,15 @@ test("Owner can resolve post-cutoff Baja attribution with Havana-local time and 
   assert.match(JOURNEY,/rpc\('bc7_revisar_baja_fuera_corte'/);
   assert.match(JOURNEY,/Solo el Dueño puede registrar esta revisión/);
 });
+
+
+test("final cash label follows the actual handover phase, not a generic pending state",()=>{
+  const start=JOURNEY.indexOf("function cashDeclarationHtml(detail){");
+  const end=JOURNEY.indexOf("function renderDailyCash",start);
+  assert.ok(start>=0&&end>start);
+  const block=JOURNEY.slice(start,end);
+  assert.match(block,/sessionState==='COMPLETADA'/);
+  assert.match(block,/approvalState==='PENDIENTE'\|\|approvalState==='ESPERANDO_APROBACION'/);
+  assert.match(block,/\?'Esperando aprobación'/);
+  assert.match(block,/:'Esperando entrega'/);
+});
