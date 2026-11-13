@@ -24,6 +24,11 @@ test("each attendant checklist item opens its own operational section", () => {
   assert.match(ui, /data-bc7-finance-form="gasto"/);
   assert.match(ui, /data-bc7-finance-form="reinversion"/);
   assert.match(ui, /data-bc7-adjust-form/);
+  assert.match(ui, /function checklistConfirmButtonHtml\(detail,key,isAssigned\)/);
+  assert.match(ui, /checklistConfirmButtonHtml\(detail,'gastos',isAssigned\)/);
+  assert.match(ui, /checklistConfirmButtonHtml\(detail,'reinversiones',isAssigned\)/);
+  assert.match(ui, /checklistConfirmButtonHtml\(detail,'bajas',isAssigned\)/);
+  assert.doesNotMatch(ui, /data-bc7-checklist-toggle="'\+item\.key\+'/);
 });
 
 test("cash declaration is visible before handover but cannot be approved or counted early", () => {
