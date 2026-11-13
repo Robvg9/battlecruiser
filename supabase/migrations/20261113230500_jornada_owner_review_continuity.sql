@@ -405,6 +405,7 @@ DECLARE
   v_pending_expenses integer:=0;
   v_pending_reinvestments integer:=0;
   v_pending_adjustments integer:=0;
+  v_pending_post integer:=0;
   v_final_declared numeric;
   v_final_counted numeric;
   v_final_cash_state text;
@@ -438,6 +439,23 @@ BEGIN
   v_start_at:=coalesce(v_turno.apertura_real,v_initial.confirmado_en,v_initial.creado_en);
   v_end_at:=coalesce(v_final.confirmado_en,v_final.creado_en,now());
   v_rate:=v_p.salario_porcentaje;
+
+  -- Approved Bajas/Mermas registered or approved after the immutable final cut
+  -- require an explicit Owner decision before sales/salary can be calculated.
+  SELECT count(*)::integer INTO v_pending_post
+  FROM (
+    SELECT b.id FROM public.bajas b
+    WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
+      AND coalesce(b.fecha_revision,b.creado_en)>v_end_at
+      AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+        WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA' AND mr.movimiento_id=b.id)
+    UNION ALL
+    SELECT m.id FROM public.mermas m
+    WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
+      AND coalesce(m.fecha_revision,m.creado_en)>v_end_at
+      AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+        WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA' AND mr.movimiento_id=m.id)
+  ) unresolved;
 
   WITH initial_lines AS (
     SELECT l.producto_id AS product_id,l.cantidad_contada::numeric AS qty
@@ -500,7 +518,11 @@ BEGIN
     JOIN public.productos p ON p.id=m.producto_id
     WHERE m.almacen_id=v_s.almacen_id AND m.estado='APROBADA'
       AND (
-        (m.creado_en>v_start_at AND m.creado_en<=v_end_at)
+        (coalesce(m.fecha_revision,m.creado_en)>v_start_at
+          AND coalesce(m.fecha_revision,m.creado_en)<=v_end_at
+          AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+            WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA'
+              AND mr.movimiento_id=m.id AND mr.clasificacion='DESPUES_CORTE'))
         OR EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
           WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA'
             AND mr.movimiento_id=m.id AND mr.clasificacion='ANTES_CORTE')
@@ -512,7 +534,11 @@ BEGIN
     JOIN public.productos p ON p.id=b.producto_id
     WHERE b.almacen_id=v_s.almacen_id AND b.estado='APROBADA'
       AND (
-        (b.creado_en>v_start_at AND b.creado_en<=v_end_at)
+        (coalesce(b.fecha_revision,b.creado_en)>v_start_at
+          AND coalesce(b.fecha_revision,b.creado_en)<=v_end_at
+          AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+            WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA'
+              AND mr.movimiento_id=b.id AND mr.clasificacion='DESPUES_CORTE'))
         OR EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
           WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA'
             AND mr.movimiento_id=b.id AND mr.clasificacion='ANTES_CORTE')
@@ -636,10 +662,21 @@ BEGIN
     THEN round(v_sales_total-v_expenses-v_reinvestments-v_salary,2) ELSE NULL END;
   v_difference:=CASE WHEN v_cash_received IS NOT NULL AND v_expected_cash IS NOT NULL
     THEN round(v_cash_received-v_expected_cash,2) ELSE NULL END;
+  IF v_pending_post>0 THEN
+    -- Hide provisional values: omitting an unclassified movement must never
+    -- appear as extra sales, cash or salary.
+    v_total_units:=NULL;
+    v_sales_total:=NULL;
+    v_salary:=NULL;
+    v_expected_cash:=NULL;
+    v_difference:=NULL;
+    v_lines:='[]'::jsonb;
+  END IF;
   v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
     AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_negative_lines=0
     AND v_rate IS NOT NULL AND v_daily_pending=0 AND v_daily_missing=0
     AND v_pending_expenses=0 AND v_pending_reinvestments=0 AND v_pending_adjustments=0
+    AND v_pending_post=0
     AND v_cash_received IS NOT NULL;
 
   RETURN jsonb_build_object(
@@ -656,9 +693,11 @@ BEGIN
     'faltan_cortes',NOT(v_initial.id IS NOT NULL AND v_final.id IS NOT NULL),
     'familias_sin_precio',v_total_lines-v_priced_lines,
     'familias_con_vendidas_negativas',v_negative_lines,
+    'movimientos_posteriores_pendientes',v_pending_post,
     'pendientes',jsonb_build_object(
       'gastos',v_pending_expenses,'reinversiones',v_pending_reinvestments,
-      'ajustes',v_pending_adjustments,'entregas_diarias',v_daily_pending,'entregas_diarias_faltantes',v_daily_missing
+      'ajustes',v_pending_adjustments,'movimientos_posteriores_corte',v_pending_post,
+      'entregas_diarias',v_daily_pending,'entregas_diarias_faltantes',v_daily_missing
     )
   );
 END;
@@ -874,13 +913,13 @@ BEGIN
     END IF;
     IF v_tipo='BAJA' AND NOT EXISTS(
       SELECT 1 FROM public.bajas b WHERE b.id=v_id AND b.turno_sesion_id=v_s.id
-        AND b.estado='APROBADA' AND b.creado_en>v_final.confirmado_en
+        AND b.estado='APROBADA' AND coalesce(b.fecha_revision,b.creado_en)>v_final.confirmado_en
     ) THEN
       RAISE EXCEPTION 'La baja indicada no pertenece a los movimientos posteriores al inventario final.' USING ERRCODE='23503';
     END IF;
     IF v_tipo='MERMA' AND NOT EXISTS(
       SELECT 1 FROM public.mermas m WHERE m.id=v_id AND m.turno_sesion_id=v_s.id
-        AND m.estado='APROBADA' AND m.creado_en>v_final.confirmado_en
+        AND m.estado='APROBADA' AND coalesce(m.fecha_revision,m.creado_en)>v_final.confirmado_en
     ) THEN
       RAISE EXCEPTION 'La merma indicada no pertenece a los movimientos posteriores al inventario final.' USING ERRCODE='23503';
     END IF;
@@ -897,12 +936,12 @@ BEGIN
     jsonb_build_object('movimientos_revisados',v_count,'decisiones',p_decisiones));
   SELECT count(*) INTO v_pending FROM (
     SELECT b.id FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
-      AND b.creado_en>v_final.confirmado_en
+      AND coalesce(b.fecha_revision,b.creado_en)>v_final.confirmado_en
       AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
         WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA' AND mr.movimiento_id=b.id)
     UNION ALL
     SELECT m.id FROM public.mermas m WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
-      AND m.creado_en>v_final.confirmado_en
+      AND coalesce(m.fecha_revision,m.creado_en)>v_final.confirmado_en
       AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
         WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA' AND mr.movimiento_id=m.id)
   ) pending;
@@ -983,21 +1022,21 @@ BEGIN
     FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
     SELECT coalesce(jsonb_agg(jsonb_build_object(
         'tipo',m.tipo,'id',m.id,'producto',m.producto,'cantidad',m.cantidad,
-        'estado',m.estado,'creado_en',m.creado_en,'motivo',m.motivo,
+        'estado',m.estado,'creado_en',m.creado_en,'fecha_revision',m.fecha_revision,'motivo',m.motivo,
         'clasificacion',r.clasificacion,'comentario_revision',r.comentario
       ) ORDER BY m.creado_en,m.producto),'[]'::jsonb),
       count(*) FILTER(WHERE r.clasificacion IS NULL)
       INTO v_post,v_pending_post
     FROM (
-      SELECT 'BAJA'::text tipo,b.id,p.nombre producto,b.cantidad,b.estado,b.creado_en,b.motivo
+      SELECT 'BAJA'::text tipo,b.id,p.nombre producto,b.cantidad,b.estado,b.creado_en,b.fecha_revision,b.motivo
       FROM public.bajas b JOIN public.productos p ON p.id=b.producto_id
       WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
-        AND v_final.id IS NOT NULL AND b.creado_en>v_final.confirmado_en
+        AND v_final.id IS NOT NULL AND coalesce(b.fecha_revision,b.creado_en)>v_final.confirmado_en
       UNION ALL
-      SELECT 'MERMA'::text,m.id,p.nombre,m.cantidad,m.estado,m.creado_en,m.motivo
+      SELECT 'MERMA'::text,m.id,p.nombre,m.cantidad,m.estado,m.creado_en,m.fecha_revision,m.motivo
       FROM public.mermas m JOIN public.productos p ON p.id=m.producto_id
       WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
-        AND v_final.id IS NOT NULL AND m.creado_en>v_final.confirmado_en
+        AND v_final.id IS NOT NULL AND coalesce(m.fecha_revision,m.creado_en)>v_final.confirmado_en
     ) m
     LEFT JOIN public.turno_jornada_movimiento_revision r
       ON r.turno_sesion_id=v_s.id AND r.tipo_movimiento=m.tipo AND r.movimiento_id=m.id;
