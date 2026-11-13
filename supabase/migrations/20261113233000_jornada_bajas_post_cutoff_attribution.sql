@@ -363,6 +363,16 @@ BEGIN
     THEN round(v_sales_total-v_expenses-v_reinvestments-v_salary,2) ELSE NULL END;
   v_difference:=CASE WHEN v_cash_received IS NOT NULL AND v_expected_cash IS NOT NULL
     THEN round(v_cash_received-v_expected_cash,2) ELSE NULL END;
+  IF v_bajas_fuera_corte>0 THEN
+    -- Do not expose a partial sales/salary estimate as if the omitted Baja
+    -- had not happened; the Owner must classify its physical occurrence first.
+    v_total_units:=NULL;
+    v_sales_total:=NULL;
+    v_salary:=NULL;
+    v_expected_cash:=NULL;
+    v_difference:=NULL;
+    v_lines:='[]'::jsonb;
+  END IF;
   v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
     AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_negative_lines=0
     AND v_rate IS NOT NULL AND v_daily_pending=0 AND v_daily_missing=0
