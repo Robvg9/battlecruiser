@@ -42,7 +42,8 @@ BEGIN
 
   INSERT INTO auth.users(id) VALUES(v_owner) ON CONFLICT(id) DO NOTHING;
   INSERT INTO public.usuarios(id,activo,role_id,nombre)
-  VALUES(v_owner,true,'30000000-0000-0000-0000-000000000001','Dueño checklist fixture');
+  VALUES(v_owner,true,'30000000-0000-0000-0000-000000000001','Dueño checklist fixture')
+  ON CONFLICT(id) DO UPDATE SET activo=true,role_id=EXCLUDED.role_id,nombre=EXCLUDED.nombre;
 
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES(v_almacen,'Jornada checklist fixture','minorista',true);
@@ -93,13 +94,13 @@ BEGIN
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: the fixture session has no active tranche'; END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
-  VALUES(v_turno,v_sesion,v_tramo,v_owner,30)
+  VALUES(v_turno,v_sesion,v_tramo,v_owner,2800)
   RETURNING id INTO v_declaracion;
 
   -- The Owner cannot count cash before the employee has completed all four checks.
   v_error:=false;
   BEGIN
-    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,30,'Conteo anticipado debe ser rechazado');
+    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo anticipado debe ser rechazado');
   EXCEPTION WHEN check_violation THEN
     v_error:=true;
   END;
@@ -148,7 +149,7 @@ BEGIN
   -- Cash count and approval now happen while the work session remains EN_CURSO.
   v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico correcto');
   IF v_result->>'estado'<>'APROBADA'
-     OR (v_result->>'monto_contado')::numeric<>30
+     OR (v_result->>'monto_contado')::numeric<>2800
      OR (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'EN_CURSO' THEN
     RAISE EXCEPTION 'FAIL: the Owner cash count did not approve before session closure: %',v_result;
   END IF;
@@ -170,7 +171,7 @@ BEGIN
   END IF;
   v_result:=public.bc7_liquidacion_inventario_jornada(v_sesion);
   IF coalesce((v_result->>'calculable')::boolean,false) IS NOT TRUE
-     OR (v_result->>'ventas_estimadas')::numeric<>30 THEN
+     OR (v_result->>'ventas_estimadas')::numeric<>10000 THEN
     RAISE EXCEPTION 'FAIL: automatic inventory/sales/cash calculation is not reproducible: %',v_result;
   END IF;
 
