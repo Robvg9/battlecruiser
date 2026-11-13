@@ -926,7 +926,11 @@ DECLARE
   v_cost_covered integer;
   v_cost_total integer;
   v_pending_post integer;
-  v_cash record;
+  v_cash_declared numeric;
+  v_cash_counted numeric;
+  v_cash_state text;
+  v_cash_declared_at timestamptz;
+  v_cash_counted_at timestamptz;
   v_revision public.turno_revisiones;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
@@ -987,7 +991,7 @@ BEGIN
       WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
         AND v_final.id IS NOT NULL AND b.creado_en>v_final.confirmado_en
       UNION ALL
-      SELECT 'MERMA'::text,m.id,p.nombre,m.producto_id::text,m.cantidad,m.estado,m.creado_en,m.motivo
+      SELECT 'MERMA'::text,m.id,p.nombre,m.cantidad,m.estado,m.creado_en,m.motivo
       FROM public.mermas m JOIN public.productos p ON p.id=m.producto_id
       WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
         AND v_final.id IS NOT NULL AND m.creado_en>v_final.confirmado_en
@@ -995,7 +999,7 @@ BEGIN
     LEFT JOIN public.turno_jornada_movimiento_revision r
       ON r.turno_sesion_id=v_s.id AND r.tipo_movimiento=m.tipo AND r.movimiento_id=m.id;
     SELECT d.monto,d.monto_contado,d.estado_aprobacion,d.declarado_at,d.contado_at
-      INTO v_cash
+      INTO v_cash_declared,v_cash_counted,v_cash_state,v_cash_declared_at,v_cash_counted_at
     FROM public.turno_declaraciones d
     WHERE d.turno_sesion_id=v_s.id
     ORDER BY d.declarado_at DESC NULLS LAST LIMIT 1;
@@ -1020,9 +1024,9 @@ BEGIN
       'estado',v_s.estado,'responsable_id',v_p.responsable_id,
       'hora_inicio',v_p.hora_inicio_prevista,'hora_fin',v_p.hora_fin_prevista,
       'salario_porcentaje',v_p.salario_porcentaje,
-      'efectivo',CASE WHEN v_cash IS NULL THEN NULL ELSE jsonb_build_object(
-        'declarado',v_cash.monto,'contado',v_cash.monto_contado,'estado',v_cash.estado_aprobacion,
-        'declarado_at',v_cash.declarado_at,'contado_at',v_cash.contado_at) END,
+      'efectivo',CASE WHEN v_cash_state IS NULL THEN NULL ELSE jsonb_build_object(
+        'declarado',v_cash_declared,'contado',v_cash_counted,'estado',v_cash_state,
+        'declarado_at',v_cash_declared_at,'contado_at',v_cash_counted_at) END,
       'liquidacion',v_liq
     ));
   END LOOP;
