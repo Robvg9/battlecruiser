@@ -40,7 +40,7 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,mermas:crear,bajas:crear,reinversiones:editar_any',false);
 
-  INSERT INTO auth.users(id) VALUES(v_owner);
+  INSERT INTO auth.users(id) VALUES(v_owner) ON CONFLICT(id) DO NOTHING;
   INSERT INTO public.usuarios(id,activo,role_id,nombre)
   VALUES(v_owner,true,'30000000-0000-0000-0000-000000000001','Dueño checklist fixture');
 
