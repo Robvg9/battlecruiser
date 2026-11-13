@@ -285,7 +285,10 @@ function applySql(file) {
     applySql("test/bc7-turno-movimientos-sesion-fixture.sql");
     applySql("supabase/migrations/20261027184823_bc7_turno_movimientos_sesion_20261027.sql");
     applySql("test/bc7-turno-movimientos-sesion-contract.sql");
-    log("\r\n=== 8/9 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
+    log("\r\n=== 8/9 Apply grouped Baja approval contract before the Jornada snapshot tests ===");
+    applySql("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
+    applySql("supabase/migrations/20261113130000_bc7_jornada_baja_bulk.sql");
+    log("\r\n=== 9/10 Verify snapshot, guarded open/close, session-scoped grouped Bajas and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
     log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
     log("\\r\\n=== 10/11 Verify cash handover fixture and authenticated RLS dependency ===");
@@ -303,7 +306,6 @@ function applySql(file) {
     applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
     log("\\r\\n=== Apply La Cueva finance and reinvestment request rules before Day 2 cash handover ===");
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
-    applySql("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
     applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
     applySql("test/dependienta-jornada-merma-permission-fixture.sql");
     applySql("supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql");
