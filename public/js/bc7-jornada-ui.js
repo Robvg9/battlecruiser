@@ -1217,17 +1217,15 @@
       actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cuatro checks; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
     }else if(status==='COMPLETADA'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
-    }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
+    }else if(status==='COMPLETADA'){
+      actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
+    }else{
+      actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
+    }
     const ownerTurnId=s.turno_id||detail.turno_id||detail.turno?.id;
     if(status==='COMPLETADA'&&ownerTurnId&&(can('auditoria','editar_any')||can('entregas_caja','editar_any')||can('turnos','editar_any'))){
       actionArea+='<div class="bc7-note"><b>Revisión del Dueño</b><p>Abre el expediente completo de esta jornada: inventario, ventas estimadas, costos documentados, efectivo, diferencias y movimientos por validar.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-open-owner-review="'+esc(ownerTurnId)+'">Abrir revisión integral del turno</button></div></div>';
     }
-    else actionArea+=status==='COMPLETADA'?'':'';
-    if(status!=='COMPLETADA')actionArea=actionArea;
-    if(status!=='COMPLETADA'&&status!=='EN_CURSO'&&status!=='PENDIENTE'&&status!=='PROGRAMADA')actionArea=actionArea;
-    else if(status==='COMPLETADA'){}
-    else actionArea=actionArea;
-    else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos_ajuste);
