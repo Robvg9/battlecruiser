@@ -1135,14 +1135,27 @@
     else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
-      const products=arr(detail.productos);
       const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
       const adjustmentStorageType=canCreateBaja?'baja':'merma';
-      const adjustmentTitle=canCreateBaja&&canCreateMerma?'Registrar baja o merma':(canCreateBaja?'Registrar baja':'Registrar merma');
+      const adjustmentTitle=canCreateBaja&&canCreateMerma?'Registrar baja o merma':(canCreateBaja?'Registrar lista de bajas':'Registrar merma');
       const adjustmentTypeField=canCreateBaja&&canCreateMerma
-        ?'<label class="bc7-field">Tipo de ajuste<select data-bc7-ajust-type required><option value="baja">Baja de inventario</option><option value="merma">Merma</option></select></label>'
+        ?'<label class="bc7-field">Tipo de ajuste<select data-bc7-ajust-type required><option value="baja">Baja de inventario · lista de productos</option><option value="merma">Merma · un producto</option></select></label>'
         :'<input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'">';
-      adjustment='<details class="bc7-detail"><summary><span>'+adjustmentTitle+'</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'">'+adjustmentTypeField+'<div class="bc7-grid"><label class="bc7-field">Motivo<select data-bc7-ajust-cause required><option value="">Selecciona un motivo</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label><label class="bc7-field">Producto<select data-bc7-ajust-product required><option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('')+'</select></label><label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal"></label><label class="bc7-field">Detalle (opcional)<input data-bc7-ajust-reason maxlength="500" placeholder="Añade una aclaración"></label></div><div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar ajuste a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
+      const adjustmentProducts=products.filter(p=>Number(p.stock_actual)>0);
+      const adjustmentOptions='<option value="">Selecciona producto con stock</option>'+adjustmentProducts.map(p=>'<option value="'+esc(p.producto_id)+'" data-stock="'+esc(p.stock_actual)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('');
+      const adjustmentRow='<div class="bc7-grid bc7-adjustment-row" data-bc7-adjustment-row>'+
+        '<label class="bc7-field">Producto<select data-bc7-ajust-product required>'+adjustmentOptions+'</select></label>'+
+        '<label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal" placeholder="Cantidad real"></label>'+
+        '<div class="bc7-adjustment-row-actions"><button class="bc7-btn" type="button" data-bc7-adjustment-remove hidden>Quitar</button></div></div>';
+      adjustment='<details class="bc7-detail"><summary><span>'+adjustmentTitle+'</span><small>No afecta stock hasta aprobación</small></summary><div class="bc7-detail-body"><form data-bc7-adjust-form="'+esc(s.id)+'">'+adjustmentTypeField+
+        '<label class="bc7-field">Motivo<select data-bc7-ajust-cause required><option value="">Selecciona un motivo</option><option value="Producto vencido">Producto vencido</option><option value="Producto roto o dañado">Producto roto o dañado</option><option value="Consumo del dueño">Consumo del dueño</option><option value="Otra causa">Otra causa</option></select></label>'+
+        '<div data-bc7-adjustment-rows>'+adjustmentRow+'</div>'+
+        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-adjustment-add '+(!canCreateBaja?'hidden':'')+'>+ Añadir producto a la lista</button></div>'+
+        '<label class="bc7-field">Detalle general (opcional)<input data-bc7-ajust-reason maxlength="160" placeholder="Aclaración común para toda la solicitud"></label>'+
+        '<input type="hidden" data-bc7-adjust-key value="">'+
+        '<p class="bc7-muted" data-bc7-adjustment-hint>'+(canCreateBaja?'Puedes incluir varios productos; Administración recibirá un único expediente para aprobar la lista completa.':'La merma se envía como una sola solicitud y no modifica stock hasta su aprobación.')+'</p>'+
+        (adjustmentProducts.length?'':'<p class="bc7-msg error">No hay productos con existencias disponibles para registrar bajas o mermas en este almacén.</p>')+
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!adjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const fin=financeFormHtml(detail,isAssigned,status);
