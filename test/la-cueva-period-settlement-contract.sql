@@ -370,7 +370,10 @@ BEGIN
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
      OR (v_result->>'bajas_fuera_de_corte')::integer<>1
      OR (v_result->'pendientes'->>'bajas_fuera_de_corte')::integer<>1
-     OR jsonb_array_length(v_result->'bajas_fuera_de_corte_detalle')<>1 THEN
+     OR jsonb_array_length(v_result->'bajas_fuera_de_corte_detalle')<>1
+     OR v_result->>'ventas_estimadas' IS NOT NULL
+     OR v_result->>'salario_calculado' IS NOT NULL
+     OR jsonb_array_length(v_result->'lineas')<>0 THEN
     RAISE EXCEPTION 'FAIL: post-cutoff approved Baja must block settlement and expose auditable detail; result=%',v_result;
   END IF;
 
