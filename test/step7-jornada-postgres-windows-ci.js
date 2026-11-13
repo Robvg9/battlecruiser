@@ -264,6 +264,8 @@ function applySql(file) {
     applySql("test/step7-jornada-fixture.sql");
     log("\r\n=== 2/5 Apply Step 5 baseline migration ===");
     applySql("supabase/migrations/20261023053011_step5_jornada_unica_backend.sql");
+    log("\r\n=== Apply the Step 6 inventory/approval RPC contract used by grouped Baja resolution ===");
+    applySql("supabase/migrations/20261023091903_step6_inventory_movements_adjustments_settlement.sql");
     log("\r\n=== 2/6 Apply Step 5 minimum two-day Turno guard ===");
     applySql("supabase/migrations/20261101030000_step5_minimum_two_day_turn.sql");
     log("\r\n=== 3/9 Apply Step 7 inventory migration ===");
@@ -285,7 +287,10 @@ function applySql(file) {
     applySql("test/bc7-turno-movimientos-sesion-fixture.sql");
     applySql("supabase/migrations/20261027184823_bc7_turno_movimientos_sesion_20261027.sql");
     applySql("test/bc7-turno-movimientos-sesion-contract.sql");
-    log("\r\n=== 8/9 Verify snapshot, guarded open/close, idempotency and ACL contract ===");
+    log("\r\n=== 8/9 Apply grouped Baja approval contract before the Jornada snapshot tests ===");
+    applySql("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
+    applySql("supabase/migrations/20261113130000_bc7_jornada_baja_bulk.sql");
+    log("\r\n=== 9/10 Verify snapshot, guarded open/close, session-scoped grouped Bajas and ACL contract ===");
     applySql("test/step7-jornada-contract.sql");
     log("\\r\\n=== 9/9 Verify finance/session provenance and inventory carry-forward ===");
     log("\\r\\n=== 10/11 Verify cash handover fixture and authenticated RLS dependency ===");
@@ -303,7 +308,6 @@ function applySql(file) {
     applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
     log("\\r\\n=== Apply La Cueva finance and reinvestment request rules before Day 2 cash handover ===");
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
-    applySql("supabase/migrations/20261109224828_baja_approval_requests_and_modal.sql");
     applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
     applySql("test/dependienta-jornada-merma-permission-fixture.sql");
     applySql("supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql");

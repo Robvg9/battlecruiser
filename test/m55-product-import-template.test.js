@@ -72,8 +72,8 @@ test("reconoce XLSX por firma binaria aunque el nombre termine en CSV",()=>{
  assert.match(SRC,/Productos/);assert.match(SRC,/Categorias/);
 });
 test("versiones del shell y cachés de módulos están alineadas",()=>{
- assert.match(APP,/const VERSION="9\.5\.99"/);assert.match(APP,/m55-productos-import\.js","55\.5"/);
- assert.match(INDEX,/app\.js\?v=9\.5\.99/);assert.match(INDEX,/v9\.5\.99 — BattleCruiser/);
- assert.match(SW,/BC_SW_VERSION = "9.5.99"/);assert.match(SW,/m55-productos-import\.js\?v=55\.5/);
+ assert.match(APP,/const VERSION="9\.5\.100"/);assert.match(APP,/m55-productos-import\.js","55\.5"/);
+ assert.match(INDEX,/app\.js\?v=9\.5\.100/);assert.match(INDEX,/v9\.5\.100 — BattleCruiser/);
+ assert.match(SW,/BC_SW_VERSION = "9.5.100"/);assert.match(SW,/m55-productos-import\.js\?v=55\.5/);
  assert.match(SW,/m26-ui-integridad\.js\?v=26\.41/);assert.match(SW,/m75-productos-ui-compacto\.js\?v=75\.12/);
 });

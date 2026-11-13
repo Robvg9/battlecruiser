@@ -130,3 +130,72 @@
     font-size: 15px !important;
   }
 }
+
+
+/* 9.5.100 — keep the Jornada movement archive inside its workspace panel. */
+#tab-jornada #bc7-workspace-body,
+#tab-jornada #bc7-workspace-body .bc7-panel-stack,
+#tab-jornada #bc7-workspace-body [data-bc7-workspace-panel],
+#tab-jornada #bc7-movements {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+#tab-jornada #bc7-movements {
+  overflow: hidden;
+}
+#tab-jornada #bc7-movements .bc7-table-wrap {
+  display: block !important;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+#tab-jornada #bc7-movements .bc7-movements-table {
+  display: table;
+  width: 760px;
+  min-width: 760px;
+  max-width: none;
+  table-layout: fixed;
+}
+#tab-jornada #bc7-movements .bc7-movements-table th,
+#tab-jornada #bc7-movements .bc7-movements-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+#tab-jornada .bc7-adjustment-row {
+  align-items: end;
+  min-width: 0;
+}
+#tab-jornada .bc7-adjustment-row-actions {
+  display: flex;
+  align-items: end;
+  min-width: 0;
+}
+#tab-jornada .bc7-adjustment-row-actions .bc7-btn {
+  min-height: 40px;
+}
+@media (max-width: 759px), (hover: none) and (pointer: coarse) {
+  #tab-jornada #bc7-movements .bc7-table-wrap {
+    margin-inline: 0;
+    padding-bottom: 3px;
+  }
+  #tab-jornada #bc7-movements .bc7-movements-table {
+    min-width: 760px;
+  }
+  #tab-jornada .bc7-adjustment-row {
+    grid-template-columns: minmax(0,1fr) minmax(104px,34%) !important;
+    gap: 7px !important;
+  }
+  #tab-jornada .bc7-adjustment-row-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}

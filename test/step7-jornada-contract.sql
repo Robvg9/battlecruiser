@@ -12,9 +12,13 @@ DECLARE
   v_jugo uuid := '31000000-0000-0000-0000-000000000002';
   v_date date := (now() AT TIME ZONE 'America/Havana')::date;
   v_result jsonb;
+  v_retry jsonb;
   v_tramo uuid;
   v_ajuste uuid;
+  v_solicitud uuid;
+  v_list_count integer;
   v_error boolean;
+  v_error_message text;
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
@@ -78,6 +82,86 @@ BEGIN
       AND sesion_id IS NULL AND ciclo_id IS NULL AND estado='PENDIENTE'
   ) THEN
     RAISE EXCEPTION 'FAIL: session adjustment must keep legacy links NULL and preserve Jornada session/tranche provenance';
+  END IF;
+
+  -- A retail Jornada can submit several Bajas as one pending approval item.
+  -- This actor has creation and Jornada-view permission, but no approval permission.
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM set_config('test.perms','bajas:crear,turnos:ver',false);
+  v_result:=public.bc7_registrar_bajas_multiple_jornada(
+    v_sesion,
+    jsonb_build_array(
+      jsonb_build_object('producto_id',v_pan,'cantidad',2,'motivo','Producto roto o dañado'),
+      jsonb_build_object('producto_id',v_jugo,'cantidad',1,'motivo','Producto vencido')
+    ),
+    'Lista de bajas de prueba',
+    '93000000-0000-0000-0000-000000000008'
+  );
+  v_solicitud:=(v_result->>'solicitud_id')::uuid;
+  IF v_solicitud IS NULL OR (v_result->>'count')::integer<>2 OR v_result->>'estado'<>'PENDIENTE' THEN
+    RAISE EXCEPTION 'FAIL: bulk Jornada Baja must create one pending parent with two products';
+  END IF;
+  IF (SELECT count(*) FROM public.bajas b
+      WHERE b.solicitud_id=v_solicitud AND b.estado='PENDIENTE'
+        AND b.turno_sesion_id=v_sesion AND b.turno_tramo_id=v_tramo
+        AND b.sesion_id IS NULL AND b.ciclo_id IS NULL)<>2 THEN
+    RAISE EXCEPTION 'FAIL: each Baja line must keep exact session/tranche provenance under the same parent';
+  END IF;
+
+  -- An identical retry returns the same parent and never creates duplicate product rows.
+  v_retry:=public.bc7_registrar_bajas_multiple_jornada(
+    v_sesion,
+    jsonb_build_array(
+      jsonb_build_object('producto_id',v_pan,'cantidad',2,'motivo','Producto roto o dañado'),
+      jsonb_build_object('producto_id',v_jugo,'cantidad',1,'motivo','Producto vencido')
+    ),
+    'Lista de bajas de prueba',
+    '93000000-0000-0000-0000-000000000008'
+  );
+  IF v_retry->>'solicitud_id'<>v_solicitud::text OR (v_retry->>'count')::integer<>2
+     OR (SELECT count(*) FROM public.bajas WHERE solicitud_id=v_solicitud)<>2 THEN
+    RAISE EXCEPTION 'FAIL: an exact retry must return the same grouped request without duplicating lines';
+  END IF;
+
+  -- One insufficient product rejects the entire list and leaves no parent request.
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_bajas_multiple_jornada(
+      v_sesion,
+      jsonb_build_array(jsonb_build_object('producto_id',v_pan,'cantidad',999,'motivo','Stock de prueba')),
+      'Lista que debe fallar',
+      '93000000-0000-0000-0000-000000000009'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_message=MESSAGE_TEXT;
+    v_error:=true;
+  END;
+  IF NOT v_error OR v_error_message NOT ILIKE '%Stock insuficiente%' OR EXISTS(
+    SELECT 1 FROM public.bajas_solicitudes
+    WHERE creado_por=v_owner AND idempotency_key='93000000-0000-0000-0000-000000000009'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a stock shortage must reject the whole list without leaving a partial parent';
+  END IF;
+
+  -- The admin queue exposes one item for the whole list, not one item per product.
+  PERFORM set_config('test.bc_admin','true',false);
+  PERFORM set_config('test.perms','bajas:crear,bajas:editar_any,mermas:crear',false);
+  SELECT count(*) INTO v_list_count
+  FROM public.listar_aprobaciones_admin() q
+  WHERE q.tipo='baja_lista' AND q.id=v_solicitud;
+  IF v_list_count<>1 THEN
+    RAISE EXCEPTION 'FAIL: Administration must receive exactly one approval item for a multi-product Baja';
+  END IF;
+
+  -- One administrative decision resolves the parent list and every child line together.
+  v_result:=public.resolver_solicitud_bajas_admin(
+    v_solicitud,'RECHAZAR','Rechazo controlado del contrato aislado','[]'::jsonb
+  );
+  IF v_result->>'ok'<>'true'
+     OR (v_result->>'lineas_resueltas')::integer<>2
+     OR (SELECT estado FROM public.bajas_solicitudes WHERE id=v_solicitud)<>'RECHAZADA'
+     OR (SELECT count(*) FROM public.bajas WHERE solicitud_id=v_solicitud AND estado='RECHAZADA')<>2 THEN
+    RAISE EXCEPTION 'FAIL: one administrative decision must resolve the whole grouped Baja request';
   END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)

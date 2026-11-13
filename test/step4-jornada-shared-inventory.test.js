@@ -82,18 +82,18 @@ test("Shared inventory foreign-key index migration covers all six new references
   ]) assert.ok(indexes.includes(column),"missing covering index: "+column);
 });
 
-test("PWA and service worker cache are aligned at 9.5.99 / Jornada module 7.23",()=>{
+test("PWA and service worker cache are aligned at 9.5.100 / Jornada module 7.24",()=>{
   const version=app.match(/const VERSION="([^"]+)"/);
   const swVersion=sw.match(/BC_SW_VERSION = "([^"]+)"/);
   assert.ok(version&&swVersion,"app/service worker version declaration missing");
-  assert.equal(version[1],"9.5.99");
+  assert.equal(version[1],"9.5.100");
   assert.equal(swVersion[1],version[1]);
-  for(const marker of ['["bc7-jornada-ui.js","7.23"]','["m68-ventas-pos-definitivo.js","9.5.99"]']){
+  for(const marker of ['["bc7-jornada-ui.js","7.24"]','["m68-ventas-pos-definitivo.js","9.5.100"]']){
     assert.ok(app.includes(marker),"dynamic module cache missing "+marker);
   }
-  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.23"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.99"));
-  assert.ok(ui.includes("v7.23"));
+  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.24"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.100"));
+  assert.ok(ui.includes("v7.24"));
 });
 
 test("PostgreSQL 17 disposable CI executes the Step 4 migration and contract",()=>{

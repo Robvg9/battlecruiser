@@ -12,20 +12,20 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.99 release and Jornada UI 7.23", () => {
-  assert.ok(APP.includes('const VERSION="9.5.99";'));
-  assert.ok(INDEX.includes('style.css?v=9.5.99'));
-  assert.ok(INDEX.includes('app.js?v=9.5.99'));
-  assert.ok(INDEX.includes('js/offline.js?v=9.5.99'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.99 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.99"'));
-  assert.ok(SW.includes('./app.js?v=9.5.99'));
-  assert.ok(SW.includes('./style.css?v=9.5.99'));
-  assert.ok(SW.includes('./js/offline.js?v=9.5.99'));
-  assert.ok(APP.includes('["bc7-jornada-ui.js","7.23"]'));
-  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.23'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261112.3"]'));
-  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261112.3'));
+test("PWA shell pins one fresh 9.5.100 release and Jornada UI 7.24", () => {
+  assert.ok(APP.includes('const VERSION="9.5.100";'));
+  assert.ok(INDEX.includes('style.css?v=9.5.100'));
+  assert.ok(INDEX.includes('app.js?v=9.5.100'));
+  assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.100 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.100"'));
+  assert.ok(SW.includes('./app.js?v=9.5.100'));
+  assert.ok(SW.includes('./style.css?v=9.5.100'));
+  assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.24"]'));
+  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.24'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.1"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.1'));
 });
 
 test("PWA update notice creates its action button before binding the click", () => {

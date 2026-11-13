@@ -27,6 +27,9 @@ test("Final cash approval uses the physical-count RPC and is disabled before ses
   assert.ok(ADMIN.includes("value=\"'+(isFinalCash?'':esc(x.monto))"));
   assert.ok(ADMIN.includes("acceptButton.disabled=isFinalCash&&!finalCashReady"));
   assert.ok(ADMIN.includes("rejectButton.hidden=isFinalCash"));
+  assert.ok(ADMIN.includes("Bloqueado hasta cerrar la jornada"));
+  assert.ok(ADMIN.includes("El servidor solo acepta el conteo después de completar la Jornada"));
+  assert.ok(ADMIN.includes("vuelve a abrir esta ventana"));
   assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
   assert.ok(ADMIN.includes("p_declaracion_id:id,p_monto_contado:real"));
 });

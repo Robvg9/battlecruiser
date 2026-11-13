@@ -129,7 +129,7 @@ function renderApprovalDetails(x,detail){
     const minAmount=(isDailyCash||isFinalCash)?'0':'0.01';
     const declaredFinal=isFinalCash?'<span>Declarado por la responsable: '+esc(money(x.monto))+' CUP. Jornada: '+esc(x.motivo||'sin estado')+'.</span>':'<span>'+esc(x.motivo||'Sin descripción adicional')+'</span>';
     const finalCashNote=isFinalCash
-      ?(finalCashReady?'<p class="bc-admin-approval-message">Introduce el efectivo que contaste físicamente. El importe declarado solo sirve de referencia; no lo copies si no coincide con el dinero contado.</p>':'<p class="bc-admin-approval-message">El conteo físico se habilitará cuando la Jornada esté COMPLETADA. Todavía no registres una aprobación.</p>')
+      ?(finalCashReady?'<p class="bc-admin-approval-message">Introduce el efectivo que contaste físicamente. El importe declarado solo sirve de referencia; no lo copies si no coincide con el dinero contado.</p>':'<p class="bc-admin-approval-message">El campo está bloqueado porque la Jornada sigue en estado '+esc(x.motivo||'EN CURSO')+'. El servidor solo acepta el conteo después de completar la Jornada. Termina las aprobaciones y la liquidación, finalízala y vuelve a abrir esta ventana; entonces podrás introducir el efectivo que contaste realmente.</p>')
       :'';
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||(isReinvestment?'Reinversión':isDailyCash?'Entrega diaria':isFinalCash?'Declaración final':'Gasto'))+'</strong>'+
       declaredFinal+'</section>'+
@@ -150,7 +150,7 @@ function renderApprovalDetails(x,detail){
   const acceptButton=modal.querySelector('#admin-approval-accept');
   rejectButton.textContent=isList?'Rechazar lista completa':'Rechazar';
   rejectButton.hidden=isFinalCash;
-  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?(finalCashReady?'Registrar conteo físico':'Disponible al cerrar jornada'):'Aceptar y aprobar';
+  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?(finalCashReady?'Registrar conteo físico':'Bloqueado hasta cerrar la jornada'):'Aceptar y aprobar';
   acceptButton.disabled=isFinalCash&&!finalCashReady;
   modal.hidden=false;
   footer.hidden=false;
