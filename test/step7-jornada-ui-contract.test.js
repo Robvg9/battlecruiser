@@ -54,6 +54,8 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/data-bc7-adjustment-row/,"a baja request contains a repeatable list of product lines");
   assert.match(ui,/data-bc7-adjustment-add/,"the user can add multiple products to one baja request");
   assert.match(ui,/bc7_registrar_bajas_multiple_jornada/,"multiple bajas are sent through the Jornada-aware grouped RPC");
+  assert.match(ui,/result=await rpc\('bc7_registrar_bajas_multiple_jornada'/,"the frontend reads back the grouped request state");
+  assert.match(ui,/bajaState==='APROBADA'/,"the UI distinguishes server-side auto-approval from a pending approval list");
   assert.match(ui,/p_motivo_general:reason/,"the list shares one administrative reason");
   assert.match(ui,/friendlyError\(e,'adjustment'\)/,"stock errors are reported as inventory errors, not schedule-creation errors");
   assert.match(ui,/data-stock=/,"each candidate product carries its current available stock into validation");
