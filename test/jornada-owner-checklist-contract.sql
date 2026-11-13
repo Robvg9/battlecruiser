@@ -22,7 +22,7 @@ DECLARE
   v_turno uuid:='90000000-0000-0000-0000-000000000008';
   v_sesion uuid:='91000000-0000-0000-0000-000000000008';
   v_prog uuid:='92000000-0000-0000-0000-000000000008';
-  v_owner uuid:='20000000-0000-0000-0000-000000000001';
+  v_owner uuid:='20000000-0000-0000-0000-000000000003';
   v_almacen uuid:='10000000-0000-0000-0000-000000000004';
   v_pan uuid:='31000000-0000-0000-0000-000000000003';
   v_jugo uuid:='31000000-0000-0000-0000-000000000004';
@@ -31,6 +31,8 @@ DECLARE
   v_tramo uuid;
   v_declaracion uuid;
   v_reinversion uuid;
+  v_minimo numeric;
+  v_cantidad numeric;
   v_result jsonb;
   v_error boolean;
   v_minimo numeric;
@@ -40,12 +42,16 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,mermas:crear,bajas:crear,reinversiones:editar_any',false);
 
+  INSERT INTO auth.users(id) VALUES(v_owner);
+  INSERT INTO public.usuarios(id,activo,role_id,nombre)
+  VALUES(v_owner,true,'30000000-0000-0000-0000-000000000001','Dueño checklist fixture');
+
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES(v_almacen,'Jornada checklist fixture','minorista',true);
   INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
   VALUES
-    (v_pan,'Pan fixture','ud',true,10),
-    (v_jugo,'Jugo fixture','ud',true,20),
+    (v_pan,'Pan fixture','ud',true,9000),
+    (v_jugo,'Jugo fixture','ud',true,1000),
     (v_pru,'Pru fixture','ud',true,60);
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
   VALUES
@@ -89,13 +95,13 @@ BEGIN
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: the fixture session has no active tranche'; END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
-  VALUES(v_turno,v_sesion,v_tramo,v_owner,30)
+  VALUES(v_turno,v_sesion,v_tramo,v_owner,2800)
   RETURNING id INTO v_declaracion;
 
   -- The Owner cannot count cash before the employee has completed all four checks.
   v_error:=false;
   BEGIN
-    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,30,'Conteo anticipado debe ser rechazado');
+    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo anticipado debe ser rechazado');
   EXCEPTION WHEN check_violation THEN
     v_error:=true;
   END;
@@ -103,11 +109,35 @@ BEGIN
     RAISE EXCEPTION 'FAIL: cash count was accepted before the final inventory and employee checks';
   END IF;
 
+  -- Reinvestment approval adds 120 Pru × 60 CUP to an existing stock row
+  -- without trying to INSERT minimo=0. The final count below includes those units.
+  INSERT INTO public.reinversiones(
+    almacen_id,ciclo_id,sesion_id,turno_id,proveedor,fecha,total,
+    usuario_id,usuario_nombre,idempotency_key,turno_sesion_id,turno_tramo_id,estado
+  ) VALUES(
+    v_almacen,NULL,NULL,v_turno,'Fixture proveedor',now(),7200,
+    v_owner,'Dueño checklist fixture','93000000-0000-0000-0000-000000000010',
+    v_sesion,v_tramo,'PENDIENTE'
+  ) RETURNING id INTO v_reinversion;
+  INSERT INTO public.reinversiones_lineas(
+    reinversion_id,producto_id,cantidad_presentacion,cantidad_base,costo_total,costo_unitario
+  ) VALUES(v_reinversion,v_pru,120,120,7200,60);
+
+  v_result:=public.resolver_aprobacion_operativa(
+    'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
+  );
+  SELECT cantidad,minimo INTO v_cantidad,v_minimo
+  FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pru;
+  IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
+     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
+    RAISE EXCEPTION 'FAIL: approved reinvestment did not increase stock and preserve its minimum: % / % / %',v_result,v_cantidad,v_minimo;
+  END IF;
+
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'FINAL',
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',8),
       jsonb_build_object('producto_id',v_jugo,'cantidad',4),
-      jsonb_build_object('producto_id',v_pru,'cantidad',0)
+      jsonb_build_object('producto_id',v_pru,'cantidad',120)
     ),'Inventario final fixture checklist');
   IF v_result->>'estado'<>'CONFIRMADO' THEN
     RAISE EXCEPTION 'FAIL: final physical inventory was not confirmed';
@@ -128,9 +158,9 @@ BEGIN
   END IF;
 
   -- Cash count and approval now happen while the work session remains EN_CURSO.
-  v_result:=public.bc5_contar_dinero_entregado(v_declaracion,30,'Conteo físico correcto');
+  v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico correcto');
   IF v_result->>'estado'<>'APROBADA'
-     OR (v_result->>'monto_contado')::numeric<>30
+     OR (v_result->>'monto_contado')::numeric<>2800
      OR (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'EN_CURSO' THEN
     RAISE EXCEPTION 'FAIL: the Owner cash count did not approve before session closure: %',v_result;
   END IF;
@@ -142,7 +172,7 @@ BEGIN
   END IF;
   v_result:=public.bc7_liquidacion_inventario_jornada(v_sesion);
   IF coalesce((v_result->>'calculable')::boolean,false) IS NOT TRUE
-     OR (v_result->>'ventas_estimadas')::numeric<>30 THEN
+     OR (v_result->>'ventas_estimadas')::numeric<>10000 THEN
     RAISE EXCEPTION 'FAIL: automatic inventory/sales/cash calculation is not reproducible: %',v_result;
   END IF;
 
