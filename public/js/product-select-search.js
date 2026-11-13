@@ -1,8 +1,8 @@
 // BattleCruiser — shared searchable chooser for operational products and warehouses.
 (function () {
   'use strict';
-  if (window.__BC_PRODUCT_SELECT_PICKER__ === '2.2') return;
-  window.__BC_PRODUCT_SELECT_PICKER__ = '2.2';
+  if (window.__BC_PRODUCT_SELECT_PICKER__ === '2.3') return;
+  window.__BC_PRODUCT_SELECT_PICKER__ = '2.3';
   const PRODUCT_KNOWN = new Set(['compra-producto','venta-producto','trf-producto','vale-producto','pp-producto-select','mov-multiple-producto']);
   const WAREHOUSE_KNOWN = new Set(['alm-selector','compra-multiple-almacen','trf-origen','trf-destino','vale-almacen','mov-multiple-origen','mov-multiple-destino','bc-bajas-warehouse','inv-filtro-almacen','op-g-alm','op-r-alm']);
   const PRODUCT_EXCLUDED = /categor[ií]|presentaci[oó]n|almac[eé]n|warehouse|motivo|estado|tipo|pago|prioridad|usuario/i;
