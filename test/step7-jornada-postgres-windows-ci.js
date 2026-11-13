@@ -308,6 +308,7 @@ function applySql(file) {
     applySql("supabase/migrations/20261102144901_step4_shared_inventory_fk_indexes.sql");
     log("\\r\\n=== Apply La Cueva finance and reinvestment request rules before Day 2 cash handover ===");
     applySql("supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql");
+    applySql("supabase/migrations/20261113233000_jornada_bajas_post_cutoff_attribution.sql");
     applySql("supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql");
     applySql("test/dependienta-jornada-merma-permission-fixture.sql");
     applySql("supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql");
