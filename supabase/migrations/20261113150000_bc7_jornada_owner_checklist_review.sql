@@ -209,7 +209,11 @@ BEGIN
     SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado='PENDIENTE'
   ) pending;
 
-  v_can_count:=v_s.estado='COMPLETADA' OR (
+  v_can_count:=(
+    v_s.estado='COMPLETADA'
+    AND v_declaracion.id IS NOT NULL
+    AND v_declaracion.monto_contado IS NULL
+  ) OR (
     v_s.estado='EN_CURSO'
     AND v_gastos AND v_reinversiones AND v_bajas AND v_final
     AND v_declaracion.id IS NOT NULL AND v_declaracion.monto_contado IS NULL
@@ -453,6 +457,7 @@ DECLARE
   v_checklist jsonb;
   v_liquidacion jsonb;
   v_turno_enviado boolean:=false;
+  v_turno_aprobado boolean:=false;
   v_remaining integer;
   v_obs text:=nullif(left(btrim(coalesce(p_observacion,'')),1000),'');
 BEGIN
@@ -532,12 +537,17 @@ BEGIN
   IF v_remaining=0 THEN
     PERFORM public.bc_enviar_turno_a_aprobacion(v_s.turno_id);
     v_turno_enviado:=true;
+    -- The same owner action includes the existing turn-level approval. This keeps
+    -- the final observation in turno_revisiones and avoids a second redundant approval step.
+    PERFORM public.bc_aprobar_turno(v_s.turno_id,v_obs);
+    v_turno_aprobado:=true;
   END IF;
 
   RETURN jsonb_build_object(
     'ok',true,'idempotente',false,
     'turno_sesion_id',v_s.id,'estado','COMPLETADA',
     'turno_enviado_aprobacion',v_turno_enviado,
+    'turno_aprobado',v_turno_aprobado,
     'liquidacion',v_liquidacion
   );
 END;
