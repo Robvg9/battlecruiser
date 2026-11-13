@@ -1126,6 +1126,58 @@
       host.innerHTML=renderMovementRows(arr(r),detail.sesion);
     }catch(e){host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se han modificado datos.</div>';}
   }
+  async function completeJornadaChecklist(button){
+    const task=String(button?.dataset?.bc7ChecklistComplete||'').toUpperCase();
+    const sessionId=String(state.detail?.sesion?.id||'');
+    const labels={GASTOS:'gastos',BAJAS:'bajas y mermas',REINVERSIONES:'reinversiones'};
+    if(!sessionId||!labels[task])return;
+    if(!confirm('Confirmas que ya registraste todos los '+labels[task]+' de esta jornada? Al completar este paso no se admitirán nuevos registros de ese tipo.'))return;
+    if(!busy(button,true))return;
+    try{
+      await rpc('bc7_marcar_checklist_jornada',{p_turno_sesion_id:sessionId,p_tarea:task});
+      const reopened=await openWorkspace(sessionId);
+      if(!reopened)throw new Error('El servidor guardó el check, pero no se pudo volver a leer la jornada.');
+      setStatus('Paso '+labels[task]+' completado. El bloque quedó cerrado para nuevos registros.','ok');
+    }catch(e){
+      msg(document.querySelector('#bc7-jornada-checklist')||$('bc7-status'),friendlyError(e,'create')+' '+String(e&&e.message||''),'error');
+      setStatus('No se pudo completar el paso del checklist.','error');
+    }finally{
+      busy(button,false);
+    }
+  }
+  async function submitOwnerFinalReview(form){
+    const sessionId=String(form?.dataset?.bc7OwnerFinalReviewForm||'');
+    const note=form?.querySelector('[data-bc7-owner-final-note]')?.value.trim()||null;
+    const message=form?.querySelector('[data-bc7-owner-final-review-msg]');
+    const button=form?.querySelector('button[type="submit"]');
+    if(!state.admin||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='EN_CURSO'){
+      msg(message,'Solo el Dueño puede realizar la revisión final de una jornada en curso.','error');return false;
+    }
+    if(state.detail?.checklist?.efectivo_aprobado!==true||state.inventorySettlement?.calculable!==true){
+      msg(message,'Todavía falta aprobar el efectivo o completar la liquidación automática.','error');return false;
+    }
+    if(!confirm('La liquidación está calculable. Tu observación quedará en el expediente. ¿Apruebas la revisión final de esta jornada? Si es la última jornada del Turno, también se aprobará y cerrará el Turno.'))return false;
+    if(!busy(button,true))return false;
+    try{
+      const result=await rpc('bc7_finalizar_revision_jornada',{p_turno_sesion_id:sessionId,p_observacion:note});
+      const reread=await openWorkspace(sessionId);
+      if(!reread||String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'){
+        throw new Error('El servidor recibió la aprobación, pero no confirmó la jornada completada al volver a consultar.');
+      }
+      await loadCalendar();
+      await loadCurrentSession();
+      setStatus(result?.turno_aprobado===true
+        ?'Revisión final aprobada. La jornada y el Turno quedaron cerrados.'
+        :'Revisión final aprobada. Esta jornada quedó cerrada; el Turno continúa hasta completar las demás jornadas.','ok');
+      return true;
+    }catch(e){
+      msg(document.querySelector('[data-bc7-owner-final-review-msg]')||message,friendlyError(e,'create')+' '+String(e&&e.message||''),'error');
+      setStatus('No se pudo confirmar la revisión final.','error');
+      return false;
+    }finally{
+      busy(button,false);
+    }
+  }
   function renderJornadaChecklist(detail,isAssigned,status,finalConfirmed){
     if(detail?.sesion?.es_minorista!==true)return '';
     const checklist=detail.checklist||{};
@@ -1813,6 +1865,7 @@
   });
   document.addEventListener('click',async function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
+    if(t.hasAttribute('data-bc7-checklist-complete')){await completeJornadaChecklist(t);return;}
     if(t.hasAttribute('data-bc7-adjustment-add')){const form=t.closest('[data-bc7-adjust-form]');if(form)addAdjustmentRow(form);return;}
     if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
@@ -1843,6 +1896,7 @@
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
     else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
+    else if(f.matches('[data-bc7-owner-final-review-form]')){e.preventDefault();await submitOwnerFinalReview(f);}
   });
   document.addEventListener('change',function(e){
     const t=e.target;
