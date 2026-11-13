@@ -771,11 +771,16 @@
     if(!d)return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4><p class="bc7-muted">Todavía no hay una declaración de efectivo para esta jornada.</p></div>';
     const counted=d.monto_contado!=null;
     const difference=d.diferencia!=null;
+    const sessionState=String(detail?.sesion?.estado||'').toUpperCase();
+    const approvalState=String(d.estado_aprobacion||'').toUpperCase();
+    const statusLabel=sessionState==='COMPLETADA'
+      ?((approvalState==='PENDIENTE'||approvalState==='ESPERANDO_APROBACION')?'Esperando aprobación':humanStatus(approvalState||'ESPERANDO_APROBACION'))
+      :'Esperando entrega';
     return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4>'+
       '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(d.monto))+' CUP</b></div>'+
       '<div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(counted?esc(money(d.monto_contado))+' CUP':'Pendiente')+'</b></div>'+
       '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(difference?esc(money(d.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
-      '<p class="bc7-muted">Estado: '+esc(humanStatus(d.estado_aprobacion||'ESPERANDO_APROBACION'))+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
+      '<p class="bc7-muted">Estado: '+esc(statusLabel)+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
   }
   function renderDailyCash(host,data){
     if(!host)return;
