@@ -40,7 +40,7 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   const opEnd=ui.indexOf("const mov='<div class=\"bc7-panel-stack\">",opStart);
   assert.ok(opStart>=0&&opEnd>opStart,"one operation panel exists");
   const operationPanel=ui.slice(opStart,opEnd);
-  assert.ok(operationPanel.includes("actionArea+fin+adjustment"),"cash, finance and adjustment content are composed into the same panel");
+  assert.ok(operationPanel.includes("bc7-checklist-section-source")&&operationPanel.includes("fin+adjustment"),"cash, finance and adjustment content remain available to their focused checklist modals");
   assert.doesNotMatch(ui,/data-bc7-workspace-tab="finanzas"/,"finances are no longer a separate task tab");
   const financeStart=ui.indexOf("function financeFormHtml(detail,isAssigned,status){");
   const financeEnd=ui.indexOf("function cashDaysManagerShellHtml(detail,isAssigned,status){",financeStart);
@@ -132,7 +132,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.26");
+  assert.equal(moduleVersion,"7.27");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assert.ok(app.includes('["aprobaciones-admin.js","20261113.3"]'));
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.3"));

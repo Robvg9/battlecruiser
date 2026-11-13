@@ -2,6 +2,206 @@
 -- Keep legacy stock/FIFO behavior isolated from Jornada-linked requests.
 BEGIN;
 
+CREATE OR REPLACE FUNCTION public.bc7_jornada_saldos_operativos(p_turno_sesion_id uuid)
+ RETURNS TABLE(producto_id uuid, inventario_inicial numeric, entradas numeric, salidas numeric, cantidad_actual numeric)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_session record;
+  v_initial record;
+  v_start_at timestamptz;
+  v_end_at timestamptz := now();
+BEGIN
+  IF p_turno_sesion_id IS NULL THEN
+    RAISE EXCEPTION 'turno_sesion_id requerido';
+  END IF;
+
+  SELECT
+    s.id,
+    s.estado,
+    s.bloque,
+    s.apertura_retroactiva,
+    s.almacen_id,
+    s.jornada_programacion_id,
+    jp.fecha AS fecha_programada,
+    jp.zona_horaria,
+    t.apertura_real,
+    a.tipo AS almacen_tipo
+  INTO v_session
+  FROM public.turno_sesiones s
+  JOIN public.turnos t ON t.id = s.turno_id
+  JOIN public.turno_jornada_programacion jp ON jp.id = s.jornada_programacion_id
+  JOIN public.almacenes a ON a.id = s.almacen_id
+  WHERE s.id = p_turno_sesion_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No existe la jornada solicitada';
+  END IF;
+
+  IF v_session.estado <> 'EN_CURSO'
+     OR v_session.bloque <> 'JORNADA'
+     OR v_session.jornada_programacion_id IS NULL
+     OR v_session.almacen_tipo <> 'minorista' THEN
+    RAISE EXCEPTION 'El saldo operativo solo aplica a una jornada minorista activa';
+  END IF;
+
+  SELECT c.id, c.confirmado_en, c.creado_en
+  INTO v_initial
+  FROM public.turno_jornada_inventario_cortes c
+  WHERE c.turno_sesion_id = p_turno_sesion_id
+    AND c.tipo = 'INICIAL'
+    AND c.estado = 'CONFIRMADO'
+  ORDER BY c.confirmado_en DESC NULLS LAST, c.creado_en DESC
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La jornada activa no tiene un corte inicial confirmado; se bloquea el saldo global incompleto';
+  END IF;
+
+  v_start_at := COALESCE(v_session.apertura_real, v_initial.confirmado_en, v_initial.creado_en);
+
+  IF v_start_at IS NULL THEN
+    RAISE EXCEPTION 'No se pudo determinar la hora de apertura de la jornada';
+  END IF;
+
+  RETURN QUERY
+  WITH initial_rows AS (
+    SELECT
+      l.producto_id,
+      SUM(l.cantidad_contada)::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+  ),
+  movement_rows AS (
+    -- Transferencias entrantes. En una apertura retroactiva solo se aceptan
+    -- las del día siguiente o las vinculadas expresamente al corte.
+    SELECT tl.producto_id, 'ENTRADA'::text AS tipo, tl.cantidad::numeric AS cantidad
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id = t.id
+    WHERE t.almacen_destino_id = v_session.almacen_id
+      AND LOWER(t.estado) = 'completada'
+      AND t.fecha > v_start_at
+      AND t.fecha <= v_end_at
+      AND (
+        NOT COALESCE(v_session.apertura_retroactiva, false)
+        OR (t.fecha AT TIME ZONE COALESCE(NULLIF(v_session.zona_horaria, ''), 'America/Havana'))::date > v_session.fecha_programada
+        OR EXISTS (
+          SELECT 1
+          FROM public.turno_jornada_entradas_vinculadas x
+          WHERE x.turno_sesion_id = p_turno_sesion_id
+            AND x.transferencia_id = t.id
+        )
+      )
+
+    UNION ALL
+
+    -- Transferencias salientes.
+    SELECT tl.producto_id, 'SALIDA'::text, tl.cantidad::numeric
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id = t.id
+    WHERE t.almacen_origen_id = v_session.almacen_id
+      AND LOWER(t.estado) = 'completada'
+      AND t.fecha > v_start_at
+      AND t.fecha <= v_end_at
+
+    UNION ALL
+
+    -- Compras recibidas en el almacén.
+    SELECT lc.producto_id, 'ENTRADA'::text, lc.cantidad_inicial::numeric
+    FROM public.lotes_compra lc
+    WHERE lc.almacen_id = v_session.almacen_id
+      AND LOWER(COALESCE(lc.origen, '')) = 'compra'
+      AND lc.fecha_compra > v_start_at
+      AND lc.fecha_compra <= v_end_at
+
+    UNION ALL
+
+    -- Reinversiones aprobadas durante esta jornada.
+    SELECT rl.producto_id, 'ENTRADA'::text, rl.cantidad_base::numeric
+    FROM public.reinversiones r
+    JOIN public.reinversiones_lineas rl ON rl.reinversion_id = r.id
+    WHERE r.almacen_id = v_session.almacen_id
+      AND r.turno_sesion_id = p_turno_sesion_id
+      AND r.estado = 'APROBADA'
+      AND r.fecha_revision IS NOT NULL
+      AND r.fecha_revision > v_start_at
+      AND r.fecha_revision <= v_end_at
+
+    UNION ALL
+
+    -- Vales de salida confirmados.
+    SELECT vs.producto_id, 'SALIDA'::text, vs.cantidad::numeric
+    FROM public.vales_salida vs
+    WHERE vs.almacen_id = v_session.almacen_id
+      AND vs.fecha > v_start_at
+      AND vs.fecha <= v_end_at
+      AND UPPER(COALESCE(vs.estado, 'REGISTRADO')) NOT IN
+          ('PENDIENTE', 'RECHAZADO', 'CANCELADO', 'ANULADO')
+
+    UNION ALL
+
+    -- Bajas y mermas aprobadas; las solicitudes pendientes no descuentan.
+    SELECT m.producto_id, 'SALIDA'::text, m.cantidad::numeric
+    FROM public.mermas m
+    WHERE m.almacen_id = v_session.almacen_id
+      AND m.estado = 'APROBADA'
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) > v_start_at
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) <= v_end_at
+
+    UNION ALL
+
+    SELECT b.producto_id, 'SALIDA'::text, b.cantidad::numeric
+    FROM public.bajas b
+    WHERE b.almacen_id = v_session.almacen_id
+      AND b.estado = 'APROBADA'
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) > v_start_at
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) <= v_end_at
+
+    UNION ALL
+
+    -- Ventas completadas, si el almacén utiliza POS.
+    SELECT vl.producto_id, 'SALIDA'::text, vl.cantidad::numeric
+    FROM public.ventas v
+    JOIN public.ventas_lineas vl ON vl.venta_id = v.id
+    WHERE v.almacen_id = v_session.almacen_id
+      AND LOWER(COALESCE(v.estado, '')) IN ('completada', 'completado')
+      AND v.fecha > v_start_at
+      AND v.fecha <= v_end_at
+  ),
+  movement_totals AS (
+    SELECT
+      m.producto_id,
+      COALESCE(SUM(m.cantidad) FILTER (WHERE m.tipo = 'ENTRADA'), 0)::numeric AS entradas,
+      COALESCE(SUM(m.cantidad) FILTER (WHERE m.tipo = 'SALIDA'), 0)::numeric AS salidas
+    FROM movement_rows m
+    GROUP BY m.producto_id
+  ),
+  product_ids AS (
+    SELECT i.producto_id FROM initial_rows i
+    UNION
+    SELECT m.producto_id FROM movement_totals m
+  )
+  SELECT
+    ids.producto_id,
+    COALESCE(i.cantidad, 0)::numeric AS inventario_inicial,
+    COALESCE(m.entradas, 0)::numeric AS entradas,
+    COALESCE(m.salidas, 0)::numeric AS salidas,
+    (
+      COALESCE(i.cantidad, 0)
+      + COALESCE(m.entradas, 0)
+      - COALESCE(m.salidas, 0)
+    )::numeric AS cantidad_actual
+  FROM product_ids ids
+  LEFT JOIN initial_rows i ON i.producto_id = ids.producto_id
+  LEFT JOIN movement_totals m ON m.producto_id = ids.producto_id;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.bc7_jornada_saldos_operativos(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_jornada_saldos_operativos(uuid) TO authenticated,service_role;
+
 CREATE OR REPLACE FUNCTION public.bc7_productos_ajuste_jornada(p_turno_sesion_id uuid)
 RETURNS TABLE(
   producto_id uuid,
