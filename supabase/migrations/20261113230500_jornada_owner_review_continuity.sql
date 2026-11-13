@@ -7,6 +7,12 @@ CREATE UNIQUE INDEX turnos_unico_abierto_por_usuario
   ON public.turnos(usuario_id)
   WHERE estado='ABIERTO' AND dias_turno IS NULL;
 
+-- Allow a new administrative Turn after the previous Jornada reaches its
+-- operational end, while still forbidding two live operational sessions in
+-- the same warehouse.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_turno_sesion_activa_almacen
+  ON public.turno_sesiones(almacen_id)
+  WHERE bloque='JORNADA' AND estado='EN_CURSO';
 
 CREATE TABLE IF NOT EXISTS public.turno_jornada_movimiento_revision (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
