@@ -144,3 +144,9 @@ test("Jornada inventory count table exposes labelled cells for accessible mobile
   assert.match(ui,/data-label="Conteo físico actual"/);
   assert.match(ui,/data-bc7-count=/);
 });
+
+test("Daily cash approvals display the feminine state labels returned by the server",()=>{
+  assert.match(ui,/APROBADA:'Aprobada'/);
+  assert.match(ui,/RECHAZADA:'Rechazada'/);
+  assert.match(ui,/status==='APROBADA'/);
+});

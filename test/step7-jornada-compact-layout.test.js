@@ -24,11 +24,11 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9.5.98"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.22"\]/);
- assert.match(sw,/BC_SW_VERSION = "9.5.98"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.22/);
- assert.match(ui,/v7\.22 — revisión móvil compacta, conteos físicos y archivo financiero por jornada/);
+ assert.match(app,/const VERSION="9.5.99"/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.23"\]/);
+ assert.match(sw,/BC_SW_VERSION = "9.5.99"/);
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.23/);
+ assert.match(ui,/v7\.23 — paneles de Operación a ancho completo y conteos móviles legibles/);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
@@ -45,4 +45,14 @@ test("M33 dependent card release is version aligned",()=>{
 
 test("Jornada workspace title includes the full multi-day period",()=>{
  assert.ok(ui.includes("fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')"));
+});
+
+test("Operation and finance containers stay full width; only daily cash cards use the compact grid",()=>{
+  assert.ok(ui.includes("#tab-jornada .bc7-jornada{display:block;grid-template-columns:minmax(0,1fr);min-width:0;width:100%;max-width:100%;box-sizing:border-box;padding:7px!important}"));
+  assert.ok(ui.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row]{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px}"));
+  assert.ok(ui.includes("#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-jornada-top{display:contents!important}"));
+  assert.ok(!ui.includes("#tab-jornada .bc7-jornada-top{display:contents!important}"));
+  assert.ok(ui.includes('data-bc7-cash-day-row'));
+  assert.ok(ui.includes('data-bc7-finance-form="gasto"'));
+  assert.ok(ui.includes('data-bc7-finance-form="reinversion"'));
 });
