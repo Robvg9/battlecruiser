@@ -24,7 +24,7 @@ DECLARE
   v_prog uuid:=gen_random_uuid();
   v_owner uuid:='20000000-0000-0000-0000-000000000001';
   v_worker uuid:=gen_random_uuid();
-  v_almacen uuid:='10000000-0000-0000-0000-000000000004';
+  v_almacen uuid:=gen_random_uuid();
   v_pan uuid:='31000000-0000-0000-0000-000000000003';
   v_jugo uuid:='31000000-0000-0000-0000-000000000004';
   v_pru uuid:='31000000-0000-0000-0000-000000000005';
