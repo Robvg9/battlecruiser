@@ -968,6 +968,7 @@ DECLARE
   v_sessions jsonb:='[]'::jsonb;
   v_cost_covered integer;
   v_cost_total integer;
+  v_sold_price_missing integer;
   v_pending_post integer;
   v_cash_declared numeric;
   v_cash_counted numeric;
@@ -1016,9 +1017,13 @@ BEGIN
         AND l.fecha_compra<=coalesce(v_final.confirmado_en,now())
         AND coalesce(l.costo_unitario,0)>0
     ) c ON true;
-    SELECT count(*) FILTER(WHERE x.value->>'estado_costo'<>'SIN_COSTO_COMPROBADO'),
-           count(*)
-      INTO v_cost_covered,v_cost_total
+    SELECT
+      count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0
+        AND x.value->>'estado_costo'<>'SIN_COSTO_COMPROBADO'),
+      count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0),
+      count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0
+        AND x.value->>'importe_estimado' IS NULL)
+      INTO v_cost_covered,v_cost_total,v_sold_price_missing
     FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
     SELECT coalesce(jsonb_agg(jsonb_build_object(
         'tipo',m.tipo,'id',m.id,'producto',m.producto,'cantidad',m.cantidad,
@@ -1057,8 +1062,9 @@ BEGIN
       ),
       'movimientos_posteriores_corte',coalesce(v_post,'[]'::jsonb),
       'movimientos_posteriores_pendientes',coalesce(v_pending_post,0),
+      'productos_vendidos_con_precio_faltante',coalesce(v_sold_price_missing,0),
       'ganancia_bruta_es_total',coalesce(v_cost_covered,0)=coalesce(v_cost_total,0)
-        AND coalesce((v_liq->>'familias_sin_precio')::integer,0)=0
+        AND coalesce(v_sold_price_missing,0)=0
         AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0
     );
     v_sessions:=v_sessions||jsonb_build_array(jsonb_build_object(
@@ -1138,13 +1144,15 @@ BEGIN
       FROM (
         SELECT b.id FROM public.bajas b
         JOIN public.turno_jornada_inventario_cortes c ON c.turno_sesion_id=v_s.id AND c.tipo='FINAL'
-        WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA' AND b.creado_en>c.confirmado_en
+        WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
+          AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>c.confirmado_en
           AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
             WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA' AND mr.movimiento_id=b.id)
         UNION ALL
         SELECT m.id FROM public.mermas m
         JOIN public.turno_jornada_inventario_cortes c ON c.turno_sesion_id=v_s.id AND c.tipo='FINAL'
-        WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA' AND m.creado_en>c.confirmado_en
+        WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
+          AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>c.confirmado_en
           AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
             WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA' AND mr.movimiento_id=m.id)
       ) pending;
