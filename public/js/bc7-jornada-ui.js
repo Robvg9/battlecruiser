@@ -1142,8 +1142,28 @@
       const adjustmentTypeField=canCreateBaja&&canCreateMerma
         ?'<label class="bc7-field">Tipo de ajuste<select data-bc7-ajust-type required><option value="baja">Baja de inventario · lista de productos</option><option value="merma">Merma · un producto</option></select></label>'
         :'<input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'">';
-      const adjustmentProducts=products.filter(p=>Number(p.stock_actual)>0);
-      const adjustmentOptions='<option value="">Selecciona producto con stock</option>'+adjustmentProducts.map(p=>'<option value="'+esc(p.producto_id)+'" data-stock="'+esc(p.stock_actual)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('');
+      const adjustmentCatalog=new Map();
+      products.forEach(p=>adjustmentCatalog.set(String(p.producto_id),Object.assign({},p,{sin_stock_configurado:false})));
+      // Include every active catalog product so an exhausted item remains searchable.
+      // Products without a stock row are visible too, but cannot be selected for a Baja.
+      arr(catalogCache()?.productos).filter(p=>p&&p.activo!==false).forEach(p=>{
+        const id=String(p.producto_id||p.id||'');
+        if(!id||adjustmentCatalog.has(id))return;
+        adjustmentCatalog.set(id,{
+          producto_id:id,nombre:p.nombre||p.nombre_producto||'Producto',
+          stock_actual:0,minimo:0,sin_stock_configurado:true,
+          inventario_mixto:!!p.inventario_mixto
+        });
+      });
+      const adjustmentAllProducts=Array.from(adjustmentCatalog.values()).sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+      const adjustmentProducts=adjustmentAllProducts.filter(p=>!p.inventario_mixto&&Number(p.stock_actual)>0);
+      const adjustmentOptions='<option value="">Selecciona producto</option>'+adjustmentAllProducts.map(p=>{
+        const stock=Number(p.stock_actual||0);
+        const mixed=!!p.inventario_mixto;
+        const unavailable=mixed||!Number.isFinite(stock)||stock<=0;
+        const suffix=mixed?' · Controlado por sabores':p.sin_stock_configurado?' · Sin stock configurado':unavailable?' · Agotado':' · stock '+qty(stock);
+        return '<option value="'+esc(p.producto_id)+'" data-stock="'+esc(Number.isFinite(stock)?stock:0)+'" '+(unavailable?'disabled':'')+'>'+esc(p.nombre)+suffix+'</option>';
+      }).join('');
       const adjustmentRow='<div class="bc7-grid bc7-adjustment-row" data-bc7-adjustment-row>'+
         '<label class="bc7-field">Producto<select data-bc7-ajust-product required>'+adjustmentOptions+'</select></label>'+
         '<label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal" placeholder="Cantidad real"></label>'+
@@ -1155,6 +1175,7 @@
         '<label class="bc7-field">Detalle general (opcional)<input data-bc7-ajust-reason maxlength="160" placeholder="Aclaración común para toda la solicitud"></label>'+
         '<input type="hidden" data-bc7-adjust-key value="">'+
         '<p class="bc7-muted" data-bc7-adjustment-hint>'+(canCreateBaja?'Puedes incluir varios productos; Administración recibirá un único expediente para aprobar la lista completa.':'La merma se envía como una sola solicitud y no modifica stock hasta su aprobación.')+'</p>'+
+        '<p class="bc7-muted">Puedes buscar cualquier producto activo. Los agotados, sin stock configurado o controlados por sabores aparecen identificados, pero no se pueden seleccionar para una baja.</p>'+
         (adjustmentProducts.length?'':'<p class="bc7-msg error">No hay productos con existencias disponibles para registrar bajas o mermas en este almacén.</p>')+
         '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!adjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
