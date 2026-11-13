@@ -544,10 +544,14 @@
       if(isFinal&&finalSaved){
         const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
         html+='<span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(finalCashState))+'. El importe declarado no sustituye el conteo físico.</p>';
-        if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='COMPLETADA'&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
-          html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico del Dueño</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
-        }else if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()!=='COMPLETADA'&&declaration.monto_contado==null){
-          html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
+        const sessionState=String(detail.sesion.estado||'').toUpperCase();
+        const canCountCash=detail.is_admin&&declaration.monto_contado==null&&
+          (sessionState==='COMPLETADA'||detail.checklist?.puede_contar_efectivo===true)&&
+          !['APROBADA','CON_DIFERENCIA'].includes(finalCashState);
+        if(canCountCash){
+          html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Quinto paso · Conteo físico del Dueño</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el efectivo que contaste realmente; no copies el importe declarado si no coincide.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Faltante, sobrante o incidencia"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Contar y aprobar efectivo</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
+        }else if(detail.is_admin&&declaration.monto_contado==null){
+          html+='<p class="bc7-muted">El conteo está pendiente. '+esc(detail.checklist?.bloqueo_efectivo||'Completa las tareas de Sheila y resuelve las aprobaciones pendientes para habilitarlo.')+'</p>';
         }else if(declaration.monto_contado!=null){
           html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
         }
@@ -698,8 +702,10 @@
     const message=form?.querySelector('[data-bc7-final-cash-msg]');
     const button=form?.querySelector('button[type="submit"]');
     const declaration=state.detail?.declaracion_dinero;
-    if(!state.admin||!declarationId||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'){
-      msg(message,'El conteo solo está disponible para ADMIN después de completar esta jornada.','error');return false;
+    const sessionState=String(state.detail?.sesion?.estado||'').toUpperCase();
+    const checklistAllows=state.detail?.checklist?.puede_contar_efectivo===true;
+    if(!state.admin||!declarationId||!sessionId||!(sessionState==='COMPLETADA'||(sessionState==='EN_CURSO'&&checklistAllows))){
+      msg(message,'El conteo se habilita cuando Sheila completa gastos, bajas, reinversiones e inventario final, y el Dueño resuelve todas las aprobaciones pendientes. '+String(state.detail?.checklist?.bloqueo_efectivo||''),'error');return false;
     }
     if(!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null){
       msg(message,'La declaración cambió o ya tiene un conteo. Actualiza la jornada antes de continuar.','error');return false;
@@ -1198,6 +1204,11 @@
       const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
       detail.entrega_compartida=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
       detail.is_admin=!!state.admin;
+      if(detail.sesion?.es_minorista===true){
+        detail.checklist=await rpc('bc7_estado_checklist_jornada',{p_turno_sesion_id:sessionId})||{};
+      }else{
+        detail.checklist=null;
+      }
       if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
     }catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
