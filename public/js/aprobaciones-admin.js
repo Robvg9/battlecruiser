@@ -126,7 +126,7 @@ function renderApprovalDetails(x,detail){
   const isReinvestment=x.tipo==='reinversion';
   const isDailyCash=x.tipo==='entrega_diaria';
   const isFinalCash=x.tipo==='declaracion_jornada';
-  const finalCashReady=['COMPLETADA','LISTA_PARA_CONTEO'].includes(String(x.motivo||'').toUpperCase());
+  const finalCashReady=String(x.motivo||'').toUpperCase()==='COMPLETADA';
   const isMoney=isExpense||isReinvestment||isDailyCash||isFinalCash;
   const isLegacyBaja=x.tipo==='baja';
   const isStockChange=x.tipo==='merma'||isLegacyBaja;
@@ -163,7 +163,7 @@ function renderApprovalDetails(x,detail){
     const minAmount=(isDailyCash||isFinalCash)?'0':'0.01';
     const declaredFinal=isFinalCash?'<span>Declarado por la responsable: '+esc(money(x.monto))+' CUP. Jornada: '+esc(x.motivo||'sin estado')+'.</span>':'<span>'+esc(x.motivo||'Sin descripción adicional')+'</span>';
     const finalCashNote=isFinalCash
-      ?(finalCashReady?'<p class="bc-admin-approval-message">Las cuatro confirmaciones de Sheila están completas. Introduce el efectivo que contaste físicamente; el importe declarado es solo una referencia.</p>':'<p class="bc-admin-approval-message">El conteo se habilitará cuando Sheila confirme gastos, reinversiones, bajas e inventario final. Estado actual: '+esc(x.motivo||'EN CURSO')+'. La jornada no necesita cerrarse para contar el efectivo.</p>')
+      ?(finalCashReady?'<p class="bc-admin-approval-message">Las cuatro confirmaciones de Sheila están completas. Introduce el efectivo que contaste físicamente; el importe declarado es solo una referencia.</p>':'<p class="bc-admin-approval-message">El conteo se habilitará después de que Sheila entregue la jornada. Estado actual: '+esc(x.motivo||'EN CURSO')+'. La sesión debe estar completada; el Turno maestro seguirá abierto.</p>')
       :'';
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||(isReinvestment?'Reinversión':isDailyCash?'Entrega diaria':isFinalCash?'Declaración final':'Gasto'))+'</strong>'+
       declaredFinal+'</section>'+
