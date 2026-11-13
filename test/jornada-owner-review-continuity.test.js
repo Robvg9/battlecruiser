@@ -41,6 +41,8 @@ test("Owner review shows product-level revenue, cost provenance, profit and post
   assert.match(MIG,/movimientos_posteriores_corte/);
   assert.match(MIG,/bc7_clasificar_movimientos_fuera_corte/);
   assert.match(MIG,/bc7_resolver_revision_jornada/);
+  assert.match(REVIEW,/m\.fecha_revision/);
+  assert.match(REVIEW,/<th>Aprobado<\/th>/);
   for(const field of ["inventario_inicial","inventario_final","unidades_vendidas","importe_estimado","costo_vendido_estimado","ganancia_bruta_estimada","margen_bruto_estimado"])assert.ok(REVIEW.includes(field),field);
 });
 test("Salary percentage can be explicitly set after a completed session but before master approval",()=>{
