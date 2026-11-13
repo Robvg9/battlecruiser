@@ -96,5 +96,5 @@ test("final cash label follows the actual handover phase, not a generic pending 
   assert.match(block,/sessionState==='EN_CURSO'/);
   assert.match(block,/approvalState==='PENDIENTE'\|\|approvalState==='ESPERANDO_APROBACION'/);
   assert.match(block,/\?'Esperando aprobación'/);
-  assert.match(block,/:'Esperando entrega'/);
+  assert.match(block,/sessionState==='EN_CURSO'\?'Esperando entrega'/);
 });
