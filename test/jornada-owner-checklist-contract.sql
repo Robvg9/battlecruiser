@@ -130,6 +130,18 @@ BEGIN
     reinversion_id,producto_id,cantidad_presentacion,cantidad_base,costo_total,costo_unitario
   ) VALUES(v_reinversion,v_pru,120,120,7200,60);
 
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_result:=public.resolver_aprobacion_operativa(
+    'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
+  );
+  SELECT cantidad,minimo INTO v_cantidad,v_minimo
+  FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pru;
+  IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
+     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
+    RAISE EXCEPTION 'FAIL: approved reinvestment did not increase stock and preserve its minimum: % / % / %',v_result,v_cantidad,v_minimo;
+  END IF;
+
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'FINAL',
@@ -168,15 +180,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the Owner cash count did not approve before session closure: %',v_result;
   END IF;
 
-  v_result:=public.resolver_aprobacion_operativa(
-    'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
-  );
-  SELECT cantidad,minimo INTO v_cantidad,v_minimo
-  FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pru;
-  IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
-     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
-    RAISE EXCEPTION 'FAIL: approved reinvestment did not increase stock and preserve its minimum: % / % / %',v_result,v_cantidad,v_minimo;
-  END IF;
 
   v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
   IF coalesce((v_result->>'lista_para_calcular')::boolean,false) IS NOT TRUE
