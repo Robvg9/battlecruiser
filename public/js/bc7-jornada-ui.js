@@ -1209,7 +1209,7 @@
       const availableAdjustmentProducts=products.filter(p=>Number(p.stock_actual)>0);
       const adjustmentOptions='<option value="">Busca cualquier producto activo del almacén</option>'+products.map(p=>{
         const stock=Number(p.stock_actual||0),minimum=Number(p.minimo||0),hasStock=stock>0;
-        return '<option value="'+esc(p.producto_id)+'" data-stock="'+esc(stock)+'" data-minimo="'+esc(minimum)+'" '+(hasStock?'':'disabled')+'>'+esc(p.nombre)+' · '+(hasStock?'stock '+esc(qty(stock)):'AGOTADO · stock 0')+(minimum>0?' · mínimo '+esc(qty(minimum)):'')+'</option>';
+        return '<option value="'+esc(p.producto_id)+'" data-stock="'+esc(stock)+'" data-minimo="'+esc(minimum)+'">'+esc(p.nombre)+' · '+(hasStock?'stock '+esc(qty(stock)):'AGOTADO · stock 0')+(minimum>0?' · mínimo '+esc(qty(minimum)):'')+'</option>';
       }).join('');
       const adjustmentRow='<div class="bc7-grid bc7-adjustment-row" data-bc7-adjustment-row>'+
         '<label class="bc7-field">Producto<select data-bc7-ajust-product required>'+adjustmentOptions+'</select></label>'+
