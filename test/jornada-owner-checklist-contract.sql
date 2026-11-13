@@ -131,17 +131,7 @@ BEGIN
     reinversion_id,producto_id,cantidad_presentacion,cantidad_base,costo_total,costo_unitario
   ) VALUES(v_reinversion,v_pru,120,120,7200,60);
 
-  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
-  PERFORM set_config('test.bc_admin','true',false);
-  v_result:=public.resolver_aprobacion_operativa(
-    'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
-  );
-  SELECT cantidad,minimo INTO v_cantidad,v_minimo
-  FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pru;
-  IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
-     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
-    RAISE EXCEPTION 'FAIL: approved reinvestment did not increase stock and preserve its minimum: % / % / %',v_result,v_cantidad,v_minimo;
-  END IF;
+  -- Keep the reinvestment pending through handover. The Owner will approve it afterward.
 
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
@@ -171,33 +161,67 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the four employee confirmations did not unlock the Owner cash-count phase: %',v_result;
   END IF;
 
-  -- Cash count and approval now happen while the work session remains EN_CURSO.
-  v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico correcto');
-  IF v_result->>'estado'<>'APROBADA'
-     OR (v_result->>'monto_contado')::numeric<>2800
-     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'EN_CURSO' THEN
-    RAISE EXCEPTION 'FAIL: the Owner cash count did not approve before session closure: %',v_result;
+  -- The four employee checks enable handover, not cash count while the employee session is active.
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo antes del traspaso debe ser rechazado');
+  EXCEPTION WHEN check_violation THEN
+    v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: the Owner was allowed to count cash before Sheila handed over the Jornada';
   END IF;
 
+  v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
+  IF v_result->>'fase'<>'LISTA_PARA_ENTREGA' THEN
+    RAISE EXCEPTION 'FAIL: completed employee checks did not expose the handover phase: %',v_result;
+  END IF;
+
+  -- Sheila hands over before the Owner counts cash or resolves pending approvals.
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
+  PERFORM public.bc5_cerrar_jornada(v_sesion,'Entrega controlada al Dueño en fixture');
+  IF (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA'
+     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turno)<>'EN_CURSO'
+     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'PENDIENTE' THEN
+    RAISE EXCEPTION 'FAIL: handover must complete only the employee session, preserve the open master Turn and leave Owner approvals pending';
+  END IF;
+
+  -- The Owner can count only after handover; the session remains completed.
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico posterior al traspaso');
+  IF v_result->>'estado'<>'APROBADA'
+     OR (v_result->>'monto_contado')::numeric<>2800
+     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA' THEN
+    RAISE EXCEPTION 'FAIL: the Owner cash count did not approve after handover: %',v_result;
+  END IF;
+
+  v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
+  IF coalesce((v_result->>'lista_para_calcular')::boolean,false) IS TRUE THEN
+    RAISE EXCEPTION 'FAIL: automatic calculation unlocked while the reinvestment approval was still pending: %',v_result;
+  END IF;
+
+  -- The Owner resolves the pending reinvestment only after accepting the handover.
+  v_result:=public.resolver_aprobacion_operativa(
+    'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
+  );
+  SELECT cantidad,minimo INTO v_cantidad,v_minimo
+  FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pru;
+  IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
+     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
+    RAISE EXCEPTION 'FAIL: post-handover reinvestment approval did not increase stock and preserve minimum=20: % / % / %',v_result,v_cantidad,v_minimo;
+  END IF;
 
   v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
   IF coalesce((v_result->>'lista_para_calcular')::boolean,false) IS NOT TRUE
      OR v_result->>'fase'<>'CALCULAR' THEN
-    RAISE EXCEPTION 'FAIL: the automatic calculation phase did not unlock after cash approval. State: %; liquidation: %',v_result,public.bc7_liquidacion_inventario_jornada(v_sesion);
+    RAISE EXCEPTION 'FAIL: automatic calculation did not unlock after the Owner cash count and pending approval: %; liquidation: %',v_result,public.bc7_liquidacion_inventario_jornada(v_sesion);
   END IF;
   v_result:=public.bc7_liquidacion_inventario_jornada(v_sesion);
   IF coalesce((v_result->>'calculable')::boolean,false) IS NOT TRUE
      OR (v_result->>'ventas_estimadas')::numeric<>10000 THEN
     RAISE EXCEPTION 'FAIL: automatic inventory/sales/cash calculation is not reproducible: %',v_result;
-  END IF;
-
-  -- The session is handed over, but the master Turn remains open for the Owner's final review.
-  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
-  PERFORM set_config('test.bc_admin','false',false);
-  PERFORM public.bc5_cerrar_jornada(v_sesion,'Entrega controlada al Dueño en fixture');
-  IF (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turno)<>'EN_CURSO' THEN
-    RAISE EXCEPTION 'FAIL: session handover must not close the master Turn before Owner approval';
   END IF;
 
   RAISE NOTICE 'PASS Jornada owner checklist: four employee checks, pre-close Owner cash approval, automatic calculation, open master Turn and reinvestment preserving minimum=20';
