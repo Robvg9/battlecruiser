@@ -143,7 +143,7 @@ test('movement operations load multi-product transfer before the compact modal',
 
 // PWA 9.5.88 uses warehouse-specific movement summary windows and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.102["']/);
+  assert.match(app, /const VERSION=["']9\\.5\\.103["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.102["']/);
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
@@ -281,16 +281,16 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.13"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.13/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.102["']/);
+  assert.match(app, /const VERSION=["']9\\.5\\.103["']/);
   assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.102["']/);
 });
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
   assert.ok(index.includes('style.css?v=9.5.100'));
-  assert.ok(index.includes('app.js?v=9.5.102'));
+  assert.ok(index.includes('app.js?v=9.5.103'));
   assert.ok(sw.includes('./style.css?v=9.5.100'));
-  assert.ok(sw.includes('./app.js?v=9.5.102'));
+  assert.ok(sw.includes('./app.js?v=9.5.103'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
