@@ -59,7 +59,10 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/p_motivo_general:reason/,"the list shares one administrative reason");
   assert.match(ui,/friendlyError\(e,'adjustment'\)/,"stock errors are reported as inventory errors, not schedule-creation errors");
   assert.match(ui,/data-stock=/,"each candidate product carries its current available stock into validation");
-  assert.match(ui,/products\.filter\(p=>Number\(p\.stock_actual\)>0\)/,"products without stock are excluded from the Baja/Merma picker");
+  assert.match(ui,/detail\.productos_ajuste/,"the adjustment picker loads every active catalog product for the current warehouse");
+  assert.match(ui,/AGOTADO · stock 0/,"out-of-stock products remain visible but disabled in the picker");
+  assert.match(ui,/availableAdjustmentProducts=products\.filter\(p=>Number\(p\.stock_actual\)>0\)/,"only positive-stock products enable Baja/Merma submission");
+  assert.match(ui,/bc7_productos_ajuste_jornada/,"the full catalog is loaded from a warehouse-scoped server RPC");
   assert.match(ui,/new Set\(lines\.map\(line=>line\.producto_id\)\)/,"duplicate products in one list are blocked before submission");
   assert.match(ui,/data-bc7-reinvestment-unit-cost/,"reinvestment captures the unit cost");
   assert.match(ui,/Math\.round\(quantity\*unitCost\*100\)\/100/,"reinvestment total is derived from quantity multiplied by unit cost");
@@ -128,11 +131,11 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.24");
+  assert.equal(moduleVersion,"7.25");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
-  assert.ok(app.includes('["aprobaciones-admin.js","20261113.1"]'));
-  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.1"));
-  assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261113.1"));
+  assert.ok(app.includes('["aprobaciones-admin.js","20261113.2"]'));
+  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.2"));
+  assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261113.2"));
 });
 
 
@@ -143,6 +146,21 @@ test("Dependienta can open her active jornada without searching a future-only ca
   assert.match(ui,/data-bc7-current-finance/);
   assert.match(ui,/addDays\(today,-7\)/);
   assert.match(ui,/state\.currentSession\?\.turno_sesion_id/);
+});
+
+
+test("Jornada employee checklist and owner cash count precede session closure",()=>{
+  for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc5_contar_dinero_entregado"]) {
+    assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
+  }
+  assert.match(ui,/Checklist de Sheila/);
+  assert.match(ui,/¿Ya pusiste todos los gastos\?/);
+  assert.match(ui,/¿Ya pusiste todas las reinversiones\?/);
+  assert.match(ui,/¿Ya pusiste todas las bajas\?/);
+  assert.match(ui,/Las entradas\/transferencias las registra el Dueño/);
+  assert.match(ui,/lista_para_calcular/);
+  assert.match(ui,/Cálculos automáticos completados/);
+  assert.match(ui,/el Turno todavía no está cerrado/);
 });
 
 test("Cash declaration can be saved before the final inventory unlocks jornada closure",()=>{
