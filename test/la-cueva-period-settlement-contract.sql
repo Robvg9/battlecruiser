@@ -322,9 +322,9 @@ BEGIN
   PERFORM public.resolver_aprobacion_operativa('entrega_diaria',v_daily_id,'APROBAR','Conteo correcto',20,NULL);
   -- The fixture's original approvals are explicitly placed inside the final
   -- cut window; the next block moves only the Baja review time past the cut.
-  UPDATE public.reinversiones SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_reinvestment_id;
-  UPDATE public.mermas SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_merma_id;
-  UPDATE public.bajas SET fecha_revision=v_mid,actualizado_en=v_mid WHERE id=v_baja_id;
+  UPDATE public.reinversiones SET fecha_revision=v_mid WHERE id=v_reinvestment_id;
+  UPDATE public.mermas SET fecha_revision=v_mid WHERE id=v_merma_id;
+  UPDATE public.bajas SET fecha_revision=v_mid WHERE id=v_baja_id;
 
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>101
      OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99 THEN
@@ -364,7 +364,7 @@ BEGIN
   -- A Baja approved after the immutable final cut is not silently omitted or
   -- guessed into the period. It blocks settlement until ADMIN records its
   -- verified physical occurrence time and reason.
-  UPDATE public.bajas SET fecha_revision=now(),actualizado_en=now() WHERE id=v_baja_id;
+  UPDATE public.bajas SET fecha_revision=now() WHERE id=v_baja_id;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM false
