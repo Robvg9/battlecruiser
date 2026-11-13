@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.23 — paneles de Operación a ancho completo y conteos móviles legibles.
+// v7.24 — reinversión por costo unitario, bajas agrupadas y movimientos contenidos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -114,7 +114,9 @@
     const value=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const code=String(error&&error.code||'').toUpperCase();
     let message='';
-    if(/retroactiv|fecha.*(pasad|anterior)|no se admiten jornadas retroactivas|no se admiten programaciones retroactivas/.test(value)) message='La fecha de inicio ya pasó. Elige hoy o una fecha futura.';
+    if(context==='adjustment'&&/stock insuficiente/.test(value)) message='La cantidad solicitada supera las existencias disponibles de uno o más productos. Revisa el stock y ajusta la lista; no se registró ninguna baja.';
+    else if(context==='adjustment'&&/idempotencia|clave.*(otra lista|otro ajuste)/.test(value)) message='Esta referencia ya corresponde a otra solicitud. Actualiza la Jornada antes de volver a enviar la lista.';
+    else if(/retroactiv|fecha.*(pasad|anterior)|no se admiten jornadas retroactivas|no se admiten programaciones retroactivas/.test(value)) message='La fecha de inicio ya pasó. Elige hoy o una fecha futura.';
     else if(/no hay patron activo|no existe patron activo|patron activo/.test(value)) message='Todavía no hay una rotación guardada para este almacén. Guarda una rotación o elige «Elegir responsables día por día».';
     else if(/ya existe programacion|programacion para el almacen|programacion.*fecha|fecha.*ya existe/.test(value)) message='Ya hay una jornada programada para una o más de esas fechas en este almacén. Revisa el calendario y elige fechas libres.';
     else if(/asignacion legacy|otra jornada programada|otro turno pendiente|ya tiene otra jornada/.test(value)) message='La persona elegida ya tiene otro turno pendiente en esa fecha. Elige otra persona o revisa ese turno.';
@@ -500,8 +502,9 @@
         '<input type="hidden" data-bc7-op-key value="">'+
         '<label class="bc7-field">Producto<select data-bc7-reinvestment-product required>'+options+'</select></label>'+
         '<div class="bc7-grid"><label class="bc7-field">Cantidad que entra al inventario<input data-bc7-reinvestment-quantity type="number" min="0.001" step="0.001" required inputmode="decimal"></label>'+
-        '<label class="bc7-field">Costo total<input data-bc7-reinvestment-cost type="number" min="0.01" step="0.01" required inputmode="decimal"></label></div>'+
-        '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
+        '<label class="bc7-field">Costo unitario (CUP)<input data-bc7-reinvestment-unit-cost type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="Ej. 60.00"></label></div>'+
+        '<p class="bc7-muted" data-bc7-reinvestment-estimate>Total calculado: introduce la cantidad y el costo unitario.</p>'+
+        '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">El sistema multiplica cantidad × costo unitario y envía el costo total calculado. La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
         '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
     }
     return html+'</section>';
@@ -927,12 +930,14 @@
       }else if(type==='reinversion'){
         const product=form.querySelector('[data-bc7-reinvestment-product]').value;
         const quantity=Number(form.querySelector('[data-bc7-reinvestment-quantity]').value);
-        const cost=Number(form.querySelector('[data-bc7-reinvestment-cost]').value);
+        const unitCost=Number(form.querySelector('[data-bc7-reinvestment-unit-cost]').value);
+        const totalCost=Math.round(quantity*unitCost*100)/100;
         const supplier=form.querySelector('[data-bc7-reinvestment-provider]').value.trim();
-        if(!product||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(cost)||cost<=0)throw new Error('Selecciona producto, cantidad positiva y costo total válido.');
+        if(!product||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitCost)||unitCost<=0||!Number.isFinite(totalCost)||totalCost<=0)throw new Error('Selecciona producto, cantidad positiva y costo unitario válido.');
+        updateReinvestmentEstimate(form);
         createdId=await rpc('bc7_registrar_reinversion_jornada',{
           p_turno_sesion_id:sessionId,
-          p_lineas:[{producto_id:product,presentacion_id:null,cantidad_presentacion:null,cantidad_base:quantity,costo_total:cost}],
+          p_lineas:[{producto_id:product,presentacion_id:null,cantidad_presentacion:null,cantidad_base:quantity,costo_total:totalCost}],
           p_idempotency_key:key,p_proveedor:supplier||null
         });
       }else{
