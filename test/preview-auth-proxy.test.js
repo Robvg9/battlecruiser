@@ -24,8 +24,8 @@ function assetsBinding() {
 
 
 test("preview Worker explicitly disables placement and leaves production Worker configuration untouched", () => {
-  assert.match(previewWranglerConfig, /^\\[placement\\]\\s*mode = "off"/m);
-  assert.doesNotMatch(productionWranglerConfig, /^\\[placement\\]/m);
+  assert.match(previewWranglerConfig, /^\[placement\]\s*mode = "off"/m);
+  assert.doesNotMatch(productionWranglerConfig, /^\[placement\]/m);
 });
 
 test("preview admin password recovery POST uses its own allowlisted Edge Function route", async (t) => {
