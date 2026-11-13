@@ -64,3 +64,13 @@ test("Expense and reinvestment approvals are concise and actionable directly fro
   assert.ok(ADMIN.includes("resolverOperativaDirecta(x,'RECHAZAR')"));
   assert.ok(ADMIN.includes("p_tipo:item.tipo,p_id:item.id,p_decision:decision"));
 });
+
+
+test("cash declaration states distinguish waiting for employee handover from waiting for owner approval",()=>{
+  const start=JOURNEY.indexOf("function humanStatus(value){");
+  const end=JOURNEY.indexOf("function friendlyTimezone",start);
+  assert.ok(start>=0&&end>start);
+  const block=JOURNEY.slice(start,end);
+  assert.match(block,/ESPERANDO_ENTREGA:'Esperando entrega'/);
+  assert.match(block,/ESPERANDO_APROBACION:'Esperando aprobación'/);
+});
