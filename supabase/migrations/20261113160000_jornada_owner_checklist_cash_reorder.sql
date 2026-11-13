@@ -87,6 +87,7 @@ SET search_path TO 'public','pg_temp'
 AS $function$
 DECLARE
   v_s public.turno_sesiones;
+  v_tramo public.turno_tramos;
   v_tipo text:=lower(coalesce(p_bloque,''));
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -95,7 +96,7 @@ BEGIN
   IF v_tipo NOT IN ('gastos','reinversiones','bajas') OR p_completado IS NULL THEN
     RAISE EXCEPTION 'El bloque de checklist no es válido.' USING ERRCODE='22023';
   END IF;
-  v_s:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);
+  v_tramo:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);
   SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
   IF NOT EXISTS (
     SELECT 1 FROM public.almacenes a
