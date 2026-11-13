@@ -143,7 +143,7 @@
   }
   function humanStatus(value){
     const key=String(value||'').toUpperCase();
-    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada'};
+    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada',ESPERANDO_ENTREGA:'Esperando entrega',ESPERANDO_APROBACION:'Esperando aprobación'};
     return labels[key]||'En revisión';
   }
   function friendlyTimezone(value){
@@ -645,8 +645,15 @@
       })){
         msg(message,'Todos los importes diarios ya están guardados y confirmados.','ok');return true;
       }
-      if(options.requireComplete&&finalSaved)return true;
-      msg(message,'Introduce al menos un importe pendiente para guardar.','error');return false;
+      // A normal Save click is allowed to be a true no-op: previously saved
+      // days and an existing final declaration must never produce a false error.
+      // This does not claim missing amounts are complete; closeSession still
+      // enforces requireComplete and reports any missing dates above.
+      if(!options.requireComplete){
+        msg(message,'No hay importes nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');
+        return true;
+      }
+      msg(message,'No hay importes nuevos para guardar. No se modificó ningún dato.','error');return false;
     }
     if(!navigator.onLine){
       msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;
