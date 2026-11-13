@@ -9,7 +9,7 @@ BEGIN
   IF position('monto_contado IS NULL' IN v_definition) = 0 THEN
     RAISE EXCEPTION 'Only declarations without a physical count may appear in this queue';
   END IF;
-  IF position('s.estado=''COMPLETADA''' IN v_definition) > 0 THEN
+  IF position('AND s.estado=''COMPLETADA''' IN v_definition) > 0 THEN
     RAISE EXCEPTION 'Pending cash visibility must not be hidden until the session is COMPLETADA';
   END IF;
   IF position('tiene_permiso' IN v_definition) = 0 THEN
