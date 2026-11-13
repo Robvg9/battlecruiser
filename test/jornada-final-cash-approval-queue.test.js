@@ -22,19 +22,18 @@ test("Centro de Control includes pending final-cash declarations for JORNADA ses
   assert.ok(QUEUE.includes("s.estado::text"));
 });
 
-test("Final cash approval unlocks after the four employee checks, before session close",()=>{
+test("Final cash count is enabled only after Sheila hands over the Jornada",()=>{
   assert.ok(ADMIN.includes("x.tipo==='declaracion_jornada'"));
-  assert.ok(ADMIN.includes("['COMPLETADA','LISTA_PARA_CONTEO'].includes(String(x.motivo||'').toUpperCase())"));
-  assert.ok(ADMIN.includes("value=\"'+(isFinalCash?'':esc(x.monto))"));
+  assert.ok(ADMIN.includes("const finalCashReady=String(x.motivo||'').toUpperCase()==='COMPLETADA'"));
   assert.ok(ADMIN.includes("acceptButton.disabled=isFinalCash&&!finalCashReady"));
   assert.ok(ADMIN.includes("rejectButton.hidden=isFinalCash"));
-  assert.ok(ADMIN.includes("Esperando los cuatro checks"));
-  assert.ok(ADMIN.includes("El conteo se habilitará cuando Sheila confirme gastos, reinversiones, bajas e inventario final"));
+  assert.ok(ADMIN.includes("La sesión debe estar completada"));
   assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
   assert.ok(ADMIN.includes("p_declaracion_id:id,p_monto_contado:real"));
-  assert.ok(PHASE.includes("IF v_s.estado='EN_CURSO'"),"cash count is allowed while the work session remains open");
-  assert.ok(PHASE.includes("lista_para_conteo"),"the server blocks count until the employee checklist is complete");
-  assert.ok(PHASE.includes("'LISTA_PARA_CONTEO'"),"the admin queue exposes a ready-to-count state before session closure");
+  assert.ok(PHASE.includes("IF v_s.estado<>'COMPLETADA' THEN"),"the server rejects cash count before session handover");
+  assert.ok(PHASE.includes("lista_para_conteo"),"the server still requires all four employee checks");
+  assert.ok(PHASE.includes("AND s.estado='COMPLETADA'"),"the Owner inbox exposes final cash only after handover");
+  assert.ok(!PHASE.includes("'LISTA_PARA_CONTEO'"),"an active session cannot advertise cash as ready to count");
 });
 
 test("Journey movement archive includes exact-session finance and cash records",()=>{
