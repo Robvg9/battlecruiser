@@ -150,7 +150,7 @@ test("Dependienta can open her active jornada without searching a future-only ca
 });
 
 
-test("Jornada employee checklist and owner cash count precede session closure",()=>{
+test("Jornada handover precedes Owner cash count and automatic calculation",()=>{
   for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc5_contar_dinero_entregado"]) {
     assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
   }
@@ -159,7 +159,11 @@ test("Jornada employee checklist and owner cash count precede session closure",(
   assert.match(ui,/¿Ya pusiste todas las reinversiones\?/);
   assert.match(ui,/¿Ya pusiste todas las bajas\?/);
   assert.match(ui,/Las entradas\/transferencias las registra el Dueño/);
+  assert.match(ui,/lista_para_conteo/);
   assert.match(ui,/lista_para_calcular/);
+  assert.doesNotMatch(ui,/detail\.checklist\?\.lista_para_calcular!==true/);
+  assert.match(ui,/LISTA_PARA_ENTREGA/);
+  assert.match(ui,/Jornada entregada al Dueño/);
   assert.match(ui,/Cálculos automáticos completados/);
   assert.match(ui,/[Ee]l Turno todavía no está cerrado/);
 });
