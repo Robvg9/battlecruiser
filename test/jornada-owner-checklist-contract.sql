@@ -23,6 +23,7 @@ DECLARE
   v_sesion uuid:=gen_random_uuid();
   v_prog uuid:=gen_random_uuid();
   v_owner uuid:='20000000-0000-0000-0000-000000000001';
+  v_worker uuid:=gen_random_uuid();
   v_almacen uuid:='10000000-0000-0000-0000-000000000004';
   v_pan uuid:='31000000-0000-0000-0000-000000000003';
   v_jugo uuid:='31000000-0000-0000-0000-000000000004';
@@ -40,9 +41,9 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,mermas:crear,bajas:crear,reinversiones:editar_any',false);
 
-  INSERT INTO auth.users(id) VALUES(v_owner) ON CONFLICT(id) DO NOTHING;
+  INSERT INTO auth.users(id) VALUES(v_worker) ON CONFLICT(id) DO NOTHING;
   INSERT INTO public.usuarios(id,activo,role_id,nombre)
-  VALUES(v_owner,true,'30000000-0000-0000-0000-000000000001','Dueño checklist fixture')
+  VALUES(v_worker,true,'30000000-0000-0000-0000-000000000002','Dependienta checklist fixture')
   ON CONFLICT(id) DO UPDATE SET activo=true,role_id=EXCLUDED.role_id,nombre=EXCLUDED.nombre;
 
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
@@ -68,7 +69,7 @@ BEGIN
     hora_inicio_prevista,hora_fin_prevista,zona_horaria,patron_id,estado,
     creado_por,actualizado_por,salario_porcentaje
   ) VALUES(
-    v_prog,v_turno,v_almacen,1,v_date,true,v_owner,
+    v_prog,v_turno,v_almacen,1,v_date,true,v_worker,
     '07:00','23:00','America/Havana',NULL,'PROGRAMADA',
     v_owner,v_owner,0
   );
@@ -76,8 +77,10 @@ BEGIN
   INSERT INTO public.turno_sesiones(id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id)
   VALUES(v_sesion,v_turno,v_almacen,1,'JORNADA',v_date,'PROGRAMADA',v_prog);
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
-  VALUES(v_sesion,v_turno,v_owner,v_owner);
+  VALUES(v_sesion,v_turno,v_worker,v_owner);
 
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'INICIAL',
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',9),
@@ -94,10 +97,12 @@ BEGIN
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: the fixture session has no active tranche'; END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
-  VALUES(v_turno,v_sesion,v_tramo,v_owner,2800)
+  VALUES(v_turno,v_sesion,v_tramo,v_worker,2800)
   RETURNING id INTO v_declaracion;
 
   -- The Owner cannot count cash before the employee has completed all four checks.
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
   v_error:=false;
   BEGIN
     PERFORM public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo anticipado debe ser rechazado');
@@ -122,6 +127,8 @@ BEGIN
     reinversion_id,producto_id,cantidad_presentacion,cantidad_base,costo_total,costo_unitario
   ) VALUES(v_reinversion,v_pru,120,120,7200,60);
 
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'FINAL',
     jsonb_build_array(
       jsonb_build_object('producto_id',v_pan,'cantidad',8),
@@ -136,6 +143,8 @@ BEGIN
   PERFORM public.bc7_confirmar_bloque_jornada(v_sesion,'reinversiones',true);
   PERFORM public.bc7_confirmar_bloque_jornada(v_sesion,'bajas',true);
 
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
   v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
   IF coalesce((v_result->>'lista_para_conteo')::boolean,false) IS NOT TRUE
      OR coalesce((v_result->'gastos'->>'completado')::boolean,false) IS NOT TRUE
@@ -176,6 +185,8 @@ BEGIN
   END IF;
 
   -- The session is handed over, but the master Turn remains open for the Owner's final review.
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
   PERFORM public.bc5_cerrar_jornada(v_sesion,'Entrega controlada al Dueño en fixture');
   IF (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA'
      OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turno)<>'EN_CURSO' THEN
