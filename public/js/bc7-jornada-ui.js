@@ -1123,6 +1123,7 @@
       return '<div class="bc7-checklist-row '+(done?'is-done':'is-pending')+'">'+
         '<span class="bc7-checklist-mark">'+(done?'✓':String(index+1))+'</span>'+
         '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+(done?'Confirmado · no tienes que registrar más en este bloque':item.question)+'</small></div>'+
+        '<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>'+
         '<button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+item.key+'" data-completed="'+(done?'true':'false')+'" '+(!isAssigned?'disabled':'')+'>'+(done?'Reabrir':'Sí, ya terminé')+'</button>'+
       '</div>';
     }).join('');
@@ -1130,6 +1131,7 @@
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
       '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':'¿Ya pusiste el inventario final?')+'</small></div>'+
+      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button>'+
       '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
     '</div>';
     return '<section class="bc7-checklist" aria-label="Checklist de cierre de la dependienta">'+
@@ -1552,6 +1554,21 @@
     }
     finally{busy(btn,false);}
   }
+  function openChecklistSection(key){
+    const tab=key==='inventario_final'?'inventario':'operacion';
+    activateWorkspaceTab(tab);
+    const findTarget=()=>{
+      let target=null;
+      if(key==='gastos')target=document.querySelector('[data-bc7-finance-form="gasto"]')?.closest('details');
+      else if(key==='reinversiones')target=document.querySelector('[data-bc7-finance-form="reinversion"]')?.closest('details');
+      else if(key==='bajas')target=document.querySelector('[data-bc7-adjust-form]')?.closest('details');
+      else if(key==='inventario_final')target=Array.from(document.querySelectorAll('#bc7-workspace-body details')).find(node=>/2\s*[·.]\s*Inventario final/i.test(node.querySelector('summary')?.textContent||''));
+      if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'center'});}
+      else if(key==='gastos'||key==='reinversiones')document.getElementById(key==='gastos'?'bc7-expenses-list':'bc7-reinvestments-list')?.scrollIntoView({behavior:'smooth',block:'center'});
+    };
+    if(key==='gastos'||key==='reinversiones')loadFinances(state.detail).finally(findTarget);
+    else findTarget();
+  }
   async function toggleChecklistBlock(button){
     const sessionId=state.selected;
     const block=button?.dataset?.bc7ChecklistToggle;
@@ -1602,10 +1619,23 @@
     const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
     if(!rows.length||rows.length>=100){msg(form.querySelector('[data-bc7-ajust-msg]'),'La lista debe contener entre 1 y 100 productos.','error');return;}
     const clone=rows[0].cloneNode(true);
-    const select=clone.querySelector('[data-bc7-ajust-product]');if(select)select.value='';
+    const select=clone.querySelector('[data-bc7-ajust-product]');
+    if(select){
+      select.value='';
+      // cloneNode copies the enhanced select's "already attached" marker and
+      // its inert trigger button, but not the original button's event handler.
+      // Restore the native select before attaching a fresh searchable picker.
+      const pickerField=select.closest('.bc-product-picker-field');
+      if(pickerField)pickerField.replaceWith(select);
+      ['bcSelectPicker','bcProductPicker','bcPickerKind','bcPickerNoun'].forEach(key=>delete select.dataset[key]);
+      select.classList.remove('bc-product-picker-native-select');
+      select.removeAttribute('aria-hidden');
+      select.removeAttribute('tabindex');
+    }
     const quantity=clone.querySelector('[data-bc7-ajust-qty]');if(quantity){quantity.value='';quantity.removeAttribute('max');quantity.setCustomValidity('');}
     const remove=clone.querySelector('[data-bc7-adjustment-remove]');if(remove)remove.hidden=false;
     form.querySelector('[data-bc7-adjustment-rows]').appendChild(clone);
+    if(select&&typeof window.__BC_PRODUCT_PICKER_REFRESH__==='function')window.__BC_PRODUCT_PICKER_REFRESH__(select);
     syncAdjustmentRows(form);
   }
   function removeAdjustmentRow(button){
@@ -1824,6 +1854,8 @@
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
   document.addEventListener('click',function(e){
+    const checklistOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-open]'):null;
+    if(checklistOpen){e.preventDefault();openChecklistSection(checklistOpen.getAttribute('data-bc7-checklist-open'));return;}
     const checklistToggle=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-toggle]'):null;
     if(checklistToggle){e.preventDefault();toggleChecklistBlock(checklistToggle);return;}
     const checklistInventory=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-inventory]'):null;
