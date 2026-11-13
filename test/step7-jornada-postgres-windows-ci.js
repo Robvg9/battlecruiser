@@ -333,6 +333,8 @@ function applySql(file) {
     applySql("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
     applySql("supabase/migrations/20261113180000_admin_show_pending_jornada_cash_declarations.sql");
     applySql("supabase/migrations/20261113190000_jornada_bajas_use_operational_stock_and_handover.sql");
+    applySql("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
+    applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
     applySql("test/jornada-pending-cash-visibility-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist, pre-close physical cash count, automatic calculation, final Turn handover and reinvestment stock-minimum preservation.");
