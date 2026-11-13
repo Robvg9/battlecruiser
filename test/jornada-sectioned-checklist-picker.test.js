@@ -18,7 +18,7 @@ test("new multi-product Baja rows reinitialize the searchable picker after cloni
 test("each attendant checklist item opens its own operational section", () => {
   const ui = read("public/js/bc7-jornada-ui.js");
   for (const section of ["gastos", "reinversiones", "bajas"]) assert.ok(ui.includes("key:'"+section+"'"), "missing checklist item: " + section);
-  assert.match(ui, /data-bc7-checklist-open="'+item\.key+'">/);
+  assert.ok(ui.includes("data-bc7-checklist-open=\"'+item.key+'\">"));
   assert.match(ui, /data-bc7-checklist-open="inventario_final"/);
   assert.match(ui, /function openChecklistSection\(key\)/);
   assert.match(ui, /data-bc7-finance-form="gasto"/);
