@@ -45,6 +45,16 @@ test("Owner review shows product-level revenue, cost provenance, profit and post
   assert.match(REVIEW,/<th>Aprobado<\/th>/);
   for(const field of ["inventario_inicial","inventario_final","unidades_vendidas","importe_estimado","costo_vendido_estimado","ganancia_bruta_estimada","margen_bruto_estimado"])assert.ok(REVIEW.includes(field),field);
 });
+test("Unpriced products with zero sales do not block the Jornada settlement",()=>{
+  assert.match(MIG,/precio_unitario IS NULL AND sold_qty>0/);
+  assert.match(MIG,/v_missing_price_sold=0/);
+  assert.match(MIG,/'familias_sin_precio',v_missing_price_sold/);
+});
+test("The Owner review does not display zero profit or cost when provisional rows are hidden",()=>{
+  assert.ok(REVIEW.includes("No calculable"));
+  assert.ok(REVIEW.includes("Las ventas y ganancias provisionales están ocultas"));
+  assert.ok(REVIEW.includes("todavía no se ha completado."));
+});
 test("Salary percentage can be explicitly set after a completed session but before master approval",()=>{
   assert.match(MIG,/v_master_estado IN \('CERRADO','CANCELADO'\)/);
   assert.match(MIG,/bc7_configurar_salario_porcentaje_jornada/);
