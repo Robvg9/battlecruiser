@@ -144,3 +144,16 @@ test("Owner can count the declared final cash only after session completion with
   assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
   assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
 });
+
+
+test("saving an already-declared cash period is a successful no-op, not a false validation error",()=>{
+  const start=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const end=UI.indexOf("async function countFinalCash(form){",start);
+  assert.ok(start>=0&&end>start);
+  const block=UI.slice(start,end);
+  assert.match(block,/if\(!operations\.length\)/);
+  assert.match(block,/if\(!options\.requireComplete\)/);
+  assert.match(block,/No hay importes nuevos que guardar\. Los registros existentes se conservaron sin cambios\./);
+  assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
+  assert.match(block,/Faltan importes de estos días/);
+});
