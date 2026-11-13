@@ -212,6 +212,7 @@ BEGIN
     AND coalesce((v_liquidacion->>'calculable')::boolean,false);
   v_phase:=CASE
     WHEN NOT v_lista_conteo THEN 'OPERACION'
+    WHEN v_s.estado<>'COMPLETADA' THEN 'LISTA_PARA_ENTREGA'
     WHEN v_cash_state IS DISTINCT FROM 'APROBADA' THEN 'PENDIENTE_CONTEO_DUENO'
     WHEN v_lista_calculo THEN 'CALCULAR'
     ELSE 'REVISION_APROBACIONES'
@@ -536,13 +537,11 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'No se encontró la jornada asociada a la declaración.' USING ERRCODE='23503';
   END IF;
-  IF v_s.estado='EN_CURSO' THEN
-    IF v_d.monto_contado IS NULL
-       AND coalesce((public.bc7_estado_confirmaciones_jornada(v_s.id)->>'lista_para_conteo')::boolean,false) IS NOT TRUE THEN
-      RAISE EXCEPTION 'Antes del conteo físico, la responsable debe confirmar gastos, reinversiones, bajas e inventario final.' USING ERRCODE='23514';
-    END IF;
-  ELSIF v_s.estado<>'COMPLETADA' THEN
-    RAISE EXCEPTION 'El conteo del administrador solo está disponible en una jornada activa lista para conteo o ya completada.' USING ERRCODE='23514';
+  IF v_s.estado<>'COMPLETADA' THEN
+    RAISE EXCEPTION 'Sheila debe entregar la jornada antes de que el Dueño pueda contar el efectivo.' USING ERRCODE='23514';
+  END IF;
+  IF coalesce((public.bc7_estado_confirmaciones_jornada(v_s.id)->>'lista_para_conteo')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'El conteo físico requiere que Sheila haya completado los cuatro checks antes de entregar la jornada.' USING ERRCODE='23514';
   END IF;
 
   -- A retry with the exact same physical count is safe. A different amount cannot overwrite evidence.
@@ -768,23 +767,14 @@ BEGIN
       d.monto,
       NULL::numeric,
       d.estado_aprobacion,
-      CASE
-        WHEN s.estado='COMPLETADA' THEN 'COMPLETADA'
-        WHEN coalesce(c.gastos_completado,false)
-         AND coalesce(c.reinversiones_completado,false)
-         AND coalesce(c.bajas_completado,false)
-         AND EXISTS (
-           SELECT 1 FROM public.turno_jornada_inventario_cortes cut
-           WHERE cut.turno_sesion_id=s.id AND cut.tipo='FINAL' AND cut.estado='CONFIRMADO'
-         ) THEN 'LISTA_PARA_CONTEO'
-        ELSE s.estado::text
-      END
+      s.estado::text
     FROM public.turno_declaraciones d
     JOIN public.turno_sesiones s ON s.id=d.turno_sesion_id
     JOIN public.almacenes a ON a.id=s.almacen_id
     LEFT JOIN public.usuarios u ON u.id=d.usuario_id
     LEFT JOIN public.turno_jornada_confirmaciones c ON c.turno_sesion_id=s.id
     WHERE s.bloque='JORNADA'
+      AND s.estado='COMPLETADA'
       AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')
       AND d.monto_contado IS NULL
       AND (public.tiene_permiso('entregas_caja','editar_any')
@@ -814,7 +804,6 @@ DECLARE
   v_result public.turno_sesiones;
   v_tramo public.turno_tramos;
   v_liquidacion jsonb;
-  v_pendientes jsonb;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Usuario no autenticado.' USING ERRCODE='42501';
@@ -839,40 +828,14 @@ BEGIN
 
   IF EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_sesion.almacen_id AND a.tipo='minorista') THEN
     v_liquidacion:=public.bc7_liquidacion_inventario_jornada(v_sesion.id);
-    v_pendientes:=coalesce(v_liquidacion->'pendientes','{}'::jsonb);
     IF coalesce((v_liquidacion->>'faltan_cortes')::boolean,true) THEN
-      RAISE EXCEPTION 'No se puede cerrar: falta confirmar el inventario inicial o final.' USING ERRCODE='23514';
-    END IF;
-    IF v_liquidacion->>'salario_porcentaje' IS NULL THEN
-      RAISE EXCEPTION 'No se puede cerrar: el Dueño debe configurar el porcentaje salarial de esta jornada.' USING ERRCODE='23514';
-    END IF;
-    IF coalesce((v_liquidacion->>'familias_sin_precio')::integer,0)>0 THEN
-      RAISE EXCEPTION 'No se puede cerrar: hay productos sin precio válido en la liquidación.' USING ERRCODE='23514';
-    END IF;
-    IF coalesce((v_liquidacion->>'familias_con_vendidas_negativas')::integer,0)>0 THEN
-      RAISE EXCEPTION 'No se puede cerrar: el inventario tiene diferencias negativas que deben revisarse.' USING ERRCODE='23514';
-    END IF;
-    IF coalesce((v_pendientes->>'gastos')::integer,0)>0
-       OR coalesce((v_pendientes->>'reinversiones')::integer,0)>0
-       OR coalesce((v_pendientes->>'ajustes')::integer,0)>0
-       OR coalesce((v_pendientes->>'entregas_diarias')::integer,0)>0
-       OR coalesce((v_pendientes->>'entregas_diarias_faltantes')::integer,0)>0 THEN
-      RAISE EXCEPTION 'No se puede cerrar: faltan importes diarios o aprobaciones de gastos, reinversiones, mermas o bajas.' USING ERRCODE='23514';
+      RAISE EXCEPTION 'No se puede entregar: falta confirmar el inventario inicial o final.' USING ERRCODE='23514';
     END IF;
     IF coalesce((public.bc7_estado_confirmaciones_jornada(v_sesion.id)->>'lista_para_conteo')::boolean,false) IS NOT TRUE THEN
       RAISE EXCEPTION 'No se puede entregar la jornada: Sheila debe completar gastos, reinversiones, bajas e inventario final.' USING ERRCODE='23514';
     END IF;
-    IF NOT EXISTS (
-      SELECT 1 FROM public.turno_declaraciones d
-      WHERE d.turno_sesion_id=v_sesion.id
-        AND d.monto_contado IS NOT NULL
-        AND d.estado_aprobacion='APROBADA'
-    ) THEN
-      RAISE EXCEPTION 'No se puede entregar la jornada: el Dueño todavía no ha contado y aprobado el efectivo final.' USING ERRCODE='23514';
-    END IF;
-    IF coalesce((v_liquidacion->>'calculable')::boolean,false) IS NOT TRUE THEN
-      RAISE EXCEPTION 'No se puede entregar la jornada: la liquidación aún no está calculable; revisa aprobaciones, efectivo, precios y porcentaje salarial.' USING ERRCODE='23514';
-    END IF;
+    -- Cash count, outstanding approvals and settlement calculation belong to the Owner phase,
+    -- after this session handover. The master Turn remains open for final review.
   END IF;
 
   v_fecha_fin:=coalesce(v_programacion.fecha_fin,v_programacion.fecha);
