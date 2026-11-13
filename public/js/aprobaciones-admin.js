@@ -16,7 +16,25 @@ async function load(){if(!canAdmin()||!(await hasLiveSession()))return;const el=
 function renderEntrega(x){const estado=x.estado==='DECLARADA'?'DECLARADA — falta contar':'CONTADA — falta aprobar';const dif=x.diferencia==null?'':' · Diferencia $'+money(x.diferencia);return row('💵 Entrega de caja',(x.declarado_nombre||'Usuario')+' · '+(x.almacen_nombre||'Almacén')+' · '+estado+' · Declarado $'+money(x.monto_declarado)+dif,x.estado==='DECLARADA'?[{text:'Contar dinero',fn:()=>contarEntrega(x.id)}]:[{text:'Aprobar',fn:()=>revisarEntrega(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarEntrega(x.id,'rechazar')}])}
 function renderCuadre(x){const dif=Number(x.diferencia||0),s=dif<0?'Faltante $'+money(Math.abs(dif)):dif>0?'Sobrante $'+money(dif):'Exacto';return row('🧾 Cuadre pendiente','Esperado $'+money(x.dinero_esperado)+' · Declarado $'+money(x.dinero_declarado)+' · '+s,[{text:'Aprobar',fn:()=>revisarCuadre(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarCuadre(x.id,'rechazar')}])}
 function renderOperativa(x){
-  let detail=x.usuario_nombre||'Usuario';
+  const user=x.usuario_nombre||'La responsable';
+  if(x.tipo==='gasto'){
+    const concept=x.resumen||'gasto';
+    return row('💸 Gasto · '+concept,
+      user+' ha registrado un gasto: '+concept+' · '+money(x.monto)+' CUP',
+      [
+        {text:'Aprobar',fn:()=>resolverOperativaDirecta(x,'APROBAR')},
+        {text:'Rechazar',fn:()=>resolverOperativaDirecta(x,'RECHAZAR')}
+      ]);
+  }
+  if(x.tipo==='reinversion'){
+    return row('🛒 Reinversión · '+(x.producto_nombre||'inventario'),
+      user+' ha registrado una reinversión: '+(x.resumen||x.producto_nombre||'productos')+' = '+money(x.monto)+' CUP en total',
+      [
+        {text:'Aprobar',fn:()=>resolverOperativaDirecta(x,'APROBAR')},
+        {text:'Rechazar',fn:()=>resolverOperativaDirecta(x,'RECHAZAR')}
+      ]);
+  }
+  let detail=user;
   if(x.almacen_nombre)detail+=' · '+x.almacen_nombre;
   if(x.tipo==='baja_lista'){
     detail+=' · '+(x.producto_nombre||'Lista de bajas');
@@ -28,13 +46,29 @@ function renderOperativa(x){
     if(x.cantidad!=null)detail+=' · Cant. '+x.cantidad;
     if(x.motivo||x.resumen)detail+=' · '+(x.motivo||x.resumen);
   }
-  const title=x.tipo==='gasto'?'💸 Gasto pendiente'
-    :x.tipo==='reinversion'?'🛒 Reinversión pendiente'
-    :x.tipo==='entrega_diaria'?'💵 Entrega diaria de efectivo pendiente'
-    :x.tipo==='declaracion_jornada'?'💵 Declaración final de efectivo · falta conteo físico'
+  const title=x.tipo==='entrega_diaria'?'💵 Entrega diaria de efectivo pendiente'
+    :x.tipo==='declaracion_jornada'?'💵 Declaración final de efectivo · conteo físico pendiente'
     :x.tipo==='merma'?'📉 Merma pendiente'
     :x.tipo==='baja_lista'?'📋 Lista de bajas pendiente':'📉 Baja pendiente';
   return row(title,detail,[{text:'Ver detalles y revisar',fn:()=>abrirRevision(x)}]);
+}
+async function resolverOperativaDirecta(item,decision){
+  if(decision==='APROBAR'&&!confirm('¿Aprobar '+(item.tipo==='gasto'?'el gasto':'la reinversión')+' por '+money(item.monto)+' CUP?'))return;
+  let comment=null;
+  if(decision==='RECHAZAR'){
+    comment=prompt('Motivo obligatorio del rechazo:');
+    if(!comment||!comment.trim())return;
+  }
+  try{
+    await rpc('resolver_aprobacion_operativa',{
+      p_tipo:item.tipo,p_id:item.id,p_decision:decision,p_comentario:comment,
+      p_cantidad_real:null,p_monto_real:null
+    });
+    await load();
+    if(typeof refrescarCentroControl==='function')await refrescarCentroControl();
+  }catch(error){
+    alert('No se pudo '+(decision==='APROBAR'?'aprobar':'rechazar')+': '+(error.message||error));
+  }
 }
 let approvalFocusReturn=null;
 function ensureApprovalModal(){
@@ -92,7 +126,7 @@ function renderApprovalDetails(x,detail){
   const isReinvestment=x.tipo==='reinversion';
   const isDailyCash=x.tipo==='entrega_diaria';
   const isFinalCash=x.tipo==='declaracion_jornada';
-  const finalCashReady=String(x.motivo||'').toUpperCase()==='COMPLETADA';
+  const finalCashReady=['COMPLETADA','LISTA_PARA_CONTEO'].includes(String(x.motivo||'').toUpperCase());
   const isMoney=isExpense||isReinvestment||isDailyCash||isFinalCash;
   const isLegacyBaja=x.tipo==='baja';
   const isStockChange=x.tipo==='merma'||isLegacyBaja;
@@ -129,7 +163,7 @@ function renderApprovalDetails(x,detail){
     const minAmount=(isDailyCash||isFinalCash)?'0':'0.01';
     const declaredFinal=isFinalCash?'<span>Declarado por la responsable: '+esc(money(x.monto))+' CUP. Jornada: '+esc(x.motivo||'sin estado')+'.</span>':'<span>'+esc(x.motivo||'Sin descripción adicional')+'</span>';
     const finalCashNote=isFinalCash
-      ?(finalCashReady?'<p class="bc-admin-approval-message">Introduce el efectivo que contaste físicamente. El importe declarado solo sirve de referencia; no lo copies si no coincide con el dinero contado.</p>':'<p class="bc-admin-approval-message">El campo está bloqueado porque la Jornada sigue en estado '+esc(x.motivo||'EN CURSO')+'. El servidor solo acepta el conteo después de completar la Jornada. Termina las aprobaciones y la liquidación, finalízala y vuelve a abrir esta ventana; entonces podrás introducir el efectivo que contaste realmente.</p>')
+      ?(finalCashReady?'<p class="bc-admin-approval-message">Las cuatro confirmaciones de Sheila están completas. Introduce el efectivo que contaste físicamente; el importe declarado es solo una referencia.</p>':'<p class="bc-admin-approval-message">El conteo se habilitará cuando Sheila confirme gastos, reinversiones, bajas e inventario final. Estado actual: '+esc(x.motivo||'EN CURSO')+'. La jornada no necesita cerrarse para contar el efectivo.</p>')
       :'';
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||(isReinvestment?'Reinversión':isDailyCash?'Entrega diaria':isFinalCash?'Declaración final':'Gasto'))+'</strong>'+
       declaredFinal+'</section>'+
@@ -150,7 +184,7 @@ function renderApprovalDetails(x,detail){
   const acceptButton=modal.querySelector('#admin-approval-accept');
   rejectButton.textContent=isList?'Rechazar lista completa':'Rechazar';
   rejectButton.hidden=isFinalCash;
-  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?(finalCashReady?'Registrar conteo físico':'Bloqueado hasta cerrar la jornada'):'Aceptar y aprobar';
+  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?(finalCashReady?'Registrar conteo físico':'Esperando los cuatro checks'):'Aceptar y aprobar';
   acceptButton.disabled=isFinalCash&&!finalCashReady;
   modal.hidden=false;
   footer.hidden=false;
@@ -217,7 +251,7 @@ async function resolverDesdeModal(decision){
       }
       if(isFinalCash){
         if(decision!=='APROBAR')throw new Error('La declaración final se resuelve con conteo físico, no con rechazo.');
-        if(String(modal.dataset.sessionState||'').toUpperCase()!=='COMPLETADA')throw new Error('Primero debe completarse la Jornada.');
+        if(!['COMPLETADA','LISTA_PARA_CONTEO'].includes(String(modal.dataset.sessionState||'').toUpperCase()))throw new Error('Sheila debe completar los cuatro checks antes del conteo físico.');
         if(!confirm('Declarado por la responsable: '+money(Number(modal.dataset.declaredAmount))+' CUP.\nConteo físico real: '+money(real)+' CUP.\n\nEl servidor aprobará solo si ambos importes coinciden. ¿Confirmas el conteo?')){accept.disabled=false;reject.disabled=false;return;}
         await rpc('bc5_contar_dinero_entregado',{
           p_declaracion_id:id,p_monto_contado:real,p_observacion:comment||null
