@@ -468,8 +468,8 @@
     const showReinvestments=state.admin||isAssigned;
     const showSales=!isRetail&&(state.admin||can('ventas','ver'));
     const showSettlement=isRetail&&(state.admin||isAssigned);
-    const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
-    const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
+    const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear')&&detail.checklist?.gastos_completados!==true;
+    const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear')&&detail.checklist?.reinversiones_completadas!==true;
     const manageSalary=isRetail&&isOwner;
     if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments&&!manageSalary)return '';
     let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
@@ -1116,6 +1116,29 @@
       host.innerHTML=renderMovementRows(arr(r),detail.sesion);
     }catch(e){host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se han modificado datos.</div>';}
   }
+  function renderJornadaChecklist(detail,isAssigned,status,finalConfirmed){
+    if(detail?.sesion?.es_minorista!==true)return '';
+    const checklist=detail.checklist||{};
+    const canMark=isAssigned&&status==='EN_CURSO';
+    const tasks=[
+      {key:'GASTOS',label:'Gastos',done:checklist.gastos_completados===true,help:'Registrar todos los gastos de la jornada.'},
+      {key:'BAJAS',label:'Bajas',done:checklist.bajas_completadas===true,help:'Registrar todas las bajas y mermas.'},
+      {key:'REINVERSIONES',label:'Reinversiones',done:checklist.reinversiones_completadas===true,help:'Registrar todas las reinversiones.'}
+    ];
+    const rows=tasks.map(task=>
+      '<article class="bc7-checklist-step"><span class="bc7-checklist-mark '+(task.done?'is-done':'is-pending')+'">'+(task.done?'✓':'○')+'</span><div class="bc7-checklist-copy"><strong>'+esc(task.label)+'</strong><small>'+(task.done?'Completado. No se admiten más registros de este tipo.':esc(task.help))+'</small></div>'+
+      (task.done?'<span class="bc7-pill ok">Completado</span>':canMark?'<button class="bc7-btn" type="button" data-bc7-checklist-complete="'+task.key+'">Ya terminé</button>':'<span class="bc7-pill">Pendiente</span>')+
+      '</article>'
+    ).join('');
+    const finalDone=finalConfirmed||checklist.inventario_final_confirmado===true;
+    const cashDone=checklist.efectivo_aprobado===true;
+    const cashState=cashDone?'Aprobado por el Dueño':checklist.puede_contar_efectivo===true?'Listo para conteo físico':'Pendiente';
+    return '<section class="bc7-card bc7-checklist" id="bc7-jornada-checklist"><h4>Checklist de la jornada</h4><p class="bc7-muted">Sheila completa los tres primeros pasos. El inventario final es el cuarto. El Dueño cuenta el efectivo como quinto paso. Las entradas al almacén las registra el Dueño.</p>'+
+      rows+
+      '<article class="bc7-checklist-step"><span class="bc7-checklist-mark '+(finalDone?'is-done':'is-pending')+'">'+(finalDone?'✓':'○')+'</span><div class="bc7-checklist-copy"><strong>Inventario final</strong><small>'+(finalDone?'Conteo físico confirmado.':'Confirma el conteo final en la pestaña Inventario.')+'</small></div><span class="bc7-pill '+(finalDone?'ok':'')+'">'+(finalDone?'Completado':'Pendiente')+'</span></article>'+
+      '<article class="bc7-checklist-step"><span class="bc7-checklist-mark '+(cashDone?'is-done':'is-pending')+'">'+(cashDone?'✓':'○')+'</span><div class="bc7-checklist-copy"><strong>Conteo y aprobación del efectivo</strong><small>'+(cashDone?'El efectivo quedó contado y aprobado.':esc(checklist.bloqueo_efectivo||'El Dueño debe contar el efectivo físico y resolver cualquier diferencia.'))+'</small></div><span class="bc7-pill '+(cashDone?'ok':'')+'">'+esc(cashState)+'</span></article>'+
+      '</section>';
+  }
   function renderWorkspace(detail){
     state.detail=detail;
     const s=detail.sesion,cuts=detail.cortes||{},initial=!!cuts.INICIAL,final=!!cuts.FINAL;
@@ -1128,10 +1151,9 @@
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
-      actionArea='<div class="bc7-note"><b>Dinero recogido y cierre de jornada.</b><p>Registra el importe de cada día en esta misma pantalla. Los días anteriores quedan como entregas diarias; el último día se guarda como declaración final. No tienes que cambiar de sección.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
+      actionArea='<div class="bc7-note"><b>Declaración del efectivo de la jornada.</b><p>Registra el efectivo recogido de cada fecha, incluido el último día. Guardarlo no cierra la jornada: primero el Dueño contará y aprobará el efectivo; el cierre se realiza después de la liquidación y la revisión final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
         cashDaysManagerShellHtml(detail,isAssigned,status)+
-        '<label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label>'+
-        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>Finalizar jornada</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
+        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes y declaración final</button></div><p class="bc7-msg" id="bc7-cash-days-msg"></p></form></div>';
     }else if(status==='EN_CURSO'){
       const saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
       actionArea='<div class="bc7-note"><b>Dinero entregado y cierre.</b><p>Registra el importe real que entregas al Dueño. Puedes guardar el dinero ahora; la jornada seguirá abierta hasta confirmar el inventario final. El administrador lo contará después del cierre.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
@@ -1140,7 +1162,7 @@
     }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
     else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     let adjustment='';
-    if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
+    if(status==='EN_CURSO'&&isAssigned&&detail.checklist?.bajas_completadas!==true&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos);
       const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
       const adjustmentStorageType=canCreateBaja?'baja':'merma';
@@ -1187,7 +1209,8 @@
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const fin=financeFormHtml(detail,isAssigned,status);
-    const op='<div class="bc7-panel-stack">'+actionArea+fin+adjustment+'</div>';
+    const checklist=renderJornadaChecklist(detail,isAssigned,status,final);
+    const op='<div class="bc7-panel-stack">'+checklist+actionArea+fin+adjustment+'</div>';
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
     $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
     $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
