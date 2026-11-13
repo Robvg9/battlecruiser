@@ -27,6 +27,7 @@ DECLARE
   v_baja_id uuid;
   v_result jsonb;
   v_count integer;
+  v_estado_solicitud text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'No hay una sesión autenticada para registrar la lista de Bajas.'
@@ -221,6 +222,9 @@ BEGIN
       END
   WHERE s.id=v_solicitud_id;
 
+  SELECT estado INTO v_estado_solicitud
+  FROM public.bajas_solicitudes WHERE id=v_solicitud_id;
+
   INSERT INTO public.turno_jornada_eventos(
     almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
   )
@@ -230,7 +234,7 @@ BEGIN
     jsonb_build_object('sesion_id',v_s.id,'tramo_id',v_t.id),
     jsonb_build_object(
       'solicitud_id',v_solicitud_id,'tipo','baja_lista',
-      'productos',v_count,'estado','PENDIENTE'
+      'productos',v_count,'estado',v_estado_solicitud
     )
   );
 
