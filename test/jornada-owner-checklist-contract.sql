@@ -91,6 +91,10 @@ BEGIN
   END IF;
 
   PERFORM public.bc5_iniciar_jornada(v_sesion,'Inicio controlado para contrato de checklist');
+  -- PostgreSQL now() is transaction-stable inside this DO/ROLLBACK fixture.
+  -- Backdate the opening marker so approvals created later in the same test
+  -- transaction remain strictly inside the Jornada inventory interval.
+  UPDATE public.turnos SET apertura_real=now()-interval '1 hour' WHERE id=v_turno;
   SELECT id INTO v_tramo FROM public.turno_tramos
   WHERE turno_sesion_id=v_sesion AND estado='ACTIVO';
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: the fixture session has no active tranche'; END IF;
