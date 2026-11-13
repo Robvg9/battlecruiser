@@ -104,12 +104,13 @@ test("closing requires every date and confirms the final day before closing the 
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
-  assert.match(block, /rpc\('bc7_liquidacion_inventario_jornada'/);
-  assert.match(block, /pending\.gastos/);
-  assert.match(block, /pending\.reinversiones/);
-  assert.match(block, /pending\.ajustes/);
-  assert.match(block, /pending\.entregas_diarias_faltantes/);
-  assert.match(block, /salario_porcentaje/);
+  assert.match(block, /rpc\('bc7_estado_confirmaciones_jornada'/);
+  assert.match(block, /lista_para_conteo/);
+  assert.match(block, /rpc\('bc5_cerrar_jornada'/);
+  assert.doesNotMatch(block, /rpc\('bc7_liquidacion_inventario_jornada'/,
+    "la liquidación no puede bloquear el traspaso; se ejecuta en la fase del Dueño");
+  assert.doesNotMatch(block, /pending\.gastos|pending\.reinversiones|pending\.ajustes|pending\.entregas_diarias_faltantes|salario_porcentaje/,
+    "las aprobaciones pendientes pertenecen a la fase posterior al traspaso");
 });
 
 
