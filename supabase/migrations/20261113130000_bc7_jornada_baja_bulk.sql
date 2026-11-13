@@ -11,7 +11,7 @@ CREATE OR REPLACE FUNCTION public.bc7_registrar_bajas_multiple_jornada(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public','pg_temp'
+SET search_path = ''
 AS $function$
 DECLARE
   v_s public.turno_sesiones;
