@@ -328,6 +328,8 @@ function applySql(file) {
     applySql("test/step4-jornada-shared-inventory-contract.sql");
     log("\\r\\n=== Enforce the final retail Jornada close gate and run full La Cueva settlement ===");
     applySql("supabase/migrations/20261112133100_jornada_close_gate_integral.sql");
+    log("\\r\\n=== Enforce La Cueva dependent checklist, owner cash count and final Turn approval ===");
+    applySql("supabase/migrations/20261113150000_bc7_jornada_owner_checklist_review.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
   } catch (error) {
