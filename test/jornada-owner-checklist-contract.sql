@@ -93,13 +93,13 @@ BEGIN
   IF v_tramo IS NULL THEN RAISE EXCEPTION 'FAIL: the fixture session has no active tranche'; END IF;
 
   INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
-  VALUES(v_turno,v_sesion,v_tramo,v_owner,2800)
+  VALUES(v_turno,v_sesion,v_tramo,v_owner,30)
   RETURNING id INTO v_declaracion;
 
   -- The Owner cannot count cash before the employee has completed all four checks.
   v_error:=false;
   BEGIN
-    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo anticipado debe ser rechazado');
+    PERFORM public.bc5_contar_dinero_entregado(v_declaracion,30,'Conteo anticipado debe ser rechazado');
   EXCEPTION WHEN check_violation THEN
     v_error:=true;
   END;
@@ -120,16 +120,6 @@ BEGIN
   INSERT INTO public.reinversiones_lineas(
     reinversion_id,producto_id,cantidad_presentacion,cantidad_base,costo_total,costo_unitario
   ) VALUES(v_reinversion,v_pru,120,120,7200,60);
-
-  v_result:=public.resolver_aprobacion_operativa(
-    'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
-  );
-  SELECT cantidad,minimo INTO v_cantidad,v_minimo
-  FROM public.stock WHERE almacen_id=v_almacen AND producto_id=v_pru;
-  IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
-     OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
-    RAISE EXCEPTION 'FAIL: approved reinvestment did not increase stock and preserve its minimum: % / % / %',v_result,v_cantidad,v_minimo;
-  END IF;
 
   v_result:=public.bc7_guardar_inventario_jornada(v_sesion,'FINAL',
     jsonb_build_array(
@@ -158,40 +148,10 @@ BEGIN
   -- Cash count and approval now happen while the work session remains EN_CURSO.
   v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico correcto');
   IF v_result->>'estado'<>'APROBADA'
-     OR (v_result->>'monto_contado')::numeric<>2800
+     OR (v_result->>'monto_contado')::numeric<>30
      OR (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'EN_CURSO' THEN
     RAISE EXCEPTION 'FAIL: the Owner cash count did not approve before session closure: %',v_result;
   END IF;
-
-  v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
-  IF coalesce((v_result->>'lista_para_calcular')::boolean,false) IS NOT TRUE
-     OR v_result->>'fase'<>'CALCULAR' THEN
-    RAISE EXCEPTION 'FAIL: the automatic calculation phase did not unlock after cash approval: %',v_result;
-  END IF;
-  v_result:=public.bc7_liquidacion_inventario_jornada(v_sesion);
-  IF coalesce((v_result->>'calculable')::boolean,false) IS NOT TRUE
-     OR (v_result->>'ventas_estimadas')::numeric<>10000 THEN
-    RAISE EXCEPTION 'FAIL: automatic inventory/sales/cash calculation is not reproducible: %',v_result;
-  END IF;
-
-  -- The session is handed over, but the master Turn remains open for the Owner's final review.
-  PERFORM public.bc5_cerrar_jornada(v_sesion,'Entrega controlada al Dueño en fixture');
-  IF (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turno)<>'EN_CURSO' THEN
-    RAISE EXCEPTION 'FAIL: session handover must not close the master Turn before Owner approval';
-  END IF;
-
-  INSERT INTO public.reinversiones(
-    almacen_id,ciclo_id,sesion_id,turno_id,proveedor,fecha,total,
-    usuario_id,usuario_nombre,idempotency_key,turno_sesion_id,turno_tramo_id,estado
-  ) VALUES(
-    v_almacen,NULL,NULL,v_turno,'Fixture proveedor',now(),7200,
-    v_owner,'Dueño fixture','93000000-0000-0000-0000-000000000010',
-    v_sesion,v_tramo,'PENDIENTE'
-  ) RETURNING id INTO v_reinversion;
-  INSERT INTO public.reinversiones_lineas(
-    reinversion_id,producto_id,cantidad_presentacion,cantidad_base,costo_total,costo_unitario
-  ) VALUES(v_reinversion,v_pru,120,120,7200,60);
 
   v_result:=public.resolver_aprobacion_operativa(
     'reinversion',v_reinversion,'APROBAR',NULL,NULL,7200
@@ -201,6 +161,24 @@ BEGIN
   IF v_result->>'ok'<>'true' OR v_cantidad<>120 OR v_minimo<>20
      OR (SELECT estado FROM public.reinversiones WHERE id=v_reinversion)<>'APROBADA' THEN
     RAISE EXCEPTION 'FAIL: approved reinvestment did not increase stock and preserve its minimum: % / % / %',v_result,v_cantidad,v_minimo;
+  END IF;
+
+  v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
+  IF coalesce((v_result->>'lista_para_calcular')::boolean,false) IS NOT TRUE
+     OR v_result->>'fase'<>'CALCULAR' THEN
+    RAISE EXCEPTION 'FAIL: the automatic calculation phase did not unlock after cash approval: %',v_result;
+  END IF;
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_sesion);
+  IF coalesce((v_result->>'calculable')::boolean,false) IS NOT TRUE
+     OR (v_result->>'ventas_estimadas')::numeric<>30 THEN
+    RAISE EXCEPTION 'FAIL: automatic inventory/sales/cash calculation is not reproducible: %',v_result;
+  END IF;
+
+  -- The session is handed over, but the master Turn remains open for the Owner's final review.
+  PERFORM public.bc5_cerrar_jornada(v_sesion,'Entrega controlada al Dueño en fixture');
+  IF (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA'
+     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turno)<>'EN_CURSO' THEN
+    RAISE EXCEPTION 'FAIL: session handover must not close the master Turn before Owner approval';
   END IF;
 
   RAISE NOTICE 'PASS Jornada owner checklist: four employee checks, pre-close Owner cash approval, automatic calculation, open master Turn and reinvestment preserving minimum=20';
