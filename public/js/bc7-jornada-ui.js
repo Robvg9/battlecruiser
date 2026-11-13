@@ -1571,8 +1571,9 @@
       :'Se enviará una solicitud de merma para un producto a revisión administrativa. El inventario solo cambia cuando se apruebe. ¿Confirmas?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
+      let result=null;
       if(storageType==='baja'){
-        await rpc('bc7_registrar_bajas_multiple_jornada',{
+        result=await rpc('bc7_registrar_bajas_multiple_jornada',{
           p_turno_sesion_id:sessionId,
           p_lineas:lines.map(line=>({producto_id:line.producto_id,cantidad:line.cantidad,motivo:reason})),
           p_motivo_general:reason,p_idempotency_key:idempotencyKey
@@ -1584,9 +1585,14 @@
           p_cantidad:line.cantidad,p_motivo:reason,p_idempotency_key:idempotencyKey
         });
       }
-      msg(msgEl,storageType==='baja'
-        ?'Lista de '+lines.length+' producto(s) enviada como un solo expediente. Está pendiente de aprobación; no se marcó como aprobada.'
-        :'Solicitud de merma guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.','ok');
+      const bajaState=String(result?.estado||'PENDIENTE').toUpperCase();
+      const successMessage=storageType==='baja'
+        ?bajaState==='APROBADA'
+          ?'Lista de '+lines.length+' producto(s) registrada y aprobada por los permisos de esta cuenta. El inventario fue actualizado por el servidor.'
+          :'Lista de '+lines.length+' producto(s) enviada como un solo expediente. Está pendiente de una única aprobación administrativa.'
+        :'Solicitud de merma guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.';
+      msg(msgEl,successMessage,'ok');
+      setStatus(successMessage,'ok');
       keyField.value='';form.reset();await openWorkspace(sessionId);
     }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'adjustment')+' No repitas el envío con otra referencia hasta revisar el estado.','error');}
     finally{busy(btn,false);}
