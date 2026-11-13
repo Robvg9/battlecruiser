@@ -63,6 +63,8 @@
     const pending=l.pendientes||{},post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:[];
     const cards=[
       ['Ventas estimadas',l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)+' CUP'],
+      ['Ganancia bruta estimada',l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL')],
+      ['Costo de ventas estimado',money(lines.reduce((v,x)=>v+Number(x.costo_vendido_estimado||0),0))+' CUP'+(Number(l.costos_sin_cobertura||0)>0?' · PARCIAL':'')],
       ['Efectivo recogido',l.dinero_recogido_total==null?'Pendiente':money(l.dinero_recogido_total)+' CUP'],
       ['Salario',l.salario_calculado==null?'Pendiente':money(l.salario_calculado)+' CUP'],
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
@@ -84,7 +86,8 @@
     if(Number(l.familias_con_vendidas_negativas||0)>0)warnings.push(Number(l.familias_con_vendidas_negativas)+' familias con unidades vendidas negativas; revisar inventario o entradas no registradas.');
     if(l.salario_porcentaje==null)warnings.push('Falta fijar el porcentaje salarial del Dueño.');
     if(Number(l.movimientos_posteriores_pendientes||0)>0)warnings.push(Number(l.movimientos_posteriores_pendientes)+' bajas/mermas aprobadas después del inventario final necesitan clasificación.');
-    if(Number(l.costos_sin_cobertura||0)>0)warnings.push(Number(l.costos_sin_cobertura)+' familias sin costo de compra histórico comprobado; la ganancia total no puede considerarse cerrada.');
+    if(Number(l.costos_sin_cobertura||0)>0)warnings.push(Number(l.costos_sin_cobertura)+' productos con ventas sin costo de compra histórico comprobado; la ganancia mostrada es parcial.');
+    if(Number(l.productos_vendidos_con_precio_faltante||0)>0)warnings.push(Number(l.productos_vendidos_con_precio_faltante)+' productos vendidos sin precio de venta válido.');
     if(Number(pending.gastos||0)>0)warnings.push(Number(pending.gastos)+' gastos pendientes.');
     if(Number(pending.reinversiones||0)>0)warnings.push(Number(pending.reinversiones)+' reinversiones pendientes.');
     if(Number(pending.ajustes||0)>0)warnings.push(Number(pending.ajustes)+' bajas/mermas pendientes.');
@@ -98,9 +101,14 @@
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
     const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' · '+sessions.length+' sesión(es) · '+(turn.estado_maestro||turn.estado||'');
     const body=document.getElementById('bcjr-content');
+    const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
+    const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
+    const profitComplete=sessions.length>0&&sessions.every(s=>s.estado!=='COMPLETADA'||s.liquidacion?.ganancia_bruta_es_total===true);
     body.innerHTML='<div class="bcjr-cards">'+[
       card('Estado del turno',turn.estado_maestro||turn.estado),
       card('Jornadas completadas',sessions.filter(s=>s.estado==='COMPLETADA').length+' / '+sessions.length),
+      card('Ganancia bruta estimada',money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL')),
+      card('Costo de ventas estimado',money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL')),
       card('Efectivo contado',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.dinero_recogido_total||0),0))+' CUP'),
       card('Gastos',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.gastos_aprobados||0),0))+' CUP'),
       card('Reinversiones',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.reinversiones_aprobadas||0),0))+' CUP')
