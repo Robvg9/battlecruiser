@@ -141,8 +141,9 @@
       if(!input||input.value.trim()===''||!Number.isFinite(value)||value<0||value>100){document.getElementById('bcjr-message').textContent='Escribe un porcentaje entre 0 y 100.';return;}
       await run(async()=>{await rpc('bc7_configurar_salario_porcentaje_jornada',{p_turno_sesion_id:t.dataset.session,p_porcentaje:value});await openReview(activeTurnId);});
     }else if(action==='classify'){
-      const session=t.dataset.session,rows=Array.from(document.querySelectorAll('[data-bcjr-movement-row]'));
-      const comment=(document.querySelector('[data-bcjr-movement-comment]')?.value||'').trim();
+      const session=t.dataset.session,section=t.closest('.bcjr-session');
+      const rows=Array.from(section?.querySelectorAll('[data-bcjr-movement-row]')||[]);
+      const comment=(section?.querySelector('[data-bcjr-movement-comment]')?.value||'').trim();
       const decisions=rows.map(row=>({tipo:row.dataset.type,id:row.dataset.id,
         clasificacion:row.querySelector('[data-bcjr-classification]')?.value||'',comentario:comment}));
       if(!comment||decisions.some(x=>!x.clasificacion)){document.getElementById('bcjr-message').textContent='Clasifica cada movimiento y escribe el motivo.';return;}
