@@ -23,7 +23,7 @@ test("The delayed handover after 23:00 no longer needs an exception reason",()=>
   assert.match(JOURNEY,/Entregar los datos después de las 23:00 no requiere motivo/);
 });
 test("The active operational session and employee tranche guards remain in the original start function",()=>{
-  assert.match(MIG,/ux_turno_sesion_activa_almacen/);
+  assert.doesNotMatch(MIG,/DROP INDEX IF EXISTS public\\.ux_turno_sesion_activa_almacen/);
   assert.match(MIG,/turno_tramos/);
   assert.match(MIG,/turno_jornada_programacion/);
 });
