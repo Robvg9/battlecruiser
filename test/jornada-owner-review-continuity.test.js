@@ -4,7 +4,7 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
-const MIG=read("supabase/migrations/20261113195000_jornada_owner_review_continuity.sql");
+const MIG=read("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
 const REVIEW=read("public/js/jornada-owner-review.js");
