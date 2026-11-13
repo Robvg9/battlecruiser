@@ -74,3 +74,14 @@ test("cash declaration states distinguish waiting for employee handover from wai
   assert.match(block,/ESPERANDO_ENTREGA:'Esperando entrega'/);
   assert.match(block,/ESPERANDO_APROBACION:'Esperando aprobación'/);
 });
+
+
+test("Owner can resolve post-cutoff Baja attribution with Havana-local time and auditable reason",()=>{
+  assert.match(JOURNEY,/Bajas posteriores al corte final/);
+  assert.match(JOURNEY,/La fecha de aprobación no demuestra cuándo ocurrió físicamente la pérdida/);
+  assert.match(JOURNEY,/data-bc7-baja-cutoff-time/);
+  assert.match(JOURNEY,/data-bc7-baja-cutoff-reason/);
+  assert.match(JOURNEY,/zonedDateTimeToIso\(localTime,'America\/Havana'\)/);
+  assert.match(JOURNEY,/rpc\('bc7_revisar_baja_fuera_corte'/);
+  assert.match(JOURNEY,/Solo el Dueño puede registrar esta revisión/);
+});
