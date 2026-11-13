@@ -50,6 +50,9 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
     assert.ok(financeMarkup.includes(control),`finance content must include ${control}`);
   }
   assert.match(ui,/data-bc7-adjust-form/,"baja/merma form is composed in the same operation panel");
+  assert.match(ui,/Hay bajas preparadas que todavía no se han enviado/,"checklist evidence cannot silently discard unsent Baja form input");
+  assert.match(ui,/Confirmar que no faltan más bajas/,"the checklist action is explicit that it only confirms no more requests remain");
+  assert.match(ui,/El botón inferior solo confirma que no faltan más registros/,"the modal explains that evidence confirmation does not save incomplete Baja rows");
 
   assert.match(ui,/data-bc7-adjustment-row/,"a baja request contains a repeatable list of product lines");
   assert.match(ui,/data-bc7-adjustment-add/,"the user can add multiple products to one baja request");
@@ -132,7 +135,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.27");
+  assert.equal(moduleVersion,"7.28");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assert.ok(app.includes('["aprobaciones-admin.js","20261113.3"]'));
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.3"));
