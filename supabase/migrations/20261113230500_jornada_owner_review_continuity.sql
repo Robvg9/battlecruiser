@@ -13,6 +13,9 @@ CREATE UNIQUE INDEX turnos_unico_abierto_por_usuario
 CREATE UNIQUE INDEX IF NOT EXISTS ux_turno_sesion_activa_almacen
   ON public.turno_sesiones(almacen_id)
   WHERE bloque='JORNADA' AND estado='EN_CURSO';
+CREATE UNIQUE INDEX IF NOT EXISTS turno_tramo_activo_unico
+  ON public.turno_tramos(turno_sesion_id)
+  WHERE estado='ACTIVO';
 
 CREATE TABLE IF NOT EXISTS public.turno_jornada_movimiento_revision (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
