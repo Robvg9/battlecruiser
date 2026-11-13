@@ -1139,7 +1139,7 @@
       if(!reopened)throw new Error('El servidor guardó el check, pero no se pudo volver a leer la jornada.');
       setStatus('Paso '+labels[task]+' completado. El bloque quedó cerrado para nuevos registros.','ok');
     }catch(e){
-      msg(document.querySelector('#bc7-jornada-checklist')||$('bc7-status'),friendlyError(e,'create')+' '+String(e&&e.message||''),'error');
+      msg($('bc7-status'),friendlyError(e,'create')+' '+String(e&&e.message||''),'error');
       setStatus('No se pudo completar el paso del checklist.','error');
     }finally{
       busy(button,false);
@@ -1282,7 +1282,7 @@
   async function openWorkspace(sessionId){
     if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
     const isNewSelection=String(state.selected||'')!==String(sessionId||'');
-    if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;}
+    if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;state.inventorySettlement=null;}
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{
@@ -1891,7 +1891,7 @@
     else if(f.matches('[data-bc7-count-form]')){e.preventDefault();await saveCount(f);}
     else if(f.matches('[data-bc7-receive-form]')){e.preventDefault();await saveReceipt(f);}
     else if(f.matches('[data-bc7-legacy-initial-form]')){e.preventDefault();await saveLegacyInitial(f);}
-    else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
+    else if(f.matches('[data-bc7-close-form]')){e.preventDefault();if(f.dataset.bc7CashMode==='daily'){msg(f.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg'),'La jornada permanece abierta. El Dueño realizará el conteo y la revisión final.','ok');return;}await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
