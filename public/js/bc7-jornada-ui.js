@@ -818,11 +818,21 @@
     if(Number(pending.reinversiones||0)>0)blockers.push(Number(pending.reinversiones)+' reinversiones pendientes de aprobación.');
     if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas/mermas pendientes de aprobación.');
     const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
+    const session=state.detail?.sesion||{};
+    const checklist=state.detail?.checklist||{};
+    const ownerReview=state.detail?.is_admin===true&&session.es_minorista===true&&String(session.estado||'').toUpperCase()==='EN_CURSO';
+    const ownerReady=ownerReview&&checklist.efectivo_aprobado===true&&calculable;
+    const ownerReviewHtml=ownerReview
+      ?'<section class="bc7-card bc7-owner-final-review"><h4>Revisión final del Dueño</h4><p class="bc7-muted">BattleCruiser terminó el cálculo automático. Revisa el resumen, escribe una observación si hace falta y aprueba para cerrar esta jornada. Si es la última jornada del Turno, el mismo acto aprobará y cerrará el Turno.</p>'+
+        (ownerReady?'<p class="bc7-pill ok">Todos los pasos están completos y la liquidación es calculable.</p>':'<p class="bc7-muted">La aprobación se habilitará cuando el efectivo esté contado y aprobado y la liquidación no tenga bloqueos.</p>')+
+        '<form data-bc7-owner-final-review-form="'+esc(session.id)+'"><label class="bc7-field">Observación final (opcional)<textarea data-bc7-owner-final-note rows="2" maxlength="1000" placeholder="Observación breve de la revisión"></textarea></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit" '+(ownerReady?'':'disabled')+'>Aprobar revisión final</button></div><p class="bc7-msg" data-bc7-owner-final-review-msg></p></form></section>'
+      :'';
     host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
       '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
       '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
       cards+(rows.length?'<details class="bc7-finance-fold"><summary>Desglose por producto</summary>'+table+'</details>':table)+
       (blockers.length?'<div class="bc7-note"><b>Para cerrar la liquidación:</b><ul>'+blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'<p class="bc7-muted">No quedan aprobaciones ni validaciones pendientes.</p>')+
+      ownerReviewHtml+
       '</div>';
   }
   function renderFinanceList(host,rows,type){
