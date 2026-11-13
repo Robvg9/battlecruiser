@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.26 — catálogo completo para ajustes y checklist de cinco pasos.
+// v7.27 — catálogo completo para ajustes y checklist de cinco pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1208,10 +1208,10 @@
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
-      actionArea='<div class="bc7-note"><b>Completar jornada y entregar al Dueño.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
-        cashDaysManagerShellHtml(detail,isAssigned,status)+
+      actionArea='<div class="bc7-note"><b>Completar jornada y enviarla a Administración.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
+        '<details class="bc7-cash-declarations-fold"><summary>Declaraciones de efectivo por día</summary>'+cashDaysManagerShellHtml(detail,isAssigned,status)+'</details>'+
         '<label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label>'+
-        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_conteo!==true?'disabled':'')+'>Entregar jornada al Dueño</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
+        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_conteo!==true?'disabled':'')+'>Cerrar jornada y enviar a Administración</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
     }else if(status==='EN_CURSO'){
       const saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
       actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cuatro checks; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
@@ -1247,11 +1247,11 @@
         (availableAdjustmentProducts.length?'':'<p class="bc7-msg error">El catálogo está completo, pero no hay existencias positivas para registrar una baja o merma.</p>')+
         '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!availableAdjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form>'+(canCreateBaja?checklistConfirmButtonHtml(detail,'bajas',isAssigned):'')+'</div></details>';
     }
-    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
+    const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><div class="bc7-checklist-section-source" hidden><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div></div>';
     const fin=financeFormHtml(detail,isAssigned,status);
     const checks=checklistHtml(detail,isAssigned,status);
     const calculation=calculationPhaseHtml(detail);
-    const op='<div class="bc7-panel-stack">'+checks+actionArea+fin+adjustment+calculation+'</div>';
+    const op='<div class="bc7-panel-stack">'+checks+actionArea+'<div class="bc7-checklist-section-source" hidden>'+fin+adjustment+'</div>'+calculation+'</div>';
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
     $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
     $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
@@ -1259,6 +1259,7 @@
     activateWorkspaceTab(state.workspaceTab);
   }
   async function openWorkspace(sessionId){
+    closeChecklistModal({restore:false});
     if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
     const isNewSelection=String(state.selected||'')!==String(sessionId||'');
     if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;}
@@ -1560,20 +1561,104 @@
     }
     finally{busy(btn,false);}
   }
-  function openChecklistSection(key){
-    const tab=key==='inventario_final'?'inventario':'operacion';
-    activateWorkspaceTab(tab);
-    const findTarget=()=>{
-      let target=null;
-      if(key==='gastos')target=document.querySelector('[data-bc7-finance-form="gasto"]')?.closest('details');
-      else if(key==='reinversiones')target=document.querySelector('[data-bc7-finance-form="reinversion"]')?.closest('details');
-      else if(key==='bajas')target=document.querySelector('[data-bc7-adjust-form]')?.closest('details');
-      else if(key==='inventario_final')target=Array.from(document.querySelectorAll('#bc7-workspace-body details')).find(node=>/2\s*[·.]\s*Inventario final/i.test(node.querySelector('summary')?.textContent||''));
-      if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'center'});}
-      else if(key==='gastos'||key==='reinversiones')document.getElementById(key==='gastos'?'bc7-expenses-list':'bc7-reinvestments-list')?.scrollIntoView({behavior:'smooth',block:'center'});
-    };
-    findTarget();
+  let checklistModalContext=null;
+  function closeChecklistModal(options){
+    if(!checklistModalContext)return;
+    const restore=options?.restore!==false;
+    if(restore){
+      checklistModalContext.entries.forEach(entry=>{
+        if(entry.placeholder?.parentNode){
+          entry.placeholder.parentNode.insertBefore(entry.node,entry.placeholder);
+          entry.placeholder.remove();
+          entry.node.open=false;
+        }
+      });
+    }
+    checklistModalContext.root?.remove();
+    document.body.style.overflow=checklistModalContext.previousBodyOverflow||'';
+    checklistModalContext=null;
   }
+  function openChecklistSection(key){
+    if(!['gastos','reinversiones','bajas','inventario_final'].includes(key))return;
+    closeChecklistModal({restore:true});
+    activateWorkspaceTab(key==='inventario_final'?'inventario':'operacion');
+    const all=Array.from(document.querySelectorAll('#bc7-workspace-body details'));
+    let targets=[];
+    if(key==='gastos'){
+      targets=all.filter(node=>node.querySelector('[data-bc7-finance-form="gasto"]')||/gastos registrados/i.test(node.querySelector('summary')?.textContent||''));
+    }else if(key==='reinversiones'){
+      targets=all.filter(node=>node.querySelector('[data-bc7-finance-form="reinversion"]')||/reinversiones registradas/i.test(node.querySelector('summary')?.textContent||''));
+    }else if(key==='bajas'){
+      const target=document.querySelector('[data-bc7-adjust-form]')?.closest('details');
+      if(target)targets=[target];
+    }else{
+      const target=all.find(node=>node.querySelector('form[data-bc7-count-form="FINAL"]')||/2\s*[·.]\s*Inventario final/i.test(node.querySelector('summary')?.textContent||''));
+      if(target)targets=[target];
+    }
+    if(!targets.length){setStatus('Esta subsección no está disponible en el estado actual de la jornada.','error');return;}
+    const labels={gastos:'Gastos',reinversiones:'Reinversiones',bajas:'Bajas',inventario_final:'Inventario final'};
+    const completed=key==='inventario_final'
+      ?!!state.detail?.cortes?.FINAL
+      :state.detail?.checklist?.[key]?.completado===true;
+    const root=document.createElement('div');
+    root.className='bc7-checklist-modal';
+    root.setAttribute('role','dialog');
+    root.setAttribute('aria-modal','true');
+    root.setAttribute('aria-label',labels[key]);
+    root.innerHTML='<div class="bc7-checklist-modal-panel">'+
+      '<header class="bc7-checklist-modal-head"><div><p>JORNADA · '+esc(labels[key].toUpperCase())+'</p><h3>'+esc(labels[key])+'</h3><small>Completa este apartado y envía su evidencia a Administración.</small></div><button type="button" class="bc7-btn" data-bc7-checklist-modal-close aria-label="Cerrar">Cerrar ✕</button></header>'+
+      '<div class="bc7-checklist-modal-body" data-bc7-checklist-modal-body></div>'+
+      '<footer class="bc7-checklist-modal-foot"><span class="bc7-muted" data-bc7-checklist-modal-state>'+(completed?'Este apartado ya está confirmado.':'Los cambios se guardan en el servidor al enviarlos.')+'</span><button type="button" class="bc7-btn primary" data-bc7-checklist-modal-action '+(key==='inventario_final'&&completed?'disabled':'')+'>'+(key==='inventario_final'?'Confirmar inventario final y enviar evidencia':(completed?'Reabrir sección':'Enviar evidencia a Administración'))+'</button></footer>'+
+    '</div>';
+    const host=document.getElementById('tab-jornada')||document.body;
+    host.appendChild(root);
+    const body=root.querySelector('[data-bc7-checklist-modal-body]');
+    const entries=[];
+    targets.forEach(node=>{
+      const placeholder=document.createComment('bc7-checklist-modal:'+key);
+      node.parentNode.insertBefore(placeholder,node);
+      body.appendChild(node);
+      node.open=true;
+      entries.push({node,placeholder});
+    });
+    checklistModalContext={root,key,entries,previousBodyOverflow:document.body.style.overflow};
+    document.body.style.overflow='hidden';
+    root.querySelector('[data-bc7-checklist-modal-close]').addEventListener('click',()=>closeChecklistModal({restore:true}));
+    root.addEventListener('click',e=>{if(e.target===root)closeChecklistModal({restore:true});});
+    root.querySelector('[data-bc7-checklist-modal-action]').addEventListener('click',async()=>{
+      if(!checklistModalContext||!navigator.onLine){setStatus('La subsección requiere conexión para enviar evidencia.','error');return;}
+      const button=root.querySelector('[data-bc7-checklist-modal-action]');
+      button.disabled=true;
+      try{
+        if(key==='inventario_final'){
+          if(state.detail?.cortes?.FINAL){
+            closeChecklistModal({restore:true});
+            setStatus('El inventario final ya está confirmado.','ok');
+            return;
+          }
+          const form=root.querySelector('form[data-bc7-count-form="FINAL"]');
+          if(!form){button.disabled=false;setStatus('No se encontró el formulario del inventario final.','error');return;}
+          form.requestSubmit();
+          return;
+        }
+        await rpc('bc7_confirmar_bloque_jornada',{
+          p_turno_sesion_id:state.selected,
+          p_bloque:key,
+          p_completado:!completed
+        });
+        closeChecklistModal({restore:false});
+        const ok=await openWorkspace(state.selected);
+        if(ok)setStatus(completed?'Sección reabierta.':'Evidencia enviada; sección confirmada para Administración.','ok');
+      }catch(error){
+        button.disabled=false;
+        setStatus('No se pudo enviar la evidencia. '+friendlyError(error,'create'),'error');
+      }
+    });
+    root.querySelector('[data-bc7-checklist-modal-close]').focus();
+  }
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&checklistModalContext)closeChecklistModal({restore:true});
+  });
   async function toggleChecklistBlock(button){
     const sessionId=state.selected;
     const block=button?.dataset?.bc7ChecklistToggle;

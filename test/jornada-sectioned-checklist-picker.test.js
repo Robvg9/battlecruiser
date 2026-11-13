@@ -29,6 +29,16 @@ test("each attendant checklist item opens its own operational section", () => {
   assert.match(ui, /checklistConfirmButtonHtml\(detail,'reinversiones',isAssigned\)/);
   assert.match(ui, /checklistConfirmButtonHtml\(detail,'bajas',isAssigned\)/);
   assert.doesNotMatch(ui, /data-bc7-checklist-toggle="'\+item\.key\+'/);
+  const openStart=ui.indexOf("function openChecklistSection(key)");
+  const openEnd=ui.indexOf("document.addEventListener('keydown'",openStart);
+  const modalOpen=openStart>=0&&openEnd>openStart?ui.slice(openStart,openEnd):"";
+  assert.match(modalOpen, /bc7-checklist-modal/);
+  assert.match(modalOpen, /data-bc7-checklist-modal-action/);
+  assert.match(modalOpen, /Enviar evidencia a Administración/);
+  assert.match(modalOpen, /form\.requestSubmit\(\)/);
+  assert.doesNotMatch(modalOpen, /scrollIntoView/);
+  assert.match(ui, /bc7-checklist-section-source" hidden/);
+  assert.match(ui, /Cerrar jornada y enviar a Administración/);
 });
 
 test("cash declaration is visible before handover but cannot be approved or counted early", () => {
@@ -46,11 +56,11 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const app = read("public/app.js");
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
-  assert.match(app, /const VERSION="9\.5\.102"/);
-  assert.match(sw, /BC_SW_VERSION = "9\.5\.102"/);
-  assert.match(html, /app\.js\?v=9\.5\.102/);
-  assert.match(app, /bc7-jornada-ui\.js","7\.26"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.26/);
+  assert.match(app, /const VERSION="9\.5\.103"/);
+  assert.match(sw, /BC_SW_VERSION = "9\.5\.103"/);
+  assert.match(html, /app\.js\?v=9\.5\.103/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.27"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.27/);
   assert.match(app, /aprobaciones-admin\.js","20261113\.3"/);
   assert.match(sw, /aprobaciones-admin\.js\?v=20261113\.3/);
 });

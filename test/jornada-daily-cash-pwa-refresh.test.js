@@ -12,18 +12,18 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.102 release and Jornada UI 7.26", () => {
-  assert.ok(APP.includes('const VERSION="9.5.102";'));
+test("PWA shell pins one fresh 9.5.103 release and Jornada UI 7.27", () => {
+  assert.ok(APP.includes('const VERSION="9.5.103";'));
   assert.ok(INDEX.includes('style.css?v=9.5.100'));
-  assert.ok(INDEX.includes('app.js?v=9.5.102'));
+  assert.ok(INDEX.includes('app.js?v=9.5.103'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.102 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.102"'));
-  assert.ok(SW.includes('./app.js?v=9.5.102'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.103 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.103"'));
+  assert.ok(SW.includes('./app.js?v=9.5.103'));
   assert.ok(SW.includes('./style.css?v=9.5.100'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
-  assert.ok(APP.includes('["bc7-jornada-ui.js","7.26"]'));
-  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.26'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.27"]'));
+  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.27'));
   assert.ok(APP.includes('["aprobaciones-admin.js","20261113.3"]'));
   assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.3'));
 });
@@ -47,7 +47,7 @@ test("cash, expenses, reinvestments, adjustments and reconciliation share the sa
   const end = UI.indexOf("const mov='<div class=\"bc7-panel-stack\">", start);
   assert.ok(start >= 0 && end > start);
   const panel = UI.slice(start, end);
-  assert.ok(panel.includes("actionArea+fin+adjustment"));
+  assert.ok(panel.includes("bc7-checklist-section-source")&&panel.includes("fin+adjustment"));
   assert.doesNotMatch(UI, /data-bc7-workspace-tab="finanzas"/);
   const financeStart=UI.indexOf("function financeFormHtml(detail,isAssigned,status){");
   const financeEnd=UI.indexOf("function cashDaysManagerShellHtml(detail,isAssigned,status){",financeStart);
