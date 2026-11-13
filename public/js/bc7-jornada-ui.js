@@ -1153,6 +1153,9 @@
       '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
     '</div>';
     if(!checks.lista_para_calcular){
+      if(phase==='LISTA_PARA_ENTREGA'){
+        return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cuatro checks de Sheila están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
+      }
       if(phase==='PENDIENTE_CONTEO_DUENO'){
         return '<section class="bc7-calculation-phase is-waiting"><h4>Paso 5 · Efectivo final</h4>'+
           fifthCheck+'<p>Los cuatro checks de Sheila están completos. El Dueño debe contar y aprobar el efectivo declarado antes de iniciar los cálculos.</p></section>';
@@ -1197,10 +1200,10 @@
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
-      actionArea='<div class="bc7-note"><b>Completar jornada y entregar al Dueño.</b><p>Registra los importes diarios aquí. Sheila no cierra el Turno: el Dueño cuenta el efectivo, resuelve las pendientes y BattleCruiser calcula antes de la aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
+      actionArea='<div class="bc7-note"><b>Completar jornada y entregar al Dueño.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
         cashDaysManagerShellHtml(detail,isAssigned,status)+
         '<label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label>'+
-        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_calcular!==true?'disabled':'')+'>Entregar jornada al Dueño</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
+        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_conteo!==true?'disabled':'')+'>Entregar jornada al Dueño</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
     }else if(status==='EN_CURSO'){
       const saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
       actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cuatro checks; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
@@ -1494,35 +1497,22 @@
       if(saved){amount=String(state.detail.declaracion_dinero.monto);}
       if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     }
-    if(cashMode==='daily'){
-      let settlement;
+    if(state.detail?.sesion?.es_minorista===true){
+      let checklist;
       try{
-        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId});
+        checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
       }catch(e){
-        msg(msgEl,'No se pudo verificar la liquidación antes del cierre. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
+        msg(msgEl,'No se pudieron verificar los cuatro checks en el servidor. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
         return;
       }
-      const pending=settlement?.pendientes||{};
-      const blockers=[];
-      if(settlement?.aplica===false)blockers.push(settlement.motivo||'La liquidación no está disponible');
-      if(settlement?.faltan_cortes)blockers.push('falta confirmar el inventario final');
-      if(settlement?.salario_porcentaje==null)blockers.push('el Dueño debe configurar el porcentaje salarial');
-      if(Number(settlement?.familias_sin_precio||0)>0)blockers.push('hay productos sin precio válido');
-      if(Number(settlement?.familias_con_vendidas_negativas||0)>0)blockers.push('hay diferencias negativas de inventario por revisar');
-      if(Number(pending.gastos||0)>0)blockers.push('hay gastos pendientes de aprobación');
-      if(Number(pending.reinversiones||0)>0)blockers.push('hay reinversiones pendientes de aprobación');
-      if(Number(pending.ajustes||0)>0)blockers.push('hay mermas o bajas pendientes de aprobación');
-      if(Number(pending.entregas_diarias||0)>0)blockers.push('hay entregas diarias pendientes de aprobación');
-      if(Number(pending.entregas_diarias_faltantes||0)>0)blockers.push('faltan importes diarios');
-      if(blockers.length){
-        msg(msgEl,'No se puede finalizar todavía: '+blockers.join('; ')+'. La jornada sigue abierta.','error');
+      if(checklist?.lista_para_conteo!==true){
+        msg(msgEl,'No se puede entregar todavía: Sheila debe completar gastos, reinversiones, bajas e inventario final. La jornada sigue abierta.','error');
         return;
       }
-      // The Dueño may count and approve the final cash after the operational handover.
     }
     const tramoId=state.detail.tramo_activo.id;
     const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    const confirmation=saved?'Los cuatro checks de Sheila, el conteo del Dueño y las aprobaciones están completos. ¿Confirmas que deseas entregar la sesión al Dueño? El Turno seguirá abierto hasta la revisión y aprobación final.':'Se guardará el importe declarado. No se puede entregar la sesión hasta que el Dueño cuente y apruebe el efectivo y resuelva las pendientes. ¿Confirmas?';
+    const confirmation=saved?'Los cuatro checks de Sheila están completos y el importe quedó declarado. ¿Entregas la jornada al Dueño? Después del traspaso podrá contar el efectivo y resolver las pendientes; el Turno seguirá abierto para la revisión final.':'Se guardará el importe declarado y se entregará la jornada. Después del traspaso, el Dueño podrá contar el efectivo y resolver las pendientes. ¿Confirmas?';
     if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
@@ -1540,7 +1530,7 @@
         setStatus('La jornada todavía no aparece como finalizada. Estado: '+humanStatus(finalState)+'. Actualiza antes de volver a intentarlo.','error');
         return;
       }
-      setStatus('Jornada finalizada y confirmada.','ok');
+      setStatus('Jornada entregada al Dueño. La sesión quedó completada y el Turno maestro sigue abierto. El Dueño ya puede contar el efectivo y resolver las pendientes.','ok');
     }catch(e){
       const errorText='No se pudo confirmar todavía el cierre. '+friendlyError(e,'create')+' Se comprobará el estado antes de permitir otro intento.';
       try{
