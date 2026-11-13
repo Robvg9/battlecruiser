@@ -24,7 +24,7 @@ test("PWA shell pins one fresh 9.5.102 release and Jornada UI 7.26", () => {
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.26"]'));
   assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.26'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.2"]'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.3"]'));
   assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.2'));
 });
 
