@@ -161,7 +161,7 @@ test("Jornada employee checklist and owner cash count precede session closure",(
   assert.match(ui,/Las entradas\/transferencias las registra el Dueño/);
   assert.match(ui,/lista_para_calcular/);
   assert.match(ui,/Cálculos automáticos completados/);
-  assert.match(ui,/el Turno todavía no está cerrado/);
+  assert.match(ui,/[Ee]l Turno todavía no está cerrado/);
 });
 
 test("Cash declaration can be saved before the final inventory unlocks jornada closure",()=>{
