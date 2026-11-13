@@ -95,6 +95,7 @@ function renderApprovalDetails(x,detail){
   const isReinvestment=x.tipo==='reinversion';
   const isDailyCash=x.tipo==='entrega_diaria';
   const isFinalCash=x.tipo==='declaracion_jornada';
+  const who=detail.usuario_nombre||x.usuario_nombre||'Sheila';
   const finalCashReady=['LISTO_PARA_CONTAR','COMPLETADA'].includes(String(x.motivo||'').toUpperCase());
   const isMoney=isExpense||isReinvestment||isDailyCash||isFinalCash;
   const isLegacyBaja=x.tipo==='baja';
