@@ -61,14 +61,14 @@ test("inventory detail has a direct route into the flavor and per-warehouse mini
   assert.match(css, /white-space: normal/);
 });
 
-test("PWA release and cache manifest are aligned at 9.5.103", () => {
+test("PWA release and cache manifest are aligned at 9.5.104", () => {
   const app = read("public/app.js");
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
-  assert.match(app, /VERSION="9\.5\.103"/);
-  assert.match(index, /app\.js\?v=9\.5\.103/);
+  assert.match(app, /VERSION="9\.5\.104"/);
+  assert.match(index, /app\.js\?v=9\.5\.104/);
   assert.match(index, /style\.css\?v=9\.5\.100/);
-  assert.match(sw, /BC_SW_VERSION = "9.5.103"/);
+  assert.match(sw, /BC_SW_VERSION = "9.5.104"/);
   assert.match(sw, /inventario-detalle\.js\?v=72/);
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.3"));
   assert.ok(app.includes('["bajas-multiple.js","1.6"]'));
