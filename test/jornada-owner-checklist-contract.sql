@@ -35,8 +35,6 @@ DECLARE
   v_cantidad numeric;
   v_result jsonb;
   v_error boolean;
-  v_minimo numeric;
-  v_cantidad numeric;
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
