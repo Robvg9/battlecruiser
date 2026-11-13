@@ -27,6 +27,8 @@ DECLARE
   v_daily_id uuid;
   v_daily_retry uuid;
   v_expense_id uuid;
+  v_cash_declaration_id uuid;
+  v_cash_result jsonb;
   v_reinvestment_id uuid;
   v_merma_id uuid;
   v_baja_id uuid;
@@ -402,39 +404,97 @@ BEGIN
     RAISE EXCEPTION 'FAIL: daily cash and settlement ACL boundary is incorrect';
   END IF;
 
-  -- The operational session closes only after the complete approved reconciliation passes.
+  -- The dependent explicitly finishes the three operational blocks. These markers
+  -- are server-enforced: after each one, the corresponding write RPC must refuse new rows.
+  UPDATE public.turno_declaraciones
+  SET estado_aprobacion='ESPERANDO_APROBACION',
+      monto_contado=NULL,contado_por=NULL,contado_at=NULL,
+      observacion_conteo=NULL,diferencia=NULL,aprobado_por=NULL,aprobado_at=NULL
+  WHERE turno_sesion_id=v_session
+  RETURNING id INTO v_cash_declaration_id;
+  IF v_cash_declaration_id IS NULL THEN
+    RAISE EXCEPTION 'FAIL: final Jornada cash declaration fixture is missing';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc5_contar_dinero_entregado(v_cash_declaration_id,19.5,'Conteo adelantado que debe bloquearse');
+  EXCEPTION WHEN check_violation THEN
+    v_error:=true;
+  END;
+  IF NOT v_error OR (SELECT monto_contado FROM public.turno_declaraciones WHERE id=v_cash_declaration_id) IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: owner cash count was enabled before Sheila completed the checklist';
+  END IF;
+
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
-  PERFORM set_config('test.perms','turnos:ver',false);
-  v_closed:=public.bc5_cerrar_jornada(v_session,'Cierre de contrato PostgreSQL fuera del horario programado');
-  IF v_closed.estado<>'COMPLETADA'
+  PERFORM set_config('test.perms','turnos:ver,gastos:crear,reinversiones:crear,mermas:crear,bajas:crear',false);
+  PERFORM public.bc7_marcar_checklist_jornada(v_session,'GASTOS');
+  PERFORM public.bc7_marcar_checklist_jornada(v_session,'BAJAS');
+  PERFORM public.bc7_marcar_checklist_jornada(v_session,'REINVERSIONES');
+
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_registrar_ajuste_jornada(
+      v_session,'baja',v_juice,0.1,'No debe aceptarse después del check de bajas',
+      'a6400000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN check_violation THEN
+    v_error:=true;
+  END;
+  IF NOT v_error THEN
+    RAISE EXCEPTION 'FAIL: a Baja was accepted after Sheila marked the Baja checklist complete';
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_cash_result:=public.bc7_estado_checklist_jornada(v_session);
+  IF coalesce((v_cash_result->>'puede_contar_efectivo')::boolean,false) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'FAIL: cash count should unlock after all three checks, final inventory and approvals; checklist=%',v_cash_result;
+  END IF;
+
+  v_cash_result:=public.bc5_contar_dinero_entregado(v_cash_declaration_id,19.5,'Conteo físico correcto');
+  IF v_cash_result->>'estado'<>'APROBADA'
+     OR (v_cash_result->>'monto_contado')::numeric<>19.5 THEN
+    RAISE EXCEPTION 'FAIL: owner physical count did not approve the matching declared cash; result=%',v_cash_result;
+  END IF;
+  v_cash_result:=public.bc5_contar_dinero_entregado(v_cash_declaration_id,19.5,'Reintento idempotente');
+  IF coalesce((v_cash_result->>'idempotente')::boolean,false) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'FAIL: repeating the exact owner cash count must remain idempotent after checklist readiness is consumed';
+  END IF;
+
+  -- The automatic settlement is now calculable; a single owner review records the
+  -- observation, completes the session and approves the Turn if no sessions remain.
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF (v_result->>'calculable')::boolean IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'FAIL: complete operational checklist and owner cash approval must unlock automatic settlement; result=%',v_result;
+  END IF;
+  v_result:=public.bc7_finalizar_revision_jornada(
+    v_session,'Observación final PostgreSQL: cálculo revisado y jornada correcta'
+  );
+  IF v_result->>'estado'<>'COMPLETADA'
+     OR coalesce((v_result->>'turno_aprobado')::boolean,false) IS DISTINCT FROM true
+     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_session)<>'COMPLETADA'
      OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='COMPLETADO')
-     OR (SELECT estado FROM public.turnos WHERE id=v_turn)<>'ABIERTO'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'EN_CURSO'
-     OR (public.bc7_liquidacion_inventario_jornada(v_session)->>'calculable')::boolean IS DISTINCT FROM true THEN
-    RAISE EXCEPTION 'FAIL: jornada close must complete the current session but preserve the master turn as open for the next programmed day';
+     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'CERRADO'
+     OR NOT EXISTS(
+       SELECT 1 FROM public.turno_revisiones
+       WHERE turno_id=v_turn AND estado='APROBADO'
+         AND comentario='Observación final PostgreSQL: cálculo revisado y jornada correcta'
+     ) THEN
+    RAISE EXCEPTION 'FAIL: one owner final review must preserve the observation, complete the jornada and approve the final Turn; result=%',v_result;
   END IF;
 
   -- The final period leaves one owner-schedulable handover because there is no
-  -- next session in the current Turn. The Turn must pass the Jornada approval gate.
+  -- next session in the current Turn. Final approval must preserve that handover.
   SELECT id INTO v_handover_id
   FROM public.turno_jornada_inventario_entregas
   WHERE origen_sesion_id=v_session AND destino_sesion_id IS NULL
     AND fecha_destino=v_today+2 AND estado='PENDIENTE_PROGRAMACION';
   IF v_handover_id IS NULL THEN
     RAISE EXCEPTION 'FAIL: final Jornada did not leave its period-end inventory handover schedulable';
-  END IF;
-
-  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
-  PERFORM set_config('test.bc_admin','true',false);
-  PERFORM public.bc_enviar_turno_a_aprobacion(v_turn);
-  IF (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'PENDIENTE_APROBACION'
-     OR NOT EXISTS(SELECT 1 FROM public.turno_revisiones WHERE turno_id=v_turn AND estado='PENDIENTE') THEN
-    RAISE EXCEPTION 'FAIL: a fully reconciled Jornada Turn did not enter owner approval';
-  END IF;
-  PERFORM public.bc_aprobar_turno(v_turn,'Liquidación de jornada completa revisada y aprobada');
-  IF (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'CERRADO' THEN
-    RAISE EXCEPTION 'FAIL: owner approval did not close the completed Jornada Turn';
   END IF;
 
   -- Create the next Turn only after the previous one is approved and closed.
