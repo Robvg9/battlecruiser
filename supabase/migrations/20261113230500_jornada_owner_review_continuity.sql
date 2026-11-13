@@ -395,6 +395,7 @@ DECLARE
   v_priced_lines integer:=0;
   v_total_lines integer:=0;
   v_negative_lines integer:=0;
+  v_missing_price_sold integer:=0;
   v_expenses numeric:=0;
   v_reinvestments numeric:=0;
   v_daily_cash numeric:=0;
@@ -600,10 +601,13 @@ BEGIN
     LEFT JOIN final_lines f ON f.product_id=ids.product_id
     LEFT JOIN movement_totals mt ON mt.product_id=ids.product_id
   )
-  SELECT count(*),count(*) FILTER(WHERE precio_unitario IS NOT NULL AND sold_qty>=0),
-         count(*) FILTER(WHERE sold_qty<0),coalesce(sum(sold_qty),0),
-         CASE WHEN count(*) FILTER(WHERE precio_unitario IS NULL OR sold_qty<0)>0 THEN NULL
-              ELSE round(sum(sold_qty*precio_unitario),2) END,
+  SELECT count(*),
+         count(*) FILTER(WHERE (precio_unitario IS NOT NULL AND sold_qty>=0) OR sold_qty=0),
+         count(*) FILTER(WHERE sold_qty<0),
+         count(*) FILTER(WHERE precio_unitario IS NULL AND sold_qty>0),
+         coalesce(sum(sold_qty),0),
+         CASE WHEN count(*) FILTER(WHERE (precio_unitario IS NULL AND sold_qty>0) OR sold_qty<0)>0 THEN NULL
+              ELSE round(coalesce(sum(sold_qty*precio_unitario),0),2) END,
          coalesce(jsonb_agg(jsonb_build_object(
            'producto_id',product_id,'nombre',nombre,'unidad',unidad,
            'inventario_inicial',initial_qty,'transferencias_entrada',transfer_in,
@@ -614,7 +618,7 @@ BEGIN
            'precio_unitario',precio_unitario,'estado_precio',estado_precio,
            'importe_estimado',CASE WHEN precio_unitario IS NOT NULL AND sold_qty>=0 THEN round(sold_qty*precio_unitario,2) ELSE NULL END
          ) ORDER BY nombre,product_id),'[]'::jsonb)
-    INTO v_total_lines,v_priced_lines,v_negative_lines,v_total_units,v_sales_total,v_lines
+    INTO v_total_lines,v_priced_lines,v_negative_lines,v_missing_price_sold,v_total_units,v_sales_total,v_lines
   FROM calculated;
 
   -- Do not present provisional sales or salary as if the missing final stock were zero.
@@ -622,6 +626,7 @@ BEGIN
     v_total_lines:=0;
     v_priced_lines:=0;
     v_negative_lines:=0;
+    v_missing_price_sold:=0;
     v_total_units:=NULL;
     v_sales_total:=NULL;
     v_lines:='[]'::jsonb;
@@ -673,7 +678,7 @@ BEGIN
     v_lines:='[]'::jsonb;
   END IF;
   v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
-    AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_negative_lines=0
+    AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_missing_price_sold=0 AND v_negative_lines=0
     AND v_rate IS NOT NULL AND v_daily_pending=0 AND v_daily_missing=0
     AND v_pending_expenses=0 AND v_pending_reinvestments=0 AND v_pending_adjustments=0
     AND v_pending_post=0
@@ -691,7 +696,7 @@ BEGIN
     'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_expected_cash,
     'diferencia',v_difference,
     'faltan_cortes',NOT(v_initial.id IS NOT NULL AND v_final.id IS NOT NULL),
-    'familias_sin_precio',v_total_lines-v_priced_lines,
+    'familias_sin_precio',v_missing_price_sold,
     'familias_con_vendidas_negativas',v_negative_lines,
     'movimientos_posteriores_pendientes',v_pending_post,
     'pendientes',jsonb_build_object(
