@@ -3,6 +3,9 @@ account_id = "8146f4242cfc2ac9c1f89aa44e7b823d"
 main = "./preview-worker.mjs"
 compatibility_date = "2026-09-24"
 
+[placement]
+mode = "off"
+
 [assets]
 directory = "./public"
 binding = "ASSETS"

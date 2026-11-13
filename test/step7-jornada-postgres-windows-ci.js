@@ -329,7 +329,10 @@ function applySql(file) {
     log("\\r\\n=== Enforce the final retail Jornada close gate and run full La Cueva settlement ===");
     applySql("supabase/migrations/20261112133100_jornada_close_gate_integral.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
-    log("\\r\\nPASS Step 7 + La Cueva period opening, shared handover preservation, family inventory-delta settlement, owner-configured salary percentage, daily cash idempotency/approval and ACL contracts.");
+    log("\\r\\n=== Apply the attendant checklist and owner cash-count phase, then verify its isolated end-to-end contract ===");
+    applySql("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
+    applySql("test/jornada-owner-checklist-contract.sql");
+    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist, pre-close physical cash count, automatic calculation, final Turn handover and reinvestment stock-minimum preservation.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));

@@ -199,3 +199,110 @@
     justify-content: flex-end;
   }
 }
+
+
+/* 9.5.101 — Jornada attendant checklist and owner calculation phase. */
+#tab-jornada .bc7-checklist,
+#tab-jornada .bc7-calculation-phase {
+  box-sizing:border-box;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  padding:12px;
+  border:1px solid var(--gold-dim);
+  border-radius:9px;
+  background:rgba(7,20,16,.42);
+}
+#tab-jornada .bc7-checklist-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px;
+}
+#tab-jornada .bc7-checklist-head h4,
+#tab-jornada .bc7-calculation-phase h4 {
+  margin:0 0 4px;
+  color:var(--gold);
+}
+#tab-jornada .bc7-checklist-head p,
+#tab-jornada .bc7-calculation-phase p {
+  margin:0;
+  color:var(--mist);
+  font-size:12px;
+  line-height:1.45;
+}
+#tab-jornada .bc7-checklist-count {
+  flex:0 0 auto;
+  min-width:44px;
+  padding:6px 9px;
+  border:1px solid var(--gold-dim);
+  border-radius:20px;
+  text-align:center;
+  font-weight:700;
+}
+#tab-jornada .bc7-checklist-row {
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  padding:9px 0;
+  border-top:1px solid var(--gold-dim);
+}
+#tab-jornada .bc7-checklist-mark {
+  display:grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  border:1px solid var(--gold-dim);
+  border-radius:50%;
+  font-weight:700;
+  color:var(--mist);
+}
+#tab-jornada .bc7-checklist-row.is-done .bc7-checklist-mark {
+  color:#8fc79d;
+  border-color:#639d72;
+  background:rgba(68,128,82,.16);
+}
+#tab-jornada .bc7-checklist-copy {
+  display:grid;
+  gap:3px;
+  min-width:0;
+}
+#tab-jornada .bc7-checklist-copy b { color:var(--text); }
+#tab-jornada .bc7-checklist-copy small,
+#tab-jornada .bc7-checklist > .bc7-muted {
+  color:var(--mist);
+  font-size:11px;
+  line-height:1.4;
+}
+#tab-jornada .bc7-checklist-row .bc7-btn {
+  min-height:38px;
+  white-space:normal;
+}
+#tab-jornada .bc7-checklist-row.is-done .bc7-checklist-copy b { color:#8fc79d; }
+#tab-jornada .bc7-checklist > .bc7-muted { display:block; margin:8px 0 0; }
+#tab-jornada .bc7-calculation-phase { border-style:solid; }
+#tab-jornada .bc7-calculation-phase.is-waiting { border-color:var(--gold-dim); }
+#tab-jornada .bc7-calculation-phase.is-ready { border-color:#639d72; }
+#tab-jornada .bc7-calculation-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin:10px 0;
+}
+#tab-jornada .bc7-calculation-grid > div {
+  display:grid;
+  gap:3px;
+  min-width:0;
+  padding:9px;
+  border:1px solid var(--gold-dim);
+  border-radius:7px;
+}
+#tab-jornada .bc7-calculation-grid small { color:var(--mist); font-size:11px; }
+#tab-jornada .bc7-calculation-grid b { overflow-wrap:anywhere; font-size:14px; }
+@media(max-width:620px) {
+  #tab-jornada .bc7-checklist-row { grid-template-columns:30px minmax(0,1fr); }
+  #tab-jornada .bc7-checklist-row .bc7-btn { grid-column:2; justify-self:start; }
+  #tab-jornada .bc7-calculation-grid { grid-template-columns:1fr 1fr; }
+}

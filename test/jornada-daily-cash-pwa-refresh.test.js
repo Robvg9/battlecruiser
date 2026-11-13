@@ -12,20 +12,20 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.100 release and Jornada UI 7.24", () => {
-  assert.ok(APP.includes('const VERSION="9.5.100";'));
+test("PWA shell pins one fresh 9.5.101 release and Jornada UI 7.25", () => {
+  assert.ok(APP.includes('const VERSION="9.5.101";'));
   assert.ok(INDEX.includes('style.css?v=9.5.100'));
-  assert.ok(INDEX.includes('app.js?v=9.5.100'));
+  assert.ok(INDEX.includes('app.js?v=9.5.101'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.100 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.100"'));
-  assert.ok(SW.includes('./app.js?v=9.5.100'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.101 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.101"'));
+  assert.ok(SW.includes('./app.js?v=9.5.101'));
   assert.ok(SW.includes('./style.css?v=9.5.100'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
-  assert.ok(APP.includes('["bc7-jornada-ui.js","7.24"]'));
-  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.24'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.1"]'));
-  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.1'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.25"]'));
+  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.25'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.2"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.2'));
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
@@ -104,12 +104,13 @@ test("closing requires every date and confirms the final day before closing the 
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
-  assert.match(block, /rpc\('bc7_liquidacion_inventario_jornada'/);
-  assert.match(block, /pending\.gastos/);
-  assert.match(block, /pending\.reinversiones/);
-  assert.match(block, /pending\.ajustes/);
-  assert.match(block, /pending\.entregas_diarias_faltantes/);
-  assert.match(block, /salario_porcentaje/);
+  assert.match(block, /rpc\('bc7_estado_confirmaciones_jornada'/);
+  assert.match(block, /lista_para_conteo/);
+  assert.match(block, /rpc\('bc5_cerrar_jornada'/);
+  assert.doesNotMatch(block, /rpc\('bc7_liquidacion_inventario_jornada'/,
+    "la liquidación no puede bloquear el traspaso; se ejecuta en la fase del Dueño");
+  assert.doesNotMatch(block, /pending\.gastos|pending\.reinversiones|pending\.ajustes|pending\.entregas_diarias_faltantes|salario_porcentaje/,
+    "las aprobaciones pendientes pertenecen a la fase posterior al traspaso");
 });
 
 

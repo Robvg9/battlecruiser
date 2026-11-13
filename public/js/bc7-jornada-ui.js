@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.24 — reinversión por costo unitario, bajas agrupadas y movimientos contenidos.
+// v7.25 — catálogo completo para ajustes y checklist de cinco pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1110,6 +1110,84 @@
       host.innerHTML=renderMovementRows(arr(r),detail.sesion);
     }catch(e){host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se han modificado datos.</div>';}
   }
+  function checklistHtml(detail,isAssigned,status){
+    if(status!=='EN_CURSO'||detail.sesion?.es_minorista!==true)return '';
+    const checks=detail.checklist||{};
+    const manual=[
+      {key:'gastos',label:'Gastos',question:'¿Ya pusiste todos los gastos?'},
+      {key:'reinversiones',label:'Reinversiones',question:'¿Ya pusiste todas las reinversiones?'},
+      {key:'bajas',label:'Bajas',question:'¿Ya pusiste todas las bajas?'}
+    ];
+    const rows=manual.map((item,index)=>{
+      const done=checks[item.key]?.completado===true;
+      return '<div class="bc7-checklist-row '+(done?'is-done':'is-pending')+'">'+
+        '<span class="bc7-checklist-mark">'+(done?'✓':String(index+1))+'</span>'+
+        '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+(done?'Confirmado · no tienes que registrar más en este bloque':item.question)+'</small></div>'+
+        '<button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+item.key+'" data-completed="'+(done?'true':'false')+'" '+(!isAssigned?'disabled':'')+'>'+(done?'Reabrir':'Sí, ya terminé')+'</button>'+
+      '</div>';
+    }).join('');
+    const finalDone=checks.inventario_final?.completado===true;
+    const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
+      '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
+      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':'¿Ya pusiste el inventario final?')+'</small></div>'+
+      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
+    '</div>';
+    return '<section class="bc7-checklist" aria-label="Checklist de cierre de la dependienta">'+
+      '<div class="bc7-checklist-head"><div><h4>Checklist de Sheila</h4><p>Completa estos cuatro pasos. Las entradas/transferencias las registra el Dueño; no aparecen aquí.</p></div>'+
+      '<span class="bc7-checklist-count">'+(manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0))+'/4</span></div>'+
+      rows+finalRow+
+      '<p class="bc7-muted">Si registras un nuevo gasto, reinversión o baja después de confirmar, el sistema reabre automáticamente ese check.</p>'+
+    '</section>';
+  }
+  function calculationPhaseHtml(detail){
+    if(detail.sesion?.es_minorista!==true)return '';
+    const checks=detail.checklist||{};
+    const phase=checks.fase||'OPERACION';
+    const settlement=detail.liquidacion||{};
+    if(!checks.lista_para_conteo)return '';
+    const cashDone=String(checks.estado_efectivo_final||'').toUpperCase()==='APROBADA';
+    const cashState=String(checks.estado_efectivo_final||'').toUpperCase();
+    const fifthCheck='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
+      '<span class="bc7-checklist-mark">'+(cashDone?'✓':'5')+'</span>'+
+      '<div class="bc7-checklist-copy"><b>Conteo físico del Dueño</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo del efectivo declarado por el Dueño')+'</small></div>'+
+      '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
+    '</div>';
+    if(!checks.lista_para_calcular){
+      if(phase==='LISTA_PARA_ENTREGA'){
+        return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cuatro checks de Sheila están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
+      }
+      if(phase==='PENDIENTE_CONTEO_DUENO'){
+        return '<section class="bc7-calculation-phase is-waiting"><h4>Paso 5 · Efectivo final</h4>'+
+          fifthCheck+'<p>Los cuatro checks de Sheila están completos. El Dueño debe contar y aprobar el efectivo declarado antes de iniciar los cálculos.</p></section>';
+      }
+      const pending=settlement.pendientes||{};
+      const reasons=[];
+      if(Number(pending.gastos||0)>0)reasons.push(Number(pending.gastos)+' gasto(s) pendientes');
+      if(Number(pending.reinversiones||0)>0)reasons.push(Number(pending.reinversiones)+' reinversión(es) pendientes');
+      if(Number(pending.ajustes||0)>0)reasons.push(Number(pending.ajustes)+' baja(s)/merma(s) pendientes');
+      if(Number(pending.entregas_diarias||0)>0||Number(pending.entregas_diarias_faltantes||0)>0)reasons.push('entregas diarias de efectivo pendientes');
+      if(cashState==='CON_DIFERENCIA')reasons.push('el conteo de efectivo tiene una diferencia pendiente de revisión');
+      if(settlement.salario_porcentaje==null)reasons.push('falta configurar el porcentaje salarial');
+      if(Number(settlement.familias_sin_precio||0)>0)reasons.push('hay productos sin precio');
+      if(Number(settlement.familias_con_vendidas_negativas||0)>0)reasons.push('hay diferencias negativas de inventario');
+      return '<section class="bc7-calculation-phase is-waiting"><h4>Fase 2 · Preparando cálculos</h4>'+
+        fifthCheck+'<p>El efectivo está aprobado cuando el check 5 aparece verde. BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
+        (reasons.length?'<small>'+esc(reasons.join(' · '))+'</small>':'')+'</section>';
+    }
+    if(settlement.calculable!==true)return '';
+    const metrics=[
+      ['Ventas estimadas',settlement.ventas_estimadas],
+      ['Salario calculado',settlement.salario_calculado],
+      ['Gastos aprobados',settlement.gastos_aprobados],
+      ['Reinversiones aprobadas',settlement.reinversiones_aprobadas],
+      ['Efectivo esperado',settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario],
+      ['Diferencia',settlement.diferencia]
+    ];
+    return '<section class="bc7-calculation-phase is-ready"><h4>Fase 2 · Cálculos automáticos completados</h4>'+
+      fifthCheck+'<div class="bc7-calculation-grid">'+
+      metrics.map(([label,value])=>'<div><small>'+esc(label)+'</small><b>'+(value==null?'—':money(value)+' CUP')+'</b></div>').join('')+
+      '</div><p>La jornada queda lista para la revisión final. El Turno todavía no está cerrado: el Dueño debe revisar el expediente, dejar su observación y pulsar «Aprobar turno» en Turnos.</p></section>';
+  }
   function renderWorkspace(detail){
     state.detail=detail;
     const s=detail.sesion,cuts=detail.cortes||{},initial=!!cuts.INICIAL,final=!!cuts.FINAL;
@@ -1122,28 +1200,31 @@
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
-      actionArea='<div class="bc7-note"><b>Dinero recogido y cierre de jornada.</b><p>Registra el importe de cada día en esta misma pantalla. Los días anteriores quedan como entregas diarias; el último día se guarda como declaración final. No tienes que cambiar de sección.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
+      actionArea='<div class="bc7-note"><b>Completar jornada y entregar al Dueño.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
         cashDaysManagerShellHtml(detail,isAssigned,status)+
         '<label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label>'+
-        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>Finalizar jornada</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
+        '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_conteo!==true?'disabled':'')+'>Entregar jornada al Dueño</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
     }else if(status==='EN_CURSO'){
       const saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
-      actionArea='<div class="bc7-note"><b>Dinero entregado y cierre.</b><p>Registra el importe real que entregas al Dueño. Puedes guardar el dinero ahora; la jornada seguirá abierta hasta confirmar el inventario final. El administrador lo contará después del cierre.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
+      actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cuatro checks; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
     }else if(status==='COMPLETADA'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
     }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
     else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
-      const products=arr(detail.productos);
+      const products=arr(detail.productos_ajuste);
       const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
       const adjustmentStorageType=canCreateBaja?'baja':'merma';
       const adjustmentTitle=canCreateBaja&&canCreateMerma?'Registrar baja o merma':(canCreateBaja?'Registrar lista de bajas':'Registrar merma');
       const adjustmentTypeField=canCreateBaja&&canCreateMerma
         ?'<label class="bc7-field">Tipo de ajuste<select data-bc7-ajust-type required><option value="baja">Baja de inventario · lista de productos</option><option value="merma">Merma · un producto</option></select></label>'
         :'<input type="hidden" data-bc7-ajust-type value="'+adjustmentStorageType+'">';
-      const adjustmentProducts=products.filter(p=>Number(p.stock_actual)>0);
-      const adjustmentOptions='<option value="">Selecciona producto con stock</option>'+adjustmentProducts.map(p=>'<option value="'+esc(p.producto_id)+'" data-stock="'+esc(p.stock_actual)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('');
+      const availableAdjustmentProducts=products.filter(p=>Number(p.stock_actual)>0);
+      const adjustmentOptions='<option value="">Busca cualquier producto activo del almacén</option>'+products.map(p=>{
+        const stock=Number(p.stock_actual||0),minimum=Number(p.minimo||0),hasStock=stock>0;
+        return '<option value="'+esc(p.producto_id)+'" data-stock="'+esc(stock)+'" data-minimo="'+esc(minimum)+'">'+esc(p.nombre)+' · '+(hasStock?'stock '+esc(qty(stock)):'AGOTADO · stock 0')+(minimum>0?' · mínimo '+esc(qty(minimum)):'')+'</option>';
+      }).join('');
       const adjustmentRow='<div class="bc7-grid bc7-adjustment-row" data-bc7-adjustment-row>'+
         '<label class="bc7-field">Producto<select data-bc7-ajust-product required>'+adjustmentOptions+'</select></label>'+
         '<label class="bc7-field">Cantidad<input type="number" min="0.001" step="0.001" data-bc7-ajust-qty required inputmode="decimal" placeholder="Cantidad real"></label>'+
@@ -1155,12 +1236,14 @@
         '<label class="bc7-field">Detalle general (opcional)<input data-bc7-ajust-reason maxlength="160" placeholder="Aclaración común para toda la solicitud"></label>'+
         '<input type="hidden" data-bc7-adjust-key value="">'+
         '<p class="bc7-muted" data-bc7-adjustment-hint>'+(canCreateBaja?'Puedes incluir varios productos; Administración recibirá un único expediente para aprobar la lista completa.':'La merma se envía como una sola solicitud y no modifica stock hasta su aprobación.')+'</p>'+
-        (adjustmentProducts.length?'':'<p class="bc7-msg error">No hay productos con existencias disponibles para registrar bajas o mermas en este almacén.</p>')+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!adjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
+        (availableAdjustmentProducts.length?'':'<p class="bc7-msg error">El catálogo está completo, pero no hay existencias positivas para registrar una baja o merma.</p>')+
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!availableAdjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div>';
     const fin=financeFormHtml(detail,isAssigned,status);
-    const op='<div class="bc7-panel-stack">'+actionArea+fin+adjustment+'</div>';
+    const checks=checklistHtml(detail,isAssigned,status);
+    const calculation=calculationPhaseHtml(detail);
+    const op='<div class="bc7-panel-stack">'+checks+actionArea+fin+adjustment+calculation+'</div>';
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
     $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
     $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
@@ -1175,7 +1258,16 @@
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{
       const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
-      detail.entrega_compartida=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
+      const [delivery,checklist,adjustmentCatalog,liquidation]=await Promise.all([
+        rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId}),
+        rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId}),
+        rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId}),
+        rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})
+      ]);
+      detail.entrega_compartida=delivery;
+      detail.checklist=checklist;
+      detail.productos_ajuste=Array.isArray(adjustmentCatalog)?adjustmentCatalog:[];
+      detail.liquidacion=liquidation;
       detail.is_admin=!!state.admin;
       if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
@@ -1405,35 +1497,22 @@
       if(saved){amount=String(state.detail.declaracion_dinero.monto);}
       if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     }
-    if(cashMode==='daily'){
-      let settlement;
+    if(state.detail?.sesion?.es_minorista===true){
+      let checklist;
       try{
-        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId});
+        checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
       }catch(e){
-        msg(msgEl,'No se pudo verificar la liquidación antes del cierre. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
+        msg(msgEl,'No se pudieron verificar los cuatro checks en el servidor. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
         return;
       }
-      const pending=settlement?.pendientes||{};
-      const blockers=[];
-      if(settlement?.aplica===false)blockers.push(settlement.motivo||'La liquidación no está disponible');
-      if(settlement?.faltan_cortes)blockers.push('falta confirmar el inventario final');
-      if(settlement?.salario_porcentaje==null)blockers.push('el Dueño debe configurar el porcentaje salarial');
-      if(Number(settlement?.familias_sin_precio||0)>0)blockers.push('hay productos sin precio válido');
-      if(Number(settlement?.familias_con_vendidas_negativas||0)>0)blockers.push('hay diferencias negativas de inventario por revisar');
-      if(Number(pending.gastos||0)>0)blockers.push('hay gastos pendientes de aprobación');
-      if(Number(pending.reinversiones||0)>0)blockers.push('hay reinversiones pendientes de aprobación');
-      if(Number(pending.ajustes||0)>0)blockers.push('hay mermas o bajas pendientes de aprobación');
-      if(Number(pending.entregas_diarias||0)>0)blockers.push('hay entregas diarias pendientes de aprobación');
-      if(Number(pending.entregas_diarias_faltantes||0)>0)blockers.push('faltan importes diarios');
-      if(blockers.length){
-        msg(msgEl,'No se puede finalizar todavía: '+blockers.join('; ')+'. La jornada sigue abierta.','error');
+      if(checklist?.lista_para_conteo!==true){
+        msg(msgEl,'No se puede entregar todavía: Sheila debe completar gastos, reinversiones, bajas e inventario final. La jornada sigue abierta.','error');
         return;
       }
-      // The Dueño may count and approve the final cash after the operational handover.
     }
     const tramoId=state.detail.tramo_activo.id;
     const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    const confirmation=saved?'Los importes de todos los días están guardados. ¿Confirmas que deseas finalizar la jornada?':'Se guardará el importe que entregas al Dueño y se finalizará la jornada. El administrador lo contará después del cierre. ¿Confirmas?';
+    const confirmation=saved?'Los cuatro checks de Sheila están completos y el importe quedó declarado. ¿Entregas la jornada al Dueño? Después del traspaso podrá contar el efectivo y resolver las pendientes; el Turno seguirá abierto para la revisión final.':'Se guardará el importe declarado y se entregará la jornada. Después del traspaso, el Dueño podrá contar el efectivo y resolver las pendientes. ¿Confirmas?';
     if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
@@ -1451,7 +1530,7 @@
         setStatus('La jornada todavía no aparece como finalizada. Estado: '+humanStatus(finalState)+'. Actualiza antes de volver a intentarlo.','error');
         return;
       }
-      setStatus('Jornada finalizada y confirmada.','ok');
+      setStatus('Jornada entregada al Dueño. La sesión quedó completada y el Turno maestro sigue abierto. El Dueño ya puede contar el efectivo y resolver las pendientes.','ok');
     }catch(e){
       const errorText='No se pudo confirmar todavía el cierre. '+friendlyError(e,'create')+' Se comprobará el estado antes de permitir otro intento.';
       try{
@@ -1472,6 +1551,24 @@
       }
     }
     finally{busy(btn,false);}
+  }
+  async function toggleChecklistBlock(button){
+    const sessionId=state.selected;
+    const block=button?.dataset?.bc7ChecklistToggle;
+    if(!sessionId||!['gastos','reinversiones','bajas'].includes(block))return;
+    const completed=button.dataset.completed!=='true';
+    if(!navigator.onLine){setStatus('Sin conexión: el checklist requiere confirmación del servidor.','error');return;}
+    button.disabled=true;
+    try{
+      await rpc('bc7_confirmar_bloque_jornada',{
+        p_turno_sesion_id:sessionId,p_bloque:block,p_completado:completed
+      });
+      const ok=await openWorkspace(sessionId);
+      if(ok)setStatus(completed?'Bloque confirmado. Si agregas otro registro, el sistema reabrirá este check.':'Bloque reabierto para seguir registrando.','ok');
+    }catch(e){
+      button.disabled=false;
+      setStatus('No se pudo actualizar el checklist. '+friendlyError(e,'create'),'error');
+    }
   }
   function updateReinvestmentEstimate(form){
     const output=form&&form.querySelector('[data-bc7-reinvestment-estimate]');
@@ -1727,6 +1824,10 @@
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
   document.addEventListener('click',function(e){
+    const checklistToggle=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-toggle]'):null;
+    if(checklistToggle){e.preventDefault();toggleChecklistBlock(checklistToggle);return;}
+    const checklistInventory=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-inventory]'):null;
+    if(checklistInventory){e.preventDefault();activateWorkspaceTab('inventario');return;}
     const tab=e.target&&e.target.closest?e.target.closest('[data-bc7-workspace-tab]'):null;
     if(tab){e.preventDefault();activateWorkspaceTab(tab.getAttribute('data-bc7-workspace-tab'));return;}
     const back=e.target&&e.target.closest?e.target.closest('[data-bc7-back-calendar]'):null;

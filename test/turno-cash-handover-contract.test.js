@@ -90,7 +90,7 @@ test("assigned staff can declare handed-over cash and close their legacy active 
   assert.match(STAFF_UI, /API\(\)\.cerrarSesion\(sesionId\)/);
   assert.match(STAFF_UI, /await load\(state\.turno\.id\);\s*renderModal\(\);/);
   assert.match(JOURNEY_UI, /Dinero entregado \(CUP\)/);
-  assert.match(JOURNEY_UI, /el administrador lo contará después del cierre/i);
+  assert.match(JOURNEY_UI, /El conteo físico del Dueño se habilitará cuando la jornada esté completada\./i);
   assert.match(ADMIN_UI, /Dinero entregado pendiente de contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
 });
@@ -171,12 +171,12 @@ test("the owner can start a scheduled legacy day while non-worked placeholders d
   assert.ok(TURNOS_MASTER_UI.includes("no requieren declaración de efectivo"));
 });
 
-test("PWA release 9.5.100 loads and precaches the dashboard and cash handover UI", () => {
-  assert.match(APP, /const VERSION="9.5.100"/);
+test("PWA release 9.5.101 loads and precaches the dashboard and cash handover UI", () => {
+  assert.match(APP, /const VERSION="9.5.101"/);
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.0"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9.5.100"/);
+  assert.match(SW, /BC_SW_VERSION = "9.5.101"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.0/);
-  assert.match(INDEX, /app\.js\?v=9.5.100/);
+  assert.match(INDEX, /app\.js\?v=9.5.101/);
   assert.match(INDEX, /style\.css\?v=9\.5\.100/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);

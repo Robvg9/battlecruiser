@@ -7,6 +7,7 @@ const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const QUEUE=read("supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql");
+const PHASE=read("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
 const MOVEMENTS=read("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
 const CSS=read("public/style.css");
@@ -21,17 +22,18 @@ test("Centro de Control includes pending final-cash declarations for JORNADA ses
   assert.ok(QUEUE.includes("s.estado::text"));
 });
 
-test("Final cash approval uses the physical-count RPC and is disabled before session completion",()=>{
+test("Final cash count is enabled only after Sheila hands over the Jornada",()=>{
   assert.ok(ADMIN.includes("x.tipo==='declaracion_jornada'"));
   assert.ok(ADMIN.includes("const finalCashReady=String(x.motivo||'').toUpperCase()==='COMPLETADA'"));
-  assert.ok(ADMIN.includes("value=\"'+(isFinalCash?'':esc(x.monto))"));
   assert.ok(ADMIN.includes("acceptButton.disabled=isFinalCash&&!finalCashReady"));
   assert.ok(ADMIN.includes("rejectButton.hidden=isFinalCash"));
-  assert.ok(ADMIN.includes("Bloqueado hasta cerrar la jornada"));
-  assert.ok(ADMIN.includes("El servidor solo acepta el conteo después de completar la Jornada"));
-  assert.ok(ADMIN.includes("vuelve a abrir esta ventana"));
+  assert.ok(ADMIN.includes("La sesión debe estar completada"));
   assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
   assert.ok(ADMIN.includes("p_declaracion_id:id,p_monto_contado:real"));
+  assert.ok(PHASE.includes("IF v_s.estado<>'COMPLETADA' THEN"),"the server rejects cash count before session handover");
+  assert.ok(PHASE.includes("lista_para_conteo"),"the server still requires all four employee checks");
+  assert.ok(PHASE.includes("AND s.estado='COMPLETADA'"),"the Owner inbox exposes final cash only after handover");
+  assert.ok(!PHASE.includes("'LISTA_PARA_CONTEO'"),"an active session cannot advertise cash as ready to count");
 });
 
 test("Journey movement archive includes exact-session finance and cash records",()=>{
@@ -52,4 +54,13 @@ test("Jornada operation forms and mobile header are constrained to the viewport"
   assert.ok(contentHeaderOrder, "Mi Cuenta y Cerrar sesión deben permanecer juntos al extremo derecho");
   assert.ok(CSS.includes("#app-shell.visible > .app-header #user-email"));
   assert.ok(CSS.includes("min-width:0;max-width:100%"));
+});
+
+
+test("Expense and reinvestment approvals are concise and actionable directly from the queue",()=>{
+  assert.ok(ADMIN.includes("ha registrado un gasto:"));
+  assert.ok(ADMIN.includes("ha registrado una reinversión:"));
+  assert.ok(ADMIN.includes("resolverOperativaDirecta(x,'APROBAR')"));
+  assert.ok(ADMIN.includes("resolverOperativaDirecta(x,'RECHAZAR')"));
+  assert.ok(ADMIN.includes("p_tipo:item.tipo,p_id:item.id,p_decision:decision"));
 });
