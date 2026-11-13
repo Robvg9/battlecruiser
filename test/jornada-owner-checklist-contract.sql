@@ -179,7 +179,7 @@ BEGIN
   v_result:=public.bc7_estado_confirmaciones_jornada(v_sesion);
   IF coalesce((v_result->>'lista_para_calcular')::boolean,false) IS NOT TRUE
      OR v_result->>'fase'<>'CALCULAR' THEN
-    RAISE EXCEPTION 'FAIL: the automatic calculation phase did not unlock after cash approval: %',v_result;
+    RAISE EXCEPTION 'FAIL: the automatic calculation phase did not unlock after cash approval. State: %; liquidation: %',v_result,public.bc7_liquidacion_inventario_jornada(v_sesion);
   END IF;
   v_result:=public.bc7_liquidacion_inventario_jornada(v_sesion);
   IF coalesce((v_result->>'calculable')::boolean,false) IS NOT TRUE
