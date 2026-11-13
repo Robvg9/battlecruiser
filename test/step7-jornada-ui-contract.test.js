@@ -9,6 +9,7 @@ const ui=fs.readFileSync(path.join(__dirname,"../public/js/bc7-jornada-ui.js"),"
 const app=fs.readFileSync(path.join(__dirname,"../public/app.js"),"utf8");
 const sw=fs.readFileSync(path.join(__dirname,"../public/service-worker.js"),"utf8");
 const nav=fs.readFileSync(path.join(__dirname,"../public/js/permisos-navegacion.js"),"utf8");
+const jornadaCss=fs.readFileSync(path.join(__dirname,"../public/bc7-jornada-inventory-mobile.css"),"utf8");
 
 test("Step 7 has session-scoped, immutable inventory snapshots and gates start/close server-side",()=>{
   assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_inventario_cortes/);
@@ -25,7 +26,7 @@ test("Step 7 has session-scoped, immutable inventory snapshots and gates start/c
 });
 
 test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write confirmations",()=>{
-  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
+  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_bajas_multiple_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
     assert.ok(ui.includes(rpc),`UI no wired to ${rpc}`);
   }
   assert.match(ui,/confirm\(/);
@@ -50,6 +51,19 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   }
   assert.match(ui,/data-bc7-adjust-form/,"baja/merma form is composed in the same operation panel");
 
+  assert.match(ui,/data-bc7-adjustment-row/,"a baja request contains a repeatable list of product lines");
+  assert.match(ui,/data-bc7-adjustment-add/,"the user can add multiple products to one baja request");
+  assert.match(ui,/bc7_registrar_bajas_multiple_jornada/,"multiple bajas are sent through the Jornada-aware grouped RPC");
+  assert.match(ui,/p_motivo_general:reason/,"the list shares one administrative reason");
+  assert.match(ui,/friendlyError\\(e,'adjustment'\\)/,"stock errors are reported as inventory errors, not schedule-creation errors");
+  assert.match(ui,/data-stock=/,"each candidate product carries its current available stock into validation");
+  assert.match(ui,/products\\.filter\\(p=>Number\\(p\\.stock_actual\\)>0\\)/,"products without stock are excluded from the Baja/Merma picker");
+  assert.match(ui,/new Set\\(lines\\.map\\(line=>line\\.producto_id\\)\\)/,"duplicate products in one list are blocked before submission");
+  assert.match(ui,/data-bc7-reinvestment-unit-cost/,"reinvestment captures the unit cost");
+  assert.match(ui,/Math\\.round\\(quantity\\*unitCost\\*100\\)\\/100/,"reinvestment total is derived from quantity multiplied by unit cost");
+  assert.match(ui,/data-bc7-reinvestment-estimate/,"the reinvestment form previews the calculated total");
+  assert.match(jornadaCss,/#tab-jornada #bc7-movements \\.bc7-table-wrap[\\s\\S]*overflow-x: auto !important/,"movement table scrolls inside its own container");
+  assert.match(jornadaCss,/#tab-jornada #bc7-movements \\.bc7-movements-table[\\s\\S]*min-width: 760px/,"movement columns remain readable without pushing the refresh action outside the panel");
   assert.match(ui,/data-bc7-ajust-type/,"cuando el rol tiene ambos permisos se puede elegir baja o merma");
   for(const cause of ["Producto vencido","Producto roto o dañado","Consumo del dueño","Otra causa"]) assert.ok(ui.includes(cause),`falta el motivo ${cause}`);
   assert.match(ui,/const adjustmentStorageType=canCreateBaja\?'baja':'merma'/,"el tipo predeterminado respeta los permisos disponibles");
@@ -112,7 +126,11 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
+  assert.equal(moduleVersion,"7.24");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
+  assert.ok(app.includes('["aprobaciones-admin.js","20261113.1"]'));
+  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.1"));
+  assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261113.1"));
 });
 
 
