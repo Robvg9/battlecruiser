@@ -31,13 +31,17 @@ BEGIN
     RAISE EXCEPTION 'Legacy open-turn uniqueness must only apply to non-Jornada legacy Turns: %',v_index;
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public'
-    AND indexname='ux_turno_sesion_activa_almacen') THEN
-    RAISE EXCEPTION 'The unique active operational session guard was removed';
+  SELECT indexdef INTO v_index FROM pg_indexes
+  WHERE schemaname='public' AND indexname='ux_turno_sesion_activa_almacen';
+  IF v_index IS NULL OR v_index NOT ILIKE '%almacen_id%'
+     OR v_index NOT ILIKE '%JORNADA%' OR v_index NOT ILIKE '%EN_CURSO%' THEN
+    RAISE EXCEPTION 'The unique active operational session guard is missing or incorrectly scoped: %',v_index;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public'
-    AND indexname='turno_tramo_activo_unico') THEN
-    RAISE EXCEPTION 'The active tranche guard was removed';
+  SELECT indexdef INTO v_index FROM pg_indexes
+  WHERE schemaname='public' AND indexname='turno_tramo_activo_unico';
+  IF v_index IS NULL OR v_index NOT ILIKE '%turno_sesion_id%'
+     OR v_index NOT ILIKE '%ACTIVO%' THEN
+    RAISE EXCEPTION 'The unique active tranche guard is missing or incorrectly scoped: %',v_index;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public'
     AND indexname='turno_jornada_un_responsable_dia') THEN
