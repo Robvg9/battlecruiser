@@ -1,4 +1,15 @@
 -- Disposable-only baseline for Step 7 contract checks. Uses the Step 5 fixture; no LIVE rows.
+
+-- Supabase's local/hosted roles must exist in the disposable plain PostgreSQL
+-- cluster too, because production migrations explicitly grant/revoke service_role.
+DO $roles$
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN
+    CREATE ROLE service_role NOLOGIN;
+  END IF;
+END
+$roles$;
+
 \i test/step5-jornada-fixture.sql
 
 -- Production owner-review ledger: one immutable review row per Turn master.
