@@ -16,6 +16,7 @@ const m26 = fs.readFileSync('public/js/m26-ui-integridad.js', 'utf8');
 const index = fs.readFileSync('public/index.html', 'utf8');
 const auth = fs.readFileSync('public/js/auth.js', 'utf8');
 const e2e = fs.readFileSync('test/live-offline-e2e.js', 'utf8');
+const productPicker = fs.readFileSync('public/js/product-select-search.js', 'utf8');
 
 function extract(text, pattern, label) {
   const m = text.match(pattern);
@@ -27,6 +28,14 @@ test('app.js y service-worker.js comparten la misma versión BattleCruiser', () 
   const appVersion = extract(app, /const VERSION=["'](\d+\.\d+\.\d+)["']/, 'VERSION de app.js');
   const swVersion = extract(sw, /BC_SW_VERSION\s*=\s*["'](\d+\.\d+\.\d+)["']/, 'BC_SW_VERSION del Service Worker');
   assert.equal(swVersion, appVersion);
+});
+
+test('El selector de productos deja buscar los agotados sin permitir seleccionarlos', () => {
+  assert.ok(app.includes('["product-select-search.js","2.3"]'));
+  assert.ok(sw.includes("./js/product-select-search.js?v=2.3"));
+  assert.match(productPicker,/const matches = Array\.from\(active\.options\)\.filter\(option => option\.value && norm\(option\.textContent\)\.includes\(term\)\)/);
+  assert.match(productPicker,/button\.disabled=unavailable/);
+  assert.match(productPicker,/if\(!unavailable\)button\.setAttribute\('data-bc-product-value', option\.value\)/);
 });
 
 test('Service Worker construye los nombres de caché desde BC_SW_VERSION', () => {
