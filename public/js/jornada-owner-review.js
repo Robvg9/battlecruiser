@@ -172,28 +172,32 @@
   }
   function render(data){
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
-    const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
+    const lastDate=sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha;
+    const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(lastDate)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
     const body=document.getElementById('bcjr-content');
     const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes||0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
     const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
-    const completedSessions=sessions.filter(s=>s.estado==='COMPLETADA');
+    const completed=sessions.filter(s=>s.estado==='COMPLETADA');
     const cashSessions=sessions.filter(s=>s.liquidacion?.dinero_recogido_total!=null);
     const cashComplete=sessions.length>0&&cashSessions.length===sessions.length;
     const cashTotal=cashSessions.reduce((v,s)=>v+Number(s.liquidacion.dinero_recogido_total),0);
     const cashLabel=cashComplete?money(cashTotal)+' CUP':cashSessions.length?money(cashTotal)+' CUP · PARCIAL':'Pendiente';
-    const profitComplete=sessions.length>0&&sessions.every(s=>['COMPLETADA','CANCELADA'].includes(s.estado))
-      &&completedSessions.every(s=>s.liquidacion?.ganancia_bruta_es_total===true);
-    body.innerHTML='<div class="bcjr-cards">'+[
+    const profitComplete=sessions.length>0&&sessions.every(s=>['COMPLETADA','CANCELADA'].includes(s.estado))&&completed.every(s=>s.liquidacion?.ganancia_bruta_es_total===true);
+    const mainCards=[
       card('Estado de revisión',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
-      card('Periodo del turno',String(turn.dias_turno||1)+' día(s) · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)),
+      card('Periodo del turno',String(turn.dias_turno||1)+' día(s) · '+fmtDate(turn.fecha)+' – '+fmtDate(lastDate)),
       card('Productos en los cortes',String(sessions.reduce((n,s)=>n+(s.liquidacion?.lineas?.length||0),0))),
-      card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
-      card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
-      card('Efectivo total recogido',cashLabel),
+      card('Efectivo recogido',cashLabel)
+    ];
+    const detailCards=[
+      card('Ventas estimadas',hasPendingPost?'Pendiente de clasificación':(completed.some(s=>s.liquidacion?.ventas_estimadas!=null)?money(completed.reduce((v,s)=>v+Number(s.liquidacion?.ventas_estimadas||0),0))+' CUP':'No calculable')),
+      card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completed.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
+      card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completed.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Gastos',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.gastos_aprobados||0),0))+' CUP'),
       card('Reinversiones',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.reinversiones_aprobadas||0),0))+' CUP')
-    ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
+    ];
+    body.innerHTML='<div class="bcjr-cards">'+mainCards.join('')+'</div><details class="bcjr-panel"><summary>Ver resumen financiero completo</summary><div class="bcjr-panel-body"><div class="bcjr-cards">'+detailCards.join('')+'</div></div></details>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{
       const l=s.liquidacion||{};
@@ -206,20 +210,10 @@
     btn.disabled=busy||blockers.length>0||approved||sessions.length===0;
     btn.textContent=approved?'Turno aprobado':blockers.length?'Aprobación bloqueada · '+blockers.length+' validación(es)':'Aprobar turno';
     const msg=document.getElementById('bcjr-message');
-    msg.textContent=approved?'Este Turno ya fue aprobado.':blockers.length?blockers.join(' · '):'Revisa las cifras y confirma la aprobación cuando estés conforme.';
+    msg.textContent=approved?'Este Turno ya fue aprobado.':blockers.length?blockers.slice(0,3).join(' · ')+(blockers.length>3?' · y '+(blockers.length-3)+' más':''):'Revisa las cifras y confirma la aprobación cuando estés conforme.';
     msg.className='bcjr-message'+(blockers.length?' bcjr-error':'');
     modal.hidden=false;document.body.classList.add('bc-jornada-review-open');
   }
-  async function openReview(turnId){
-    activeTurnId=turnId;const modal=ensure();modal.hidden=false;
-    document.body.classList.add('bc-jornada-review-open');
-    document.getElementById('bcjr-title').textContent='Revisión integral del turno';
-    document.getElementById('bcjr-subtitle').textContent='Recuperando liquidación…';
-    document.getElementById('bcjr-content').innerHTML='<p>Consultando inventario, ventas, costos, efectivo y movimientos…</p>';
-    try{const data=await rpc('bc7_obtener_revision_jornada',{p_turno_id:turnId});render(data);}
-    catch(e){document.getElementById('bcjr-content').innerHTML='<div class="bcjr-alert">'+esc(e.message||e)+'</div>';document.getElementById('bcjr-message').textContent='No se pudo cargar el expediente.';}
-  }
-  function close(){const m=document.getElementById('bc-jornada-review-modal');if(m)m.hidden=true;document.body.classList.remove('bc-jornada-review-open');}
   let correctionContext=null;
   function openCorrectionModal(kind,data){
     correctionContext={kind,session:data.session,product:data.product,name:data.name};
