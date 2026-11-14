@@ -103,8 +103,9 @@ BEGIN
     INTO v_definition;
   IF position('IF coalesce(v_pending_post,0)>0 THEN' IN v_definition)=0
      OR position('costo_vendido_estimado' IN v_definition)=0
-     OR position('v_cost_covered:=0' IN v_definition)=0
-     OR position('ganancia_bruta_es_total' IN v_definition)=0 THEN
+     OR position('costos_con_cobertura' IN v_definition)=0
+     OR position('ganancia_bruta_parcial' IN v_definition)=0
+     OR position('ganancia_bruta_es_total',false) IN v_definition)=0 THEN
     RAISE EXCEPTION 'Owner review must mask derived sales/cost/profit fields without discarding physical inventory lines';
   END IF;
 
