@@ -110,3 +110,9 @@ test("Post-cutoff classification controls remain visible and usable on mobile wi
   assert.match(REVIEW,/Guardar clasificación auditada/);
   assert.doesNotMatch(REVIEW,/bcjr-movement-list.*<table/);
 });
+
+
+test("Owner review primary action keeps sufficient dark-mode contrast",()=>{
+  assert.ok(REVIEW.includes(".bcjr-btn.primary{background:#315d4a;color:white;border-color:transparent}"));
+  assert.ok(REVIEW.includes("body.bc-theme-light .bcjr-btn.primary{background:#315d4a;color:#fff"));
+});
