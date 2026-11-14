@@ -142,12 +142,14 @@
     const daily=Array.isArray(s.entregas_diarias)?s.entregas_diarias:[];
     const periodDays=Math.max(1,Number(turn?.dias_turno||1));
     const periodTitle=periodDays>1?'Jornada · '+fmtDate(s.fecha)+' – '+fmtDate(s.fecha_fin||s.fecha)+' · '+periodDays+' días':'Jornada · '+fmtDate(s.fecha);
-    const dailyCash=daily.length?'<div class="bcjr-alert"><b>Entregas de efectivo por día</b><ul>'+daily.map(e=>'<li>'+esc(fmtDate(e.fecha))+' · '+esc(money(e.monto))+' CUP · '+esc(e.estado||'sin estado')+'</li>').join('')+'</ul><p class="bcjr-muted">El efectivo final contado ('+esc(money(s.efectivo?.contado))+' CUP) es un conteo aparte; no lo confundas con la entrega diaria.</p></div>':'<p class="bcjr-muted">No hay entregas diarias registradas en el expediente.</p>';
+    const cashRows=daily.map(e=>'<li>'+esc(fmtDate(e.fecha))+' · Entrega diaria aprobada: <b>'+esc(money(e.monto))+' CUP</b></li>');
+    if(s.efectivo?.contado!=null)cashRows.push('<li>'+esc(fmtDate((s.efectivo.contado_at||'').slice(0,10)||s.fecha_fin||s.fecha))+' · Conteo final de caja: <b>'+esc(money(s.efectivo.contado))+' CUP</b> · '+esc(s.efectivo.estado||'sin estado')+'</li>');
+    const dailyCash=cashRows.length?'<div class="bcjr-alert"><b>Dinero recibido durante el período</b><ul>'+cashRows.join('')+'</ul><p class="bcjr-muted">Total recogido: <b>'+esc(money(l.dinero_recogido_total))+' CUP</b>. El conteo final se muestra separado de las entregas diarias para no duplicarlo.</p></div>':'<p class="bcjr-muted">No hay entregas diarias ni conteo final registrados en el expediente.</p>';
     return '<section class="bcjr-session"><h3>'+esc(periodTitle)+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · efectivo final declarado '+esc(money(s.efectivo?.declarado))+' CUP · conteo final '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin aprobación')+'</p>'+dailyCash+'<span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+movements+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+(lines.length?esc(lines.length)+' productos · '+(pendingPost?'existencias visibles; ventas bloqueadas':'tabla detallada'):'Pendiente de cortes de inventario confirmados')+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details>'+'</section>';
   }
   function render(data){
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
-    const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' · '+sessions.length+' sesión(es) · '+(turn.estado_maestro||turn.estado||'');
+    const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
     const body=document.getElementById('bcjr-content');
     const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes||0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
@@ -162,7 +164,7 @@
     body.innerHTML='<div class="bcjr-cards">'+[
       card('Estado de revisión',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
       card('Periodo del turno',String(turn.dias_turno||1)+' día(s) · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)),
-      card('Sesiones registradas',String(sessions.length)),
+      card('Productos en los cortes',String(sessions.reduce((n,s)=>n+(s.liquidacion?.lineas?.length||0),0))),
       card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Efectivo total recogido',cashLabel),
