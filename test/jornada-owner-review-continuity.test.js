@@ -134,12 +134,12 @@ test("Inventory detail control remains available even while calculation lines ar
 
 test("Unclassified post-cutoff movements preserve physical stock and block derived values",()=>{
   const fn=MIG.slice(MIG.indexOf("CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada"),MIG.indexOf("CREATE OR REPLACE FUNCTION public.listar_aprobaciones_admin"));
-  const owner=MIG.slice(MIG.indexOf("CREATE OR REPLACE FUNCTION public.bc7_obtener_revision_jornada"),MIG.indexOf("CREATE OR REPLACE FUNCTION public.bc7_resolver_revision_jornada"));
+  const INTEGRAL=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
+  const owner=INTEGRAL.slice(INTEGRAL.indexOf("CREATE OR REPLACE FUNCTION public.bc7_obtener_revision_jornada"),INTEGRAL.indexOf("CREATE OR REPLACE FUNCTION public.bc7_corregir_inventario_final_jornada"));
   assert.match(fn,/v_difference:=NULL;[\s\S]*v_priced_lines:=0;[\s\S]*x\.value - ARRAY\['unidades_vendidas','importe_estimado'\]/);
   assert.match(fn,/'inventario_inicial',initial_qty/);
   assert.match(fn,/'inventario_final',final_qty/);
-  assert.match(owner,/IF coalesce\(v_pending_post,0\)>0 THEN[\s\S]*'costo_vendido_estimado'[\s\S]*v_cost_covered:=0/);
-  assert.match(owner,/IF coalesce\(v_pending_post,0\)>0 THEN[\s\S]*'ganancia_bruta_es_total',false/);
+  assert.match(owner,/IF coalesce\(v_pending_post,0\)>0 THEN[\s\S]*'costos_con_cobertura',0[\s\S]*'ganancia_bruta_es_total',false/);
   assert.match(REVIEW,/El inventario físico sí está disponible/);
   assert.match(REVIEW,/Pendiente de clasificación/);
   assert.match(REVIEW,/Inventario inicial/);
