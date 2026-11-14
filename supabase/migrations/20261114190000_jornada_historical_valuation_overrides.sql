@@ -581,6 +581,8 @@ DECLARE
   v_s public.turno_sesiones;
   v_before jsonb;
   v_after jsonb;
+  v_price numeric(14,2);
+  v_cost numeric(14,2);
 BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo el Dueño/Admin puede corregir precios o costos históricos.' USING ERRCODE='42501';
@@ -622,19 +624,20 @@ BEGIN
   SELECT jsonb_build_object('precio_venta',precio_venta_corregido,'costo_unitario',costo_unitario_corregido)
     INTO v_before
   FROM public.turno_jornada_valoracion_correcciones
-  WHERE turno_sesion_id=v_s.id AND producto_id=p_producto_id AND vigente;
+  WHERE turno_sesion_id=v_s.id AND producto_id=p_producto_id AND vigente
+  FOR UPDATE;
+  v_price:=coalesce(p_precio_venta,nullif(v_before->>'precio_venta','')::numeric);
+  v_cost:=coalesce(p_costo_unitario,nullif(v_before->>'costo_unitario','')::numeric);
+  IF v_price IS NULL AND v_cost IS NULL THEN
+    RAISE EXCEPTION 'No hay valores que conservar; introduce un precio o costo histórico.' USING ERRCODE='22023';
+  END IF;
+  UPDATE public.turno_jornada_valoracion_correcciones
+    SET vigente=false
+    WHERE turno_sesion_id=v_s.id AND producto_id=p_producto_id AND vigente;
   INSERT INTO public.turno_jornada_valoracion_correcciones(
     turno_sesion_id,producto_id,precio_venta_corregido,costo_unitario_corregido,comentario,creado_por,vigente
-  ) VALUES(v_s.id,p_producto_id,p_precio_venta,p_costo_unitario,btrim(p_comentario),auth.uid(),true)
-  ON CONFLICT (turno_sesion_id,producto_id) WHERE vigente
-  DO UPDATE SET
-    precio_venta_corregido=coalesce(EXCLUDED.precio_venta_corregido,public.turno_jornada_valoracion_correcciones.precio_venta_corregido),
-    costo_unitario_corregido=coalesce(EXCLUDED.costo_unitario_corregido,public.turno_jornada_valoracion_correcciones.costo_unitario_corregido),
-    comentario=EXCLUDED.comentario,creado_por=EXCLUDED.creado_por,creado_en=now();
-  SELECT jsonb_build_object('precio_venta',precio_venta_corregido,'costo_unitario',costo_unitario_corregido)
-    INTO v_after
-  FROM public.turno_jornada_valoracion_correcciones
-  WHERE turno_sesion_id=v_s.id AND producto_id=p_producto_id AND vigente;
+  ) VALUES(v_s.id,p_producto_id,v_price,v_cost,btrim(p_comentario),auth.uid(),true);
+  v_after:=jsonb_build_object('precio_venta',v_price,'costo_unitario',v_cost);
   INSERT INTO public.turno_jornada_eventos(
     almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
   ) VALUES(
