@@ -86,6 +86,47 @@
       @media(max-width:650px){.bcjr-dialog{padding:14px;max-height:98vh}.bcjr-head h2{font-size:1.15rem}.bcjr-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.bcjr-session{padding:10px}.bcjr-inventory>summary{padding:12px;font-size:.9rem}.bcjr-inventory-body{padding:7px}}
 
     `;
+
+    style.textContent += `
+      .bcjr-dialog{display:flex;flex-direction:column;height:min(96dvh,960px);max-height:96dvh;min-height:0;overflow:hidden;box-sizing:border-box}
+      #bcjr-content{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 3px 10px}
+      .bcjr-head{flex:0 0 auto}
+      .bcjr-footer{position:static;flex:0 0 auto;margin-top:8px;padding-top:9px}
+      .bcjr-session,.bcjr-inventory-body{min-width:0}
+      .bcjr-inventory{overflow:visible}
+      .bcjr-table-wrap{max-width:100%;max-height:56vh;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+      .bcjr-table{width:100%;min-width:760px;table-layout:auto;border-collapse:separate;border-spacing:0}
+      .bcjr-table th:first-child,.bcjr-table td:first-child{z-index:2;min-width:155px}
+      .bcjr-table thead th{z-index:3}
+      .bcjr-table thead th:first-child{z-index:4}
+      .bcjr-table[data-bcjr-view="stock"]{min-width:0}
+      .bcjr-table[data-bcjr-view="stock"] th:nth-child(n+7),.bcjr-table[data-bcjr-view="stock"] td:nth-child(n+7){display:none}
+      .bcjr-table[data-bcjr-view="finance"] th:nth-child(n+2):nth-child(-n+6),.bcjr-table[data-bcjr-view="finance"] td:nth-child(n+2):nth-child(-n+6){display:none}
+      .bcjr-table-switch{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+      .bcjr-table-switch .active{background:#315d4a;color:#fff;border-color:#315d4a}
+      .bcjr-detail{margin:9px 0;border:1px solid var(--gold-dim,#9a7c3e);border-radius:10px;overflow:hidden}
+      .bcjr-detail>summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:var(--stone-2,#1a3830);font-weight:750;list-style:none}
+      .bcjr-detail>summary::-webkit-details-marker{display:none}
+      .bcjr-detail>summary:after{content:'＋';color:var(--gold,#d4b05c);font-size:1.1rem}
+      .bcjr-detail[open]>summary:after{content:'−'}
+      .bcjr-detail-body{padding:10px 12px;min-width:0}
+      .bcjr-btn.small{padding:6px 8px;font-size:.75rem;white-space:nowrap}
+      body.bc-theme-light .bcjr-detail>summary{background:#e2ded3;color:#202722}
+      @media(max-width:650px){
+        #bc-jornada-review-modal{padding:0}
+        .bcjr-dialog{width:100%;height:100dvh;max-height:100dvh;border-radius:0;padding:10px}
+        .bcjr-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+        .bcjr-card{padding:9px}
+        .bcjr-session{padding:9px;margin:9px 0}
+        .bcjr-table-wrap{max-height:50dvh}
+        .bcjr-table{font-size:.76rem}
+        .bcjr-table th,.bcjr-table td{padding:7px}
+        .bcjr-table th:first-child,.bcjr-table td:first-child{min-width:125px}
+        .bcjr-footer{gap:5px}
+        .bcjr-footer-actions .bcjr-btn{padding:8px 9px;font-size:.78rem}
+        .bcjr-message{flex:1 1 100%}
+      }
+    `;
     document.head.appendChild(style);
   }
   function ensure(){
