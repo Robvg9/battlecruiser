@@ -258,7 +258,7 @@
   function openValuesEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
     const box=document.createElement('div');box.className='bcjr-values-modal';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Se aplican exclusivamente a esta Jornada. No modifican el catálogo ni las ventas futuras. Si hubo varios precios o costos, introduce el promedio ponderado del período.</p><label>Precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price value="'+esc(button.dataset.price)+'"></label><label>Costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost value="'+esc(button.dataset.cost)+'"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar valores auditados</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Solo afecta esta Jornada. No cambia el catálogo ni futuras ventas. Precio actual en el cálculo: <b>'+esc(button.dataset.price===''?'Sin precio':money(button.dataset.price))+' CUP</b>. Costo documentado actual: <b>'+esc(button.dataset.cost===''?'Sin costo':money(button.dataset.cost))+' CUP</b>. Deja vacío cualquier campo que no quieras modificar; cuando hubo varios importes, usa el promedio ponderado de la jornada.</p><label>Nuevo precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price placeholder="Sin cambio"></label><label>Nuevo costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost placeholder="Sin cambio"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar valores auditados</button></div></section>';
     document.body.appendChild(box);box.querySelector('[data-bcjr-value-price]')?.focus();
   }
   async function saveValuesEditor(button){
@@ -266,12 +266,13 @@
     const price=box?.querySelector('[data-bcjr-value-price]')?.value.trim();
     const cost=box?.querySelector('[data-bcjr-value-cost]')?.value.trim();
     const reason=box?.querySelector('[data-bcjr-value-reason]')?.value.trim();
-    if(price===''||cost===''||!Number.isFinite(Number(price))||!Number.isFinite(Number(cost))||Number(price)<0||Number(cost)<0||reason.length<5){
-      const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Indica precio, costo y un motivo verificable (mínimo 5 caracteres).';return;
+    const hasPrice=price!==''&&price!=null,hasCost=cost!==''&&cost!=null;
+    if((!hasPrice&&!hasCost)||(hasPrice&&(!Number.isFinite(Number(price))||Number(price)<0))||(hasCost&&(!Number.isFinite(Number(cost))||Number(cost)<0))||reason.length<5){
+      const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Indica al menos un valor válido (precio o costo) y un motivo verificable (mínimo 5 caracteres).';return;
     }
     if(busy)return;
     await run(async()=>{
-      await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:Number(price),costo_unitario:Number(cost)}],p_comentario:reason});
+      await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:hasPrice?Number(price):null,costo_unitario:hasCost?Number(cost):null}],p_comentario:reason});
       box?.remove();await openReview(activeTurnId);
     });
   }
