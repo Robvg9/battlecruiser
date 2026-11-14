@@ -603,7 +603,7 @@ BEGIN
   END IF;
   IF EXISTS(
     SELECT 1 FROM public.turnos t
-    WHERE t.id=v_s.turno_id AND coalesce(nullif(t.estado_maestro,''),t.estado) IN ('CERRADO','CANCELADO')
+    WHERE t.id=v_s.turno_id AND coalesce(nullif(t.estado_maestro::text,''),t.estado::text) IN ('CERRADO','CANCELADO')
   ) THEN
     RAISE EXCEPTION 'El Turno ya está cerrado o cancelado; no admite correcciones históricas.' USING ERRCODE='23514';
   END IF;
