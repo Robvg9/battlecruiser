@@ -19,34 +19,72 @@
       #bc-jornada-review-modal{position:fixed;inset:0;z-index:10080;display:flex;align-items:center;justify-content:center;padding:2vh 2vw}
       #bc-jornada-review-modal[hidden]{display:none}
       .bcjr-backdrop{position:absolute;inset:0;background:rgba(10,18,30,.72);backdrop-filter:blur(3px)}
-      .bcjr-dialog{position:relative;width:min(1440px,100%);max-height:96vh;overflow:auto;background:var(--card-bg,#fff);color:var(--text,#172033);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);padding:22px}
-      .bcjr-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:1px solid var(--border,#ddd);padding-bottom:14px;margin-bottom:16px}
-      .bcjr-head h2{margin:0 0 5px;font-size:1.4rem}.bcjr-head p{margin:0;color:var(--muted,#667085)}
+      .bcjr-dialog{position:relative;width:min(1440px,100%);max-height:96vh;overflow:auto;background:var(--stone,#122a24);color:var(--text,#f5efe3);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.35);padding:22px}
+      .bcjr-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:1px solid var(--gold-dim,#9a7c3e);padding-bottom:14px;margin-bottom:16px}
+      .bcjr-head h2{margin:0 0 5px;font-size:1.4rem}.bcjr-head p{margin:0;color:var(--mist,#c9c0a8)}
       .bcjr-close{border:0;background:transparent;font-size:28px;cursor:pointer;color:inherit}
       .bcjr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:14px 0}
-      .bcjr-card{border:1px solid var(--border,#ddd);border-radius:12px;padding:12px;background:var(--surface,#f8fafc)}
-      .bcjr-card small{display:block;color:var(--muted,#667085);font-size:.78rem}.bcjr-card b{display:block;font-size:1.12rem;margin-top:5px;overflow-wrap:anywhere}
-      .bcjr-session{border:1px solid var(--border,#ddd);border-radius:14px;margin:16px 0;padding:16px}
-      .bcjr-session h3{margin:0 0 8px}.bcjr-muted{color:var(--muted,#667085);font-size:.88rem}
-      .bcjr-pill{display:inline-block;border-radius:999px;padding:4px 9px;background:#eef2f6;font-size:.78rem;font-weight:700}
-      .bcjr-pill.warn{background:#fff2d6;color:#895b00}.bcjr-pill.ok{background:#e4f5e9;color:#176c38}
-      .bcjr-alert{border-left:4px solid #c88c16;background:#fff8e7;padding:10px 12px;margin:10px 0;border-radius:6px}
-      .bcjr-table-wrap{overflow:auto;border:1px solid var(--border,#ddd);border-radius:10px;margin:12px 0}
+      .bcjr-card{border:1px solid var(--gold-dim,#9a7c3e);border-radius:12px;padding:12px;background:var(--stone-2,#1a3830)}
+      .bcjr-card small{display:block;color:var(--mist,#c9c0a8);font-size:.78rem}.bcjr-card b{display:block;font-size:1.12rem;margin-top:5px;overflow-wrap:anywhere}
+      .bcjr-session{border:1px solid var(--gold-dim,#9a7c3e);border-radius:14px;margin:16px 0;padding:16px}
+      .bcjr-session h3{margin:0 0 8px}.bcjr-muted{color:var(--mist,#c9c0a8);font-size:.88rem}
+      .bcjr-pill{display:inline-block;border-radius:999px;padding:4px 9px;background:rgba(201,192,168,.16);color:var(--text,#f5efe3);font-size:.78rem;font-weight:700}
+      .bcjr-pill.warn{background:rgba(212,176,92,.18);color:var(--gold-bright,#efd48a)}.bcjr-pill.ok{background:rgba(90,160,112,.18);color:#9fd2aa}
+      .bcjr-alert{border-left:4px solid var(--gold,#d4b05c);background:rgba(212,176,92,.12);padding:10px 12px;margin:10px 0;border-radius:6px}
+      .bcjr-table-wrap{overflow:auto;border:1px solid var(--gold-dim,#9a7c3e);border-radius:10px;margin:12px 0}
       .bcjr-table{border-collapse:collapse;width:100%;min-width:1180px;font-size:.82rem}
-      .bcjr-table th,.bcjr-table td{padding:8px 9px;border-bottom:1px solid var(--border,#e2e8f0);white-space:nowrap;text-align:right}
-      .bcjr-table th:first-child,.bcjr-table td:first-child{text-align:left;position:sticky;left:0;background:var(--card-bg,#fff);z-index:1}
-      .bcjr-table thead th{background:var(--surface,#f1f5f9);position:sticky;top:0;z-index:2}
-      .bcjr-table tfoot td{font-weight:800;background:var(--surface,#f1f5f9)}
-      .bcjr-field{display:flex;flex-wrap:wrap;align-items:end;gap:9px;margin:12px 0;padding:12px;border:1px solid var(--border,#ddd);border-radius:10px}
+      .bcjr-table th,.bcjr-table td{padding:8px 9px;border-bottom:1px solid var(--gold-dim,#9a7c3e);white-space:nowrap;text-align:right}
+      .bcjr-table th:first-child,.bcjr-table td:first-child{text-align:left;position:sticky;left:0;background:var(--stone,#122a24);z-index:1}
+      .bcjr-table thead th{background:var(--stone-2,#1a3830);position:sticky;top:0;z-index:2}
+      .bcjr-table tfoot td{font-weight:800;background:var(--stone-2,#1a3830)}
+      .bcjr-field{display:flex;flex-wrap:wrap;align-items:end;gap:9px;margin:12px 0;padding:12px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:10px}
       .bcjr-field label{display:flex;flex-direction:column;gap:4px;font-size:.83rem}
-      .bcjr-field input,.bcjr-field select,.bcjr-field textarea{padding:8px;border:1px solid var(--border,#bbb);border-radius:7px;max-width:100%}
-      .bcjr-btn{border:1px solid var(--border,#bbb);border-radius:9px;padding:9px 13px;background:var(--surface,#f5f7fa);color:inherit;cursor:pointer;font-weight:650}
-      .bcjr-btn.primary{background:var(--primary,#164e8a);color:white;border-color:transparent}.bcjr-btn.danger{color:#a32323}
+      .bcjr-field input,.bcjr-field select,.bcjr-field textarea{padding:8px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:7px;max-width:100%}
+      .bcjr-btn{border:1px solid var(--gold-dim,#9a7c3e);border-radius:9px;padding:9px 13px;background:var(--stone-2,#1a3830);color:var(--text,#f5efe3);cursor:pointer;font-weight:650}
+      .bcjr-btn.primary{background:#315d4a;color:white;border-color:transparent}.bcjr-btn.danger{color:#ff8d86}
       .bcjr-btn:disabled{opacity:.45;cursor:not-allowed}
-      .bcjr-footer{position:sticky;bottom:-22px;background:var(--card-bg,#fff);padding:14px 0 0;border-top:1px solid var(--border,#ddd);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px}
+      .bcjr-footer{position:sticky;bottom:-22px;background:var(--stone,#122a24);padding:14px 0 0;border-top:1px solid var(--gold-dim,#9a7c3e);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px}
       .bcjr-footer-actions{display:flex;gap:8px;flex-wrap:wrap}
-      .bcjr-message{min-height:1.3em;color:var(--muted,#667085);font-size:.88rem}.bcjr-error{color:#b42318}
-      @media(max-width:650px){.bcjr-dialog{padding:14px;max-height:98vh}.bcjr-head h2{font-size:1.15rem}.bcjr-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.bcjr-session{padding:10px}}
+      .bcjr-message{min-height:1.3em;color:var(--mist,#c9c0a8);font-size:.88rem}.bcjr-error{color:#ff8d86}
+      
+      .bcjr-movement-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:9px;margin:12px 0}
+      .bcjr-movement-card{min-width:0;padding:12px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:10px;background:var(--stone-2,#1a3830);color:var(--text,#f5efe3)}
+      .bcjr-movement-title{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.bcjr-movement-title b{overflow-wrap:anywhere}.bcjr-movement-title strong{white-space:nowrap;color:var(--gold-bright,#efd48a)}
+      .bcjr-movement-meta{display:grid;gap:3px;margin:8px 0;color:var(--mist,#c9c0a8);font-size:.76rem}
+      .bcjr-movement-decision{display:grid;gap:6px;font-size:.82rem;font-weight:700}
+      .bcjr-movement-decision select{width:100%;min-height:42px;padding:9px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:8px;background:var(--void,#0a1613);color:var(--text,#f5efe3)}
+      .bcjr-movement-reason{display:block;margin-top:8px;color:var(--mist,#c9c0a8);line-height:1.4}
+      body.bc-theme-light .bcjr-movement-card{background:#efede5!important;color:#202722!important;border-color:#c7bda8!important}
+      body.bc-theme-light .bcjr-movement-meta,body.bc-theme-light .bcjr-movement-reason{color:#4b534b}
+      body.bc-theme-light .bcjr-movement-title strong{color:#75571d}
+      body.bc-theme-light .bcjr-movement-decision select{background:#f1eee5!important;color:#202722!important;border-color:#bdb39e!important}
+      .bcjr-inventory{margin:14px 0;border:1px solid var(--gold-dim,#9a7c3e);border-radius:12px;overflow:hidden}
+      .bcjr-inventory>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;cursor:pointer;padding:13px 15px;background:var(--stone-2,#1a3830);color:var(--text,#f5efe3);font-weight:750}
+      .bcjr-inventory>summary::-webkit-details-marker{display:none}
+      .bcjr-inventory>summary:after{content:'＋';font-size:1.2rem;color:var(--gold,#d4b05c)}
+      .bcjr-inventory[open]>summary:after{content:'−'}
+      .bcjr-inventory-body{padding:10px;background:var(--stone,#122a24)}
+      .bcjr-inventory .bcjr-table{min-width:980px}
+      .bcjr-field input,.bcjr-field select,.bcjr-field textarea{background:var(--void,#0a1613);color:var(--text,#f5efe3)}
+      .bcjr-field select option{background:var(--stone,#122a24);color:var(--text,#f5efe3)}
+      body.bc-theme-light .bcjr-dialog{background:#e8e4da;color:#202722}
+      body.bc-theme-light .bcjr-head,body.bc-theme-light .bcjr-session,body.bc-theme-light .bcjr-field,body.bc-theme-light .bcjr-table-wrap,body.bc-theme-light .bcjr-inventory{border-color:#c3b9a5}
+      body.bc-theme-light .bcjr-card{background:#f3efe6;border-color:#c9bfac;color:#202722}
+      body.bc-theme-light .bcjr-card small,body.bc-theme-light .bcjr-muted{color:#4b534b}
+      body.bc-theme-light .bcjr-alert{background:#f1e8d4;color:#332b1d;border-left-color:#9b742b}
+      body.bc-theme-light .bcjr-pill.warn{background:#f2dfb8;color:#654812}
+      body.bc-theme-light .bcjr-pill.ok{background:#dce9dc;color:#285333}
+      body.bc-theme-light .bcjr-table th,body.bc-theme-light .bcjr-table td{background:#efede5;color:#202722;border-color:#c7bda8}
+      body.bc-theme-light .bcjr-table thead th,body.bc-theme-light .bcjr-table tfoot td,body.bc-theme-light .bcjr-inventory>summary{background:#e2ded3!important;color:#202722!important}
+      body.bc-theme-light .bcjr-table th:first-child,body.bc-theme-light .bcjr-table td:first-child{background:#e8e4da!important}
+      body.bc-theme-light .bcjr-field input,body.bc-theme-light .bcjr-field select,body.bc-theme-light .bcjr-field textarea{background:#f1eee5;color:#202722;border-color:#bdb39e}
+      body.bc-theme-light .bcjr-btn{background:#e2ded3;color:#202722;border-color:#bdb39e}
+      body.bc-theme-light .bcjr-btn.primary{background:#315d4a;color:#fff;border-color:#315d4a}
+      body.bc-theme-light .bcjr-btn.danger{color:#8d3030}
+      body.bc-theme-light .bcjr-footer{background:#e8e4da;border-color:#c7bda8}
+      body.bc-theme-light .bcjr-message{color:#424b43}
+      @media(max-width:650px){.bcjr-dialog{padding:14px;max-height:98vh}.bcjr-head h2{font-size:1.15rem}.bcjr-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.bcjr-session{padding:10px}.bcjr-inventory>summary{padding:12px;font-size:.9rem}.bcjr-inventory-body{padding:7px}}
+
     `;
     document.head.appendChild(style);
   }
@@ -61,25 +99,27 @@
   function sessionHtml(s){
     const l=s.liquidacion||{},lines=Array.isArray(l.lineas)?l.lineas:[];
     const pending=l.pendientes||{},post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:[];
+    const pendingPost=Number(l.movimientos_posteriores_pendientes||pending.movimientos_posteriores_corte||0)>0;
+    const blocked='Pendiente de clasificación';
     const cards=[
-      ['Ventas estimadas',l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)+' CUP'],
-      ['Ganancia bruta estimada',l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL')],
-      ['Costo de ventas estimado',lines.some(x=>x.costo_vendido_estimado!=null)?money(lines.reduce((v,x)=>v+Number(x.costo_vendido_estimado||0),0))+' CUP'+(Number(l.costos_sin_cobertura||0)>0?' · PARCIAL':''):'No calculable'],
+      ['Ventas estimadas',pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)+' CUP')],
+      ['Ganancia bruta estimada',pendingPost?blocked:(l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL'))],
+      ['Costo de ventas estimado',pendingPost?blocked:(lines.some(x=>x.costo_vendido_estimado!=null)?money(lines.reduce((v,x)=>v+Number(x.costo_vendido_estimado||0),0))+' CUP'+(Number(l.costos_sin_cobertura||0)>0?' · PARCIAL':''):'No calculable')],
       ['Efectivo recogido',l.dinero_recogido_total==null?'Pendiente':money(l.dinero_recogido_total)+' CUP'],
-      ['Salario',l.salario_calculado==null?'Pendiente':money(l.salario_calculado)+' CUP'],
+      ['Salario',pendingPost?blocked:(l.salario_calculado==null?'Pendiente':money(l.salario_calculado)+' CUP')],
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
-      ['Efectivo esperado',l.efectivo_esperado_despues_de_gastos_reinversiones_salario==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP'],
-      ['Diferencia',l.diferencia==null?'No calculable':money(l.diferencia)+' CUP'],
-      ['Costo documentado',qty(l.costos_con_cobertura)+' / '+qty(l.familias_total_costo)+' familias']
+      ['Efectivo esperado',pendingPost?blocked:(l.efectivo_esperado_despues_de_gastos_reinversiones_salario==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP')],
+      ['Diferencia',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
+      ['Costo documentado',pendingPost?blocked:(qty(l.costos_con_cobertura)+' / '+qty(l.familias_total_costo)+' familias')]
     ];
     const entries=x=>Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0);
     const exits=x=>Number(x.transferencias_salida||0)+Number(x.vales_salida||0)+Number(x.mermas_aprobadas||0)+Number(x.bajas_aprobadas||0);
     const sums={initial:0,entries:0,exits:0,final:0,sold:0,revenue:0,cost:0,profit:0};
     lines.forEach(x=>{sums.initial+=Number(x.inventario_inicial||0);sums.entries+=entries(x);sums.exits+=exits(x);sums.final+=Number(x.inventario_final||0);sums.sold+=Number(x.unidades_vendidas||0);if(x.importe_estimado!=null)sums.revenue+=Number(x.importe_estimado);if(x.costo_vendido_estimado!=null)sums.cost+=Number(x.costo_vendido_estimado);if(x.ganancia_bruta_estimada!=null)sums.profit+=Number(x.ganancia_bruta_estimada)});
-    const table='<div class="bcjr-table-wrap"><table class="bcjr-table"><thead><tr><th>Producto</th><th>Inicial</th><th>Entradas</th><th>Salidas</th><th>Bajas</th><th>Final</th><th>Vendidas</th><th>Precio venta</th><th>Ingreso est.</th><th>Costo/u est.</th><th>Costo vendido est.</th><th>Ganancia bruta est.</th><th>Margen est.</th></tr></thead><tbody>'+
-      lines.map(x=>'<tr><td>'+esc(x.nombre||'Producto')+'</td><td>'+esc(qty(x.inventario_inicial))+'</td><td>'+esc(qty(entries(x)))+'</td><td>'+esc(qty(exits(x)))+'</td><td>'+esc(qty(x.bajas_aprobadas))+'</td><td>'+esc(qty(x.inventario_final))+'</td><td>'+esc(qty(x.unidades_vendidas))+'</td><td>'+esc(x.precio_unitario==null?'Sin precio':money(x.precio_unitario))+'</td><td>'+esc(x.importe_estimado==null?'—':money(x.importe_estimado))+'</td><td>'+esc(x.costo_unitario_estimado==null?'Sin costo':money(x.costo_unitario_estimado))+'</td><td>'+esc(x.costo_vendido_estimado==null?'—':money(x.costo_vendido_estimado))+'</td><td>'+esc(x.ganancia_bruta_estimada==null?'—':money(x.ganancia_bruta_estimada))+'</td><td>'+esc(x.margen_bruto_estimado==null?'—':qty(x.margen_bruto_estimado)+'%')+'</td></tr>').join('')+
-      '</tbody><tfoot><tr><td>TOTALES</td><td>'+esc(qty(sums.initial))+'</td><td>'+esc(qty(sums.entries))+'</td><td>'+esc(qty(sums.exits))+'</td><td>'+esc(qty(lines.reduce((v,x)=>v+Number(x.bajas_aprobadas||0),0)))+'</td><td>'+esc(qty(sums.final))+'</td><td>'+esc(qty(sums.sold))+'</td><td>—</td><td>'+esc(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas))+'</td><td>—</td><td>'+esc(money(sums.cost))+'*</td><td>'+esc(money(sums.profit))+'*</td><td>—</td></tr></tfoot></table></div><p class="bcjr-muted">* Costos y ganancias son estimaciones parciales cuando faltan costos históricos. No equivalen a un costo FIFO completo.</p>';
+    const table='<div class="bcjr-table-wrap"><table class="bcjr-table"><thead><tr><th>Producto</th><th>Inventario inicial</th><th>Entradas</th><th>Salidas</th><th>Bajas incluidas</th><th>Inventario final</th><th>Unidades vendidas</th><th>Precio venta</th><th>Ingreso est.</th><th>Costo/u est.</th><th>Costo vendido est.</th><th>Ganancia bruta est.</th><th>Margen est.</th></tr></thead><tbody>'+
+      lines.map(x=>'<tr><td>'+esc(x.nombre||'Producto')+'</td><td>'+esc(qty(x.inventario_inicial))+'</td><td>'+esc(qty(entries(x)))+'</td><td>'+esc(qty(exits(x)))+'</td><td>'+esc(qty(x.bajas_aprobadas))+'</td><td>'+esc(qty(x.inventario_final))+'</td><td>'+esc(pendingPost?blocked:qty(x.unidades_vendidas))+'</td><td>'+esc(x.precio_unitario==null?'Sin precio':money(x.precio_unitario))+'</td><td>'+esc(pendingPost?blocked:(x.importe_estimado==null?'—':money(x.importe_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_unitario_estimado==null?'Sin costo':money(x.costo_unitario_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_vendido_estimado==null?'—':money(x.costo_vendido_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.ganancia_bruta_estimada==null?'—':money(x.ganancia_bruta_estimada)))+'</td><td>'+esc(pendingPost?blocked:(x.margen_bruto_estimado==null?'—':qty(x.margen_bruto_estimado)+'%'))+'</td></tr>').join('')+
+      '</tbody><tfoot><tr><td>TOTALES</td><td>'+esc(qty(sums.initial))+'</td><td>'+esc(qty(sums.entries))+'</td><td>'+esc(qty(sums.exits))+'</td><td>'+esc(qty(lines.reduce((v,x)=>v+Number(x.bajas_aprobadas||0),0)))+'</td><td>'+esc(qty(sums.final))+'</td><td>'+esc(pendingPost?blocked:qty(sums.sold))+'</td><td>—</td><td>'+esc(pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)))+'</td><td>—</td><td>'+esc(pendingPost?blocked:money(sums.cost)+'*')+'</td><td>'+esc(pendingPost?blocked:money(sums.profit)+'*')+'</td><td>—</td></tr></tfoot></table></div><p class="bcjr-muted">'+(pendingPost?'El inventario físico sí está disponible. Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte.':'* Costos y ganancias son estimaciones parciales cuando faltan costos históricos. No equivalen a un costo FIFO completo.')+'</p>';
     const warnings=[];
     if(l.faltan_cortes)warnings.push('Falta un corte de inventario confirmado.');
     if(Number(l.familias_sin_precio||0)>0)warnings.push(Number(l.familias_sin_precio)+' familias sin precio de venta válido.');
@@ -92,26 +132,31 @@
     if(Number(pending.reinversiones||0)>0)warnings.push(Number(pending.reinversiones)+' reinversiones pendientes.');
     if(Number(pending.ajustes||0)>0)warnings.push(Number(pending.ajustes)+' bajas/mermas pendientes.');
     const salary=s.salario_porcentaje==null?'<div class="bcjr-field"><label>Porcentaje salarial de esta jornada (%)<input type="number" min="0" max="100" step="0.01" data-bcjr-salary-input="'+esc(s.id)+'" placeholder="Escribe el porcentaje"></label><button type="button" class="bcjr-btn" data-bcjr-action="salary" data-session="'+esc(s.id)+'">Guardar porcentaje</button><small>Es una decisión del Dueño; no se aplica un valor predeterminado.</small></div>':'<p class="bcjr-muted">Porcentaje salarial fijado: <b>'+esc(qty(s.salario_porcentaje))+'%</b></p>';
-    const movements=post.length?'<div class="bcjr-alert"><b>Movimientos aprobados después del inventario final</b><p>Confirma si cada pérdida ocurrió antes o después del conteo físico. El sistema no la incluirá en la fórmula hasta que la clasifiques.</p><div class="bcjr-table-wrap"><table class="bcjr-table" style="min-width:840px"><thead><tr><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Registrado</th><th>Aprobado</th><th>Estado</th><th>Momento real</th><th>Motivo</th></tr></thead><tbody>'+
-      post.map(m=>'<tr data-bcjr-movement-row data-type="'+esc(m.tipo)+'" data-id="'+esc(m.id)+'"><td>'+esc(m.tipo)+'</td><td>'+esc(m.producto)+'</td><td>'+esc(qty(m.cantidad))+'</td><td>'+esc(m.creado_en?new Date(m.creado_en).toLocaleString():'—')+'</td><td>'+esc(m.fecha_revision?new Date(m.fecha_revision).toLocaleString():'—')+'</td><td>'+esc(m.estado)+'</td><td><select data-bcjr-classification><option value="">Seleccionar…</option><option value="ANTES_CORTE" '+(m.clasificacion==='ANTES_CORTE'?'selected':'')+'>Ocurrió antes del inventario final</option><option value="DESPUES_CORTE" '+(m.clasificacion==='DESPUES_CORTE'?'selected':'')+'>Ocurrió después del inventario final</option></select></td><td>'+esc(m.motivo||'—')+(m.comentario_revision?'<small> · '+esc(m.comentario_revision)+'</small>':'')+'</td></tr>').join('')+
-      '</tbody></table></div><div class="bcjr-field"><label>Motivo general de la clasificación<input type="text" maxlength="500" data-bcjr-movement-comment placeholder="Por qué confirmas el momento de estos movimientos"></label><button type="button" class="bcjr-btn" data-bcjr-action="classify" data-session="'+esc(s.id)+'">Guardar clasificación auditada</button></div></div>':'';
-    return '<section class="bcjr-session"><h3>Día '+esc(s.numero_dia)+' · '+esc(fmtDate(s.fecha))+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+esc(fmtDate(s.fecha_fin)):'')+'</h3><p class="bcjr-muted">Estado '+esc(s.estado)+' · efectivo declarado '+esc(money(s.efectivo?.declarado))+' CUP · contado '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin declaración')+'</p><span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+movements+(lines.length?table:(Number(l.movimientos_posteriores_pendientes||0)>0?'<p class="bcjr-muted">Las ventas y ganancias provisionales están ocultas mientras existan bajas/mermas sin clasificar. Clasifica los movimientos de esta jornada para recalcular el cuadro de productos.</p>':'<p class="bcjr-muted">No hay líneas de inventario para esta sesión.</p>'))+'</section>';
+    const movements=post.length?'<div class="bcjr-alert"><b>Movimientos aprobados después del inventario final</b><p>Revisa cada baja o merma y marca cuándo ocurrió realmente. Esta clasificación auditada es necesaria para recalcular la liquidación.</p><div class="bcjr-movement-list">'+
+      post.map(m=>'<article class="bcjr-movement-card" data-bcjr-movement-row data-type="'+esc(m.tipo)+'" data-id="'+esc(m.id)+'"><div class="bcjr-movement-title"><b>'+esc(m.tipo)+' · '+esc(m.producto)+'</b><strong>'+esc(qty(m.cantidad))+'</strong></div><div class="bcjr-movement-meta"><span>Registrado: '+esc(m.creado_en?new Date(m.creado_en).toLocaleString():'—')+'</span><span>Aprobado: '+esc(m.fecha_revision?new Date(m.fecha_revision).toLocaleString():'—')+'</span><span>Estado: '+esc(m.estado)+'</span></div><label class="bcjr-movement-decision">¿Cuándo ocurrió esta baja/merma?<select data-bcjr-classification><option value="">Seleccionar momento real…</option><option value="ANTES_CORTE" '+(m.clasificacion==='ANTES_CORTE'?'selected':'')+'>Antes del inventario final</option><option value="DESPUES_CORTE" '+(m.clasificacion==='DESPUES_CORTE'?'selected':'')+'>Después del inventario final</option></select></label><small class="bcjr-movement-reason">Motivo registrado: '+esc(m.motivo||'Sin motivo')+(m.comentario_revision?' · '+esc(m.comentario_revision):'')+'</small></article>').join('')+
+      '</div><div class="bcjr-field"><label>Motivo general de la clasificación<input type="text" maxlength="500" data-bcjr-movement-comment placeholder="Explica por qué confirmas el momento de estos movimientos"></label><button type="button" class="bcjr-btn" data-bcjr-action="classify" data-session="'+esc(s.id)+'">Guardar clasificación auditada</button></div></div>':'';
+    return '<section class="bcjr-session"><h3>Día '+esc(s.numero_dia)+' · '+esc(fmtDate(s.fecha))+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+esc(fmtDate(s.fecha_fin)):'')+'</h3><p class="bcjr-muted">Estado '+esc(s.estado)+' · efectivo declarado '+esc(money(s.efectivo?.declarado))+' CUP · contado '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin declaración')+'</p><span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+movements+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+(lines.length?esc(lines.length)+' productos · '+(pendingPost?'existencias visibles; ventas bloqueadas':'tabla detallada'):'Pendiente de cortes de inventario confirmados')+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details>'+'</section>';
   }
   function render(data){
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
     const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' · '+sessions.length+' sesión(es) · '+(turn.estado_maestro||turn.estado||'');
     const body=document.getElementById('bcjr-content');
+    const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes||0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
     const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
     const completedSessions=sessions.filter(s=>s.estado==='COMPLETADA');
+    const cashSessions=sessions.filter(s=>s.liquidacion?.dinero_recogido_total!=null);
+    const cashComplete=sessions.length>0&&cashSessions.length===sessions.length;
+    const cashTotal=cashSessions.reduce((v,s)=>v+Number(s.liquidacion.dinero_recogido_total),0);
+    const cashLabel=cashComplete?money(cashTotal)+' CUP':cashSessions.length?money(cashTotal)+' CUP · PARCIAL':'Pendiente';
     const profitComplete=sessions.length>0&&sessions.every(s=>['COMPLETADA','CANCELADA'].includes(s.estado))
       &&completedSessions.every(s=>s.liquidacion?.ganancia_bruta_es_total===true);
     body.innerHTML='<div class="bcjr-cards">'+[
       card('Estado del turno',turn.estado_maestro||turn.estado),
       card('Jornadas completadas',sessions.filter(s=>s.estado==='COMPLETADA').length+' / '+sessions.length),
-      card('Ganancia bruta estimada',completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable'),
-      card('Costo de ventas estimado',completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable'),
-      card('Efectivo contado',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.dinero_recogido_total||0),0))+' CUP'),
+      card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
+      card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
+      card('Efectivo contado',cashLabel),
       card('Gastos',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.gastos_aprobados||0),0))+' CUP'),
       card('Reinversiones',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.reinversiones_aprobadas||0),0))+' CUP')
     ].join('')+'</div>'+sessions.map(sessionHtml).join('');

@@ -12,14 +12,14 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.105 release and Jornada UI 7.29", () => {
-  assert.ok(APP.includes('const VERSION="9.5.105";'));
+test("PWA shell pins one fresh 9.5.107 release and Jornada UI 7.29", () => {
+  assert.ok(APP.includes('const VERSION="9.5.107";'));
   assert.ok(INDEX.includes('style.css?v=9.5.100'));
-  assert.ok(INDEX.includes('app.js?v=9.5.105'));
+  assert.ok(INDEX.includes('app.js?v=9.5.107'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.105 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.105"'));
-  assert.ok(SW.includes('./app.js?v=9.5.105'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.107 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.107"'));
+  assert.ok(SW.includes('./app.js?v=9.5.107'));
   assert.ok(SW.includes('./style.css?v=9.5.100'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.29"]'));

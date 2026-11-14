@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.105 — Jornada móvil y conteo de efectivo del Dueño y actualización PWA confiable
+// v9.5.107 — Inventario físico de Jornada y tema claro de baja fatiga
 (function hotfixV9475(){
-  const VERSION="9.5.105";
+  const VERSION="9.5.107";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -38,7 +38,7 @@
   const modules=[
     ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.8"],["bc7-jornada-ui.js","7.29"],["bc7-periodo-apertura-ui.js","1.7"],
     ["cache-update-fix.js","1.0"],["usuarios-permisos-rest.js","60.2"],["permisos-navegacion.js","67.8"],["fix-permisos-rol.js","60.2"],["m12-fe5-hide-vales.js","60.1"],
-    ["configuracion.js","20261104.1"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js","20261108.5"],["aprobaciones-admin.js","20261113.4"],["jornada-owner-review.js","1.0"],
+    ["configuracion.js","20261104.1"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js","20261108.5"],["aprobaciones-admin.js","20261113.4"],["jornada-owner-review.js","1.2"],
     ["m26-ui-integridad.js","26.41"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.7"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.3"],["ui-operaciones-hub.js","43.3"],
     ["alta-usuario-sin-email.js","46.2"],["m22-sesiones-en-m21.js","25.5"],["m22-fe-patches-m21.js","22.1"],
@@ -48,7 +48,7 @@
     ["venta-turno-ui.js","9.4.46"],["m26-9-data-truth.js","26.9b5"],["m26-10-categorias-ventas.js","26.10"],["m26-11-offline-shell-guard.js","20261030.1"],
     ["m26-12-comunicacion-whatsapp.js","26.12"],["m26-13-comunicacion-ux.js","26.13"],["m26-15-comunicacion-layout.js","26.15b"],["fix-permisos-carga.js","26.18"],
     ["sesion-navegacion-reset.js","26.11"],["m27-3-fe-cierre-entrega.js","m27-3b10"],["m27-4-restriccion-turnos-asignados.js","27.4"],
-    ["m27-5-ventas-precio-politica.js","27.5b7"],["m27-5-theme-dark-reset.js","27.5a1"],["m27-6-ventas-presentaciones.js","27.6g"],
+    ["m27-5-ventas-precio-politica.js","27.5b7"],["m27-5-theme-dark-reset.js","27.5a2"],["m27-6-ventas-presentaciones.js","27.6g"],
     ["m27-6b-venta-payload-pres.js","27.6b2"],["mision-c-tipos-almacen.js","C.1"],["mision-c-editar-tipo-almacen-modal.js","C.2b"],["m27-7-almacenes-modal.js","27.7f"],
     ["mision-d-stock-reposicion.js","D.11"],["m-f8-trf-selects-preserve.js","F8.1"],["m-f9-turnos-integrity.js","F9.1"],["m-f12-f17-ui-layout.js","F12.1"],
     ["inventario-detalle.js","72"],["compra-multiple.js","27.16"],["m28-usuarios-archivado.js","28.2"],["m28-ajustes-archivados.js","28.2"],
@@ -57,7 +57,7 @@
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
     ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261109.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
     ["m53-inventario-centro.js","53.9"],["m55-productos-import.js","55.5"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.8"],["m57-turnos-sesion-ux-fix.js","57.6"],
-    ["m68-ventas-pos-definitivo.js","9.5.105"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
+    ["m68-ventas-pos-definitivo.js","9.5.107"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.2"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.4"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.7"],["hotfix-17-final-loader-20260903.js","20261030.2"],

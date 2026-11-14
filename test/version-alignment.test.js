@@ -16,6 +16,7 @@ const m26 = fs.readFileSync('public/js/m26-ui-integridad.js', 'utf8');
 const index = fs.readFileSync('public/index.html', 'utf8');
 const auth = fs.readFileSync('public/js/auth.js', 'utf8');
 const e2e = fs.readFileSync('test/live-offline-e2e.js', 'utf8');
+const theme = fs.readFileSync('public/js/m27-5-theme-dark-reset.js', 'utf8');
 
 function extract(text, pattern, label) {
   const m = text.match(pattern);
@@ -143,8 +144,8 @@ test('movement operations load multi-product transfer before the compact modal',
 
 // PWA 9.5.88 uses warehouse-specific movement summary windows and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.105["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.105["']/);
+  assert.match(app, /const VERSION=["']9\.5\.107["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.107["']/);
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
@@ -160,7 +161,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.105["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.107["']/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261105\.4/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.2/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -196,8 +197,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.105 — Jornada móvil y conteo de efectivo del Dueño y actualización PWA confiable/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.105"><\/script>/);
+  assert.match(app, /v9\.5\.107 — Inventario físico de Jornada y tema claro de baja fatiga/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.107"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.100',
     'js/centro-control.js?v=9.5.70',
@@ -229,7 +230,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.105');"));
+  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.107');"));
 });
 
 
@@ -239,7 +240,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.105"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.107"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -281,16 +282,16 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.13"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.13/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.match(app, /const VERSION=["']9\.5\.105["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.105["']/);
+  assert.match(app, /const VERSION=["']9\.5\.107["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.107["']/);
 });
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
   assert.ok(index.includes('style.css?v=9.5.100'));
-  assert.ok(index.includes('app.js?v=9.5.105'));
+  assert.ok(index.includes('app.js?v=9.5.107'));
   assert.ok(sw.includes('./style.css?v=9.5.100'));
-  assert.ok(sw.includes('./app.js?v=9.5.105'));
+  assert.ok(sw.includes('./app.js?v=9.5.107'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
@@ -303,4 +304,14 @@ test('Administration UI modules refresh their cache keys', () => {
   assert.match(sw, /m26-ui-integridad\.js\?v=26\.41/);
   assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.12/);
   assert.match(sw, /catalogos\.js\?v=20261106\.1/);
+});
+
+
+test('Light theme cache is pinned and low-glare styles do not use white surfaces', () => {
+  assert.match(app, /\["m27-5-theme-dark-reset\.js","27\.5a2"\]/);
+  assert.ok(sw.includes('./js/m27-5-theme-dark-reset.js?v=27.5a2'));
+  assert.ok(theme.includes('--stone:#efede5;'));
+  assert.ok(theme.includes('--stone-2:#e2ded3;'));
+  assert.ok(theme.includes('--text:#202722;'));
+  assert.ok(theme.includes('background:#f1eee5!important; color:var(--text)!important;'));
 });
