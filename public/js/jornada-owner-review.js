@@ -145,6 +145,10 @@
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
     const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
     const completedSessions=sessions.filter(s=>s.estado==='COMPLETADA');
+    const cashSessions=sessions.filter(s=>s.liquidacion?.dinero_recogido_total!=null);
+    const cashComplete=sessions.length>0&&cashSessions.length===sessions.length;
+    const cashTotal=cashSessions.reduce((v,s)=>v+Number(s.liquidacion.dinero_recogido_total),0);
+    const cashLabel=cashComplete?money(cashTotal)+' CUP':cashSessions.length?money(cashTotal)+' CUP · PARCIAL':'Pendiente';
     const profitComplete=sessions.length>0&&sessions.every(s=>['COMPLETADA','CANCELADA'].includes(s.estado))
       &&completedSessions.every(s=>s.liquidacion?.ganancia_bruta_es_total===true);
     body.innerHTML='<div class="bcjr-cards">'+[
@@ -152,7 +156,7 @@
       card('Jornadas completadas',sessions.filter(s=>s.estado==='COMPLETADA').length+' / '+sessions.length),
       card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
-      card('Efectivo contado',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.dinero_recogido_total||0),0))+' CUP'),
+      card('Efectivo contado',cashLabel),
       card('Gastos',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.gastos_aprobados||0),0))+' CUP'),
       card('Reinversiones',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.reinversiones_aprobadas||0),0))+' CUP')
     ].join('')+'</div>'+sessions.map(sessionHtml).join('');
