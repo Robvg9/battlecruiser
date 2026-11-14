@@ -16,6 +16,7 @@ test("Product review can switch between stock and financial columns",()=>{
   assert.match(REVIEW,/data-bcjr-table-view="stock"/);
   assert.match(REVIEW,/data-bcjr-table-view="finance"/);
   assert.match(REVIEW,/data-bcjr-view="stock"/);
+  assert.match(REVIEW,/data-bcjr-open-count/);
   assert.match(REVIEW,/table\.dataset\.bcjrView=view/);
 });
 test("Review evidence is optional in collapsible panels",()=>{
@@ -28,6 +29,7 @@ test("Historical product values are edited through an audited session-only RPC",
   assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);
   assert.match(REVIEW,/No modifican el catálogo ni las ventas futuras/);
   assert.match(MIGRATION,/turno_jornada_valores_correcciones/);
+  assert.match(MIGRATION,/CHECK \(precio_venta_unitario IS NOT NULL OR costo_unitario IS NOT NULL\)/);
   assert.match(MIGRATION,/VALORES_HISTORICOS_JORNADA_CORREGIDOS/);
   assert.match(MIGRATION,/catalogo_modificado',false/);
   assert.match(MIGRATION,/REVOKE ALL ON FUNCTION public\.bc7_ajustar_valores_producto_jornada/);
