@@ -337,6 +337,7 @@ function applySql(file) {
       : "supabase/migrations/20261113190000_jornada_bajas_use_operational_stock_and_handover.sql";
     applySql(operationalStockMigration);
     applySql("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
+    applySql("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
     applySql("test/jornada-pending-cash-visibility-contract.sql");
