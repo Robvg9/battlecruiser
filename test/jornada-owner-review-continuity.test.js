@@ -197,8 +197,31 @@ test("Jornada review keeps physical stock visible and reports negative-product d
 test("Post-cutoff Mermas retain the same audit fields as Bajas",()=>{
   const migration=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
   const start=migration.indexOf("SELECT 'BAJA'::text");
-  const end=migration.indexOf(") m\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
+  const end=migration.indexOf("\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
   assert.ok(start>=0&&end>start,"post-cutoff movement UNION must exist");
   const union=migration.slice(start,end);
   assert.match(union,/SELECT 'BAJA'[\s\S]*?b\.motivo[\s\S]*?UNION ALL[\s\S]*?SELECT 'MERMA'[\s\S]*?coalesce\(p\.precio_normal,pp\.precio_normal\)[\s\S]*?m\.motivo/);
+});
+
+test("Owner review separates stock and financial tables without a pinned product column",()=>{
+  assert.match(REVIEW,/data-bcjr-table-view="stock"/);
+  assert.match(REVIEW,/data-bcjr-table-view="finance"/);
+  assert.match(REVIEW,/data-bcjr-product-search/);
+  assert.match(REVIEW,/data-bcjr-product-row/);
+  assert.match(REVIEW,/position:static;background:transparent;z-index:auto/);
+  assert.match(REVIEW,/bcjr-footer\{position:relative;z-index:10/);
+});
+test("Journey table exposes audited physical-count and historical-price corrections",()=>{
+  assert.match(REVIEW,/open-count-correction/);
+  assert.match(REVIEW,/open-values-correction/);
+  assert.match(REVIEW,/bc7_corregir_inventario_final_jornada/);
+  assert.match(REVIEW,/bc7_corregir_valores_historicos_producto_jornada/);
+  assert.match(REVIEW,/no modifica el corte original ni el catálogo actual/);
+  assert.match(REVIEW,/Buscar producto/);
+});
+test("Review secondary detail panels are collapsed by default",()=>{
+  assert.match(REVIEW,/<details class="bcjr-panel">/);
+  assert.match(REVIEW,/Detalle del efectivo/);
+  assert.match(REVIEW,/Validaciones pendientes/);
+  assert.match(REVIEW,/Revisar .* bajas\/mermas posteriores al corte/);
 });
