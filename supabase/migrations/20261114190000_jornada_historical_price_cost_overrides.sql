@@ -157,6 +157,7 @@ DECLARE
   v_adjusted_salary numeric;
   v_adjusted_expected numeric;
   v_adjusted_difference numeric;
+  v_adjusted_missing_prices integer:=0;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo el Dueño/Admin puede consultar la revisión integral.' USING ERRCODE='42501';
@@ -193,12 +194,13 @@ BEGIN
      AND jv.vigente;
 
     IF coalesce((v_liq->>'movimientos_posteriores_pendientes')::integer,0)=0
-       AND v_liq->>'ventas_estimadas' IS NOT NULL THEN
-      SELECT round(coalesce(sum((x.value->>'importe_estimado')::numeric),0),2)
-      INTO v_adjusted_sales
-      FROM jsonb_array_elements(v_adjusted_lines) x(value)
-      WHERE x.value->>'importe_estimado' IS NOT NULL;
-      v_adjusted_salary:=CASE WHEN v_liq->>'salario_porcentaje' IS NOT NULL
+       AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0 THEN
+      SELECT count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0 AND x.value->>'importe_estimado' IS NULL),
+        CASE WHEN count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0 AND x.value->>'importe_estimado' IS NULL)>0
+          THEN NULL ELSE round(coalesce(sum((x.value->>'importe_estimado')::numeric),0),2) END
+      INTO v_adjusted_missing_prices,v_adjusted_sales
+      FROM jsonb_array_elements(v_adjusted_lines) x(value);
+      v_adjusted_salary:=CASE WHEN v_adjusted_sales IS NOT NULL AND v_liq->>'salario_porcentaje' IS NOT NULL
         THEN round(v_adjusted_sales*(v_liq->>'salario_porcentaje')::numeric/100,2) ELSE NULL END;
       v_adjusted_expected:=CASE WHEN v_adjusted_salary IS NOT NULL
         THEN round(v_adjusted_sales-coalesce((v_liq->>'gastos_aprobados')::numeric,0)
@@ -209,7 +211,8 @@ BEGIN
         'lineas',v_adjusted_lines,'ventas_estimadas',v_adjusted_sales,
         'salario_calculado',v_adjusted_salary,
         'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_adjusted_expected,
-        'diferencia',v_adjusted_difference
+        'diferencia',v_adjusted_difference,
+        'familias_sin_precio',v_adjusted_missing_prices
       );
     ELSE
       v_liq:=v_liq||jsonb_build_object('lineas',v_adjusted_lines);
