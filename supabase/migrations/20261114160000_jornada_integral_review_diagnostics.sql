@@ -390,8 +390,7 @@ BEGIN
     )
   );
 END;
-$function$
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.bc7_obtener_revision_jornada(p_turno_id uuid)
  RETURNS jsonb
