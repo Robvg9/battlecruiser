@@ -481,8 +481,12 @@ BEGIN
       WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
         AND v_final.id IS NOT NULL AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_final.confirmado_en
       UNION ALL
-      SELECT 'MERMA'::text,m.id,p.nombre,m.cantidad,m.estado,m.creado_en,coalesce(m.fecha_revision,m.actualizado_en) AS fecha_revision,m.motivo
-      FROM public.mermas m JOIN public.productos p ON p.id=m.producto_id
+      SELECT 'MERMA'::text,m.id,p.nombre,m.cantidad,
+        coalesce(p.precio_normal,pp.precio_normal) precio_unitario,
+        m.estado,m.creado_en,coalesce(m.fecha_revision,m.actualizado_en) AS fecha_revision,m.motivo
+      FROM public.mermas m
+      JOIN public.productos p ON p.id=m.producto_id
+      LEFT JOIN public.productos pp ON pp.id=p.producto_padre_id
       WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
         AND v_final.id IS NOT NULL AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>v_final.confirmado_en
     ) m
