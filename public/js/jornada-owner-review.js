@@ -300,7 +300,7 @@
     }catch(error){
       setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');
       button.disabled=false;button.textContent='Reintentar guardado';
-    }finally{busy=false;}
+    }finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   function openCountEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
@@ -322,7 +322,7 @@
       setStatus('Corrección guardada. Actualizando la liquidación…','success');
       box.remove();await openReview(activeTurnId);
     }catch(error){setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');button.disabled=false;button.textContent='Reintentar guardado';}
-    finally{busy=false;}
+    finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   async function click(e){
     const t=e.target.closest&&e.target.closest('[data-bcjr-action],[data-bcjr-close],[data-bcjr-table-view],[data-bcjr-open-values],[data-bcjr-values-save],[data-bcjr-values-cancel],[data-bcjr-open-count],[data-bcjr-count-save],[data-bcjr-count-cancel]');if(!t)return;
