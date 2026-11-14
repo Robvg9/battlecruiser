@@ -69,7 +69,7 @@ test("The app shell loads the new owner review module and keeps cache versions a
   assert.match(APP,/VERSION="9\.5\.108"/);
   assert.match(APP,/jornada-owner-review\.js","1\.3"/);
   assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.2/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
   assert.match(INDEX,/v9\.5\.108/);
 });
 
@@ -98,7 +98,7 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(APP,/VERSION="9\.5\.108"/);
   assert.match(APP,/jornada-owner-review\.js","1\.3"/);
   assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.2/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
   assert.match(INDEX,/v9\.5\.108/);
 });
 
