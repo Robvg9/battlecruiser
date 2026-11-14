@@ -558,9 +558,11 @@ BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo el Dueño/Admin puede corregir un corte histórico.' USING ERRCODE='42501';
   END IF;
-  IF p_correcciones IS NULL OR jsonb_typeof(p_correcciones)<>'array'
-     OR jsonb_array_length(p_correcciones)=0 OR jsonb_array_length(p_correcciones)>200 THEN
-    RAISE EXCEPTION 'Envía al menos una corrección de producto.' USING ERRCODE='22023';
+  IF p_correcciones IS NULL OR jsonb_typeof(p_correcciones)<>'array' THEN
+    RAISE EXCEPTION 'Envía una lista de correcciones de producto.' USING ERRCODE='22023';
+  END IF;
+  IF jsonb_array_length(p_correcciones)=0 OR jsonb_array_length(p_correcciones)>200 THEN
+    RAISE EXCEPTION 'Envía entre 1 y 200 correcciones de producto.' USING ERRCODE='22023';
   END IF;
   IF length(btrim(coalesce(p_comentario,'')))<5 OR length(p_comentario)>500 THEN
     RAISE EXCEPTION 'Explica el motivo de la corrección (5–500 caracteres).' USING ERRCODE='22023';
