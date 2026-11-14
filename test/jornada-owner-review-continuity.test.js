@@ -182,6 +182,11 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   assert.match(REVIEW,/Marcar todas: después del corte/);
   assert.match(REVIEW,/valor_estimado/);
   assert.match(MIGRATION,/valor_estimado/);
+  assert.match(MIGRATION,/turno_jornada_inventario_correcciones/);
+  assert.match(MIGRATION,/bc7_corregir_inventario_final_jornada/);
+  assert.match(MIGRATION,/INVENTARIO_FINAL_CORREGIDO/);
+  assert.match(REVIEW,/Guardar corrección auditada/);
+  assert.match(REVIEW,/bc7_corregir_inventario_final_jornada/);
   assert.match(REVIEW,/Conteo final de caja/);
   assert.match(REVIEW,/Productos en los cortes/);
   assert.match(REVIEW,/PENDIENTE DE REVISIÓN/);
