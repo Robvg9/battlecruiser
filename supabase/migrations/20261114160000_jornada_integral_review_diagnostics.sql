@@ -354,7 +354,7 @@ BEGIN
     v_expected_cash:=NULL;
     v_difference:=NULL;
     SELECT coalesce(jsonb_agg(
-      x.value-ARRAY['unidades_vendidas','importe_estimado']
+      x.value - ARRAY['unidades_vendidas','importe_estimado']
       ORDER BY x.value->>'nombre'
     ),'[]'::jsonb)
     INTO v_lines
