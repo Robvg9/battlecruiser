@@ -17,6 +17,11 @@ function renderEntrega(x){const estado=x.estado==='DECLARADA'?'DECLARADA — fal
 function renderCuadre(x){const dif=Number(x.diferencia||0),s=dif<0?'Faltante $'+money(Math.abs(dif)):dif>0?'Sobrante $'+money(dif):'Exacto';return row('🧾 Cuadre pendiente','Esperado $'+money(x.dinero_esperado)+' · Declarado $'+money(x.dinero_declarado)+' · '+s,[{text:'Aprobar',fn:()=>revisarCuadre(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarCuadre(x.id,'rechazar')}])}
 function renderOperativa(x){
   const user=x.usuario_nombre||'La responsable';
+  if(x.tipo==='jornada_revision'){
+    return row('📊 Jornada completa · revisión pendiente',
+      (x.almacen_nombre||'Almacén')+' · '+(x.resumen||'Liquidación por revisar')+' · Estado '+(x.estado||'EN_CURSO'),
+      [{text:'Abrir liquidación',fn:()=>{if(typeof window.bcAbrirRevisionJornada==='function')window.bcAbrirRevisionJornada(x.id);else alert('No se ha cargado el módulo de revisión. Actualiza BattleCruiser.')}}]);
+  }
   if(x.tipo==='declaracion_jornada'&&String(x.estado||'').toUpperCase()==='ESPERANDO_ENTREGA'){
     return row('💵 Declaración final · esperando entrega de jornada',
       user+' · '+(x.resumen||'Declaración de efectivo')+' · '+money(x.monto)+' CUP declarados. La sesión de Sheila aún no está COMPLETADA; el conteo y la aprobación siguen bloqueados.',

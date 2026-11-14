@@ -12,20 +12,20 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.104 release and Jornada UI 7.28", () => {
-  assert.ok(APP.includes('const VERSION="9.5.104";'));
+test("PWA shell pins one fresh 9.5.105 release and Jornada UI 7.29", () => {
+  assert.ok(APP.includes('const VERSION="9.5.105";'));
   assert.ok(INDEX.includes('style.css?v=9.5.100'));
-  assert.ok(INDEX.includes('app.js?v=9.5.104'));
+  assert.ok(INDEX.includes('app.js?v=9.5.105'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.104 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.104"'));
-  assert.ok(SW.includes('./app.js?v=9.5.104'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.105 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.105"'));
+  assert.ok(SW.includes('./app.js?v=9.5.105'));
   assert.ok(SW.includes('./style.css?v=9.5.100'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
-  assert.ok(APP.includes('["bc7-jornada-ui.js","7.28"]'));
-  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.28'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.3"]'));
-  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.3'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.29"]'));
+  assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.29'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261113.4"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.4'));
 });
 
 test("PWA update notice creates its action button before binding the click", () => {
@@ -143,4 +143,17 @@ test("Owner can count the declared final cash only after session completion with
   assert.match(UI, /declaration\.monto_contado==null/);
   assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
   assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
+});
+
+
+test("saving an already-declared cash period is a successful no-op, not a false validation error",()=>{
+  const start=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const end=UI.indexOf("async function countFinalCash(form){",start);
+  assert.ok(start>=0&&end>start);
+  const block=UI.slice(start,end);
+  assert.match(block,/if\(!operations\.length\)/);
+  assert.match(block,/if\(!options\.requireComplete\)/);
+  assert.match(block,/No hay importes nuevos que guardar\. Los registros existentes se conservaron sin cambios\./);
+  assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
+  assert.match(block,/Faltan importes de estos días/);
 });

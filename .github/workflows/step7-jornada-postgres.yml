@@ -12,6 +12,8 @@ on:
       - 'supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql'
       - 'supabase/migrations/20261113180000_admin_show_pending_jornada_cash_declarations.sql'
       - 'supabase/migrations/20261113190000_jornada_bajas_use_operational_stock_and_handover.sql'
+      - 'supabase/migrations/20261113230500_jornada_owner_review_continuity.sql'
+      - 'test/jornada-owner-review-continuity-contract.sql'
       - 'test/jornada-pending-cash-visibility-contract.sql'
       - 'test/jornada-sectioned-checklist-picker.test.js'
       - 'supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql'

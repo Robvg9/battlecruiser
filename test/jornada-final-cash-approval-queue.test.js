@@ -64,3 +64,16 @@ test("Expense and reinvestment approvals are concise and actionable directly fro
   assert.ok(ADMIN.includes("resolverOperativaDirecta(x,'RECHAZAR')"));
   assert.ok(ADMIN.includes("p_tipo:item.tipo,p_id:item.id,p_decision:decision"));
 });
+
+
+test("final cash label follows the actual handover phase, not a generic pending state",()=>{
+  const start=JOURNEY.indexOf("function cashDeclarationHtml(detail){");
+  const end=JOURNEY.indexOf("function renderDailyCash",start);
+  assert.ok(start>=0&&end>start);
+  const block=JOURNEY.slice(start,end);
+  assert.match(block,/sessionState==='COMPLETADA'/);
+  assert.match(block,/sessionState==='EN_CURSO'/);
+  assert.match(block,/approvalState==='PENDIENTE'\|\|approvalState==='ESPERANDO_APROBACION'/);
+  assert.match(block,/\?'Esperando aprobación'/);
+  assert.match(block,/sessionState==='EN_CURSO'\?'Esperando entrega'/);
+});

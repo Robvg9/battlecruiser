@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.28 — catálogo completo para ajustes y checklist de cinco pasos.
+// v7.29 — catálogo completo para ajustes y checklist de cinco pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -143,7 +143,7 @@
   }
   function humanStatus(value){
     const key=String(value||'').toUpperCase();
-    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada'};
+    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada',ESPERANDO_ENTREGA:'Esperando entrega',ESPERANDO_APROBACION:'Esperando aprobación'};
     return labels[key]||'En revisión';
   }
   function friendlyTimezone(value){
@@ -645,8 +645,14 @@
       })){
         msg(message,'Todos los importes diarios ya están guardados y confirmados.','ok');return true;
       }
-      if(options.requireComplete&&finalSaved)return true;
-      msg(message,'Introduce al menos un importe pendiente para guardar.','error');return false;
+      // A normal Save click can be a no-op. Never report a false validation
+      // error when all existing declarations are already saved; closeSession
+      // still enforces requireComplete and missing dates above.
+      if(!options.requireComplete){
+        msg(message,'No hay importes nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');
+        return true;
+      }
+      msg(message,'No hay importes nuevos para guardar. No se modificó ningún dato.','error');return false;
     }
     if(!navigator.onLine){
       msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;
@@ -748,11 +754,16 @@
     if(!d)return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4><p class="bc7-muted">Todavía no hay una declaración de efectivo para esta jornada.</p></div>';
     const counted=d.monto_contado!=null;
     const difference=d.diferencia!=null;
+    const sessionState=String(detail?.sesion?.estado||'').toUpperCase();
+    const approvalState=String(d.estado_aprobacion||'').toUpperCase();
+    const statusLabel=sessionState==='COMPLETADA'
+      ?((approvalState==='PENDIENTE'||approvalState==='ESPERANDO_APROBACION')?'Esperando aprobación':humanStatus(approvalState||'ESPERANDO_APROBACION'))
+      :sessionState==='EN_CURSO'?'Esperando entrega':humanStatus(sessionState||approvalState||'ESPERANDO_ENTREGA');
     return '<div class="bc7-jornada" id="bc7-cash-summary"><h4>Entrega de efectivo</h4>'+
       '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(d.monto))+' CUP</b></div>'+
       '<div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(counted?esc(money(d.monto_contado))+' CUP':'Pendiente')+'</b></div>'+
       '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(difference?esc(money(d.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
-      '<p class="bc7-muted">Estado: '+esc(humanStatus(d.estado_aprobacion||'ESPERANDO_APROBACION'))+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
+      '<p class="bc7-muted">Estado: '+esc(statusLabel)+'. El conteo físico del efectivo es independiente del total de ventas.</p></div>';
   }
   function renderDailyCash(host,data){
     if(!host)return;
@@ -1210,15 +1221,22 @@
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Completar jornada y enviarla a Administración.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
         '<details class="bc7-cash-declarations-fold"><summary>Declaraciones de efectivo por día</summary>'+cashDaysManagerShellHtml(detail,isAssigned,status)+'</details>'+
-        '<label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label>'+
+        '<label class="bc7-field">Motivo de cierre anticipado o tiempo extra (opcional)<input id="bc7-close-reason" maxlength="1000" placeholder="Solo si cerraste antes o trabajaste tiempo extra"><small class="bc7-muted">Entregar los datos después de las 23:00 no requiere motivo: la jornada termina a la hora programada y el registro queda fechado por separado.</small></label>'+
         '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_conteo!==true?'disabled':'')+'>Cerrar jornada y enviar a Administración</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
     }else if(status==='EN_CURSO'){
       const saved=detail.declaracion_dinero&&tramo&&String(detail.declaracion_dinero.turno_tramo_id)===String(tramo.id);
       actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cuatro checks; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
     }else if(status==='COMPLETADA'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
-    }else if(status==='COMPLETADA')actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
-    else actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
+    }else if(status==='COMPLETADA'){
+      actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
+    }else{
+      actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
+    }
+    const ownerTurnId=s.turno_id||detail.turno_id||detail.turno?.id;
+    if(status==='COMPLETADA'&&ownerTurnId&&(can('auditoria','editar_any')||can('entregas_caja','editar_any')||can('turnos','editar_any'))){
+      actionArea+='<div class="bc7-note"><b>Revisión del Dueño</b><p>Abre el expediente completo de esta jornada: inventario, ventas estimadas, costos documentados, efectivo, diferencias y movimientos por validar.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-open-owner-review="'+esc(ownerTurnId)+'">Abrir revisión integral del turno</button></div></div>';
+    }
     let adjustment='';
     if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos_ajuste);
@@ -1957,6 +1975,8 @@
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
   document.addEventListener('click',function(e){
+    const ownerReview=e.target&&e.target.closest?e.target.closest('[data-bc7-open-owner-review]'):null;
+    if(ownerReview){e.preventDefault();if(typeof window.bcAbrirRevisionJornada==='function')window.bcAbrirRevisionJornada(ownerReview.getAttribute('data-bc7-open-owner-review'));else if(typeof window.alert==='function')alert('La revisión del Dueño todavía no está cargada. Actualiza la aplicación.');return;}
     const checklistOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-open]'):null;
     if(checklistOpen){e.preventDefault();openChecklistSection(checklistOpen.getAttribute('data-bc7-checklist-open'));return;}
     const checklistToggle=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-toggle]'):null;
