@@ -178,5 +178,9 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   assert.match(REVIEW,/Sesiones registradas/);
   assert.match(REVIEW,/Entregas de efectivo por día/);
   assert.match(REVIEW,/Efectivo total recogido/);
+  assert.match(REVIEW,/Conteo final de caja/);
+  assert.match(REVIEW,/Productos en los cortes/);
+  assert.match(REVIEW,/PENDIENTE DE REVISIÓN/);
+  assert.doesNotMatch(REVIEW,/Sesiones registradas/);
   assert.doesNotMatch(REVIEW,/Jornadas completadas/);
 });
