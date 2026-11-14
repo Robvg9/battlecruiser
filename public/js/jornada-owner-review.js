@@ -54,10 +54,10 @@
       .bcjr-movement-decision{display:grid;gap:6px;font-size:.82rem;font-weight:700}
       .bcjr-movement-decision select{width:100%;min-height:42px;padding:9px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:8px;background:var(--void,#0a1613);color:var(--text,#f5efe3)}
       .bcjr-movement-reason{display:block;margin-top:8px;color:var(--mist,#c9c0a8);line-height:1.4}
-      body.bc-theme-light .bcjr-movement-card{background:#f3efe6;color:#202722;border-color:#c9bfac}
+      body.bc-theme-light .bcjr-movement-card{background:#f3efe6!important;color:#202722!important;border-color:#c9bfac!important}
       body.bc-theme-light .bcjr-movement-meta,body.bc-theme-light .bcjr-movement-reason{color:#505950}
       body.bc-theme-light .bcjr-movement-title strong{color:#75571d}
-      body.bc-theme-light .bcjr-movement-decision select{background:#f8f5ed;color:#202722;border-color:#b8ad98}
+      body.bc-theme-light .bcjr-movement-decision select{background:#f8f5ed!important;color:#202722!important;border-color:#b8ad98!important}
       .bcjr-inventory{margin:14px 0;border:1px solid var(--gold-dim,#9a7c3e);border-radius:12px;overflow:hidden}
       .bcjr-inventory>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;list-style:none;cursor:pointer;padding:13px 15px;background:var(--stone-2,#1a3830);color:var(--text,#f5efe3);font-weight:750}
       .bcjr-inventory>summary::-webkit-details-marker{display:none}
@@ -75,8 +75,8 @@
       body.bc-theme-light .bcjr-pill.warn{background:#f2dfb8;color:#654812}
       body.bc-theme-light .bcjr-pill.ok{background:#dce9dc;color:#285333}
       body.bc-theme-light .bcjr-table th,body.bc-theme-light .bcjr-table td{background:#f3efe6;color:#202722;border-color:#c9bfac}
-      body.bc-theme-light .bcjr-table thead th,body.bc-theme-light .bcjr-table tfoot td,body.bc-theme-light .bcjr-inventory>summary{background:#ddd6c7;color:#202722}
-      body.bc-theme-light .bcjr-table th:first-child,body.bc-theme-light .bcjr-table td:first-child{background:#e9e4da}
+      body.bc-theme-light .bcjr-table thead th,body.bc-theme-light .bcjr-table tfoot td,body.bc-theme-light .bcjr-inventory>summary{background:#ddd6c7!important;color:#202722!important}
+      body.bc-theme-light .bcjr-table th:first-child,body.bc-theme-light .bcjr-table td:first-child{background:#e9e4da!important}
       body.bc-theme-light .bcjr-field input,body.bc-theme-light .bcjr-field select,body.bc-theme-light .bcjr-field textarea{background:#f8f5ed;color:#202722;border-color:#b8ad98}
       body.bc-theme-light .bcjr-btn{background:#ded8cb;color:#202722;border-color:#b8ad98}
       body.bc-theme-light .bcjr-btn.primary{background:#315d4a;color:#fff;border-color:#315d4a}
