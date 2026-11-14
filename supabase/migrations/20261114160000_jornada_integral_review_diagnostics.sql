@@ -1,3 +1,23 @@
+-- Audited overrides keep original physical cuts immutable.
+CREATE TABLE IF NOT EXISTS public.turno_jornada_inventario_correcciones (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT,
+  tipo text NOT NULL DEFAULT 'FINAL' CHECK (tipo='FINAL'),
+  producto_id uuid NOT NULL REFERENCES public.productos(id) ON DELETE RESTRICT,
+  cantidad_original numeric(14,3) NOT NULL CHECK (cantidad_original>=0),
+  cantidad_corregida numeric(14,3) NOT NULL CHECK (cantidad_corregida>=0),
+  comentario text NOT NULL CHECK (length(btrim(comentario)) BETWEEN 5 AND 500),
+  creado_por uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
+  creado_en timestamptz NOT NULL DEFAULT now(),
+  vigente boolean NOT NULL DEFAULT true
+);
+CREATE UNIQUE INDEX IF NOT EXISTS turno_jornada_inventario_correccion_vigente_idx
+  ON public.turno_jornada_inventario_correcciones(turno_sesion_id,tipo,producto_id) WHERE vigente;
+CREATE INDEX IF NOT EXISTS turno_jornada_inventario_correcciones_historial_idx
+  ON public.turno_jornada_inventario_correcciones(turno_sesion_id,producto_id,creado_en DESC);
+ALTER TABLE public.turno_jornada_inventario_correcciones ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.turno_jornada_inventario_correcciones FROM PUBLIC, anon, authenticated;
+
 -- Jornada integral review: preserve physical inventory, explain negative rows,
 -- and expose each daily cash handover without guessing movement chronology.
 CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada(p_turno_sesion_id uuid)
@@ -93,8 +113,14 @@ BEGIN
     WHERE l.corte_id=v_initial.id
   ),
   final_lines AS (
-    SELECT l.producto_id AS product_id,l.cantidad_contada::numeric AS qty
+    SELECT l.producto_id AS product_id,
+      coalesce(c.cantidad_corregida,l.cantidad_contada)::numeric AS qty,
+      l.cantidad_contada::numeric AS original_qty,
+      c.cantidad_corregida AS corrected_qty
     FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=v_s.id AND c.tipo='FINAL'
+      AND c.producto_id=l.producto_id AND c.vigente
     WHERE l.corte_id=v_final.id
   ),
   movement_events AS (
@@ -217,6 +243,7 @@ BEGIN
   calculated AS (
     SELECT ids.product_id,coalesce(pi.nombre,p.nombre) nombre,coalesce(pi.unidad,p.unidad) unidad,
       coalesce(i.qty,0) initial_qty,coalesce(f.qty,0) final_qty,
+      f.original_qty final_qty_original,f.corrected_qty final_qty_corrected,
       coalesce(mt.transfer_in,0) transfer_in,coalesce(mt.purchases_in,0) purchases_in,
       coalesce(mt.reinvestment_in,0) reinvestment_in,coalesce(mt.transfer_out,0) transfer_out,
       coalesce(mt.vales_out,0) vales_out,coalesce(mt.merma_out,0) merma_out,coalesce(mt.bajas_out,0) bajas_out,
@@ -243,7 +270,8 @@ BEGIN
            'compras',purchases_in,'reinversiones_entrada',reinvestment_in,
            'transferencias_salida',transfer_out,'vales_salida',vales_out,
            'mermas_aprobadas',merma_out,'bajas_aprobadas',bajas_out,
-           'inventario_final',final_qty,'unidades_vendidas',sold_qty,
+           'inventario_final',final_qty,'inventario_final_original',final_qty_original,
+           'inventario_final_corregido',final_qty_corrected,'unidades_vendidas',sold_qty,
            'precio_unitario',precio_unitario,'estado_precio',estado_precio,
            'importe_estimado',CASE WHEN precio_unitario IS NOT NULL AND sold_qty>=0 THEN round(sold_qty*precio_unitario,2) ELSE NULL END
          ) ORDER BY nombre,product_id),'[]'::jsonb)
@@ -311,7 +339,9 @@ BEGIN
     'vales_salida',x.value->'vales_salida',
     'mermas_aprobadas',x.value->'mermas_aprobadas',
     'bajas_aprobadas',x.value->'bajas_aprobadas',
-    'inventario_final',x.value->'inventario_final'
+    'inventario_final',x.value->'inventario_final',
+    'inventario_final_original',x.value->'inventario_final_original',
+    'inventario_final_corregido',x.value->'inventario_final_corregido'
   ) ORDER BY x.value->>'nombre'),'[]'::jsonb)
   INTO v_negative_details
   FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value)
@@ -507,3 +537,84 @@ BEGIN
 END;
 $function$
 
+
+
+CREATE OR REPLACE FUNCTION public.bc7_corregir_inventario_final_jornada(
+  p_turno_sesion_id uuid,
+  p_correcciones jsonb,
+  p_comentario text
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_final public.turno_jornada_inventario_cortes;
+  v_item jsonb;
+  v_product_id uuid;
+  v_new_qty numeric;
+  v_old_qty numeric;
+  v_count integer:=0;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo el Dueño/Admin puede corregir un corte histórico.' USING ERRCODE='42501';
+  END IF;
+  IF p_correcciones IS NULL OR jsonb_typeof(p_correcciones)<>'array'
+     OR jsonb_array_length(p_correcciones)=0 OR jsonb_array_length(p_correcciones)>200 THEN
+    RAISE EXCEPTION 'Envía al menos una corrección de producto.' USING ERRCODE='22023';
+  END IF;
+  IF length(btrim(coalesce(p_comentario,'')))<5 OR length(p_comentario)>500 THEN
+    RAISE EXCEPTION 'Explica el motivo de la corrección (5–500 caracteres).' USING ERRCODE='22023';
+  END IF;
+  IF EXISTS(
+    SELECT 1 FROM jsonb_array_elements(p_correcciones) x(value)
+    WHERE jsonb_typeof(x.value)<>'object'
+      OR coalesce(x.value->>'producto_id','') !~* '^[0-9a-f-]{36}$'
+      OR coalesce(x.value->>'cantidad','') !~ '^([0-9]+([.][0-9]{1,3})?|[.][0-9]{1,3})$'
+  ) THEN RAISE EXCEPTION 'Producto o cantidad inválida. Usa cantidades no negativas con hasta 3 decimales.' USING ERRCODE='22023'; END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(p_correcciones))
+     <> (SELECT count(DISTINCT (x.value->>'producto_id')::uuid) FROM jsonb_array_elements(p_correcciones) x(value)) THEN
+    RAISE EXCEPTION 'No repitas el mismo producto en una corrección.' USING ERRCODE='22023';
+  END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.estado<>'COMPLETADA' THEN
+    RAISE EXCEPTION 'Solo se corrige el inventario final de una jornada completada.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_final FROM public.turno_jornada_inventario_cortes
+    WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO' FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No existe un inventario final confirmado.' USING ERRCODE='23503'; END IF;
+  FOR v_item IN SELECT value FROM jsonb_array_elements(p_correcciones)
+  LOOP
+    v_product_id:=(v_item->>'producto_id')::uuid;
+    v_new_qty:=(v_item->>'cantidad')::numeric;
+    SELECT coalesce(c.cantidad_corregida,l.cantidad_contada)
+      INTO v_old_qty
+    FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=v_s.id AND c.tipo='FINAL'
+      AND c.producto_id=l.producto_id AND c.vigente
+    WHERE l.corte_id=v_final.id AND l.producto_id=v_product_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'El producto % no pertenece al corte final confirmado.',v_product_id USING ERRCODE='23503'; END IF;
+    IF v_old_qty=v_new_qty THEN CONTINUE; END IF;
+    UPDATE public.turno_jornada_inventario_correcciones
+      SET vigente=false WHERE turno_sesion_id=v_s.id AND tipo='FINAL'
+        AND producto_id=v_product_id AND vigente;
+    INSERT INTO public.turno_jornada_inventario_correcciones(
+      turno_sesion_id,tipo,producto_id,cantidad_original,cantidad_corregida,comentario,creado_por
+    ) VALUES(v_s.id,'FINAL',v_product_id,v_old_qty,v_new_qty,btrim(p_comentario),auth.uid());
+    v_count:=v_count+1;
+  END LOOP;
+  IF v_count=0 THEN RAISE EXCEPTION 'No hay cantidades distintas que corregir.' USING ERRCODE='22023'; END IF;
+  INSERT INTO public.turno_jornada_eventos(
+    almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
+  ) VALUES(
+    v_s.almacen_id,v_s.jornada_programacion_id,auth.uid(),'INVENTARIO_FINAL_CORREGIDO',btrim(p_comentario),
+    jsonb_build_object('sesion_id',v_s.id,'corte_original_id',v_final.id),
+    jsonb_build_object('productos_corregidos',v_count,'correcciones',p_correcciones)
+  );
+  RETURN jsonb_build_object('ok',true,'productos_corregidos',v_count,'corte_original_conservado',true);
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text) TO authenticated;
