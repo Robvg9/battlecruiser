@@ -676,7 +676,7 @@ CREATE TABLE IF NOT EXISTS public.turno_jornada_valores_producto_correcciones (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT,
   producto_id uuid NOT NULL REFERENCES public.productos(id) ON DELETE RESTRICT,
-  precio_venta_corregido numeric(14,2) CHECK (precio_venta_corregido IS NULL OR precio_venta_corregido>0),
+  precio_venta_corregido numeric(14,4) CHECK (precio_venta_corregido IS NULL OR precio_venta_corregido>0),
   costo_unitario_corregido numeric(14,2) CHECK (costo_unitario_corregido IS NULL OR costo_unitario_corregido>=0),
   comentario text NOT NULL CHECK (length(btrim(comentario)) BETWEEN 5 AND 500),
   creado_por uuid REFERENCES auth.users(id) ON DELETE RESTRICT,
@@ -752,6 +752,7 @@ SET search_path TO 'public','pg_temp'
 AS $function$
 DECLARE
   v_s public.turno_sesiones;
+  v_turn public.turnos;
   v_old_price numeric;
   v_old_cost numeric;
   v_new_price numeric;
@@ -776,6 +777,11 @@ BEGIN
   WHERE id=p_turno_sesion_id FOR UPDATE;
   IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.estado<>'COMPLETADA' THEN
     RAISE EXCEPTION 'Solo se corrigen valores de una jornada completada.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_turn FROM public.turnos WHERE id=v_s.turno_id FOR UPDATE;
+  IF NOT FOUND OR upper(coalesce(v_turn.estado,''))='CERRADO'
+      OR upper(coalesce(v_turn.estado_maestro,''))='CERRADO' THEN
+    RAISE EXCEPTION 'El turno ya está cerrado; solicita una reapertura auditada antes de corregir.' USING ERRCODE='23514';
   END IF;
   IF NOT EXISTS (
     SELECT 1
