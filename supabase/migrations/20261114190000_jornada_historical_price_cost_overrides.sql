@@ -212,7 +212,20 @@ BEGIN
         'salario_calculado',v_adjusted_salary,
         'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_adjusted_expected,
         'diferencia',v_adjusted_difference,
-        'familias_sin_precio',v_adjusted_missing_prices
+        'familias_sin_precio',v_adjusted_missing_prices,
+        'calculable',
+          coalesce((v_liq->>'faltan_cortes')::boolean,true)=false
+          AND v_adjusted_missing_prices=0
+          AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0
+          AND v_adjusted_sales IS NOT NULL
+          AND v_adjusted_salary IS NOT NULL
+          AND coalesce((v_liq->>'movimientos_posteriores_pendientes')::integer,0)=0
+          AND coalesce((v_liq->'pendientes'->>'gastos')::integer,0)=0
+          AND coalesce((v_liq->'pendientes'->>'reinversiones')::integer,0)=0
+          AND coalesce((v_liq->'pendientes'->>'ajustes')::integer,0)=0
+          AND coalesce((v_liq->'pendientes'->>'entregas_diarias')::integer,0)=0
+          AND coalesce((v_liq->'pendientes'->>'entregas_diarias_faltantes')::integer,0)=0
+          AND v_liq->>'dinero_recogido_total' IS NOT NULL
       );
     ELSE
       v_liq:=v_liq||jsonb_build_object('lineas',v_adjusted_lines);
