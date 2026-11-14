@@ -92,12 +92,15 @@ BEGIN
       AND coalesce(p.producto_padre_id,p.id)=v_product_id
       AND l.fecha_compra<=v_final.confirmado_en
       AND coalesce(l.costo_unitario,0)>0;
-    SELECT v_before||jsonb_build_array(jsonb_build_object(
+    SELECT coalesce(v_before,'[]'::jsonb)||jsonb_build_array(jsonb_build_object(
       'producto_id',v_product_id,'precio_venta_anterior',coalesce(j.precio_venta_unitario,v_old_price),
       'costo_anterior',coalesce(j.costo_unitario,v_old_cost)
     )) INTO v_before
-    FROM (SELECT precio_venta_unitario,costo_unitario FROM public.turno_jornada_valores_correcciones
-      WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente) j;
+    FROM (SELECT 1) base
+    LEFT JOIN LATERAL (
+      SELECT precio_venta_unitario,costo_unitario FROM public.turno_jornada_valores_correcciones
+      WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente
+    ) j ON true;
     UPDATE public.turno_jornada_valores_correcciones
       SET vigente=false
       WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente;
