@@ -157,3 +157,56 @@ BEGIN
 
   RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, physical inventory visibility, no-provisional-settlement, and ACL contract';
 END $$;
+
+DO $$
+DECLARE
+  v_definition text;
+  v_has_rls boolean;
+  v_price_nullable text;
+  v_cost_nullable text;
+BEGIN
+  IF to_regclass('public.turno_jornada_valores_correcciones') IS NULL THEN
+    RAISE EXCEPTION 'Historical Jornada price/cost correction table was not created';
+  END IF;
+  SELECT relrowsecurity INTO v_has_rls
+  FROM pg_class WHERE oid='public.turno_jornada_valores_correcciones'::regclass;
+  IF v_has_rls IS DISTINCT FROM true
+     OR has_table_privilege('authenticated','public.turno_jornada_valores_correcciones','SELECT')
+     OR has_table_privilege('authenticated','public.turno_jornada_valores_correcciones','INSERT')
+     OR has_table_privilege('anon','public.turno_jornada_valores_correcciones','SELECT') THEN
+    RAISE EXCEPTION 'Historical value corrections must be RLS-protected with no direct client table grants';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Historical value correction RPC must be authenticated Owner-only';
+  END IF;
+  SELECT is_nullable INTO v_price_nullable
+  FROM information_schema.columns
+  WHERE table_schema='public' AND table_name='turno_jornada_valores_correcciones'
+    AND column_name='precio_venta_unitario';
+  SELECT is_nullable INTO v_cost_nullable
+  FROM information_schema.columns
+  WHERE table_schema='public' AND table_name='turno_jornada_valores_correcciones'
+    AND column_name='costo_unitario';
+  IF v_price_nullable IS DISTINCT FROM 'YES' OR v_cost_nullable IS DISTINCT FROM 'YES' THEN
+    RAISE EXCEPTION 'Historical price and cost must be independently correctable without inventing the missing value';
+  END IF;
+  SELECT pg_get_functiondef('public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text)'::regprocedure)
+    INTO v_definition;
+  IF position('bc_actor_is_admin' IN v_definition)=0
+     OR position('VALORES_HISTORICOS_JORNADA_CORREGIDOS' IN v_definition)=0
+     OR position('catalogo_modificado' IN v_definition)=0
+     OR position('turno_jornada_inventario_cortes' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Historical value edits must be Owner-only, audited, jornada-scoped and preserve the catalogue';
+  END IF;
+  SELECT pg_get_functiondef('public.bc7_obtener_revision_jornada(uuid)'::regprocedure)
+    INTO v_definition;
+  IF position('turno_jornada_valores_correcciones' IN v_definition)=0
+     OR position('precio_corregido_jornada' IN v_definition)=0
+     OR position('costo_corregido_jornada' IN v_definition)=0
+     OR position('familias_sin_precio' IN v_definition)=0
+     OR position('v_adjusted_sales' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Owner review must use audited historic values to recalculate Jornada sales and cost';
+  END IF;
+  RAISE NOTICE 'PASS Historical Jornada price/cost overrides: RLS, no direct grants, Owner-only RPC, independent nullable fields, audit trail, no catalogue mutation, recalculated review';
+END $$;
