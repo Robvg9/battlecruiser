@@ -66,11 +66,11 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -95,11 +95,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -197,8 +197,50 @@ test("Jornada review keeps physical stock visible and reports negative-product d
 test("Post-cutoff Mermas retain the same audit fields as Bajas",()=>{
   const migration=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
   const start=migration.indexOf("SELECT 'BAJA'::text");
-  const end=migration.indexOf(") m\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
+  const end=migration.indexOf("\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
   assert.ok(start>=0&&end>start,"post-cutoff movement UNION must exist");
   const union=migration.slice(start,end);
   assert.match(union,/SELECT 'BAJA'[\s\S]*?b\.motivo[\s\S]*?UNION ALL[\s\S]*?SELECT 'MERMA'[\s\S]*?coalesce\(p\.precio_normal,pp\.precio_normal\)[\s\S]*?m\.motivo/);
+});
+
+test("Owner review separates stock and financial tables without a pinned product column",()=>{
+  assert.match(REVIEW,/data-bcjr-table-view="stock"/);
+  assert.match(REVIEW,/data-bcjr-table-view="finance"/);
+  assert.match(REVIEW,/data-bcjr-product-search/);
+  assert.match(REVIEW,/data-bcjr-product-row/);
+  assert.match(REVIEW,/position:static;background:transparent;z-index:auto/);
+  assert.match(REVIEW,/bcjr-footer\{position:relative;z-index:10/);
+});
+test("Journey table exposes audited physical-count and historical-price corrections",()=>{
+  assert.match(REVIEW,/open-count-correction/);
+  assert.match(REVIEW,/open-values-correction/);
+  assert.match(REVIEW,/bc7_corregir_inventario_final_jornada/);
+  assert.match(REVIEW,/bc7_corregir_valores_historicos_producto_jornada/);
+  assert.match(REVIEW,/no modifica el corte original ni el catálogo actual/);
+  assert.match(REVIEW,/Buscar producto/);
+});
+test("Review secondary detail panels are collapsed by default",()=>{
+  assert.match(REVIEW,/<details class="bcjr-panel">/);
+  assert.match(REVIEW,/Detalle del efectivo/);
+  assert.match(REVIEW,/Validaciones pendientes/);
+  assert.match(REVIEW,/Revisar .* bajas\/mermas posteriores al corte/);
+});
+
+test("Historical price corrections preserve precise weighted averages and reject closed turns",()=>{
+  const migration=read("supabase/migrations/20261114180000_jornada_historical_values_and_price_history.sql");
+  assert.match(migration,/precio_venta_corregido numeric\(14,4\)/);
+  assert.match(migration,/upper\(coalesce\(v_turn\.estado_maestro,''\)\)='CERRADO'/);
+  assert.match(migration,/solicita una reapertura auditada/);
+  assert.match(REVIEW,/step="0\.0001" data-bcjr-correction-price/);
+});
+
+test("Post-cutoff movement reference values use audited historical family prices",()=>{
+  const migration=read("supabase/migrations/20261114180000_jornada_historical_values_and_price_history.sql");
+  const start=migration.indexOf("SELECT 'BAJA'::text");
+  const end=migration.indexOf(") m\n     LEFT JOIN public.turno_jornada_movimiento_revision",start);
+  assert.ok(start>=0&&end>start,"post-cutoff movement union must exist");
+  const movementSql=migration.slice(start,end);
+  assert.match(movementSql,/correction\.precio_venta_corregido/);
+  assert.match(movementSql,/history\.precio_normal/);
+  assert.match(movementSql,/h\.efectivo_desde<=coalesce\(v_final\.confirmado_en,now\(\)\)/);
 });
