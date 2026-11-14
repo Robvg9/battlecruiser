@@ -122,5 +122,28 @@ BEGIN
     RAISE EXCEPTION 'Owner resolution must block approval while post-cutoff movements remain unclassified';
   END IF;
 
+
+  IF to_regclass('public.turno_jornada_inventario_correcciones') IS NULL THEN
+    RAISE EXCEPTION 'Audited inventory correction history table was not created';
+  END IF;
+  SELECT relrowsecurity INTO v_has_rls FROM pg_class
+    WHERE oid='public.turno_jornada_inventario_correcciones'::regclass;
+  IF v_has_rls IS DISTINCT FROM true
+     OR has_table_privilege('authenticated','public.turno_jornada_inventario_correcciones','SELECT')
+     OR has_table_privilege('authenticated','public.turno_jornada_inventario_correcciones','INSERT') THEN
+    RAISE EXCEPTION 'Inventory correction history must be private and RLS protected';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Audited inventory correction RPC privileges are not correctly restricted';
+  END IF;
+  SELECT pg_get_functiondef('public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text)'::regprocedure)
+    INTO v_definition;
+  IF position('INVENTARIO_FINAL_CORREGIDO' IN v_definition)=0
+     OR position('corte_original_conservado' IN v_definition)=0
+     OR position('bc_actor_is_admin' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Inventory corrections must preserve the original cut and emit an Owner-only audit event';
+  END IF;
+
   RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, physical inventory visibility, no-provisional-settlement, and ACL contract';
 END $$;
