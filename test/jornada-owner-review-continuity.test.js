@@ -66,11 +66,11 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -95,11 +95,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -175,7 +175,7 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   assert.match(REVIEW,/familias_vendidas_negativas_detalle/);
   assert.match(REVIEW,/más unidades en el corte final/);
   assert.match(REVIEW,/Periodo del turno/);
-  assert.match(REVIEW,/Entregas diarias y conteo final/);
+  assert.match(REVIEW,/Entregas y conteo de efectivo/);
   assert.match(REVIEW,/Efectivo total recogido/);
   assert.match(REVIEW,/Marcar todas: antes del corte/);
   assert.match(REVIEW,/Marcar todas: después del corte/);
@@ -197,8 +197,10 @@ test("Jornada review keeps physical stock visible and reports negative-product d
 test("Post-cutoff Mermas retain the same audit fields as Bajas",()=>{
   const migration=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
   const start=migration.indexOf("SELECT 'BAJA'::text");
-  const end=migration.indexOf(") m\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
-  assert.ok(start>=0&&end>start,"post-cutoff movement UNION must exist");
-  const union=migration.slice(start,end);
+  assert.ok(start>=0,"post-cutoff BAJA movement must exist");
+  const tail=migration.slice(start);
+  const end=tail.search(/\)\s+m\s+LEFT JOIN public\.turno_jornada_movimiento_revision/);
+  assert.ok(end>0,"post-cutoff movement UNION must exist");
+  const union=tail.slice(0,end);
   assert.match(union,/SELECT 'BAJA'[\s\S]*?b\.motivo[\s\S]*?UNION ALL[\s\S]*?SELECT 'MERMA'[\s\S]*?coalesce\(p\.precio_normal,pp\.precio_normal\)[\s\S]*?m\.motivo/);
 });
