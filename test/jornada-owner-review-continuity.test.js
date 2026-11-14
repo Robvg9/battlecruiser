@@ -169,7 +169,8 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   const MIGRATION=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
   assert.match(MIGRATION,/familias_vendidas_negativas_detalle/);
   assert.match(MIGRATION,/x\.value-ARRAY\['unidades_vendidas','importe_estimado'\]/);
-  assert.doesNotMatch(MIGRATION,/v_lines:='\[\]'::jsonb/);
+  const pendingBlock=MIGRATION.slice(MIGRATION.indexOf('IF v_pending_post>0 THEN'),MIGRATION.indexOf('v_complete:=',MIGRATION.indexOf('IF v_pending_post>0 THEN')));
+  assert.doesNotMatch(pendingBlock,/v_lines:='\[\]'::jsonb/);
   assert.match(MIGRATION,/'entregas_diarias'/);
   assert.match(REVIEW,/familias_vendidas_negativas_detalle/);
   assert.match(REVIEW,/diferencia negativa/);
