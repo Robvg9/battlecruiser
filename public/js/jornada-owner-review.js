@@ -96,7 +96,7 @@
   }
   function fmtDate(value){if(!value)return '—';try{return new Date(value+'T12:00:00').toLocaleDateString('es-ES')}catch(_){return String(value)}}
   function card(label,value){return '<div class="bcjr-card"><small>'+esc(label)+'</small><b>'+esc(value==null?'Pendiente':value)+'</b></div>'}
-  function sessionHtml(s){
+  function sessionHtml(s,turn){
     const l=s.liquidacion||{},lines=Array.isArray(l.lineas)?l.lineas:[];
     const pending=l.pendientes||{},post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:[];
     const pendingPost=Number(l.movimientos_posteriores_pendientes||pending.movimientos_posteriores_corte||0)>0;
@@ -105,7 +105,7 @@
       ['Ventas estimadas',pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)+' CUP')],
       ['Ganancia bruta estimada',pendingPost?blocked:(l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL'))],
       ['Costo de ventas estimado',pendingPost?blocked:(lines.some(x=>x.costo_vendido_estimado!=null)?money(lines.reduce((v,x)=>v+Number(x.costo_vendido_estimado||0),0))+' CUP'+(Number(l.costos_sin_cobertura||0)>0?' · PARCIAL':''):'No calculable')],
-      ['Efectivo recogido',l.dinero_recogido_total==null?'Pendiente':money(l.dinero_recogido_total)+' CUP'],
+      ['Efectivo total recogido',l.dinero_recogido_total==null?'Pendiente':money(l.dinero_recogido_total)+' CUP'],
       ['Salario',pendingPost?blocked:(l.salario_calculado==null?'Pendiente':money(l.salario_calculado)+' CUP')],
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
@@ -123,7 +123,11 @@
     const warnings=[];
     if(l.faltan_cortes)warnings.push('Falta un corte de inventario confirmado.');
     if(Number(l.familias_sin_precio||0)>0)warnings.push(Number(l.familias_sin_precio)+' familias sin precio de venta válido.');
-    if(Number(l.familias_con_vendidas_negativas||0)>0)warnings.push(Number(l.familias_con_vendidas_negativas)+' familias con unidades vendidas negativas; revisar inventario o entradas no registradas.');
+    if(Number(l.familias_con_vendidas_negativas||0)>0){
+      const negative=Array.isArray(l.familias_vendidas_negativas_detalle)?l.familias_vendidas_negativas_detalle:[];
+      warnings.push(Number(l.familias_con_vendidas_negativas)+' productos/familias con diferencia negativa. No se puede calcular venta de una cantidad negativa; revisa el detalle y corrige el corte o registra la entrada faltante.');
+      negative.forEach(x=>warnings.push((x.nombre||'Producto')+': diferencia '+qty(x.unidades_vendidas)+' · inicial '+qty(x.inventario_inicial)+' + entradas '+qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0))+' − salidas '+qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)+Number(x.mermas_aprobadas||0)+Number(x.bajas_aprobadas||0))+' − final '+qty(x.inventario_final)));
+    }
     if(l.salario_porcentaje==null)warnings.push('Falta fijar el porcentaje salarial del Dueño.');
     if(Number(l.movimientos_posteriores_pendientes||0)>0)warnings.push(Number(l.movimientos_posteriores_pendientes)+' bajas/mermas aprobadas después del inventario final necesitan clasificación.');
     if(Number(l.costos_sin_cobertura||0)>0)warnings.push(Number(l.costos_sin_cobertura)+' productos con ventas sin costo de compra histórico comprobado; la ganancia mostrada es parcial.');
@@ -135,7 +139,11 @@
     const movements=post.length?'<div class="bcjr-alert"><b>Movimientos aprobados después del inventario final</b><p>Revisa cada baja o merma y marca cuándo ocurrió realmente. Esta clasificación auditada es necesaria para recalcular la liquidación.</p><div class="bcjr-movement-list">'+
       post.map(m=>'<article class="bcjr-movement-card" data-bcjr-movement-row data-type="'+esc(m.tipo)+'" data-id="'+esc(m.id)+'"><div class="bcjr-movement-title"><b>'+esc(m.tipo)+' · '+esc(m.producto)+'</b><strong>'+esc(qty(m.cantidad))+'</strong></div><div class="bcjr-movement-meta"><span>Registrado: '+esc(m.creado_en?new Date(m.creado_en).toLocaleString():'—')+'</span><span>Aprobado: '+esc(m.fecha_revision?new Date(m.fecha_revision).toLocaleString():'—')+'</span><span>Estado: '+esc(m.estado)+'</span></div><label class="bcjr-movement-decision">¿Cuándo ocurrió esta baja/merma?<select data-bcjr-classification><option value="">Seleccionar momento real…</option><option value="ANTES_CORTE" '+(m.clasificacion==='ANTES_CORTE'?'selected':'')+'>Antes del inventario final</option><option value="DESPUES_CORTE" '+(m.clasificacion==='DESPUES_CORTE'?'selected':'')+'>Después del inventario final</option></select></label><small class="bcjr-movement-reason">Motivo registrado: '+esc(m.motivo||'Sin motivo')+(m.comentario_revision?' · '+esc(m.comentario_revision):'')+'</small></article>').join('')+
       '</div><div class="bcjr-field"><label>Motivo general de la clasificación<input type="text" maxlength="500" data-bcjr-movement-comment placeholder="Explica por qué confirmas el momento de estos movimientos"></label><button type="button" class="bcjr-btn" data-bcjr-action="classify" data-session="'+esc(s.id)+'">Guardar clasificación auditada</button></div></div>':'';
-    return '<section class="bcjr-session"><h3>Día '+esc(s.numero_dia)+' · '+esc(fmtDate(s.fecha))+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+esc(fmtDate(s.fecha_fin)):'')+'</h3><p class="bcjr-muted">Estado '+esc(s.estado)+' · efectivo declarado '+esc(money(s.efectivo?.declarado))+' CUP · contado '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin declaración')+'</p><span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+movements+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+(lines.length?esc(lines.length)+' productos · '+(pendingPost?'existencias visibles; ventas bloqueadas':'tabla detallada'):'Pendiente de cortes de inventario confirmados')+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details>'+'</section>';
+    const daily=Array.isArray(s.entregas_diarias)?s.entregas_diarias:[];
+    const periodDays=Math.max(1,Number(turn?.dias_turno||1));
+    const periodTitle=periodDays>1?'Jornada · '+fmtDate(s.fecha)+' – '+fmtDate(s.fecha_fin||s.fecha)+' · '+periodDays+' días':'Jornada · '+fmtDate(s.fecha);
+    const dailyCash=daily.length?'<div class="bcjr-alert"><b>Entregas de efectivo por día</b><ul>'+daily.map(e=>'<li>'+esc(fmtDate(e.fecha))+' · '+esc(money(e.monto))+' CUP · '+esc(e.estado||'sin estado')+'</li>').join('')+'</ul><p class="bcjr-muted">El efectivo final contado ('+esc(money(s.efectivo?.contado))+' CUP) es un conteo aparte; no lo confundas con la entrega diaria.</p></div>':'<p class="bcjr-muted">No hay entregas diarias registradas en el expediente.</p>';
+    return '<section class="bcjr-session"><h3>'+esc(periodTitle)+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · efectivo final declarado '+esc(money(s.efectivo?.declarado))+' CUP · conteo final '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin aprobación')+'</p>'+dailyCash+'<span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+movements+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+(lines.length?esc(lines.length)+' productos · '+(pendingPost?'existencias visibles; ventas bloqueadas':'tabla detallada'):'Pendiente de cortes de inventario confirmados')+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details>'+'</section>';
   }
   function render(data){
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
@@ -152,20 +160,21 @@
     const profitComplete=sessions.length>0&&sessions.every(s=>['COMPLETADA','CANCELADA'].includes(s.estado))
       &&completedSessions.every(s=>s.liquidacion?.ganancia_bruta_es_total===true);
     body.innerHTML='<div class="bcjr-cards">'+[
-      card('Estado del turno',turn.estado_maestro||turn.estado),
-      card('Jornadas completadas',sessions.filter(s=>s.estado==='COMPLETADA').length+' / '+sessions.length),
+      card('Estado de revisión',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
+      card('Periodo del turno',String(turn.dias_turno||1)+' día(s) · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)),
+      card('Sesiones registradas',String(sessions.length)),
       card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Efectivo contado',cashLabel),
       card('Gastos',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.gastos_aprobados||0),0))+' CUP'),
       card('Reinversiones',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.reinversiones_aprobadas||0),0))+' CUP')
-    ].join('')+'</div>'+sessions.map(sessionHtml).join('');
+    ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{
       const l=s.liquidacion||{};
-      if(!['COMPLETADA','CANCELADA'].includes(s.estado))blockers.push('Día '+s.numero_dia+': todavía no se ha completado.');
-      if(s.estado==='COMPLETADA'&&l.calculable!==true)blockers.push('Día '+s.numero_dia+': liquidación todavía no calculable');
-      if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Día '+s.numero_dia+': movimientos posteriores sin clasificar');
+      if(!['COMPLETADA','CANCELADA'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía no se ha completado.');
+      if(s.estado==='COMPLETADA'&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
+      if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Jornada '+fmtDate(s.fecha)+': movimientos posteriores sin clasificar');
     });
     const approved=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
     const btn=modal.querySelector('[data-bcjr-action="approve"]');
