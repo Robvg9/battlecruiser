@@ -17,6 +17,7 @@ test("Product review can switch between stock and financial columns",()=>{
   assert.match(REVIEW,/data-bcjr-table-view="finance"/);
   assert.match(REVIEW,/data-bcjr-view="stock"/);
   assert.match(REVIEW,/data-bcjr-open-count/);
+  assert.match(REVIEW,/x\.inventario_final_original!=null\?/,"count correction is only offered when a final-cut row exists");
   assert.match(REVIEW,/table\.dataset\.bcjrView=view/);
 });
 test("Review evidence is optional in collapsible panels",()=>{
