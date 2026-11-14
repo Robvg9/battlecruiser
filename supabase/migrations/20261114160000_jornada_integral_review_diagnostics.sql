@@ -439,14 +439,16 @@ BEGIN
     FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
     SELECT coalesce(jsonb_agg(jsonb_build_object(
         'tipo',m.tipo,'id',m.id,'producto',m.producto,'cantidad',m.cantidad,
+        'precio_unitario',m.precio_unitario,
+        'valor_estimado',CASE WHEN m.precio_unitario IS NOT NULL THEN round(m.cantidad*m.precio_unitario,2) ELSE NULL END,
         'estado',m.estado,'creado_en',m.creado_en,'fecha_revision',m.fecha_revision,'motivo',m.motivo,
         'clasificacion',r.clasificacion,'comentario_revision',r.comentario
       ) ORDER BY m.creado_en,m.producto),'[]'::jsonb),
       count(*) FILTER(WHERE r.clasificacion IS NULL)
       INTO v_post,v_pending_post
     FROM (
-      SELECT 'BAJA'::text tipo,b.id,p.nombre producto,b.cantidad,b.estado,b.creado_en,coalesce(b.fecha_revision,b.actualizado_en) AS fecha_revision,b.motivo
-      FROM public.bajas b JOIN public.productos p ON p.id=b.producto_id
+      SELECT 'BAJA'::text tipo,b.id,p.nombre producto,b.cantidad,coalesce(p.precio_normal,pp.precio_normal) precio_unitario,b.estado,b.creado_en,coalesce(b.fecha_revision,b.actualizado_en) AS fecha_revision,b.motivo
+      FROM public.bajas b JOIN public.productos p ON p.id=b.producto_id LEFT JOIN public.productos pp ON pp.id=p.producto_padre_id
       WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
         AND v_final.id IS NOT NULL AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_final.confirmado_en
       UNION ALL
