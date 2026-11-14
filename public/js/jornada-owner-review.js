@@ -111,6 +111,13 @@
       .bcjr-detail[open]>summary:after{content:'−'}
       .bcjr-detail-body{padding:10px 12px;min-width:0}
       .bcjr-btn.small{padding:6px 8px;font-size:.75rem;white-space:nowrap}
+      .bcjr-values-modal{position:fixed;inset:0;z-index:10090;display:grid;place-items:center;padding:14px;background:rgba(0,0,0,.68)}
+      .bcjr-values-dialog{width:min(520px,100%);max-height:90dvh;overflow:auto;border:1px solid var(--gold-dim,#9a7c3e);border-radius:14px;padding:16px;background:var(--stone,#122a24);color:var(--text,#f5efe3);box-shadow:0 20px 70px rgba(0,0,0,.4)}
+      .bcjr-values-dialog label{display:grid;gap:5px;margin:11px 0;font-size:.85rem}
+      .bcjr-values-dialog input,.bcjr-values-dialog textarea{width:100%;min-width:0;padding:10px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:8px;background:var(--void,#0a1613);color:var(--text,#f5efe3)}
+      .bcjr-values-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+      body.bc-theme-light .bcjr-values-dialog{background:#e8e4da;color:#202722}
+      body.bc-theme-light .bcjr-values-dialog input,body.bc-theme-light .bcjr-values-dialog textarea{background:#f1eee5;color:#202722}
       body.bc-theme-light .bcjr-detail>summary{background:#e2ded3;color:#202722}
       @media(max-width:650px){
         #bc-jornada-review-modal{padding:0}
@@ -159,9 +166,9 @@
     const sums={initial:0,entries:0,exits:0,final:0,sold:0,revenue:0,cost:0,profit:0};
     lines.forEach(x=>{sums.initial+=Number(x.inventario_inicial||0);sums.entries+=entries(x);sums.exits+=exits(x);sums.final+=Number(x.inventario_final||0);sums.sold+=Number(x.unidades_vendidas||0);if(x.importe_estimado!=null)sums.revenue+=Number(x.importe_estimado);if(x.costo_vendido_estimado!=null)sums.cost+=Number(x.costo_vendido_estimado);if(x.ganancia_bruta_estimada!=null)sums.profit+=Number(x.ganancia_bruta_estimada)});
     const tableSwitch='<div class="bcjr-table-switch"><button type="button" class="bcjr-btn active" data-bcjr-table-view="stock">Inventario físico</button><button type="button" class="bcjr-btn" data-bcjr-table-view="finance">Ventas y rentabilidad</button></div>';
-    const table='<div class="bcjr-table-wrap"><table class="bcjr-table" data-bcjr-view="stock"><thead><tr><th>Producto</th><th>Inventario inicial</th><th>Entradas</th><th>Salidas</th><th>Bajas incluidas</th><th>Inventario final</th><th>Unidades vendidas</th><th>Precio venta</th><th>Ingreso est.</th><th>Costo/u est.</th><th>Costo vendido est.</th><th>Ganancia bruta est.</th><th>Margen est.</th></tr></thead><tbody>'+
-      lines.map(x=>'<tr><td>'+esc(x.nombre||'Producto')+'</td><td>'+esc(qty(x.inventario_inicial))+'</td><td>'+esc(qty(entries(x)))+'</td><td>'+esc(qty(exits(x)))+'</td><td>'+esc(qty(x.bajas_aprobadas))+'</td><td>'+esc(qty(x.inventario_final))+'</td><td>'+esc(pendingPost?blocked:qty(x.unidades_vendidas))+'</td><td>'+esc(x.precio_unitario==null?'Sin precio':money(x.precio_unitario))+'</td><td>'+esc(pendingPost?blocked:(x.importe_estimado==null?'—':money(x.importe_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_unitario_estimado==null?'Sin costo':money(x.costo_unitario_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_vendido_estimado==null?'—':money(x.costo_vendido_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.ganancia_bruta_estimada==null?'—':money(x.ganancia_bruta_estimada)))+'</td><td>'+esc(pendingPost?blocked:(x.margen_bruto_estimado==null?'—':qty(x.margen_bruto_estimado)+'%'))+'</td></tr>').join('')+
-      '</tbody><tfoot><tr><td>TOTALES</td><td>'+esc(qty(sums.initial))+'</td><td>'+esc(qty(sums.entries))+'</td><td>'+esc(qty(sums.exits))+'</td><td>'+esc(qty(lines.reduce((v,x)=>v+Number(x.bajas_aprobadas||0),0)))+'</td><td>'+esc(qty(sums.final))+'</td><td>'+esc(pendingPost?blocked:qty(sums.sold))+'</td><td>—</td><td>'+esc(pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)))+'</td><td>—</td><td>'+esc(pendingPost?blocked:money(sums.cost)+'*')+'</td><td>'+esc(pendingPost?blocked:money(sums.profit)+'*')+'</td><td>—</td></tr></tfoot></table></div><p class="bcjr-muted">'+(pendingPost?'El inventario físico sí está disponible. Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte.':'* Costos y ganancias son estimaciones parciales cuando faltan costos históricos. No equivalen a un costo FIFO completo.')+'</p>';
+    const table='<div class="bcjr-table-wrap"><table class="bcjr-table" data-bcjr-view="stock"><thead><tr><th>Producto</th><th>Inventario inicial</th><th>Entradas</th><th>Salidas</th><th>Bajas incluidas</th><th>Inventario final</th><th>Unidades vendidas</th><th>Precio venta</th><th>Ingreso est.</th><th>Costo/u est.</th><th>Costo vendido est.</th><th>Ganancia bruta est.</th><th>Margen est.</th><th>Valores</th></tr></thead><tbody>'+
+      lines.map(x=>'<tr><td>'+esc(x.nombre||'Producto')+'</td><td>'+esc(qty(x.inventario_inicial))+'</td><td>'+esc(qty(entries(x)))+'</td><td>'+esc(qty(exits(x)))+'</td><td>'+esc(qty(x.bajas_aprobadas))+'</td><td>'+esc(qty(x.inventario_final))+'</td><td>'+esc(pendingPost?blocked:qty(x.unidades_vendidas))+'</td><td>'+esc(x.precio_unitario==null?'Sin precio':money(x.precio_unitario))+'</td><td>'+esc(pendingPost?blocked:(x.importe_estimado==null?'—':money(x.importe_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_unitario_estimado==null?'Sin costo':money(x.costo_unitario_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_vendido_estimado==null?'—':money(x.costo_vendido_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.ganancia_bruta_estimada==null?'—':money(x.ganancia_bruta_estimada)))+'</td><td>'+esc(pendingPost?blocked:(x.margen_bruto_estimado==null?'—':qty(x.margen_bruto_estimado)+'%'))+'</td><td><button type="button" class="bcjr-btn small" data-bcjr-open-values data-session="'+esc(s.id)+'" data-product="'+esc(x.producto_id)+'" data-name="'+esc(x.nombre||'Producto')+'" data-price="'+esc(x.precio_unitario==null?'':x.precio_unitario)+'" data-cost="'+esc(x.costo_unitario_estimado==null?'':x.costo_unitario_estimado)+'">Editar valores</button></td></tr>').join('')')+
+      '</tbody><tfoot><tr><td>TOTALES</td><td>'+esc(qty(sums.initial))+'</td><td>'+esc(qty(sums.entries))+'</td><td>'+esc(qty(sums.exits))+'</td><td>'+esc(qty(lines.reduce((v,x)=>v+Number(x.bajas_aprobadas||0),0)))+'</td><td>'+esc(qty(sums.final))+'</td><td>'+esc(pendingPost?blocked:qty(sums.sold))+'</td><td>—</td><td>'+esc(pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)))+'</td><td>—</td><td>'+esc(pendingPost?blocked:money(sums.cost)+'*')+'</td><td>'+esc(pendingPost?blocked:money(sums.profit)+'*')+'</td><td>—</td><td>—</td></tr></tfoot></table></div><p class="bcjr-muted">'+(pendingPost?'El inventario físico sí está disponible. Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte.':'* Costos y ganancias son estimaciones parciales cuando faltan costos históricos. No equivalen a un costo FIFO completo.')+'</p>';
     const warnings=[];
     const negative=Array.isArray(l.familias_vendidas_negativas_detalle)?l.familias_vendidas_negativas_detalle:[];
     if(l.faltan_cortes)warnings.push('Falta un corte de inventario confirmado.');
@@ -250,10 +257,33 @@
     catch(e){document.getElementById('bcjr-content').innerHTML='<div class="bcjr-alert">'+esc(e.message||e)+'</div>';document.getElementById('bcjr-message').textContent='No se pudo cargar el expediente.';}
   }
   function close(){const m=document.getElementById('bc-jornada-review-modal');if(m)m.hidden=true;document.body.classList.remove('bc-jornada-review-open');}
+  function openValuesEditor(button){
+    document.querySelector('.bcjr-values-modal')?.remove();
+    const box=document.createElement('div');box.className='bcjr-values-modal';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Se aplican exclusivamente a esta Jornada. No modifican el catálogo ni las ventas futuras. Si hubo varios precios o costos, introduce el promedio ponderado del período.</p><label>Precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price value="'+esc(button.dataset.price)+'"></label><label>Costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost value="'+esc(button.dataset.cost)+'"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar valores auditados</button></div></section>';
+    document.body.appendChild(box);box.querySelector('[data-bcjr-value-price]')?.focus();
+  }
+  async function saveValuesEditor(button){
+    const box=button.closest('.bcjr-values-modal');
+    const price=box?.querySelector('[data-bcjr-value-price]')?.value.trim();
+    const cost=box?.querySelector('[data-bcjr-value-cost]')?.value.trim();
+    const reason=box?.querySelector('[data-bcjr-value-reason]')?.value.trim();
+    if(price===''||cost===''||!Number.isFinite(Number(price))||!Number.isFinite(Number(cost))||Number(price)<0||Number(cost)<0||reason.length<5){
+      const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Indica precio, costo y un motivo verificable (mínimo 5 caracteres).';return;
+    }
+    if(busy)return;
+    await run(async()=>{
+      await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:Number(price),costo_unitario:Number(cost)}],p_comentario:reason});
+      box?.remove();await openReview(activeTurnId);
+    });
+  }
   async function click(e){
-    const t=e.target.closest&&e.target.closest('[data-bcjr-action],[data-bcjr-close],[data-bcjr-table-view]');if(!t)return;
+    const t=e.target.closest&&e.target.closest('[data-bcjr-action],[data-bcjr-close],[data-bcjr-table-view],[data-bcjr-open-values],[data-bcjr-values-save],[data-bcjr-values-cancel]');if(!t)return;
     if(t.hasAttribute('data-bcjr-close')){close();return;}
-    if(t.hasAttribute('data-bcjr-table-view')){const body=t.closest('.bcjr-inventory-body'),table=body?.querySelector('.bcjr-table'),view=t.dataset.bcjrTableView; if(table){table.dataset.bcjrView=view;body.querySelectorAll('[data-bcjr-table-view]').forEach(b=>b.classList.toggle('active',b===t));} return;}
+    if(t.hasAttribute('data-bcjr-table-view')){const body=t.closest('.bcjr-inventory-body'),table=body?.querySelector('.bcjr-table'),view=t.dataset.bcjrTableView;if(table){table.dataset.bcjrView=view;body.querySelectorAll('[data-bcjr-table-view]').forEach(b=>b.classList.toggle('active',b===t));}return;}
+    if(t.hasAttribute('data-bcjr-open-values')){openValuesEditor(t);return;}
+    if(t.hasAttribute('data-bcjr-values-cancel')){t.closest('.bcjr-values-modal')?.remove();return;}
+    if(t.hasAttribute('data-bcjr-values-save')){await saveValuesEditor(t);return;}
     const action=t.dataset.bcjrAction;
     if(busy)return;
     if(action==='correct-final-counts'){
