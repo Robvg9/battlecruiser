@@ -233,3 +233,14 @@ test("Historical price corrections preserve precise weighted averages and reject
   assert.match(migration,/solicita una reapertura auditada/);
   assert.match(REVIEW,/step="0\.0001" data-bcjr-correction-price/);
 });
+
+test("Post-cutoff movement reference values use audited historical family prices",()=>{
+  const migration=read("supabase/migrations/20261114180000_jornada_historical_values_and_price_history.sql");
+  const start=migration.indexOf("SELECT 'BAJA'::text");
+  const end=migration.indexOf(") m\n     LEFT JOIN public.turno_jornada_movimiento_revision",start);
+  assert.ok(start>=0&&end>start,"post-cutoff movement union must exist");
+  const movementSql=migration.slice(start,end);
+  assert.match(movementSql,/correction\.precio_venta_corregido/);
+  assert.match(movementSql,/history\.precio_normal/);
+  assert.match(movementSql,/h\.efectivo_desde<=coalesce\(v_final\.confirmado_en,now\(\)\)/);
+});
