@@ -462,17 +462,17 @@ BEGIN
     v_liq:=public.bc7_liquidacion_inventario_jornada(v_s.id);
     SELECT coalesce(jsonb_agg(
       x.value || jsonb_build_object(
-        'costo_unitario_estimado',coalesce(vc.costo_unitario_corregido,coalesce(vc.costo_unitario_corregido,c.costo_unitario)),
+        'costo_unitario_estimado',coalesce(vc.costo_unitario_corregido,c.costo_unitario),
         'estado_costo',CASE WHEN vc.costo_unitario_corregido IS NOT NULL THEN 'COSTO_HISTORICO_AUDITADO' WHEN c.costo_unitario IS NULL THEN 'SIN_COSTO_COMPROBADO' ELSE 'COSTO_PROMEDIO_PONDERADO_LOTES' END,
-        'costo_vendido_estimado',CASE WHEN coalesce(vc.costo_unitario_corregido,coalesce(vc.costo_unitario_corregido,c.costo_unitario)) IS NOT NULL AND (x.value->>'unidades_vendidas')::numeric>=0
-          THEN round((x.value->>'unidades_vendidas')::numeric*coalesce(vc.costo_unitario_corregido,coalesce(vc.costo_unitario_corregido,c.costo_unitario)),2) ELSE NULL END,
-        'ganancia_bruta_estimada',CASE WHEN coalesce(vc.costo_unitario_corregido,coalesce(vc.costo_unitario_corregido,c.costo_unitario)) IS NOT NULL AND x.value->>'importe_estimado' IS NOT NULL
+        'costo_vendido_estimado',CASE WHEN coalesce(vc.costo_unitario_corregido,c.costo_unitario) IS NOT NULL AND (x.value->>'unidades_vendidas')::numeric>=0
+          THEN round((x.value->>'unidades_vendidas')::numeric*coalesce(vc.costo_unitario_corregido,c.costo_unitario),2) ELSE NULL END,
+        'ganancia_bruta_estimada',CASE WHEN coalesce(vc.costo_unitario_corregido,c.costo_unitario) IS NOT NULL AND x.value->>'importe_estimado' IS NOT NULL
           THEN round((x.value->>'importe_estimado')::numeric-
             ((x.value->>'unidades_vendidas')::numeric*coalesce(vc.costo_unitario_corregido,c.costo_unitario)),2) ELSE NULL END,
-        'margen_bruto_estimado',CASE WHEN coalesce(vc.costo_unitario_corregido,coalesce(vc.costo_unitario_corregido,c.costo_unitario)) IS NOT NULL
+        'margen_bruto_estimado',CASE WHEN coalesce(vc.costo_unitario_corregido,c.costo_unitario) IS NOT NULL
           AND nullif((x.value->>'importe_estimado')::numeric,0) IS NOT NULL
           THEN round(100*(((x.value->>'importe_estimado')::numeric-
-            ((x.value->>'unidades_vendidas')::numeric*coalesce(vc.costo_unitario_corregido,coalesce(vc.costo_unitario_corregido,c.costo_unitario))))/
+            ((x.value->>'unidades_vendidas')::numeric*coalesce(vc.costo_unitario_corregido,c.costo_unitario)))/
             (x.value->>'importe_estimado')::numeric),2) ELSE NULL END
       ) ORDER BY x.value->>'nombre'
     ),'[]'::jsonb)
@@ -724,13 +724,11 @@ BEGIN
   IF TG_OP='INSERT'
     OR NEW.precio_normal IS DISTINCT FROM OLD.precio_normal
     OR NEW.precio_mayorista IS DISTINCT FROM OLD.precio_mayorista THEN
-    IF NEW.precio_normal IS NOT NULL OR NEW.precio_mayorista IS NOT NULL THEN
-      INSERT INTO public.productos_historial_precios(
-        producto_id,precio_normal,precio_mayorista,fuente,efectivo_desde,registrado_por
-      ) VALUES (
-        NEW.id,NEW.precio_normal,NEW.precio_mayorista,'CAMBIO_CATALOGO',clock_timestamp(),auth.uid()
-      );
-    END IF;
+    INSERT INTO public.productos_historial_precios(
+      producto_id,precio_normal,precio_mayorista,fuente,efectivo_desde,registrado_por
+    ) VALUES (
+      NEW.id,NEW.precio_normal,NEW.precio_mayorista,'CAMBIO_CATALOGO',clock_timestamp(),auth.uid()
+    );
   END IF;
   RETURN NEW;
 END;
@@ -738,7 +736,7 @@ $function$;
 REVOKE ALL ON FUNCTION public.bc_registrar_historial_precios_producto() FROM PUBLIC,anon,authenticated;
 DROP TRIGGER IF EXISTS trg_bc_registrar_historial_precios_producto ON public.productos;
 CREATE TRIGGER trg_bc_registrar_historial_precios_producto
-AFTER INSERT OR UPDATE OF precio_normal,precio_mayorista ON public.productos
+AFTER INSERT OR UPDATE ON public.productos
 FOR EACH ROW EXECUTE FUNCTION public.bc_registrar_historial_precios_producto();
 
 CREATE OR REPLACE FUNCTION public.bc7_corregir_valores_historicos_producto_jornada(
