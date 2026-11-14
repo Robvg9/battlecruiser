@@ -69,7 +69,7 @@ test("The app shell loads the new owner review module and keeps cache versions a
   assert.match(APP,/VERSION="9\.5\.109"/);
   assert.match(APP,/jornada-owner-review\.js","1\.4"/);
   assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
   assert.match(INDEX,/v9\.5\.109/);
 });
 
@@ -98,7 +98,7 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(APP,/VERSION="9\.5\.109"/);
   assert.match(APP,/jornada-owner-review\.js","1\.4"/);
   assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
   assert.match(INDEX,/v9\.5\.109/);
 });
 
@@ -175,7 +175,7 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   assert.match(REVIEW,/familias_vendidas_negativas_detalle/);
   assert.match(REVIEW,/más unidades en el corte final/);
   assert.match(REVIEW,/Periodo del turno/);
-  assert.match(REVIEW,/Entregas diarias y conteo final/);
+  assert.match(REVIEW,/Entregas y conteo de efectivo/);
   assert.match(REVIEW,/Efectivo total recogido/);
   assert.match(REVIEW,/Marcar todas: antes del corte/);
   assert.match(REVIEW,/Marcar todas: después del corte/);
