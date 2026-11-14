@@ -1,5 +1,5 @@
--- Historical price and cost overrides scoped to one completed Jornada.
--- Original catalogue prices and physical inventory cuts remain untouched.
+-- Audited price/cost overrides scoped to one completed Jornada.
+-- The catalogue and original physical cuts are never changed.
 CREATE TABLE IF NOT EXISTS public.turno_jornada_valores_correcciones (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   turno_sesion_id uuid NOT NULL REFERENCES public.turno_sesiones(id) ON DELETE RESTRICT,
@@ -59,8 +59,12 @@ BEGIN
     SELECT 1 FROM jsonb_array_elements(p_ajustes) x(value)
     WHERE jsonb_typeof(x.value)<>'object'
       OR coalesce(x.value->>'producto_id','') !~* '^[0-9a-f-]{36}$'
-      OR (nullif(x.value->>'precio_venta_unitario','') IS NOT NULL AND (x.value->>'precio_venta_unitario') !~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})
-  ) THEN RAISE EXCEPTION 'Producto, precio o costo inválido. Usa importes no negativos con hasta 4 decimales.' USING ERRCODE='22023'; END IF;
+      OR (nullif(x.value->>'precio_venta_unitario','') IS NOT NULL AND (x.value->>'precio_venta_unitario') !~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})$')
+      OR (nullif(x.value->>'costo_unitario','') IS NOT NULL AND (x.value->>'costo_unitario') !~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})$')
+      OR (nullif(x.value->>'precio_venta_unitario','') IS NULL AND nullif(x.value->>'costo_unitario','') IS NULL)
+  ) THEN
+    RAISE EXCEPTION 'Producto, precio o costo inválido. Usa importes no negativos con hasta 4 decimales.' USING ERRCODE='22023';
+  END IF;
   IF (SELECT count(*) FROM jsonb_array_elements(p_ajustes))
       <> (SELECT count(DISTINCT (x.value->>'producto_id')::uuid) FROM jsonb_array_elements(p_ajustes) x(value)) THEN
     RAISE EXCEPTION 'No repitas el mismo producto en los ajustes.' USING ERRCODE='22023';
@@ -82,148 +86,6 @@ BEGIN
     WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente;
     v_price:=coalesce(v_price,v_existing_price);
     v_cost:=coalesce(v_cost,v_existing_cost);
-    IF NOT EXISTS(
-      SELECT 1 FROM public.turno_jornada_inventario_lineas il
-      JOIN public.turno_jornada_inventario_cortes c ON c.id=il.corte_id
-      WHERE c.turno_sesion_id=v_s.id AND c.tipo IN ('INICIAL','FINAL')
-        AND c.estado='CONFIRMADO' AND il.producto_id=v_product_id
-    ) THEN
-      RAISE EXCEPTION 'El producto % no pertenece a los cortes confirmados de esta Jornada.',v_product_id USING ERRCODE='23503';
-    END IF;
-    SELECT p.precio_normal INTO v_old_price FROM public.productos p WHERE p.id=v_product_id;
-    SELECT round(sum(l.cantidad_inicial*l.costo_unitario)/nullif(sum(l.cantidad_inicial),0),4)
-      INTO v_old_cost
-    FROM public.lotes_compra l
-    JOIN public.productos p ON p.id=l.producto_id
-    WHERE l.almacen_id=v_s.almacen_id
-      AND coalesce(p.producto_padre_id,p.id)=v_product_id
-      AND l.fecha_compra<=v_final.confirmado_en
-      AND coalesce(l.costo_unitario,0)>0;
-    SELECT coalesce(v_before,'[]'::jsonb)||jsonb_build_array(jsonb_build_object(
-      'producto_id',v_product_id,'precio_venta_anterior',coalesce(j.precio_venta_unitario,v_old_price),
-      'costo_anterior',coalesce(j.costo_unitario,v_old_cost)
-    )) INTO v_before
-    FROM (SELECT 1) base
-    LEFT JOIN LATERAL (
-      SELECT precio_venta_unitario,costo_unitario FROM public.turno_jornada_valores_correcciones
-      WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente
-    ) j ON true;
-    UPDATE public.turno_jornada_valores_correcciones
-      SET vigente=false
-      WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente;
-    INSERT INTO public.turno_jornada_valores_correcciones(
-      turno_sesion_id,producto_id,precio_venta_original,costo_unitario_original,
-      precio_venta_unitario,costo_unitario,comentario,creado_por
-    ) VALUES(v_s.id,v_product_id,v_old_price,v_old_cost,v_price,v_cost,btrim(p_comentario),auth.uid());
-    v_after:=v_after||jsonb_build_array(jsonb_build_object(
-      'producto_id',v_product_id,'precio_venta_unitario',v_price,'costo_unitario',v_cost
-    ));
-    v_count:=v_count+1;
-  END LOOP;
-  INSERT INTO public.turno_jornada_eventos(
-    almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
-  ) VALUES(
-    v_s.almacen_id,v_s.jornada_programacion_id,auth.uid(),'VALORES_HISTORICOS_JORNADA_CORREGIDOS',
-    btrim(p_comentario),jsonb_build_object('valores_anteriores',v_before),
-    jsonb_build_object('valores_nuevos',v_after,'productos_ajustados',v_count)
-  );
-  RETURN jsonb_build_object('ok',true,'productos_ajustados',v_count,'catalogo_modificado',false);
-END;
-$function$;
-REVOKE ALL ON FUNCTION public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text) TO authenticated;
-
-
-)
-      OR (nullif(x.value->>'costo_unitario','') IS NOT NULL AND (x.value->>'costo_unitario') !~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})
-  ) THEN RAISE EXCEPTION 'Producto, precio o costo inválido. Usa importes no negativos con hasta 4 decimales.' USING ERRCODE='22023'; END IF;
-  IF (SELECT count(*) FROM jsonb_array_elements(p_ajustes))
-      <> (SELECT count(DISTINCT (x.value->>'producto_id')::uuid) FROM jsonb_array_elements(p_ajustes) x(value)) THEN
-    RAISE EXCEPTION 'No repitas el mismo producto en los ajustes.' USING ERRCODE='22023';
-  END IF;
-  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
-  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.estado<>'COMPLETADA' THEN
-    RAISE EXCEPTION 'Solo se corrigen valores de una Jornada completada.' USING ERRCODE='23514';
-  END IF;
-  SELECT * INTO v_final FROM public.turno_jornada_inventario_cortes
-    WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO';
-  IF NOT FOUND THEN RAISE EXCEPTION 'La Jornada no tiene un inventario final confirmado.' USING ERRCODE='23503'; END IF;
-  FOR v_item IN SELECT value FROM jsonb_array_elements(p_ajustes)
-  LOOP
-    v_product_id:=(v_item->>'producto_id')::uuid;
-    v_price:=(v_item->>'precio_venta_unitario')::numeric;
-    v_cost:=(v_item->>'costo_unitario')::numeric;
-    IF NOT EXISTS(
-      SELECT 1 FROM public.turno_jornada_inventario_lineas il
-      JOIN public.turno_jornada_inventario_cortes c ON c.id=il.corte_id
-      WHERE c.turno_sesion_id=v_s.id AND c.tipo IN ('INICIAL','FINAL')
-        AND c.estado='CONFIRMADO' AND il.producto_id=v_product_id
-    ) THEN
-      RAISE EXCEPTION 'El producto % no pertenece a los cortes confirmados de esta Jornada.',v_product_id USING ERRCODE='23503';
-    END IF;
-    SELECT p.precio_normal INTO v_old_price FROM public.productos p WHERE p.id=v_product_id;
-    SELECT round(sum(l.cantidad_inicial*l.costo_unitario)/nullif(sum(l.cantidad_inicial),0),4)
-      INTO v_old_cost
-    FROM public.lotes_compra l
-    JOIN public.productos p ON p.id=l.producto_id
-    WHERE l.almacen_id=v_s.almacen_id
-      AND coalesce(p.producto_padre_id,p.id)=v_product_id
-      AND l.fecha_compra<=v_final.confirmado_en
-      AND coalesce(l.costo_unitario,0)>0;
-    SELECT coalesce(v_before,'[]'::jsonb)||jsonb_build_array(jsonb_build_object(
-      'producto_id',v_product_id,'precio_venta_anterior',coalesce(j.precio_venta_unitario,v_old_price),
-      'costo_anterior',coalesce(j.costo_unitario,v_old_cost)
-    )) INTO v_before
-    FROM (SELECT 1) base
-    LEFT JOIN LATERAL (
-      SELECT precio_venta_unitario,costo_unitario FROM public.turno_jornada_valores_correcciones
-      WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente
-    ) j ON true;
-    UPDATE public.turno_jornada_valores_correcciones
-      SET vigente=false
-      WHERE turno_sesion_id=v_s.id AND producto_id=v_product_id AND vigente;
-    INSERT INTO public.turno_jornada_valores_correcciones(
-      turno_sesion_id,producto_id,precio_venta_original,costo_unitario_original,
-      precio_venta_unitario,costo_unitario,comentario,creado_por
-    ) VALUES(v_s.id,v_product_id,v_old_price,v_old_cost,v_price,v_cost,btrim(p_comentario),auth.uid());
-    v_after:=v_after||jsonb_build_array(jsonb_build_object(
-      'producto_id',v_product_id,'precio_venta_unitario',v_price,'costo_unitario',v_cost
-    ));
-    v_count:=v_count+1;
-  END LOOP;
-  INSERT INTO public.turno_jornada_eventos(
-    almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
-  ) VALUES(
-    v_s.almacen_id,v_s.jornada_programacion_id,auth.uid(),'VALORES_HISTORICOS_JORNADA_CORREGIDOS',
-    btrim(p_comentario),jsonb_build_object('valores_anteriores',v_before),
-    jsonb_build_object('valores_nuevos',v_after,'productos_ajustados',v_count)
-  );
-  RETURN jsonb_build_object('ok',true,'productos_ajustados',v_count,'catalogo_modificado',false);
-END;
-$function$;
-REVOKE ALL ON FUNCTION public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.bc7_ajustar_valores_producto_jornada(uuid,jsonb,text) TO authenticated;
-
-
-)
-      OR (nullif(x.value->>'precio_venta_unitario','') IS NULL AND nullif(x.value->>'costo_unitario','') IS NULL)
-  ) THEN RAISE EXCEPTION 'Producto, precio o costo inválido. Usa importes no negativos con hasta 4 decimales.' USING ERRCODE='22023'; END IF;
-  IF (SELECT count(*) FROM jsonb_array_elements(p_ajustes))
-      <> (SELECT count(DISTINCT (x.value->>'producto_id')::uuid) FROM jsonb_array_elements(p_ajustes) x(value)) THEN
-    RAISE EXCEPTION 'No repitas el mismo producto en los ajustes.' USING ERRCODE='22023';
-  END IF;
-  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
-  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.estado<>'COMPLETADA' THEN
-    RAISE EXCEPTION 'Solo se corrigen valores de una Jornada completada.' USING ERRCODE='23514';
-  END IF;
-  SELECT * INTO v_final FROM public.turno_jornada_inventario_cortes
-    WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO';
-  IF NOT FOUND THEN RAISE EXCEPTION 'La Jornada no tiene un inventario final confirmado.' USING ERRCODE='23503'; END IF;
-  FOR v_item IN SELECT value FROM jsonb_array_elements(p_ajustes)
-  LOOP
-    v_product_id:=(v_item->>'producto_id')::uuid;
-    v_price:=(v_item->>'precio_venta_unitario')::numeric;
-    v_cost:=(v_item->>'costo_unitario')::numeric;
     IF NOT EXISTS(
       SELECT 1 FROM public.turno_jornada_inventario_lineas il
       JOIN public.turno_jornada_inventario_cortes c ON c.id=il.corte_id
@@ -307,6 +169,7 @@ DECLARE
   v_adjusted_expected numeric;
   v_adjusted_difference numeric;
   v_adjusted_missing_prices integer:=0;
+  v_adjusted_negative integer:=0;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo el Dueño/Admin puede consultar la revisión integral.' USING ERRCODE='42501';
@@ -321,6 +184,8 @@ BEGIN
     SELECT * INTO v_final FROM public.turno_jornada_inventario_cortes
       WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO';
     v_liq:=public.bc7_liquidacion_inventario_jornada(v_s.id);
+
+    -- Apply explicit values for this completed Jornada only; catalogue pricing remains untouched.
     SELECT coalesce(jsonb_agg(
       x.value || jsonb_build_object(
         'precio_catalogo_unitario',x.value->'precio_unitario',
@@ -342,43 +207,53 @@ BEGIN
      AND jv.producto_id=(x.value->>'producto_id')::uuid
      AND jv.vigente;
 
+    SELECT
+      count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0
+        AND x.value->>'importe_estimado' IS NULL),
+      count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)<0)
+    INTO v_adjusted_missing_prices,v_adjusted_negative
+    FROM jsonb_array_elements(coalesce(v_adjusted_lines,'[]'::jsonb)) x(value);
+
     IF coalesce((v_liq->>'movimientos_posteriores_pendientes')::integer,0)=0
-       AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0 THEN
-      SELECT count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0 AND x.value->>'importe_estimado' IS NULL),
-        CASE WHEN count(*) FILTER(WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0 AND x.value->>'importe_estimado' IS NULL)>0
-          THEN NULL ELSE round(coalesce(sum((x.value->>'importe_estimado')::numeric),0),2) END
-      INTO v_adjusted_missing_prices,v_adjusted_sales
-      FROM jsonb_array_elements(v_adjusted_lines) x(value);
-      v_adjusted_salary:=CASE WHEN v_adjusted_sales IS NOT NULL AND v_liq->>'salario_porcentaje' IS NOT NULL
-        THEN round(v_adjusted_sales*(v_liq->>'salario_porcentaje')::numeric/100,2) ELSE NULL END;
-      v_adjusted_expected:=CASE WHEN v_adjusted_salary IS NOT NULL
-        THEN round(v_adjusted_sales-coalesce((v_liq->>'gastos_aprobados')::numeric,0)
-          -coalesce((v_liq->>'reinversiones_aprobadas')::numeric,0)-v_adjusted_salary,2) ELSE NULL END;
-      v_adjusted_difference:=CASE WHEN v_adjusted_expected IS NOT NULL AND v_liq->>'dinero_recogido_total' IS NOT NULL
-        THEN round((v_liq->>'dinero_recogido_total')::numeric-v_adjusted_expected,2) ELSE NULL END;
-      v_liq:=v_liq||jsonb_build_object(
-        'lineas',v_adjusted_lines,'ventas_estimadas',v_adjusted_sales,
-        'salario_calculado',v_adjusted_salary,
-        'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_adjusted_expected,
-        'diferencia',v_adjusted_difference,
-        'familias_sin_precio',v_adjusted_missing_prices,
-        'calculable',
-          coalesce((v_liq->>'faltan_cortes')::boolean,true)=false
-          AND v_adjusted_missing_prices=0
-          AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0
-          AND v_adjusted_sales IS NOT NULL
-          AND v_adjusted_salary IS NOT NULL
-          AND coalesce((v_liq->>'movimientos_posteriores_pendientes')::integer,0)=0
-          AND coalesce((v_liq->'pendientes'->>'gastos')::integer,0)=0
-          AND coalesce((v_liq->'pendientes'->>'reinversiones')::integer,0)=0
-          AND coalesce((v_liq->'pendientes'->>'ajustes')::integer,0)=0
-          AND coalesce((v_liq->'pendientes'->>'entregas_diarias')::integer,0)=0
-          AND coalesce((v_liq->'pendientes'->>'entregas_diarias_faltantes')::integer,0)=0
-          AND v_liq->>'dinero_recogido_total' IS NOT NULL
-      );
+       AND coalesce((v_liq->>'faltan_cortes')::boolean,true)=false
+       AND v_adjusted_negative=0
+       AND v_adjusted_missing_prices=0 THEN
+      SELECT round(coalesce(sum((x.value->>'importe_estimado')::numeric),0),2)
+      INTO v_adjusted_sales
+      FROM jsonb_array_elements(coalesce(v_adjusted_lines,'[]'::jsonb)) x(value);
     ELSE
-      v_liq:=v_liq||jsonb_build_object('lineas',v_adjusted_lines);
+      v_adjusted_sales:=NULL;
     END IF;
+    v_adjusted_salary:=CASE WHEN v_adjusted_sales IS NOT NULL AND v_liq->>'salario_porcentaje' IS NOT NULL
+      THEN round(v_adjusted_sales*(v_liq->>'salario_porcentaje')::numeric/100,2) ELSE NULL END;
+    v_adjusted_expected:=CASE WHEN v_adjusted_salary IS NOT NULL
+      THEN round(v_adjusted_sales-coalesce((v_liq->>'gastos_aprobados')::numeric,0)
+        -coalesce((v_liq->>'reinversiones_aprobadas')::numeric,0)-v_adjusted_salary,2) ELSE NULL END;
+    v_adjusted_difference:=CASE WHEN v_adjusted_expected IS NOT NULL AND v_liq->>'dinero_recogido_total' IS NOT NULL
+      THEN round((v_liq->>'dinero_recogido_total')::numeric-v_adjusted_expected,2) ELSE NULL END;
+    v_liq:=coalesce(v_liq,'{}'::jsonb)||jsonb_build_object(
+      'lineas',v_adjusted_lines,
+      'ventas_estimadas',v_adjusted_sales,
+      'salario_calculado',v_adjusted_salary,
+      'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_adjusted_expected,
+      'diferencia',v_adjusted_difference,
+      'familias_sin_precio',v_adjusted_missing_prices,
+      'productos_vendidos_con_precio_faltante',v_adjusted_missing_prices,
+      'calculable',
+        coalesce((v_liq->>'faltan_cortes')::boolean,true)=false
+        AND v_adjusted_missing_prices=0
+        AND v_adjusted_negative=0
+        AND v_adjusted_sales IS NOT NULL
+        AND v_adjusted_salary IS NOT NULL
+        AND coalesce((v_liq->>'movimientos_posteriores_pendientes')::integer,0)=0
+        AND coalesce((v_liq->'pendientes'->>'gastos')::integer,0)=0
+        AND coalesce((v_liq->'pendientes'->>'reinversiones')::integer,0)=0
+        AND coalesce((v_liq->'pendientes'->>'ajustes')::integer,0)=0
+        AND coalesce((v_liq->'pendientes'->>'entregas_diarias')::integer,0)=0
+        AND coalesce((v_liq->'pendientes'->>'entregas_diarias_faltantes')::integer,0)=0
+        AND v_liq->>'dinero_recogido_total' IS NOT NULL
+    );
+
     SELECT coalesce(jsonb_agg(
       x.value || jsonb_build_object(
         'costo_lote_unitario',c.costo_unitario,
