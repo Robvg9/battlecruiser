@@ -38,8 +38,9 @@ BEGIN
     INTO v_definition;
   IF position('bc_actor_is_admin' IN v_definition)=0
      OR position('catalogo_actual_inalterado' IN v_definition)=0
-     OR position('VALORACION_HISTORICA_CORREGIDA' IN v_definition)=0 THEN
-    RAISE EXCEPTION 'Historical valuation corrections must enforce Owner/Admin and emit an audit event';
+     OR position('VALORACION_HISTORICA_CORREGIDA' IN v_definition)=0
+     OR position('SET vigente=false' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Historical valuation corrections must enforce Owner/Admin, preserve prior versions and emit an audit event';
   END IF;
 END;
 $$;
