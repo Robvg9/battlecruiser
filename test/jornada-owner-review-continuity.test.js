@@ -154,3 +154,12 @@ test("Light theme uses warm low-glare surfaces with readable text",()=>{
   assert.ok(THEME.includes("background:#f1eee5!important;"));
   assert.ok(REVIEW.includes("body.bc-theme-light .bcjr-dialog{background:#e8e4da;color:#202722}"));
 });
+
+
+test("The overall cash summary distinguishes pending, partial and fully approved counts",()=>{
+  assert.match(REVIEW,/const cashSessions=sessions\.filter\(s=>s\.liquidacion\?\.dinero_recogido_total!=null\)/);
+  assert.match(REVIEW,/const cashComplete=sessions\.length>0&&cashSessions\.length===sessions\.length/);
+  assert.match(REVIEW,/const cashLabel=cashComplete\?money\(cashTotal\)\+' CUP':cashSessions\.length\?money\(cashTotal\)\+' CUP · PARCIAL':'Pendiente'/);
+  assert.match(REVIEW,/card\('Efectivo contado',cashLabel\)/);
+  assert.doesNotMatch(REVIEW,/money\(sessions\.reduce\(\(v,s\)=>v\+Number\(s\.liquidacion\?\.dinero_recogido_total\|\|0\)/);
+});
