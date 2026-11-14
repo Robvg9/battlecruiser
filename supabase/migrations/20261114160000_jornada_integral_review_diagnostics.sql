@@ -510,6 +510,15 @@ BEGIN
         AND coalesce(v_sold_price_missing,0)=0
         AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0
     );
+    IF coalesce(v_pending_post,0)>0 THEN
+      v_liq:=v_liq||jsonb_build_object(
+        'costos_con_cobertura',0,
+        'costos_sin_cobertura',0,
+        'familias_total_costo',0,
+        'ganancia_bruta_parcial',NULL,
+        'ganancia_bruta_es_total',false
+      );
+    END IF;
     v_sessions:=v_sessions||jsonb_build_array(jsonb_build_object(
       'id',v_s.id,'numero_dia',v_s.numero_dia,'fecha',v_p.fecha,'fecha_fin',coalesce(v_p.fecha_fin,v_p.fecha),
       'estado',v_s.estado,'responsable_id',v_p.responsable_id,
