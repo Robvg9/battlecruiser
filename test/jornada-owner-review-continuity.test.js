@@ -116,3 +116,9 @@ test("Owner review primary action keeps sufficient dark-mode contrast",()=>{
   assert.ok(REVIEW.includes(".bcjr-btn.primary{background:#315d4a;color:white;border-color:transparent}"));
   assert.ok(REVIEW.includes("body.bc-theme-light .bcjr-btn.primary{background:#315d4a;color:#fff"));
 });
+
+
+test("Light theme review surfaces override global white table and input styles",()=>{
+  assert.ok(REVIEW.includes("background:#f3efe6!important;color:#202722!important;border-color:#c9bfac!important"));
+  assert.ok(REVIEW.includes("background:#f8f5ed!important;color:#202722!important;border-color:#b8ad98!important"));
+});
