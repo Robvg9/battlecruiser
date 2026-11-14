@@ -196,6 +196,9 @@ test("Jornada review keeps physical stock visible and reports negative-product d
 
 test("Post-cutoff Mermas retain the same audit fields as Bajas",()=>{
   const migration=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
-  const union=migration.slice(migration.indexOf("FROM (\n      SELECT 'BAJA'"),migration.indexOf(") m\n    LEFT JOIN public.turno_jornada_movimiento_revision"));
+  const start=migration.indexOf("SELECT 'BAJA'::text");
+  const end=migration.indexOf(") m\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
+  assert.ok(start>=0&&end>start,"post-cutoff movement UNION must exist");
+  const union=migration.slice(start,end);
   assert.match(union,/SELECT 'BAJA'[\s\S]*?b\.motivo[\s\S]*?UNION ALL[\s\S]*?SELECT 'MERMA'[\s\S]*?coalesce\(p\.precio_normal,pp\.precio_normal\)[\s\S]*?m\.motivo/);
 });
