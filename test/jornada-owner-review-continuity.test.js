@@ -66,11 +66,11 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -95,11 +95,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -127,7 +127,7 @@ test("Light theme review surfaces override global white table and input styles",
 
 test("Inventory detail control remains available even while calculation lines are blocked",()=>{
   assert.ok(REVIEW.includes("Pendiente de cortes de inventario confirmados"));
-  assert.ok(REVIEW.includes("Todavía no hay líneas físicas de inventario confirmadas"));
+  assert.ok(REVIEW.includes("Todavía no hay líneas físicas confirmadas"));
   assert.ok(REVIEW.includes("Comprueba los cortes inicial y final para mostrar la tabla por producto"));
 });
 
