@@ -100,3 +100,13 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(SW,/jornada-owner-review\.js\?v=1\.1/);
   assert.match(INDEX,/v9\.5\.106/);
 });
+
+
+test("Post-cutoff classification controls remain visible and usable on mobile without a wide table",()=>{
+  assert.match(REVIEW,/bcjr-movement-card/);
+  assert.match(REVIEW,/bcjr-movement-decision/);
+  assert.match(REVIEW,/Antes del inventario final/);
+  assert.match(REVIEW,/Después del inventario final/);
+  assert.match(REVIEW,/Guardar clasificación auditada/);
+  assert.doesNotMatch(REVIEW,/bcjr-movement-list.*<table/);
+});
