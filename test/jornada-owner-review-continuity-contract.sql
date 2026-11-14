@@ -103,7 +103,8 @@ BEGIN
     INTO v_definition;
   IF position('IF coalesce(v_pending_post,0)>0 THEN' IN v_definition)=0
      OR position('costo_vendido_estimado' IN v_definition)=0
-     OR position('v_cost_covered:=0' IN v_definition)=0
+     OR position('costos_con_cobertura' IN v_definition)=0
+     OR position('ganancia_bruta_parcial' IN v_definition)=0
      OR position('ganancia_bruta_es_total' IN v_definition)=0 THEN
     RAISE EXCEPTION 'Owner review must mask derived sales/cost/profit fields without discarding physical inventory lines';
   END IF;
@@ -120,6 +121,38 @@ BEGIN
   IF position('coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)' IN v_definition)=0
      OR position('coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)' IN v_definition)=0 THEN
     RAISE EXCEPTION 'Owner resolution must block approval while post-cutoff movements remain unclassified';
+  END IF;
+
+
+  IF to_regclass('public.turno_jornada_inventario_correcciones') IS NULL THEN
+    RAISE EXCEPTION 'Audited inventory correction history table was not created';
+  END IF;
+  SELECT relrowsecurity INTO v_has_rls FROM pg_class
+    WHERE oid='public.turno_jornada_inventario_correcciones'::regclass;
+  IF v_has_rls IS DISTINCT FROM true
+     OR has_table_privilege('authenticated','public.turno_jornada_inventario_correcciones','SELECT')
+     OR has_table_privilege('authenticated','public.turno_jornada_inventario_correcciones','INSERT') THEN
+    RAISE EXCEPTION 'Inventory correction history must be private and RLS protected';
+  END IF;
+  IF NOT has_function_privilege('authenticated','public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text)','EXECUTE')
+     OR has_function_privilege('anon','public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Audited inventory correction RPC privileges are not correctly restricted';
+  END IF;
+  SELECT pg_get_functiondef('public.bc7_corregir_inventario_final_jornada(uuid,jsonb,text)'::regprocedure)
+    INTO v_definition;
+  IF position('INVENTARIO_FINAL_CORREGIDO' IN v_definition)=0
+     OR position('corte_original_conservado' IN v_definition)=0
+     OR position('bc_actor_is_admin' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Inventory corrections must preserve the original cut and emit an Owner-only audit event';
+  END IF;
+
+
+  SELECT pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure)
+    INTO v_definition;
+  IF position('turno_jornada_inventario_correcciones' IN v_definition)=0
+     OR position('coalesce(c.cantidad_corregida,l.cantidad_contada)' IN v_definition)=0
+     OR position('inventario_final_original' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Liquidation must apply audited final-count overrides without rewriting the immutable physical cut';
   END IF;
 
   RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, physical inventory visibility, no-provisional-settlement, and ACL contract';

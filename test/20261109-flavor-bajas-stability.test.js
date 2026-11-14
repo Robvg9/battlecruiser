@@ -46,5 +46,5 @@ test("Connectivity tolerates transient mobile probe failures and offers controll
  assert.match(net,/fallosSondeoSeguidos >= 3/);
  assert.match(app,/bc-pwa-update-notice/);
  assert.match(app,/window\.location\.reload\(\)/);
- assert.match(sw,/BC_SW_VERSION = "9\.5\.107"/);
+ assert.match(sw,/BC_SW_VERSION = "9\.5\.108"/);
 });

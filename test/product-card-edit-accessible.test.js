@@ -127,11 +127,11 @@ test("cards gain keyboard affordance when permissions finish hydrating after the
 });
 
 test("product-card editor is wired into the current PWA shell and precached with matching version", () => {
-  assert.match(APP_SOURCE, /const VERSION\s*=\s*["']9\.5\.107["']/);
+  assert.match(APP_SOURCE, /const VERSION\s*=\s*["']9\.5\.108["']/);
   assert.match(APP_SOURCE, /\["bc-product-card-edit\.js",\s*["']1\.1["']\]/);
   assert.match(APP_SOURCE, /password-recovery-admin\.js/);
-  assert.match(INDEX_SOURCE, /app\.js\?v=9\.5\.107/);
-  assert.match(INDEX_SOURCE, /v9\.5\.107/);
-  assert.match(SW_SOURCE, /BC_SW_VERSION\s*=\s*["']9\.5\.107["']/);
+  assert.match(INDEX_SOURCE, /app\.js\?v=9\.5\.108/);
+  assert.match(INDEX_SOURCE, /v9\.5\.108/);
+  assert.match(SW_SOURCE, /BC_SW_VERSION\s*=\s*["']9\.5\.108["']/);
   assert.match(SW_SOURCE, /js\/bc-product-card-edit\.js\?v=1\.1/);
 });

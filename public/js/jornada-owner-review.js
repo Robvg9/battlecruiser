@@ -96,7 +96,7 @@
   }
   function fmtDate(value){if(!value)return '—';try{return new Date(value+'T12:00:00').toLocaleDateString('es-ES')}catch(_){return String(value)}}
   function card(label,value){return '<div class="bcjr-card"><small>'+esc(label)+'</small><b>'+esc(value==null?'Pendiente':value)+'</b></div>'}
-  function sessionHtml(s){
+  function sessionHtml(s,turn){
     const l=s.liquidacion||{},lines=Array.isArray(l.lineas)?l.lineas:[];
     const pending=l.pendientes||{},post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:[];
     const pendingPost=Number(l.movimientos_posteriores_pendientes||pending.movimientos_posteriores_corte||0)>0;
@@ -105,7 +105,7 @@
       ['Ventas estimadas',pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)+' CUP')],
       ['Ganancia bruta estimada',pendingPost?blocked:(l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL'))],
       ['Costo de ventas estimado',pendingPost?blocked:(lines.some(x=>x.costo_vendido_estimado!=null)?money(lines.reduce((v,x)=>v+Number(x.costo_vendido_estimado||0),0))+' CUP'+(Number(l.costos_sin_cobertura||0)>0?' · PARCIAL':''):'No calculable')],
-      ['Efectivo recogido',l.dinero_recogido_total==null?'Pendiente':money(l.dinero_recogido_total)+' CUP'],
+      ['Efectivo total recogido',l.dinero_recogido_total==null?'Pendiente':money(l.dinero_recogido_total)+' CUP'],
       ['Salario',pendingPost?blocked:(l.salario_calculado==null?'Pendiente':money(l.salario_calculado)+' CUP')],
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
@@ -121,9 +121,13 @@
       lines.map(x=>'<tr><td>'+esc(x.nombre||'Producto')+'</td><td>'+esc(qty(x.inventario_inicial))+'</td><td>'+esc(qty(entries(x)))+'</td><td>'+esc(qty(exits(x)))+'</td><td>'+esc(qty(x.bajas_aprobadas))+'</td><td>'+esc(qty(x.inventario_final))+'</td><td>'+esc(pendingPost?blocked:qty(x.unidades_vendidas))+'</td><td>'+esc(x.precio_unitario==null?'Sin precio':money(x.precio_unitario))+'</td><td>'+esc(pendingPost?blocked:(x.importe_estimado==null?'—':money(x.importe_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_unitario_estimado==null?'Sin costo':money(x.costo_unitario_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_vendido_estimado==null?'—':money(x.costo_vendido_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.ganancia_bruta_estimada==null?'—':money(x.ganancia_bruta_estimada)))+'</td><td>'+esc(pendingPost?blocked:(x.margen_bruto_estimado==null?'—':qty(x.margen_bruto_estimado)+'%'))+'</td></tr>').join('')+
       '</tbody><tfoot><tr><td>TOTALES</td><td>'+esc(qty(sums.initial))+'</td><td>'+esc(qty(sums.entries))+'</td><td>'+esc(qty(sums.exits))+'</td><td>'+esc(qty(lines.reduce((v,x)=>v+Number(x.bajas_aprobadas||0),0)))+'</td><td>'+esc(qty(sums.final))+'</td><td>'+esc(pendingPost?blocked:qty(sums.sold))+'</td><td>—</td><td>'+esc(pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)))+'</td><td>—</td><td>'+esc(pendingPost?blocked:money(sums.cost)+'*')+'</td><td>'+esc(pendingPost?blocked:money(sums.profit)+'*')+'</td><td>—</td></tr></tfoot></table></div><p class="bcjr-muted">'+(pendingPost?'El inventario físico sí está disponible. Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte.':'* Costos y ganancias son estimaciones parciales cuando faltan costos históricos. No equivalen a un costo FIFO completo.')+'</p>';
     const warnings=[];
+    const negative=Array.isArray(l.familias_vendidas_negativas_detalle)?l.familias_vendidas_negativas_detalle:[];
     if(l.faltan_cortes)warnings.push('Falta un corte de inventario confirmado.');
     if(Number(l.familias_sin_precio||0)>0)warnings.push(Number(l.familias_sin_precio)+' familias sin precio de venta válido.');
-    if(Number(l.familias_con_vendidas_negativas||0)>0)warnings.push(Number(l.familias_con_vendidas_negativas)+' familias con unidades vendidas negativas; revisar inventario o entradas no registradas.');
+    if(Number(l.familias_con_vendidas_negativas||0)>0){
+      warnings.push(Number(l.familias_con_vendidas_negativas)+' productos/familias tienen más unidades en el corte final que las disponibles. Verifica el conteo final o registra la entrada que falte.');
+      negative.forEach(x=>warnings.push((x.nombre||'Producto')+': diferencia '+qty(x.unidades_vendidas)+' · inicial '+qty(x.inventario_inicial)+' + entradas '+qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0))+' − salidas '+qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)+Number(x.mermas_aprobadas||0)+Number(x.bajas_aprobadas||0))+' − final '+qty(x.inventario_final)));
+    }
     if(l.salario_porcentaje==null)warnings.push('Falta fijar el porcentaje salarial del Dueño.');
     if(Number(l.movimientos_posteriores_pendientes||0)>0)warnings.push(Number(l.movimientos_posteriores_pendientes)+' bajas/mermas aprobadas después del inventario final necesitan clasificación.');
     if(Number(l.costos_sin_cobertura||0)>0)warnings.push(Number(l.costos_sin_cobertura)+' productos con ventas sin costo de compra histórico comprobado; la ganancia mostrada es parcial.');
@@ -132,14 +136,26 @@
     if(Number(pending.reinversiones||0)>0)warnings.push(Number(pending.reinversiones)+' reinversiones pendientes.');
     if(Number(pending.ajustes||0)>0)warnings.push(Number(pending.ajustes)+' bajas/mermas pendientes.');
     const salary=s.salario_porcentaje==null?'<div class="bcjr-field"><label>Porcentaje salarial de esta jornada (%)<input type="number" min="0" max="100" step="0.01" data-bcjr-salary-input="'+esc(s.id)+'" placeholder="Escribe el porcentaje"></label><button type="button" class="bcjr-btn" data-bcjr-action="salary" data-session="'+esc(s.id)+'">Guardar porcentaje</button><small>Es una decisión del Dueño; no se aplica un valor predeterminado.</small></div>':'<p class="bcjr-muted">Porcentaje salarial fijado: <b>'+esc(qty(s.salario_porcentaje))+'%</b></p>';
-    const movements=post.length?'<div class="bcjr-alert"><b>Movimientos aprobados después del inventario final</b><p>Revisa cada baja o merma y marca cuándo ocurrió realmente. Esta clasificación auditada es necesaria para recalcular la liquidación.</p><div class="bcjr-movement-list">'+
-      post.map(m=>'<article class="bcjr-movement-card" data-bcjr-movement-row data-type="'+esc(m.tipo)+'" data-id="'+esc(m.id)+'"><div class="bcjr-movement-title"><b>'+esc(m.tipo)+' · '+esc(m.producto)+'</b><strong>'+esc(qty(m.cantidad))+'</strong></div><div class="bcjr-movement-meta"><span>Registrado: '+esc(m.creado_en?new Date(m.creado_en).toLocaleString():'—')+'</span><span>Aprobado: '+esc(m.fecha_revision?new Date(m.fecha_revision).toLocaleString():'—')+'</span><span>Estado: '+esc(m.estado)+'</span></div><label class="bcjr-movement-decision">¿Cuándo ocurrió esta baja/merma?<select data-bcjr-classification><option value="">Seleccionar momento real…</option><option value="ANTES_CORTE" '+(m.clasificacion==='ANTES_CORTE'?'selected':'')+'>Antes del inventario final</option><option value="DESPUES_CORTE" '+(m.clasificacion==='DESPUES_CORTE'?'selected':'')+'>Después del inventario final</option></select></label><small class="bcjr-movement-reason">Motivo registrado: '+esc(m.motivo||'Sin motivo')+(m.comentario_revision?' · '+esc(m.comentario_revision):'')+'</small></article>').join('')+
-      '</div><div class="bcjr-field"><label>Motivo general de la clasificación<input type="text" maxlength="500" data-bcjr-movement-comment placeholder="Explica por qué confirmas el momento de estos movimientos"></label><button type="button" class="bcjr-btn" data-bcjr-action="classify" data-session="'+esc(s.id)+'">Guardar clasificación auditada</button></div></div>':'';
-    return '<section class="bcjr-session"><h3>Día '+esc(s.numero_dia)+' · '+esc(fmtDate(s.fecha))+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+esc(fmtDate(s.fecha_fin)):'')+'</h3><p class="bcjr-muted">Estado '+esc(s.estado)+' · efectivo declarado '+esc(money(s.efectivo?.declarado))+' CUP · contado '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin declaración')+'</p><span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+movements+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+(lines.length?esc(lines.length)+' productos · '+(pendingPost?'existencias visibles; ventas bloqueadas':'tabla detallada'):'Pendiente de cortes de inventario confirmados')+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details>'+'</section>';
+    const postValue=post.reduce((v,m)=>v+Number(m.valor_estimado||0),0);
+    const postValueKnown=post.every(m=>m.valor_estimado!=null);
+    const movements=post.length?'<div class="bcjr-alert"><b>Movimientos aprobados después del inventario final</b><p>'+esc(post.length)+' bajas/mermas · cantidad total '+esc(qty(post.reduce((v,m)=>v+Number(m.cantidad||0),0)))+' · valor referencial a precio actual '+(postValueKnown?esc(money(postValue)+' CUP'):'incompleto')+'. El valor es orientativo, no un gasto de caja.</p><p>La fecha de aprobación no demuestra cuándo ocurrió la baja. Contrasta con la hoja del turno y clasifica el momento real; solo entonces se recalculan ventas, costos, salario y diferencia.</p><div class="bcjr-field"><button type="button" class="bcjr-btn" data-bcjr-action="classify-all-before">Marcar todas: antes del corte</button><button type="button" class="bcjr-btn" data-bcjr-action="classify-all-after">Marcar todas: después del corte</button></div><div class="bcjr-movement-list">'+
+       post.map(m=>'<article class="bcjr-movement-card" data-bcjr-movement-row data-type="'+esc(m.tipo)+'" data-id="'+esc(m.id)+'"><div class="bcjr-movement-title"><b>'+esc(m.tipo)+' · '+esc(m.producto)+'</b><strong>'+esc(qty(m.cantidad))+'</strong></div><div class="bcjr-movement-meta"><span>Registrado: '+esc(m.creado_en?new Date(m.creado_en).toLocaleString():'—')+'</span><span>Aprobado: '+esc(m.fecha_revision?new Date(m.fecha_revision).toLocaleString():'—')+'</span><span>Valor referencial: '+esc(m.valor_estimado==null?'Sin precio':money(m.valor_estimado)+' CUP')+'</span><span>Estado: '+esc(m.estado)+'</span></div><label class="bcjr-movement-decision">¿Cuándo ocurrió esta baja/merma?<select data-bcjr-classification><option value="">Seleccionar momento real…</option><option value="ANTES_CORTE" '+(m.clasificacion==='ANTES_CORTE'?'selected':'')+'>Antes del inventario final</option><option value="DESPUES_CORTE" '+(m.clasificacion==='DESPUES_CORTE'?'selected':'')+'>Después del inventario final</option></select></label><small class="bcjr-movement-reason">Motivo registrado: '+esc(m.motivo||'Sin motivo')+(m.comentario_revision?' · '+esc(m.comentario_revision):'')+'</small></article>').join('')+
+       '</div><div class="bcjr-field"><label>Motivo general de la clasificación<input type="text" maxlength="500" data-bcjr-movement-comment placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></label><button type="button" class="bcjr-btn" data-bcjr-action="classify" data-session="'+esc(s.id)+'">Guardar clasificación auditada</button></div></div>':'';
+    const correctionForm=negative.length?'<div class="bcjr-alert"><b>Corregir un conteo final equivocado</b><p>Si al cotejar el conteo físico confirmas que la cantidad final se escribió mal, introduce aquí la cantidad correcta. El corte original no se borra: la corrección queda registrada con usuario, fecha y motivo. Si la cantidad física sí es correcta, no la cambies; registra la entrada faltante.</p><div class="bcjr-field">'+negative.map(x=>'<label>'+esc(x.nombre)+' · final guardado '+esc(qty(x.inventario_final))+'<input type="number" min="0" step="0.001" data-bcjr-final-correction data-product="'+esc(x.producto_id)+'" value="'+esc(x.inventario_final)+'"></label>').join('')+'<label>Motivo obligatorio<input type="text" maxlength="500" data-bcjr-final-correction-comment placeholder="Ej.: cotejado con el inventario físico y la hoja del turno"></label><button type="button" class="bcjr-btn primary" data-bcjr-action="correct-final-counts" data-session="'+esc(s.id)+'">Guardar corrección auditada</button></div></div>':'';
+    const daily=Array.isArray(s.entregas_diarias)?s.entregas_diarias:[];
+    const periodDays=Math.max(1,Number(turn?.dias_turno||1));
+    const periodTitle=periodDays>1?'Jornada · '+fmtDate(s.fecha)+' – '+fmtDate(s.fecha_fin||s.fecha)+' · '+periodDays+' días':'Jornada · '+fmtDate(s.fecha);
+    const cashRows=daily.map(e=>'<li>'+esc(fmtDate(e.fecha))+' · Entrega diaria aprobada: <b>'+esc(money(e.monto))+' CUP</b></li>');
+    if(s.efectivo?.contado!=null)cashRows.push('<li>'+esc(fmtDate((s.efectivo.contado_at||'').slice(0,10)||s.fecha_fin||s.fecha))+' · Conteo final de caja: <b>'+esc(money(s.efectivo.contado))+' CUP</b> · '+esc(s.efectivo.estado||'sin estado')+'</li>');
+    const countedDate=(s.efectivo?.contado_at||'').slice(0,10);
+    const lateCount=countedDate&&countedDate>(s.fecha_fin||s.fecha);
+    const cashNote=lateCount?'El conteo final se registró el '+esc(fmtDate(countedDate))+', después de terminar el período ('+esc(fmtDate(s.fecha_fin||s.fecha))+'). Se conserva la fecha real del registro.':'El conteo final se muestra separado de las entregas diarias para no duplicarlo.';
+    const dailyCash=cashRows.length?'<div class="bcjr-alert"><b>Entregas diarias y conteo final</b><ul>'+cashRows.join('')+'</ul><p class="bcjr-muted">Total recogido: <b>'+esc(money(l.dinero_recogido_total))+' CUP</b>. '+cashNote+'</p></div>':'<p class="bcjr-muted">No hay entregas diarias ni conteo final registrados en el expediente.</p>';
+    return '<section class="bcjr-session"><h3>'+esc(periodTitle)+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · efectivo final declarado '+esc(money(s.efectivo?.declarado))+' CUP · conteo final '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin aprobación')+'</p>'+dailyCash+'<span class="bcjr-pill '+(l.calculable===true?'ok':'warn')+'">'+(l.calculable===true?'Liquidación calculable':'Liquidación provisional')+'</span><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div>'+salary+(warnings.length?'<div class="bcjr-alert"><b>Validaciones pendientes</b><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>')+correctionForm+movements+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+(lines.length?esc(lines.length)+' productos · '+(pendingPost?'existencias visibles; ventas bloqueadas':'tabla detallada'):'Pendiente de cortes de inventario confirmados')+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details>'+'</section>';
   }
   function render(data){
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
-    const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' · '+sessions.length+' sesión(es) · '+(turn.estado_maestro||turn.estado||'');
+    const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
     const body=document.getElementById('bcjr-content');
     const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes||0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
@@ -152,20 +168,21 @@
     const profitComplete=sessions.length>0&&sessions.every(s=>['COMPLETADA','CANCELADA'].includes(s.estado))
       &&completedSessions.every(s=>s.liquidacion?.ganancia_bruta_es_total===true);
     body.innerHTML='<div class="bcjr-cards">'+[
-      card('Estado del turno',turn.estado_maestro||turn.estado),
-      card('Jornadas completadas',sessions.filter(s=>s.estado==='COMPLETADA').length+' / '+sessions.length),
+      card('Estado de revisión',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
+      card('Periodo del turno',String(turn.dias_turno||1)+' día(s) · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)),
+      card('Productos en los cortes',String(sessions.reduce((n,s)=>n+(s.liquidacion?.lineas?.length||0),0))),
       card('Ganancia bruta estimada',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>s.liquidacion?.ganancia_bruta_parcial!=null)?money(grossProfit)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
       card('Costo de ventas estimado',hasPendingPost?'Pendiente de clasificación':(completedSessions.some(s=>(s.liquidacion?.lineas||[]).some(x=>x.costo_vendido_estimado!=null))?money(costOfSales)+' CUP'+(profitComplete?'':' · PARCIAL'):'No calculable')),
-      card('Efectivo contado',cashLabel),
+      card('Efectivo total recogido',cashLabel),
       card('Gastos',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.gastos_aprobados||0),0))+' CUP'),
       card('Reinversiones',money(sessions.reduce((v,s)=>v+Number(s.liquidacion?.reinversiones_aprobadas||0),0))+' CUP')
-    ].join('')+'</div>'+sessions.map(sessionHtml).join('');
+    ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{
       const l=s.liquidacion||{};
-      if(!['COMPLETADA','CANCELADA'].includes(s.estado))blockers.push('Día '+s.numero_dia+': todavía no se ha completado.');
-      if(s.estado==='COMPLETADA'&&l.calculable!==true)blockers.push('Día '+s.numero_dia+': liquidación todavía no calculable');
-      if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Día '+s.numero_dia+': movimientos posteriores sin clasificar');
+      if(!['COMPLETADA','CANCELADA'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía no se ha completado.');
+      if(s.estado==='COMPLETADA'&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
+      if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Jornada '+fmtDate(s.fecha)+': movimientos posteriores sin clasificar');
     });
     const approved=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
     const btn=modal.querySelector('[data-bcjr-action="approve"]');
@@ -191,6 +208,23 @@
     if(t.hasAttribute('data-bcjr-close')){close();return;}
     const action=t.dataset.bcjrAction;
     if(busy)return;
+    if(action==='correct-final-counts'){
+      const section=t.closest('.bcjr-session');
+      const comment=(section?.querySelector('[data-bcjr-final-correction-comment]')?.value||'').trim();
+      const corrections=Array.from(section?.querySelectorAll('[data-bcjr-final-correction]')||[]).map(input=>({producto_id:input.dataset.product,cantidad:input.value}));
+      if(!comment||corrections.some(x=>x.cantidad.trim()===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0)){
+        document.getElementById('bcjr-message').textContent='Indica cantidades válidas y explica el motivo de la corrección.';
+        return;
+      }
+      await run(async()=>{await rpc('bc7_corregir_inventario_final_jornada',{p_turno_sesion_id:t.dataset.session,p_correcciones:corrections,p_comentario:comment});await openReview(activeTurnId);});
+    }else if(action==='classify-all-before'||action==='classify-all-after'){
+      const section=t.closest('.bcjr-session');
+      const value=action==='classify-all-before'?'ANTES_CORTE':'DESPUES_CORTE';
+      section?.querySelectorAll('[data-bcjr-classification]').forEach(select=>{select.value=value;});
+      const msg=document.getElementById('bcjr-message');
+      if(msg)msg.textContent='Selección preparada. Revisa los movimientos y guarda la clasificación auditada para aplicar el cambio.';
+      return;
+    }
     if(action==='salary'){
       const input=document.querySelector('[data-bcjr-salary-input="'+t.dataset.session+'"]');
       const value=Number(input&&input.value);

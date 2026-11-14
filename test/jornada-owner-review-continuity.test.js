@@ -66,11 +66,11 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.107"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.2"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.107"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.2/);
-  assert.match(INDEX,/v9\.5\.107/);
+  assert.match(APP,/VERSION="9\.5\.108"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
+  assert.match(INDEX,/v9\.5\.108/);
 });
 
 
@@ -95,11 +95,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.107"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.2"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.107"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.2/);
-  assert.match(INDEX,/v9\.5\.107/);
+  assert.match(APP,/VERSION="9\.5\.108"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
+  assert.match(INDEX,/v9\.5\.108/);
 });
 
 
@@ -134,12 +134,12 @@ test("Inventory detail control remains available even while calculation lines ar
 
 test("Unclassified post-cutoff movements preserve physical stock and block derived values",()=>{
   const fn=MIG.slice(MIG.indexOf("CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada"),MIG.indexOf("CREATE OR REPLACE FUNCTION public.listar_aprobaciones_admin"));
-  const owner=MIG.slice(MIG.indexOf("CREATE OR REPLACE FUNCTION public.bc7_obtener_revision_jornada"),MIG.indexOf("CREATE OR REPLACE FUNCTION public.bc7_resolver_revision_jornada"));
+  const INTEGRAL=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
+  const owner=INTEGRAL.slice(INTEGRAL.indexOf("CREATE OR REPLACE FUNCTION public.bc7_obtener_revision_jornada"),INTEGRAL.indexOf("CREATE OR REPLACE FUNCTION public.bc7_corregir_inventario_final_jornada"));
   assert.match(fn,/v_difference:=NULL;[\s\S]*v_priced_lines:=0;[\s\S]*x\.value - ARRAY\['unidades_vendidas','importe_estimado'\]/);
   assert.match(fn,/'inventario_inicial',initial_qty/);
   assert.match(fn,/'inventario_final',final_qty/);
-  assert.match(owner,/IF coalesce\(v_pending_post,0\)>0 THEN[\s\S]*'costo_vendido_estimado'[\s\S]*v_cost_covered:=0/);
-  assert.match(owner,/'ganancia_bruta_es_total',coalesce\(v_pending_post,0\)=0/);
+  assert.match(owner,/IF coalesce\(v_pending_post,0\)>0 THEN[\s\S]*'costos_con_cobertura',0[\s\S]*'ganancia_bruta_es_total',false/);
   assert.match(REVIEW,/El inventario físico sí está disponible/);
   assert.match(REVIEW,/Pendiente de clasificación/);
   assert.match(REVIEW,/Inventario inicial/);
@@ -160,6 +160,36 @@ test("The overall cash summary distinguishes pending, partial and fully approved
   assert.match(REVIEW,/const cashSessions=sessions\.filter\(s=>s\.liquidacion\?\.dinero_recogido_total!=null\)/);
   assert.match(REVIEW,/const cashComplete=sessions\.length>0&&cashSessions\.length===sessions\.length/);
   assert.match(REVIEW,/const cashLabel=cashComplete\?money\(cashTotal\)\+' CUP':cashSessions\.length\?money\(cashTotal\)\+' CUP · PARCIAL':'Pendiente'/);
-  assert.match(REVIEW,/card\('Efectivo contado',cashLabel\)/);
+  assert.match(REVIEW,/card\('Efectivo total recogido',cashLabel\)/);
   assert.doesNotMatch(REVIEW,/money\(sessions\.reduce\(\(v,s\)=>v\+Number\(s\.liquidacion\?\.dinero_recogido_total\|\|0\)/);
+});
+
+
+test("Jornada review keeps physical stock visible and reports negative-product diagnostics while post-cutoff movements remain pending",()=>{
+  const MIGRATION=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
+  assert.match(MIGRATION,/familias_vendidas_negativas_detalle/);
+  assert.match(MIGRATION,/x\.value\s*-\s*ARRAY\['unidades_vendidas','importe_estimado'\]/);
+  const pendingBlock=MIGRATION.slice(MIGRATION.indexOf('IF v_pending_post>0 THEN'),MIGRATION.indexOf('v_complete:=',MIGRATION.indexOf('IF v_pending_post>0 THEN')));
+  assert.doesNotMatch(pendingBlock,/v_lines:='\[\]'::jsonb/);
+  assert.match(MIGRATION,/'entregas_diarias'/);
+  assert.match(REVIEW,/familias_vendidas_negativas_detalle/);
+  assert.match(REVIEW,/más unidades en el corte final/);
+  assert.match(REVIEW,/Periodo del turno/);
+  assert.match(REVIEW,/Entregas diarias y conteo final/);
+  assert.match(REVIEW,/Efectivo total recogido/);
+  assert.match(REVIEW,/Marcar todas: antes del corte/);
+  assert.match(REVIEW,/Marcar todas: después del corte/);
+  assert.match(REVIEW,/valor_estimado/);
+  assert.match(MIGRATION,/valor_estimado/);
+  assert.match(MIGRATION,/turno_jornada_inventario_correcciones/);
+  assert.match(MIGRATION,/bc7_corregir_inventario_final_jornada/);
+  assert.match(MIGRATION,/INVENTARIO_FINAL_CORREGIDO/);
+  assert.match(REVIEW,/Guardar corrección auditada/);
+  assert.match(REVIEW,/bc7_corregir_inventario_final_jornada/);
+  assert.match(REVIEW,/Conteo final de caja/);
+  assert.match(REVIEW,/después de terminar el período/);
+  assert.match(REVIEW,/Productos en los cortes/);
+  assert.match(REVIEW,/PENDIENTE DE REVISIÓN/);
+  assert.doesNotMatch(REVIEW,/Sesiones registradas/);
+  assert.doesNotMatch(REVIEW,/Jornadas completadas/);
 });
