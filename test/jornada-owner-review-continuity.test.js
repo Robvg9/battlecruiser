@@ -87,7 +87,7 @@ test("Unclassified post-cutoff Bajas and Mermas block provisional sales and sala
 test("Owner review modal uses BattleCruiser theme tokens and accessible light surfaces",()=>{
   assert.match(REVIEW,/background:var\(--stone,#122a24\);color:var\(--text,#f5efe3\)/);
   assert.ok(REVIEW.includes("body.bc-theme-light .bcjr-dialog{background:#e9e4da;color:#202722}"));
-  assert.ok(REVIEW.includes("body.bc-theme-light .bcjr-dialog{background:#e9e4da;color:#202722}"));
+  assert.ok(REVIEW.includes("body.bc-theme-light .bcjr-card{background:#f3efe6"));
   assert.match(REVIEW,/bcjr-field select option/);
 });
 test("Owner review product inventory is collapsed behind an explicit detail control",()=>{
