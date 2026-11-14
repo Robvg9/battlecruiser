@@ -163,3 +163,18 @@ test("The overall cash summary distinguishes pending, partial and fully approved
   assert.match(REVIEW,/card\('Efectivo contado',cashLabel\)/);
   assert.doesNotMatch(REVIEW,/money\(sessions\.reduce\(\(v,s\)=>v\+Number\(s\.liquidacion\?\.dinero_recogido_total\|\|0\)/);
 });
+
+
+test("Jornada review keeps physical stock visible and reports negative-product diagnostics while post-cutoff movements remain pending",()=>{
+  const MIGRATION=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
+  assert.match(MIGRATION,/familias_vendidas_negativas_detalle/);
+  assert.match(MIGRATION,/x\.value-ARRAY\['unidades_vendidas','importe_estimado'\]/);
+  assert.doesNotMatch(MIGRATION,/v_lines:='\[\]'::jsonb/);
+  assert.match(MIGRATION,/'entregas_diarias'/);
+  assert.match(REVIEW,/familias_vendidas_negativas_detalle/);
+  assert.match(REVIEW,/diferencia negativa/);
+  assert.match(REVIEW,/Periodo del turno/);
+  assert.match(REVIEW,/Sesiones registradas/);
+  assert.match(REVIEW,/Entregas de efectivo por día/);
+  assert.doesNotMatch(REVIEW,/Jornadas completadas/);
+});
