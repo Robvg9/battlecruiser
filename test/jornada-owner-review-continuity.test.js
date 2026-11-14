@@ -127,7 +127,7 @@ test("Light theme review surfaces override global white table and input styles",
 
 test("Inventory detail control remains available even while calculation lines are blocked",()=>{
   assert.ok(REVIEW.includes("Pendiente de cortes de inventario confirmados"));
-  assert.ok(REVIEW.includes("Todavía no hay líneas físicas confirmadas"));
+  assert.ok(REVIEW.includes("Todavía no hay líneas físicas de inventario confirmadas"));
   assert.ok(REVIEW.includes("Comprueba los cortes inicial y final para mostrar la tabla por producto"));
 });
 
