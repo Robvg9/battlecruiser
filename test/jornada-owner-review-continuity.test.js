@@ -43,7 +43,7 @@ test("Owner review shows product-level revenue, cost provenance, profit and post
   assert.match(MIG,/bc7_clasificar_movimientos_fuera_corte/);
   assert.match(MIG,/bc7_resolver_revision_jornada/);
   assert.match(REVIEW,/m\.fecha_revision/);
-  assert.match(REVIEW,/<th>Aprobado<\/th>/);
+  assert.match(REVIEW,/Aprobado: /);
   for(const field of ["inventario_inicial","inventario_final","unidades_vendidas","importe_estimado","costo_vendido_estimado","ganancia_bruta_estimada","margen_bruto_estimado"])assert.ok(REVIEW.includes(field),field);
 });
 test("Unpriced products with zero sales do not block the Jornada settlement",()=>{
@@ -53,7 +53,7 @@ test("Unpriced products with zero sales do not block the Jornada settlement",()=
 });
 test("The Owner review does not display zero profit or cost when provisional rows are hidden",()=>{
   assert.ok(REVIEW.includes("No calculable"));
-  assert.ok(REVIEW.includes("Las ventas y ganancias provisionales están ocultas"));
+  assert.ok(REVIEW.includes("Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte."));
   assert.ok(REVIEW.includes("todavía no se ha completado."));
 });
 test("Salary percentage can be explicitly set after a completed session but before master approval",()=>{
@@ -67,9 +67,9 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
   assert.match(APP,/VERSION="9\.5\.107"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.1"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.2"}/);
   assert.match(SW,/BC_SW_VERSION = "9\.5\.107"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.1/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.2/);
   assert.match(INDEX,/v9\.5\.107/);
 });
 
@@ -96,9 +96,9 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
   assert.match(APP,/VERSION="9\.5\.107"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.1"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.2"}/);
   assert.match(SW,/BC_SW_VERSION = "9\.5\.107"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.1/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.2/);
   assert.match(INDEX,/v9\.5\.107/);
 });
 
@@ -126,9 +126,9 @@ test("Light theme review surfaces override global white table and input styles",
 
 
 test("Inventory detail control remains available even while calculation lines are blocked",()=>{
-  assert.ok(REVIEW.includes("Datos pendientes de clasificación"));
-  assert.ok(REVIEW.includes("Todavía no hay líneas de inventario calculadas para mostrar"));
-  assert.ok(REVIEW.includes("vuelve a abrir esta revisión para consultar la tabla por producto"));
+  assert.ok(REVIEW.includes("Pendiente de cortes de inventario confirmados"));
+  assert.ok(REVIEW.includes("Todavía no hay líneas físicas de inventario confirmadas"));
+  assert.ok(REVIEW.includes("Comprueba los cortes inicial y final para mostrar la tabla por producto"));
 });
 
 
