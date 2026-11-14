@@ -31,8 +31,9 @@ BEGIN
   SELECT pg_get_functiondef('public.bc7_obtener_revision_jornada(uuid)'::regprocedure)
     INTO v_definition;
   IF position('costo_unitario_corregido' IN v_definition)=0
-     OR position('COSTO_HISTORICO_AUDITADO' IN v_definition)=0 THEN
-    RAISE EXCEPTION 'Owner review must apply auditable historical cost overrides';
+     OR position('COSTO_HISTORICO_AUDITADO' IN v_definition)=0
+     OR position('coalesce(hv.precio_venta_corregido,p.precio_normal,pp.precio_normal)' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Owner review must apply auditable historical costs and price overrides to sales and post-cutoff Baja/Merma values';
   END IF;
   SELECT pg_get_functiondef('public.bc7_corregir_valoracion_historica_jornada(uuid,uuid,numeric,numeric,text)'::regprocedure)
     INTO v_definition;
