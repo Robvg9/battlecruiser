@@ -61,6 +61,6 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   assert.match(html, /app\.js\?v=9\.5\.105/);
   assert.match(app, /bc7-jornada-ui\.js","7\.29"/);
   assert.match(sw, /bc7-jornada-ui\.js\?v=7\.29/);
-  assert.match(app, /aprobaciones-admin\.js","20261113\.3"/);
-  assert.match(sw, /aprobaciones-admin\.js\?v=20261113\.3/);
+  assert.match(app, /aprobaciones-admin\.js","20261113\.4"/);
+  assert.match(sw, /aprobaciones-admin\.js\?v=20261113\.4/);
 });
