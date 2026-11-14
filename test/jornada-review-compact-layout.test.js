@@ -47,4 +47,5 @@ test("Historical value and final-count editors show save progress and backend er
   assert.match(REVIEW,/Guardando corrección de inventario/);
   assert.match(REVIEW,/No se guardó: introduce un precio o costo válido/);
   assert.match(REVIEW,/No se guardó: introduce una cantidad final válida/);
+  assert.equal((REVIEW.match(/finally\\{busy=false;if\\(report/g)||[]).length,3,"both editors must release busy and refresh the review state");
 });
