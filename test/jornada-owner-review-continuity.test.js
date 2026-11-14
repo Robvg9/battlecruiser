@@ -66,11 +66,11 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -95,11 +95,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.108"/);
-  assert.match(APP,/jornada-owner-review\.js","1\.3"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.108"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.3/);
-  assert.match(INDEX,/v9\.5\.108/);
+  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/jornada-owner-review\.js","1\.4"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.4/);
+  assert.match(INDEX,/v9\.5\.109/);
 });
 
 
@@ -197,8 +197,29 @@ test("Jornada review keeps physical stock visible and reports negative-product d
 test("Post-cutoff Mermas retain the same audit fields as Bajas",()=>{
   const migration=read("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
   const start=migration.indexOf("SELECT 'BAJA'::text");
-  const end=migration.indexOf(") m\n    LEFT JOIN public.turno_jornada_movimiento_revision",start);
+  const end=migration.indexOf("LEFT JOIN public.turno_jornada_movimiento_revision",start);
   assert.ok(start>=0&&end>start,"post-cutoff movement UNION must exist");
   const union=migration.slice(start,end);
   assert.match(union,/SELECT 'BAJA'[\s\S]*?b\.motivo[\s\S]*?UNION ALL[\s\S]*?SELECT 'MERMA'[\s\S]*?coalesce\(p\.precio_normal,pp\.precio_normal\)[\s\S]*?m\.motivo/);
+});
+
+
+test("Jornada Owner review is compact, searchable and keeps correction panels optional",()=>{
+  const REVIEW=read("public/js/jornada-owner-review.js");
+  assert.match(REVIEW,/bcjr-table-compact/);
+  assert.match(REVIEW,/data-bcjr-product-filter/);
+  assert.match(REVIEW,/<details class="bcjr-panel">/);
+  assert.match(REVIEW,/data-bcjr-action="correct-one-final-count"/);
+  assert.match(REVIEW,/data-bcjr-action="save-historical-valuation"/);
+  assert.match(REVIEW,/bcjr-table-wrap\{position:relative;isolation:isolate;contain:paint/);
+});
+
+test("Historical Jornada valuation overrides are separate from the current product catalogue",()=>{
+  const MIGRATION=read("supabase/migrations/20261114190000_jornada_historical_valuation_overrides.sql");
+  assert.match(MIGRATION,/turno_jornada_valoracion_correcciones/);
+  assert.match(MIGRATION,/bc7_corregir_valoracion_historica_jornada/);
+  assert.match(MIGRATION,/PRECIO_HISTORICO_AUDITADO/);
+  assert.match(MIGRATION,/COSTO_HISTORICO_AUDITADO/);
+  assert.match(MIGRATION,/catalogo_actual_inalterado/);
+  assert.match(MIGRATION,/REVOKE ALL ON public\.turno_jornada_valoracion_correcciones FROM PUBLIC,anon,authenticated/);
 });
