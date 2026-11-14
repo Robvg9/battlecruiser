@@ -105,7 +105,7 @@ BEGIN
      OR position('costo_vendido_estimado' IN v_definition)=0
      OR position('costos_con_cobertura' IN v_definition)=0
      OR position('ganancia_bruta_parcial' IN v_definition)=0
-     OR position('ganancia_bruta_es_total',false) IN v_definition)=0 THEN
+     OR position('ganancia_bruta_es_total' IN v_definition)=0 THEN
     RAISE EXCEPTION 'Owner review must mask derived sales/cost/profit fields without discarding physical inventory lines';
   END IF;
 
