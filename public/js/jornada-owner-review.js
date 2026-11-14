@@ -116,6 +116,11 @@
       .bcjr-values-dialog label{display:grid;gap:5px;margin:11px 0;font-size:.85rem}
       .bcjr-values-dialog input,.bcjr-values-dialog textarea{width:100%;min-width:0;padding:10px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:8px;background:var(--void,#0a1613);color:var(--text,#f5efe3)}
       .bcjr-values-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+      .bcjr-values-status{min-height:1.3em;margin:10px 0 0;font-size:.86rem;line-height:1.4;overflow-wrap:anywhere}
+      .bcjr-values-status.error{color:#ff8d86}
+      .bcjr-values-status.success{color:#9fd2aa}
+      .bcjr-values-dialog label{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;line-height:1.35}
+      .bcjr-values-dialog input,.bcjr-values-dialog textarea{display:block;box-sizing:border-box;min-height:42px}
       body.bc-theme-light .bcjr-values-dialog{background:#e8e4da;color:#202722}
       body.bc-theme-light .bcjr-values-dialog input,body.bc-theme-light .bcjr-values-dialog textarea{background:#f1eee5;color:#202722}
       body.bc-theme-light .bcjr-detail>summary{background:#e2ded3;color:#202722}
@@ -258,42 +263,66 @@
   function openValuesEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
     const box=document.createElement('div');box.className='bcjr-values-modal';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Solo afecta esta Jornada. No modifican el catálogo ni las ventas futuras. Precio actual en el cálculo: <b>'+esc(button.dataset.price===''?'Sin precio':money(button.dataset.price))+' CUP</b>. Costo documentado actual: <b>'+esc(button.dataset.cost===''?'Sin costo':money(button.dataset.cost))+' CUP</b>. Deja vacío cualquier campo que no quieras modificar; cuando hubo varios importes, usa el promedio ponderado de la jornada.</p><label>Nuevo precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price placeholder="Sin cambio"></label><label>Nuevo costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost placeholder="Sin cambio"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar valores auditados</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Solo afecta esta Jornada. No modifican el catálogo ni las ventas futuras. Precio actual en el cálculo: <b>'+esc(button.dataset.price===''?'Sin precio':money(button.dataset.price))+' CUP</b>. Costo documentado actual: <b>'+esc(button.dataset.cost===''?'Sin costo':money(button.dataset.cost))+' CUP</b>. Deja vacío cualquier campo que no quieras modificar; cuando hubo varios importes, usa el promedio ponderado de la jornada.</p><label>Nuevo precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price placeholder="Sin cambio"></label><label>Nuevo costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost placeholder="Sin cambio"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar valores auditados</button></div></section>';
     document.body.appendChild(box);box.querySelector('[data-bcjr-value-price]')?.focus();
   }
   async function saveValuesEditor(button){
     const box=button.closest('.bcjr-values-modal');
-    const price=box?.querySelector('[data-bcjr-value-price]')?.value.trim();
-    const cost=box?.querySelector('[data-bcjr-value-cost]')?.value.trim();
-    const reason=box?.querySelector('[data-bcjr-value-reason]')?.value.trim();
-    const hasPrice=price!==''&&price!=null,hasCost=cost!==''&&cost!=null;
-    if((!hasPrice&&!hasCost)||(hasPrice&&(!Number.isFinite(Number(price))||Number(price)<0))||(hasCost&&(!Number.isFinite(Number(cost))||Number(cost)<0))||reason.length<5){
-      const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Indica al menos un valor válido (precio o costo) y un motivo verificable (mínimo 5 caracteres).';return;
+    const status=box?.querySelector('[data-bcjr-values-status]');
+    const priceInput=box?.querySelector('[data-bcjr-value-price]');
+    const costInput=box?.querySelector('[data-bcjr-value-cost]');
+    const reasonInput=box?.querySelector('[data-bcjr-value-reason]');
+    const setStatus=(message,kind='')=>{
+      if(!status)return;
+      status.textContent=message;
+      status.className='bcjr-values-status'+(kind?' '+kind:'');
+    };
+    if(!box||!priceInput||!costInput||!reasonInput){
+      setStatus('No se pudo preparar el formulario. Cierra esta ventana y vuelve a abrir la revisión.','error');
+      return;
     }
-    if(busy)return;
-    await run(async()=>{
-      await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:hasPrice?Number(price):null,costo_unitario:hasCost?Number(cost):null}],p_comentario:reason});
-      box?.remove();await openReview(activeTurnId);
-    });
+    const price=priceInput.value.trim(),cost=costInput.value.trim(),reason=reasonInput.value.trim();
+    const hasPrice=price!=='',hasCost=cost!=='';
+    if((!hasPrice&&!hasCost)||(hasPrice&&(!Number.isFinite(Number(price))||Number(price)<0))||(hasCost&&(!Number.isFinite(Number(cost))||Number(cost)<0))||reason.length<5){
+      setStatus('No se guardó: introduce un precio o costo válido y un motivo/fuente de al menos 5 caracteres.','error');return;
+    }
+    if(busy){setStatus('Ya hay otra operación guardándose. Espera a que termine.','error');return;}
+    busy=true;button.disabled=true;button.textContent='Guardando…';
+    setStatus('Guardando valores históricos de esta Jornada…');
+    try{
+      await rpc('bc7_ajustar_valores_producto_jornada',{
+        p_turno_sesion_id:button.dataset.session,
+        p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:hasPrice?Number(price):null,costo_unitario:hasCost?Number(cost):null}],
+        p_comentario:reason
+      });
+      setStatus('Valores guardados. Actualizando la liquidación…','success');
+      box.remove();await openReview(activeTurnId);
+    }catch(error){
+      setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');
+      button.disabled=false;button.textContent='Reintentar guardado';
+    }finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   function openCountEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
     const box=document.createElement('div');box.className='bcjr-values-modal';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Corregir inventario final · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Corrige solo si el conteo físico confirma que la cantidad guardada es incorrecta. Se conserva el corte original y se registra usuario, fecha y motivo.</p><label>Cantidad final correcta<input type="number" min="0" step="0.001" data-bcjr-count-value value="'+esc(button.dataset.final)+'"></label><label>Motivo y evidencia<textarea rows="3" maxlength="500" data-bcjr-count-reason placeholder="Ej.: reconteo físico del expediente de la jornada"></textarea></label><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-count-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-count-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar corrección auditada</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Corregir inventario final · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Corrige solo si el conteo físico confirma que la cantidad guardada es incorrecta. Se conserva el corte original y se registra usuario, fecha y motivo.</p><label>Cantidad final correcta<input type="number" min="0" step="0.001" data-bcjr-count-value value="'+esc(button.dataset.final)+'"></label><label>Motivo y evidencia<textarea rows="3" maxlength="500" data-bcjr-count-reason placeholder="Ej.: reconteo físico del expediente de la jornada"></textarea></label><p class="bcjr-values-status" data-bcjr-count-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-count-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-count-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar corrección auditada</button></div></section>';
     document.body.appendChild(box);box.querySelector('[data-bcjr-count-value]')?.focus();
   }
   async function saveCountEditor(button){
-    const box=button.closest('.bcjr-values-modal');
-    const value=box?.querySelector('[data-bcjr-count-value]')?.value.trim();
-    const reason=box?.querySelector('[data-bcjr-count-reason]')?.value.trim();
-    if(value===''||!Number.isFinite(Number(value))||Number(value)<0||reason.length<5){
-      const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Indica una cantidad final válida y el motivo del reconteo (mínimo 5 caracteres).';return;
-    }
-    if(busy)return;
-    await run(async()=>{
+    const box=button.closest('.bcjr-values-modal'),status=box?.querySelector('[data-bcjr-count-status]');
+    const valueInput=box?.querySelector('[data-bcjr-count-value]'),reasonInput=box?.querySelector('[data-bcjr-count-reason]');
+    const setStatus=(message,kind='')=>{if(status){status.textContent=message;status.className='bcjr-values-status'+(kind?' '+kind:'');}};
+    if(!box||!valueInput||!reasonInput){setStatus('No se pudo preparar el formulario. Cierra esta ventana y vuelve a abrir la revisión.','error');return;}
+    const value=valueInput.value.trim(),reason=reasonInput.value.trim();
+    if(value===''||!Number.isFinite(Number(value))||Number(value)<0||reason.length<5){setStatus('No se guardó: introduce una cantidad final válida y un motivo de al menos 5 caracteres.','error');return;}
+    if(busy){setStatus('Ya hay otra operación guardándose. Espera a que termine.','error');return;}
+    busy=true;button.disabled=true;button.textContent='Guardando…';setStatus('Guardando corrección de inventario…');
+    try{
       await rpc('bc7_corregir_inventario_final_jornada',{p_turno_sesion_id:button.dataset.session,p_correcciones:[{producto_id:button.dataset.product,cantidad:Number(value)}],p_comentario:reason});
-      box?.remove();await openReview(activeTurnId);
-    });
+      setStatus('Corrección guardada. Actualizando la liquidación…','success');
+      box.remove();await openReview(activeTurnId);
+    }catch(error){setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');button.disabled=false;button.textContent='Reintentar guardado';}
+    finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   async function click(e){
     const t=e.target.closest&&e.target.closest('[data-bcjr-action],[data-bcjr-close],[data-bcjr-table-view],[data-bcjr-open-values],[data-bcjr-values-save],[data-bcjr-values-cancel],[data-bcjr-open-count],[data-bcjr-count-save],[data-bcjr-count-cancel]');if(!t)return;

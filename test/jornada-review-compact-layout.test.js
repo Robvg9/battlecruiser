@@ -36,3 +36,16 @@ test("Historical product values are edited through an audited session-only RPC",
   assert.match(MIGRATION,/REVOKE ALL ON FUNCTION public\.bc7_ajustar_valores_producto_jornada/);
   assert.match(MIGRATION,/GRANT EXECUTE ON FUNCTION public\.bc7_ajustar_valores_producto_jornada.*TO authenticated/);
 });
+
+
+test("Historical value and final-count editors show save progress and backend errors inside the floating modal",()=>{
+  assert.match(REVIEW,/data-bcjr-values-status/);
+  assert.match(REVIEW,/Guardando valores históricos de esta Jornada/);
+  assert.match(REVIEW,/No se pudo guardar: /);
+  assert.match(REVIEW,/Reintentar guardado/);
+  assert.match(REVIEW,/data-bcjr-count-status/);
+  assert.match(REVIEW,/Guardando corrección de inventario/);
+  assert.match(REVIEW,/No se guardó: introduce un precio o costo válido/);
+  assert.match(REVIEW,/No se guardó: introduce una cantidad final válida/);
+  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,3,"both editors must release busy and refresh the review state");
+});
