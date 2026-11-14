@@ -297,8 +297,11 @@
   }
   async function run(fn){
     busy=true;const msg=document.getElementById('bcjr-message');if(msg)msg.textContent='Guardando…';
-    try{await fn();}catch(e){if(msg){msg.textContent=e.message||String(e);msg.className='bcjr-message bcjr-error';}}
-    finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
+    try{await fn();}catch(e){
+      const detail=document.getElementById('bcjr-correction-subtitle');
+      if(correctionContext&&detail){detail.textContent=e.message||String(e);}
+      else if(msg){msg.textContent=e.message||String(e);msg.className='bcjr-message bcjr-error';}
+    }finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   document.addEventListener('click',click);
   document.addEventListener('input',filterProducts);
