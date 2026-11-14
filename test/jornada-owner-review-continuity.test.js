@@ -122,3 +122,10 @@ test("Light theme review surfaces override global white table and input styles",
   assert.ok(REVIEW.includes("background:#f3efe6!important;color:#202722!important;border-color:#c9bfac!important"));
   assert.ok(REVIEW.includes("background:#f8f5ed!important;color:#202722!important;border-color:#b8ad98!important"));
 });
+
+
+test("Inventory detail control remains available even while calculation lines are blocked",()=>{
+  assert.ok(REVIEW.includes("Datos pendientes de clasificación"));
+  assert.ok(REVIEW.includes("Todavía no hay líneas de inventario calculadas para mostrar"));
+  assert.ok(REVIEW.includes("vuelve a abrir esta revisión para consultar la tabla por producto"));
+});
