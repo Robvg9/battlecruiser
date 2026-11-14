@@ -684,7 +684,15 @@ BEGIN
     v_salary:=NULL;
     v_expected_cash:=NULL;
     v_difference:=NULL;
-    v_lines:='[]'::jsonb;
+    v_priced_lines:=0;
+    v_negative_lines:=0;
+    v_missing_price_sold:=0;
+    SELECT coalesce(jsonb_agg(
+      x.value - ARRAY['unidades_vendidas','importe_estimado']
+      ORDER BY x.value->>'nombre'
+    ),'[]'::jsonb)
+    INTO v_lines
+    FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
   END IF;
   v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
     AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_missing_price_sold=0 AND v_negative_lines=0
@@ -1059,6 +1067,19 @@ BEGIN
     ) m
     LEFT JOIN public.turno_jornada_movimiento_revision r
       ON r.turno_sesion_id=v_s.id AND r.tipo_movimiento=m.tipo AND r.movimiento_id=m.id;
+    IF coalesce(v_pending_post,0)>0 THEN
+      SELECT coalesce(jsonb_agg(
+        x.value - ARRAY[
+          'unidades_vendidas','importe_estimado','costo_unitario_estimado',
+          'estado_costo','costo_vendido_estimado','ganancia_bruta_estimada','margen_bruto_estimado'
+        ] ORDER BY x.value->>'nombre'
+      ),'[]'::jsonb)
+      INTO v_lines
+      FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
+      v_cost_covered:=0;
+      v_cost_total:=0;
+      v_sold_price_missing:=0;
+    END IF;
     SELECT d.monto,d.monto_contado,d.estado_aprobacion,d.declarado_at,d.contado_at
       INTO v_cash_declared,v_cash_counted,v_cash_state,v_cash_declared_at,v_cash_counted_at
     FROM public.turno_declaraciones d
@@ -1077,7 +1098,8 @@ BEGIN
       'movimientos_posteriores_corte',coalesce(v_post,'[]'::jsonb),
       'movimientos_posteriores_pendientes',coalesce(v_pending_post,0),
       'productos_vendidos_con_precio_faltante',coalesce(v_sold_price_missing,0),
-      'ganancia_bruta_es_total',coalesce(v_cost_covered,0)=coalesce(v_cost_total,0)
+      'ganancia_bruta_es_total',coalesce(v_pending_post,0)=0
+        AND coalesce(v_cost_covered,0)=coalesce(v_cost_total,0)
         AND coalesce(v_sold_price_missing,0)=0
         AND coalesce((v_liq->>'familias_con_vendidas_negativas')::integer,0)=0
     );
