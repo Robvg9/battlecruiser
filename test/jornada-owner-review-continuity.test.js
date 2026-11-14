@@ -82,3 +82,21 @@ test("Unclassified post-cutoff Bajas and Mermas block provisional sales and sala
   assert.match(MIG,/v_salary:=NULL/);
   assert.match(MIG,/v_complete[\s\S]*v_pending_post=0/);
 });
+
+
+test("Owner review modal uses BattleCruiser theme tokens and accessible light surfaces",()=>{
+  assert.match(REVIEW,/background:var\(--stone,#122a24\);color:var\(--text,#f5efe3\)/);
+  assert.match(REVIEW,/body\\.bc-theme-light \\.bcjr-dialog\\{background:#e9e4da;color:#202722\\}/);
+  assert.match(REVIEW,/body\\.bc-theme-light \\.bcjr-card\\{background:#f3efe6/);
+  assert.match(REVIEW,/bcjr-field select option/);
+});
+test("Owner review product inventory is collapsed behind an explicit detail control",()=>{
+  assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
+  assert.match(REVIEW,/Ver inventario y liquidación por producto/);
+  assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
+  assert.match(APP,/VERSION="9\\.5\\.106"/);
+  assert.match(APP,/jornada-owner-review\\.js","1\\.1"/);
+  assert.match(SW,/BC_SW_VERSION = "9\\.5\\.106"/);
+  assert.match(SW,/jornada-owner-review\\.js\\?v=1\\.1/);
+  assert.match(INDEX,/v9\\.5\\.106/);
+});
