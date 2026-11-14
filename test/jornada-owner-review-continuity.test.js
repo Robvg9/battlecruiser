@@ -225,3 +225,11 @@ test("Review secondary detail panels are collapsed by default",()=>{
   assert.match(REVIEW,/Validaciones pendientes/);
   assert.match(REVIEW,/Revisar .* bajas\/mermas posteriores al corte/);
 });
+
+test("Historical price corrections preserve precise weighted averages and reject closed turns",()=>{
+  const migration=read("supabase/migrations/20261114180000_jornada_historical_values_and_price_history.sql");
+  assert.match(migration,/precio_venta_corregido numeric\(14,4\)/);
+  assert.match(migration,/upper\(coalesce\(v_turn\.estado_maestro,''\)\)='CERRADO'/);
+  assert.match(migration,/solicita una reapertura auditada/);
+  assert.match(REVIEW,/step="0\.0001" data-bcjr-correction-price/);
+});
