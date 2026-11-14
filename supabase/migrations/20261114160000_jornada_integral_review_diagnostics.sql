@@ -535,9 +535,7 @@ BEGIN
     'sesiones',v_sessions
   );
 END;
-$function$
-
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.bc7_corregir_inventario_final_jornada(
   p_turno_sesion_id uuid,
