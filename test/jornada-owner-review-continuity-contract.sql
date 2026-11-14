@@ -92,8 +92,20 @@ BEGIN
      OR position('IF v_pending_post>0 THEN' IN v_definition)=0
      OR position('v_sales_total:=NULL' IN v_definition)=0
      OR position('v_salary:=NULL' IN v_definition)=0
-     OR position('v_lines:=''[]''::jsonb' IN v_definition)=0 THEN
-    RAISE EXCEPTION 'Settlement must use approval timestamps, cutoff classification, and suppress provisional estimates while movements remain unclassified';
+     OR position('unidades_vendidas' IN v_definition)=0
+     OR position('inventario_inicial' IN v_definition)=0
+     OR position('inventario_final' IN v_definition)=0
+     OR position('x.value - ARRAY[' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Settlement must preserve physical inventory while suppressing sales-derived fields until post-cutoff movements are classified';
+  END IF;
+
+  SELECT pg_get_functiondef('public.bc7_obtener_revision_jornada(uuid)'::regprocedure)
+    INTO v_definition;
+  IF position('IF coalesce(v_pending_post,0)>0 THEN' IN v_definition)=0
+     OR position('costo_vendido_estimado' IN v_definition)=0
+     OR position('v_cost_covered:=0' IN v_definition)=0
+     OR position('ganancia_bruta_es_total' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Owner review must mask derived sales/cost/profit fields without discarding physical inventory lines';
   END IF;
 
   SELECT pg_get_functiondef('public.bc7_clasificar_movimientos_fuera_corte(uuid,jsonb)'::regprocedure)
@@ -110,5 +122,5 @@ BEGIN
     RAISE EXCEPTION 'Owner resolution must block approval while post-cutoff movements remain unclassified';
   END IF;
 
-  RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, no-provisional-settlement, and ACL contract';
+  RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, physical inventory visibility, no-provisional-settlement, and ACL contract';
 END $$;
