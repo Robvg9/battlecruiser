@@ -145,5 +145,14 @@ BEGIN
     RAISE EXCEPTION 'Inventory corrections must preserve the original cut and emit an Owner-only audit event';
   END IF;
 
+
+  SELECT pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure)
+    INTO v_definition;
+  IF position('turno_jornada_inventario_correcciones' IN v_definition)=0
+     OR position('coalesce(c.cantidad_corregida,l.cantidad_contada)' IN v_definition)=0
+     OR position('inventario_final_original' IN v_definition)=0 THEN
+    RAISE EXCEPTION 'Liquidation must apply audited final-count overrides without rewriting the immutable physical cut';
+  END IF;
+
   RAISE NOTICE 'PASS Jornada Owner review continuity, late handover, cutoff attribution, physical inventory visibility, no-provisional-settlement, and ACL contract';
 END $$;
