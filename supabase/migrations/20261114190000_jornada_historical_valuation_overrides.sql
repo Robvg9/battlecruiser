@@ -493,17 +493,22 @@ BEGIN
       count(*) FILTER(WHERE r.clasificacion IS NULL)
       INTO v_post,v_pending_post
     FROM (
-      SELECT 'BAJA'::text tipo,b.id,p.nombre producto,b.cantidad,coalesce(p.precio_normal,pp.precio_normal) precio_unitario,b.estado,b.creado_en,coalesce(b.fecha_revision,b.actualizado_en) AS fecha_revision,b.motivo
-      FROM public.bajas b JOIN public.productos p ON p.id=b.producto_id LEFT JOIN public.productos pp ON pp.id=p.producto_padre_id
+      SELECT 'BAJA'::text tipo,b.id,p.nombre producto,b.cantidad,coalesce(hv.precio_venta_corregido,p.precio_normal,pp.precio_normal) precio_unitario,b.estado,b.creado_en,coalesce(b.fecha_revision,b.actualizado_en) AS fecha_revision,b.motivo
+      FROM public.bajas b JOIN public.productos p ON p.id=b.producto_id
+      LEFT JOIN public.productos pp ON pp.id=p.producto_padre_id
+      LEFT JOIN public.turno_jornada_valoracion_correcciones hv
+        ON hv.turno_sesion_id=v_s.id AND hv.producto_id=coalesce(p.producto_padre_id,p.id) AND hv.vigente
       WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
         AND v_final.id IS NOT NULL AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_final.confirmado_en
       UNION ALL
       SELECT 'MERMA'::text,m.id,p.nombre,m.cantidad,
-        coalesce(p.precio_normal,pp.precio_normal) precio_unitario,
+        coalesce(hv.precio_venta_corregido,p.precio_normal,pp.precio_normal) precio_unitario,
         m.estado,m.creado_en,coalesce(m.fecha_revision,m.actualizado_en) AS fecha_revision,m.motivo
       FROM public.mermas m
       JOIN public.productos p ON p.id=m.producto_id
       LEFT JOIN public.productos pp ON pp.id=p.producto_padre_id
+      LEFT JOIN public.turno_jornada_valoracion_correcciones hv
+        ON hv.turno_sesion_id=v_s.id AND hv.producto_id=coalesce(p.producto_padre_id,p.id) AND hv.vigente
       WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
         AND v_final.id IS NOT NULL AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>v_final.confirmado_en
     ) m
