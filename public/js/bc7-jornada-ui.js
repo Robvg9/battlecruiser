@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.31 — traspaso retroactivo auditado y bloqueo de turnos cerrados.
+// v7.32 — recepción física legible por producto en pantallas móviles.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1040,12 +1040,58 @@
 
   function receiveFormHtml(delivery,detail){
     const lines=arr(delivery&&delivery.lineas);
-    const table=lines.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Existencia declarada</th><th>Conteo físico recibido</th></tr></thead><tbody>'+lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-receive-count="'+esc(l.producto_id)+'" aria-label="Conteo recibido de '+esc(l.nombre||'producto')+'" placeholder="Contar físicamente"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">El almacén no tiene productos activos con stock registrado; confirma la recepción de cero productos.</div>';
+    const list=lines.length
+      ?'<div class="bc7-receive-progress" data-bc7-receive-progress role="status" aria-live="polite">Contados 0/'+lines.length+' · Coinciden 0 · Diferencias 0 · Pendientes '+lines.length+'</div>'+
+       '<div class="bc7-receive-list" aria-label="Recepción física por producto">'+lines.map((l,index)=>{
+         const name=l.nombre||'Producto';
+         return '<article class="bc7-receive-item">'+
+           '<div class="bc7-receive-product"><small>Producto '+(index+1)+' de '+lines.length+'</small><strong>'+esc(name)+'</strong></div>'+
+           '<div class="bc7-receive-declared"><span>Existencia declarada</span><b>'+esc(qty(l.cantidad_declarada))+'</b></div>'+
+           '<label class="bc7-receive-count"><span>Conteo físico recibido</span><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-receive-count="'+esc(l.producto_id)+'" data-bc7-receive-declared="'+esc(l.cantidad_declarada)+'" aria-label="Conteo físico recibido de '+esc(name)+'; existencia declarada '+esc(qty(l.cantidad_declarada))+'" placeholder="Escribe la cantidad"></label>'+
+           '<p class="bc7-receive-line-status is-pending" data-bc7-receive-status>Pendiente de contar</p>'+
+         '</article>';
+       }).join('')+'</div>'
+      :'<div class="bc7-empty">El almacén no tiene productos activos con stock registrado; confirma la recepción de cero productos.</div>';
     const recount=delivery.estado==='REQUIERE_RECUENTO'?'<p class="bc7-note">El dueño rechazó el intento anterior. Realiza otro conteo físico completo. El intento rechazado y su motivo permanecen en el historial.</p>':'';
-    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Compara cada producto con lo que realmente recibes. Una recepción igual se confirma automáticamente. Cualquier diferencia queda bloqueada hasta que el dueño la revise.</p>'+recount+'</div>'+
-      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'">'+table+
+    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Cada ficha muestra el nombre, la cantidad declarada y el conteo que recibiste físicamente. El indicador se actualiza mientras escribes; no significa que se haya guardado. Una diferencia queda bloqueada hasta que el dueño la revise.</p>'+recount+'</div>'+
+      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'">'+list+
       '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" placeholder="Incidencias, embalaje o diferencias observadas"></label>'+
       '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar recepción física</button></div><p class="bc7-msg" data-bc7-receive-msg></p></form>';
+  }
+
+  function updateReceivePreview(form){
+    if(!form)return;
+    const inputs=Array.from(form.querySelectorAll('[data-bc7-receive-count]'));
+    let counted=0,matches=0,differences=0,invalid=0;
+    inputs.forEach(input=>{
+      const status=input.closest('.bc7-receive-item')?.querySelector('[data-bc7-receive-status]');
+      const raw=String(input.value||'').trim();
+      if(!raw){
+        if(status){status.textContent='Pendiente de contar';status.className='bc7-receive-line-status is-pending';}
+        return;
+      }
+      if(!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){
+        invalid++;
+        if(status){status.textContent='Cantidad no válida';status.className='bc7-receive-line-status is-invalid';}
+        return;
+      }
+      counted++;
+      const declared=Number(input.getAttribute('data-bc7-receive-declared'));
+      const difference=Math.round((Number(raw)-declared)*1000)/1000;
+      if(Math.abs(difference)<0.0005){
+        matches++;
+        if(status){status.textContent='Coincide · pendiente de guardar';status.className='bc7-receive-line-status is-match';}
+      }else{
+        differences++;
+        const signed=(difference>0?'+':'')+qty(difference);
+        if(status){status.textContent='Diferencia '+signed+' · requiere revisión del Dueño al guardar';status.className='bc7-receive-line-status is-difference';}
+      }
+    });
+    const progress=form.querySelector('[data-bc7-receive-progress]');
+    if(progress){
+      const pending=inputs.length-counted-invalid;
+      progress.textContent='Contados '+counted+'/'+inputs.length+' · Coinciden '+matches+' · Diferencias '+differences+' · Pendientes '+pending+(invalid?' · Inválidos '+invalid:'');
+    }
   }
 
   function legacyInitialFormHtml(detail){
@@ -2126,6 +2172,8 @@
   });
   document.addEventListener('input',function(e){
     const t=e.target;
+    const receiveForm=t&&t.matches&&t.matches('[data-bc7-receive-count]')?t.closest('form[data-bc7-receive-form]'):null;
+    if(receiveForm)updateReceivePreview(receiveForm);
     const reinvestment=t&&t.closest&&t.closest('[data-bc7-finance-form="reinversion"]');
     if(reinvestment&&t.matches('[data-bc7-reinvestment-quantity],[data-bc7-reinvestment-unit-cost]'))updateReinvestmentEstimate(reinvestment);
     if(t&&t.matches('[data-bc7-ajust-qty]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));

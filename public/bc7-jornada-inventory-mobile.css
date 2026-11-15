@@ -350,3 +350,123 @@
   #tab-jornada .bc7-checklist-modal-foot { align-items: stretch; flex-direction: column; }
   #tab-jornada .bc7-checklist-modal-foot .bc7-btn { width: 100%; }
 }
+
+
+/* 2026-11-15 — Shared-inventory receipt: keep product, declared quantity and
+   physical count visible together; this replaces horizontal panning only here. */
+#tab-jornada .bc7-receive-progress {
+  box-sizing: border-box;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: var(--stone);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+#tab-jornada .bc7-receive-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+#tab-jornada .bc7-receive-item {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(130px,.38fr) minmax(190px,.62fr);
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: var(--stone);
+}
+#tab-jornada .bc7-receive-product,
+#tab-jornada .bc7-receive-declared,
+#tab-jornada .bc7-receive-count {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+}
+#tab-jornada .bc7-receive-product small,
+#tab-jornada .bc7-receive-declared span,
+#tab-jornada .bc7-receive-count > span {
+  color: var(--mist);
+  font-size: 10px;
+  line-height: 1.3;
+}
+#tab-jornada .bc7-receive-product strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+#tab-jornada .bc7-receive-declared b {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+#tab-jornada .bc7-receive-count input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+  background: var(--void);
+  color: var(--text);
+  font: 600 16px/1.2 Inter, sans-serif;
+}
+#tab-jornada .bc7-receive-count input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+#tab-jornada .bc7-receive-line-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--gold-dim);
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+#tab-jornada .bc7-receive-line-status.is-pending { color: var(--mist); }
+#tab-jornada .bc7-receive-line-status.is-match { color: #8fcea0; }
+#tab-jornada .bc7-receive-line-status.is-difference { color: #e4c06d; }
+#tab-jornada .bc7-receive-line-status.is-invalid { color: #e79a93; }
+@media (max-width: 650px), (hover: none) and (pointer: coarse) {
+  #tab-jornada .bc7-receive-item {
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+    gap: 8px 10px;
+    padding: 10px;
+  }
+  #tab-jornada .bc7-receive-product { grid-column: 1 / -1; }
+  #tab-jornada .bc7-receive-declared,
+  #tab-jornada .bc7-receive-count {
+    align-self: stretch;
+    padding: 8px;
+    border: 1px solid var(--gold-dim);
+    border-radius: 6px;
+    background: rgba(0,0,0,.08);
+  }
+  #tab-jornada .bc7-receive-count input { min-height: 46px; }
+  #tab-jornada .bc7-receive-line-status { grid-column: 1 / -1; }
+}
+@media (max-width: 360px) {
+  #tab-jornada .bc7-receive-item { grid-template-columns: minmax(0,1fr); }
+  #tab-jornada .bc7-receive-product,
+  #tab-jornada .bc7-receive-declared,
+  #tab-jornada .bc7-receive-count,
+  #tab-jornada .bc7-receive-line-status { grid-column: 1; }
+}
