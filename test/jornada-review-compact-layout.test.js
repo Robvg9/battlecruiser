@@ -6,6 +6,7 @@ const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const REVIEW=read("public/js/jornada-owner-review.js");
 const MIGRATION=read("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
+const TRANCHE_MIGRATION=read("supabase/migrations/20261115003500_jornada_historic_price_tranches.sql");
 
 test("Owner review keeps the approval footer outside the scrollable content",()=>{
   assert.match(REVIEW,/\.bcjr-dialog\{display:flex;flex-direction:column/);
@@ -47,5 +48,16 @@ test("Historical value and final-count editors show save progress and backend er
   assert.match(REVIEW,/Guardando corrección de inventario/);
   assert.match(REVIEW,/No se guardó: introduce un precio o costo válido/);
   assert.match(REVIEW,/No se guardó: introduce una cantidad final válida/);
-  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,3,"both editors must release busy and refresh the review state");
+  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,4,"all historical editors must release busy and refresh the review state");
+});
+
+test("Historic sale price tranches are audited, quantity-balanced and included in liquidation revenue",()=>{
+  assert.match(REVIEW,/data-bcjr-open-tranches/);
+  assert.match(REVIEW,/bc7_guardar_tramos_precio_jornada/);
+  assert.match(REVIEW,/precio_tramos/);
+  assert.match(TRANCHE_MIGRATION,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_precio_tramos/);
+  assert.match(TRANCHE_MIGRATION,/abs\(v_sum-v_sold\)>0\.0001/);
+  assert.match(TRANCHE_MIGRATION,/round\(sum\(t\.cantidad\*t\.precio_unitario\),2\)/);
+  assert.match(TRANCHE_MIGRATION,/PRECIOS_POR_TRAMOS/);
+  assert.match(TRANCHE_MIGRATION,/auth\.uid\(\)/);
 });
