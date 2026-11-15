@@ -66,10 +66,39 @@ function cacheSuccessfulResponse(request, response) {
 }
 
 function cachedFallback(request) {
-  // Script and stylesheet URLs are versioned with query strings. Match the
-  // canonical cached asset when those query parameters are absent offline.
-  return caches.match(request, { ignoreSearch: true }).then(function(cached) {
-    return cached || Response.error();
+  // Match the exact versioned request first. Never use ignoreSearch here:
+  // doing so can return a different release's bytes for the same pathname.
+  return caches.open(BC_STATIC).then(function(cache) {
+    return cache.match(request).then(function(exact) {
+      if (exact) return exact;
+
+      var url;
+      try {
+        url = new URL(request.url);
+      } catch (error) {
+        return Response.error();
+      }
+
+      // Legacy unversioned URLs may use a fallback only when this release cache
+      // contains exactly one candidate for that pathname. An explicit query
+      // string is an immutable version request and must never fall back.
+      if (url.search) return Response.error();
+
+      return cache.keys().then(function(keys) {
+        var candidates = keys.filter(function(key) {
+          try {
+            var candidate = new URL(key.url);
+            return candidate.origin === url.origin && candidate.pathname === url.pathname;
+          } catch (error) {
+            return false;
+          }
+        });
+        if (candidates.length !== 1) return Response.error();
+        return cache.match(candidates[0]).then(function(candidate) {
+          return candidate || Response.error();
+        });
+      });
+    });
   });
 }
 
@@ -89,10 +118,12 @@ self.addEventListener("fetch", function(event) {
       return url.origin === expected.origin && url.pathname === expected.pathname;
     });
     if (!offlineExternal) return;
-    event.respondWith(caches.match(request, { ignoreSearch: true }).then(function(cached) {
+    event.respondWith(caches.open(BC_STATIC).then(function(cache) {
+      return cache.match(request);
+    }).then(function(cached) {
       if (cached) return cached;
-      // The install gate normally prepopulates this pinned asset. Online fallback
-      // keeps recovery possible if browser storage was cleared while connected.
+      // The install gate normally prepopulates this exact pinned asset. Online
+      // fallback keeps recovery possible if browser storage was cleared.
       return fetch(request);
     }));
     return;
