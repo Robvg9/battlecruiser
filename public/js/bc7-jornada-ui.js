@@ -5,7 +5,7 @@
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -276,6 +276,56 @@
     const calendar=$('bc7-calendar-section');
     if(calendar)calendar.scrollIntoView({behavior:'smooth',block:'start'});
   }
+  function ensureWorkspaceOperationData(detail){
+    if(!detail||!detail.sesion||!detail.sesion.id)return Promise.resolve(false);
+    const sessionId=String(detail.sesion.id);
+    if(state.workspaceOperationSessionId!==sessionId){
+      state.workspaceOperationSessionId=sessionId;
+      state.workspaceOperationPromise=null;
+      state.workspaceOperationLoaded=false;
+    }
+    if(state.workspaceOperationLoaded)return Promise.resolve(true);
+    if(state.workspaceOperationPromise)return state.workspaceOperationPromise;
+
+    const requestVersion=state.workspaceRequestVersion;
+    const panel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
+    if(panel)panel.innerHTML='<div class="bc7-empty" data-bc7-operation-loading>Consultando los datos de Operación y liquidación…</div>';
+
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const canAdjust=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
+    const checklistPromise=rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
+    const adjustmentPromise=canAdjust
+      ?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId})
+      :Promise.resolve([]);
+    const liquidationPromise=detail.sesion.es_minorista===true
+      ?rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})
+      :Promise.resolve(null);
+
+    state.workspaceOperationPromise=Promise.all([checklistPromise,adjustmentPromise,liquidationPromise]).then(([checklist,adjustmentCatalog,liquidation])=>{
+      const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
+      if(!stillCurrent)return false;
+      detail.checklist=checklist;
+      detail.productos_ajuste=Array.isArray(adjustmentCatalog)?adjustmentCatalog:[];
+      if(liquidation!==null)detail.liquidacion=liquidation;
+      state.workspaceOperationLoaded=true;
+      state.workspaceOperationPromise=null;
+      renderWorkspace(detail);
+      return true;
+    }).catch(error=>{
+      const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
+      state.workspaceOperationPromise=null;
+      if(stillCurrent){
+        const operationPanel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
+        if(operationPanel){
+          operationPanel.innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificaron datos. <button class="bc7-btn" type="button" data-bc7-operation-retry>Reintentar carga</button></div>';
+        }
+      }
+      return false;
+    });
+    return state.workspaceOperationPromise;
+  }
+
   function activateWorkspaceTab(name){
     const allowed=['inventario','operacion','movimientos'];
     const tab=allowed.includes(name)?name:(name==='finanzas'?'operacion':'inventario');
@@ -288,8 +338,11 @@
     });
     body.querySelectorAll('[data-bc7-workspace-panel]').forEach(panel=>{panel.hidden=panel.getAttribute('data-bc7-workspace-panel')!==tab;});
     if(tab==='operacion'&&state.detail){
-      loadCashDaysWorkspace(state.detail);
-      loadFinances(state.detail);
+      ensureWorkspaceOperationData(state.detail);
+      if(state.workspaceOperationLoaded){
+        loadCashDaysWorkspace(state.detail);
+        loadFinances(state.detail);
+      }
     }
     if(tab==='movimientos'&&state.detail)loadMovements(state.detail);
   }
@@ -909,7 +962,8 @@
     }
     if(hasSettlement){
       try{
-        settlement=await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})||{};
+        settlement=detail.liquidacion||await rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})||{};
+        detail.liquidacion=settlement;
         state.inventorySettlement=settlement;
         renderInventorySettlement($('bc7-inventory-settlement'),settlement);
       }catch(e){
@@ -1331,26 +1385,31 @@
   async function openWorkspace(sessionId){
     closeChecklistModal({restore:false});
     if(!$('bc7-workspace')||!$('bc7-workspace-body'))return false;
+    const requestVersion=++state.workspaceRequestVersion;
     const isNewSelection=String(state.selected||'')!==String(sessionId||'');
+    state.detail=null;
+    state.workspaceOperationSessionId=String(sessionId||'');
+    state.workspaceOperationPromise=null;
+    state.workspaceOperationLoaded=false;
+    state.inventorySettlement=null;
     if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;}
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{
-      const detail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
-      const [delivery,checklist,adjustmentCatalog,liquidation]=await Promise.all([
-        rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId}),
-        rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId}),
-        rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId}),
-        rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})
+      const [detail,delivery]=await Promise.all([
+        rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId}),
+        rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId})
       ]);
+      if(state.workspaceRequestVersion!==requestVersion)return false;
       detail.entrega_compartida=delivery;
-      detail.checklist=checklist;
-      detail.productos_ajuste=Array.isArray(adjustmentCatalog)?adjustmentCatalog:[];
-      detail.liquidacion=liquidation;
       detail.is_admin=!!state.admin;
       if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
-    }catch(e){$('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';return false;}
+    }catch(e){
+      if(state.workspaceRequestVersion!==requestVersion)return false;
+      $('bc7-workspace-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún dato.</div>';
+      return false;
+    }
   }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
@@ -2146,6 +2205,7 @@
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
     if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
     if(t.hasAttribute('data-bc7-delivery-decision')){await resolveSharedDelivery(t);return;}
+    if(t.hasAttribute('data-bc7-operation-retry')){if(state.detail)ensureWorkspaceOperationData(state.detail);return;}
     if(t.hasAttribute('data-bc7-mov-refresh')){if(state.detail)await loadMovements(state.detail);return;}
     if(t.hasAttribute('data-bc7-open-movements')){openMovements();return;}
   });
