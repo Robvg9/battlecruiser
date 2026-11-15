@@ -15,6 +15,7 @@ on:
       - 'supabase/migrations/20261113230500_jornada_owner_review_continuity.sql'
       - 'supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql'
       - 'supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql'
+      - 'supabase/migrations/20261115003500_jornada_historic_price_tranches.sql'
       - 'test/jornada-owner-review-continuity-contract.sql'
       - 'supabase/migrations/20261115132235_jornada_retro_successor_handover.sql'
       - 'supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql'
