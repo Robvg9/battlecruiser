@@ -94,7 +94,7 @@ test("PWA loader: UI_READY waits for actual module load attempts and reports deg
     "UI_READY must wait for module load attempts");
   assert.match(app, /__BC_MODULE_LOAD_STATE__/,
     "module readiness diagnostics must be available to the application");
-  assert.match(app, /status:"degraded"/,
+  assert.match(app, /status:failed\|\|timedOut\?"degraded":"ready"/,
     "failed or timed-out modules must produce an explicit degraded state");
   assert.match(app, /__BC_UI_READY_DEGRADED__/,
     "the degraded readiness state must be externally observable");
