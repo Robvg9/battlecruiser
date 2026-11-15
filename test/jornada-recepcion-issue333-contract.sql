@@ -3,6 +3,7 @@
 -- Covers: 66/66, 1 and 15 differences (+/-), zero & <=3 decimals, full 66-line payload,
 -- idempotency/retry, rejection/recount, mandatory reasons, detail permissions (+/-),
 -- FINAL/INITIAL integrity and no public.stock changes.
+BEGIN;
 
 DO $issue333$
 DECLARE
@@ -332,3 +333,5 @@ BEGIN
   RAISE NOTICE 'PASS issue #333 reception (isolated): 66-line payload, 66/66, 1 & 15 diffs (+/-), zero/decimals, idempotency/recount, mandatory reasons, detail permissions, FINAL/INITIAL integrity, no stock changes';
 END
 $issue333$;
+
+ROLLBACK;
