@@ -39,3 +39,12 @@ test("is production-data aware and does not hardcode generated row UUIDs",()=>{
   assert.ok(!/d2c34c45-16c6-4be2-907e-8036ee8a7cec/i.test(migration));
   assert.ok(!/c494dd3d-1311-42f5-8c97-4408dd578f24/i.test(migration));
 });
+
+test("uses the 66-family outgoing handover snapshot, not today's expanded product catalog",()=>{
+  assert.ok(migration.includes("immutable product-family snapshot"));
+  assert.ok(migration.includes("The payload must match exactly the product families frozen in this delivery."));
+  assert.ok(migration.includes("FROM public.turno_jornada_inventario_entrega_lineas"));
+  assert.ok(migration.includes("WHERE entrega_id=v_e.id"));
+  assert.ok(migration.includes("v_line_count<>66"));
+  assert.ok(!/v_line_count<>66 OR v_line_count<>v_expected/.test(migration));
+});
