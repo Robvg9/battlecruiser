@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.113 — Bloqueo de turnos cerrados y recepción sucesora retroactiva
+// v9.5.114 — Bloqueo de turnos cerrados y recepción sucesora retroactiva
 (function hotfixV9475(){
-  const VERSION="9.5.113";
+  const VERSION="9.5.114";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
