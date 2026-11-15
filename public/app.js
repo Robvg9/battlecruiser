@@ -136,6 +136,6 @@
   const pendientes=modules.map(([name,version])=>cargarUno(name,version));
   Promise.all(pendientes).then(terminarBootUI).catch(error=>{
     console.error("[BattleCruiser] Falló la coordinación de carga de módulos:",error);
-    terminarBootUI([]);
+    terminarBootUI([{name:"module-loader",status:"failed",reason:String(error&&error.message||error)}]);
   });
 })();
