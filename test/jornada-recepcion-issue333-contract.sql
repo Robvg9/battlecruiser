@@ -330,12 +330,15 @@ BEGIN
   v_detail := public.bc7_detalle_recepcion_entrega_jornada(v_entrega);
   IF v_detail IS NULL THEN RAISE EXCEPTION 'FAIL: auditor could not read delivery detail'; END IF;
 
-  RAISE NOTICE 'PASS issue #333 reception (isolated): 66-line payload, 66/66, 1 & 15 diffs (+/-), zero/decimals, idempotency/recount, mandatory reasons, detail permissions, FINAL/INITIAL integrity, no stock changes;
+  RAISE NOTICE 'PASS issue #333 reception (isolated): 66-line payload, 66/66, 1 & 15 diffs (+/-), zero/decimals, idempotency/recount, mandatory reasons, detail permissions, FINAL/INITIAL integrity, no stock changes';
 -- Cleanup ALL test data inserted by this contract to ensure no side effects on downstream contracts.
 DELETE FROM public.stock WHERE almacen_id = v_almacen;
 DELETE FROM public.productos WHERE id IN (v_p1, v_p2, v_p3, v_p4);
+DELETE FROM public.productos WHERE nombre LIKE 'Prod333-%';
 DELETE FROM public.turno_asignaciones WHERE turno_sesion_id IN (v_s1, v_s2, v_s3, v_s4);
 DELETE FROM public.turno_sesiones WHERE id IN (v_s1, v_s2, v_s3, v_s4);
 DELETE FROM public.turno_jornada_programacion WHERE id IN (v_prog1, v_prog2, v_prog3, v_prog4);
 DELETE FROM public.turnos WHERE id = v_turno;
 DELETE FROM public.almacenes WHERE id = v_almacen;
+END
+$issue333$;
