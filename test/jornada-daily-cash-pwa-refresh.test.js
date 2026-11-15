@@ -12,7 +12,7 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.112 release and Jornada UI 7.29", () => {
+test("PWA shell pins one fresh 9.5.112 release and Jornada UI 7.30", () => {
   assert.ok(APP.includes('const VERSION="9.5.112";'));
   assert.ok(INDEX.includes('style.css?v=9.5.100'));
   assert.ok(INDEX.includes('app.js?v=9.5.112'));
