@@ -102,6 +102,9 @@ test("production deploy uses standard hosted Windows and persists the exact LIVE
   assert.ok(deployScript.includes('const filename = "release-" + expected.source_sha + ".json";'));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
   assert.ok(deployScript.includes("workflow_run_id"));
+  assert.ok(deployScript.includes("asset_inventory"));
+  assert.ok(deployScript.includes("critical_asset_SHA256=PASS"));
+  assert.ok(deployScript.includes('"style.css": style.body'));
   assert.ok(deployScript.includes("writeFileSync(path.join(artifactDir, filename)"));
   assert.ok(deployScript.includes("CLOUDFLARE_API_TOKEN"));
 });
@@ -123,6 +126,9 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
   assert.match(verifier, /source_sha: expectedSha/);
   assert.match(verifier, /workflow_run_id: expectedRunId/);
   assert.match(verifier, /EXACT_SHA=PASS/);
+  assert.ok(verifier.includes("release.asset_inventory"));
+  assert.ok(verifier.includes("critical asset SHA-256=PASS"));
+  assert.ok(verifier.includes('"style.css": liveStyle'));
   assert.doesNotMatch(verifier, /request\(baseUrl \+ "\/" \+ releaseFilename/);
 });
 
@@ -130,6 +136,10 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}/);
   assert.match(liveOfflineE2e, /path\.join\(OUTPUT_DIR, "release", releaseFilename\)/);
   assert.match(liveOfflineE2e, /workflow_run_id: expectedRunId/);
+  assert.match(liveOfflineE2e, /startupPerformanceCold/);
+  assert.match(liveOfflineE2e, /domInteractiveMs/);
+  assert.match(liveOfflineE2e, /duplicateScriptPathnames/);
+  assert.match(liveOfflineE2e, /scriptTransferBytes/);
   assert.match(liveOfflineE2e, /sha256\(candidate\.body\) !== sha256\(sourceReference\)/);
   assert.doesNotMatch(liveOfflineE2e, /fetchText\(BASE_URL \+ "\/" \+ releaseFilename/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
