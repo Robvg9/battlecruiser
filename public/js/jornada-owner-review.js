@@ -162,8 +162,8 @@
       ['Salario',pendingPost?blocked:(l.salario_calculado==null?'Pendiente':money(l.salario_calculado)+' CUP')],
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
-      ['Efectivo esperado',pendingPost?blocked:(l.efectivo_esperado_despues_de_gastos_reinversiones_salario==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP')],
-      ['Diferencia',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
+      ['Efectivo esperado (sin salario)',pendingPost?blocked:((l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP')],
+      ['Sobrante / faltante de caja',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
       ['Costo documentado',pendingPost?blocked:(qty(l.costos_con_cobertura)+' / '+qty(l.familias_total_costo)+' familias')]
     ];
     const entries=x=>Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0);
@@ -211,7 +211,7 @@
     const warningsPanel=warnings.length?'<details class="bcjr-detail"><summary>Validaciones pendientes <small>'+warnings.length+'</small></summary><div class="bcjr-detail-body"><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div></details>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>';
     const correctionPanel=correctionForm?'<details class="bcjr-detail"><summary>Correcciones de conteo <small>'+negative.length+' producto(s)</small></summary><div class="bcjr-detail-body">'+correctionForm+'</div></details>':'';
     const movementPanel=movements?'<details class="bcjr-detail"><summary>Bajas y mermas para clasificar <small>'+post.length+'</small></summary><div class="bcjr-detail-body">'+movements+'</div></details>':'';
-    const financePanel='<details class="bcjr-detail"><summary>Liquidación y desglose financiero</summary><div class="bcjr-detail-body"><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div></div></details>';
+    const financePanel='<details class="bcjr-detail"><summary>Liquidación y desglose financiero</summary><div class="bcjr-detail-body"><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div><p class="bcjr-muted">El salario se acumula en CuevaCoin y se paga después; no se descuenta del efectivo de esta jornada.</p></div></details>';
     return '<section class="bcjr-session"><h3>'+esc(periodTitle)+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · efectivo final '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin aprobación')+'</p>'+dailyCash+financePanel+salaryPanel+warningsPanel+correctionPanel+movementPanel+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+('Productos en los cortes · '+(lines.length?esc(lines.length):'Pendiente de cortes de inventario confirmados'))+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?tableSwitch+table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details></section>';
   }
   function render(data){
@@ -234,7 +234,7 @@
       card('Estado',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
       card('Ventas estimadas',sessions.length&&sessions.every(s=>s.liquidacion?.ventas_estimadas!=null)?money(totalSales)+' CUP':'Pendiente'),
       card('Efectivo total recogido',cashLabel),
-      card('Diferencia',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?money(totalDifference)+' CUP':'Pendiente')
+      card('Sobrante / faltante de caja',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?money(totalDifference)+' CUP':'Pendiente')
     ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{

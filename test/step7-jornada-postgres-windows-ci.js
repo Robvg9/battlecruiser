@@ -328,7 +328,6 @@ function applySql(file) {
     applySql("test/step4-jornada-shared-inventory-contract.sql");
     log("\\r\\n=== Enforce the final retail Jornada close gate and run full La Cueva settlement ===");
     applySql("supabase/migrations/20261112133100_jornada_close_gate_integral.sql");
-    applySql("test/la-cueva-period-settlement-contract.sql");
     log("\\r\\n=== Apply the attendant checklist and owner cash-count phase, then verify its isolated end-to-end contract ===");
     applySql("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
     applySql("supabase/migrations/20261113180000_admin_show_pending_jornada_cash_declarations.sql");
@@ -339,6 +338,8 @@ function applySql(file) {
     applySql("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
     applySql("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
     applySql("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
+    applySql("supabase/migrations/20261115120000_jornada_cash_difference_excludes_salary.sql");
+    applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
     applySql("test/jornada-pending-cash-visibility-contract.sql");

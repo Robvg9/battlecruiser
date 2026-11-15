@@ -32,6 +32,7 @@ DECLARE
   v_baja_id uuid;
   v_closed public.turno_sesiones;
   v_result jsonb;
+  v_review jsonb;
   v_error boolean;
   v_operation text;
   -- The current jornada covers the two completed dates before today; the next one starts today.
@@ -321,9 +322,14 @@ BEGIN
   PERFORM public.resolver_aprobacion_operativa('baja',v_baja_id,'APROBAR','Baja comprobada',0.5,NULL);
   PERFORM public.resolver_aprobacion_operativa('entrega_diaria',v_daily_id,'APROBAR','Conteo correcto',20,NULL);
 
+  -- Reinvestment and merma affect global stock; Jornada-linked Baja stays in the Jornada ledger.
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>101
-     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99 THEN
-    RAISE EXCEPTION 'FAIL: approval must apply reinvestment, merma and baja stock effects exactly once';
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99.5 THEN
+    RAISE EXCEPTION 'FAIL: reinvestment and merma must affect global stock once, while Jornada-linked Baja must not double-decrement it';
+  END IF;
+  IF (SELECT cantidad_actual FROM public.bc7_jornada_saldos_operativos(v_session) WHERE producto_id=v_pan)<>12
+     OR (SELECT cantidad_actual FROM public.bc7_jornada_saldos_operativos(v_session) WHERE producto_id=v_juice)<>5 THEN
+    RAISE EXCEPTION 'FAIL: the Jornada operational ledger must include the linked reinvestment, merma and Baja exactly once';
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
@@ -336,12 +342,16 @@ BEGIN
      OR (v_result->>'reinversiones_aprobadas')::numeric<>3 THEN
     RAISE EXCEPTION 'FAIL: approved sale/expense/reinvestment/merma/baja inputs were not included correctly; result=%',v_result;
   END IF;
-  IF (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones_salario')::numeric<>39.5 THEN
-    RAISE EXCEPTION 'FAIL: expected cash after expense, reinvestment and salary should be CUP39.50; result=%',v_result;
+  IF (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones')::numeric<>42
+     OR (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones_salario')::numeric<>42 THEN
+    RAISE EXCEPTION 'FAIL: cash expectation must exclude accrued salary; expected CUP42; result=%',v_result;
+  END IF;
+  IF (v_result->>'salario_calculado')::numeric<>2.5 THEN
+    RAISE EXCEPTION 'FAIL: salary must remain visible as a separate accrued payroll amount; result=%',v_result;
   END IF;
   IF (v_result->>'dinero_recogido_total')::numeric<>39.5
-     OR (v_result->>'diferencia')::numeric<>0 THEN
-    RAISE EXCEPTION 'FAIL: daily approved cash + final counted cash should reconcile at zero; result=%',v_result;
+     OR (v_result->>'diferencia')::numeric<>-2.5 THEN
+    RAISE EXCEPTION 'FAIL: daily cash must reconcile against sales less expenses/reinvestments only; result=%',v_result;
   END IF;
   IF NOT EXISTS(
     SELECT 1 FROM jsonb_array_elements(v_result->'lineas') line
@@ -381,7 +391,7 @@ BEGIN
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM true
      OR (v_result->>'dinero_recogido_total')::numeric<>40.5
-     OR (v_result->>'diferencia')::numeric<>1 THEN
+     OR (v_result->>'diferencia')::numeric<>-1.5 THEN
     RAISE EXCEPTION 'FAIL: corrected daily cash should keep the settlement auditable; result=%',v_result;
   END IF;
 
@@ -402,10 +412,15 @@ BEGIN
     RAISE EXCEPTION 'FAIL: daily cash and settlement ACL boundary is incorrect';
   END IF;
 
-  -- The operational session closes only after the complete approved reconciliation passes.
+  -- The employee must explicitly confirm the three operational checklist blocks before handover.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
   PERFORM set_config('test.perms','turnos:ver',false);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'gastos',true);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'reinversiones',true);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'bajas',true);
+
+  -- The operational session closes only after the complete approved reconciliation passes.
   v_closed:=public.bc5_cerrar_jornada(v_session,'Cierre de contrato PostgreSQL fuera del horario programado');
   IF v_closed.estado<>'COMPLETADA'
      OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='COMPLETADO')
@@ -413,6 +428,16 @@ BEGIN
      OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'EN_CURSO'
      OR (public.bc7_liquidacion_inventario_jornada(v_session)->>'calculable')::boolean IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'FAIL: jornada close must complete the current session but preserve the master turn as open for the next programmed day';
+  END IF;
+
+  -- The Owner's combined review must use the same no-salary cash formula as the session settlement.
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_review:=public.bc7_obtener_revision_jornada(v_turn);
+  IF (v_review->'sesiones'->0->'liquidacion'->>'efectivo_esperado_despues_de_gastos_reinversiones')::numeric<>42
+     OR (v_review->'sesiones'->0->'liquidacion'->>'diferencia')::numeric<>-1.5
+     OR (v_review->'sesiones'->0->'liquidacion'->>'salario_calculado')::numeric<>2.5 THEN
+    RAISE EXCEPTION 'FAIL: Owner review cash, variance and separate salary disagree with session settlement; result=%',v_review;
   END IF;
 
   -- The final period leaves one owner-schedulable handover because there is no
