@@ -271,6 +271,12 @@ BEGIN
   FROM public.turno_jornada_programacion
   WHERE id=v_source_session.jornada_programacion_id;
 
+  SELECT u.id INTO STRICT v_owner_id
+  FROM public.usuarios u
+  WHERE u.username='roberto'
+    AND u.activo=true
+    AND coalesce(u.archivado,false)=false;
+
   -- The Dueño confirms the physical handover happened on Nov 11 at 07:00.
   -- The later Nov 13 close event is retained as the delayed administrative
   -- reconciliation record; it is not treated as evidence that Sheyla kept working.
@@ -327,12 +333,6 @@ BEGIN
        'siguiente_responsable_username','dahiana',
        'cierre_administrativo_original_preservado',true
      ));
-
-  SELECT u.id INTO STRICT v_owner_id
-  FROM public.usuarios u
-  WHERE u.username='roberto'
-    AND u.activo=true
-    AND coalesce(u.archivado,false)=false;
 
   SELECT u.id INTO STRICT v_responsible_id
   FROM public.usuarios u
