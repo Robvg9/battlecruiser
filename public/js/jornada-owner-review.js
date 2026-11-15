@@ -343,7 +343,7 @@
     'mani grande':240,'maní grande':240,'mantecado iskener':35,'masarreal redonda':160,'masareal redonda':160,
     'mentiplus':180,'ojitos':36,'paniqueque grande':80,'pelly cebolla':170,'pelly de cebolla':170,'suspiros':75
   };
-  const normalizeProductName=value=>String(value||'').toLowerCase().normalize('NFD').replace(/\\p{M}/gu,'').replace(/[^a-z0-9]+/g,' ').trim();
+  const normalizeProductName=value=>String(value||'').toLowerCase().normalize('NFD').replace(/\p{M}/gu,'').replace(/[^a-z0-9]+/g,' ').trim();
   function openBulkCostsEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
     const session=(report?.sesiones||[]).find(x=>String(x.id)===String(button.dataset.session));
