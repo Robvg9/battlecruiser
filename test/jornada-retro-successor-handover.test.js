@@ -23,6 +23,10 @@ test("retail handover counts parent families and aggregates variants",()=>{
   assert.ok(migration.includes("sp.producto_padre_id=rl.producto_id"));
   assert.ok(migration.includes("inventario_agrupado_por_familia"));
 });
+test("closed master turns freeze late movement classification",()=>{
+  assert.ok(migration.includes("El Turno está cerrado. Las bajas/mermas quedaron congeladas"));
+  assert.ok(migration.includes("bc7_clasificar_movimientos_fuera_corte"));
+});
 test("owner-approved physical differences produce an audited correction of previous final",()=>{
   assert.ok(migration.includes("bc7_corregir_inventario_final_jornada(v_e.origen_sesion_id,v_correcciones"));
   assert.ok(migration.includes("El Turno está cerrado. Solo se permite corregir"));
