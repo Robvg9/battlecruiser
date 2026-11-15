@@ -21,7 +21,7 @@ BEGIN
     'public.bc7_admin_programar_sucesora_pendiente(uuid,date,uuid,text)'::regprocedure
   ) INTO v_definition;
 
-  v_old := $old$
+  v_old := $old_admin$
  IF v_grouped THEN
   SELECT count(*) INTO v_expected FROM public.productos p WHERE p.activo=true AND p.producto_padre_id IS NULL;
  ELSE
@@ -31,9 +31,9 @@ BEGIN
  SELECT count(*) INTO v_line_count FROM public.turno_jornada_inventario_entrega_lineas WHERE entrega_id=v_e.id;
  IF v_line_count=0 OR v_line_count<>v_expected THEN
   RAISE EXCEPTION 'La entrega heredada contiene % líneas, pero el catálogo actual requiere % productos/familias. No se abrirá una sucesora incompleta.',v_line_count,v_expected USING ERRCODE='23514';
- END IF;$old$;
+ END IF;$old_admin$;
 
-  v_new := $new$
+  v_new := $new_admin$
  IF v_grouped THEN
   -- Retail delivery lines are the immutable product-family snapshot from
   -- the outgoing final cut. Do not compare them with today's active catalog:
@@ -59,7 +59,7 @@ BEGIN
   IF v_line_count=0 OR v_line_count<>v_expected THEN
    RAISE EXCEPTION 'La entrega heredada contiene % líneas, pero el catálogo actual requiere % productos.',v_line_count,v_expected USING ERRCODE='23514';
   END IF;
- END IF;$new$;
+ END IF;$new_admin$;
 
   IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
     RAISE EXCEPTION 'No se localizó el contrato de catálogo en bc7_admin_programar_sucesora_pendiente.';
@@ -70,15 +70,15 @@ BEGIN
     'public.bc7_recibir_entrega_jornada(uuid,jsonb,text,uuid)'::regprocedure
   ) INTO v_definition;
 
-  v_old := $old$
+  v_old := $old_receive$
  IF v_grouped THEN
   SELECT count(*) INTO v_expected FROM public.productos p WHERE p.activo=true AND p.producto_padre_id IS NULL;
  ELSE
   SELECT count(*) INTO v_expected FROM public.stock s JOIN public.productos p ON p.id=s.producto_id
   WHERE s.almacen_id=v_s.almacen_id AND p.activo=true;
- END IF;$old$;
+ END IF;$old_receive$;
 
-  v_new := $new$
+  v_new := $new_receive$
  IF v_grouped THEN
   -- The payload must match exactly the product families frozen in this delivery.
   -- New products created after the shift are not part of the historical receipt.
@@ -88,17 +88,14 @@ BEGIN
  ELSE
   SELECT count(*) INTO v_expected FROM public.stock s JOIN public.productos p ON p.id=s.producto_id
   WHERE s.almacen_id=v_s.almacen_id AND p.activo=true;
- END IF;$new$;
+ END IF;$new_receive$;
 
   IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
     RAISE EXCEPTION 'No se localizó el recuento de catálogo en bc7_recibir_entrega_jornada.';
   END IF;
-  v_definition:=replace(v_definition,v_old,v_new);
-
-  v_old := $old$
-  LEFT JOIN public.productos p ON p.id=(x.value->>'producto_id')::uuid AND p.activo=true
-  WHERE jsonb_typeof(x.value)<>'object' OR p.id IS NULL
-    OR coalesce(x.value->>'cantidad','') !~ '^([0-9]+([.][0-9]{1,3})?|[.][0-9]{1,3})
+  EXECUTE replace(v_definition,v_old,v_new);
+END;
+$snapshot_contract$;
 
 -- Historical Jornada inventory must use the product catalog as it existed by
 -- the configured period end, not product families added later.
