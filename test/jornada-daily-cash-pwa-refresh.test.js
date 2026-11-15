@@ -39,9 +39,9 @@ test("PWA update notice creates its action button before binding the click", () 
 test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
   assert.match(UI, /const activeSessionId=String\(state\.currentSession\?\.turno_sesion_id\|\|''\);/);
   assert.match(UI,/activeSessionId===sessionId/);
-  assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*ensureWorkspaceOperationData\(state\.detail\);\s*if\(state\.workspaceOperationLoaded\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}\}/);
+  assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*ensureWorkspaceOperationData\(state\.detail\);\s*if\(state\.workspaceOperationLoaded\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}\s*\}/);
   assert.match(UI,/const sessionId=String\(detail\.sesion\.id\)/);
-  assert.match(UI,/const isAssigned=.*activeSessionId===sessionId/);
+  assert.match(UI,/state\.workspaceOperationLoaded=true;\s*state\.workspaceOperationPromise=null;\s*renderWorkspace\(detail\)/);\n  assert.match(UI,/activateWorkspaceTab\(state\.workspaceTab\)/);\n  assert.match(UI,/const isAssigned=.*activeSessionId===sessionId/);
 });
 
 test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {
