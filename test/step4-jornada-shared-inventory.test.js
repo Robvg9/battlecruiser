@@ -93,7 +93,7 @@ test("PWA and service worker cache are aligned at 9.5.112 / Jornada module 7.29"
   }
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.30"));
   assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.112"));
-  assert.ok(ui.includes("v7.29"));
+  assert.ok(ui.includes("v7.30"));
 });
 
 test("PostgreSQL 17 disposable CI executes the Step 4 migration and contract",()=>{
