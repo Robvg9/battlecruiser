@@ -177,6 +177,7 @@ DECLARE
   v_delivery public.turno_jornada_inventario_entregas%ROWTYPE;
   v_source_session public.turno_sesiones%ROWTYPE;
   v_source_turn public.turnos%ROWTYPE;
+  v_source_program public.turno_jornada_programacion%ROWTYPE;
   v_config public.turno_jornada_configuracion%ROWTYPE;
   v_owner_id uuid;
   v_responsible_id uuid;
@@ -249,6 +250,10 @@ BEGIN
   SELECT * INTO STRICT v_source_turn
   FROM public.turnos
   WHERE id=v_delivery.turno_id;
+
+  SELECT * INTO STRICT v_source_program
+  FROM public.turno_jornada_programacion
+  WHERE id=v_source_session.jornada_programacion_id;
 
   SELECT u.id INTO STRICT v_owner_id
   FROM public.usuarios u
