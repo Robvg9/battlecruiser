@@ -104,7 +104,6 @@ DECLARE
   v_delivery public.turno_jornada_inventario_entregas%ROWTYPE;
   v_source_session public.turno_sesiones%ROWTYPE;
   v_source_turn public.turnos%ROWTYPE;
-  v_source_program public.turno_jornada_programacion%ROWTYPE;
   v_config public.turno_jornada_configuracion%ROWTYPE;
   v_owner_id uuid;
   v_responsible_id uuid;
@@ -178,10 +177,6 @@ BEGIN
   FROM public.turnos
   WHERE id=v_delivery.turno_id;
 
-  SELECT * INTO STRICT v_source_program
-  FROM public.turno_jornada_programacion
-  WHERE id=v_source_session.jornada_programacion_id;
-
   SELECT u.id INTO STRICT v_owner_id
   FROM public.usuarios u
   WHERE u.username='roberto'
@@ -214,8 +209,7 @@ BEGIN
     v_end_time:=v_config.hora_fin;
     v_salary:=v_config.salario_porcentaje;
   END IF;
-  v_salary:=coalesce(v_salary,v_source_program.salario_porcentaje);
-  v_today:=(now() AT TIME ZONE v_timezone)::date;
+  -- Do not inherit the outgoing worker's jornada-specific salary rate.\n  -- Leave it unset unless the warehouse has an explicit configured rate.\n  v_today:=(now() AT TIME ZONE v_timezone)::date;
 
   IF DATE '2026-11-13'>=v_today THEN
     RAISE EXCEPTION 'The owner-confirmed successor period must already be over for retroactive recovery.';
