@@ -20,8 +20,6 @@ on:
       - 'supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql'
       - 'supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql'
       - 'test/dahiana-retro-successor-period.test.js'
-      - 'supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql'
-      - 'test/dahiana-retro-successor-period.test.js'
       - 'test/jornada-pending-cash-visibility-contract.sql'
       - 'test/jornada-sectioned-checklist-picker.test.js'
       - 'supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql'
