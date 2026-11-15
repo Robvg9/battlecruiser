@@ -67,6 +67,31 @@ BEGIN
 END;
 $patch$;
 
+-- A closed master turn must not accept late classification edits.
+DO $patch$
+DECLARE v_definition text; v_old text; v_new text;
+BEGIN
+ SELECT pg_get_functiondef('public.bc7_clasificar_movimientos_fuera_corte(uuid,jsonb)'::regprocedure)
+ INTO v_definition;
+ v_old := $old$IF NOT FOUND OR v_s.estado<>'COMPLETADA' THEN
+    RAISE EXCEPTION 'Solo se pueden revisar movimientos de una jornada completada.' USING ERRCODE='23514';
+  END IF;$old$;
+ v_new := $new$IF NOT FOUND OR v_s.estado<>'COMPLETADA' THEN
+    RAISE EXCEPTION 'Solo se pueden revisar movimientos de una jornada completada.' USING ERRCODE='23514';
+  END IF;
+  IF EXISTS(
+    SELECT 1 FROM public.turnos t
+    WHERE t.id=v_s.turno_id AND coalesce(t.estado_maestro,t.estado) IN ('CERRADO','CANCELADO')
+  ) THEN
+    RAISE EXCEPTION 'El Turno está cerrado. Las bajas/mermas quedaron congeladas al aprobar la liquidación.' USING ERRCODE='23514';
+  END IF;$new$;
+ IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+  RAISE EXCEPTION 'No se localizó el control de cierre de clasificación de movimientos.';
+ END IF;
+ EXECUTE replace(v_definition,v_old,v_new);
+END;
+$patch$;
+
 -- Allow a closed final count correction only while its successor has a real
 -- discrepancy awaiting an owner decision.
 DO $patch$
