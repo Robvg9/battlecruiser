@@ -278,8 +278,8 @@
     const raw=box?.querySelector('[data-bcjr-tranches]')?.value||'';
     const reason=(box?.querySelector('[data-bcjr-tranches-reason]')?.value||'').trim();
     const tramos=[];
-    for(const line of raw.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean)){
-      const m=line.match(/^([0-9]+(?:[.,][0-9]{1,4})?)\\s*(?:x|×|@)\\s*([0-9]+(?:[.,][0-9]{1,4})?)$/i);
+    for(const line of raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)){
+      const m=line.match(/^([0-9]+(?:[.,][0-9]{1,4})?)\s*(?:x|×|@)\s*([0-9]+(?:[.,][0-9]{1,4})?)$/i);
       if(!m){setStatus('Formato inválido. Usa cantidad x precio, por ejemplo: 12 x 50.','error');return;}
       tramos.push({cantidad:Number(m[1].replace(',','.')),precio_unitario:Number(m[2].replace(',','.'))});
     }
