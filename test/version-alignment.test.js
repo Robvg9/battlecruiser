@@ -144,8 +144,8 @@ test('movement operations load multi-product transfer before the compact modal',
 
 // PWA 9.5.88 uses warehouse-specific movement summary windows and aligns release cache keys.
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
-  assert.match(app, /const VERSION=["']9\.5\.114["']/);
-  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.114["']/);
+  assert.match(app, /const VERSION=["']9\.5\.113["']/);
+  assert.match(sw, /BC_SW_VERSION\s*=\s*["']9\.5\.113["']/);
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
