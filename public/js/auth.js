@@ -1034,8 +1034,27 @@ safeInit("cambiar-contraseña", () => {
 });
 
 if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+  window.addEventListener("load", function() {
+    navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" }).then(function(registration) {
+      function announceWaiting() {
+        if (!registration.waiting || !navigator.serviceWorker.controller) return;
+        window.dispatchEvent(new CustomEvent("bc:pwa-update-ready", {
+          detail: { registration: registration }
+        }));
+      }
+      registration.addEventListener("updatefound", function() {
+        var installing = registration.installing;
+        if (!installing) return;
+        installing.addEventListener("statechange", function() {
+          if (installing.state === "installed") announceWaiting();
+        });
+      });
+      announceWaiting();
+      // A lightweight, non-blocking check prevents an HTTP-cached SW script hiding a release.
+      registration.update().then(announceWaiting).catch(function() {});
+    }).catch(function(error) {
+      console.warn("[BattleCruiser] No se pudo comprobar la actualización PWA:", error);
+    });
   });
 }
 
