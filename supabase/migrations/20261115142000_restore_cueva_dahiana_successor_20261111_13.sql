@@ -158,7 +158,7 @@ BEGIN
     'public.bc7_obtener_inventario_jornada(uuid)'::regprocedure
   ) INTO v_definition;
 
-  v_old := $old$      FROM public.productos p WHERE p.activo=true AND p.producto_padre_id IS NULL$new$;
+  v_old := $old$      FROM public.productos p WHERE p.activo=true AND p.producto_padre_id IS NULL$old$;
   v_new := $new$      FROM public.productos p
       WHERE p.activo=true AND p.producto_padre_id IS NULL
         AND p.created_at < (
