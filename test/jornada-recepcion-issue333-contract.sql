@@ -333,11 +333,15 @@ BEGIN
   RAISE NOTICE 'PASS issue #333 reception (isolated): 66-line payload, 66/66, 1 & 15 diffs (+/-), zero/decimals, idempotency/recount, mandatory reasons, detail permissions, FINAL/INITIAL integrity, no stock changes';
 -- Cleanup ALL test data inserted by this contract to ensure no side effects on downstream contracts.
 -- Order matters: delete dependent rows first to avoid FK violations.
-DELETE FROM public.turno_jornada_inventario_lineas WHERE producto_id IN (v_p1, v_p2, v_p3, v_p4);
-DELETE FROM public.turno_jornada_inventario_entrega_lineas WHERE producto_id IN (v_p1, v_p2, v_p3, v_p4);
+-- Delete inventory lines first (they reference productos.id via FK)
+DELETE FROM public.turno_jornada_inventario_lineas;
+DELETE FROM public.turno_jornada_inventario_entrega_lineas;
+-- Delete stock rows for this warehouse
 DELETE FROM public.stock WHERE almacen_id = v_almacen;
+-- Delete the 4 specific products created by this fixture (Prod333-A through D, plus loop products)
 DELETE FROM public.productos WHERE id IN (v_p1, v_p2, v_p3, v_p4);
 DELETE FROM public.productos WHERE nombre LIKE 'Prod333-%';
+-- Delete session/turno/programacion data
 DELETE FROM public.turno_asignaciones WHERE turno_sesion_id IN (v_s1, v_s2, v_s3, v_s4);
 DELETE FROM public.turno_sesiones WHERE id IN (v_s1, v_s2, v_s3, v_s4);
 DELETE FROM public.turno_jornada_programacion WHERE id IN (v_prog1, v_prog2, v_prog3, v_prog4);
