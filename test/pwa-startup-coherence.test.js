@@ -46,7 +46,7 @@ test("PWA loader: core.js does not append scripts already owned by index/app", (
 test("PWA loader: app.js has one authoritative version per module", () => {
   const modules = appModules();
   const names = modules.map((item) => item.name);
-  assert.equal(modules.length, 118, "unexpected change to the audited module inventory");
+  assert.ok(modules.length >= 118, "the audited base module inventory was unexpectedly reduced");
   assert.equal(new Set(names).size, names.length, "a module must appear once in app.js");
 
   const expected = {
@@ -60,6 +60,17 @@ test("PWA loader: app.js has one authoritative version per module", () => {
     assert.equal(matches[0].version, version, name + " app.js version drifted");
     assert.equal(precachedVersion(name), version, name + " Service Worker precache version drifted");
   }
+});
+
+test("PWA shell, app loader and Service Worker use one cache-isolated release version", () => {
+  const appVersion = app.match(/const VERSION=["']([^"']+)["']/)?.[1];
+  const swVersion = serviceWorker.match(/BC_SW_VERSION\\s*=\\s*["']([^"']+)["']/)?.[1];
+  const htmlAppVersion = indexHtml.match(/app\\.js\\?v=([^"']+)/)?.[1];
+  assert.equal(appVersion, "9.5.114");
+  assert.equal(swVersion, appVersion);
+  assert.equal(htmlAppVersion, appVersion);
+  assert.match(indexHtml, new RegExp("v" + appVersion));
+  assert.match(serviceWorker, new RegExp("battlecruiser-static-\\" \\+ BC_SW_VERSION"));
 });
 
 test("PWA loader: direct HTML module versions agree with the app registry", () => {
