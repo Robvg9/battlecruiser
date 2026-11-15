@@ -694,6 +694,45 @@ async function main() {
   };
   report.evidence.startupPerformanceCold = startupMetrics;
 
+  // Warm-load measurement: same Chromium profile, normal reload, browser HTTP
+  // cache enabled, and Service Worker still active. Keep it separate from the
+  // cold-navigation phase so the two measurements are never conflated.
+  await evaluate("document.readyState === 'complete' ? true : new Promise(resolve => window.addEventListener('load',()=>resolve(true),{once:true}))");
+  await cdpCommand("Network.setCacheDisabled", { cacheDisabled: false });
+  report.evidence.phase = "online_warm";
+  const warmResponseStart = responses.length;
+  await reloadAndWait(false);
+  const warm = await waitUntil("shell warm con versión esperada", shellSnapshotPredicate(), 10000);
+  assert(warm.readyState !== "loading" && warm.version === expectedVersion,
+    "La segunda navegación cálida no terminó con la versión esperada.");
+  await evaluate("document.readyState === 'complete' ? true : new Promise(resolve => window.addEventListener('load',()=>resolve(true),{once:true}))");
+  const warmMetrics = await evaluate(startupPerformanceExpression());
+  const warmResponses = responses.slice(warmResponseStart).filter(item => item.phase === "online_warm");
+  const warmByPath = new Map();
+  for (const item of warmResponses) {
+    try {
+      const url = new URL(item.url);
+      const values = warmByPath.get(url.pathname) || [];
+      values.push({ url: item.url, status: item.status, type: item.type, fromServiceWorker: item.fromServiceWorker, fromDiskCache: item.fromDiskCache });
+      warmByPath.set(url.pathname, values);
+    } catch (_) {}
+  }
+  warmMetrics.network = {
+    responses: warmResponses.length,
+    failedRequests: failures.filter(item => item.phase === "online_warm").length,
+    repeatedPathnames: Array.from(warmByPath.entries()).filter(([, values]) => values.length > 1)
+      .map(([pathname, values]) => ({ pathname, requests: values }))
+  };
+  warmMetrics.conditions = {
+    browserProfile: "same temporary Chromium user-data-dir as cold navigation",
+    browserHttpCacheDisabled: false,
+    serviceWorkerBypass: false,
+    phase: "second online navigation after first-load cache population"
+  };
+  report.evidence.startupPerformanceWarm = warmMetrics;
+  await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
+  report.evidence.phase = "online_functional";
+
   // The preview login proxy must reach the real Edge Function with its allowlisted
   // production Origin. GET is a no-credential diagnostic: the expected upstream
   // response is 405, before the login rate limiter or auth/database code runs.
