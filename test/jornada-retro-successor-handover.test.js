@@ -7,9 +7,18 @@ const jornada=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
 
+const actualCloseMigration=fs.readFileSync("supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql","utf8");
+
 test("closed master turns are normalized and future approvals close both state fields",()=>{
   assert.ok(migration.includes("estado='CERRADO',estado_maestro='CERRADO'"));
   assert.ok(migration.includes("t.estado_maestro='CERRADO' AND t.estado<>'CERRADO'"));
+});
+test("successor handover follows the actual close date, not stale scheduled end",()=>{
+  assert.ok(actualCloseMigration.includes("v_tipo_evento='JORNADA_ENTREGADA_TARDE' THEN v_fecha_fin + 1"));
+  assert.ok(actualCloseMigration.includes("ELSE v_local::date + 1"));
+  assert.ok(actualCloseMigration.includes("JORNADA_CERRADA_CON_EXCEPCION"));
+  assert.ok(actualCloseMigration.includes("INVENTARIO_ENTREGA_DESTINO_RECALCULADO"));
+  assert.ok(actualCloseMigration.includes("destino_sesion_id IS NULL"));
 });
 test("successor is programmed from existing handover and requires physical reception before starting",()=>{
   assert.ok(migration.includes("bc7_admin_programar_sucesora_pendiente"));
