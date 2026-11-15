@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.110 — Revisión compacta y valores históricos de Jornada
+// v9.5.111 — Carga masiva de costos históricos por Jornada
 (function hotfixV9475(){
   const VERSION="9.5.111";
   window.__BC_VERSION__=VERSION;
