@@ -62,12 +62,12 @@ BEGIN
     (v_prog4,v_turno,v_almacen,4,(now() AT TIME ZONE 'America/Havana')::date+23,true,v_worker,'07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner)
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO public.turno_sesiones(id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id,creada_por)
+  INSERT INTO public.turno_sesiones(id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id)
   VALUES
-    (v_s1,v_turno,v_almacen,1,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+20,'PROGRAMADA',v_prog1,v_owner),
-    (v_s2,v_turno,v_almacen,2,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+21,'PROGRAMADA',v_prog2,v_owner),
-    (v_s3,v_turno,v_almacen,3,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+22,'PROGRAMADA',v_prog3,v_owner),
-    (v_s4,v_turno,v_almacen,4,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+23,'PROGRAMADA',v_prog4,v_owner)
+    (v_s1,v_turno,v_almacen,1,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+20,'PROGRAMADA',v_prog1),
+    (v_s2,v_turno,v_almacen,2,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+21,'PROGRAMADA',v_prog2),
+    (v_s3,v_turno,v_almacen,3,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+22,'PROGRAMADA',v_prog3),
+    (v_s4,v_turno,v_almacen,4,'JORNADA',(now() AT TIME ZONE 'America/Havana')::date+23,'PROGRAMADA',v_prog4)
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
