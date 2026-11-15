@@ -64,13 +64,13 @@ test("PWA loader: app.js has one authoritative version per module", () => {
 
 test("PWA shell, app loader and Service Worker use one cache-isolated release version", () => {
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/)?.[1];
-  const swVersion = serviceWorker.match(/BC_SW_VERSION\\s*=\\s*["']([^"']+)["']/)?.[1];
-  const htmlAppVersion = indexHtml.match(/app\\.js\\?v=([^"']+)/)?.[1];
+  const swVersion = serviceWorker.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
+  const htmlAppVersion = indexHtml.match(/app\.js\?v=([^"']+)/)?.[1];
   assert.equal(appVersion, "9.5.114");
   assert.equal(swVersion, appVersion);
   assert.equal(htmlAppVersion, appVersion);
   assert.match(indexHtml, new RegExp("v" + appVersion));
-  assert.match(serviceWorker, new RegExp("battlecruiser-static-\\" \\+ BC_SW_VERSION"));
+  assert.ok(serviceWorker.includes('var BC_STATIC = "battlecruiser-static-" + BC_SW_VERSION;'));
 });
 
 test("PWA loader: direct HTML module versions agree with the app registry", () => {
