@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.29 — catálogo completo para ajustes y checklist de cinco pasos.
+// v7.30 — caja de Jornada separada del salario acumulado.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -797,8 +797,8 @@
       ['Gastos aprobados',result.gastos_aprobados],
       ['Reinversiones aprobadas',result.reinversiones_aprobadas],
       ['Dinero recogido',result.dinero_recogido_total],
-      ['Efectivo esperado',result.efectivo_esperado_despues_de_gastos_reinversiones_salario],
-      ['Faltante / sobrante',result.diferencia]
+      ['Efectivo esperado (sin salario)',(result.efectivo_esperado_despues_de_gastos_reinversiones??result.efectivo_esperado_despues_de_gastos_reinversiones_salario)],
+      ['Sobrante / faltante de caja',result.diferencia]
     ];
     const cards='<div class="bc7-workspace-overview">'+summary.map(function(item){
       const value=item[1]==null?'Pendiente':money(item[1])+' CUP';
@@ -831,6 +831,7 @@
     const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
     host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
       '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
+      '<p class="bc7-muted">El salario se acumula en CuevaCoin y se paga después; no se descuenta del efectivo de esta jornada.</p>'+
       '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
       cards+(rows.length?'<details class="bc7-finance-fold"><summary>Desglose por producto</summary>'+table+'</details>':table)+
       (blockers.length?'<div class="bc7-note"><b>Para cerrar la liquidación:</b><ul>'+blockers.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'<p class="bc7-muted">No quedan aprobaciones ni validaciones pendientes.</p>')+
@@ -1199,8 +1200,8 @@
       ['Salario calculado',settlement.salario_calculado],
       ['Gastos aprobados',settlement.gastos_aprobados],
       ['Reinversiones aprobadas',settlement.reinversiones_aprobadas],
-      ['Efectivo esperado',settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario],
-      ['Diferencia',settlement.diferencia]
+      ['Efectivo esperado (sin salario)',(settlement.efectivo_esperado_despues_de_gastos_reinversiones??settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario)],
+      ['Sobrante / faltante de caja',settlement.diferencia]
     ];
     return '<section class="bc7-calculation-phase is-ready"><h4>Fase 2 · Cálculos automáticos completados</h4>'+
       fifthCheck+'<div class="bc7-calculation-grid">'+
