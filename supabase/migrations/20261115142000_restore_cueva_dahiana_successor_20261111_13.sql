@@ -109,6 +109,16 @@ DECLARE
   v_old text;
   v_new text;
 BEGIN
+  -- Production has productos.created_at; isolated legacy contract fixtures do not.
+  -- Skip only this historical catalogue-boundary patch when the timestamp column is absent.
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='productos' AND column_name='created_at'
+  ) THEN
+    RAISE NOTICE 'Skipping historical product-catalog cutoff patch: productos.created_at is absent in this schema.';
+    RETURN;
+  END IF;
+
   SELECT pg_get_functiondef(
     'public.bc7_guardar_inventario_jornada(uuid,text,jsonb,text)'::regprocedure
   ) INTO v_definition;
