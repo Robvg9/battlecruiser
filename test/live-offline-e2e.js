@@ -1060,7 +1060,7 @@ async function main() {
 
   // index.html is precached separately from the root URL, so request it explicitly while
   // the browser's network is disabled. This proves the indexed document is recoverable.
-  const indexProbe = await evaluate("(async()=>{const r=await fetch('/index.html?bc_offline_probe='+Date.now(),{cache:'no-store'});const body=await r.text();return {status:r.status,ok:r.ok,bodyLength:body.length,containsTitle:body.includes('<title>BattleCruiser</title>')}})()");
+  const indexProbe = await evaluate("(async()=>{const r=await fetch('/index.html',{cache:'no-store'});const body=await r.text();return {status:r.status,ok:r.ok,bodyLength:body.length,containsTitle:body.includes('<title>BattleCruiser</title>')}})()");
   report.evidence.offlineIndexProbe = indexProbe;
   assert(indexProbe.status === 200 && indexProbe.ok && indexProbe.containsTitle, "index.html no se pudo recuperar desde la caché mientras la red estaba desconectada.");
 
