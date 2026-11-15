@@ -440,14 +440,14 @@ BEGIN
     RAISE EXCEPTION 'FAIL: Owner review cash, variance and separate salary disagree with session settlement; result=%',v_review;
   END IF;
 
-  -- The final period leaves one owner-schedulable handover because there is no
-  -- next session in the current Turn. The Turn must pass the Jornada approval gate.
+  -- The final handover is scheduled for the day after the recorded operational close.
+  -- This may differ from the programmed period end when closure used an exception.
   SELECT id INTO v_handover_id
   FROM public.turno_jornada_inventario_entregas
   WHERE origen_sesion_id=v_session AND destino_sesion_id IS NULL
-    AND fecha_destino=v_today+2 AND estado='PENDIENTE_PROGRAMACION';
+    AND fecha_destino=((v_end AT TIME ZONE 'America/Havana')::date+1) AND estado='PENDIENTE_PROGRAMACION';
   IF v_handover_id IS NULL THEN
-    RAISE EXCEPTION 'FAIL: final Jornada did not leave its period-end inventory handover schedulable';
+    RAISE EXCEPTION 'FAIL: final Jornada did not leave its actual-close-date handover schedulable';
   END IF;
 
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
@@ -464,7 +464,7 @@ BEGIN
 
   -- Create the next Turn only after the previous one is approved and closed.
   v_program_result:=public.bc5_crear_jornada_unica(
-    v_warehouse,v_today+2,2,
+    v_warehouse,((v_end AT TIME ZONE 'America/Havana')::date+1),2,
     jsonb_build_array(
       jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_worker),
       jsonb_build_object('numero_dia',2,'trabaja',false,'responsable_id',NULL)
@@ -502,14 +502,24 @@ BEGIN
     RAISE EXCEPTION 'FAIL: next Turn did not receive and confirm the prior period inventory';
   END IF;
 
-  v_next_tranche:=public.bc5_iniciar_jornada(
-    v_next_session,'Apertura de la siguiente Jornada tras aprobar el período anterior'
-  );
-  IF v_next_tranche.estado<>'ACTIVO'
-     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'EN_CURSO'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_next_turn)<>'EN_CURSO'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'CERRADO' THEN
-    RAISE EXCEPTION 'FAIL: the next Turn/Jornada could not open after owner approval and physical inventory receipt';
+  IF (SELECT fecha FROM public.turno_jornada_programacion WHERE id=v_next_program)
+     =(now() AT TIME ZONE 'America/Havana')::date THEN
+    v_next_tranche:=public.bc5_iniciar_jornada(
+      v_next_session,'Apertura de la siguiente Jornada tras aprobar el período anterior'
+    );
+    IF v_next_tranche.estado<>'ACTIVO'
+       OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'EN_CURSO'
+       OR (SELECT estado_maestro FROM public.turnos WHERE id=v_next_turn)<>'EN_CURSO'
+       OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'CERRADO' THEN
+      RAISE EXCEPTION 'FAIL: the next Turn/Jornada could not open on its scheduled date after physical inventory receipt';
+    END IF;
+  ELSE
+    IF (SELECT fecha FROM public.turno_jornada_programacion WHERE id=v_next_program)
+         < (now() AT TIME ZONE 'America/Havana')::date
+       OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'PROGRAMADA'
+       OR (SELECT estado_maestro FROM public.turnos WHERE id=v_next_turn)<>'PROGRAMADO' THEN
+      RAISE EXCEPTION 'FAIL: a future next Turn/Jornada was opened before its scheduled date';
+    END IF;
   END IF;
 
   RAISE NOTICE 'PASS La Cueva: multi-day daily cash, approved expense/reinvestment/merma/baja, full inventory/cash reconciliation, owner Turn approval, next Turn creation, cross-Turn inventory handover/receipt, next Jornada open and ACL.';
