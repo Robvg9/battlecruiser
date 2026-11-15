@@ -66,3 +66,9 @@ test("restoration audit references the actual source program row",()=>{
   assert.ok(migration.includes("v_source_program public.turno_jornada_programacion%ROWTYPE"));
   assert.ok(migration.includes("SELECT * INTO STRICT v_source_program"));
 });
+
+test("refuses to create a successor before the source jornada actually closed",()=>{
+  assert.ok(migration.includes("v_source_actual_close_date"));
+  assert.ok(migration.includes("v_source_actual_close_date >= DATE '2026-11-11'"));
+  assert.ok(migration.includes("No se puede crear la sucesora 11–13"));
+});
