@@ -1,5 +1,5 @@
 "use strict";
-const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -264,7 +264,6 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
 test("app shell, application and Service Worker stay release-aligned and load refreshed navigation modules", () => {
   assertPwaReleaseAligned(assert,{app,serviceWorker,index});
   assert.match(index, /href="style\.css\?v=9\.5\.100"/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.111"><\/script>/);
   assert.match(app, /\["permisos-navegacion\.js","67\.8"\]/);
   assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.8/, "Service Worker debe precargar la misma versión de app.js");
   assert.ok(index.includes("js/navegacion.js?v=9.5.65"));

@@ -1,5 +1,5 @@
 "use strict";
-const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
 const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,file),"utf8");
 test("Flavor save always renders an in-modal live feedback target and requires the conversion acknowledgment visibly",()=>{
