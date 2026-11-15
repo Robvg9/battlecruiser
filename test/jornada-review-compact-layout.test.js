@@ -7,6 +7,7 @@ const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const REVIEW=read("public/js/jornada-owner-review.js");
 const MIGRATION=read("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
 const TRANCHE_MIGRATION=read("supabase/migrations/20261115003500_jornada_historic_price_tranches.sql");
+const APP=read("public/app.js"),SW=read("public/service-worker.js");
 
 test("Owner review keeps the approval footer outside the scrollable content",()=>{
   assert.match(REVIEW,/\.bcjr-dialog\{display:flex;flex-direction:column/);
