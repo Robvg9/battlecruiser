@@ -3,6 +3,7 @@
 (function(){'use strict';
 const ID='admin-aprobaciones',TIMEOUT=20000;
 const esc=v=>typeof escHtml==='function'?escHtml(v):String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+const escDate=v=>{const s=String(v||'').slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:s||'—';};
 const key=()=>crypto.randomUUID(),money=v=>typeof window.money==='function'?window.money(v):Number(v||0).toFixed(2),can=(s,a)=>typeof tienePermiso==='function'&&tienePermiso(s,a);
 const canAdmin=()=>can('entregas_caja','editar_any')||canViewOperationalQueue();
 const canViewOperationalQueue=()=>can('gastos','editar_any')||can('mermas','editar_any')||can('bajas','editar_any')||can('reinversiones','editar_any')||can('entregas_caja','editar_any')||can('auditoria','editar_any');
@@ -26,6 +27,11 @@ function renderOperativa(x){
     return row('💵 Declaración final · esperando entrega de jornada',
       user+' · '+(x.resumen||'Declaración de efectivo')+' · '+money(x.monto)+' CUP declarados. La sesión de Sheila aún no está COMPLETADA; el conteo y la aprobación siguen bloqueados.',
       [{text:'Esperando entrega de Sheila',disabled:true}]);
+  }
+  if(x.tipo==='recepcion_inventario_jornada'){
+    return row('📦 Recepción inventario compartido · revisión pendiente',
+      (x.almacen_nombre||'Almacén')+' · '+user+' · '+(x.producto_nombre||'Jornada origen/destino')+' · '+(x.resumen||'Recepción pendiente'),
+      [{text:'Ver detalle y resolver',fn:()=>abrirRevision(x)}]);
   }
   if(x.tipo==='gasto'){
     const concept=x.resumen||'gasto';
@@ -137,24 +143,44 @@ function renderApprovalDetails(x,detail){
   const isDailyCash=x.tipo==='entrega_diaria';
   const isFinalCash=x.tipo==='declaracion_jornada';
   const finalCashReady=String(x.motivo||'').toUpperCase()==='COMPLETADA';
+  const isReceipt=x.tipo==='recepcion_inventario_jornada';
   const isMoney=isExpense||isReinvestment||isDailyCash||isFinalCash;
   const isLegacyBaja=x.tipo==='baja';
   const isStockChange=x.tipo==='merma'||isLegacyBaja;
   const lines=isList?(Array.isArray(detail.lineas)?detail.lineas:[]):isLegacyBaja?[{
     id:x.id,producto_nombre:x.producto_nombre,cantidad:x.cantidad,motivo:x.motivo,estado:x.estado
-  }]:[];
-  const title=isList?'Lista de bajas':isExpense?'Gasto pendiente':isReinvestment?'Reinversión pendiente':isDailyCash?'Entrega diaria de efectivo':isFinalCash?'Declaración final de efectivo':x.tipo==='merma'?'Merma pendiente':'Baja pendiente';
+  }]:isReceipt?(Array.isArray(detail.lineas)?detail.lineas:[]):[];
+  const title=isList?'Lista de bajas':isExpense?'Gasto pendiente':isReinvestment?'Reinversión pendiente':isDailyCash?'Entrega diaria de efectivo':isFinalCash?'Declaración final de efectivo':isReceipt?'Recepción inventario compartido':x.tipo==='merma'?'Merma pendiente':'Baja pendiente';
   modal.querySelector('#admin-approval-title').textContent='Revisión administrativa · '+title;
-  subtitle.textContent=(detail.usuario_nombre||x.usuario_nombre||'Usuario')
-    +(detail.almacen_nombre||x.almacen_nombre?' · '+(detail.almacen_nombre||x.almacen_nombre):'')
-    +(detail.fecha||x.fecha?' · '+new Date(detail.fecha||x.fecha).toLocaleString():'');
+  subtitle.textContent=(isReceipt
+      ?((detail.almacen_nombre||x.almacen_nombre||'Almacén')+' · Responsable '+(detail.responsable_destino_nombre||x.usuario_nombre||'—')+' · Origen '+escDate(detail.origen_fecha)+' · Destino '+escDate(detail.destino_fecha))
+      :(detail.usuario_nombre||x.usuario_nombre||'Usuario')
+        +(detail.almacen_nombre||x.almacen_nombre?' · '+(detail.almacen_nombre||x.almacen_nombre):'')
+        +(detail.fecha||x.fecha?' · '+new Date(detail.fecha||x.fecha).toLocaleString():'')
+    );
   modal.dataset.approvalType=x.tipo;
   modal.dataset.approvalId=x.id;
   modal.dataset.sessionState=String(x.motivo||'');
   modal.dataset.declaredAmount=String(x.monto==null?'':x.monto);
   modal.dataset.declaredAmount=String(x.monto??'');
   let html='';
-  if(isList){
+  if(isReceipt){
+    const rec=detail.recepcion||{};
+    const diffs=lines.filter(l=>Number(l.diferencia||0)!==0);
+    html+='<section class="bc-admin-approval-summary"><strong>Recepción con '+diffs.length+' diferencia(s)</strong>'+
+      '<span>'+lines.length+' productos · Estado '+esc(detail.estado||x.estado||'PENDIENTE_REVISION')+'. El Dueño aprueba o rechaza con la RPC existente; rechazar exige recuento.</span></section>';
+    if(rec.observacion)html+='<p class="bc-admin-approval-message">Observación: '+esc(rec.observacion)+'</p>';
+    html+='<div class="bc-admin-approval-lines">';
+    lines.forEach(line=>{
+      const diff=Number(line.diferencia||0);
+      const diffTxt=(diff>0?'+':'')+money(diff);
+      html+='<article class="bc-admin-approval-line">'+
+        '<div class="bc-admin-approval-line-info"><strong>'+esc(line.nombre||line.producto_nombre||'Producto')+'</strong>'+
+        '<span>Declarado: '+esc(money(line.cantidad_declarada))+' · Físico: '+esc(line.cantidad_recibida==null?'—':money(line.cantidad_recibida))+' · Delta: '+esc(diffTxt)+'</span>'+
+        '</div></article>';
+    });
+    html+='</div>';
+  }else if(isList){
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(detail.motivo_general||x.motivo||'Motivo general no especificado')+'</strong>'+
       '<span>'+lines.length+' productos en una sola solicitud. La aprobación se ejecuta como una operación atómica.</span></section>';
     html+='<div class="bc-admin-approval-lines">';
@@ -192,9 +218,9 @@ function renderApprovalDetails(x,detail){
   body.innerHTML=html;
   const rejectButton=modal.querySelector('#admin-approval-reject');
   const acceptButton=modal.querySelector('#admin-approval-accept');
-  rejectButton.textContent=isList?'Rechazar lista completa':'Rechazar';
+  rejectButton.textContent=isList?'Rechazar lista completa':isReceipt?'Rechazar y exigir recuento':'Rechazar';
   rejectButton.hidden=isFinalCash;
-  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?(finalCashReady?'Registrar conteo físico':'Esperando los cuatro checks'):'Aceptar y aprobar';
+  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?(finalCashReady?'Registrar conteo físico':'Esperando los cuatro checks'):isReceipt?'Aprobar recepción':'Aceptar y aprobar';
   acceptButton.disabled=isFinalCash&&!finalCashReady;
   modal.hidden=false;
   footer.hidden=false;
@@ -215,6 +241,8 @@ async function abrirRevision(x){
     let detail=x;
     if(x.tipo==='baja_lista'){
       detail=await rpc('obtener_detalle_solicitud_baja_admin',{p_solicitud_id:x.id});
+    }else if(x.tipo==='recepcion_inventario_jornada'){
+      detail=await rpc('bc7_detalle_recepcion_entrega_jornada',{p_entrega_id:x.id});
     }
     renderApprovalDetails(x,detail||x);
   }catch(error){
@@ -237,7 +265,11 @@ async function resolverDesdeModal(decision){
   accept.disabled=true;reject.disabled=true;
   setApprovalMessage(decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
   try{
-    if(type==='baja_lista'){
+    if(type==='recepcion_inventario_jornada'){
+      await rpc('bc7_resolver_entrega_jornada',{
+        p_entrega_id:id,p_decision:decision,p_motivo:comment
+      });
+    }else if(type==='baja_lista'){
       const lineInputs=Array.from(modal.querySelectorAll('[data-bc-approval-line-qty]')).filter(input=>!input.disabled);
       const lines=lineInputs.map(input=>({id:input.dataset.lineId,cantidad_real:Number(input.value)}));
       if(decision==='APROBAR'&&lines.some(line=>!Number.isFinite(line.cantidad_real)||line.cantidad_real<=0)){
