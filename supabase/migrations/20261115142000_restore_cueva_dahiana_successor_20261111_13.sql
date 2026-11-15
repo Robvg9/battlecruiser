@@ -205,8 +205,9 @@ DECLARE
   v_line_count integer;
   v_match_count integer;
   v_today date;
-  v_source_actual_close_date date;
-  v_reason text := 'Regularización retroactiva autorizada por el Dueño: la jornada real de Dahiana cubrió del 11 al 13 de noviembre de 2026. Se restaura la fecha original de entrega del 11/11, desplazada por el recálculo del cierre administrativo tardío de la jornada anterior. La recepción física y el cierre de esta jornada siguen pendientes de sus datos reales.';
+  v_source_tranche public.turno_tramos%ROWTYPE;
+  v_handover_at timestamptz := TIMESTAMP '2026-11-11 07:00:00' AT TIME ZONE 'America/Havana';
+  v_reason text := 'Regularización retroactiva autorizada por el Dueño: Dahiana recibió físicamente la jornada el 11/11/2026 a las 07:00 y trabajó hasta el 13/11/2026 a las 23:00. El cierre registrado posteriormente en el turno de Sheyla fue administrativo y tardío por la conciliación pendiente. El inventario heredado queda sujeto a recepción física de las 66 familias; no se inventan cantidades ni se modifica stock global.';
 BEGIN
   -- Resolve the handover from its business keys, not generated UUIDs.
   SELECT count(*)
@@ -270,33 +271,62 @@ BEGIN
   FROM public.turno_jornada_programacion
   WHERE id=v_source_session.jornada_programacion_id;
 
-  -- A successor cannot begin before its predecessor actually handed over.
-  -- The existing LIVE evidence records Sheyla's real close on 2026-11-13,
-  -- so a requested 2026-11-11 successor must fail closed rather than overlap.
-  SELECT coalesce(
-    nullif(close_event.estado_despues->>'fecha_real','')::date,
-    (
-      SELECT (tr.fin_at AT TIME ZONE coalesce(nullif(v_source_program.zona_horaria,''),'America/Havana'))::date
-      FROM public.turno_tramos tr
-      WHERE tr.turno_sesion_id=v_source_session.id
-      ORDER BY tr.fin_at DESC NULLS LAST,tr.created_at DESC
-      LIMIT 1
-    )
-  )
-  INTO v_source_actual_close_date
-  FROM LATERAL (
-    SELECT je.estado_despues
-    FROM public.turno_jornada_eventos je
-    WHERE je.programacion_id=v_source_program.id
-      AND je.tipo IN ('JORNADA_CERRADA','JORNADA_CERRADA_CON_EXCEPCION','JORNADA_ENTREGADA_TARDE')
-    ORDER BY je.creado_en DESC
-    LIMIT 1
-  ) close_event;
+  -- The Dueño confirms the physical handover happened on Nov 11 at 07:00.
+  -- The later Nov 13 close event is retained as the delayed administrative
+  -- reconciliation record; it is not treated as evidence that Sheyla kept working.
+  SELECT * INTO STRICT v_source_tranche
+  FROM public.turno_tramos
+  WHERE turno_sesion_id=v_source_session.id
+  ORDER BY inicio_at DESC NULLS LAST,created_at DESC
+  LIMIT 1
+  FOR UPDATE;
 
-  IF v_source_actual_close_date IS NULL OR v_source_actual_close_date >= DATE '2026-11-11' THEN
-    RAISE EXCEPTION 'No se puede crear la sucesora 11–13: la jornada de origen terminó realmente el %, por lo que ese período se solapa con el trabajo anterior.',
-      coalesce(v_source_actual_close_date::text,'sin evidencia de cierre');
+  IF v_source_tranche.estado<>'COMPLETADO'
+     OR v_source_tranche.inicio_at IS NULL
+     OR v_source_tranche.inicio_at>=v_handover_at
+     OR v_handover_at>now() THEN
+    RAISE EXCEPTION 'El tramo de Sheyla no permite documentar el relevo físico confirmado del 11/11/2026 a las 07:00.';
   END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.turno_tramos tr
+    WHERE tr.turno_sesion_id=v_source_session.id
+      AND tr.id<>v_source_tranche.id
+      AND tr.inicio_at<v_handover_at
+      AND coalesce(tr.fin_at,'infinity'::timestamptz)>v_handover_at
+  ) THEN
+    RAISE EXCEPTION 'Existe otro tramo de la jornada de origen que cruza la hora de relevo confirmada.';
+  END IF;
+
+  -- Keep the original completion event unchanged. Correct only the operational
+  -- boundary of the completed Sheyla tranche and add an explicit owner audit event.
+  UPDATE public.turno_tramos
+  SET fin_at=v_handover_at
+  WHERE id=v_source_tranche.id;
+
+  INSERT INTO public.turno_jornada_eventos
+    (almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues)
+  VALUES
+    (v_source_program.almacen_id,v_source_program.id,v_owner_id,
+     'JORNADA_RELEVO_FISICO_CONFIRMADO_POR_DUENO',
+     'El Dueño confirma que Dahiana recibió físicamente la jornada el 11/11/2026 a las 07:00. Los registros administrativos posteriores se introdujeron con atraso por la conciliación pendiente del turno anterior.',
+     jsonb_build_object(
+       'tramo_id',v_source_tranche.id,
+       'responsable_id',v_source_tranche.usuario_id,
+       'inicio_at',v_source_tranche.inicio_at,
+       'fin_at_registrado',v_source_tranche.fin_at,
+       'estado',v_source_tranche.estado
+     ),
+     jsonb_build_object(
+       'tramo_id',v_source_tranche.id,
+       'responsable_id',v_source_tranche.usuario_id,
+       'fin_operativo_confirmado_at',v_handover_at,
+       'fin_operativo_confirmado_fecha','2026-11-11',
+       'fin_operativo_confirmado_hora','07:00',
+       'zona_horaria','America/Havana',
+       'siguiente_responsable_username','dahiana',
+       'cierre_administrativo_original_preservado',true
+     ));
 
   SELECT u.id INTO STRICT v_owner_id
   FROM public.usuarios u
