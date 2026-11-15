@@ -48,3 +48,8 @@ test("uses the 66-family outgoing handover snapshot, not today's expanded produc
   assert.ok(migration.includes("v_line_count<>66"));
   assert.ok(!/v_line_count<>66 OR v_line_count<>v_expected/.test(migration));
 });
+
+test("does not silently copy the outgoing worker's salary percentage",()=>{
+  assert.ok(migration.includes("Do not inherit the outgoing worker's jornada-specific salary rate."));
+  assert.ok(!migration.includes("v_source_program.salario_porcentaje"));
+});
