@@ -129,9 +129,9 @@ BEGIN
   PERFORM set_config('test.bc_admin','false',false);
   PERFORM set_config('test.perms','turnos:ver',false);
 
-  UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_s1;
   v_result := public.bc7_guardar_inventario_jornada(v_s1,'INICIAL',v_lines,'Issue333 initial S1');
   IF v_result->>'estado' <> 'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: S1 INITIAL not confirmed'; END IF;
+  UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_s1;
 
   v_result := public.bc7_guardar_inventario_jornada(v_s1,'FINAL',v_lines,'Issue333 final S1 66 lines');
   IF v_result->>'estado' <> 'CONFIRMADO' THEN RAISE EXCEPTION 'FAIL: S1 FINAL not confirmed'; END IF;
