@@ -1851,7 +1851,6 @@
     }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'adjustment')+' No repitas el envío con otra referencia hasta revisar el estado.','error');}
     finally{busy(btn,false);}
   }
-  async function saveHours(form){
   async function openRetroSuccessorPanel(btn){
     const host=$('bc7-retro-handover-content');
     if(!host)return;
