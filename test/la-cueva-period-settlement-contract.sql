@@ -502,14 +502,24 @@ BEGIN
     RAISE EXCEPTION 'FAIL: next Turn did not receive and confirm the prior period inventory';
   END IF;
 
-  v_next_tranche:=public.bc5_iniciar_jornada(
-    v_next_session,'Apertura de la siguiente Jornada tras aprobar el período anterior'
-  );
-  IF v_next_tranche.estado<>'ACTIVO'
-     OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'EN_CURSO'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_next_turn)<>'EN_CURSO'
-     OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'CERRADO' THEN
-    RAISE EXCEPTION 'FAIL: the next Turn/Jornada could not open after owner approval and physical inventory receipt';
+  IF (SELECT fecha FROM public.turno_jornada_programacion WHERE id=v_next_program)
+     =(now() AT TIME ZONE 'America/Havana')::date THEN
+    v_next_tranche:=public.bc5_iniciar_jornada(
+      v_next_session,'Apertura de la siguiente Jornada tras aprobar el período anterior'
+    );
+    IF v_next_tranche.estado<>'ACTIVO'
+       OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'EN_CURSO'
+       OR (SELECT estado_maestro FROM public.turnos WHERE id=v_next_turn)<>'EN_CURSO'
+       OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'CERRADO' THEN
+      RAISE EXCEPTION 'FAIL: the next Turn/Jornada could not open on its scheduled date after physical inventory receipt';
+    END IF;
+  ELSE
+    IF (SELECT fecha FROM public.turno_jornada_programacion WHERE id=v_next_program)
+         < (now() AT TIME ZONE 'America/Havana')::date
+       OR (SELECT estado FROM public.turno_sesiones WHERE id=v_next_session)<>'PROGRAMADA'
+       OR (SELECT estado_maestro FROM public.turnos WHERE id=v_next_turn)<>'PROGRAMADO' THEN
+      RAISE EXCEPTION 'FAIL: a future next Turn/Jornada was opened before its scheduled date';
+    END IF;
   END IF;
 
   RAISE NOTICE 'PASS La Cueva: multi-day daily cash, approved expense/reinvestment/merma/baja, full inventory/cash reconciliation, owner Turn approval, next Turn creation, cross-Turn inventory handover/receipt, next Jornada open and ACL.';
