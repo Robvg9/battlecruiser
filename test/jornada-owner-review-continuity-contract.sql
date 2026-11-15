@@ -95,7 +95,10 @@ BEGIN
      OR position('unidades_vendidas' IN v_definition)=0
      OR position('inventario_inicial' IN v_definition)=0
      OR position('inventario_final' IN v_definition)=0
-     OR position('x.value - ARRAY[' IN v_definition)=0 THEN
+     OR position('x.value - ARRAY[' IN v_definition)=0
+     OR position('v_sales_total-v_expenses-v_reinvestments,2' IN v_definition)=0
+     OR position('v_sales_total-v_expenses-v_reinvestments-v_salary' IN v_definition)>0
+     OR position('efectivo_esperado_despues_de_gastos_reinversiones' IN v_definition)=0 THEN
     RAISE EXCEPTION 'Settlement must preserve physical inventory while suppressing sales-derived fields until post-cutoff movements are classified';
   END IF;
 
@@ -105,7 +108,10 @@ BEGIN
      OR position('costo_vendido_estimado' IN v_definition)=0
      OR position('costos_con_cobertura' IN v_definition)=0
      OR position('ganancia_bruta_parcial' IN v_definition)=0
-     OR position('ganancia_bruta_es_total' IN v_definition)=0 THEN
+     OR position('ganancia_bruta_es_total' IN v_definition)=0
+     OR position($needle$v_adjusted_sales-coalesce((v_liq->>'gastos_aprobados')::numeric,0)$needle$ IN v_definition)=0
+     OR position('-v_adjusted_salary,2)' IN v_definition)>0
+     OR position('efectivo_esperado_despues_de_gastos_reinversiones' IN v_definition)=0 THEN
     RAISE EXCEPTION 'Owner review must mask derived sales/cost/profit fields without discarding physical inventory lines';
   END IF;
 
