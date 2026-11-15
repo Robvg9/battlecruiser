@@ -23,6 +23,26 @@
   --mist: #c9c0a8;      /* texto secundario — contraste A1 */
   --mist-dim: #8f8670;  /* placeholders / footnotes — legible */
 }
+
+/* Apply the persisted light preference before JavaScript modules initialize. */
+html[data-bc-theme="light"] {
+  --void: #e8e4da;
+  --stone: #efede5;
+  --stone-2: #e2ded3;
+  --gold: #765819;
+  --gold-bright: #8d6926;
+  --gold-dim: #aa9465;
+  --wine: #913b46;
+  --sage: #3f644d;
+  --text: #202722;
+  --mist: #4b534b;
+  --mist-dim: #626a60;
+  color-scheme: light;
+}
+html[data-bc-theme="light"] body {
+  background: linear-gradient(180deg,#eeeae1 0%,#e3dfd5 100%) !important;
+  color: var(--text) !important;
+}
 * { box-sizing: border-box; }
 body {
   margin: 0;
