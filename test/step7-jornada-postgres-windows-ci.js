@@ -338,6 +338,8 @@ function applySql(file) {
     applySql("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
     applySql("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
     applySql("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
+    log("\\r\\n=== Apply historical Jornada price-tranche support required by successor recovery ===");
+    applySql("supabase/migrations/20261115003500_jornada_historic_price_tranches.sql");
     applySql("supabase/migrations/20261115120000_jornada_cash_difference_excludes_salary.sql");
     log("\\r\\n=== Apply PR #328 retroactive successor handover backend ===");
     applySql("supabase/migrations/20261115132235_jornada_retro_successor_handover.sql");
