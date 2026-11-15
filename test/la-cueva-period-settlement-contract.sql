@@ -412,10 +412,15 @@ BEGIN
     RAISE EXCEPTION 'FAIL: daily cash and settlement ACL boundary is incorrect';
   END IF;
 
-  -- The operational session closes only after the complete approved reconciliation passes.
+  -- The employee must explicitly confirm the three operational checklist blocks before handover.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
   PERFORM set_config('test.perms','turnos:ver',false);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'gastos',true);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'reinversiones',true);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'bajas',true);
+
+  -- The operational session closes only after the complete approved reconciliation passes.
   v_closed:=public.bc5_cerrar_jornada(v_session,'Cierre de contrato PostgreSQL fuera del horario programado');
   IF v_closed.estado<>'COMPLETADA'
      OR NOT EXISTS(SELECT 1 FROM public.turno_tramos WHERE id=v_tranche AND estado='COMPLETADO')
