@@ -440,14 +440,14 @@ BEGIN
     RAISE EXCEPTION 'FAIL: Owner review cash, variance and separate salary disagree with session settlement; result=%',v_review;
   END IF;
 
-  -- The final period leaves one owner-schedulable handover because there is no
-  -- next session in the current Turn. The Turn must pass the Jornada approval gate.
+  -- The final handover is scheduled for the day after the recorded operational close.
+  -- This may differ from the programmed period end when closure used an exception.
   SELECT id INTO v_handover_id
   FROM public.turno_jornada_inventario_entregas
   WHERE origen_sesion_id=v_session AND destino_sesion_id IS NULL
-    AND fecha_destino=v_today+2 AND estado='PENDIENTE_PROGRAMACION';
+    AND fecha_destino=((v_end AT TIME ZONE 'America/Havana')::date+1) AND estado='PENDIENTE_PROGRAMACION';
   IF v_handover_id IS NULL THEN
-    RAISE EXCEPTION 'FAIL: final Jornada did not leave its period-end inventory handover schedulable';
+    RAISE EXCEPTION 'FAIL: final Jornada did not leave its actual-close-date handover schedulable';
   END IF;
 
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
