@@ -5,6 +5,10 @@
 -- Physical receipt remains pending; this migration never fabricates inventory counts
 -- and never changes global stock, cash, sales, purchases or movement rows.
 
+-- Keep period-scoped inventory filtering portable across legacy disposable fixtures.
+ALTER TABLE public.productos
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
 BEGIN;
 
 -- Treat the outgoing handover as an immutable historical product-family snapshot.
