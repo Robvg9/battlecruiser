@@ -4,6 +4,8 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
+const INDEX=read("public/index.html");
 const REVIEW=read("public/js/jornada-owner-review.js");
 const MIGRATION=read("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
 const TRANCHE_MIGRATION=read("supabase/migrations/20261115003500_jornada_historic_price_tranches.sql");
@@ -65,6 +67,14 @@ test("Historic sale price tranches are audited, quantity-balanced and included i
 
 
 test("Historical costs can be reviewed and saved for all missing-cost products in one audited RPC",()=>{
+  assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"jornada-owner-review.js"});
+  assert.match(REVIEW,/bulkCostsEligible/);
+  assert.match(REVIEW,/validCost/);
+  assert.match(REVIEW,/filled.length>200/);
+  assert.match(REVIEW,/duplicateIds/);
+  assert.match(REVIEW,/Resultado incierto/);
+  assert.match(REVIEW,/no vuelvas a guardar estos importes/);
   assert.match(REVIEW,/data-bcjr-open-bulk-costs/);
   assert.match(REVIEW,/data-bcjr-bulk-costs-save/);
   assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);
@@ -72,6 +82,4 @@ test("Historical costs can be reviewed and saved for all missing-cost products i
   assert.match(REVIEW,/verifiedHistoricCosts/);
   assert.match(REVIEW,/Los vacíos no se guardarán/);
   assert.match(REVIEW,/No modifican el catálogo/);
-  assert.match(APP,/VERSION="9\.5\.111"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.111"/);
 });
