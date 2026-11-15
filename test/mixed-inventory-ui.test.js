@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -145,9 +146,8 @@ test("Product catalog query falls back until the optional migration is deployed"
 });
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
+  assertPwaReleaseAligned(assert,{app:read("public/app.js"),serviceWorker:read("public/service-worker.js"),index});
   assert.match(index, /productos\.js\?v=20261111\.2/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.110/);
-  assert.match(read("public/service-worker.js"), /BC_SW_VERSION = "9.5.110"/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.9"\]/);
 });

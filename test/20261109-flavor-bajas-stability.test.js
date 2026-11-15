@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
 const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,file),"utf8");
 test("Flavor save always renders an in-modal live feedback target and requires the conversion acknowledgment visibly",()=>{
@@ -40,11 +41,11 @@ test("Android Bajas modal has exactly one active scroll area and no overlapping 
  assert.match(js,/updateModalViewportHeight\(modal\)/);
 });
 test("Connectivity tolerates transient mobile probe failures and offers controlled PWA update reload",()=>{
- const net=read("public/js/network-core.js"),app=read("public/app.js"),sw=read("public/service-worker.js");
+ const net=read("public/js/network-core.js"),app=read("public/app.js"),sw=read("public/service-worker.js"),index=read("public/index.html");
  assert.match(net,/transientConnectivityFailures < 3/);
  assert.match(net,/POLL_INTERVAL_MS = 60000, FIRST_RETRY_MS = 8000, MAX_RETRY_MS = 60000/);
  assert.match(net,/fallosSondeoSeguidos >= 3/);
  assert.match(app,/bc-pwa-update-notice/);
  assert.match(app,/window\.location\.reload\(\)/);
- assert.match(sw,/BC_SW_VERSION = "9\.5\.110"/);
+ assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
 });

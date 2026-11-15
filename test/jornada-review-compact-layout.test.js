@@ -4,9 +4,12 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
+const INDEX=read("public/index.html");
 const REVIEW=read("public/js/jornada-owner-review.js");
 const MIGRATION=read("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
 const TRANCHE_MIGRATION=read("supabase/migrations/20261115003500_jornada_historic_price_tranches.sql");
+const APP=read("public/app.js"),SW=read("public/service-worker.js");
 
 test("Owner review keeps the approval footer outside the scrollable content",()=>{
   assert.match(REVIEW,/\.bcjr-dialog\{display:flex;flex-direction:column/);
@@ -48,7 +51,9 @@ test("Historical value and final-count editors show save progress and backend er
   assert.match(REVIEW,/Guardando corrección de inventario/);
   assert.match(REVIEW,/No se guardó: introduce un precio o costo válido/);
   assert.match(REVIEW,/No se guardó: introduce una cantidad final válida/);
-  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,4,"all historical editors must release busy and refresh the review state");
+  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,4,"legacy historical editors retain their release/refresh finalizers");
+  const bulkSave=REVIEW.slice(REVIEW.indexOf("async function saveBulkCostsEditor"),REVIEW.indexOf("function openCountEditor"));
+  assert.ok(bulkSave.includes("finally{") && bulkSave.includes("busy=false;"),"the bulk editor must release the shared busy lock in a finally block");
 });
 
 test("Historic sale price tranches are audited, quantity-balanced and included in liquidation revenue",()=>{
@@ -60,4 +65,29 @@ test("Historic sale price tranches are audited, quantity-balanced and included i
   assert.match(TRANCHE_MIGRATION,/round\(sum\(t\.cantidad\*t\.precio_unitario\),2\)/);
   assert.match(TRANCHE_MIGRATION,/PRECIOS_POR_TRAMOS/);
   assert.match(TRANCHE_MIGRATION,/auth\.uid\(\)/);
+});
+
+
+test("Historical costs can be reviewed and saved for all missing-cost products in one audited RPC",()=>{
+  assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"jornada-owner-review.js"});
+  assert.match(REVIEW,/bulkCostsEligible/);
+  assert.match(REVIEW,/validCost/);
+  assert.match(REVIEW,/filled.length>200/);
+  assert.match(REVIEW,/duplicateIds/);
+  assert.match(REVIEW,/Resultado incierto/);
+  assert.match(REVIEW,/no vuelvas a guardar estos importes/);
+  assert.match(REVIEW,/error.name=\x27UnconfirmedBulkCostResult\x27/);
+  assert.match(REVIEW,/Number\(result.productos_ajustados\)!==adjustments.length/);
+  assert.match(REVIEW,/result.catalogo_modificado!==false/);
+  assert.match(REVIEW,/render\(data\);return true/);
+  assert.match(REVIEW,/No se pudo cargar el expediente\.\x27;return false/);
+  assert.match(REVIEW,/if\(refreshed\)box.remove\(\)/);
+  assert.match(REVIEW,/data-bcjr-open-bulk-costs/);
+  assert.match(REVIEW,/data-bcjr-bulk-costs-save/);
+  assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);
+  assert.match(REVIEW,/p_ajustes:adjustments/);
+  assert.match(REVIEW,/verifiedHistoricCosts/);
+  assert.match(REVIEW,/Los vacíos no se guardarán/);
+  assert.match(REVIEW,/No modifican el catálogo/);
 });
