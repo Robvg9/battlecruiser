@@ -343,6 +343,8 @@ function applySql(file) {
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
     applySql("test/jornada-pending-cash-visibility-contract.sql");
+    log("\\r\\n=== Apply owner-confirmed Dahiana successor period recovery (production-data no-op in clean CI fixture) ===");
+    applySql("supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist, pre-close physical cash count, automatic calculation, final Turn handover and reinvestment stock-minimum preservation.");
   } catch (error) {
     failure = error;
