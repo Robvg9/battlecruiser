@@ -420,10 +420,13 @@ async function main() {
     }
     assert(live, "No se pudo obtener la versión exacta de LIVE " + assetPath + " después de " + maxAttempts
       + " intentos. Último error: " + (lastError ? lastError.message : "desconocido"));
+    const liveBytes = Buffer.from(live.body, "utf8");
     liveAssetEvidence[assetPath] = {
       httpStatus: live.status,
       contentType: live.contentType,
       sha256: sha256(live.body),
+      sha256Raw: crypto.createHash("sha256").update(liveBytes).digest("hex"),
+      bytesRaw: liveBytes.length,
     };
   }
 
@@ -450,6 +453,27 @@ async function main() {
         "El manifiesto validado por Deploy " + releaseFilename + " no coincide en " + key
           + ": esperado " + expected[key] + ", recibido " + release[key] + ".");
     }
+    const inventory = release.asset_inventory;
+    assert(inventory && typeof inventory === "object" &&
+      Number.isSafeInteger(release.asset_count) &&
+      Object.keys(inventory).length === release.asset_count && release.asset_count >= 100,
+      "El manifiesto no contiene el inventario SHA-256 completo de los archivos públicos.");
+    const criticalPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
+    for (const assetPath of criticalPaths) {
+      const sourcePath = assetPath.slice(1);
+      const expectedAsset = inventory[sourcePath];
+      const actualAsset = liveAssetEvidence[assetPath];
+      assert(expectedAsset && actualAsset &&
+        expectedAsset.sha256 === actualAsset.sha256Raw &&
+        expectedAsset.bytes === actualAsset.bytesRaw,
+        "El recurso LIVE no coincide con su SHA-256 de release: " + assetPath);
+    }
+    report.evidence.releaseCriticalAssetHashes = criticalPaths.map(assetPath => ({
+      path: assetPath,
+      sha256: liveAssetEvidence[assetPath].sha256Raw,
+      bytes: liveAssetEvidence[assetPath].bytesRaw,
+      verified: true,
+    }));
     report.evidence.releaseProvenance = release;
     report.evidence.releaseManifestArtifact = releasePath;
     report.evidence.releaseManifestSource = "Artifact uploaded by the exact Deploy workflow run after its LIVE smoke test fetched and validated this manifest.";
