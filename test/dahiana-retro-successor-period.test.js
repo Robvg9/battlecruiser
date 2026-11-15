@@ -67,8 +67,20 @@ test("restoration audit references the actual source program row",()=>{
   assert.ok(migration.includes("SELECT * INTO STRICT v_source_program"));
 });
 
-test("refuses to create a successor before the source jornada actually closed",()=>{
-  assert.ok(migration.includes("v_source_actual_close_date"));
-  assert.ok(migration.includes("v_source_actual_close_date >= DATE '2026-11-11'"));
-  assert.ok(migration.includes("No se puede crear la sucesora 11–13"));
+test("uses the owner-confirmed physical handover instead of the delayed administrative close",()=>{
+  assert.ok(migration.includes("v_handover_at timestamptz"));
+  assert.ok(migration.includes("TIMESTAMP '2026-11-11 07:00:00' AT TIME ZONE 'America/Havana'"));
+  assert.ok(migration.includes("UPDATE public.turno_tramos"));
+  assert.ok(migration.includes("SET fin_at=v_handover_at"));
+  assert.ok(migration.includes("JORNADA_RELEVO_FISICO_CONFIRMADO_POR_DUENO"));
+  assert.ok(migration.includes("cierre_administrativo_original_preservado"));
+  assert.ok(!migration.includes("v_source_actual_close_date >= DATE '2026-11-11'"));
+});
+
+test("records the owner-confirmed Dayana period and keeps physical receiving pending",()=>{
+  assert.ok(migration.includes("Dahiana recibió físicamente la jornada el 11/11/2026 a las 07:00"));
+  assert.ok(migration.includes("trabajó hasta el 13/11/2026 a las 23:00"));
+  assert.ok(migration.includes("estado='PENDIENTE_RECEPCION'"));
+  assert.ok(migration.includes("'recepcion_fisica_pendiente',true"));
+  assert.ok(!/UPDATE\\s+public\\.stock\\b/i.test(migration));
 });
