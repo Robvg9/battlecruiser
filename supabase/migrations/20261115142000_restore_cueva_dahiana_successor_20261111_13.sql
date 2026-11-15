@@ -99,6 +99,82 @@ BEGIN
   LEFT JOIN public.productos p ON p.id=(x.value->>'producto_id')::uuid AND p.activo=true
   WHERE jsonb_typeof(x.value)<>'object' OR p.id IS NULL
     OR coalesce(x.value->>'cantidad','') !~ '^([0-9]+([.][0-9]{1,3})?|[.][0-9]{1,3})
+
+-- Historical Jornada inventory must use the product catalog as it existed by
+-- the configured period end, not product families added later.
+DO $period_snapshot$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_guardar_inventario_jornada(uuid,text,jsonb,text)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$  v_s public.turno_sesiones; v_uid uuid:=auth.uid();$old$;
+  v_new := $new$  v_s public.turno_sesiones;
+  v_period_end date;
+  v_timezone text := 'America/Havana';
+  v_uid uuid:=auth.uid();$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se localizó la declaración de bc7_guardar_inventario_jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La sesión no corresponde al modelo de jornada única.' USING ERRCODE='23503';
+  END IF;$old$;
+  v_new := $new$  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La sesión no corresponde al modelo de jornada única.' USING ERRCODE='23503';
+  END IF;
+  SELECT coalesce(p.fecha_fin,p.fecha),
+         coalesce(nullif(p.zona_horaria,''),'America/Havana')
+  INTO v_period_end,v_timezone
+  FROM public.turno_jornada_programacion p
+  WHERE p.id=v_s.jornada_programacion_id;$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se localizó el inicio de sesión en bc7_guardar_inventario_jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$      SELECT count(*) INTO v_expected FROM public.productos p WHERE p.activo=true AND p.producto_padre_id IS NULL;$old$;
+  v_new := $new$      SELECT count(*) INTO v_expected
+      FROM public.productos p
+      WHERE p.activo=true AND p.producto_padre_id IS NULL
+        AND p.created_at < ((v_period_end + 1)::timestamp AT TIME ZONE v_timezone);$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se localizó el catálogo inicial en bc7_guardar_inventario_jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$        WHERE s.almacen_id=v_s.almacen_id AND p.activo=true$old$;
+  v_new := $new$        WHERE s.almacen_id=v_s.almacen_id AND p.activo=true
+          AND p.created_at < ((v_period_end + 1)::timestamp AT TIME ZONE v_timezone)$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>2*length(v_old) THEN
+    RAISE EXCEPTION 'No se localizaron ambos filtros de período en bc7_guardar_inventario_jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+  EXECUTE v_definition;
+
+  SELECT pg_get_functiondef(
+    'public.bc7_obtener_inventario_jornada(uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$      FROM public.productos p WHERE p.activo=true AND p.producto_padre_id IS NULL$new$;
+  v_new := $new$      FROM public.productos p
+      WHERE p.activo=true AND p.producto_padre_id IS NULL
+        AND p.created_at < (
+          (coalesce(v_p.fecha_fin,v_p.fecha) + 1)::timestamp
+          AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana')
+        )$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se localizó la lista de familias en bc7_obtener_inventario_jornada.';
+  END IF;
+  EXECUTE replace(v_definition,v_old,v_new);
+END;
+$period_snapshot$;
+
 DO $restore$
 DECLARE
   v_delivery public.turno_jornada_inventario_entregas%ROWTYPE;
