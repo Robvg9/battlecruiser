@@ -289,9 +289,9 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
   assert.ok(index.includes('style.css?v=9.5.100'));
-  assert.ok(index.includes('app.js?v=9.5.114'));
+  assert.ok(index.includes('app.js?v=9.5.113'));
   assert.ok(sw.includes('./style.css?v=9.5.100'));
-  assert.ok(sw.includes('./app.js?v=9.5.114'));
+  assert.ok(sw.includes('./app.js?v=9.5.113'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
