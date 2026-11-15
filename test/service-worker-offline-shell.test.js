@@ -38,6 +38,9 @@ function createWorker(options = {}) {
         }
       }
       return undefined;
+    },
+    keys: async function() {
+      return Array.from(entries.keys()).map(url => new Request(url));
     }
   };
   const caches = {
@@ -127,8 +130,22 @@ test('successful same-origin shell requests are cached for subsequent offline us
   assert.ok(worker.entries.has(request.url), 'network response must be cached under its requested URL');
 });
 
-test('offline fallback serves a cached versioned app.js request by ignoring only the query string', async () => {
-  // Installation happens online, including the pinned CDN dependency; only later app requests fail offline.
+test('offline fallback serves the exact cached app.js release URL', async () => {
+  const worker = createWorker({
+    fetch: async function(request) {
+      const url = new URL(request.url);
+      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
+      throw new TypeError('offline');
+    }
+  });
+  await dispatchInstall(worker);
+  const appVersion = source.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)[1];
+  const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=' + appVersion));
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), 'cached:/app.js');
+});
+
+test('offline fallback fails closed when an explicit app.js release version is not cached', async () => {
   const worker = createWorker({
     fetch: async function(request) {
       const url = new URL(request.url);
@@ -138,12 +155,24 @@ test('offline fallback serves a cached versioned app.js request by ignoring only
   });
   await dispatchInstall(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=9.4.77'));
-  assert.equal(response.status, 200);
-  assert.equal(await response.text(), 'cached:/app.js');
+  assert.equal(response.status, 0);
 });
 
-test('offline fallback serves the app root from the precache even with a query string', async () => {
-  // Model a successful online install, then a network outage during navigation.
+test('offline fallback serves the exact app root from the precache', async () => {
+  const worker = createWorker({
+    fetch: async function(request) {
+      const url = new URL(request.url);
+      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
+      throw new TypeError('offline');
+    }
+  });
+  await dispatchInstall(worker);
+  const response = await dispatchFetch(worker, new Request(ORIGIN + '/'));
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), 'cached:/');
+});
+
+test('offline fallback rejects a cache-busting query on an unversioned navigation URL', async () => {
   const worker = createWorker({
     fetch: async function(request) {
       const url = new URL(request.url);
@@ -153,8 +182,23 @@ test('offline fallback serves the app root from the precache even with a query s
   });
   await dispatchInstall(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/?offline_check=1'));
+  assert.equal(response.status, 0);
+});
+
+test('legacy unversioned URL may use one unique cached pathname candidate', async () => {
+  const worker = createWorker({ fetch: async function() { throw new TypeError('offline'); } });
+  await worker.cache.put(new Request(ORIGIN + '/js/legacy-module.js?v=1'), new Response('cached legacy module', { status: 200 }));
+  const response = await dispatchFetch(worker, new Request(ORIGIN + '/js/legacy-module.js'));
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), 'cached:/');
+  assert.equal(await response.text(), 'cached legacy module');
+});
+
+test('legacy unversioned URL rejects ambiguous cached pathname candidates', async () => {
+  const worker = createWorker({ fetch: async function() { throw new TypeError('offline'); } });
+  await worker.cache.put(new Request(ORIGIN + '/js/legacy-module.js?v=1'), new Response('old version', { status: 200 }));
+  await worker.cache.put(new Request(ORIGIN + '/js/legacy-module.js?v=2'), new Response('new version', { status: 200 }));
+  const response = await dispatchFetch(worker, new Request(ORIGIN + '/js/legacy-module.js'));
+  assert.equal(response.status, 0);
 });
 
 test('a genuinely uncached shell request fails closed offline instead of inventing a response', async () => {

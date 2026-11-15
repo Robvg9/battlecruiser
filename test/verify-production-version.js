@@ -1,6 +1,7 @@
 "use strict";
 
 const fs = require("fs");
+const crypto = require("crypto");
 const path = require("path");
 const https = require("https");
 const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
@@ -93,9 +94,11 @@ function readVerifiedReleaseArtifact() {
 }
 async function verifyOnce(attempt) {
   const stamp = Date.now() + "-" + attempt;
-  const [liveApp, liveSw] = await Promise.all([
+  const [liveIndex, liveApp, liveSw, liveStyle] = await Promise.all([
+    request(baseUrl + "/?bc_verify=" + stamp + "-index"),
     request(baseUrl + "/app.js?bc_verify=" + stamp + "-app"),
     request(baseUrl + "/service-worker.js?bc_verify=" + stamp + "-sw"),
+    request(baseUrl + "/style.css?bc_verify=" + stamp + "-style"),
   ]);
   const liveAppMatch = liveApp.match(/const VERSION=["']([^"']+)["']/);
   const liveSwMatch = liveSw.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);
@@ -109,6 +112,30 @@ async function verifyOnce(attempt) {
   }
 
   const release = readVerifiedReleaseArtifact();
+  if (!release.asset_inventory || !Number.isSafeInteger(release.asset_count) ||
+      Object.keys(release.asset_inventory).length !== release.asset_count || release.asset_count < 100) {
+    throw new Error("Verified release artifact is missing its complete public asset SHA-256 inventory.");
+  }
+  const criticalAssets = {
+    "index.html": liveIndex,
+    "app.js": liveApp,
+    "service-worker.js": liveSw,
+    "style.css": liveStyle,
+  };
+  for (const [assetPath, body] of Object.entries(criticalAssets)) {
+    const expectedAsset = release.asset_inventory[assetPath];
+    if (!expectedAsset || !/^[0-9a-f]{64}$/.test(String(expectedAsset.sha256 || ""))) {
+      throw new Error("Verified release artifact has no valid SHA-256 for " + assetPath);
+    }
+    const bytes = Buffer.from(body, "utf8");
+    const actualHash = crypto.createHash("sha256").update(bytes).digest("hex");
+    if (actualHash !== expectedAsset.sha256 || bytes.length !== expectedAsset.bytes) {
+      throw new Error("LIVE asset provenance mismatch for " + assetPath +
+        ": expected SHA-256/bytes=" + expectedAsset.sha256 + "/" + expectedAsset.bytes +
+        ", got=" + actualHash + "/" + bytes.length);
+    }
+  }
+  console.log("[production-release] critical asset SHA-256=PASS (index, app, service worker, CSS)");
   console.log("[production-release] PASS — manifest artifact=" + releaseFilename
     + ", deploy_run=" + release.workflow_run_id
     + ", app=" + expectedAppVersion

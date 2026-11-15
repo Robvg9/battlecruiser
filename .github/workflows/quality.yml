@@ -79,6 +79,11 @@ jobs:
           node --check test/verify-pr-preview-assets.js
           node --check test/step7-jornada-postgres-windows-ci.js
           node --check test/deploy-production-pwa.js
+          node --check test/verify-production-version.js
+          node --check test/live-offline-e2e.js
+          node --check test/pwa-startup-coherence.test.js
+          node --check test/release-provenance.test.js
+          node --check scripts/write-release-manifest.js
 
       - name: Focused B2.3
         shell: cmd

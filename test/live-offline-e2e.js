@@ -316,6 +316,49 @@ async function reloadAndWait(ignoreCache = true) {
 function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
 }
+function startupPerformanceExpression() {
+  return `(()=> {
+    const nav=performance.getEntriesByType("navigation")[0]||null;
+    const resources=performance.getEntriesByType("resource");
+    const scripts=resources.filter(entry=>{try{return new URL(entry.name,location.href).pathname.endsWith(".js");}catch(_){return false;}});
+    const byPath=new Map();
+    for(const entry of scripts){
+      try{
+        const url=new URL(entry.name,location.href);
+        const items=byPath.get(url.pathname)||[];
+        items.push({url:entry.name,durationMs:Math.round(entry.duration*10)/10,transferSize:entry.transferSize||0,encodedBodySize:entry.encodedBodySize||0,decodedBodySize:entry.decodedBodySize||0});
+        byPath.set(url.pathname,items);
+      }catch(_){}
+    }
+    const duplicateScripts=Array.from(byPath.entries()).filter(([,items])=>items.length>1).map(([pathname,items])=>({pathname,requests:items}));
+    const longTasks=performance.getEntriesByType("longtask").map(entry=>({startMs:Math.round(entry.startTime*10)/10,durationMs:Math.round(entry.duration*10)/10}));
+    return {
+      capturedAt:new Date().toISOString(),
+      elapsedMs:Math.round(performance.now()*10)/10,
+      navigation:nav?{
+        responseStartMs:Math.round(nav.responseStart*10)/10,
+        domInteractiveMs:Math.round(nav.domInteractive*10)/10,
+        domContentLoadedMs:Math.round(nav.domContentLoadedEventEnd*10)/10,
+        loadEventEndMs:Math.round(nav.loadEventEnd*10)/10,
+        transferSize:nav.transferSize||0,
+        encodedBodySize:nav.encodedBodySize||0
+      }:null,
+      resources:{
+        total:resources.length,
+        scripts:scripts.length,
+        scriptTransferBytes:scripts.reduce((sum,item)=>sum+(item.transferSize||0),0),
+        scriptEncodedBytes:scripts.reduce((sum,item)=>sum+(item.encodedBodySize||0),0),
+        duplicateScriptPathnames:duplicateScripts,
+        slowestScripts:scripts.slice().sort((a,b)=>b.duration-a.duration).slice(0,10).map(item=>({url:item.name,durationMs:Math.round(item.duration*10)/10,transferSize:item.transferSize||0}))
+      },
+      longTasks,
+      moduleLoad:window.__BC_MODULE_LOAD_STATE__||null,
+      serviceWorkerController:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),
+      serviceWorkerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,
+      degraded:window.__BC_UI_READY_DEGRADED__===true
+    };
+  })()`;
+}
 function shellSnapshotPredicate() {
   return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState!=='loading'&&s.loginForm&&s.usernameField&&s.passwordField&&window.__BC_UI_READY_RESOLVED__===true?s:null})()";
 }
@@ -379,10 +422,13 @@ async function main() {
     }
     assert(live, "No se pudo obtener la versión exacta de LIVE " + assetPath + " después de " + maxAttempts
       + " intentos. Último error: " + (lastError ? lastError.message : "desconocido"));
+    const liveBytes = Buffer.from(live.body, "utf8");
     liveAssetEvidence[assetPath] = {
       httpStatus: live.status,
       contentType: live.contentType,
       sha256: sha256(live.body),
+      sha256Raw: crypto.createHash("sha256").update(liveBytes).digest("hex"),
+      bytesRaw: liveBytes.length,
     };
   }
 
@@ -409,6 +455,27 @@ async function main() {
         "El manifiesto validado por Deploy " + releaseFilename + " no coincide en " + key
           + ": esperado " + expected[key] + ", recibido " + release[key] + ".");
     }
+    const inventory = release.asset_inventory;
+    assert(inventory && typeof inventory === "object" &&
+      Number.isSafeInteger(release.asset_count) &&
+      Object.keys(inventory).length === release.asset_count && release.asset_count >= 100,
+      "El manifiesto no contiene el inventario SHA-256 completo de los archivos públicos.");
+    const criticalPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
+    for (const assetPath of criticalPaths) {
+      const sourcePath = assetPath.slice(1);
+      const expectedAsset = inventory[sourcePath];
+      const actualAsset = liveAssetEvidence[assetPath];
+      assert(expectedAsset && actualAsset &&
+        expectedAsset.sha256 === actualAsset.sha256Raw &&
+        expectedAsset.bytes === actualAsset.bytesRaw,
+        "El recurso LIVE no coincide con su SHA-256 de release: " + assetPath);
+    }
+    report.evidence.releaseCriticalAssetHashes = criticalPaths.map(assetPath => ({
+      path: assetPath,
+      sha256: liveAssetEvidence[assetPath].sha256Raw,
+      bytes: liveAssetEvidence[assetPath].bytesRaw,
+      verified: true,
+    }));
     report.evidence.releaseProvenance = release;
     report.evidence.releaseManifestArtifact = releasePath;
     report.evidence.releaseManifestSource = "Artifact uploaded by the exact Deploy workflow run after its LIVE smoke test fetched and validated this manifest.";
@@ -600,6 +667,83 @@ async function main() {
   assert(initial.version === expectedVersion, "Versión de navegador " + initial.version + " distinta de la esperada " + expectedVersion + ".");
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
+
+  // Capture reproducible startup evidence from a fresh Chromium profile with
+  // the browser HTTP cache disabled. This is a measurement, not a pass/fail
+  // performance claim; compare reports from identical runner/network conditions.
+  const startupMetrics = await evaluate(startupPerformanceExpression());
+  const startupResponses = responses.slice(initialResponseStart).filter(item => item.phase === "online_initial");
+  const startupByPath = new Map();
+  for (const item of startupResponses) {
+    try {
+      const url = new URL(item.url);
+      const values = startupByPath.get(url.pathname) || [];
+      values.push({ url: item.url, status: item.status, type: item.type, fromServiceWorker: item.fromServiceWorker, fromDiskCache: item.fromDiskCache });
+      startupByPath.set(url.pathname, values);
+    } catch (_) {}
+  }
+  startupMetrics.network = {
+    responses: startupResponses.length,
+    failedRequests: failures.filter(item => item.phase === "online_initial").length,
+    repeatedPathnames: Array.from(startupByPath.entries()).filter(([, values]) => values.length > 1)
+      .map(([pathname, values]) => ({ pathname, requests: values }))
+  };
+  startupMetrics.conditions = {
+    browserProfile: "fresh temporary Chromium user-data-dir",
+    browserHttpCacheDisabled: true,
+    serviceWorkerBypass: false,
+    phase: "first online navigation"
+  };
+  report.evidence.startupPerformanceCold = startupMetrics;
+
+  // Warm-load measurement: same Chromium profile, normal reload, browser HTTP
+  // cache enabled, and Service Worker still active. Keep it separate from the
+  // cold-navigation phase so the two measurements are never conflated.
+  await evaluate("document.readyState === 'complete' ? true : new Promise(resolve => window.addEventListener('load',()=>resolve(true),{once:true}))");
+  await cdpCommand("Network.setCacheDisabled", { cacheDisabled: false });
+  report.evidence.phase = "online_warm";
+  const warmResponseStart = responses.length;
+  await reloadAndWait(false);
+  const warm = await waitUntil("shell warm con versión esperada", shellSnapshotPredicate(), 10000);
+  assert(warm.readyState !== "loading" && warm.version === expectedVersion,
+    "La segunda navegación cálida no terminó con la versión esperada.");
+  await evaluate("document.readyState === 'complete' ? true : new Promise(resolve => window.addEventListener('load',()=>resolve(true),{once:true}))");
+  const warmMetrics = await evaluate(startupPerformanceExpression());
+  const warmResponses = responses.slice(warmResponseStart).filter(item => item.phase === "online_warm");
+  const warmByPath = new Map();
+  for (const item of warmResponses) {
+    try {
+      const url = new URL(item.url);
+      const values = warmByPath.get(url.pathname) || [];
+      values.push({ url: item.url, status: item.status, type: item.type, fromServiceWorker: item.fromServiceWorker, fromDiskCache: item.fromDiskCache });
+      warmByPath.set(url.pathname, values);
+    } catch (_) {}
+  }
+  warmMetrics.network = {
+    responses: warmResponses.length,
+    failedRequests: failures.filter(item => item.phase === "online_warm").length,
+    repeatedPathnames: Array.from(warmByPath.entries()).filter(([, values]) => values.length > 1)
+      .map(([pathname, values]) => ({ pathname, requests: values }))
+  };
+  warmMetrics.conditions = {
+    browserProfile: "same temporary Chromium user-data-dir as cold navigation",
+    browserHttpCacheDisabled: false,
+    serviceWorkerBypass: false,
+    phase: "second online navigation after first-load cache population"
+  };
+  report.evidence.startupPerformanceWarm = warmMetrics;
+  const coldElapsedMs = Number(startupMetrics.elapsedMs);
+  const warmElapsedMs = Number(warmMetrics.elapsedMs);
+  report.evidence.startupPerformanceColdWarmComparison = {
+    coldElapsedMs,
+    warmElapsedMs,
+    deltaMs: Number.isFinite(coldElapsedMs) && Number.isFinite(warmElapsedMs)
+      ? Math.round((coldElapsedMs - warmElapsedMs) * 10) / 10 : null,
+    comparableEnvironment: "same Chromium process/profile/runner; cold has HTTP cache disabled, warm has HTTP cache enabled",
+    interpretation: "descriptive only; this is not a before/after code-change comparison"
+  };
+  await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
+  report.evidence.phase = "online_functional";
 
   // The preview login proxy must reach the real Edge Function with its allowlisted
   // production Origin. GET is a no-credential diagnostic: the expected upstream
@@ -991,7 +1135,7 @@ async function main() {
 
   // index.html is precached separately from the root URL, so request it explicitly while
   // the browser's network is disabled. This proves the indexed document is recoverable.
-  const indexProbe = await evaluate("(async()=>{const r=await fetch('/index.html?bc_offline_probe='+Date.now(),{cache:'no-store'});const body=await r.text();return {status:r.status,ok:r.ok,bodyLength:body.length,containsTitle:body.includes('<title>BattleCruiser</title>')}})()");
+  const indexProbe = await evaluate("(async()=>{const r=await fetch('/index.html',{cache:'no-store'});const body=await r.text();return {status:r.status,ok:r.ok,bodyLength:body.length,containsTitle:body.includes('<title>BattleCruiser</title>')}})()");
   report.evidence.offlineIndexProbe = indexProbe;
   assert(indexProbe.status === 200 && indexProbe.ok && indexProbe.containsTitle, "index.html no se pudo recuperar desde la caché mientras la red estaba desconectada.");
 

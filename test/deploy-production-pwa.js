@@ -1,6 +1,7 @@
 "use strict";
 
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { writeReleaseManifest } = require("../scripts/write-release-manifest.js");
@@ -67,19 +68,20 @@ async function verifyLiveRelease(expected) {
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
       const stamp = encodeURIComponent(String(process.env.GITHUB_RUN_ID) + "-" + attempt);
-      const [index, app, sw, manifest] = await Promise.all([
+      const [index, app, sw, style, manifest] = await Promise.all([
         fetchText(PROD_BASE + "/?bc_deploy_ready=" + stamp),
         fetchText(PROD_BASE + "/app.js?bc_deploy_ready=" + stamp + "-app"),
         fetchText(PROD_BASE + "/service-worker.js?bc_deploy_ready=" + stamp + "-sw"),
+        fetchText(PROD_BASE + "/style.css?bc_deploy_ready=" + stamp + "-style"),
         fetchText(PROD_BASE + "/" + filename + "?bc_deploy_ready=" + stamp + "-manifest"),
       ]);
 
-      const statusesOk = [index, app, sw, manifest].every(x => x.status === 200);
+      const statusesOk = [index, app, sw, style, manifest].every(x => x.status === 200);
       const appMatch = app.body.match(VERSION_RE);
       const swMatch = sw.body.match(SW_VERSION_RE);
       if (!statusesOk) {
         log("[deploy smoke] attempt " + attempt + "/30: statuses index=" + index.status +
-          " app=" + app.status + " sw=" + sw.status + " manifest=" + manifest.status);
+          " app=" + app.status + " sw=" + sw.status + " style=" + style.status + " manifest=" + manifest.status);
       } else if (!/<html\b/i.test(index.body) || !/BattleCruiser/i.test(index.body)) {
         log("[deploy smoke] attempt " + attempt + "/30: production index does not contain the expected app shell");
       } else if (!appMatch || appMatch[1] !== expected.app_version) {
@@ -103,14 +105,33 @@ async function verifyLiveRelease(expected) {
           workflow_run_id: expected.workflow_run_id,
         };
         const mismatch = Object.entries(expectedFields).find(([key, value]) => String(liveManifest[key]) !== String(value));
+        const inventory = liveManifest.asset_inventory;
+        const inventoryCount = inventory && typeof inventory === "object" ? Object.keys(inventory).length : 0;
+        const criticalBodies = {
+          "index.html": index.body,
+          "app.js": app.body,
+          "service-worker.js": sw.body,
+          "style.css": style.body,
+        };
+        const criticalMismatch = Object.entries(criticalBodies).find(([assetPath, body]) => {
+          const expectedAsset = inventory && inventory[assetPath];
+          if (!expectedAsset || !/^[0-9a-f]{64}$/.test(String(expectedAsset.sha256 || ""))) return true;
+          const bytes = Buffer.from(body, "utf8");
+          const actualHash = crypto.createHash("sha256").update(bytes).digest("hex");
+          return actualHash !== expectedAsset.sha256 || bytes.length !== expectedAsset.bytes;
+        });
         if (mismatch) {
           log("[deploy smoke] attempt " + attempt + "/30: LIVE manifest mismatch " + mismatch[0] +
             " expected=" + mismatch[1] + " actual=" + liveManifest[mismatch[0]]);
+        } else if (!Number.isSafeInteger(liveManifest.asset_count) || liveManifest.asset_count !== inventoryCount || inventoryCount < 100) {
+          log("[deploy smoke] attempt " + attempt + "/30: incomplete LIVE asset inventory count=" + inventoryCount);
+        } else if (criticalMismatch) {
+          log("[deploy smoke] attempt " + attempt + "/30: LIVE asset SHA-256 mismatch for " + criticalMismatch[0][0]);
         } else {
           const artifactDir = path.join(RESULT_DIR, "release");
           fs.mkdirSync(artifactDir, { recursive: true });
           fs.writeFileSync(path.join(artifactDir, filename), JSON.stringify(liveManifest, null, 2) + "\n", "utf8");
-          log("[deploy smoke] PASS — exact LIVE SHA=" + liveManifest.source_sha +
+          log("[deploy smoke] PASS — exact LIVE SHA=" + liveManifest.source_sha + " assets=" + inventoryCount + " critical_asset_SHA256=PASS" +
             " app=" + liveManifest.app_version + " service-worker=" + liveManifest.service_worker_version +
             " deploy_run=" + liveManifest.workflow_run_id);
           log("[deploy smoke] persisted LIVE-verified manifest " + filename);
