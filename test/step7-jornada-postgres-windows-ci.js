@@ -339,6 +339,11 @@ function applySql(file) {
     applySql("supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql");
     applySql("supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql");
     applySql("supabase/migrations/20261115120000_jornada_cash_difference_excludes_salary.sql");
+    log("\\r\\n=== Apply PR #328 retroactive successor handover backend ===");
+    applySql("supabase/migrations/20261115132235_jornada_retro_successor_handover.sql");
+    applySql("supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql");
+    log("\\r\\n=== Verify owner-confirmed Dahiana successor period recovery ===");
+    applySql("supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
