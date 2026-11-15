@@ -391,7 +391,7 @@ BEGIN
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
   IF (v_result->>'calculable')::boolean IS DISTINCT FROM true
      OR (v_result->>'dinero_recogido_total')::numeric<>40.5
-     OR (v_result->>'diferencia')::numeric<>1 THEN
+     OR (v_result->>'diferencia')::numeric<>-1.5 THEN
     RAISE EXCEPTION 'FAIL: corrected daily cash should keep the settlement auditable; result=%',v_result;
   END IF;
 
@@ -430,7 +430,7 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   v_review:=public.bc7_obtener_revision_jornada(v_turn);
   IF (v_review->'sesiones'->0->'liquidacion'->>'efectivo_esperado_despues_de_gastos_reinversiones')::numeric<>42
-     OR (v_review->'sesiones'->0->'liquidacion'->>'diferencia')::numeric<>-2.5
+     OR (v_review->'sesiones'->0->'liquidacion'->>'diferencia')::numeric<>-1.5
      OR (v_review->'sesiones'->0->'liquidacion'->>'salario_calculado')::numeric<>2.5 THEN
     RAISE EXCEPTION 'FAIL: Owner review cash, variance and separate salary disagree with session settlement; result=%',v_review;
   END IF;
