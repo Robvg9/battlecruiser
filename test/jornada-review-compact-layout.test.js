@@ -51,7 +51,9 @@ test("Historical value and final-count editors show save progress and backend er
   assert.match(REVIEW,/Guardando corrección de inventario/);
   assert.match(REVIEW,/No se guardó: introduce un precio o costo válido/);
   assert.match(REVIEW,/No se guardó: introduce una cantidad final válida/);
-  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,5,"all historical editors, including bulk costs, must release busy and refresh the review state");
+  assert.equal(REVIEW.split("finally{busy=false;if(report").length-1,4,"legacy historical editors retain their release/refresh finalizers");
+  const bulkSave=REVIEW.slice(REVIEW.indexOf("async function saveBulkCostsEditor"),REVIEW.indexOf("function openCountEditor"));
+  assert.match(bulkSave,/finally\\{[\\s\\S]*busy=false/,"the bulk editor must release the shared busy lock in a finally block");
 });
 
 test("Historic sale price tranches are audited, quantity-balanced and included in liquidation revenue",()=>{

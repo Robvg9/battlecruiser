@@ -150,11 +150,11 @@ test("bulk-cost save validates rows, sends one audited payload and closes only a
   assert.equal(calls.length, 1, "the entire batch is sent once");
   assert.equal(calls[0].args.p_turno_sesion_id, SESSION_ID);
   assert.equal(calls[0].args.p_ajustes.length, 1);
-  assert.deepEqual(calls[0].args.p_ajustes[0], {
+  assert.equal(JSON.stringify(calls[0].args.p_ajustes[0]), JSON.stringify({
     producto_id: PRODUCT_ID,
     precio_venta_unitario: null,
     costo_unitario: 12.3456
-  });
+  }));
   assert.equal(calls[0].args.p_comentario, "Factura y hoja P.C. verificadas");
 });
 

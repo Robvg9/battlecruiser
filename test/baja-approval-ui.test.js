@@ -63,10 +63,10 @@ test("inventory detail has a direct route into the flavor and per-warehouse mini
 });
 
 test("PWA release and cache manifest stay aligned", () => {
-  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
   const app = read("public/app.js");
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
+  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
   assert.match(index, /style\.css\?v=9\.5\.100/);
   assert.match(sw, /inventario-detalle\.js\?v=72/);
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.4"));
