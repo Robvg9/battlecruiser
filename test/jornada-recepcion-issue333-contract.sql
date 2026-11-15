@@ -337,6 +337,7 @@ BEGIN
 DELETE FROM public.turno_jornada_inventario_lineas;
 DELETE FROM public.turno_jornada_inventario_entrega_lineas;
 DELETE FROM public.turno_jornada_inventario_recepcion_lineas;
+DELETE FROM public.turno_jornada_inventario_correcciones;
 -- Delete stock rows for this warehouse
 DELETE FROM public.stock WHERE almacen_id = v_almacen;
 -- Delete the 4 specific products created by this fixture (Prod333-A through D, plus loop products)
