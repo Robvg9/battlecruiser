@@ -166,7 +166,7 @@ BEGIN
     turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,
     declarado_at,estado_aprobacion,monto_contado,contado_por,contado_at,diferencia,aprobado_por,aprobado_at
   ) VALUES(
-    v_turn,v_session,v_tranche,v_worker,22,'CUP',v_end,'APROBADA',22,v_owner,v_end,0,v_owner,v_end
+    v_turn,v_session,v_tranche,v_worker,19.5,'CUP',v_end,'APROBADA',19.5,v_owner,v_end,0,v_owner,v_end
   );
 
   -- Rate configuration is an explicit owner action. Test uses 5%; production remains NULL until configured.
@@ -344,8 +344,8 @@ BEGIN
   IF (v_result->>'salario_calculado')::numeric<>2.5 THEN
     RAISE EXCEPTION 'FAIL: salary must remain visible as a separate accrued payroll amount; result=%',v_result;
   END IF;
-  IF (v_result->>'dinero_recogido_total')::numeric<>42
-     OR (v_result->>'diferencia')::numeric<>0 THEN
+  IF (v_result->>'dinero_recogido_total')::numeric<>39.5
+     OR (v_result->>'diferencia')::numeric<>-2.5 THEN
     RAISE EXCEPTION 'FAIL: daily cash must reconcile against sales less expenses/reinvestments only; result=%',v_result;
   END IF;
   IF NOT EXISTS(
@@ -425,7 +425,7 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   v_review:=public.bc7_obtener_revision_jornada(v_turn);
   IF (v_review->'sesiones'->0->'liquidacion'->>'efectivo_esperado_despues_de_gastos_reinversiones')::numeric<>42
-     OR (v_review->'sesiones'->0->'liquidacion'->>'diferencia')::numeric<>0
+     OR (v_review->'sesiones'->0->'liquidacion'->>'diferencia')::numeric<>-2.5
      OR (v_review->'sesiones'->0->'liquidacion'->>'salario_calculado')::numeric<>2.5 THEN
     RAISE EXCEPTION 'FAIL: Owner review cash, variance and separate salary disagree with session settlement; result=%',v_review;
   END IF;
