@@ -353,6 +353,8 @@ function startupPerformanceExpression() {
       },
       longTasks,
       moduleLoad:window.__BC_MODULE_LOAD_STATE__||null,
+      serviceWorkerController:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),
+      serviceWorkerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,
       degraded:window.__BC_UI_READY_DEGRADED__===true
     };
   })()`;
@@ -730,6 +732,16 @@ async function main() {
     phase: "second online navigation after first-load cache population"
   };
   report.evidence.startupPerformanceWarm = warmMetrics;
+  const coldElapsedMs = Number(startupMetrics.elapsedMs);
+  const warmElapsedMs = Number(warmMetrics.elapsedMs);
+  report.evidence.startupPerformanceColdWarmComparison = {
+    coldElapsedMs,
+    warmElapsedMs,
+    deltaMs: Number.isFinite(coldElapsedMs) && Number.isFinite(warmElapsedMs)
+      ? Math.round((coldElapsedMs - warmElapsedMs) * 10) / 10 : null,
+    comparableEnvironment: "same Chromium process/profile/runner; cold has HTTP cache disabled, warm has HTTP cache enabled",
+    interpretation: "descriptive only; this is not a before/after code-change comparison"
+  };
   await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
   report.evidence.phase = "online_functional";
 
