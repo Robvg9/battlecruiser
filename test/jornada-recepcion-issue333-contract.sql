@@ -334,6 +334,7 @@ BEGIN
 -- Cleanup ALL test data inserted by this contract to ensure no side effects on downstream contracts.
 -- Order matters: delete dependent rows first to avoid FK violations.
 DELETE FROM public.turno_jornada_inventario_lineas WHERE producto_id IN (v_p1, v_p2, v_p3, v_p4);
+DELETE FROM public.turno_jornada_inventario_entrega_lineas WHERE producto_id IN (v_p1, v_p2, v_p3, v_p4);
 DELETE FROM public.stock WHERE almacen_id = v_almacen;
 DELETE FROM public.productos WHERE id IN (v_p1, v_p2, v_p3, v_p4);
 DELETE FROM public.productos WHERE nombre LIKE 'Prod333-%';
