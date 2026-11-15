@@ -205,6 +205,7 @@ DECLARE
   v_line_count integer;
   v_match_count integer;
   v_today date;
+  v_source_actual_close_date date;
   v_reason text := 'Regularización retroactiva autorizada por el Dueño: la jornada real de Dahiana cubrió del 11 al 13 de noviembre de 2026. Se restaura la fecha original de entrega del 11/11, desplazada por el recálculo del cierre administrativo tardío de la jornada anterior. La recepción física y el cierre de esta jornada siguen pendientes de sus datos reales.';
 BEGIN
   -- Resolve the handover from its business keys, not generated UUIDs.
@@ -268,6 +269,34 @@ BEGIN
   SELECT * INTO STRICT v_source_program
   FROM public.turno_jornada_programacion
   WHERE id=v_source_session.jornada_programacion_id;
+
+  -- A successor cannot begin before its predecessor actually handed over.
+  -- The existing LIVE evidence records Sheyla's real close on 2026-11-13,
+  -- so a requested 2026-11-11 successor must fail closed rather than overlap.
+  SELECT coalesce(
+    nullif(close_event.estado_despues->>'fecha_real','')::date,
+    (
+      SELECT (tr.fin_at AT TIME ZONE coalesce(nullif(v_source_program.zona_horaria,''),'America/Havana'))::date
+      FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id=v_source_session.id
+      ORDER BY tr.fin_at DESC NULLS LAST,tr.created_at DESC
+      LIMIT 1
+    )
+  )
+  INTO v_source_actual_close_date
+  FROM LATERAL (
+    SELECT je.estado_despues
+    FROM public.turno_jornada_eventos je
+    WHERE je.programacion_id=v_source_program.id
+      AND je.tipo IN ('JORNADA_CERRADA','JORNADA_CERRADA_CON_EXCEPCION','JORNADA_ENTREGADA_TARDE')
+    ORDER BY je.creado_en DESC
+    LIMIT 1
+  ) close_event;
+
+  IF v_source_actual_close_date IS NULL OR v_source_actual_close_date >= DATE '2026-11-11' THEN
+    RAISE EXCEPTION 'No se puede crear la sucesora 11–13: la jornada de origen terminó realmente el %, por lo que ese período se solapa con el trabajo anterior.',
+      coalesce(v_source_actual_close_date::text,'sin evidencia de cierre');
+  END IF;
 
   SELECT u.id INTO STRICT v_owner_id
   FROM public.usuarios u
