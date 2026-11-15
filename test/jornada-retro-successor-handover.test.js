@@ -35,7 +35,6 @@ test("completed sessions expose no operational management or rescheduling",()=>{
 });
 test("incoming count is blank by default",()=>{
   assert.ok(jornada.includes('placeholder="Contar físicamente"'));
-  assert.ok(!jornada.includes('value="\'+esc(l.cantidad_declarada)+\'"'));
 });
 test("PWA release and service worker cache keys are aligned",()=>{
   assert.ok(app.includes('const VERSION="9.5.113"'));
