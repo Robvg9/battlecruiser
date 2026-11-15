@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.114 — Recepción física legible y validación visual por producto
+// v9.5.113 — Recepción física legible y validación visual por producto
 (function hotfixV9475(){
-  const VERSION="9.5.114";
+  const VERSION="9.5.113";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
