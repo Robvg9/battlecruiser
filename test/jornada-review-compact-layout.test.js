@@ -72,6 +72,6 @@ test("Historical costs can be reviewed and saved for all missing-cost products i
   assert.match(REVIEW,/verifiedHistoricCosts/);
   assert.match(REVIEW,/Los vacíos no se guardarán/);
   assert.match(REVIEW,/No modifican el catálogo/);
-  assert.match(APP,/VERSION="9\\.5\\.111"/);
-  assert.match(SW,/BC_SW_VERSION = "9\\.5\\.111"/);
+  assert.match(APP,/VERSION="9\.5\.111"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.111"/);
 });
