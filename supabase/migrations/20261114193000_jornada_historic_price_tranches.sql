@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.turno_jornada_precio_tramos (
   creado_en timestamptz NOT NULL DEFAULT now(),
   vigente boolean NOT NULL DEFAULT true
 );
+COMMENT ON TABLE public.turno_jornada_precio_tramos IS 'Audited per-sale-price quantities for completed Jornadas; never affects catalogue or future sales.';
 CREATE INDEX IF NOT EXISTS idx_turno_jornada_precio_tramos_vigente
  ON public.turno_jornada_precio_tramos(turno_sesion_id,producto_id) WHERE vigente;
 ALTER TABLE public.turno_jornada_precio_tramos ENABLE ROW LEVEL SECURITY;
