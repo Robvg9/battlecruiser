@@ -16,6 +16,8 @@ on:
       - 'supabase/migrations/20261114160000_jornada_integral_review_diagnostics.sql'
       - 'supabase/migrations/20261114190000_jornada_historical_price_cost_overrides.sql'
       - 'test/jornada-owner-review-continuity-contract.sql'
+      - 'supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql'
+      - 'test/dahiana-retro-successor-period.test.js'
       - 'test/jornada-pending-cash-visibility-contract.sql'
       - 'test/jornada-sectioned-checklist-picker.test.js'
       - 'supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql'
