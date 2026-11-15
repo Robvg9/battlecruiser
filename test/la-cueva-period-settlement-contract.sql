@@ -32,6 +32,7 @@ DECLARE
   v_baja_id uuid;
   v_closed public.turno_sesiones;
   v_result jsonb;
+  v_review jsonb;
   v_error boolean;
   v_operation text;
   -- The current jornada covers the two completed dates before today; the next one starts today.
@@ -165,7 +166,7 @@ BEGIN
     turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto,moneda,
     declarado_at,estado_aprobacion,monto_contado,contado_por,contado_at,diferencia,aprobado_por,aprobado_at
   ) VALUES(
-    v_turn,v_session,v_tranche,v_worker,19.5,'CUP',v_end,'APROBADA',19.5,v_owner,v_end,0,v_owner,v_end
+    v_turn,v_session,v_tranche,v_worker,22,'CUP',v_end,'APROBADA',22,v_owner,v_end,0,v_owner,v_end
   );
 
   -- Rate configuration is an explicit owner action. Test uses 5%; production remains NULL until configured.
@@ -336,12 +337,16 @@ BEGIN
      OR (v_result->>'reinversiones_aprobadas')::numeric<>3 THEN
     RAISE EXCEPTION 'FAIL: approved sale/expense/reinvestment/merma/baja inputs were not included correctly; result=%',v_result;
   END IF;
-  IF (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones_salario')::numeric<>39.5 THEN
-    RAISE EXCEPTION 'FAIL: expected cash after expense, reinvestment and salary should be CUP39.50; result=%',v_result;
+  IF (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones')::numeric<>42
+     OR (v_result->>'efectivo_esperado_despues_de_gastos_reinversiones_salario')::numeric<>42 THEN
+    RAISE EXCEPTION 'FAIL: cash expectation must exclude accrued salary; expected CUP42; result=%',v_result;
   END IF;
-  IF (v_result->>'dinero_recogido_total')::numeric<>39.5
+  IF (v_result->>'salario_calculado')::numeric<>2.5 THEN
+    RAISE EXCEPTION 'FAIL: salary must remain visible as a separate accrued payroll amount; result=%',v_result;
+  END IF;
+  IF (v_result->>'dinero_recogido_total')::numeric<>42
      OR (v_result->>'diferencia')::numeric<>0 THEN
-    RAISE EXCEPTION 'FAIL: daily approved cash + final counted cash should reconcile at zero; result=%',v_result;
+    RAISE EXCEPTION 'FAIL: daily cash must reconcile against sales less expenses/reinvestments only; result=%',v_result;
   END IF;
   IF NOT EXISTS(
     SELECT 1 FROM jsonb_array_elements(v_result->'lineas') line
@@ -413,6 +418,16 @@ BEGIN
      OR (SELECT estado_maestro FROM public.turnos WHERE id=v_turn)<>'EN_CURSO'
      OR (public.bc7_liquidacion_inventario_jornada(v_session)->>'calculable')::boolean IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'FAIL: jornada close must complete the current session but preserve the master turn as open for the next programmed day';
+  END IF;
+
+  -- The Owner's combined review must use the same no-salary cash formula as the session settlement.
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_review:=public.bc7_obtener_revision_jornada(v_turn);
+  IF (v_review->'sesiones'->0->'liquidacion'->>'efectivo_esperado_despues_de_gastos_reinversiones')::numeric<>42
+     OR (v_review->'sesiones'->0->'liquidacion'->>'diferencia')::numeric<>0
+     OR (v_review->'sesiones'->0->'liquidacion'->>'salario_calculado')::numeric<>2.5 THEN
+    RAISE EXCEPTION 'FAIL: Owner review cash, variance and separate salary disagree with session settlement; result=%',v_review;
   END IF;
 
   -- The final period leaves one owner-schedulable handover because there is no
