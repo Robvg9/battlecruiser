@@ -64,8 +64,78 @@
     ["hotfix-pulido-20260903.js","20261105.4"],["hotfix-pulido-20260903b.js","20261105.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20261103.1"],
     ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.12"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.2"],["bajas-multiple.js","1.6"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.0"]
   ];
-  let resolveUIReady;window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});window.__BC_UI_READY_RESOLVED__=false;
-  function cargarUno(name,version){return new Promise(resolve=>{if(document.querySelector('script[src*="'+name+'"]')){resolve();return;}const s=document.createElement("script");s.src="js/"+name+(version?"?v="+version:"");s.async=false;let terminado=false;const terminar=(estado)=>{if(terminado)return;terminado=true;if(estado==="error")console.warn("[BattleCruiser] Módulo no cargó (degradado):",name);resolve();};s.onload=()=>terminar("ok");s.onerror=()=>terminar("error");setTimeout(()=>terminar("timeout"),4000);document.body.appendChild(s);});}
-  function terminarBootUI(){if(window.__BC_UI_READY_RESOLVED__)return;window.__BC_UI_READY_RESOLVED__=true;resolveUIReady();}
-  const actuales=modules.filter(([name])=>!document.querySelector('script[src*="'+name+'"]'));const pendientes=actuales.map(([name,version])=>cargarUno(name,version));setTimeout(terminarBootUI,1500);Promise.allSettled(pendientes).then(terminarBootUI);
+  let resolveUIReady;
+  window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});
+  window.__BC_UI_READY_RESOLVED__=false;
+  window.__BC_UI_READY_DEGRADED__=false;
+  window.__BC_MODULE_LOAD_STATE__={status:"loading",total:modules.length,loaded:0,failed:0,timedOut:0,results:[]};
+
+  function findModuleScript(name){
+    const expectedPath=new URL("js/"+name,document.baseURI).pathname;
+    return Array.from(document.scripts).find(script=>{
+      const src=script.getAttribute("src");
+      if(!src)return false;
+      try{
+        const url=new URL(src,document.baseURI);
+        return url.origin===location.origin&&url.pathname===expectedPath;
+      }catch(_){return false;}
+    })||null;
+  }
+
+  function cargarUno(name,version){
+    return new Promise(resolve=>{
+      const existing=findModuleScript(name);
+      if(existing){
+        resolve({name,status:"already-present",url:existing.src||existing.getAttribute("src")||""});
+        return;
+      }
+      const script=document.createElement("script");
+      script.src="js/"+name+(version?"?v="+version:"");
+      script.async=false;
+      script.dataset.bcModuleName=name;
+      script.dataset.bcModuleState="loading";
+      let settled=false;
+      let timer=null;
+      const finish=status=>{
+        if(settled)return;
+        settled=true;
+        if(timer!==null)clearTimeout(timer);
+        script.dataset.bcModuleState=status;
+        if(status==="failed"||status==="timed_out"){
+          console.warn("[BattleCruiser] Módulo no cargó ("+status+"):",name);
+        }
+        resolve({name,status,url:script.src});
+      };
+      script.onload=()=>finish("loaded");
+      script.onerror=()=>finish("failed");
+      timer=setTimeout(()=>finish("timed_out"),4000);
+      document.body.appendChild(script);
+    });
+  }
+
+  function terminarBootUI(results){
+    if(window.__BC_UI_READY_RESOLVED__)return;
+    const safeResults=Array.isArray(results)?results:[];
+    const failed=safeResults.filter(item=>item.status==="failed").length;
+    const timedOut=safeResults.filter(item=>item.status==="timed_out").length;
+    const loaded=safeResults.length-failed-timedOut;
+    const summary={
+      status:failed||timedOut?"degraded":"ready",
+      total:modules.length,
+      loaded,
+      failed,
+      timedOut,
+      results:safeResults
+    };
+    window.__BC_MODULE_LOAD_STATE__=summary;
+    window.__BC_UI_READY_DEGRADED__=summary.status==="degraded";
+    window.__BC_UI_READY_RESOLVED__=true;
+    resolveUIReady(summary);
+  }
+
+  const pendientes=modules.map(([name,version])=>cargarUno(name,version));
+  Promise.all(pendientes).then(terminarBootUI).catch(error=>{
+    console.error("[BattleCruiser] Falló la coordinación de carga de módulos:",error);
+    terminarBootUI([]);
+  });
 })();
