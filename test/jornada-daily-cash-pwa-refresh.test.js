@@ -12,14 +12,14 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.113 release and Jornada UI 7.32", () => {
-  assert.ok(APP.includes('const VERSION="9.5.113";'));
+test("PWA shell pins one fresh 9.5.114 release and Jornada UI 7.32", () => {
+  assert.ok(APP.includes('const VERSION="9.5.114";'));
   assert.ok(INDEX.includes('style.css?v=9.5.100'));
-  assert.ok(INDEX.includes('app.js?v=9.5.113'));
+  assert.ok(INDEX.includes('app.js?v=9.5.114'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.113 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.113"'));
-  assert.ok(SW.includes('./app.js?v=9.5.113'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.114 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.114"'));
+  assert.ok(SW.includes('./app.js?v=9.5.114'));
   assert.ok(SW.includes('./style.css?v=9.5.100'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.32"]'));
@@ -38,8 +38,10 @@ test("PWA update notice creates its action button before binding the click", () 
 
 test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
   assert.match(UI, /const activeSessionId=String\(state\.currentSession\?\.turno_sesion_id\|\|''\);/);
-  assert.match(UI, /activeSessionId===String\(detail\.sesion\.id\|\|''\)/);
-  assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}/);
+  assert.match(UI,/activeSessionId===sessionId/);
+  assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*ensureWorkspaceOperationData\(state\.detail\);\s*if\(state\.workspaceOperationLoaded\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}\}/);
+  assert.match(UI,/const sessionId=String\(detail\.sesion\.id\)/);
+  assert.match(UI,/const isAssigned=.*activeSessionId===sessionId/);
 });
 
 test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {
