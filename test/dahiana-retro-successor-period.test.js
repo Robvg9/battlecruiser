@@ -53,3 +53,11 @@ test("does not silently copy the outgoing worker's salary percentage",()=>{
   assert.ok(migration.includes("Do not inherit the outgoing worker's jornada-specific salary rate."));
   assert.ok(!migration.includes("v_source_program.salario_porcentaje"));
 });
+
+test("historical counts and UI catalog are bounded by the jornada end date",()=>{
+  assert.ok(migration.includes("bc7_guardar_inventario_jornada(uuid,text,jsonb,text)"));
+  assert.ok(migration.includes("bc7_obtener_inventario_jornada(uuid)"));
+  assert.ok(migration.includes("v_period_end + 1"));
+  assert.ok(migration.includes("coalesce(v_p.fecha_fin,v_p.fecha) + 1"));
+  assert.ok(migration.includes("p.created_at <"));
+});
