@@ -46,8 +46,12 @@ BEGIN
   VALUES (v_almacen,'Almacen Issue333','RETAIL',true)
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO public.turnos(id,almacen_id,dias_turno,creado_por,estado_maestro,estado)
-  VALUES (v_turno,v_almacen,4,v_owner,'EN_CURSO','ABIERTO')
+  INSERT INTO public.turnos(
+    id,usuario_id,usuario_nombre,almacen_id,fecha,estado,creado_por,created_by,estado_maestro,dias_turno
+  ) VALUES (
+    v_turno,v_owner,'Owner Issue333',v_almacen,(now() AT TIME ZONE 'America/Havana')::date+20,
+    'ABIERTO',v_owner,v_owner,'EN_CURSO',4
+  )
   ON CONFLICT (id) DO NOTHING;
 
   INSERT INTO public.turno_jornada_programacion(id,turno_id,almacen_id,numero_dia,fecha,trabaja,responsable_id,hora_inicio_prevista,hora_fin_prevista,zona_horaria,patron_id,estado,creado_por,actualizado_por)
