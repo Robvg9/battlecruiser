@@ -30,6 +30,8 @@ CREATE TABLE public.turnos (
   creado_por uuid NOT NULL REFERENCES auth.users(id), created_by uuid NOT NULL REFERENCES auth.users(id),
   estado_maestro text, dias_turno integer,
   apertura_real timestamptz, cierre_real timestamptz,
+  observacion text,
+  creado_en timestamptz NOT NULL DEFAULT now(),
   actualizado_en timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX ux_turnos_maestro_unico_activo_por_almacen
