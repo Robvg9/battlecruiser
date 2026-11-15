@@ -316,6 +316,47 @@ async function reloadAndWait(ignoreCache = true) {
 function pageSnapshotExpression() {
   return "(()=>({readyState:document.readyState,title:document.title,bodyText:(document.body&&document.body.innerText||'').slice(0,1400),version:window.__BC_VERSION__||null,loginForm:!!document.querySelector('#login-form'),usernameField:!!document.querySelector('#email'),passwordField:!!document.querySelector('#password'),supabaseAvailable:!!(window.supabase&&typeof window.supabase.createClient==='function'),clientDefined:typeof client!=='undefined',localStylesheet:!!document.querySelector('link[rel=stylesheet][href*=\\\"style.css\\\"]'),online:navigator.onLine,controller:!!(navigator.serviceWorker&&navigator.serviceWorker.controller),controllerScript:navigator.serviceWorker&&navigator.serviceWorker.controller?navigator.serviceWorker.controller.scriptURL:null,href:location.href}))()";
 }
+function startupPerformanceExpression() {
+  return `(()=> {
+    const nav=performance.getEntriesByType("navigation")[0]||null;
+    const resources=performance.getEntriesByType("resource");
+    const scripts=resources.filter(entry=>{try{return new URL(entry.name,location.href).pathname.endsWith(".js");}catch(_){return false;}});
+    const byPath=new Map();
+    for(const entry of scripts){
+      try{
+        const url=new URL(entry.name,location.href);
+        const items=byPath.get(url.pathname)||[];
+        items.push({url:entry.name,durationMs:Math.round(entry.duration*10)/10,transferSize:entry.transferSize||0,encodedBodySize:entry.encodedBodySize||0,decodedBodySize:entry.decodedBodySize||0});
+        byPath.set(url.pathname,items);
+      }catch(_){}
+    }
+    const duplicateScripts=Array.from(byPath.entries()).filter(([,items])=>items.length>1).map(([pathname,items])=>({pathname,requests:items}));
+    const longTasks=performance.getEntriesByType("longtask").map(entry=>({startMs:Math.round(entry.startTime*10)/10,durationMs:Math.round(entry.duration*10)/10}));
+    return {
+      capturedAt:new Date().toISOString(),
+      elapsedMs:Math.round(performance.now()*10)/10,
+      navigation:nav?{
+        responseStartMs:Math.round(nav.responseStart*10)/10,
+        domInteractiveMs:Math.round(nav.domInteractive*10)/10,
+        domContentLoadedMs:Math.round(nav.domContentLoadedEventEnd*10)/10,
+        loadEventEndMs:Math.round(nav.loadEventEnd*10)/10,
+        transferSize:nav.transferSize||0,
+        encodedBodySize:nav.encodedBodySize||0
+      }:null,
+      resources:{
+        total:resources.length,
+        scripts:scripts.length,
+        scriptTransferBytes:scripts.reduce((sum,item)=>sum+(item.transferSize||0),0),
+        scriptEncodedBytes:scripts.reduce((sum,item)=>sum+(item.encodedBodySize||0),0),
+        duplicateScriptPathnames:duplicateScripts,
+        slowestScripts:scripts.slice().sort((a,b)=>b.duration-a.duration).slice(0,10).map(item=>({url:item.name,durationMs:Math.round(item.duration*10)/10,transferSize:item.transferSize||0}))
+      },
+      longTasks,
+      moduleLoad:window.__BC_MODULE_LOAD_STATE__||null,
+      degraded:window.__BC_UI_READY_DEGRADED__===true
+    };
+  })()`;
+}
 function shellSnapshotPredicate() {
   return "(()=>{const s=" + pageSnapshotExpression() + ";return s.readyState!=='loading'&&s.loginForm&&s.usernameField&&s.passwordField&&window.__BC_UI_READY_RESOLVED__===true?s:null})()";
 }
@@ -600,6 +641,34 @@ async function main() {
   assert(initial.version === expectedVersion, "Versión de navegador " + initial.version + " distinta de la esperada " + expectedVersion + ".");
   assert(initial.loginForm && initial.usernameField && initial.passwordField, "La raíz LIVE no muestra el formulario de inicio de sesión esperado.");
   assert(initial.localStylesheet, "La página LIVE no enlazó style.css.");
+
+  // Capture reproducible startup evidence from a fresh Chromium profile with
+  // the browser HTTP cache disabled. This is a measurement, not a pass/fail
+  // performance claim; compare reports from identical runner/network conditions.
+  const startupMetrics = await evaluate(startupPerformanceExpression());
+  const startupResponses = responses.slice(initialResponseStart).filter(item => item.phase === "online_initial");
+  const startupByPath = new Map();
+  for (const item of startupResponses) {
+    try {
+      const url = new URL(item.url);
+      const values = startupByPath.get(url.pathname) || [];
+      values.push({ url: item.url, status: item.status, type: item.type, fromServiceWorker: item.fromServiceWorker, fromDiskCache: item.fromDiskCache });
+      startupByPath.set(url.pathname, values);
+    } catch (_) {}
+  }
+  startupMetrics.network = {
+    responses: startupResponses.length,
+    failedRequests: failures.filter(item => item.phase === "online_initial").length,
+    repeatedPathnames: Array.from(startupByPath.entries()).filter(([, values]) => values.length > 1)
+      .map(([pathname, values]) => ({ pathname, requests: values }))
+  };
+  startupMetrics.conditions = {
+    browserProfile: "fresh temporary Chromium user-data-dir",
+    browserHttpCacheDisabled: true,
+    serviceWorkerBypass: false,
+    phase: "first online navigation"
+  };
+  report.evidence.startupPerformanceCold = startupMetrics;
 
   // The preview login proxy must reach the real Edge Function with its allowlisted
   // production Origin. GET is a no-credential diagnostic: the expected upstream
