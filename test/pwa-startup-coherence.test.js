@@ -23,12 +23,27 @@ function appModules() {
 }
 
 function precachedVersion(name) {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escaped = name.replace(".", "\\.");
   const match = serviceWorker.match(new RegExp('"\\./js/' + escaped + '\\?v=([^"]+)"'));
   return match ? match[1] : null;
 }
 
-test("PWA loader: core.js does not append scripts already owned by index/app", () => {\n  for (const name of [\n    "compra-multiple.js",\n    "movimiento-multiple.js",\n    "inventario-detalle.js",\n    "historial-detalle.js",\n    "loading-guard.js",\n  ]) {\n    const escaped = name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");\n    assert.doesNotMatch(core, new RegExp("s\\\\.src\\\\s*=\\\\s*[\'\\"]js/" + escaped));\n  }\n  assert.match(core, /style-historiales\\.css\\?v=56/,\n    "removing duplicate history JS must preserve its dedicated stylesheet");\n});\ntest("PWA loader: app.js has one authoritative version per module", () => {
+test("PWA loader: core.js does not append scripts already owned by index/app", () => {
+  for (const name of [
+    "compra-multiple.js",
+    "movimiento-multiple.js",
+    "inventario-detalle.js",
+    "historial-detalle.js",
+    "loading-guard.js",
+  ]) {
+    const escaped = name.replace(".", "\\.");
+    assert.doesNotMatch(core, new RegExp("s\\.src\\s*=\\s*['\"]js/" + escaped));
+  }
+  assert.match(core, /style-historiales\.css\?v=56/,
+    "removing duplicate history JS must preserve its dedicated stylesheet");
+});
+
+test("PWA loader: app.js has one authoritative version per module", () => {
   const modules = appModules();
   const names = modules.map((item) => item.name);
   assert.equal(modules.length, 118, "unexpected change to the audited module inventory");
@@ -47,10 +62,9 @@ test("PWA loader: core.js does not append scripts already owned by index/app", (
   }
 });
 
-
 test("PWA loader: direct HTML module versions agree with the app registry", () => {
   const modules = new Map(appModules().map((item) => [item.name, item.version]));
-  const directScripts = [...indexHtml.matchAll(/<script\\s+src=["']([^"']+)["']/gi)].map((match) => match[1]);
+  const directScripts = [...indexHtml.matchAll(/<script\s+src=["']([^"']+)["']/gi)].map((match) => match[1]);
   for (const src of directScripts) {
     const url = new URL(src, "https://battlecruiser.invalid/");
     const name = url.pathname.split("/").pop();
@@ -58,7 +72,7 @@ test("PWA loader: direct HTML module versions agree with the app registry", () =
     const htmlVersion = new URLSearchParams(url.search).get("v") || "";
     assert.equal(htmlVersion, modules.get(name), name + " index.html and app.js versions must match");
   }
-  assert.match(app, /url\\.pathname===expectedPath/,
+  assert.match(app, /url\.pathname===expectedPath/,
     "existing scripts must be matched by exact pathname, not substring");
 });
 
@@ -75,7 +89,30 @@ test("PWA loader: UI_READY waits for actual module load attempts and reports deg
     "the degraded readiness state must be externally observable");
 });
 
-test("Jornada: operation-only RPCs load on demand and keep retry available", () => {\n  const start = jornadaUi.indexOf("async function openWorkspace(sessionId)");\n  const end = jornadaUi.indexOf("async function saveCount(form)", start);\n  assert.ok(start >= 0 && end > start, "openWorkspace must be present");\n  const openWorkspace = jornadaUi.slice(start, end);\n  assert.match(openWorkspace, /rpc\\(\'bc7_obtener_inventario_jornada\'/);\n  assert.match(openWorkspace, /rpc\\(\'bc7_estado_entrega_inventario_jornada\'/);\n  for (const rpcName of [\n    "bc7_estado_confirmaciones_jornada",\n    "bc7_productos_ajuste_jornada",\n    "bc7_liquidacion_inventario_jornada",\n  ]) {\n    assert.doesNotMatch(openWorkspace, new RegExp(rpcName),\n      rpcName + " must not block the initial inventory workspace");\n  }\n  assert.match(jornadaUi, /ensureWorkspaceOperationData\\(state\\.detail\\)/,\n    "opening the operation tab must trigger deferred data");\n  assert.match(jornadaUi, /data-bc7-operation-retry/,\n    "a failed deferred load must expose a retry control");\n  assert.match(jornadaUi, /settlement=detail\\.liquidacion\\|\\|await rpc\\(\'bc7_liquidacion_inventario_jornada\'/,\n    "the tab must reuse its deferred liquidation instead of issuing a duplicate RPC");\n});\ntest("Service Worker: offline fallback never ignores an explicit asset version", () => {
+test("Jornada: operation-only RPCs load on demand and keep retry available", () => {
+  const start = jornadaUi.indexOf("async function openWorkspace(sessionId)");
+  const end = jornadaUi.indexOf("async function saveCount(form)", start);
+  assert.ok(start >= 0 && end > start, "openWorkspace must be present");
+  const openWorkspace = jornadaUi.slice(start, end);
+  assert.match(openWorkspace, /rpc\('bc7_obtener_inventario_jornada'/);
+  assert.match(openWorkspace, /rpc\('bc7_estado_entrega_inventario_jornada'/);
+  for (const rpcName of [
+    "bc7_estado_confirmaciones_jornada",
+    "bc7_productos_ajuste_jornada",
+    "bc7_liquidacion_inventario_jornada",
+  ]) {
+    assert.doesNotMatch(openWorkspace, new RegExp(rpcName),
+      rpcName + " must not block the initial inventory workspace");
+  }
+  assert.match(jornadaUi, /ensureWorkspaceOperationData\(state\.detail\)/,
+    "opening the operation tab must trigger deferred data");
+  assert.match(jornadaUi, /data-bc7-operation-retry/,
+    "a failed deferred load must expose a retry control");
+  assert.match(jornadaUi, /settlement=detail\.liquidacion\|\|await rpc\('bc7_liquidacion_inventario_jornada'/,
+    "the tab must reuse its deferred liquidation instead of issuing a duplicate RPC");
+});
+
+test("Service Worker: offline fallback never ignores an explicit asset version", () => {
   assert.doesNotMatch(serviceWorker, /ignoreSearch\s*:\s*true/,
     "ignoreSearch can serve bytes from an incompatible query-string version");
   const start = serviceWorker.indexOf("function cachedFallback(request)");
