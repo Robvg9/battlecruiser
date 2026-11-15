@@ -66,11 +66,11 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/VERSION="9\.5\.110"/);
   assert.match(APP,/jornada-owner-review\.js","1\.5"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.110"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1\.5/);
-  assert.match(INDEX,/v9\.5\.109/);
+  assert.match(INDEX,/v9\.5\.110/);
 });
 
 
@@ -95,11 +95,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.109"/);
+  assert.match(APP,/VERSION="9\.5\.110"/);
   assert.match(APP,/jornada-owner-review\.js","1\.5"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.109"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.110"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1\.5/);
-  assert.match(INDEX,/v9\.5\.109/);
+  assert.match(INDEX,/v9\.5\.110/);
 });
 
 
