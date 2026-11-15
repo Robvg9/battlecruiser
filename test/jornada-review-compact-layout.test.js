@@ -75,6 +75,12 @@ test("Historical costs can be reviewed and saved for all missing-cost products i
   assert.match(REVIEW,/duplicateIds/);
   assert.match(REVIEW,/Resultado incierto/);
   assert.match(REVIEW,/no vuelvas a guardar estos importes/);
+  assert.match(REVIEW,/error.name=\x27UnconfirmedBulkCostResult\x27/);
+  assert.match(REVIEW,/Number\(result.productos_ajustados\)!==adjustments.length/);
+  assert.match(REVIEW,/result.catalogo_modificado!==false/);
+  assert.match(REVIEW,/render\(data\);return true/);
+  assert.match(REVIEW,/No se pudo cargar el expediente\.\x27;return false/);
+  assert.match(REVIEW,/if\(refreshed\)box.remove\(\)/);
   assert.match(REVIEW,/data-bcjr-open-bulk-costs/);
   assert.match(REVIEW,/data-bcjr-bulk-costs-save/);
   assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);

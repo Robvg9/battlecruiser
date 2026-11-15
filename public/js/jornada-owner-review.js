@@ -258,8 +258,8 @@
     document.getElementById('bcjr-title').textContent='Revisión integral del turno';
     document.getElementById('bcjr-subtitle').textContent='Recuperando liquidación…';
     document.getElementById('bcjr-content').innerHTML='<p>Consultando inventario, ventas, costos, efectivo y movimientos…</p>';
-    try{const data=await rpc('bc7_obtener_revision_jornada',{p_turno_id:turnId});render(data);}
-    catch(e){document.getElementById('bcjr-content').innerHTML='<div class="bcjr-alert">'+esc(e.message||e)+'</div>';document.getElementById('bcjr-message').textContent='No se pudo cargar el expediente.';}
+    try{const data=await rpc('bc7_obtener_revision_jornada',{p_turno_id:turnId});render(data);return true;}
+    catch(e){document.getElementById('bcjr-content').innerHTML='<div class="bcjr-alert">'+esc(e.message||e)+'</div>';document.getElementById('bcjr-message').textContent='No se pudo cargar el expediente.';return false;}
   }
   function close(){const m=document.getElementById('bc-jornada-review-modal');if(m)m.hidden=true;document.querySelector('.bcjr-values-modal')?.remove();document.body.classList.remove('bc-jornada-review-open');}
   function openValuesEditor(button){
@@ -389,11 +389,16 @@
     busy=true;button.disabled=true;button.textContent='Guardando '+adjustments.length+'…';setStatus('Guardando todos los costos en una sola operación auditada…');
     try{
       try{
-        await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:adjustments,p_comentario:reason});
+        const result=await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:adjustments,p_comentario:reason});
+        if(!result||result.ok!==true||Number(result.productos_ajustados)!==adjustments.length||result.catalogo_modificado!==false){
+          const error=new Error('El servidor no confirmó el número exacto de costos guardados ni que el catálogo permanezca intacto. Reabre la revisión para comprobar el resultado; no repitas el guardado desde esta ventana.');
+          error.name='UnconfirmedBulkCostResult';
+          throw error;
+        }
       }catch(error){
         const message=error?.message||String(error);
         const statusCode=Number(error?.status||error?.statusCode||0);
-        const uncertain=error?.name==='TypeError'||statusCode>=500||/network|fetch|timeout|timed out|abort|connection/i.test(message);
+        const uncertain=error?.name==='TypeError'||error?.name==='UnconfirmedBulkCostResult'||statusCode>=500||/network|fetch|timeout|timed out|abort|connection/i.test(message);
         if(uncertain){
           button.disabled=true;button.textContent='Resultado incierto';
           setStatus('No se pudo confirmar la respuesta del servidor. No vuelvas a guardar desde esta ventana. Ciérrala y abre de nuevo la revisión para comprobar qué costos quedaron guardados. Detalle: '+message,'error');
@@ -407,8 +412,9 @@
       box.querySelectorAll('input,textarea').forEach(input=>{input.disabled=true;});
       setStatus('Costos guardados. Actualizando la liquidación…','success');
       try{
-        await openReview(activeTurnId);
-        box.remove();
+        const refreshed=await openReview(activeTurnId);
+        if(refreshed)box.remove();
+        else setStatus('Los costos sí se guardaron, pero no se pudo recargar la revisión. Cierra esta lista y vuelve a abrir la jornada; no vuelvas a guardar estos importes.','warning');
       }catch(refreshError){
         setStatus('Los costos sí se guardaron. Falló únicamente la actualización de la revisión. Cierra esta lista y vuelve a abrir la jornada; no vuelvas a guardar estos importes.','warning');
       }
