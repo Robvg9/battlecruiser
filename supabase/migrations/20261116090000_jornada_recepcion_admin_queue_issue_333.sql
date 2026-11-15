@@ -44,8 +44,14 @@ BEGIN
       FROM public.turno_sesiones s
       LEFT JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id
       LEFT JOIN public.turno_asignaciones ta ON ta.turno_sesion_id=s.id AND ta.retirado_at IS NULL
+      LEFT JOIN public.turnos t ON t.id=s.turno_id
       WHERE s.id IN (v_e.origen_sesion_id, v_e.destino_sesion_id)
-        AND (s.creada_por=auth.uid() OR p.responsable_id=auth.uid() OR ta.usuario_id=auth.uid())
+        AND (
+          p.responsable_id=auth.uid()
+          OR ta.usuario_id=auth.uid()
+          OR t.creado_por=auth.uid()
+          OR t.usuario_id=auth.uid()
+        )
     ) AND NOT EXISTS (
       SELECT 1
       FROM public.turno_sesiones s
