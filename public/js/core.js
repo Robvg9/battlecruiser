@@ -9,35 +9,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_pczHaS1JDPGrEA31vdbOLg_1l2qFhbm";
 
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Recover control when a new document has an active registration but no
-// navigator.serviceWorker.controller after reconnect/reload.
-(function recuperarControlServiceWorker() {
-  if (!("serviceWorker" in navigator)) return;
-  var claimRequested = false;
-  function recover(registration) {
-    if (navigator.serviceWorker.controller || !registration || !registration.active || claimRequested) return;
-    claimRequested = true;
-    try {
-      registration.active.postMessage({ type: "CLAIM_CLIENT" });
-    } catch (_) {
-      claimRequested = false;
-    }
-  }
-  function inspectRegistration() {
-    navigator.serviceWorker.getRegistration().then(recover).catch(function () {});
-  }
-  navigator.serviceWorker.addEventListener("controllerchange", function () {
-    claimRequested = false;
-  });
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", inspectRegistration, { once: true });
-  } else {
-    inspectRegistration();
-  }
-  navigator.serviceWorker.ready.then(recover).catch(function () {});
-})();
-
-
+// Controller changes are coordinated by app.js after the user accepts an update.
+// Never claim a new worker while this document may still be booting.
 // index.html owns historial-detalle.js?v=h1.2. core.js only adds its stylesheet,
 // avoiding a second evaluation with the legacy v56 script.
 (function cargarEstilosHistoriales(){function cargar(){if(document.querySelector('link[data-battlecruiser-historiales-style="1"]'))return;const css=document.createElement('link');css.rel='stylesheet';css.href='style-historiales.css?v=56';css.dataset.battlecruiserHistorialesStyle='1';document.head.appendChild(css);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',cargar,{once:true});else cargar();})();
