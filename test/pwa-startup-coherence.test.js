@@ -10,6 +10,7 @@ const read = (relativePath) => fs.readFileSync(path.join(ROOT, relativePath), "u
 const core = read("public/js/core.js");
 const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
+const indexHtml = read("public/index.html");
 
 function appModules() {
   const start = app.indexOf("const modules=[");
@@ -51,6 +52,21 @@ test("PWA loader: app.js has one authoritative version per module", () => {
   }
 });
 
+
+test("PWA loader: direct HTML module versions agree with the app registry", () => {
+  const modules = new Map(appModules().map((item) => [item.name, item.version]));
+  const directScripts = [...indexHtml.matchAll(/<script\\s+src=["']([^"']+)["']/gi)].map((match) => match[1]);
+  for (const src of directScripts) {
+    const url = new URL(src, "https://battlecruiser.invalid/");
+    const name = url.pathname.split("/").pop();
+    if (!modules.has(name)) continue;
+    const htmlVersion = new URLSearchParams(url.search).get("v") || "";
+    assert.equal(htmlVersion, modules.get(name), name + " index.html and app.js versions must match");
+  }
+  assert.match(app, /url\\.pathname===expectedPath/,
+    "existing scripts must be matched by exact pathname, not substring");
+});
+
 test("PWA loader: UI_READY waits for actual module load attempts and reports degraded loads", () => {
   assert.doesNotMatch(app, /setTimeout\(terminarBootUI,\s*1500\)/,
     "UI_READY must not be resolved by an optimistic 1.5 second timer");
@@ -73,7 +89,7 @@ test("Service Worker: offline fallback never ignores an explicit asset version",
   const fallback = serviceWorker.slice(start, end);
   assert.match(fallback, /cache\.match\(request\)/,
     "same-version cached assets must be matched by their full request URL");
-  assert.match(fallback, /if\(url\.search\) return Response\.error\(\)/,
+  assert.match(fallback, /if\s*\(url\.search\)\s*return\s+Response\.error\(\)/,
     "an explicitly versioned request must fail closed when that exact version is absent");
   assert.match(fallback, /candidates\.length !== 1/,
     "unversioned fallback must reject ambiguous cached pathname variants");
