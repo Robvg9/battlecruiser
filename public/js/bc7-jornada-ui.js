@@ -314,7 +314,7 @@
       return true;
     }).catch(error=>{
       const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
-      state.workspaceOperationPromise=null;
+      if(stillCurrent)state.workspaceOperationPromise=null;
       if(stillCurrent){
         const operationPanel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
         if(operationPanel){
