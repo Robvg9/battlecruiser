@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { buildReleaseManifest, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { buildAssetInventory, buildReleaseManifest, collectPublicAssets, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
 
 const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
@@ -16,18 +16,57 @@ const liveOfflineE2e = fs.readFileSync(path.join(__dirname, "live-offline-e2e.js
 
 test("release manifest records exact source SHA, numeric run ID and aligned app/SW versions", () => {
   const sha = "abcdef0123456789abcdef0123456789abcdef01";
+  const assetInventory = buildAssetInventory([
+    { path: "index.html", content: "<html>ok</html>" },
+    { path: "app.js", content: 'const VERSION="9.5.16";' },
+  ]);
   const manifest = buildReleaseManifest({
     appSource: 'const VERSION="9.5.16";',
     swSource: 'var BC_SW_VERSION = "9.5.16";',
     sourceSha: sha,
     workflowRunId: "39999999999",
+    assetInventory,
   });
-  assert.deepEqual(manifest, {
-    source_sha: sha,
-    app_version: "9.5.16",
-    service_worker_version: "9.5.16",
-    workflow_run_id: "39999999999",
+  assert.equal(manifest.source_sha, sha);
+  assert.equal(manifest.app_version, "9.5.16");
+  assert.equal(manifest.service_worker_version, "9.5.16");
+  assert.equal(manifest.workflow_run_id, "39999999999");
+  assert.equal(manifest.asset_count, 2);
+  assert.deepEqual(Object.keys(manifest.asset_inventory), ["app.js", "index.html"]);
+  assert.deepEqual(manifest.asset_inventory["app.js"], {
+    sha256: "c2e5e7c9fbe83f347a59ea92b4a92eec1f6b0cda119e9c40b76cebec9d6f26bd",
+    bytes: 24,
   });
+  assert.deepEqual(manifest.asset_inventory["index.html"], {
+    sha256: "2de5f0da6e7a4f0f8b4bd8e1dc4aa1f5f8c9c1d1c82f7c9d3de8aef2e6c5f8ad",
+    bytes: 15,
+  });
+});
+
+test("release asset inventory is stable, complete, and excludes the generated manifest", () => {
+  const entries = buildAssetInventory([
+    { path: "z/icon.svg", content: "<svg/>" },
+    { path: "release-" + "a".repeat(40) + ".json", content: "self-reference" },
+    { path: "app.js", content: "hello" },
+  ]);
+  assert.deepEqual(Object.keys(entries), ["app.js", "z/icon.svg"]);
+  assert.equal(entries["app.js"].bytes, 5);
+  assert.equal(entries["app.js"].sha256,
+    require("node:crypto").createHash("sha256").update("hello").digest("hex"));
+  assert.throws(() => buildAssetInventory([{ path: "../escape.js", content: "x" }]), /Invalid public asset path/);
+  assert.throws(() => buildAssetInventory([{ path: "app.js", content: "x" }, { path: "app.js", content: "y" }]), /Duplicate public asset path/);
+  assert.throws(() => buildAssetInventory([]), /cannot be empty/);
+});
+
+test("asset collection reads the full public tree and omits prior release manifests", () => {
+  const inventory = collectPublicAssets(path.join(root, "public"));
+  assert.ok(Object.keys(inventory).length > 100, "public inventory should cover the deployed application, not a hand-picked subset");
+  for (const required of ["index.html", "app.js", "service-worker.js", "style.css", "js/core.js", "js/bc7-jornada-ui.js"]) {
+    assert.ok(inventory[required], "missing public release asset " + required);
+    assert.match(inventory[required].sha256, /^[0-9a-f]{64}$/);
+  }
+  assert.ok(!Object.keys(inventory).some(name => /^release-[0-9a-f]{40}\.json$/i.test(name)),
+    "a generated manifest must not hash itself or prior manifests");
 });
 
 test("content-addressed manifest URL is unique to a full commit SHA", () => {
