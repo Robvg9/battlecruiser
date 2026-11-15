@@ -139,11 +139,11 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.31");
+  assert.equal(moduleVersion,"7.32");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assert.ok(app.includes('["aprobaciones-admin.js","20261113.4"]'));
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.4"));
-  assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261113.4"));
+  assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261115.1"));
 });
 
 
@@ -199,4 +199,22 @@ test("Daily cash approvals display the feminine state labels returned by the ser
   assert.match(ui,/APROBADA:'Aprobada'/);
   assert.match(ui,/RECHAZADA:'Rechazada'/);
   assert.match(ui,/status==='APROBADA'/);
+});
+
+
+test("shared inventory receipt keeps name, declared quantity and live count visible without horizontal scrolling",()=>{
+  const start=ui.indexOf("function receiveFormHtml(delivery,detail){");
+  const end=ui.indexOf("function updateReceivePreview(form){",start);
+  assert.ok(start>=0&&end>start,"shared receipt form and preview helper must be present");
+  const receive=ui.slice(start,end);
+  for(const token of ["bc7-receive-list","bc7-receive-item","Existencia declarada","Conteo físico recibido","data-bc7-receive-declared","data-bc7-receive-status","data-bc7-receive-progress"]) {
+    assert.ok(receive.includes(token),"receipt form must include "+token);
+  }
+  assert.match(ui,/Coincide · pendiente de guardar/,"a match is not falsely labelled server-confirmed before saving");
+  assert.match(ui,/requiere revisión del Dueño al guardar/,"differences remain explicitly gated for owner review");
+  assert.match(ui,/bc7_recibir_entrega_jornada/,"the existing server receipt RPC remains authoritative");
+  assert.ok(jornadaCss.includes(".bc7-receive-item"));
+  assert.ok(jornadaCss.includes(".bc7-receive-count input"));
+  assert.ok(jornadaCss.includes("@media (max-width: 650px)"));
+  assert.ok(ui.includes("if(receiveForm)updateReceivePreview(receiveForm)"));
 });
