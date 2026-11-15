@@ -28,7 +28,7 @@ test("compact Step 7 updates app loader and offline cache",()=>{
  assert.match(app,/\["bc7-jornada-ui\.js","7\.30"\]/);
  assert.match(sw,/BC_SW_VERSION = "9.5.112"/);
  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.30/);
- assert.match(ui,/v7\.30 — catálogo completo para ajustes y checklist de cinco pasos/);
+ assert.match(ui,/v7\.30 — caja de Jornada separada del salario acumulado/);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
