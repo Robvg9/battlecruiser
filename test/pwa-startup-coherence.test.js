@@ -11,6 +11,7 @@ const core = read("public/js/core.js");
 const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
 const indexHtml = read("public/index.html");
+const jornadaUi = read("public/js/bc7-jornada-ui.js");
 
 function appModules() {
   const start = app.indexOf("const modules=[");
@@ -27,13 +28,7 @@ function precachedVersion(name) {
   return match ? match[1] : null;
 }
 
-test("PWA loader: core.js no longer races app.js for the three versioned modules", () => {
-  for (const name of ["compra-multiple.js", "movimiento-multiple.js", "inventario-detalle.js"]) {
-    assert.doesNotMatch(core, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  }
-});
-
-test("PWA loader: app.js has one authoritative version per module", () => {
+test("PWA loader: core.js does not append scripts already owned by index/app", () => {\n  for (const name of [\n    "compra-multiple.js",\n    "movimiento-multiple.js",\n    "inventario-detalle.js",\n    "historial-detalle.js",\n    "loading-guard.js",\n  ]) {\n    const escaped = name.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");\n    assert.doesNotMatch(core, new RegExp("s\\\\.src\\\\s*=\\\\s*[\'\\"]js/" + escaped));\n  }\n  assert.match(core, /style-historiales\\.css\\?v=56/,\n    "removing duplicate history JS must preserve its dedicated stylesheet");\n});\ntest("PWA loader: app.js has one authoritative version per module", () => {
   const modules = appModules();
   const names = modules.map((item) => item.name);
   assert.equal(modules.length, 118, "unexpected change to the audited module inventory");
@@ -80,7 +75,7 @@ test("PWA loader: UI_READY waits for actual module load attempts and reports deg
     "the degraded readiness state must be externally observable");
 });
 
-test("Service Worker: offline fallback never ignores an explicit asset version", () => {
+test("Jornada: operation-only RPCs load on demand and keep retry available", () => {\n  const start = jornadaUi.indexOf("async function openWorkspace(sessionId)");\n  const end = jornadaUi.indexOf("async function saveCount(form)", start);\n  assert.ok(start >= 0 && end > start, "openWorkspace must be present");\n  const openWorkspace = jornadaUi.slice(start, end);\n  assert.match(openWorkspace, /rpc\\(\'bc7_obtener_inventario_jornada\'/);\n  assert.match(openWorkspace, /rpc\\(\'bc7_estado_entrega_inventario_jornada\'/);\n  for (const rpcName of [\n    "bc7_estado_confirmaciones_jornada",\n    "bc7_productos_ajuste_jornada",\n    "bc7_liquidacion_inventario_jornada",\n  ]) {\n    assert.doesNotMatch(openWorkspace, new RegExp(rpcName),\n      rpcName + " must not block the initial inventory workspace");\n  }\n  assert.match(jornadaUi, /ensureWorkspaceOperationData\\(state\\.detail\\)/,\n    "opening the operation tab must trigger deferred data");\n  assert.match(jornadaUi, /data-bc7-operation-retry/,\n    "a failed deferred load must expose a retry control");\n  assert.match(jornadaUi, /settlement=detail\\.liquidacion\\|\\|await rpc\\(\'bc7_liquidacion_inventario_jornada\'/,\n    "the tab must reuse its deferred liquidation instead of issuing a duplicate RPC");\n});\ntest("Service Worker: offline fallback never ignores an explicit asset version", () => {
   assert.doesNotMatch(serviceWorker, /ignoreSearch\s*:\s*true/,
     "ignoreSearch can serve bytes from an incompatible query-string version");
   const start = serviceWorker.indexOf("function cachedFallback(request)");
