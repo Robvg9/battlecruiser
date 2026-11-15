@@ -170,7 +170,8 @@
     const exits=x=>Number(x.transferencias_salida||0)+Number(x.vales_salida||0)+Number(x.mermas_aprobadas||0)+Number(x.bajas_aprobadas||0);
     const sums={initial:0,entries:0,exits:0,final:0,sold:0,revenue:0,cost:0,profit:0};
     lines.forEach(x=>{sums.initial+=Number(x.inventario_inicial||0);sums.entries+=entries(x);sums.exits+=exits(x);sums.final+=Number(x.inventario_final||0);sums.sold+=Number(x.unidades_vendidas||0);if(x.importe_estimado!=null)sums.revenue+=Number(x.importe_estimado);if(x.costo_vendido_estimado!=null)sums.cost+=Number(x.costo_vendido_estimado);if(x.ganancia_bruta_estimada!=null)sums.profit+=Number(x.ganancia_bruta_estimada)});
-    const tableSwitch='<div class="bcjr-table-switch"><button type="button" class="bcjr-btn active" data-bcjr-table-view="stock">Inventario físico</button><button type="button" class="bcjr-btn" data-bcjr-table-view="finance">Ventas y rentabilidad</button></div>';
+    const missingCosts=lines.filter(x=>Number(x.unidades_vendidas||0)>0&&x.costo_unitario_estimado==null);
+    const tableSwitch='<div class="bcjr-table-switch"><button type="button" class="bcjr-btn active" data-bcjr-table-view="stock">Inventario físico</button><button type="button" class="bcjr-btn" data-bcjr-table-view="finance">Ventas y rentabilidad</button>'+(missingCosts.length?'<button type="button" class="bcjr-btn primary" data-bcjr-open-bulk-costs data-session="'+esc(s.id)+'">Completar '+esc(missingCosts.length)+' costos en lista</button>':'')+'</div>';
     const table='<div class="bcjr-table-wrap"><table class="bcjr-table" data-bcjr-view="stock"><thead><tr><th>Producto</th><th>Inventario inicial</th><th>Entradas</th><th>Salidas</th><th>Bajas incluidas</th><th>Inventario final</th><th>Unidades vendidas</th><th>Precio venta</th><th>Ingreso est.</th><th>Costo/u est.</th><th>Costo vendido est.</th><th>Ganancia bruta est.</th><th>Margen est.</th><th>Valores</th><th>Conteo</th></tr></thead><tbody>'+
       lines.map(x=>'<tr><td>'+esc(x.nombre||'Producto')+'</td><td>'+esc(qty(x.inventario_inicial))+'</td><td>'+esc(qty(entries(x)))+'</td><td>'+esc(qty(exits(x)))+'</td><td>'+esc(qty(x.bajas_aprobadas))+'</td><td>'+esc(qty(x.inventario_final))+'</td><td>'+esc(pendingPost?blocked:qty(x.unidades_vendidas))+'</td><td>'+esc(Array.isArray(x.precio_tramos)&&x.precio_tramos.length?x.precio_tramos.map(t=>qty(t.cantidad)+' × '+money(t.precio_unitario)).join(' · '):(x.precio_unitario==null?'Sin precio':money(x.precio_unitario)))+'</td><td>'+esc(pendingPost?blocked:(x.importe_estimado==null?'—':money(x.importe_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_unitario_estimado==null?'Sin costo':money(x.costo_unitario_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.costo_vendido_estimado==null?'—':money(x.costo_vendido_estimado)))+'</td><td>'+esc(pendingPost?blocked:(x.ganancia_bruta_estimada==null?'—':money(x.ganancia_bruta_estimada)))+'</td><td>'+esc(pendingPost?blocked:(x.margen_bruto_estimado==null?'—':qty(x.margen_bruto_estimado)+'%'))+'</td><td><button type="button" class="bcjr-btn small" data-bcjr-open-values data-session="'+esc(s.id)+'" data-product="'+esc(x.producto_id)+'" data-name="'+esc(x.nombre||'Producto')+'" data-price="'+esc(x.precio_unitario==null?'':x.precio_unitario)+'" data-cost="'+esc(x.costo_unitario_estimado==null?'':x.costo_unitario_estimado)+'">Editar valores</button><button type="button" class="bcjr-btn small" data-bcjr-open-tranches data-session="'+esc(s.id)+'" data-product="'+esc(x.producto_id)+'" data-name="'+esc(x.nombre||'Producto')+'" data-sold="'+esc(x.unidades_vendidas||0)+'">Precios por tramos</button></td><td>'+(x.inventario_final_original!=null?'<button type="button" class="bcjr-btn small" data-bcjr-open-count data-session="'+esc(s.id)+'" data-product="'+esc(x.producto_id)+'" data-name="'+esc(x.nombre||'Producto')+'" data-final="'+esc(x.inventario_final)+'">Corregir final</button>':'<span class="bcjr-muted">Sin línea final</span>')+'</td></tr>').join('')+
       '</tbody><tfoot><tr><td>TOTALES</td><td>'+esc(qty(sums.initial))+'</td><td>'+esc(qty(sums.entries))+'</td><td>'+esc(qty(sums.exits))+'</td><td>'+esc(qty(lines.reduce((v,x)=>v+Number(x.bajas_aprobadas||0),0)))+'</td><td>'+esc(qty(sums.final))+'</td><td>'+esc(pendingPost?blocked:qty(sums.sold))+'</td><td>—</td><td>'+esc(pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)))+'</td><td>—</td><td>'+esc(pendingPost?blocked:money(sums.cost)+'*')+'</td><td>'+esc(pendingPost?blocked:money(sums.profit)+'*')+'</td><td>—</td><td>—</td><td>—</td></tr></tfoot></table></div><p class="bcjr-muted">'+(pendingPost?'El inventario físico sí está disponible. Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte.':'* Costos y ganancias son estimaciones parciales cuando faltan costos históricos. No equivalen a un costo FIFO completo.')+'</p>';
@@ -332,6 +333,51 @@
       button.disabled=false;button.textContent='Reintentar guardado';
     }finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
+  const verifiedHistoricCosts={
+    'botellas de agua':310,'botella de agua':310,'cerveza cristal':667,'cerveza cristal lata':667,
+    'cerveza mayabe':750,'cerveza mayabe lata':750,'chicle americano':70,'chupachupa':48,'chupa chupa':48,
+    'cigarros criollos':720,'cigarro criollo':720,'cigarros englishman':1350,'cigarro englishman':1350,
+    'cigarros popular rojo':1200,'cigarro popular rojo':1200,'condones':31,'preservativos':31,'cubalces':9,'cubalse':9,
+    'galletas mantequilla':150,'galletas maria':210,'galletas picapau':320,'guataquitas':30,'guataquitas 40':30,
+    'guataquitas fabio':40,'huevos sorpresa':100,'huevo sorpresa':100,'leche condensada':950,'malta bucanero':690,
+    'mani grande':240,'maní grande':240,'mantecado iskener':35,'masarreal redonda':160,'masareal redonda':160,
+    'mentiplus':180,'ojitos':36,'paniqueque grande':80,'pelly cebolla':170,'pelly de cebolla':170,'suspiros':75
+  };
+  const normalizeProductName=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+  function openBulkCostsEditor(button){
+    document.querySelector('.bcjr-values-modal')?.remove();
+    const session=(report?.sesiones||[]).find(x=>String(x.id)===String(button.dataset.session));
+    const lines=Array.isArray(session?.liquidacion?.lineas)?session.liquidacion.lineas:[];
+    const pending=lines.filter(x=>Number(x.unidades_vendidas||0)>0&&x.costo_unitario_estimado==null);
+    const rows=pending.map(x=>{
+      const normalized=normalizeProductName(x.nombre);
+      const cost=verifiedHistoricCosts[normalized];
+      return '<tr><td><b>'+esc(x.nombre||'Producto')+'</b><small class="bcjr-muted" style="display:block">'+esc(qty(x.unidades_vendidas))+' vendidas</small></td><td><input type="number" min="0" step="0.0001" inputmode="decimal" data-bcjr-bulk-cost="'+esc(x.producto_id)+'" value="'+(cost==null?'':esc(cost))+'" placeholder="Costo CUP" aria-label="Costo histórico de '+esc(x.nombre)+'"></td><td>'+(cost==null?'<span class="bcjr-pill warn">Revisar</span>':'<span class="bcjr-pill ok">Excel</span>')+'</td></tr>';
+    }).join('');
+    const mapped=pending.filter(x=>verifiedHistoricCosts[normalizeProductName(x.nombre)]!=null).length;
+    const box=document.createElement('div');box.className='bcjr-values-modal';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Costos históricos · carga en lote</h3><p class="bcjr-muted">Una sola lista para toda la jornada. '+mapped+' de '+pending.length+' costos vienen precargados desde el Excel verificado. Revisa los importes; puedes corregirlos aquí. Los vacíos no se guardarán. Esto solo modifica esta jornada, nunca el catálogo.</p><div class="bcjr-table-wrap" style="max-height:58dvh"><table class="bcjr-table" style="min-width:0"><thead><tr><th>Producto / vendidas</th><th>Costo CUP</th><th>Fuente</th></tr></thead><tbody>'+rows+'</tbody></table></div><label>Fuente común<textarea rows="2" maxlength="500" data-bcjr-bulk-reason>Verificado en Noviembre-09-10-Sheyla.xlsx, columna P.C.; costo histórico exclusivo de esta jornada.</textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-bulk-costs-save data-session="'+esc(button.dataset.session)+'">Guardar todos los costos</button></div></section>';
+    document.body.appendChild(box);
+  }
+  async function saveBulkCostsEditor(button){
+    const box=button.closest('.bcjr-values-modal'),status=box?.querySelector('[data-bcjr-values-status]');
+    const setStatus=(message,kind='')=>{if(status){status.textContent=message;status.className='bcjr-values-status'+(kind?' '+kind:'');}};
+    const inputs=[...(box?.querySelectorAll('[data-bcjr-bulk-cost]')||[])];
+    const adjustments=inputs.filter(input=>input.value.trim()!=='').map(input=>({producto_id:input.dataset.bcjrBulkCost,precio_venta_unitario:null,costo_unitario:Number(input.value)}));
+    const reason=(box?.querySelector('[data-bcjr-bulk-reason]')?.value||'').trim();
+    if(!adjustments.length||adjustments.some(x=>!Number.isFinite(x.costo_unitario)||x.costo_unitario<0)||reason.length<5){
+      setStatus('Revisa los costos: introduce importes válidos y una fuente de al menos 5 caracteres. No se guardó nada.','error');return;
+    }
+    if(busy){setStatus('Ya hay otra operación guardándose.','error');return;}
+    if(!confirm('Se guardarán '+adjustments.length+' costos históricos en esta jornada. Los precios de venta y el catálogo no cambiarán. ¿Continuar?'))return;
+    busy=true;button.disabled=true;button.textContent='Guardando '+adjustments.length+'…';setStatus('Guardando todos los costos en una sola operación auditada…');
+    try{
+      await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:adjustments,p_comentario:reason});
+      setStatus('Guardados '+adjustments.length+' costos. Actualizando rentabilidad…','success');
+      box.remove();await openReview(activeTurnId);
+    }catch(error){setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');button.disabled=false;button.textContent='Reintentar guardado';}
+    finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
+  }
   function openCountEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
     const box=document.createElement('div');box.className='bcjr-values-modal';
@@ -355,11 +401,13 @@
     finally{busy=false;if(report&&!document.getElementById('bc-jornada-review-modal')?.hidden)render(report);}
   }
   async function click(e){
-    const t=e.target.closest&&e.target.closest('[data-bcjr-action],[data-bcjr-close],[data-bcjr-table-view],[data-bcjr-open-values],[data-bcjr-open-tranches],[data-bcjr-tranches-save],[data-bcjr-values-save],[data-bcjr-values-cancel],[data-bcjr-open-count],[data-bcjr-count-save],[data-bcjr-count-cancel]');if(!t)return;
+    const t=e.target.closest&&e.target.closest('[data-bcjr-action],[data-bcjr-close],[data-bcjr-table-view],[data-bcjr-open-values],[data-bcjr-open-tranches],[data-bcjr-tranches-save],[data-bcjr-values-save],[data-bcjr-values-cancel],[data-bcjr-open-count],[data-bcjr-count-save],[data-bcjr-count-cancel],[data-bcjr-open-bulk-costs],[data-bcjr-bulk-costs-save]');if(!t)return;
     if(t.hasAttribute('data-bcjr-close')){close();return;}
     if(t.hasAttribute('data-bcjr-table-view')){const body=t.closest('.bcjr-inventory-body'),table=body?.querySelector('.bcjr-table'),view=t.dataset.bcjrTableView;if(table){table.dataset.bcjrView=view;body.querySelectorAll('[data-bcjr-table-view]').forEach(b=>b.classList.toggle('active',b===t));}return;}
     if(t.hasAttribute('data-bcjr-open-values')){openValuesEditor(t);return;}
     if(t.hasAttribute('data-bcjr-open-tranches')){openTranchesEditor(t);return;}
+    if(t.hasAttribute('data-bcjr-open-bulk-costs')){openBulkCostsEditor(t);return;}
+    if(t.hasAttribute('data-bcjr-bulk-costs-save')){await saveBulkCostsEditor(t);return;}
     if(t.hasAttribute('data-bcjr-tranches-save')){await saveTranchesEditor(t);return;}
     if(t.hasAttribute('data-bcjr-values-cancel')){t.closest('.bcjr-values-modal')?.remove();return;}
     if(t.hasAttribute('data-bcjr-values-save')){await saveValuesEditor(t);return;}
