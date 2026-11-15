@@ -190,9 +190,17 @@
     try {
       var p = JSON.parse(localStorage.getItem(LS) || '{}');
       var appearance = p.appearance === 'light' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-bc-theme', appearance);
+      document.documentElement.style.colorScheme = appearance;
+      var themeColor = document.querySelector('meta[name="theme-color"]');
+      if (themeColor) themeColor.setAttribute('content', appearance === 'light' ? '#eeeae1' : '#0c1c18');
       document.body.classList.toggle('bc-theme-light', appearance === 'light');
       document.body.classList.toggle('bc-theme-dark', appearance === 'dark');
     } catch (e) {
+      document.documentElement.setAttribute('data-bc-theme', 'dark');
+      document.documentElement.style.colorScheme = 'dark';
+      var themeColor = document.querySelector('meta[name="theme-color"]');
+      if (themeColor) themeColor.setAttribute('content', '#0c1c18');
       document.body.classList.remove('bc-theme-light');
       document.body.classList.add('bc-theme-dark');
     }
