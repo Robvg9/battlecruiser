@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.114 — Bloqueo de turnos cerrados y recepción sucesora retroactiva
+// v9.5.115 — Bloqueo de turnos cerrados y recepción sucesora retroactiva
 (function hotfixV9475(){
-  const VERSION="9.5.114";
+  const VERSION="9.5.115";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -14,25 +14,71 @@
 })();
 (function instalarAvisoActualizacionPWA(){
   if (!("serviceWorker" in navigator)) return;
-  var teniaControlador = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.addEventListener("controllerchange", function(){
-    if (!teniaControlador) { teniaControlador = !!navigator.serviceWorker.controller; return; }
-    if (window.__BC_SW_UPDATE_NOTICE__) return;
-    window.__BC_SW_UPDATE_NOTICE__ = true;
-    var notice = document.createElement("aside");
-    notice.className = "bc-pwa-update-notice";
-    notice.id = "bc-pwa-update-notice";
-    notice.setAttribute("role", "status");
+  var aviso = null;
+
+  function mostrarAviso(registration) {
+    if (!registration || !registration.waiting || !navigator.serviceWorker.controller || aviso) return;
+    aviso = document.createElement("aside");
+    aviso.className = "bc-pwa-update-notice";
+    aviso.id = "bc-pwa-update-notice";
+    aviso.setAttribute("role", "status");
+
     var message = document.createElement("span");
-    message.textContent = "Hay una versión nueva de BattleCruiser lista. Actualiza cuando termines lo que estás haciendo.";
+    message.textContent = "Hay una versión nueva de BattleCruiser lista. La aplicación actual seguirá estable hasta que la actualices.";
     var button = document.createElement("button");
     button.type = "button";
     button.textContent = "Actualizar ahora";
-    button.addEventListener("click", function(){ window.location.reload(); });
-    notice.appendChild(message);
-    notice.appendChild(button);
-    document.body.appendChild(notice);
+    button.addEventListener("click", async function() {
+      var waiting = registration.waiting;
+      if (!waiting) {
+        window.location.reload();
+        return;
+      }
+      button.disabled = true;
+      button.textContent = "Preparando actualización…";
+      try {
+        await new Promise(function(resolve, reject) {
+          var timer = setTimeout(function() {
+            waiting.removeEventListener("statechange", onStateChange);
+            reject(new Error("La nueva versión no terminó de activarse."));
+          }, 15000);
+          function onStateChange() {
+            if (waiting.state === "activated") {
+              clearTimeout(timer);
+              waiting.removeEventListener("statechange", onStateChange);
+              resolve();
+            } else if (waiting.state === "redundant") {
+              clearTimeout(timer);
+              waiting.removeEventListener("statechange", onStateChange);
+              reject(new Error("La actualización fue reemplazada."));
+            }
+          }
+          waiting.addEventListener("statechange", onStateChange);
+          if (waiting.state === "activated") {
+            clearTimeout(timer);
+            waiting.removeEventListener("statechange", onStateChange);
+            resolve();
+            return;
+          }
+          waiting.postMessage({ type: "SKIP_WAITING" });
+        });
+        window.location.reload();
+      } catch (error) {
+        console.warn("[BattleCruiser] No se pudo activar la actualización:", error);
+        button.disabled = false;
+        button.textContent = "Reintentar actualización";
+      }
+    });
+
+    aviso.appendChild(message);
+    aviso.appendChild(button);
+    document.body.appendChild(aviso);
+  }
+
+  window.addEventListener("bc:pwa-update-ready", function(event) {
+    mostrarAviso(event.detail && event.detail.registration);
   });
+  navigator.serviceWorker.ready.then(mostrarAviso).catch(function() {});
 })();
 (function cargarModulosDinamicos(){
   const modules=[
@@ -57,7 +103,7 @@
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
     ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261109.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
     ["m53-inventario-centro.js","53.9"],["m55-productos-import.js","55.5"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.8"],["m57-turnos-sesion-ux-fix.js","57.6"],
-    ["m68-ventas-pos-definitivo.js","9.5.114"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
+    ["m68-ventas-pos-definitivo.js","9.5.115"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.2"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.4"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.7"],["hotfix-17-final-loader-20260903.js","20261030.2"],
@@ -138,4 +184,16 @@
     console.error("[BattleCruiser] Falló la coordinación de carga de módulos:",error);
     terminarBootUI([{name:"module-loader",status:"failed",reason:String(error&&error.message||error)}]);
   });
+})();
+
+// Cache garbage collection is deliberately deferred until the UI is ready.
+// The active worker retains prior release caches while multiple tabs are open.
+(function liberarCachesObsoletasTrasBoot(){
+  if (!("serviceWorker" in navigator)) return;
+  Promise.resolve(window.__BC_UI_READY__).then(function() {
+    return navigator.serviceWorker.ready;
+  }).then(function(registration) {
+    var worker = navigator.serviceWorker.controller || registration.active;
+    if (worker) worker.postMessage({ type: "PRUNE_OLD_RELEASES" });
+  }).catch(function() {});
 })();
