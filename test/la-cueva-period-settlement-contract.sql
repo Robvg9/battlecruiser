@@ -322,9 +322,14 @@ BEGIN
   PERFORM public.resolver_aprobacion_operativa('baja',v_baja_id,'APROBAR','Baja comprobada',0.5,NULL);
   PERFORM public.resolver_aprobacion_operativa('entrega_diaria',v_daily_id,'APROBAR','Conteo correcto',20,NULL);
 
+  -- Reinvestment and merma affect global stock; Jornada-linked Baja stays in the Jornada ledger.
   IF (SELECT cantidad FROM public.stock WHERE producto_id=v_pan AND almacen_id=v_warehouse)<>101
-     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99 THEN
-    RAISE EXCEPTION 'FAIL: approval must apply reinvestment, merma and baja stock effects exactly once';
+     OR (SELECT cantidad FROM public.stock WHERE producto_id=v_juice AND almacen_id=v_warehouse)<>99.5 THEN
+    RAISE EXCEPTION 'FAIL: reinvestment and merma must affect global stock once, while Jornada-linked Baja must not double-decrement it';
+  END IF;
+  IF (SELECT cantidad_actual FROM public.bc7_jornada_saldos_operativos(v_session) WHERE producto_id=v_pan)<>12
+     OR (SELECT cantidad_actual FROM public.bc7_jornada_saldos_operativos(v_session) WHERE producto_id=v_juice)<>5 THEN
+    RAISE EXCEPTION 'FAIL: the Jornada operational ledger must include the linked reinvestment, merma and Baja exactly once';
   END IF;
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
