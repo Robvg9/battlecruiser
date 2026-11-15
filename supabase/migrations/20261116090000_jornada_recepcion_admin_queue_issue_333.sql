@@ -33,6 +33,30 @@ BEGIN
     RAISE EXCEPTION 'Entrega de inventario no encontrada.' USING ERRCODE='23503';
   END IF;
 
+  -- turnos.ver is limited: non-admin/non-auditor callers may only read deliveries
+  -- for jornadas/almacenes they belong to (origin or destination assignment context).
+  IF NOT (
+    public.bc_actor_is_admin()
+    OR public.tiene_permiso('auditoria','editar_any')
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.turno_sesiones s
+      LEFT JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id
+      LEFT JOIN public.turno_asignaciones ta ON ta.turno_sesion_id=s.id AND ta.retirado_at IS NULL
+      WHERE s.id IN (v_e.origen_sesion_id, v_e.destino_sesion_id)
+        AND (s.creada_por=auth.uid() OR p.responsable_id=auth.uid() OR ta.usuario_id=auth.uid())
+    ) AND NOT EXISTS (
+      SELECT 1
+      FROM public.turno_sesiones s
+      JOIN public.turno_asignaciones ta ON ta.turno_sesion_id=s.id AND ta.retirado_at IS NULL
+      WHERE s.almacen_id=v_e.almacen_id
+        AND ta.usuario_id=auth.uid()
+    ) THEN
+      RAISE EXCEPTION 'Sin permiso para consultar entregas ajenas.' USING ERRCODE='42501';
+    END IF;
+  END IF;
+
   v_detail:=public._bc7_entrega_inventario_json(v_e.id);
   RETURN v_detail || jsonb_build_object(
     'almacen_nombre',(SELECT a.nombre FROM public.almacenes a WHERE a.id=v_e.almacen_id),

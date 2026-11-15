@@ -4,7 +4,7 @@
 const ID='admin-aprobaciones',TIMEOUT=20000;
 const esc=v=>typeof escHtml==='function'?escHtml(v):String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 const escDate=v=>{const s=String(v||'').slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:s||'—';};
-const key=()=>crypto.randomUUID(),money=v=>typeof window.money==='function'?window.money(v):Number(v||0).toFixed(2),can=(s,a)=>typeof tienePermiso==='function'&&tienePermiso(s,a);
+const key=()=>crypto.randomUUID(),money=v=>typeof window.money==='function'?window.money(v):Number(v||0).toFixed(2),qty=v=>{const n=Number(v);if(!Number.isFinite(n))return '-';const s=(Math.round(n*1000)/1000).toFixed(3);return s.replace(/\.?0+$/,'');},can=(s,a)=>typeof tienePermiso==='function'&&tienePermiso(s,a);
 const canAdmin=()=>can('entregas_caja','editar_any')||canViewOperationalQueue();
 const canViewOperationalQueue=()=>can('gastos','editar_any')||can('mermas','editar_any')||can('bajas','editar_any')||can('reinversiones','editar_any')||can('entregas_caja','editar_any')||can('auditoria','editar_any');
 async function hasLiveSession(){const api=window.client||(typeof client!=='undefined'?client:null);if(!api||!api.auth||typeof api.auth.getSession!=='function')return false;try{const pack=await api.auth.getSession();return !!(pack&&!pack.error&&pack.data&&pack.data.session&&pack.data.session.user&&pack.data.session.user.id)}catch(_){return false}}
@@ -173,12 +173,12 @@ function renderApprovalDetails(x,detail){
     html+='<div class="bc-admin-approval-lines">';
     lines.forEach(line=>{
       const diff=Number(line.diferencia||0);
-      const diffTxt=(diff>0?'+':'')+money(diff);
+      const diffTxt=(diff>0?'+':'')+qty(diff);
       html+='<article class="bc-admin-approval-line">'+
         '<div class="bc-admin-approval-line-info"><strong>'+esc(line.nombre||line.producto_nombre||'Producto')+'</strong>'+
-        '<span>Declarado: '+esc(money(line.cantidad_declarada))+' · Físico: '+esc(line.cantidad_recibida==null?'—':money(line.cantidad_recibida))+' · Delta: '+esc(diffTxt)+'</span>'+
+        '<span>Declarado: '+esc(qty(line.cantidad_declarada))+' — Físico: '+esc(line.cantidad_recibida==null?'-':qty(line.cantidad_recibida))+' — Delta: '+esc(diffTxt)+'</span>'+
         '</div></article>';
-    });
+    });;
     html+='</div>';
   }else if(isList){
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(detail.motivo_general||x.motivo||'Motivo general no especificado')+'</strong>'+
@@ -213,7 +213,7 @@ function renderApprovalDetails(x,detail){
       '<span>'+esc(x.motivo||'Sin detalle adicional')+'</span></section>'+
       '<label class="bc-admin-approval-field"><span>Valor real</span><input id="admin-approval-real" type="number" min="0.01" step="0.01" value="'+esc(isExpense?x.monto:x.cantidad||'')+'"></label>';
   }
-  html+='<label class="bc-admin-approval-field"><span>Comentario administrativo</span><textarea id="admin-approval-comment" rows="2" placeholder="Obligatorio para rechazar; opcional para aprobar"></textarea></label>'+
+  html+='<label class="bc-admin-approval-field"><span>Comentario administrativo</span><textarea id="admin-approval-comment" rows="2" placeholder="'+(isReceipt?'Obligatorio para aprobar o rechazar':'Obligatorio para rechazar; opcional para aprobar')+'"></textarea></label>'+
     '<p id="admin-approval-message" class="bc-admin-approval-message" role="status" aria-live="polite"></p>';
   body.innerHTML=html;
   const rejectButton=modal.querySelector('#admin-approval-reject');
@@ -256,6 +256,11 @@ async function resolverDesdeModal(decision){
   if(!modal||modal.hidden)return;
   const type=modal.dataset.approvalType,id=modal.dataset.approvalId;
   const comment=(modal.querySelector('#admin-approval-comment')?.value||'').trim();
+  if(type==='recepcion_inventario_jornada' && !comment){
+    setApprovalMessage('Escribe el motivo obligatorio de la decisión.',true);
+    modal.querySelector('#admin-approval-comment')?.focus();
+    return;
+  }
   if(decision==='RECHAZAR'&&!comment){
     setApprovalMessage('Escribe el motivo obligatorio del rechazo.',true);
     modal.querySelector('#admin-approval-comment')?.focus();

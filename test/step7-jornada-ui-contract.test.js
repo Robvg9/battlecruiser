@@ -202,19 +202,31 @@ test("Daily cash approvals display the feminine state labels returned by the ser
 });
 
 
-test("shared inventory receipt keeps name, declared quantity and live count visible without horizontal scrolling",()=>{
+
+test("shared inventory receipt uses A/B attestation flow and preserves live counting state",()=>{
   const start=ui.indexOf("function receiveFormHtml(delivery,detail){");
   const end=ui.indexOf("function updateReceivePreview(form){",start);
   assert.ok(start>=0&&end>start,"shared receipt form and preview helper must be present");
   const receive=ui.slice(start,end);
-  for(const token of ["bc7-receive-list","bc7-receive-item","Existencia declarada","Conteo físico recibido","data-bc7-receive-declared","data-bc7-receive-status","data-bc7-receive-progress"]) {
+  for(const token of [
+    "data-bc7-receive-mode=\"fast\"",
+    "data-bc7-receive-mode=\"diff\"",
+    "data-bc7-receive-attest-fast",
+    "data-bc7-receive-attest-diff",
+    "data-bc7-receive-summary",
+    "bc7-receive-list",
+    "bc7-receive-item",
+    "Declarado:",
+    "data-bc7-receive-declared",
+    "data-bc7-receive-mark",
+    "data-bc7-receive-count"
+  ]) {
     assert.ok(receive.includes(token),"receipt form must include "+token);
   }
-  assert.match(ui,/Coincide · pendiente de guardar/,"a match is not falsely labelled server-confirmed before saving");
-  assert.match(ui,/requiere revisión del Dueño al guardar/,"differences remain explicitly gated for owner review");
+  assert.match(ui,/function receiveSummaryFromForm\(form\)\{[\s\S]*attested[\s\S]*pending/,"summary reflects attestation/pending state");
+  assert.match(ui,/No se pudo actualizar la vista automáticamente\. La recepción ya fue registrada en el servidor/,"post-save refresh failure must not be presented as reception failure");
   assert.match(ui,/bc7_recibir_entrega_jornada/,"the existing server receipt RPC remains authoritative");
   assert.ok(jornadaCss.includes(".bc7-receive-item"));
   assert.ok(jornadaCss.includes(".bc7-receive-count input"));
   assert.ok(jornadaCss.includes("@media (max-width: 650px)"));
-  assert.ok(ui.includes("if(receiveForm)updateReceivePreview(receiveForm)"));
 });

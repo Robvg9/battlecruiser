@@ -1070,13 +1070,19 @@
     const mode=form.querySelector('[data-bc7-receive-mode][aria-pressed="true"]')?.dataset.bc7ReceiveMode||'fast';
     let counted=0,matches=0,differences=0,invalid=0,pending=0;
     if(mode==='fast'){
-      counted=lines.length;matches=lines.length;
-      return {total:lines.length,counted,matches,differences,pending,invalid,mode};
+      const attested=!!form.querySelector('[data-bc7-receive-attest-fast]')?.checked;
+      if(attested){counted=lines.length;matches=lines.length;}
+      else{pending=lines.length;}
+      return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested};
     }
+    const attested=!!form.querySelector('[data-bc7-receive-attest-diff]')?.checked;
     lines.forEach(l=>{
       const id=String(l.producto_id);
       const marked=!!form.querySelector('[data-bc7-receive-mark="'+CSS.escape(id)+'"]')?.checked;
-      if(!marked){counted++;matches++;return;}
+      if(!marked){
+        if(attested){counted++;matches++;} else {pending++;}
+        return;
+      }
       const input=form.querySelector('[data-bc7-receive-count="'+CSS.escape(id)+'"]');
       const raw=String(input?input.value:'').trim();
       if(raw===''){pending++;return;}
@@ -1085,20 +1091,17 @@
       const diff=Math.round((Number(raw)-Number(l.cantidad_declarada))*1000)/1000;
       if(Math.abs(diff)<0.0005)matches++; else differences++;
     });
-    return {total:lines.length,counted,matches,differences,pending,invalid,mode};
+    return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested};
   }
   function renderReceiveSummary(form){
     const s=receiveSummaryFromForm(form);
     const el=form.querySelector('[data-bc7-receive-summary]');
     if(el){
-      el.textContent='Total '+s.total+' · Contados '+s.counted+' · Coincidencias '+s.matches+' · Diferencias '+s.differences+' · Pendientes '+s.pending+(s.invalid?' · Inválidos '+s.invalid:'');
+      el.textContent='Total '+s.total+' — Contados '+s.counted+' — Coincidencias '+s.matches+' — Diferencias '+s.differences+' — Pendientes '+s.pending+(s.invalid?' — Inválidos '+s.invalid:'');
     }
     const submit=form.querySelector('button[type="submit"]');
     if(submit){
-      const attestationOk=s.mode==='fast'
-        ?!!form.querySelector('[data-bc7-receive-attest-fast]')?.checked
-        :!!form.querySelector('[data-bc7-receive-attest-diff]')?.checked;
-      const canSend=!form.dataset.bc7Sending && attestationOk && s.invalid===0 && (s.mode==='fast' || (s.pending===0 && s.differences>=0));
+      const canSend=!form.dataset.bc7Sending && !!s.attested && s.invalid===0 && s.pending===0;
       submit.disabled=!canSend;
     }
   }
@@ -1172,7 +1175,10 @@
       '<div class="bc7-receive-list" aria-label="Lista de productos para recepción">'+rows+'</div>'+
       '<label class="bc7-check"><input type="checkbox" data-bc7-receive-attest-diff '+(attempt.attestDiff?'checked':'')+'> <span>Conté físicamente los '+total+' productos; los productos que no marqué coinciden.</span></label>'+
       '</section>';
-    const summary='<div class="bc7-note" data-bc7-receive-summary role="status" aria-live="polite">Total '+total+' · Contados 0 · Coincidencias 0 · Diferencias 0 · Pendientes '+(mode==='diff'?total:0)+'</div>';
+    const initialPending=(mode==='fast'&&!attempt.attestFast)||(mode==='diff'&&!attempt.attestDiff)?total:(mode==='diff'?Object.keys(attempt.marked||{}).filter(k=>attempt.marked[k]&&!String(attempt.values[k]??'').trim()).length:0);
+    const initialCounted=(mode==='fast'&&attempt.attestFast)?total:(mode==='diff'&&attempt.attestDiff?lines.filter(l=>!attempt.marked[String(l.producto_id)]).length:0);
+    const initialMatches=initialCounted;
+    const summary='<div class="bc7-note" data-bc7-receive-summary role="status" aria-live="polite">Total '+total+' — Contados '+initialCounted+' — Coincidencias '+initialMatches+' — Diferencias 0 — Pendientes '+initialPending+'</div>';
     return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Elige un camino. En diferencias, solo capturas cantidades de productos marcados; los no marcados se envían con la cantidad declarada tras tu atestación.</p>'+recount+'</div>'+
       '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'" data-bc7-receive-delivery="'+esc(delivery.id)+'" data-bc7-receive-lines=\''+esc(JSON.stringify(lines.map(l=>({producto_id:String(l.producto_id),cantidad_declarada:Number(l.cantidad_declarada),nombre:l.nombre||''}))))+'\'>'+
       modeTabs+fastPane+diffPane+summary+
@@ -1521,8 +1527,12 @@
         attempt.inline={text:'Recepción coincidente aceptada; inventario inicial compartido confirmado.',kind:'ok'};
       }
       attempt.idempotencyKey=''; attempt.lastSignature=''; // logical attempt completed
-      await openWorkspace(sessionId);
-      setStatus(attempt.inline.text,'ok');
+      const refreshed=await openWorkspace(sessionId);
+      if(refreshed){setStatus(attempt.inline.text,'ok');}
+      else{
+        setStatus(attempt.inline.text+' No se pudo actualizar la vista automáticamente; recarga o reabre la jornada si es necesario.','ok');
+        if($('bc7-workspace-body'))$('bc7-workspace-body').innerHTML='<div class="bc7-note"><b>'+esc(attempt.inline.text)+'</b><p class="bc7-muted">No se pudo actualizar la vista automáticamente. La recepción ya fue registrada en el servidor. Recarga o reabre la jornada para ver el estado actual.</p></div>';
+      }
     }catch(e){
       let uncertain=isUncertainReceiveError(e);
       if(uncertain){
@@ -1535,8 +1545,12 @@
               ?('Recepción enviada a revisión del Dueño: '+diff+' diferencias; jornada bloqueada hasta la decisión.')
               :'Recepción coincidente aceptada; inventario inicial compartido confirmado.',kind:'ok'};
             attempt.idempotencyKey=''; attempt.lastSignature='';
-            await openWorkspace(sessionId);
-            setStatus(attempt.inline.text,'ok');
+            const refreshed=await openWorkspace(sessionId);
+            if(refreshed){setStatus(attempt.inline.text,'ok');}
+            else{
+              setStatus(attempt.inline.text+' No se pudo actualizar la vista automáticamente; recarga o reabre la jornada si es necesario.','ok');
+              if($('bc7-workspace-body'))$('bc7-workspace-body').innerHTML='<div class="bc7-note"><b>'+esc(attempt.inline.text)+'</b><p class="bc7-muted">No se pudo actualizar la vista automáticamente. La recepción ya fue registrada en el servidor. Recarga o reabre la jornada para ver el estado actual.</p></div>';
+            }
             return;
           }
           if(inbound && (inbound.estado==='PENDIENTE_RECEPCION' || inbound.estado==='REQUIERE_RECUENTO')){
