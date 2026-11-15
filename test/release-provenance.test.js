@@ -34,11 +34,11 @@ test("release manifest records exact source SHA, numeric run ID and aligned app/
   assert.equal(manifest.asset_count, 2);
   assert.deepEqual(Object.keys(manifest.asset_inventory), ["app.js", "index.html"]);
   assert.deepEqual(manifest.asset_inventory["app.js"], {
-    sha256: "c2e5e7c9fbe83f347a59ea92b4a92eec1f6b0cda119e9c40b76cebec9d6f26bd",
-    bytes: 24,
+    sha256: "57387868c142a387ccbee6fc03e7151f4c406baddeae487a39750e37e8811652",
+    bytes: 23,
   });
   assert.deepEqual(manifest.asset_inventory["index.html"], {
-    sha256: "2de5f0da6e7a4f0f8b4bd8e1dc4aa1f5f8c9c1d1c82f7c9d3de8aef2e6c5f8ad",
+    sha256: "b6c951ed9485262465aa9b940f7e9b7df577e3a299a33f8c86fdda98f66a9fdc",
     bytes: 15,
   });
 });
