@@ -3,11 +3,11 @@
 -- Covers: 66/66, 1 and 15 differences (+/-), zero & <=3 decimals, full 66-line payload,
 -- idempotency/retry, rejection/recount, mandatory reasons, detail permissions (+/-),
 -- FINAL/INITIAL integrity and no public.stock changes.
--- IMPORTANT: This contract adds DELETE statements inside the DO block to clean up all test data
--- (public.stock, public.productos, public.turnos, etc.) while the variables are still in scope,
--- ensuring no persistent side effects on downstream contracts. All inserted data is removed
--- so subsequent contracts see a clean state.
+-- The fixture runs inside a transaction and is rolled back after the assertions.
+-- No broad DELETE statements: all fixture writes and trigger side effects are reverted.
 -- Run: psql -v ON_ERROR_STOP=1 -f test/jornada-recepcion-issue333-contract.sql
+
+BEGIN;
 
 DO $issue333$
 DECLARE
@@ -331,24 +331,7 @@ BEGIN
   IF v_detail IS NULL THEN RAISE EXCEPTION 'FAIL: auditor could not read delivery detail'; END IF;
 
   RAISE NOTICE 'PASS issue #333 reception (isolated): 66-line payload, 66/66, 1 & 15 diffs (+/-), zero/decimals, idempotency/recount, mandatory reasons, detail permissions, FINAL/INITIAL integrity, no stock changes';
--- Cleanup ALL test data inserted by this contract to ensure no side effects on downstream contracts.
--- Order matters: delete dependent rows first to avoid FK violations.
--- Delete inventory lines first (they reference productos.id via FK)
-DELETE FROM public.turno_jornada_inventario_lineas;
-DELETE FROM public.turno_jornada_inventario_entrega_lineas;
-DELETE FROM public.turno_jornada_inventario_recepcion_lineas;
-DELETE FROM public.turno_jornada_inventario_correcciones;
-DELETE FROM public.turno_jornada_inventario_cortes;
--- Delete stock rows for this warehouse
-DELETE FROM public.stock WHERE almacen_id = v_almacen;
--- Delete the 4 specific products created by this fixture (Prod333-A through D, plus loop products)
-DELETE FROM public.productos WHERE id IN (v_p1, v_p2, v_p3, v_p4);
-DELETE FROM public.productos WHERE nombre LIKE 'Prod333-%';
--- Delete session/turno/programacion data
-DELETE FROM public.turno_asignaciones WHERE turno_sesion_id IN (v_s1, v_s2, v_s3, v_s4);
-DELETE FROM public.turno_sesiones WHERE id IN (v_s1, v_s2, v_s3, v_s4);
-DELETE FROM public.turno_jornada_programacion WHERE id IN (v_prog1, v_prog2, v_prog3, v_prog4);
-DELETE FROM public.turnos WHERE id = v_turno;
-DELETE FROM public.almacenes WHERE id = v_almacen;
 END
 $issue333$;
+
+ROLLBACK;
