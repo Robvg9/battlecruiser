@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.30 — caja de Jornada separada del salario acumulado.
+// v7.31 — traspaso retroactivo auditado y bloqueo de turnos cerrados.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -257,7 +257,7 @@
        '<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">¿Cómo quieres organizar los días?<select id="bc7-plan-mode"><option value="explicit">Elegir responsables día por día</option><option value="pattern">Repetir una rotación guardada</option></select></label></div>'+
        '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Hora local del almacén<input type="hidden" id="bc7-timezone" value="America/Havana"><span id="bc7-timezone-label" class="bc7-muted">Hora de Cuba (La Habana)</span></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
        '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="2" max="31" value="7" required></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
-       '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+
+       '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar una jornada atrasada · Entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Prepara una sucesora con fechas pasadas usando el inventario final del turno ya cerrado. No se modifica el stock global ni se inventa un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>'+
       '</section></details>'+
       '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><h3>Calendario</h3><span class="bc7-muted">Jornadas asignadas</span></div><div class="bc7-calendar-controls"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
       '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
@@ -409,9 +409,10 @@
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
     const rest=!r.trabaja||r.estado==='DESCANSO';
     const pill=rest?'<span class="bc7-pill">Descanso</span>':status==='COMPLETADA'?'<span class="bc7-pill ok">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':status==='PROGRAMADA'||status==='PENDIENTE'?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const action=(!rest&&r.sesion_id)?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">Gestionar jornada</button>':'';
+    const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status);
+    const action=(!rest&&!isTerminal&&r.sesion_id)?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">Gestionar jornada</button>':'';
     let reschedule='';
-    if(state.admin){
+    if(state.admin&&!isTerminal){
       reschedule='<details class="bc7-reschedule"><summary>Reprogramar responsable / descanso</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-check"><input type="checkbox" data-bc7-rework '+(!rest?'checked':'')+'> Jornada laborable</label><label class="bc7-field">Responsable<select data-bc7-reperson '+(rest||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Ausencia, sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reprogramación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
     }
     return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
@@ -1039,7 +1040,7 @@
 
   function receiveFormHtml(delivery,detail){
     const lines=arr(delivery&&delivery.lineas);
-    const table=lines.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Existencia declarada</th><th>Conteo físico recibido</th></tr></thead><tbody>'+lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-receive-count="'+esc(l.producto_id)+'" aria-label="Conteo recibido de '+esc(l.nombre||'producto')+'" value="'+esc(l.cantidad_declarada)+'"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">El almacén no tiene productos activos con stock registrado; confirma la recepción de cero productos.</div>';
+    const table=lines.length?'<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Existencia declarada</th><th>Conteo físico recibido</th></tr></thead><tbody>'+lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-receive-count="'+esc(l.producto_id)+'" aria-label="Conteo recibido de '+esc(l.nombre||'producto')+'" placeholder="Contar físicamente"></td></tr>').join('')+'</tbody></table></div>':'<div class="bc7-empty">El almacén no tiene productos activos con stock registrado; confirma la recepción de cero productos.</div>';
     const recount=delivery.estado==='REQUIERE_RECUENTO'?'<p class="bc7-note">El dueño rechazó el intento anterior. Realiza otro conteo físico completo. El intento rechazado y su motivo permanecen en el historial.</p>':'';
     return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Compara cada producto con lo que realmente recibes. Una recepción igual se confirma automáticamente. Cualquier diferencia queda bloqueada hasta que el dueño la revise.</p>'+recount+'</div>'+
       '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'">'+table+
@@ -1061,7 +1062,7 @@
     const delivery=[shared.entrada,shared.salida].find(x=>x&&x.estado==='PENDIENTE_REVISION');
     if(!detail.is_admin||!delivery)return '';
     const lines=arr(delivery.lineas);
-    return '<div class="bc7-note"><b>Revisión del dueño · diferencia de recepción</b><p class="bc7-muted">No se ha creado el inventario inicial de destino. La jornada permanece bloqueada hasta aprobar la cantidad recibida o rechazarla para un nuevo conteo.</p>'+
+    return '<div class="bc7-note"><b>Revisión del dueño · diferencia de recepción</b><p class="bc7-muted">No se ha creado el inventario inicial de destino. Al aprobar, las diferencias se guardarán como correcciones auditadas del inventario final anterior y la cantidad física recibida se convertirá en el inventario inicial de esta jornada. El corte original se conserva. Rechazar exige un nuevo conteo.</p>'+
       '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Declarado</th><th>Recibido</th><th>Diferencia</th></tr></thead><tbody>'+
       lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td>'+esc(l.cantidad_recibida==null?'—':qty(l.cantidad_recibida))+'</td><td class="bc7-diff '+(Number(l.diferencia)===0?'good':'bad')+'">'+(Number(l.diferencia)>0?'+':'')+esc(qty(l.diferencia||0))+'</td></tr>').join('')+
       '</tbody></table></div><label class="bc7-field">Motivo obligatorio de la decisión<input data-bc7-delivery-decision-note maxlength="1000" placeholder="Motivo de aprobación o rechazo"></label>'+
@@ -1217,7 +1218,11 @@
     const isAssigned=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
     const tramo=detail.tramo_activo;
     let actionArea='';
-    if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
+    if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial&&s.sucesora_retroactiva===true){
+      actionArea=state.admin
+        ?'<div class="bc7-note"><b>Recepción física aceptada.</b><p>Esta es una sucesora atrasada. El inventario inicial ya está vinculado y aprobado. Registra la hora real de apertura y el motivo administrativo para habilitar su operación.</p><label class="bc7-field">Hora real de apertura<input id="bc7-retro-start-time" type="time" value="'+esc(String(s.hora_inicio_prevista||'07:00').slice(0,5))+'" required></label><label class="bc7-field">Motivo obligatorio de apertura retroactiva<input id="bc7-retro-start-reason" maxlength="1000" placeholder="Regularización del período atrasado tras el retraso del cierre anterior"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start-retro="'+esc(s.id)+'">Abrir jornada atrasada</button></div><p class="bc7-msg" id="bc7-retro-start-msg"></p></div>'
+        :'<div class="bc7-note"><b>Inventario recibido y validado.</b><p>La recepción quedó aceptada. El dueño debe activar esta jornada retroactiva antes de registrar operaciones.</p></div>';
+    }else if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Completar jornada y enviarla a Administración.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
@@ -1369,7 +1374,7 @@
     const message=document.querySelector('[data-bc7-delivery-decision-msg]');
     if(!note){msg(message,'Registra el motivo de la decisión.','error');return;}
     if(!confirm(decision==='APROBAR'
-      ?'Vas a aprobar la cantidad recibida y convertirla en la existencia efectiva compartida de ambos días. ¿Confirmas?'
+      ?'Vas a aprobar la recepción. Las diferencias corregirán el inventario final anterior mediante auditoría y crearán el inventario inicial con la cantidad física recibida. El conteo original se conserva. ¿Confirmas?'
       :'Vas a rechazar esta recepción. La jornada seguirá bloqueada y la dependienta tendrá que realizar otro conteo físico. ¿Confirmas?'))return;
     if(!busy(btn,true))return;
     try{
@@ -1847,6 +1852,81 @@
     finally{busy(btn,false);}
   }
   async function saveHours(form){
+  async function openRetroSuccessorPanel(btn){
+    const host=$('bc7-retro-handover-content');
+    if(!host)return;
+    if(!state.admin){setStatus('Solo el Dueño/Admin puede regularizar una sucesora atrasada.','error');return;}
+    if(!busy(btn,true))return;
+    host.innerHTML='<div class="bc7-empty">Consultando entregas pendientes…</div>';
+    try{
+      await ensureResponsibleCatalog(true);
+      const pending=arr(await rpc('bc7_listar_entregas_sucesoras_pendientes',{}));
+      if(!pending.length){host.innerHTML='<div class="bc7-empty">No hay entregas cerradas esperando una jornada sucesora.</div>';return;}
+      const first=pending[0];
+      const deliveryOptions=pending.map(d=>'<option value="'+esc(d.entrega_id)+'">'+esc((d.almacen_nombre||'Almacén')+' · '+fmtDate(d.fecha_destino)+' · '+d.lineas+' familias · anterior '+fmtDate(d.fecha_inicio)+'–'+fmtDate(d.fecha_fin_anterior))+'</option>').join('');
+      const personOptions='<option value="">Selecciona la responsable real</option>'+eligibleStaff().map(u=>'<option value="'+esc(u.id)+'">'+esc(u.nombre||u.nombre_usuario||u.email||u.id)+'</option>').join('');
+      host.innerHTML='<form id="bc7-retro-successor-form" class="bc7-panel-stack">'+
+        '<label class="bc7-field">Entrega de inventario anterior<select id="bc7-retro-delivery" required>'+deliveryOptions+'</select></label>'+
+        '<div class="bc7-grid"><label class="bc7-field">Inicio (heredado de la entrega)<input id="bc7-retro-start-date" type="date" value="'+esc(first.fecha_destino)+'" readonly></label>'+
+        '<label class="bc7-field">Fin de la jornada<input id="bc7-retro-end-date" type="date" min="'+esc(first.fecha_destino)+'" max="'+esc(addDays(first.fecha_destino,30))+'" value="'+esc(addDays(first.fecha_destino,2))+'" required></label></div>'+
+        '<label class="bc7-field">Responsable real del período<select id="bc7-retro-responsible" required>'+personOptions+'</select></label>'+
+        '<label class="bc7-field">Motivo de regularización<input id="bc7-retro-note" maxlength="1000" minlength="5" value="Regularización del período atrasado tras el retraso del cierre del turno anterior y su conciliación auditada." required></label>'+
+        '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Crear sucesora y vincular el inventario</button></div>'+
+        '<p class="bc7-msg" id="bc7-retro-successor-msg"></p></form>'+
+        '<p class="bc7-muted">Solo se crea la programación. La responsable debe realizar el conteo físico real antes de poder operar.</p>';
+      const select=$('bc7-retro-delivery');
+      select?.addEventListener('change',()=>{
+        const d=pending.find(x=>String(x.entrega_id)===String(select.value));
+        if(!d)return;
+        $('bc7-retro-start-date').value=d.fecha_destino;
+        $('bc7-retro-end-date').min=d.fecha_destino;
+        $('bc7-retro-end-date').max=addDays(d.fecha_destino,30);
+        $('bc7-retro-end-date').value=addDays(d.fecha_destino,2);
+      });
+    }catch(e){host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'create'))+'</div>';}
+    finally{busy(btn,false);}
+  }
+  async function createRetroSuccessor(form){
+    const deliveryId=$('bc7-retro-delivery')?.value;
+    const start=$('bc7-retro-start-date')?.value;
+    const end=$('bc7-retro-end-date')?.value;
+    const responsible=$('bc7-retro-responsible')?.value;
+    const note=$('bc7-retro-note')?.value.trim()||'';
+    const output=$('bc7-retro-successor-msg');
+    if(!deliveryId||!start||!end||end<start||!responsible||note.length<5){msg(output,'Selecciona la entrega, el período, la responsable y el motivo.','error');return;}
+    if(!confirm('Se preparará una jornada única '+fmtDate(start)+'–'+fmtDate(end)+', con la responsable elegida. Se vinculará el inventario final existente; no se modificará el stock global ni se registrará un conteo inicial automático. Después la responsable tendrá que contar físicamente las familias. ¿Confirmas?'))return;
+    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
+    try{
+      const result=await rpc('bc7_admin_programar_sucesora_pendiente',{
+        p_entrega_id:deliveryId,p_fecha_fin:end,p_responsable_id:responsible,p_observacion:note
+      });
+      $('bc7-list-from').value=start;$('bc7-list-days').value='31';
+      await loadCalendar();
+      const host=$('bc7-retro-handover-content');
+      if(host)host.innerHTML='<div class="bc7-note"><b>Sucesora preparada.</b><p>Período '+esc(fmtDate(result.fecha_inicio))+'–'+esc(fmtDate(result.fecha_fin))+' · '+esc(result.lineas_inventario)+' familias vinculadas · responsable '+esc(userName(result.responsable_id))+'.</p><p>La jornada sigue bloqueada hasta que se registre la recepción física.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-open="'+esc(result.sesion_id)+'">Abrir recepción física</button></div></div>';
+      setStatus('Sucesora retroactiva preparada y vinculada. El turno anterior permanece cerrado.','ok');
+    }catch(e){msg(output,'No se creó la sucesora. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+  async function startRetroSuccessor(btn){
+    const sessionId=btn.dataset.bc7StartRetro;
+    const hour=$('bc7-retro-start-time')?.value;
+    const reason=$('bc7-retro-start-reason')?.value.trim()||'';
+    const message=$('bc7-retro-start-msg');
+    if(!hour||reason.length<5){msg(message,'Indica la hora real y el motivo obligatorio.','error');return;}
+    if(!confirm('Se abrirá la jornada atrasada con la hora real '+hour+' de su fecha programada. La recepción física ya debe estar aceptada. ¿Confirmas?'))return;
+    if(!busy(btn,true))return;
+    try{
+      await rpc('bc7_admin_iniciar_sucesora_retroactiva',{
+        p_turno_sesion_id:sessionId,p_hora_real:hour,p_motivo:reason
+      });
+      await refreshPosArchiveAfterSessionStart();await loadCalendar();await loadCurrentSession();await openWorkspace(sessionId);
+      setStatus('Jornada sucesora retroactiva iniciada tras la recepción física.','ok');
+    }catch(e){msg(message,'No se pudo iniciar la jornada. '+friendlyError(e,'create'),'error');}
+    finally{busy(btn,false);}
+  }
+
+  async function saveHours(form){
     const warehouse=$('bc7-warehouse')?.value;
     const start=$('bc7-hour-start').value,end=$('bc7-hour-end').value,zone=$('bc7-timezone').value.trim();
     if(!warehouse){msg($('bc7-hours-msg'),'Selecciona un almacén.','error');return;}
@@ -2015,6 +2095,8 @@
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-preview')){await previewPattern(t);return;}
     if(t.hasAttribute('data-bc7-create')){await createSchedule(t);return;}
+    if(t.hasAttribute('data-bc7-retro-handover-open')){await openRetroSuccessorPanel(t);return;}
+    if(t.hasAttribute('data-bc7-start-retro')){await startRetroSuccessor(t);return;}
     if(t.hasAttribute('data-bc7-open')){await openWorkspace(t.dataset.bc7Open);return;}
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
     if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
@@ -2024,7 +2106,8 @@
   });
   document.addEventListener('submit',async function(e){
     const f=e.target;if(!(f instanceof HTMLFormElement))return;
-    if(f.id==='bc7-hours-form'){e.preventDefault();await saveHours(f);}
+    if(f.id==='bc7-retro-successor-form'){e.preventDefault();await createRetroSuccessor(f);}
+    else if(f.id==='bc7-hours-form'){e.preventDefault();await saveHours(f);}
     else if(f.id==='bc7-pattern-form'){e.preventDefault();await savePattern(f);}
     else if(f.matches('[data-bc7-reschedule]')){e.preventDefault();await reschedule(f);}
     else if(f.matches('[data-bc7-count-form]')){e.preventDefault();await saveCount(f);}
