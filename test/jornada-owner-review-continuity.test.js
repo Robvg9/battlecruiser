@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -66,11 +67,8 @@ test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC gr
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);
 });
 test("The app shell loads the new owner review module and keeps cache versions aligned",()=>{
-  assert.match(APP,/VERSION="9\.5\.111"/);
-  assert.match(APP,/jornada-owner-review\\.js","1\\.7"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.111"/);
-  assert.match(SW,/jornada-owner-review\\.js\\?v=1\\.7/);
-  assert.match(INDEX,/v9\.5\.111/);
+  assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"jornada-owner-review.js"});
 });
 
 
@@ -92,14 +90,11 @@ test("Owner review modal uses BattleCruiser theme tokens and accessible light su
   assert.match(REVIEW,/bcjr-field select option/);
 });
 test("Owner review product inventory is collapsed behind an explicit detail control",()=>{
+  assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"jornada-owner-review.js"});
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
   assert.match(REVIEW,/Ver inventario y liquidación por producto/);
   assert.match(REVIEW,/bcjr-inventory\[open\]>summary/);
-  assert.match(APP,/VERSION="9\.5\.111"/);
-  assert.match(APP,/jornada-owner-review\\.js","1\\.7"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.111"/);
-  assert.match(SW,/jornada-owner-review\\.js\\?v=1\\.7/);
-  assert.match(INDEX,/v9\.5\.111/);
 });
 
 
