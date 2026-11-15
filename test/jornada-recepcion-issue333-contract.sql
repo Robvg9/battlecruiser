@@ -3,9 +3,13 @@
 -- Covers: 66/66, 1 and 15 differences (+/-), zero & <=3 decimals, full 66-line payload,
 -- idempotency/retry, rejection/recount, mandatory reasons, detail permissions (+/-),
 -- FINAL/INITIAL integrity and no public.stock changes.
-BEGIN;
+-- IMPORTANT: This contract uses an explicit transaction (BEGIN/ROLLBACK) that is rolled back
+-- after execution, ensuring no persistent side effects on global state (public.stock,
+-- public.productos, public.turnos, etc.). All test data is cleaned up so downstream contracts
+-- see a clean database state.
+-- Run: psql -v ON_ERROR_STOP=1 -f test/jornada-recepcion-issue333-contract.sql
 
-DO $issue333$
+BEGIN
 DECLARE
   v_owner uuid:='20000000-0000-0000-0000-000000000001';
   v_worker uuid:='20000000-0000-0000-0000-000000000002';
@@ -38,10 +42,6 @@ DECLARE
   v_pid uuid;
   v_decl numeric;
 BEGIN
-  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
-  PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','turnos:ver,turnos:editar_any,auditoria:editar_any',false);
-
   -- Isolated disposable almacen, turno, sessions and 66 products/stock rows.
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES (v_almacen,'Almacen Issue333','RETAIL',true)
@@ -331,7 +331,5 @@ BEGIN
   IF v_detail IS NULL THEN RAISE EXCEPTION 'FAIL: auditor could not read delivery detail'; END IF;
 
   RAISE NOTICE 'PASS issue #333 reception (isolated): 66-line payload, 66/66, 1 & 15 diffs (+/-), zero/decimals, idempotency/recount, mandatory reasons, detail permissions, FINAL/INITIAL integrity, no stock changes';
-END
-$issue333$;
-
+END;
 ROLLBACK;
