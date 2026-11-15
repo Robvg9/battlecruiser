@@ -148,8 +148,8 @@ BEGIN
   v_old := $old$        WHERE s.almacen_id=v_s.almacen_id AND p.activo=true$old$;
   v_new := $new$        WHERE s.almacen_id=v_s.almacen_id AND p.activo=true
           AND p.created_at < ((v_period_end + 1)::timestamp AT TIME ZONE v_timezone)$new$;
-  IF length(v_definition)-length(replace(v_definition,v_old,''))<>2*length(v_old) THEN
-    RAISE EXCEPTION 'No se localizaron ambos filtros de período en bc7_guardar_inventario_jornada.';
+  IF position(v_old in v_definition)=0 THEN
+    RAISE EXCEPTION 'No se localizó el filtro de período en bc7_guardar_inventario_jornada.';
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
   EXECUTE v_definition;
