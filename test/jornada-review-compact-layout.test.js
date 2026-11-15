@@ -55,7 +55,7 @@ test("Historic sale price tranches are audited, quantity-balanced and included i
   assert.match(REVIEW,/data-bcjr-open-tranches/);
   assert.match(REVIEW,/bc7_guardar_tramos_precio_jornada/);
   assert.match(REVIEW,/precio_tramos/);
-  assert.match(TRANCHE_MIGRATION,/CREATE TABLE IF NOT EXISTS public\\.turno_jornada_precio_tramos/);
+  assert.match(TRANCHE_MIGRATION,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_precio_tramos/);
   assert.match(TRANCHE_MIGRATION,/abs\\(v_sum-v_sold\\)>0\\.0001/);
   assert.match(TRANCHE_MIGRATION,/round\\(sum\\(t\\.cantidad\\*t\\.precio_unitario\\),2\\)/);
   assert.match(TRANCHE_MIGRATION,/PRECIOS_POR_TRAMOS/);
