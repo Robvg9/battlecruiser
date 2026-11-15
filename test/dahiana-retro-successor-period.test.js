@@ -61,3 +61,8 @@ test("historical counts and UI catalog are bounded by the jornada end date",()=>
   assert.ok(migration.includes("coalesce(v_p.fecha_fin,v_p.fecha) + 1"));
   assert.ok(migration.includes("p.created_at <"));
 });
+
+test("restoration audit references the actual source program row",()=>{
+  assert.ok(migration.includes("v_source_program public.turno_jornada_programacion%ROWTYPE"));
+  assert.ok(migration.includes("SELECT * INTO STRICT v_source_program"));
+});
