@@ -1,4 +1,4 @@
-name: BattleCruiser Step 7 — Jornada inventory PostgreSQL 17
+name: BattleCruiser Step 7 â€” Jornada inventory PostgreSQL 17
 on:
   pull_request:
     branches: [main]
@@ -22,6 +22,8 @@ on:
       - 'supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql'
       - 'test/dahiana-retro-successor-period.test.js'
       - 'test/jornada-pending-cash-visibility-contract.sql'
+      - 'supabase/migrations/20261116090000_jornada_recepcion_admin_queue_issue_333.sql'
+      - 'test/jornada-recepcion-issue333-contract.sql'
       - 'test/jornada-sectioned-checklist-picker.test.js'
       - 'supabase/migrations/20261112142000_dependienta_jornada_merma_creation.sql'
       - 'test/dependienta-jornada-merma-permission-contract.sql'

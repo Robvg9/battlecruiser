@@ -5,7 +5,7 @@
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{}};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -230,6 +230,7 @@
       '@media(max-width:650px){#tab-jornada .bc7-hero{display:block}#tab-jornada .bc7-status{text-align:left;margin-top:9px;max-width:none}#tab-jornada .bc7-grid{grid-template-columns:1fr}#tab-jornada .bc7-day-row{grid-template-columns:1fr;gap:5px}#tab-jornada .bc7-day-row label{margin-top:4px}#tab-jornada .bc7-actions .bc7-btn{flex:1 1 140px}#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:8px 6px}}'
     ].join('\n');
     document.head.appendChild(s);
+    if(!$('bc7-receive-style')){const r=document.createElement('style');r.id='bc7-receive-style';r.textContent='#tab-jornada .bc7-receive-list{display:grid;gap:8px;margin:8px 0}#tab-jornada .bc7-receive-item{display:grid;gap:6px;padding:10px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(255,255,255,.02)}#tab-jornada .bc7-receive-item.is-marked{border-color:var(--gold);background:rgba(201,162,77,.06)}#tab-jornada .bc7-receive-product{display:flex;flex-direction:column;gap:2px}#tab-jornada .bc7-receive-count-wrap{display:grid;gap:2px}#tab-jornada .bc7-receive-item[hidden]{display:none!important}#tab-jornada [data-bc7-receive-pane][hidden]{display:none!important}';document.head.appendChild(r);}
     if(!$('bc7-compact-style')){const c=document.createElement('style');c.id='bc7-compact-style';c.textContent="#tab-jornada{max-width:1320px!important;padding-bottom:12px!important}\n#tab-jornada .bc7-hero{align-items:center!important;margin:0 0 7px!important;padding:3px 0 7px!important}\n#tab-jornada .bc7-hero h2{font-family:Inter,sans-serif!important;font-size:20px!important;font-weight:700!important}\n#tab-jornada .bc7-hero p{display:none!important}\n#tab-jornada .bc7-status{font-size:10px!important;min-height:0!important;max-width:none!important}\n#tab-jornada .bc7-card{padding:8px!important;margin:6px 0!important;border-radius:8px!important}\n#tab-jornada .bc7-card h3{font-size:13px!important;margin:0 0 5px!important}\n#tab-jornada .bc7-card h4{font-size:12px!important;margin:7px 0 5px!important}\n#tab-jornada .bc7-muted{font-size:10px!important;line-height:1.3!important}\n#tab-jornada .bc7-field{font-size:10px!important;gap:3px!important;margin:4px 0!important}\n#tab-jornada .bc7-field input,#tab-jornada .bc7-field select,#tab-jornada .bc7-field textarea{height:34px!important;min-height:34px!important;padding:6px 8px!important;font-size:11px!important}\n#tab-jornada .bc7-btn{min-height:34px!important;padding:6px 10px!important;font-size:10px!important;border-radius:6px!important}\n#tab-jornada .bc7-actions{gap:5px!important;margin-top:6px!important}\n#tab-jornada .bc7-jornada{display:block;grid-template-columns:minmax(0,1fr);min-width:0;width:100%;max-width:100%;box-sizing:border-box;padding:7px!important}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row]{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-jornada-top{display:contents!important}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] strong{font-size:11px!important;line-height:1.2}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] p{font-size:10px!important;margin:2px 0 0!important}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-actions{margin:0!important;grid-column:3}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-btn{white-space:nowrap;min-height:30px!important;padding:5px 8px!important}\n#tab-jornada .bc7-help,#tab-jornada .bc7-admin-details{margin:4px 0!important;padding:6px 8px;border:1px solid var(--gold-dim);border-radius:7px;background:rgba(255,255,255,.02)}\n#tab-jornada .bc7-help summary,#tab-jornada .bc7-admin-details>summary{font-size:10px!important;font-weight:600;color:var(--gold);cursor:pointer;list-style:none}\n#tab-jornada .bc7-admin-details[hidden],#tab-jornada [hidden]{display:none!important}\n#tab-jornada .bc7-calendar-controls{display:grid;grid-template-columns:minmax(0,1fr) 68px auto;gap:6px;align-items:end}\n#tab-jornada .bc7-calendar-controls .bc7-field{margin:0!important}\n#tab-jornada .bc7-workspace-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}\n#tab-jornada .bc7-workspace-title-wrap{min-width:0;display:flex;align-items:center;gap:8px}\n#tab-jornada .bc7-workspace-head h3{font-size:14px!important;margin:0!important}\n#tab-jornada .bc7-back{min-height:30px!important;padding:5px 8px!important;white-space:nowrap}\n#tab-jornada .bc7-workspace-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:4px 0 8px}\n#tab-jornada .bc7-overview-item{min-width:0;padding:6px 7px;border:1px solid var(--gold-dim);border-radius:6px;background:rgba(255,255,255,.025)}\n#tab-jornada .bc7-overview-item small{display:block;font-size:9px;color:var(--mist);line-height:1.1}\n#tab-jornada .bc7-overview-item b{display:block;font-size:11px;margin-top:3px;overflow-wrap:anywhere}\n#tab-jornada .bc7-workspace-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:6px 0 8px;padding:3px;background:rgba(0,0,0,.18);border:1px solid var(--gold-dim);border-radius:7px}\n#tab-jornada .bc7-workspace-tab{min-width:0;min-height:32px;padding:5px 3px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--mist);font-size:10px;font-weight:600;cursor:pointer}\n#tab-jornada .bc7-workspace-tab[aria-selected=true]{color:var(--text);background:rgba(201,162,77,.16);border-color:var(--gold-dim)}\n#tab-jornada .bc7-workspace-panel[hidden]{display:none!important}\n#tab-jornada .bc7-panel-stack{display:grid;gap:6px}\n#tab-jornada .bc7-detail{border:1px solid var(--gold-dim);border-radius:7px;background:rgba(255,255,255,.018);padding:0 8px}\n#tab-jornada .bc7-detail>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;cursor:pointer;list-style:none;font-size:11px;font-weight:600}\n#tab-jornada .bc7-detail>summary small{font-size:9px;color:var(--mist);font-weight:500}\n#tab-jornada .bc7-detail-body{padding:0 0 7px;min-width:0}\n#tab-jornada .bc7-note{padding:7px!important;font-size:10px!important;line-height:1.3!important}\n#tab-jornada .bc7-table{font-size:10px!important}\n#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:5px!important}\n#tab-jornada .bc7-table input{width:76px!important;padding:5px!important;font-size:11px!important}\n@media(max-width:650px){#tab-jornada .bc7-calendar-controls{grid-template-columns:minmax(0,1fr) 60px auto}#tab-jornada .bc7-jornada{grid-template-columns:minmax(0,1fr) auto;gap:5px}#tab-jornada .bc7-jornada .bc7-actions{grid-column:2;grid-row:2}#tab-jornada .bc7-workspace-overview{grid-template-columns:repeat(3,minmax(0,1fr))}#tab-jornada .bc7-overview-item{padding:5px}#tab-jornada .bc7-overview-item b{font-size:10px}#tab-jornada .bc7-workspace-tab{font-size:9px;min-height:30px}#tab-jornada .bc7-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-jornada .bc7-day-row{grid-template-columns:minmax(70px,.8fr) minmax(80px,1fr) minmax(100px,1.4fr)}#tab-jornada .bc7-day-row label{margin:0!important}}\n@media(max-width:390px){#tab-jornada .bc7-workspace-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.appendChild(c);}
   }
   function ensureDayRowsStyles(){
@@ -1038,60 +1039,158 @@
       '</tbody></table></div>'+sharedNote;
   }
 
+  function receiveAttemptKey(deliveryId){
+    return String(deliveryId||'');
+  }
+  function getReceiveAttempt(delivery){
+    const key=receiveAttemptKey(delivery&&delivery.id);
+    if(!key)return {key:'',mode:'fast',marked:{},values:{},note:'',attestFast:false,attestDiff:false,inline:null,sending:false,idempotencyKey:'',lastSignature:''};
+    if(!state.receiveAttempts[key]){
+      state.receiveAttempts[key]={key,mode:'fast',marked:{},values:{},note:'',attestFast:false,attestDiff:false,inline:null,sending:false,idempotencyKey:'',lastSignature:''};
+    }
+    return state.receiveAttempts[key];
+  }
+  function receiveSignature(payload){try{return JSON.stringify(payload);}catch(_){return String(Date.now());}}
+  function isUncertainReceiveError(error){
+    const value=String(error&&error.message||error||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const code=String(error&&error.code||'').toUpperCase();
+    return code===''&&(/failed to fetch|network|timeout|load failed|fetch failed|abort|offline|sin conexion|cliente supabase no disponible/.test(value));
+  }
+  function receiveInlineStatusHtml(attempt,delivery){
+    const backendPending=delivery&&delivery.estado==='PENDIENTE_REVISION';
+    const backendRecount=delivery&&delivery.estado==='REQUIERE_RECUENTO';
+    let text='',kind='';
+    if(attempt&&attempt.inline){text=attempt.inline.text||'';kind=attempt.inline.kind||'';}
+    else if(backendPending){text='Recepción enviada a revisión del Dueño. Jornada bloqueada hasta la decisión.';kind='ok';}
+    else if(backendRecount){text='El Dueño rechazó el conteo anterior. Se requiere un nuevo conteo físico completo.';kind='error';}
+    return '<p class="bc7-msg '+esc(kind)+'" data-bc7-receive-msg role="status" aria-live="polite">'+esc(text)+'</p>';
+  }
+  function receiveSummaryFromForm(form){
+    const lines=arr(JSON.parse(form.dataset.bc7ReceiveLines||'[]'));
+    const mode=form.querySelector('[data-bc7-receive-mode][aria-pressed="true"]')?.dataset.bc7ReceiveMode||'fast';
+    let counted=0,matches=0,differences=0,invalid=0,pending=0;
+    if(mode==='fast'){
+      const attested=!!form.querySelector('[data-bc7-receive-attest-fast]')?.checked;
+      if(attested){counted=lines.length;matches=lines.length;}
+      else{pending=lines.length;}
+      return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested};
+    }
+    const attested=!!form.querySelector('[data-bc7-receive-attest-diff]')?.checked;
+    lines.forEach(l=>{
+      const id=String(l.producto_id);
+      const marked=!!form.querySelector('[data-bc7-receive-mark="'+CSS.escape(id)+'"]')?.checked;
+      if(!marked){
+        if(attested){counted++;matches++;} else {pending++;}
+        return;
+      }
+      const input=form.querySelector('[data-bc7-receive-count="'+CSS.escape(id)+'"]');
+      const raw=String(input?input.value:'').trim();
+      if(raw===''){pending++;return;}
+      if(!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){invalid++;return;}
+      counted++;
+      const diff=Math.round((Number(raw)-Number(l.cantidad_declarada))*1000)/1000;
+      if(Math.abs(diff)<0.0005)matches++; else differences++;
+    });
+    return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested};
+  }
+  function renderReceiveSummary(form){
+    const s=receiveSummaryFromForm(form);
+    const el=form.querySelector('[data-bc7-receive-summary]');
+    if(el){
+      el.textContent='Total '+s.total+' — Contados '+s.counted+' — Coincidencias '+s.matches+' — Diferencias '+s.differences+' — Pendientes '+s.pending+(s.invalid?' — Inválidos '+s.invalid:'');
+    }
+    const submit=form.querySelector('button[type="submit"]');
+    if(submit){
+      const canSend=!form.dataset.bc7Sending && !!s.attested && s.invalid===0 && s.pending===0;
+      submit.disabled=!canSend;
+    }
+  }
+  function syncReceiveFormState(form){
+    if(!form)return;
+    const deliveryId=form.dataset.bc7ReceiveDelivery||'';
+    const attempt=getReceiveAttempt({id:deliveryId});
+    attempt.mode=form.querySelector('[data-bc7-receive-mode][aria-pressed="true"]')?.dataset.bc7ReceiveMode||attempt.mode||'fast';
+    const note=form.querySelector('[data-bc7-receive-note]');
+    if(note)attempt.note=note.value||'';
+    const af=form.querySelector('[data-bc7-receive-attest-fast]'); if(af)attempt.attestFast=af.checked;
+    const ad=form.querySelector('[data-bc7-receive-attest-diff]'); if(ad)attempt.attestDiff=ad.checked;
+    form.querySelectorAll('[data-bc7-receive-mark]').forEach(ch=>{
+      const id=ch.dataset.bc7ReceiveMark; attempt.marked[id]=ch.checked;
+      const row=form.querySelector('[data-bc7-receive-row="'+CSS.escape(id)+'"]');
+      const input=form.querySelector('[data-bc7-receive-count="'+CSS.escape(id)+'"]');
+      if(row)row.classList.toggle('is-marked',ch.checked);
+      if(input){input.disabled=!ch.checked; if(!ch.checked)input.value='';}
+      const diffBox=form.querySelector('[data-bc7-receive-diff="'+CSS.escape(id)+'"]');
+      if(diffBox)diffBox.textContent=ch.checked&&input&&input.value!==''?('Diferencia: '+((Number(input.value)-Number(input.dataset.bc7ReceiveDeclared))>0?'+':'')+qty(Number(input.value)-Number(input.dataset.bc7ReceiveDeclared))):'';
+    });
+    form.querySelectorAll('[data-bc7-receive-count]').forEach(input=>{
+      attempt.values[input.dataset.bc7ReceiveCount]=input.value;
+      const id=input.dataset.bc7ReceiveCount;
+      const diffBox=form.querySelector('[data-bc7-receive-diff="'+CSS.escape(id)+'"]');
+      if(diffBox && attempt.marked[id]){
+        const raw=String(input.value||'').trim();
+        if(raw!=='' && /^\d+(?:\.\d{1,3})?$/.test(raw)){
+          const d=Math.round((Number(raw)-Number(input.dataset.bc7ReceiveDeclared))*1000)/1000;
+          diffBox.textContent='Diferencia: '+(d>0?'+':'')+qty(d);
+        }else diffBox.textContent='';
+      }
+    });
+    const search=form.querySelector('[data-bc7-receive-search]');
+    const q=(search?search.value:'').toLowerCase().trim();
+    form.querySelectorAll('[data-bc7-receive-row]').forEach(row=>{
+      const name=(row.getAttribute('data-bc7-receive-name')||'').toLowerCase();
+      row.hidden=!!q && !name.includes(q);
+    });
+    renderReceiveSummary(form);
+  }
   function receiveFormHtml(delivery,detail){
     const lines=arr(delivery&&delivery.lineas);
-    const list=lines.length
-      ?'<div class="bc7-receive-progress" data-bc7-receive-progress role="status" aria-live="polite">Contados 0/'+lines.length+' · Coinciden 0 · Diferencias 0 · Pendientes '+lines.length+'</div>'+
-       '<div class="bc7-receive-list" aria-label="Recepción física por producto">'+lines.map((l,index)=>{
-         const name=l.nombre||'Producto';
-         return '<article class="bc7-receive-item">'+
-           '<div class="bc7-receive-product"><small>Producto '+(index+1)+' de '+lines.length+'</small><strong>'+esc(name)+'</strong></div>'+
-           '<div class="bc7-receive-declared"><span>Existencia declarada</span><b>'+esc(qty(l.cantidad_declarada))+'</b></div>'+
-           '<label class="bc7-receive-count"><span>Conteo físico recibido</span><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-receive-count="'+esc(l.producto_id)+'" data-bc7-receive-declared="'+esc(l.cantidad_declarada)+'" aria-label="Conteo físico recibido de '+esc(name)+'; existencia declarada '+esc(qty(l.cantidad_declarada))+'" placeholder="Escribe la cantidad"></label>'+
-           '<p class="bc7-receive-line-status is-pending" data-bc7-receive-status>Pendiente de contar</p>'+
-         '</article>';
-       }).join('')+'</div>'
-      :'<div class="bc7-empty">El almacén no tiene productos activos con stock registrado; confirma la recepción de cero productos.</div>';
+    const attempt=getReceiveAttempt(delivery);
+    const total=lines.length;
+    const mode=attempt.mode||'fast';
     const recount=delivery.estado==='REQUIERE_RECUENTO'?'<p class="bc7-note">El dueño rechazó el intento anterior. Realiza otro conteo físico completo. El intento rechazado y su motivo permanecen en el historial.</p>':'';
-    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Cada ficha muestra el nombre, la cantidad declarada y el conteo que recibiste físicamente. El indicador se actualiza mientras escribes; no significa que se haya guardado. Una diferencia queda bloqueada hasta que el dueño la revise.</p>'+recount+'</div>'+
-      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'">'+list+
-      '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" placeholder="Incidencias, embalaje o diferencias observadas"></label>'+
-      '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar recepción física</button></div><p class="bc7-msg" data-bc7-receive-msg></p></form>';
+    const modeTabs='<div class="bc7-actions" role="tablist" aria-label="Modo de recepción">'+
+      '<button type="button" class="bc7-btn '+(mode==='fast'?'primary':'')+'" data-bc7-receive-mode="fast" aria-pressed="'+(mode==='fast')+'">A. Todo coincide</button>'+
+      '<button type="button" class="bc7-btn '+(mode==='diff'?'primary':'')+'" data-bc7-receive-mode="diff" aria-pressed="'+(mode==='diff')+'">B. Registrar diferencias</button></div>';
+    const fastPane='<section data-bc7-receive-pane="fast" '+(mode!=='fast'?'hidden':'')+'>'+
+      '<p class="bc7-muted"><b>El camino verde significa exclusivamente conteo físico completo y coincidencia total.</b></p>'+
+      '<label class="bc7-check"><input type="checkbox" data-bc7-receive-attest-fast '+(attempt.attestFast?'checked':'')+'> <span>Confirmo que conté físicamente los '+total+' productos y que todos coinciden con lo declarado.</span></label>'+
+      '</section>';
+    const rows=lines.map(l=>{
+      const id=String(l.producto_id);
+      const name=l.nombre||'Producto';
+      const marked=!!attempt.marked[id];
+      const val=attempt.values[id]!=null?String(attempt.values[id]):'';
+      return '<article class="bc7-receive-item '+(marked?'is-marked':'')+'" data-bc7-receive-row="'+esc(id)+'" data-bc7-receive-name="'+esc(name)+'">'+
+        '<label class="bc7-check"><input type="checkbox" data-bc7-receive-mark="'+esc(id)+'" '+(marked?'checked':'')+'> <span>Marcar diferencia</span></label>'+
+        '<div class="bc7-receive-product"><strong>'+esc(name)+'</strong><span class="bc7-muted">Declarado: '+esc(qty(l.cantidad_declarada))+'</span></div>'+
+        '<div class="bc7-receive-count-wrap" data-bc7-receive-input-wrap>'+ 
+          '<label class="bc7-field"><span>Conteo físico (solo si difiere)</span><input type="number" min="0" step="0.001" inputmode="decimal" data-bc7-receive-count="'+esc(id)+'" data-bc7-receive-declared="'+esc(l.cantidad_declarada)+'" aria-label="Conteo físico de '+esc(name)+'" value="'+esc(val)+'" '+(marked?'':'disabled')+' placeholder="Cantidad física"></label>'+
+          '<small class="bc7-muted" data-bc7-receive-diff="'+esc(id)+'"></small>'+
+        '</div>'+
+      '</article>';
+    }).join('');
+    const diffPane='<section data-bc7-receive-pane="diff" '+(mode!=='diff'?'hidden':'')+'>'+
+      '<label class="bc7-field"><span>Buscar producto</span><input type="search" data-bc7-receive-search placeholder="Filtra por nombre"></label>'+
+      '<div class="bc7-receive-list" aria-label="Lista de productos para recepción">'+rows+'</div>'+
+      '<label class="bc7-check"><input type="checkbox" data-bc7-receive-attest-diff '+(attempt.attestDiff?'checked':'')+'> <span>Conté físicamente los '+total+' productos; los productos que no marqué coinciden.</span></label>'+
+      '</section>';
+    const initialPending=(mode==='fast'&&!attempt.attestFast)||(mode==='diff'&&!attempt.attestDiff)?total:(mode==='diff'?Object.keys(attempt.marked||{}).filter(k=>attempt.marked[k]&&!String(attempt.values[k]??'').trim()).length:0);
+    const initialCounted=(mode==='fast'&&attempt.attestFast)?total:(mode==='diff'&&attempt.attestDiff?lines.filter(l=>!attempt.marked[String(l.producto_id)]).length:0);
+    const initialMatches=initialCounted;
+    const summary='<div class="bc7-note" data-bc7-receive-summary role="status" aria-live="polite">Total '+total+' — Contados '+initialCounted+' — Coincidencias '+initialMatches+' — Diferencias 0 — Pendientes '+initialPending+'</div>';
+    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Elige un camino. En diferencias, solo capturas cantidades de productos marcados; los no marcados se envían con la cantidad declarada tras tu atestación.</p>'+recount+'</div>'+
+      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'" data-bc7-receive-delivery="'+esc(delivery.id)+'" data-bc7-receive-lines=\''+esc(JSON.stringify(lines.map(l=>({producto_id:String(l.producto_id),cantidad_declarada:Number(l.cantidad_declarada),nombre:l.nombre||''}))))+'\'>'+
+      modeTabs+fastPane+diffPane+summary+
+      '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" value="'+esc(attempt.note||'')+'" placeholder="Incidencias, embalaje o diferencias observadas"></label>'+
+      '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar recepción física</button></div>'+
+      receiveInlineStatusHtml(attempt,delivery)+
+      '</form>';
   }
 
   function updateReceivePreview(form){
-    if(!form)return;
-    const inputs=Array.from(form.querySelectorAll('[data-bc7-receive-count]'));
-    let counted=0,matches=0,differences=0,invalid=0;
-    inputs.forEach(input=>{
-      const status=input.closest('.bc7-receive-item')?.querySelector('[data-bc7-receive-status]');
-      const raw=String(input.value||'').trim();
-      if(!raw){
-        if(status){status.textContent='Pendiente de contar';status.className='bc7-receive-line-status is-pending';}
-        return;
-      }
-      if(!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){
-        invalid++;
-        if(status){status.textContent='Cantidad no válida';status.className='bc7-receive-line-status is-invalid';}
-        return;
-      }
-      counted++;
-      const declared=Number(input.getAttribute('data-bc7-receive-declared'));
-      const difference=Math.round((Number(raw)-declared)*1000)/1000;
-      if(Math.abs(difference)<0.0005){
-        matches++;
-        if(status){status.textContent='Coincide · pendiente de guardar';status.className='bc7-receive-line-status is-match';}
-      }else{
-        differences++;
-        const signed=(difference>0?'+':'')+qty(difference);
-        if(status){status.textContent='Diferencia '+signed+' · requiere revisión del Dueño al guardar';status.className='bc7-receive-line-status is-difference';}
-      }
-    });
-    const progress=form.querySelector('[data-bc7-receive-progress]');
-    if(progress){
-      const pending=inputs.length-counted-invalid;
-      progress.textContent='Contados '+counted+'/'+inputs.length+' · Coinciden '+matches+' · Diferencias '+differences+' · Pendientes '+pending+(invalid?' · Inválidos '+invalid:'');
-    }
+    // Compatibility for existing input listener: sync and render summary.
+    syncReceiveFormState(form);
   }
 
   function legacyInitialFormHtml(detail){
@@ -1130,7 +1229,11 @@
       return '<div class="bc7-note"><b>Recepción bloqueada</b><p class="bc7-muted">Existe una entrega previa todavía no vinculada a esta jornada. El dueño debe vincular la sesión ya programada antes de registrar el conteo inicial.</p></div>';
     }
     if(type==='INICIAL'&&inbound){
-      if(inbound.estado==='PENDIENTE_REVISION')return '<div class="bc7-note"><b>Recepción pendiente de decisión del dueño</b><p class="bc7-muted">Se registró el conteo recibido. No existe un inventario inicial confirmado y no se puede abrir esta jornada hasta resolver la diferencia.</p></div>';
+      if(inbound.estado==='PENDIENTE_REVISION'){
+        const attempt=getReceiveAttempt(inbound);
+        if(!attempt.inline)attempt.inline={text:'Recepción enviada a revisión del Dueño. Jornada bloqueada hasta la decisión.',kind:'ok'};
+        return '<div class="bc7-note"><b>Recepción pendiente de decisión del dueño</b><p class="bc7-muted">Se registró el conteo recibido. No existe un inventario inicial confirmado y no se puede abrir esta jornada hasta resolver la diferencia.</p></div>'+receiveInlineStatusHtml(attempt,inbound);
+      }
       if(inbound.estado==='REQUIERE_RECUENTO'||inbound.estado==='PENDIENTE_RECEPCION')return receiveFormHtml(inbound,detail);
       if(inbound.estado==='ACEPTADA')return '<div class="bc7-empty">La entrega ya fue aceptada. Actualiza la jornada para recuperar el inventario inicial compartido.</div>';
     }
@@ -1369,26 +1472,105 @@
   }
   async function saveReceipt(form){
     const sessionId=form.dataset.bc7ReceiveForm;
-    const inputs=Array.from(form.querySelectorAll('[data-bc7-receive-count]'));
-    const lines=inputs.map(i=>({producto_id:i.dataset.bc7ReceiveCount,cantidad:i.value.trim()}));
-    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
+    const deliveryId=form.dataset.bc7ReceiveDelivery||'';
     const msgEl=form.querySelector('[data-bc7-receive-msg]');
-    if(bad){msg(msgEl,'Cuenta todos los productos y usa cantidades válidas con hasta 3 decimales.','error');return;}
-    if(!confirm('Vas a registrar el conteo físico recibido. Si coincide con lo declarado, se comparte automáticamente. Si difiere, la jornada quedará bloqueada hasta la decisión del dueño. ¿Confirmas el conteo real?'))return;
-    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{
-      const result=await rpc('bc7_recibir_entrega_jornada',{
-        p_destino_sesion_id:sessionId,
-        p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),
-        p_observacion:form.querySelector('[data-bc7-receive-note]')?.value||null,
-        p_idempotency_key:crypto.randomUUID()
+    const btn=form.querySelector('button[type="submit"]');
+    if(form.dataset.bc7Sending==='1')return;
+    syncReceiveFormState(form);
+    const attempt=getReceiveAttempt({id:deliveryId});
+    const lineDefs=arr(JSON.parse(form.dataset.bc7ReceiveLines||'[]'));
+    const mode=attempt.mode||'fast';
+    const note=(form.querySelector('[data-bc7-receive-note]')?.value||'').trim()||null;
+
+    let payloadLines=[];
+    if(mode==='fast'){
+      if(!form.querySelector('[data-bc7-receive-attest-fast]')?.checked){
+        msg(msgEl,'Debes confirmar que contaste físicamente todos los productos y que todos coinciden.','error');return;
+      }
+      payloadLines=lineDefs.map(l=>({producto_id:l.producto_id,cantidad:Number(l.cantidad_declarada)}));
+    }else{
+      if(!form.querySelector('[data-bc7-receive-attest-diff]')?.checked){
+        msg(msgEl,'Debes confirmar que contaste físicamente todos los productos y que los no marcados coinciden.','error');return;
+      }
+      let bad=false, markedCount=0;
+      payloadLines=lineDefs.map(l=>{
+        const id=String(l.producto_id);
+        const marked=!!attempt.marked[id];
+        if(!marked) return {producto_id:l.producto_id,cantidad:Number(l.cantidad_declarada)};
+        markedCount++;
+        const raw=String(attempt.values[id]??'').trim();
+        if(raw===''||!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){bad=true; return {producto_id:l.producto_id,cantidad:NaN};}
+        return {producto_id:l.producto_id,cantidad:Number(raw)};
       });
-      await openWorkspace(sessionId);
-      setStatus(result&&result.requiere_revision
-        ?'Recepción registrada. Hay diferencias pendientes de decisión del dueño; la jornada permanece bloqueada.'
-        :'Recepción coincidente confirmada. La existencia compartida ya está disponible en ambos expedientes.','ok');
-    }catch(e){msg(msgEl,'No se confirmó la recepción. '+friendlyError(e,'create'),'error');}
-    finally{busy(btn,false);}
+      if(bad){msg(msgEl,'Los productos marcados requieren una cantidad física válida (0 o hasta 3 decimales).','error');return;}
+      // markedCount can be 0? user could use diff mode with no marks but attestation means all match - treat as all match payload.
+    }
+
+    const payload={p_destino_sesion_id:sessionId,p_lineas:payloadLines,p_observacion:note};
+    const signature=receiveSignature(payload);
+    if(!attempt.idempotencyKey || attempt.lastSignature!==signature){
+      try{attempt.idempotencyKey=freshIdempotencyKey();}catch(e){msg(msgEl,'No se pudo preparar el envío de forma segura. Actualiza e inténtalo de nuevo.','error');return;}
+      attempt.lastSignature=signature;
+    }
+    const idempotencyKey=attempt.idempotencyKey;
+
+    attempt.sending=true; attempt.inline={text:'Enviando recepción… no cierres esta pantalla.',kind:''};
+    form.dataset.bc7Sending='1'; if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true');}
+    msg(msgEl,attempt.inline.text,''); setStatus(attempt.inline.text,'');
+
+    try{
+      const result=await rpc('bc7_recibir_entrega_jornada',{...payload,p_idempotency_key:idempotencyKey});
+      const diffCount=mode==='diff'?payloadLines.filter((l,i)=>Math.round((Number(l.cantidad)-Number(lineDefs[i].cantidad_declarada))*1000)!==0).length:(result&&result.requiere_revision?null:0);
+      if(result&&result.requiere_revision){
+        attempt.inline={text:'Recepción enviada a revisión del Dueño: '+(diffCount!=null?diffCount+' diferencias':'hay diferencias')+'; jornada bloqueada hasta la decisión.',kind:'ok'};
+      }else{
+        attempt.inline={text:'Recepción coincidente aceptada; inventario inicial compartido confirmado.',kind:'ok'};
+      }
+      attempt.idempotencyKey=''; attempt.lastSignature=''; // logical attempt completed
+      const refreshed=await openWorkspace(sessionId);
+      if(refreshed){setStatus(attempt.inline.text,'ok');}
+      else{
+        setStatus(attempt.inline.text+' No se pudo actualizar la vista automáticamente; recarga o reabre la jornada si es necesario.','ok');
+        if($('bc7-workspace-body'))$('bc7-workspace-body').innerHTML='<div class="bc7-note"><b>'+esc(attempt.inline.text)+'</b><p class="bc7-muted">No se pudo actualizar la vista automáticamente. La recepción ya fue registrada en el servidor. Recarga o reabre la jornada para ver el estado actual.</p></div>';
+      }
+    }catch(e){
+      let uncertain=isUncertainReceiveError(e);
+      if(uncertain){
+        try{
+          const deliveryState=await rpc('bc7_estado_entrega_inventario_jornada',{p_turno_sesion_id:sessionId});
+          const inbound=deliveryState&&deliveryState.entrada;
+          if(inbound && (inbound.estado==='PENDIENTE_REVISION' || inbound.estado==='ACEPTADA')){
+            const diff=(arr(inbound.lineas).filter(l=>Number(l.diferencia||0)!==0)).length;
+            attempt.inline={text:inbound.estado==='PENDIENTE_REVISION'
+              ?('Recepción enviada a revisión del Dueño: '+diff+' diferencias; jornada bloqueada hasta la decisión.')
+              :'Recepción coincidente aceptada; inventario inicial compartido confirmado.',kind:'ok'};
+            attempt.idempotencyKey=''; attempt.lastSignature='';
+            const refreshed=await openWorkspace(sessionId);
+            if(refreshed){setStatus(attempt.inline.text,'ok');}
+            else{
+              setStatus(attempt.inline.text+' No se pudo actualizar la vista automáticamente; recarga o reabre la jornada si es necesario.','ok');
+              if($('bc7-workspace-body'))$('bc7-workspace-body').innerHTML='<div class="bc7-note"><b>'+esc(attempt.inline.text)+'</b><p class="bc7-muted">No se pudo actualizar la vista automáticamente. La recepción ya fue registrada en el servidor. Recarga o reabre la jornada para ver el estado actual.</p></div>';
+            }
+            return;
+          }
+          if(inbound && (inbound.estado==='PENDIENTE_RECEPCION' || inbound.estado==='REQUIERE_RECUENTO')){
+            uncertain=false;
+          }
+        }catch(_){/* keep uncertain */}
+      }
+      if(uncertain){
+        attempt.inline={text:'Respuesta incierta de la red. No se confirmó si se guardó. Pulsa "Guardar recepción física" para reintentar de forma segura (se reutilizará la misma clave si no cambiaste los datos).',kind:'error'};
+        msg(msgEl,attempt.inline.text,'error');
+        setStatus('Respuesta incierta: reintenta de forma segura sin cambiar los datos.','error');
+      }else{
+        attempt.inline={text:'No se confirmó la recepción. '+friendlyError(e,'create')+' Puedes corregir y reintentar; no se borraron tus selecciones.',kind:'error'};
+        msg(msgEl,attempt.inline.text,'error');
+        setStatus('No se confirmó la recepción.','error');
+      }
+    }finally{
+      attempt.sending=false; form.dataset.bc7Sending=''; if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');}
+      syncReceiveFormState(form);
+    }
   }
 
   async function saveLegacyInitial(form){
@@ -2129,6 +2311,16 @@
     if(t.matches&&t.matches('.tab-btn[data-tab="jornada"]')){setTimeout(()=>{ensureWarehouseCatalog();},0);}
   });
   document.addEventListener('click',async function(e){
+    const modeBtn=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-mode]'):null;
+    if(modeBtn){
+      const form=modeBtn.closest('form[data-bc7-receive-form]');
+      if(form){
+        form.querySelectorAll('[data-bc7-receive-mode]').forEach(b=>{const on=b===modeBtn;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('primary',on);});
+        form.querySelectorAll('[data-bc7-receive-pane]').forEach(p=>{p.hidden=p.getAttribute('data-bc7-receive-pane')!==modeBtn.dataset.bc7ReceiveMode;});
+        syncReceiveFormState(form);
+      }
+      return;
+    }
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
     if(t.hasAttribute('data-bc7-adjustment-add')){const form=t.closest('[data-bc7-adjust-form]');if(form)addAdjustmentRow(form);return;}
     if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
@@ -2166,14 +2358,19 @@
   });
   document.addEventListener('change',function(e){
     const t=e.target;
+    if(t&&(t.matches('[data-bc7-receive-mark]')||t.matches('[data-bc7-receive-attest-fast]')||t.matches('[data-bc7-receive-attest-diff]'))){
+      const f=t.closest('form[data-bc7-receive-form]'); if(f)syncReceiveFormState(f);
+    }
     if(t&&t.matches('[data-bc7-rework]')){const s=t.closest('form')?.querySelector('[data-bc7-reperson]');if(s){s.disabled=!t.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!t.checked)s.value='';}}
     if(t&&t.matches('[data-bc7-ajust-type]'))syncAdjustmentRows(t.closest('[data-bc7-adjust-form]'));
     if(t&&t.matches('[data-bc7-ajust-product]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));
   });
   document.addEventListener('input',function(e){
     const t=e.target;
-    const receiveForm=t&&t.matches&&t.matches('[data-bc7-receive-count]')?t.closest('form[data-bc7-receive-form]'):null;
-    if(receiveForm)updateReceivePreview(receiveForm);
+    if(t&&(t.matches('[data-bc7-receive-count]')||t.matches('[data-bc7-receive-search]')||t.matches('[data-bc7-receive-note]'))){
+      const receiveForm=t.closest('form[data-bc7-receive-form]');
+      if(receiveForm)syncReceiveFormState(receiveForm);
+    }
     const reinvestment=t&&t.closest&&t.closest('[data-bc7-finance-form="reinversion"]');
     if(reinvestment&&t.matches('[data-bc7-reinvestment-quantity],[data-bc7-reinvestment-unit-cost]'))updateReinvestmentEstimate(reinvestment);
     if(t&&t.matches('[data-bc7-ajust-qty]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));

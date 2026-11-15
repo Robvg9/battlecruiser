@@ -213,7 +213,7 @@ function applySql(file) {
   logStream = fs.createWriteStream(CI_LOG, { flags: "w" });
   let failure = null;
   try {
-    log("=== Step 7 PostgreSQL 17 disposable contract — Windows self-hosted ===");
+    log("=== Step 7 PostgreSQL 17 disposable contract â€” Windows self-hosted ===");
     log("Repository checkout: " + ROOT);
     log("PostgreSQL runtime/cache: " + TEMP_ROOT);
     log("C-drive workaround: PostgreSQL archive/runtime/data are stored on D: when available.");
@@ -346,6 +346,9 @@ function applySql(file) {
     applySql("supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql");
     log("\\r\\n=== Verify owner-confirmed Dahiana successor period recovery ===");
     applySql("supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql");
+    log("\\r\\n=== Apply Issue #333 reception admin queue/detail and verify contract ===");
+    applySql("supabase/migrations/20261116090000_jornada_recepcion_admin_queue_issue_333.sql");
+    applySql("test/jornada-recepcion-issue333-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
