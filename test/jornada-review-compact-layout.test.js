@@ -61,3 +61,16 @@ test("Historic sale price tranches are audited, quantity-balanced and included i
   assert.match(TRANCHE_MIGRATION,/PRECIOS_POR_TRAMOS/);
   assert.match(TRANCHE_MIGRATION,/auth\.uid\(\)/);
 });
+
+
+test("Historical costs can be reviewed and saved for all missing-cost products in one audited RPC",()=>{
+  assert.match(REVIEW,/data-bcjr-open-bulk-costs/);
+  assert.match(REVIEW,/data-bcjr-bulk-costs-save/);
+  assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);
+  assert.match(REVIEW,/p_ajustes:adjustments/);
+  assert.match(REVIEW,/verifiedHistoricCosts/);
+  assert.match(REVIEW,/Los vacíos no se guardarán/);
+  assert.match(REVIEW,/No modifican el catálogo/);
+  assert.match(APP,/VERSION="9\\.5\\.111"/);
+  assert.match(SW,/BC_SW_VERSION = "9\\.5\\.111"/);
+});
