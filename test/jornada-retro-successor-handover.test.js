@@ -2,7 +2,7 @@
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
-const migration=fs.readFileSync("supabase/migrations/20261115150000_jornada_retro_successor_handover.sql","utf8");
+const migration=fs.readFileSync("supabase/migrations/20261115132235_jornada_retro_successor_handover.sql","utf8");
 const jornada=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
