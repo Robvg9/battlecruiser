@@ -29,9 +29,14 @@ BEGIN
  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
   RAISE EXCEPTION 'Solo el Dueño/Admin puede corregir precios históricos.' USING ERRCODE='42501';
  END IF;
- IF length(btrim(coalesce(p_comentario,'')))<5 OR length(p_comentario)>500
-   OR jsonb_typeof(p_tramos)<>'array' OR jsonb_array_length(p_tramos)<2 OR jsonb_array_length(p_tramos)>30 THEN
-  RAISE EXCEPTION 'Indica al menos dos tramos y una fuente de verificación válida.' USING ERRCODE='22023';
+ IF length(btrim(coalesce(p_comentario,'')))<5 OR length(p_comentario)>500 THEN
+  RAISE EXCEPTION 'La fuente de verificación debe tener entre 5 y 500 caracteres.' USING ERRCODE='22023';
+ END IF;
+ IF jsonb_typeof(p_tramos) IS DISTINCT FROM 'array' THEN
+  RAISE EXCEPTION 'Los tramos deben enviarse como una lista.' USING ERRCODE='22023';
+ END IF;
+ IF jsonb_array_length(p_tramos)<2 OR jsonb_array_length(p_tramos)>30 THEN
+  RAISE EXCEPTION 'Indica entre dos y treinta tramos.' USING ERRCODE='22023';
  END IF;
  IF EXISTS(SELECT 1 FROM jsonb_array_elements(p_tramos) x(value)
    WHERE jsonb_typeof(x.value)<>'object'
