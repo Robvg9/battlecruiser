@@ -44,7 +44,7 @@ test("owner-approved physical differences stay on the receipt and do not mutate 
   assert.ok(resolver.includes("diferencias_registradas_en_recepcion"));
   assert.ok(resolver.includes("corte_final_origen_modificado',false"));
   assert.ok(resolver.includes("_bc7_crear_inicial_desde_entrega"));
-  assert.doesNotMatch(resolver,/PERFORM public\\.bc7_corregir_inventario_final_jornada/);
+  assert.equal(resolver.includes("PERFORM public.bc7_corregir_inventario_final_jornada"),false);
 });
 test("completed sessions expose read-only viewing but no operational management or rescheduling",()=>{
   assert.ok(jornada.includes("const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status)"));
