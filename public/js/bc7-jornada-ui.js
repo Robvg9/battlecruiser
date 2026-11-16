@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.32 — recepción física legible por producto en pantallas móviles.
+// v7.33 — arranque autenticado y seguro de Jornada e inventario.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
