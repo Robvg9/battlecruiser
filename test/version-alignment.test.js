@@ -308,8 +308,12 @@ test('Administration UI modules refresh their cache keys', () => {
 
 
 test('Light theme cache is pinned and low-glare styles do not use white surfaces', () => {
-  assert.match(app, /\["m27-5-theme-dark-reset\.js","27\.5a2"\]/);
-  assert.ok(sw.includes('./js/m27-5-theme-dark-reset.js?v=27.5a2'));
+  assert.match(app, /\["m27-5-theme-dark-reset\.js","27\.5a3"\]/);
+  assert.ok(sw.includes('./js/m27-5-theme-dark-reset.js?v=27.5a3'));
+  assert.ok(index.includes('js/core.js?v=9.5.115'));
+  assert.ok(index.includes('js/auth.js?v=9.5.115'));
+  assert.ok(sw.includes('./js/core.js?v=9.5.115'));
+  assert.ok(sw.includes('./js/auth.js?v=9.5.115'));
   assert.ok(theme.includes('--stone:#efede5;'));
   assert.ok(theme.includes('--stone-2:#e2ded3;'));
   assert.ok(theme.includes('--text:#202722;'));
