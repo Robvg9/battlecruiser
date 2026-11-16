@@ -491,6 +491,7 @@ BEGIN
     'monto_declarado',v_d.monto,'conteo_fisico_pendiente',true);
 END;
 $function$;
+REVOKE ALL ON FUNCTION public.bc7_resolver_declaracion_jornada(uuid,text,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bc7_resolver_declaracion_jornada(uuid,text,text) TO authenticated;
 
 
@@ -585,6 +586,7 @@ BEGIN
   ORDER BY t.fecha,t.id,p.nombre;
 END;
 $function$;
+REVOKE ALL ON FUNCTION public.bc7_transferencias_pendientes_vinculo_jornada(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bc7_transferencias_pendientes_vinculo_jornada(uuid) TO authenticated;
 
 
@@ -1617,6 +1619,7 @@ BEGIN
     'periodo_operativo_fin',coalesce(v_p.fecha_fin,v_p.fecha),'lineas',v_line_count);
 END;
 $function$;
+REVOKE ALL ON FUNCTION public.bc7_vincular_transferencia_jornada(uuid,uuid,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bc7_vincular_transferencia_jornada(uuid,uuid,text) TO authenticated;
 
 COMMIT;
