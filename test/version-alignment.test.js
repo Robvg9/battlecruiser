@@ -190,14 +190,14 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/productos\.js\?v=20261111\.2"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261111\.2/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.118"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.117"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.118 — Registro PWA temprano y arranque autenticado de Jornada/);
+  assert.match(app, /v9\.5\.118 — Recepción física de inventario compartido en dos pasos/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.118"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.115',
