@@ -29,7 +29,7 @@ BEGIN
     RAISE EXCEPTION 'Late FINAL correction does not safely synchronize and audit an unreceived handover.';
   END IF;
 
-  IF position('bc7_corregir_inventario_final_jornada' IN v_resolver)>0
+  IF position('PERFORM public.bc7_corregir_inventario_final_jornada' IN v_resolver)>0
      OR position('corte_final_origen_modificado'',false' IN v_resolver)=0
      OR position('diferencias_registradas_en_recepcion' IN v_resolver)=0 THEN
     RAISE EXCEPTION 'Receipt approval must preserve the closed source FINAL and record physical differences in the receipt.';
