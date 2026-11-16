@@ -39,4 +39,16 @@ BEGIN
     RAISE EXCEPTION 'Append-only mutation blocker trigger is missing.';
   END IF;
 END;
+
+  IF (
+    SELECT count(*) FROM pg_indexes
+    WHERE schemaname='public'
+      AND indexname IN (
+        'turno_jornada_rect_post_cierre_turno_idx',
+        'turno_jornada_rect_post_cierre_producto_idx',
+        'turno_jornada_rect_post_cierre_actor_idx'
+      )
+  ) <> 3 THEN
+    RAISE EXCEPTION 'Post-close rectification foreign-key indexes are missing.';
+  END IF;
 $contract$;
