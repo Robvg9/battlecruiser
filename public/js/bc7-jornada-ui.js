@@ -309,9 +309,14 @@
 
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const canAdjust=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
+    const sessionIsOpen=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO';
+    const canAdjust=sessionIsOpen&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
+    const canCreateReinvestment=sessionIsOpen&&isAssigned&&can('reinversiones','crear');
+    // Reinversiones must use the live active-product catalog too: the inventory
+    // snapshot can omit products with zero opening stock or products added later.
+    const needsProductCatalog=canAdjust||canCreateReinvestment;
     const checklistPromise=rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
-    const adjustmentPromise=canAdjust
+    const adjustmentPromise=needsProductCatalog
       ?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId})
       :Promise.resolve([]);
     const liquidationPromise=detail.sesion.es_minorista===true
@@ -538,7 +543,9 @@
   }
   function financeFormHtml(detail,isAssigned,status){
     const sessionId=detail.sesion.id;
-    const products=arr(detail.productos);
+    // Use the server's current active-product catalog for reinvestments;
+    // the immutable opening inventory is not a product catalogue.
+    const products=Array.isArray(detail.productos_ajuste)?detail.productos_ajuste:arr(detail.productos);
     const isRetail=detail.sesion.es_minorista===true;
     const isOwner=can('reinversiones','editar_any');
     const showExpenses=state.admin||isAssigned;
