@@ -58,10 +58,12 @@ function createWorker(options = {}) {
     }
     return new Response('network:' + new URL(request.url).pathname, { status: 200 });
   });
+  // Keep a stable VM fetch function whose closure observes later online/offline changes.
+  const fetchAdapter = function(request) { return networkFetch(request); };
   vm.runInNewContext(source, {
     self: self,
     caches: caches,
-    fetch: networkFetch,
+    fetch: fetchAdapter,
     Request: Request,
     Response: Response,
     URL: URL,
