@@ -479,7 +479,8 @@
     const rest=!r.trabaja||r.estado==='DESCANSO';
     const pill=rest?'<span class="bc7-pill">Descanso</span>':status==='COMPLETADA'?'<span class="bc7-pill ok">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':status==='PROGRAMADA'||status==='PENDIENTE'?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
     const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status);
-    const action=(!rest&&!isTerminal&&r.sesion_id)?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">Gestionar jornada</button>':'';
+    const viewable=status==='COMPLETADA';
+    const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     let reschedule='';
     if(state.admin&&!isTerminal){
       reschedule='<details class="bc7-reschedule"><summary>Reprogramar responsable / descanso</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-check"><input type="checkbox" data-bc7-rework '+(!rest?'checked':'')+'> Jornada laborable</label><label class="bc7-field">Responsable<select data-bc7-reperson '+(rest||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Ausencia, sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reprogramación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
